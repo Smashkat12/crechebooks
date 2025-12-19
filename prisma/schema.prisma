@@ -1,5 +1,4 @@
 // CrecheBooks Prisma Schema
-// This is the base configuration. Entity models will be added in subsequent tasks.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,5 +8,46 @@ datasource db {
   provider = "postgresql"
 }
 
-// Entity models will be added in TASK-CORE-002 and subsequent tasks.
-// This file establishes the database connection configuration only.
+// ============================================
+// ENUMS
+// ============================================
+
+enum TaxStatus {
+  VAT_REGISTERED
+  NOT_REGISTERED
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model Tenant {
+  id                   String             @id @default(uuid())
+  name                 String             @db.VarChar(200)
+  tradingName          String?            @map("trading_name") @db.VarChar(200)
+  registrationNumber   String?            @map("registration_number") @db.VarChar(50)
+  vatNumber            String?            @map("vat_number") @db.VarChar(20)
+  taxStatus            TaxStatus          @default(NOT_REGISTERED) @map("tax_status")
+  addressLine1         String             @map("address_line1") @db.VarChar(200)
+  addressLine2         String?            @map("address_line2") @db.VarChar(200)
+  city                 String             @db.VarChar(100)
+  province             String             @db.VarChar(50)
+  postalCode           String             @map("postal_code") @db.VarChar(10)
+  phone                String             @db.VarChar(20)
+  email                String             @unique @db.VarChar(255)
+  xeroTenantId         String?            @unique @map("xero_tenant_id") @db.VarChar(50)
+  subscriptionStatus   SubscriptionStatus @default(TRIAL) @map("subscription_status")
+  invoiceDayOfMonth    Int                @default(1) @map("invoice_day_of_month")
+  invoiceDueDays       Int                @default(7) @map("invoice_due_days")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  @@map("tenants")
+}

@@ -1,7 +1,7 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-CORE-002 Completed)
+2025-12-20 by AI Agent (TASK-CORE-003 Completed)
 
 ## Current Focus
 CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
@@ -11,80 +11,114 @@ CrecheBooks is an AI-powered bookkeeping system for South African creches and pr
 
 ## Active Task
 **Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001, TASK-CORE-002
-**Next**: TASK-CORE-003 (User Entity and Authentication Types)
+**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003
+**Next**: TASK-CORE-004 (Audit Log Entity and Trail System)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
 
 ---
 
-## TASK-CORE-002 Summary (COMPLETED)
+## TASK-CORE-003 Summary (COMPLETED)
 
 ### What Was Built
-- PrismaModule and PrismaService with Prisma 7 adapter pattern
-- Tenant model in Prisma schema with TaxStatus and SubscriptionStatus enums
-- Database migration creating tenants table
-- ITenant TypeScript interface
-- CreateTenantDto and UpdateTenantDto with class-validator decorators
-- TenantRepository with full CRUD operations
-- Comprehensive error handling with custom exceptions
-- 16 integration tests using REAL database (no mocks)
+- User model in Prisma schema with UserRole enum
+- Database migration creating users table
+- IUser TypeScript interface
+- CreateUserDto and UpdateUserDto with class-validator
+- UserRepository with 8 methods (create, findById, findByAuth0Id, findByTenantAndEmail, findByTenant, update, updateLastLogin, deactivate)
+- Comprehensive error handling with fail-fast pattern
+- 21 integration tests using REAL database (no mocks)
 
 ### Key Files Created
 ```
 src/database/
-├── prisma/
-│   ├── prisma.service.ts      # Prisma client with lifecycle hooks
-│   ├── prisma.module.ts       # Global module
-│   └── index.ts
 ├── entities/
-│   ├── tenant.entity.ts       # ITenant interface, enums
-│   └── index.ts
+│   ├── user.entity.ts         # IUser interface, UserRole enum
+│   └── index.ts               # Updated
 ├── dto/
-│   ├── tenant.dto.ts          # CreateTenantDto, UpdateTenantDto
-│   └── index.ts
+│   ├── user.dto.ts            # CreateUserDto, UpdateUserDto
+│   └── index.ts               # Updated
 ├── repositories/
-│   ├── tenant.repository.ts   # CRUD with error handling
-│   └── index.ts
-├── database.module.ts
-└── index.ts
+│   ├── user.repository.ts     # 8 methods with error handling
+│   └── index.ts               # Updated
+├── database.module.ts         # Updated with UserRepository
 
 prisma/
-├── schema.prisma              # Tenant model added
+├── schema.prisma              # User model, UserRole enum added
 └── migrations/
-    └── 20251219225823_create_tenants/
+    └── 20251219233350_create_users/
 
 tests/database/repositories/
-└── tenant.repository.spec.ts  # 16 tests with real DB
+└── user.repository.spec.ts    # 21 tests with real DB
 ```
 
 ### Commits
-- `9d295fc` - feat(database): implement Tenant entity and PrismaModule (TASK-CORE-002)
-- `4537c35` - chore: update AI context, Claude Code config, and task specs
+- Latest commit includes User entity implementation
 
 ### Verification
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 78 unit + 1 e2e (all passing)
+- Tests: 99 unit + 1 e2e (all passing)
 
 ---
 
-## TASK-CORE-003 Requirements (NEXT)
+## Current Project State
+
+### Prisma Schema (prisma/schema.prisma)
+```
+Enums: TaxStatus, SubscriptionStatus, UserRole
+Models: Tenant, User
+```
+
+### Migrations Applied
+1. `20251219225823_create_tenants`
+2. `20251219233350_create_users`
+
+### Project Structure
+```
+crechebooks/
+├── src/
+│   ├── app.module.ts
+│   ├── main.ts
+│   ├── config/
+│   ├── health/
+│   ├── database/
+│   │   ├── prisma/            # PrismaService, PrismaModule
+│   │   ├── entities/          # ITenant, IUser, enums
+│   │   ├── dto/               # Tenant, User DTOs
+│   │   └── repositories/      # TenantRepository, UserRepository
+│   └── shared/
+│       ├── constants/
+│       ├── exceptions/        # Custom exceptions
+│       ├── interfaces/
+│       └── utils/             # Money, Date utilities
+├── prisma/
+│   ├── schema.prisma
+│   └── migrations/
+├── prisma.config.ts           # Prisma 7 config
+├── tests/
+│   ├── shared/
+│   └── database/
+└── test/
+```
+
+---
+
+## TASK-CORE-004 Requirements (NEXT)
 
 ### Purpose
-Create the User entity for authentication and authorization. Users belong to a Tenant and have roles.
+Create the AuditLog entity for immutable audit trail. This is CRITICAL for financial compliance.
 
-### Key Deliverables
-1. User model in Prisma schema with Role enum
-2. Database migration for users table
-3. TypeScript interface IUser
-4. CreateUserDto and UpdateUserDto
-5. UserRepository with CRUD operations
-6. Integration tests with REAL database
+### Key Differences from Previous Tasks
+1. **IMMUTABLE TABLE** - Database rules prevent UPDATE/DELETE
+2. **No foreign keys** - Intentional, to maintain immutability if parent records deleted
+3. **Service instead of Repository** - Uses AuditLogService pattern
+4. **7 action types** - CREATE, UPDATE, DELETE, CATEGORIZE, MATCH, RECONCILE, SUBMIT
 
 ### Dependencies
 - TASK-CORE-002 (Tenant entity) - COMPLETED
+- Note: Does NOT depend on TASK-CORE-003 (User) - userId is just a string, not FK
 
 ---
 
@@ -94,6 +128,7 @@ Create the User entity for authentication and authorization. Users belong to a T
 | 2025-12-20 | Prisma 7 adapter pattern | Pool + PrismaPg adapter in service |
 | 2025-12-20 | Tests use real database | No mocks, DATABASE_URL required |
 | 2025-12-20 | Fail fast philosophy | Errors logged fully, then re-thrown |
+| 2025-12-20 | Repository pattern | CRUD in repositories, not services |
 
 ---
 
@@ -101,7 +136,7 @@ Create the User entity for authentication and authorization. Users belong to a T
 - Constitution: `specs/constitution.md`
 - Data Models: `specs/technical/data-models.md`
 - Task Index: `specs/tasks/_index.md`
-- Task Spec: `specs/tasks/TASK-CORE-003.md`
+- Task Spec: `specs/tasks/TASK-CORE-004.md`
 - Progress: `.ai/progress.md`
 - Decisions: `.ai/decisionLog.md`
 
@@ -118,11 +153,11 @@ pnpm run test:e2e # E2E tests must pass
 ---
 
 ## Current Blockers
-- None - Ready to proceed with TASK-CORE-003
+- None - Ready to proceed with TASK-CORE-004
 
 ---
 
 ## Session Notes
-TASK-CORE-002 completed successfully with all tests passing.
-Project pushed to GitHub with 2 commits.
-Ready to proceed with User entity implementation.
+TASK-CORE-003 completed with 99 unit tests + 1 e2e passing.
+Foundation Layer: 3/15 tasks complete (20%).
+Next: Audit Log Entity (immutable table with database rules).

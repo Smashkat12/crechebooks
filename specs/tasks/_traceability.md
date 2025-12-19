@@ -12,7 +12,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Tech Spec Item | Type | Covered by Task ID | Status |
 |----------------|------|-------------------|--------|
 | Tenant entity | data_model | TASK-CORE-002 | ✅ Complete |
-| User entity | data_model | TASK-CORE-003 | Pending |
+| User entity | data_model | TASK-CORE-003 | ✅ Complete |
 | AuditLog entity | data_model | TASK-CORE-004 | Pending |
 | Transaction entity | data_model | TASK-TRANS-001 | Pending |
 | Categorization entity | data_model | TASK-TRANS-002 | Pending |

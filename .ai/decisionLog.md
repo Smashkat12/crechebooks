@@ -259,6 +259,44 @@ constructor() {
 
 ---
 
+---
+
+## DEC-017: Repository Pattern for CRUD
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Use Repository pattern for database CRUD, Service pattern for business logic
+
+**Context**: TASK-CORE-003 required UserRepository
+
+**Implementation**:
+- `TenantRepository` and `UserRepository` in `src/database/repositories/`
+- Repositories handle CRUD operations with error handling
+- Services (future) will handle business logic that spans entities
+
+**Consequences**:
+- Clear separation of concerns
+- Repositories are injected via NestJS DI
+- DatabaseModule exports all repositories
+
+---
+
+## DEC-018: Test Cleanup Order
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: In tests, delete child records before parent records
+
+**Context**: Foreign key constraints require proper cleanup order
+
+**Implementation**:
+```typescript
+beforeEach(async () => {
+  await prisma.user.deleteMany({});   // Child first
+  await prisma.tenant.deleteMany({}); // Parent second
+});
+```
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
@@ -266,3 +304,4 @@ constructor() {
 | 2025-12-19 | DEC-001 through DEC-009 documented | AI Agent |
 | 2025-12-20 | DEC-010 through DEC-014 added (TASK-CORE-001 learnings) | AI Agent |
 | 2025-12-20 | DEC-015, DEC-016 added (TASK-CORE-002 learnings) | AI Agent |
+| 2025-12-20 | DEC-017, DEC-018 added (TASK-CORE-003 learnings) | AI Agent |

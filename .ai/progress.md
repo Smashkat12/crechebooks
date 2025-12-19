@@ -38,8 +38,8 @@
 ### Tasks (15 total)
 - [x] **TASK-CORE-001**: Project Setup and Base Configuration - **COMPLETED 2025-12-20**
 - [x] **TASK-CORE-002**: Tenant Entity and Migration - **COMPLETED 2025-12-20**
-- [ ] TASK-CORE-003: User Entity and Authentication Types ← **NEXT**
-- [ ] TASK-CORE-004: Audit Log Entity and Trail System
+- [x] **TASK-CORE-003**: User Entity and Authentication Types - **COMPLETED 2025-12-20**
+- [ ] TASK-CORE-004: Audit Log Entity and Trail System ← **NEXT**
 - [ ] TASK-TRANS-001: Transaction Entity and Migration
 - [ ] TASK-TRANS-002: Categorization Entity and Types
 - [ ] TASK-TRANS-003: Payee Pattern Entity
@@ -52,7 +52,7 @@
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 2/15 (13%)**
+**Progress: 3/15 (20%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -82,72 +82,29 @@
 - Comprehensive error handling (fail-fast, no swallowing)
 - 16 integration tests using REAL database (no mocks)
 
+### TASK-CORE-003 Completion Summary
+**Date**: 2025-12-20
+**Commit**: (latest)
+
+**Implemented**:
+- UserRole enum in Prisma schema (OWNER, ADMIN, VIEWER, ACCOUNTANT)
+- User model with bidirectional relation to Tenant
+- Database migration for users table (20251219233350_create_users)
+- IUser TypeScript interface
+- CreateUserDto and UpdateUserDto with class-validator
+- UserRepository with 8 methods:
+  - create, findById, findByAuth0Id
+  - findByTenantAndEmail, findByTenant
+  - update, updateLastLogin, deactivate
+- Fail-fast error handling on all methods
+- 21 integration tests using REAL database (no mocks)
+
 **Verification**:
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 78 unit + 1 e2e (all passing)
+- Tests: 99 unit + 1 e2e (all passing)
 
 **GitHub**: https://github.com/Smashkat12/crechebooks
-
----
-
-## Phase 2: Logic Layer
-
-### Tasks (21 total)
-- [ ] TASK-TRANS-011: Transaction Import Service
-- [ ] TASK-TRANS-012: Transaction Categorization Service
-- [ ] TASK-TRANS-013: Payee Pattern Learning Service
-- [ ] TASK-TRANS-014: Xero Sync Service
-- [ ] TASK-BILL-011: Enrollment Management Service
-- [ ] TASK-BILL-012: Invoice Generation Service
-- [ ] TASK-BILL-013: Invoice Delivery Service
-- [ ] TASK-BILL-014: Pro-rata Calculation Service
-- [ ] TASK-PAY-011: Payment Matching Service
-- [ ] TASK-PAY-012: Payment Allocation Service
-- [ ] TASK-PAY-013: Arrears Calculation Service
-- [ ] TASK-PAY-014: Payment Reminder Service
-- [ ] TASK-SARS-011: VAT Calculation Service
-- [ ] TASK-SARS-012: PAYE Calculation Service
-- [ ] TASK-SARS-013: UIF Calculation Service
-- [ ] TASK-SARS-014: VAT201 Generation Service
-- [ ] TASK-SARS-015: EMP201 Generation Service
-- [ ] TASK-SARS-016: IRP5 Generation Service
-- [ ] TASK-RECON-011: Bank Reconciliation Service
-- [ ] TASK-RECON-012: Discrepancy Detection Service
-- [ ] TASK-RECON-013: Financial Report Service
-
-**Progress: 0/21 (0%)**
-
----
-
-## Phase 3: Agent Layer
-
-### Tasks (5 total)
-- [ ] TASK-AGENT-001: Claude Code Configuration and Context
-- [ ] TASK-AGENT-002: Transaction Categorizer Agent
-- [ ] TASK-AGENT-003: Payment Matcher Agent
-- [ ] TASK-AGENT-004: SARS Calculation Agent
-- [ ] TASK-AGENT-005: Orchestrator Agent Setup
-
-**Progress: 0/5 (0%)**
-
----
-
-## Phase 4: Surface Layer
-
-### Tasks (16 total)
-- [ ] TASK-API-001 through TASK-RECON-032
-
-**Progress: 0/16 (0%)**
-
----
-
-## Phase 5: Integration & Testing
-
-### Tasks (5 total)
-- [ ] TASK-INT-001 through TASK-INT-005
-
-**Progress: 0/5 (0%)**
 
 ---
 
@@ -156,11 +113,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 2 |
+| Completed | 3 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 60 |
-| **Overall Progress** | **3.2%** |
+| Remaining | 59 |
+| **Overall Progress** | **4.8%** |
 
 ---
 
@@ -195,7 +152,7 @@
 1. **Prisma 7 Breaking Change**: Database URL must be in `prisma.config.ts`, NOT in schema.prisma
 2. **Package Manager**: Use pnpm (not npm)
 3. **NestJS Version**: 11.x
-4. **E2E Tests**: Must be updated when default endpoints change (broken test fixed)
+4. **E2E Tests**: Must be updated when default endpoints change
 5. **Type Safety**: ESLint enforces strict typing on test assertions
 
 ### Key Learnings from TASK-CORE-002
@@ -203,6 +160,23 @@
 2. **Real Database Tests**: Tests connect to actual PostgreSQL, no mocks
 3. **Error Handling**: All errors logged with full context before re-throwing
 4. **Migration**: `npx prisma migrate dev --name create_tenants` creates migration
+
+### Key Learnings from TASK-CORE-003
+1. **Composite Unique**: `@@unique([tenantId, email])` creates compound unique constraint
+2. **Prisma Naming**: Use `tenantId_email` for compound unique in where clause
+3. **Bidirectional Relations**: Add `users User[]` to parent model (Tenant)
+4. **Repository Methods**: 8 standard methods cover all use cases
+5. **Test Cleanup**: Delete child records (users) before parent (tenants) due to FK
+
+### Current Database State
+```prisma
+Enums: TaxStatus, SubscriptionStatus, UserRole
+Models: Tenant (with users relation), User (with tenant relation)
+```
+
+### Applied Migrations
+1. `20251219225823_create_tenants` - Tenant table
+2. `20251219233350_create_users` - User table with FK to tenants
 
 ### Project Structure
 ```
@@ -212,22 +186,42 @@ crechebooks/
 │   ├── main.ts
 │   ├── config/
 │   ├── health/
-│   ├── database/           # NEW in TASK-CORE-002
+│   ├── database/
 │   │   ├── prisma/
+│   │   │   ├── prisma.service.ts
+│   │   │   ├── prisma.module.ts
+│   │   │   └── index.ts
 │   │   ├── entities/
+│   │   │   ├── tenant.entity.ts
+│   │   │   ├── user.entity.ts
+│   │   │   └── index.ts
 │   │   ├── dto/
-│   │   └── repositories/
+│   │   │   ├── tenant.dto.ts
+│   │   │   ├── user.dto.ts
+│   │   │   └── index.ts
+│   │   ├── repositories/
+│   │   │   ├── tenant.repository.ts
+│   │   │   ├── user.repository.ts
+│   │   │   └── index.ts
+│   │   ├── database.module.ts
+│   │   └── index.ts
 │   └── shared/
 │       ├── constants/
 │       ├── exceptions/
+│       │   ├── base.exception.ts
+│       │   └── index.ts
 │       ├── interfaces/
 │       └── utils/
 ├── prisma/
 │   ├── schema.prisma
-│   └── migrations/         # NEW in TASK-CORE-002
+│   └── migrations/
 ├── prisma.config.ts
 ├── tests/
 │   ├── shared/
-│   └── database/           # NEW in TASK-CORE-002
+│   └── database/
+│       └── repositories/
+│           ├── tenant.repository.spec.ts
+│           └── user.repository.spec.ts
 └── test/
+    └── app.e2e-spec.ts
 ```

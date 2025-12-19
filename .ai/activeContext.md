@@ -1,7 +1,7 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-CORE-001 Completed)
+2025-12-20 by AI Agent (TASK-CORE-002 Completed)
 
 ## Current Focus
 CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
@@ -11,87 +11,88 @@ CrecheBooks is an AI-powered bookkeeping system for South African creches and pr
 
 ## Active Task
 **Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001 (Project Setup)
-**Next**: TASK-CORE-002 (Tenant Entity and Migration)
+**Completed**: TASK-CORE-001, TASK-CORE-002
+**Next**: TASK-CORE-003 (User Entity and Authentication Types)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
 
 ---
 
-## TASK-CORE-001 Summary (COMPLETED)
+## TASK-CORE-002 Summary (COMPLETED)
 
 ### What Was Built
-- NestJS 11 project with TypeScript strict mode
-- Prisma 7 ORM with PostgreSQL configuration
-- ConfigModule with fail-fast environment validation
-- Money utility class (Decimal.js with banker's rounding)
-- Date utility (Africa/Johannesburg timezone)
-- Base exception classes
-- Health endpoint at GET /health
-- 63 passing tests (62 unit + 1 e2e)
+- PrismaModule and PrismaService with Prisma 7 adapter pattern
+- Tenant model in Prisma schema with TaxStatus and SubscriptionStatus enums
+- Database migration creating tenants table
+- ITenant TypeScript interface
+- CreateTenantDto and UpdateTenantDto with class-validator decorators
+- TenantRepository with full CRUD operations
+- Comprehensive error handling with custom exceptions
+- 16 integration tests using REAL database (no mocks)
 
 ### Key Files Created
 ```
-src/
-├── app.module.ts              # Root module
-├── main.ts                    # Bootstrap with fail-fast
-├── config/                    # Environment configuration
-├── health/                    # Health check endpoint
-└── shared/
-    ├── constants/             # VAT_RATE, TIMEZONE, etc.
-    ├── exceptions/            # AppException, ValidationException, etc.
-    ├── interfaces/            # IBaseEntity, IMoney, etc.
-    └── utils/                 # Money, DateUtil classes
+src/database/
+├── prisma/
+│   ├── prisma.service.ts      # Prisma client with lifecycle hooks
+│   ├── prisma.module.ts       # Global module
+│   └── index.ts
+├── entities/
+│   ├── tenant.entity.ts       # ITenant interface, enums
+│   └── index.ts
+├── dto/
+│   ├── tenant.dto.ts          # CreateTenantDto, UpdateTenantDto
+│   └── index.ts
+├── repositories/
+│   ├── tenant.repository.ts   # CRUD with error handling
+│   └── index.ts
+├── database.module.ts
+└── index.ts
+
 prisma/
-└── schema.prisma              # Base schema (NO MODELS YET)
-prisma.config.ts               # Prisma 7 datasource configuration
+├── schema.prisma              # Tenant model added
+└── migrations/
+    └── 20251219225823_create_tenants/
+
+tests/database/repositories/
+└── tenant.repository.spec.ts  # 16 tests with real DB
 ```
 
-### Technical Configuration
-- **Package Manager**: pnpm (NOT npm)
-- **NestJS**: 11.x
-- **Prisma**: 7.x (breaking change: uses prisma.config.ts)
-- **Node.js**: 20.x required
+### Commits
+- `9d295fc` - feat(database): implement Tenant entity and PrismaModule (TASK-CORE-002)
+- `4537c35` - chore: update AI context, Claude Code config, and task specs
+
+### Verification
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 78 unit + 1 e2e (all passing)
 
 ---
 
-## TASK-CORE-002 Requirements (NEXT)
+## TASK-CORE-003 Requirements (NEXT)
 
 ### Purpose
-Create the Tenant entity - the FIRST database model. All other entities will reference tenant_id for multi-tenancy.
+Create the User entity for authentication and authorization. Users belong to a Tenant and have roles.
 
 ### Key Deliverables
-1. PrismaModule and PrismaService (database connection)
-2. Tenant model in Prisma schema with enums
-3. Database migration for tenants table
-4. TypeScript interface ITenant
-5. CreateTenantDto and UpdateTenantDto
-6. TenantRepository with CRUD operations
-7. Integration tests with REAL database
+1. User model in Prisma schema with Role enum
+2. Database migration for users table
+3. TypeScript interface IUser
+4. CreateUserDto and UpdateUserDto
+5. UserRepository with CRUD operations
+6. Integration tests with REAL database
 
-### Critical Requirements
-- NO mock data in tests
-- Fail fast with robust error logging
-- NO workarounds or fallbacks
-- All fields must match specs/technical/data-models.md
-
-### Files to Create
-- `src/database/prisma/prisma.service.ts`
-- `src/database/prisma/prisma.module.ts`
-- `src/database/entities/tenant.entity.ts`
-- `src/database/dto/tenant.dto.ts`
-- `src/database/repositories/tenant.repository.ts`
-- `tests/database/repositories/tenant.repository.spec.ts`
+### Dependencies
+- TASK-CORE-002 (Tenant entity) - COMPLETED
 
 ---
 
 ## Recent Decisions
 | Date | Decision | Impact |
 |------|----------|--------|
-| 2025-12-20 | Prisma 7 uses prisma.config.ts | URL NOT in schema.prisma |
-| 2025-12-20 | pnpm as package manager | Use `pnpm run`, not `npm run` |
-| 2025-12-20 | No mock data in tests | Tests require real DATABASE_URL |
+| 2025-12-20 | Prisma 7 adapter pattern | Pool + PrismaPg adapter in service |
+| 2025-12-20 | Tests use real database | No mocks, DATABASE_URL required |
 | 2025-12-20 | Fail fast philosophy | Errors logged fully, then re-thrown |
 
 ---
@@ -100,7 +101,7 @@ Create the Tenant entity - the FIRST database model. All other entities will ref
 - Constitution: `specs/constitution.md`
 - Data Models: `specs/technical/data-models.md`
 - Task Index: `specs/tasks/_index.md`
-- Task Spec: `specs/tasks/TASK-CORE-002.md`
+- Task Spec: `specs/tasks/TASK-CORE-003.md`
 - Progress: `.ai/progress.md`
 - Decisions: `.ai/decisionLog.md`
 
@@ -117,12 +118,11 @@ pnpm run test:e2e # E2E tests must pass
 ---
 
 ## Current Blockers
-- [ ] PostgreSQL database must be running for TASK-CORE-002
-- [ ] DATABASE_URL must be set in .env
+- None - Ready to proceed with TASK-CORE-003
 
 ---
 
 ## Session Notes
-TASK-CORE-001 completed successfully. Project pushed to GitHub.
-TASK-CORE-002.md updated with comprehensive context for AI agent execution.
-Ready to proceed with Tenant entity implementation.
+TASK-CORE-002 completed successfully with all tests passing.
+Project pushed to GitHub with 2 commits.
+Ready to proceed with User entity implementation.

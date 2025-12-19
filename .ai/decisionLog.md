@@ -220,9 +220,49 @@ model Tenant {
 
 ---
 
+## DEC-015: Prisma 7 Adapter Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Use Pool + PrismaPg adapter for database connections in Prisma 7
+
+**Context**: Prisma 7 requires explicit adapter configuration for database connections
+
+**Implementation**:
+```typescript
+// src/database/prisma/prisma.service.ts
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+
+constructor() {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const adapter = new PrismaPg(pool);
+  super({ adapter });
+  this.pool = pool;
+}
+```
+
+**Consequences**:
+- Must close pool in onModuleDestroy
+- DATABASE_URL validation happens in constructor (fail-fast)
+
+---
+
+## DEC-016: Global PrismaModule
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: PrismaModule is @Global() so PrismaService is available everywhere
+
+**Rationale**:
+- All repositories need database access
+- Avoids importing PrismaModule in every feature module
+- Single source of truth for database connection
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
 |------|----------|--------|
 | 2025-12-19 | DEC-001 through DEC-009 documented | AI Agent |
 | 2025-12-20 | DEC-010 through DEC-014 added (TASK-CORE-001 learnings) | AI Agent |
+| 2025-12-20 | DEC-015, DEC-016 added (TASK-CORE-002 learnings) | AI Agent |

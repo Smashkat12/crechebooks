@@ -37,8 +37,8 @@
 
 ### Tasks (15 total)
 - [x] **TASK-CORE-001**: Project Setup and Base Configuration - **COMPLETED 2025-12-20**
-- [ ] TASK-CORE-002: Tenant Entity and Migration ← **NEXT**
-- [ ] TASK-CORE-003: User Entity and Authentication Types
+- [x] **TASK-CORE-002**: Tenant Entity and Migration - **COMPLETED 2025-12-20**
+- [ ] TASK-CORE-003: User Entity and Authentication Types ← **NEXT**
 - [ ] TASK-CORE-004: Audit Log Entity and Trail System
 - [ ] TASK-TRANS-001: Transaction Entity and Migration
 - [ ] TASK-TRANS-002: Categorization Entity and Types
@@ -52,7 +52,7 @@
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 1/15 (7%)**
+**Progress: 2/15 (13%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -68,10 +68,24 @@
 - Health endpoint at GET /health
 - 62 unit tests + 1 e2e test (all passing)
 
+### TASK-CORE-002 Completion Summary
+**Date**: 2025-12-20
+**Commit**: 9d295fc
+
+**Implemented**:
+- PrismaModule and PrismaService with Prisma 7 adapter pattern
+- Tenant model with TaxStatus and SubscriptionStatus enums
+- Database migration for tenants table
+- ITenant TypeScript interface
+- CreateTenantDto and UpdateTenantDto with validation
+- TenantRepository with full CRUD operations
+- Comprehensive error handling (fail-fast, no swallowing)
+- 16 integration tests using REAL database (no mocks)
+
 **Verification**:
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 63 total (62 unit + 1 e2e)
+- Tests: 78 unit + 1 e2e (all passing)
 
 **GitHub**: https://github.com/Smashkat12/crechebooks
 
@@ -142,11 +156,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 1 |
+| Completed | 2 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 61 |
-| **Overall Progress** | **1.6%** |
+| Remaining | 60 |
+| **Overall Progress** | **3.2%** |
 
 ---
 
@@ -184,6 +198,12 @@
 4. **E2E Tests**: Must be updated when default endpoints change (broken test fixed)
 5. **Type Safety**: ESLint enforces strict typing on test assertions
 
+### Key Learnings from TASK-CORE-002
+1. **Prisma 7 Adapter**: Requires Pool + PrismaPg adapter for database connections
+2. **Real Database Tests**: Tests connect to actual PostgreSQL, no mocks
+3. **Error Handling**: All errors logged with full context before re-throwing
+4. **Migration**: `npx prisma migrate dev --name create_tenants` creates migration
+
 ### Project Structure
 ```
 crechebooks/
@@ -192,14 +212,22 @@ crechebooks/
 │   ├── main.ts
 │   ├── config/
 │   ├── health/
+│   ├── database/           # NEW in TASK-CORE-002
+│   │   ├── prisma/
+│   │   ├── entities/
+│   │   ├── dto/
+│   │   └── repositories/
 │   └── shared/
 │       ├── constants/
 │       ├── exceptions/
 │       ├── interfaces/
 │       └── utils/
 ├── prisma/
-│   └── schema.prisma
+│   ├── schema.prisma
+│   └── migrations/         # NEW in TASK-CORE-002
 ├── prisma.config.ts
 ├── tests/
+│   ├── shared/
+│   └── database/           # NEW in TASK-CORE-002
 └── test/
 ```

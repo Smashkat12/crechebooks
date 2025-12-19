@@ -1,0 +1,13 @@
+// CrecheBooks Prisma Schema
+// This is the base configuration. Entity models will be added in subsequent tasks.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Entity models will be added in TASK-CORE-002 and subsequent tasks.
+// This file establishes the database connection configuration only.

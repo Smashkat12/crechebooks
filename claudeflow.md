@@ -34,9 +34,15 @@ npx claude-flow@alpha init
 npx claude-flow@alpha agent memory init      # 88% success vs 60%
 npx claude-flow@alpha agent memory status
 
-# Memory
-npx claude-flow memory store --namespace "project/area" --key "name" --value '{...}'
-npx claude-flow memory retrieve --key "project/area/name"
+# Memory (CORRECT SYNTAX - positional args, not flags)
+npx claude-flow memory store "<key>" '<json-value>' -n "<namespace>"
+npx claude-flow memory get "<key>" -n "<namespace>"
+npx claude-flow memory list -n "<namespace>"
+npx claude-flow memory delete "<key>" -n "<namespace>"
+
+# Examples:
+npx claude-flow memory store "agent1/output" '{"files":["a.ts"],"status":"done"}' -n "project/task"
+npx claude-flow memory get "agent1/output" -n "project/task"
 
 # Coordination
 npx claude-flow coordination swarm-init --topology [centralized|hierarchical|mesh]
@@ -73,20 +79,20 @@ Task("[agent-type]", `
   ## WORKFLOW CONTEXT
   Agent #N of M | Previous: [what, where stored] | Next: [who, what they need]
 
-  ## MEMORY RETRIEVAL
-  npx claude-flow memory retrieve --key "project/[namespace]"
+  ## MEMORY RETRIEVAL (use `get` with positional key, -n for namespace)
+  npx claude-flow memory get "<key>" -n "project/[namespace]"
   Understand: [schemas/decisions/constraints from previous agents]
 
-  ## MEMORY STORAGE (For Next Agents)
-  1. For [Next Agent]: key "project/[ns]/[key]" - [what/why]
-  2. For [Future Agent]: key "project/[ns]/[key]" - [what/why]
+  ## MEMORY STORAGE (use `store` with positional key + value, -n for namespace)
+  1. For [Next Agent]: npx claude-flow memory store "<key>" '<json>' -n "project/[ns]"
+  2. For [Future Agent]: npx claude-flow memory store "<key>" '<json>' -n "project/[ns]"
 
   ## STEPS
-  1. Retrieve memories
+  1. Retrieve memories: npx claude-flow memory get "<key>" -n "<ns>"
   2. Validate data
   3. Execute task
-  4. Store memories
-  5. Verify: npx claude-flow memory retrieve --key "[your-key]"
+  4. Store memories: npx claude-flow memory store "<key>" '<json>' -n "<ns>"
+  5. Verify: npx claude-flow memory get "<key>" -n "<ns>"
 
   ## SUCCESS
   - Task complete
@@ -110,19 +116,19 @@ TodoWrite({ todos: [
 Task("backend-dev", `
   ## TASK: Implement backend feature
   ## CONTEXT: Agent #1/4 | Next: Integration (needs schema), UI (needs viz), Tests (needs endpoints)
-  ## RETRIEVAL: npx claude-flow memory retrieve --key "project/analysis/feature"
-  ## STORAGE:
-  1. For Integration: "project/events/schema" - TypeScript interface
-  2. For UI: "project/frontend/requirements" - viz specs
-  3. For Tests: "project/api/changes" - test scenarios
+  ## RETRIEVAL: npx claude-flow memory get "analysis/feature" -n "project"
+  ## STORAGE (store for next agents):
+  1. For Integration: npx claude-flow memory store "events/schema" '{"interface":"..."}' -n "project"
+  2. For UI: npx claude-flow memory store "frontend/requirements" '{"specs":"..."}' -n "project"
+  3. For Tests: npx claude-flow memory store "api/changes" '{"endpoints":"..."}' -n "project"
 `)
 
 # Agent 2: Integration (Message 2 - WAIT)
 Task("coder", `
   ## TASK: Update integration types
   ## CONTEXT: Agent #2/4 | Previous: Backend ✓ | Next: UI, Tests
-  ## RETRIEVAL: npx claude-flow memory retrieve --key "project/events/schema"
-  ## STORAGE: For UI: "project/frontend/handler" - subscription pattern
+  ## RETRIEVAL: npx claude-flow memory get "events/schema" -n "project"
+  ## STORAGE: npx claude-flow memory store "frontend/handler" '{"pattern":"..."}' -n "project"
 `)
 
 # Agent 3: UI (Message 3 - WAIT)
@@ -130,17 +136,19 @@ Task("coder", `
   ## TASK: Build UI component
   ## CONTEXT: Agent #3/4 | Previous: Backend, Integration ✓ | Next: Tests
   ## RETRIEVAL:
-    npx claude-flow memory retrieve --key "project/frontend/requirements"
-    npx claude-flow memory retrieve --key "project/frontend/handler"
-  ## STORAGE: For Tests: "project/frontend/component" - location, selectors
+    npx claude-flow memory get "frontend/requirements" -n "project"
+    npx claude-flow memory get "frontend/handler" -n "project"
+  ## STORAGE: npx claude-flow memory store "frontend/component" '{"location":"..."}' -n "project"
 `)
 
 # Agent 4: Tests (Message 4 - WAIT)
 Task("tester", `
   ## TASK: Integration tests
   ## CONTEXT: Agent #4/4 (FINAL) | Previous: All ✓
-  ## RETRIEVAL: All keys from agents 1-3
-  ## STORAGE: "project/tests/docs" - coverage, issues
+  ## RETRIEVAL:
+    npx claude-flow memory get "api/changes" -n "project"
+    npx claude-flow memory get "frontend/component" -n "project"
+  ## STORAGE: npx claude-flow memory store "tests/docs" '{"coverage":"..."}' -n "project"
 `)
 ```
 
@@ -156,32 +164,32 @@ Task("tester", `
 Task("backend-dev", `
   CONTEXT: Agent #1/4 | Next: Integration, UI, Tests
   TASK: Implement backend
-  STORAGE: Store schemas for next 3 agents
+  STORAGE: npx claude-flow memory store "events/schema" '<json>' -n "project"
 `)
 TodoWrite({ todos: [5-10 phases] })
 
 # Message 2: Integration (WAIT)
 Task("coder", `
   CONTEXT: Agent #2/4 | Previous: Backend ✓ | Next: UI, Tests
-  RETRIEVAL: npx claude-flow memory retrieve --key "project/events/[name]"
+  RETRIEVAL: npx claude-flow memory get "events/schema" -n "project"
   TASK: Update types
-  STORAGE: Store handler for UI
+  STORAGE: npx claude-flow memory store "frontend/handler" '<json>' -n "project"
 `)
 
 # Message 3: UI (WAIT)
 Task("coder", `
   CONTEXT: Agent #3/4 | Previous: Backend, Integration ✓ | Next: Tests
-  RETRIEVAL: Retrieve requirements + handler
+  RETRIEVAL: npx claude-flow memory get "frontend/handler" -n "project"
   TASK: Build UI
-  STORAGE: Store component location for Tests
+  STORAGE: npx claude-flow memory store "frontend/component" '<json>' -n "project"
 `)
 
 # Message 4: Tests (WAIT)
 Task("tester", `
   CONTEXT: Agent #4/4 (FINAL) | Previous: All ✓
-  RETRIEVAL: All keys from previous agents
+  RETRIEVAL: npx claude-flow memory get "frontend/component" -n "project"
   TASK: Integration tests
-  STORAGE: Coverage report
+  STORAGE: npx claude-flow memory store "tests/coverage" '<json>' -n "project"
 `)
 ```
 
@@ -246,12 +254,13 @@ project/tests/[feature]    # Test docs
 | Mistake | Fix |
 |---------|-----|
 | Parallel backend + frontend | Sequential: Backend stores → Frontend retrieves |
-| No contract in memory | Store schema: `hooks post-edit --memory-key "project/api/[name]"` |
+| No contract in memory | Store schema: `memory store "api/schema" '<json>' -n "project"` |
 | Uncoordinated DB changes | Schema-first: Design → Store → Backend → Frontend |
 | Skip ReasoningBank | Init: `agent memory init` + `agent memory status` |
 | No future context | Include WORKFLOW CONTEXT in prompts |
-| Missing retrieval info | Explicit keys: `memory retrieve --key "[key]"` |
+| Missing retrieval info | Explicit: `memory get "<key>" -n "<namespace>"` |
 | Unused stored memories | List future agents, what/why they need it |
+| Wrong memory syntax | Use positional args: `store <key> <value> -n <ns>` NOT `--key`/`--value` flags |
 
 ## Performance
 
@@ -272,28 +281,34 @@ project/tests/[feature]    # Test docs
 npx claude-flow@alpha agent memory init
 npx claude-flow@alpha agent memory status
 
-# 2. TASK PROMPT TEMPLATE
+# 2. MEMORY COMMANDS (CORRECT SYNTAX)
+npx claude-flow memory store "<key>" '<json>' -n "<namespace>"  # Store
+npx claude-flow memory get "<key>" -n "<namespace>"             # Retrieve
+npx claude-flow memory list -n "<namespace>"                    # List all
+npx claude-flow memory delete "<key>" -n "<namespace>"          # Delete
+
+# 3. TASK PROMPT TEMPLATE
 Task("[type]", `
   CONTEXT: Agent #N/M | Previous: [agents] | Next: [agents + needs]
-  RETRIEVAL: npx claude-flow memory retrieve --key "[keys]"
+  RETRIEVAL: npx claude-flow memory get "<key>" -n "<namespace>"
   TASK: [task]
-  STORAGE: For [Next]: "project/[ns]/[key]" - [what/why]
+  STORAGE: npx claude-flow memory store "<key>" '<json>' -n "<namespace>"
 `)
 
-# 3. WORKFLOW
+# 4. WORKFLOW
 Msg 1: Backend → Store schemas
 Msg 2: Integration → Retrieve, update, store handler
 Msg 3: UI → Retrieve, build, store location
 Msg 4: Tests → Retrieve all, test
 
-# 4. MEMORY KEYS
-project/events/[e], project/api/[a], project/database/[d],
-project/frontend/[f], project/performance/[p], project/bugs/[b], project/tests/[t]
+# 5. MEMORY NAMESPACES
+project/events, project/api, project/database,
+project/frontend, project/performance, project/bugs, project/tests
 
-# 5. AGENTS
+# 6. AGENTS
 backend-dev, coder, code-analyzer, tester, perf-analyzer, system-architect
 
-# 6. RULES
+# 7. RULES
 ✅ Sequential (99.9%), Forward-looking, Store for future, Batch todos
 ❌ Parallel backend+frontend, Skip context, Skip memory
 ```

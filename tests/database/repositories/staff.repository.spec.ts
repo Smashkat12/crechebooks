@@ -571,15 +571,15 @@ describe('StaffRepository', () => {
     it('should set endDate', async () => {
       const staff = await repository.create(createTestStaffData());
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
 
       const deactivated = await repository.deactivate(staff.id);
 
       expect(deactivated.endDate).toBeDefined();
-      // endDate is stored as DATE (no time), compare just date portion
-      const endDateOnly = new Date(deactivated.endDate!);
-      endDateOnly.setHours(0, 0, 0, 0);
-      expect(endDateOnly.getTime()).toBe(today.getTime());
+      // Compare UTC components to avoid timezone conversion issues
+      const endDate = new Date(deactivated.endDate!);
+      expect(endDate.getUTCFullYear()).toBe(today.getUTCFullYear());
+      expect(endDate.getUTCMonth()).toBe(today.getUTCMonth());
+      expect(endDate.getUTCDate()).toBe(today.getUTCDate());
     });
 
     it('should throw NotFoundException for non-existent staff', async () => {

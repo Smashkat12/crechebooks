@@ -10,6 +10,7 @@ import { FeeStructureRepository } from './repositories/fee-structure.repository'
 import { ParentRepository } from './repositories/parent.repository';
 import { InvoiceRepository } from './repositories/invoice.repository';
 import { InvoiceLineRepository } from './repositories/invoice-line.repository';
+import { PaymentRepository } from './repositories/payment.repository';
 import { AuditLogService } from './services/audit-log.service';
 import { TransactionImportService } from './services/transaction-import.service';
 import { CategorizationService } from './services/categorization.service';
@@ -17,8 +18,14 @@ import { PatternLearningService } from './services/pattern-learning.service';
 import { XeroSyncService } from './services/xero-sync.service';
 import { EnrollmentService } from './services/enrollment.service';
 import { InvoiceGenerationService } from './services/invoice-generation.service';
+import { InvoiceDeliveryService } from './services/invoice-delivery.service';
+import { ProRataService } from './services/pro-rata.service';
+import { PaymentMatchingService } from './services/payment-matching.service';
+import { EmailModule } from '../integrations/email/email.module';
+import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 
 @Module({
+  imports: [EmailModule, WhatsAppModule],
   providers: [
     TenantRepository,
     UserRepository,
@@ -31,6 +38,7 @@ import { InvoiceGenerationService } from './services/invoice-generation.service'
     ParentRepository,
     InvoiceRepository,
     InvoiceLineRepository,
+    PaymentRepository,
     AuditLogService,
     TransactionImportService,
     CategorizationService,
@@ -38,6 +46,9 @@ import { InvoiceGenerationService } from './services/invoice-generation.service'
     XeroSyncService,
     EnrollmentService,
     InvoiceGenerationService,
+    InvoiceDeliveryService,
+    ProRataService,
+    PaymentMatchingService,
   ],
   exports: [
     TenantRepository,
@@ -51,6 +62,7 @@ import { InvoiceGenerationService } from './services/invoice-generation.service'
     ParentRepository,
     InvoiceRepository,
     InvoiceLineRepository,
+    PaymentRepository,
     AuditLogService,
     TransactionImportService,
     CategorizationService,
@@ -58,6 +70,9 @@ import { InvoiceGenerationService } from './services/invoice-generation.service'
     XeroSyncService,
     EnrollmentService,
     InvoiceGenerationService,
+    InvoiceDeliveryService,
+    ProRataService,
+    PaymentMatchingService,
   ],
 })
 export class DatabaseModule {}

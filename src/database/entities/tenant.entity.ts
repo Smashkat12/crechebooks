@@ -28,6 +28,7 @@ export interface ITenant {
   subscriptionStatus: SubscriptionStatus;
   invoiceDayOfMonth: number;
   invoiceDueDays: number;
+  closureDates: string[];
   createdAt: Date;
   updatedAt: Date;
 }

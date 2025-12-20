@@ -489,12 +489,12 @@ describe('EnrollmentService', () => {
 
       expect(withdrawn).toBeDefined();
       expect(withdrawn.status).toBe(EnrollmentStatus.WITHDRAWN);
-      // Compare dates (ignoring time component since DB stores as @db.Date)
+      // Compare UTC dates to avoid timezone conversion issues
       const actualDate = new Date(withdrawn.endDate!);
       const expectedDate = new Date(withdrawDate);
-      expect(actualDate.getFullYear()).toBe(expectedDate.getFullYear());
-      expect(actualDate.getMonth()).toBe(expectedDate.getMonth());
-      expect(actualDate.getDate()).toBe(expectedDate.getDate());
+      expect(actualDate.getUTCFullYear()).toBe(expectedDate.getUTCFullYear());
+      expect(actualDate.getUTCMonth()).toBe(expectedDate.getUTCMonth());
+      expect(actualDate.getUTCDate()).toBe(expectedDate.getUTCDate());
 
       // Verify audit log
       const auditLogs = await prisma.auditLog.findMany({

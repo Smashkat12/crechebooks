@@ -482,12 +482,12 @@ describe('EnrollmentRepository', () => {
 
       expect(withdrawn.status).toBe('WITHDRAWN');
       expect(withdrawn.endDate).toBeInstanceOf(Date);
-      // End date should be set to today (date-only field, no time comparison)
+      // Compare UTC dates to avoid timezone conversion issues with DATE columns
       const now = new Date();
       const endDate = new Date(withdrawn.endDate!);
-      expect(endDate.getFullYear()).toBe(now.getFullYear());
-      expect(endDate.getMonth()).toBe(now.getMonth());
-      expect(endDate.getDate()).toBe(now.getDate());
+      expect(endDate.getUTCFullYear()).toBe(now.getUTCFullYear());
+      expect(endDate.getUTCMonth()).toBe(now.getUTCMonth());
+      expect(endDate.getUTCDate()).toBe(now.getUTCDate());
     });
 
     it('should throw NotFoundException for non-existent enrollment', async () => {

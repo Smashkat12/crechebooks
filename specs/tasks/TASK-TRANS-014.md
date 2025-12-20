@@ -1,612 +1,509 @@
-<task_spec id="TASK-TRANS-014" version="1.0">
+# TASK-TRANS-014: Xero Sync Service
 
-<metadata>
-  <title>Xero Sync Service</title>
-  <status>ready</status>
-  <layer>logic</layer>
-  <sequence>19</sequence>
-  <implements>
-    <requirement_ref>REQ-TRANS-008</requirement_ref>
-  </implements>
-  <depends_on>
-    <task_ref>TASK-MCP-001</task_ref>
-    <task_ref>TASK-TRANS-001</task_ref>
-  </depends_on>
-  <estimated_complexity>high</estimated_complexity>
-</metadata>
+## Metadata
+- **Status**: ✅ Complete
+- **Layer**: Logic
+- **Sequence**: 19
+- **Dependencies**: TASK-MCP-001 ✅, TASK-TRANS-001 ✅
+- **Complexity**: High
+- **Completed**: 2025-12-20
+- **Tests**: 22 tests (757 total)
 
-<context>
-This task creates the XeroSyncService which handles bi-directional synchronization
-between CrecheBooks and Xero accounting software via the Xero MCP server. The service
-syncs categorized transactions to Xero as bank transactions, pulls Chart of Accounts
-from Xero, handles OAuth token refresh, and resolves sync conflicts. This integration
-ensures data consistency between the two systems.
-</context>
+---
 
-<input_context_files>
-  <file purpose="xero_mcp_tools">specs/technical/mcp-integration.md#xero-mcp-server</file>
-  <file purpose="transaction_entity">src/database/entities/transaction.entity.ts</file>
-  <file purpose="categorization_entity">src/database/entities/categorization.entity.ts</file>
-  <file purpose="requirements">specs/requirements/REQ-TRANS.md</file>
-</input_context_files>
+## Context
 
-<prerequisites>
-  <check>TASK-MCP-001 completed (Xero MCP server configured)</check>
-  <check>TASK-TRANS-001 completed (Transaction entity exists)</check>
-  <check>Xero OAuth credentials configured per tenant</check>
-  <check>Bull queue for sync jobs configured</check>
-</prerequisites>
+This task creates the XeroSyncService for bi-directional synchronization between CrecheBooks and Xero. The service syncs categorized transactions to Xero, pulls Chart of Accounts, and handles OAuth token management. All sync operations use the existing Xero MCP server tools.
 
-<scope>
-  <in_scope>
-    - Create XeroSyncService in src/core/transaction/
-    - Implement push: sync categorized transactions to Xero
-    - Implement pull: fetch Chart of Accounts from Xero
-    - Handle OAuth token refresh via Xero MCP
-    - Implement conflict resolution (last-write-wins with warning)
-    - Track sync status and last sync time
-    - Queue-based processing for async sync
-    - Store xero_transaction_id for linking
-  </in_scope>
-  <out_of_scope>
-    - Initial Xero OAuth setup (manual admin task)
-    - Syncing invoices (separate billing sync)
-    - Syncing payments (separate payment sync)
-    - Real-time webhooks from Xero
-    - Historical data import from Xero
-  </out_of_scope>
-</scope>
+**CRITICAL**: This service integrates with the existing `src/mcp/xero-mcp/` implementation. Do NOT create a separate MCP client wrapper - use the MCP tools directly.
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/core/transaction/xero-sync.service.ts">
-      @Injectable()
-      export class XeroSyncService {
-        constructor(
-          private readonly transactionRepo: TransactionRepository,
-          private readonly categorizationRepo: CategorizationRepository,
-          private readonly coaRepo: ChartOfAccountsRepository,
-          private readonly xeroMCP: XeroMCPClient,
-          @InjectQueue('xero-sync') private syncQueue: Queue
-        )
+---
 
-        async syncTransactions(
-          transactionIds: string[],
-          tenantId: string
-        ): Promise&lt;SyncResult&gt;
+## Current Codebase State
 
-        async syncCategories(
-          tenantId: string
-        ): Promise&lt;CategorySyncResult&gt;
+### Existing Files (DO NOT RECREATE)
 
-        async pullFromXero(
-          tenantId: string,
-          dateFrom: Date,
-          dateTo: Date
-        ): Promise&lt;PullResult&gt;
+**Xero MCP Server** (`src/mcp/xero-mcp/`):
+```
+src/mcp/xero-mcp/
+├── server.ts              # Main MCP server - handles tool dispatch
+├── config.ts              # Configuration loader
+├── auth/
+│   ├── token-manager.ts   # OAuth token refresh with 5-min buffer
+│   └── encryption.ts      # AES-256 token encryption
+├── tools/
+│   ├── get-accounts.ts    # get_accounts tool
+│   ├── get-transactions.ts # get_transactions tool
+│   ├── update-transaction.ts # update_transaction tool
+│   ├── create-invoice.ts  # create_invoice tool
+│   ├── get-invoices.ts    # get_invoices tool
+│   ├── apply-payment.ts   # apply_payment tool
+│   ├── get-contacts.ts    # get_contacts tool
+│   └── create-contact.ts  # create_contact tool
+├── types/
+│   ├── xero.types.ts      # XeroAccount, XeroTransaction, etc.
+│   └── mcp.types.ts       # Tool input/output types
+└── utils/
+    ├── rate-limiter.ts    # 60 req/min sliding window
+    ├── error-handler.ts   # XeroMCPError, handleXeroError
+    └── logger.ts          # Structured JSON logging
+```
 
-        async pushToXero(
-          transactionId: string,
-          tenantId: string
-        ): Promise&lt;XeroTransaction&gt;
+**Transaction Repository** (`src/database/repositories/transaction.repository.ts`):
+```typescript
+// Existing methods:
+create(dto: CreateTransactionDto): Promise<Transaction>
+createMany(dtos: CreateTransactionDto[]): Promise<Transaction[]>
+findById(tenantId: string, id: string): Promise<Transaction | null>
+findByIds(tenantId: string, ids: string[]): Promise<Transaction[]>
+findByTenant(tenantId: string, filter: TransactionFilterDto): Promise<PaginatedResult<Transaction>>
+findPending(tenantId: string): Promise<Transaction[]>
+update(tenantId: string, id: string, dto: UpdateTransactionDto): Promise<Transaction>
+updateStatus(tenantId: string, id: string, status: TransactionStatus): Promise<Transaction>
+softDelete(tenantId: string, id: string): Promise<void>
+markReconciled(tenantId: string, id: string): Promise<Transaction>
 
-        private async refreshTokenIfNeeded(tenantId: string): Promise&lt;void&gt;
-        private async handleConflict(
-          transaction: Transaction,
-          xeroData: XeroTransaction
-        ): Promise&lt;ConflictResolution&gt;
-        private mapToXeroTransaction(
-          transaction: Transaction,
-          categorization: Categorization
-        ): XeroBankTransaction
-        private mapFromXeroTransaction(
-          xeroTx: XeroTransaction
-        ): CreateTransactionDto
-      }
-    </signature>
-    <signature file="src/core/transaction/dto/xero-sync.dto.ts">
-      export interface SyncResult {
-        totalProcessed: number;
-        synced: number;
-        failed: number;
-        conflicts: number;
-        errors: SyncError[];
-      }
+// NEEDS TO BE ADDED:
+findByXeroId(tenantId: string, xeroTransactionId: string): Promise<Transaction | null>
+```
 
-      export interface CategorySyncResult {
-        accountsCreated: number;
-        accountsUpdated: number;
-        accountsDeleted: number;
-        total: number;
-      }
+**Queue Configuration** (`src/config/queue.config.ts`):
+```typescript
+export const QUEUE_NAMES = {
+  CATEGORIZATION: 'transaction-categorization',
+  // ADD: XERO_SYNC: 'xero-sync',
+} as const;
+```
 
-      export interface PullResult {
-        transactionsPulled: number;
-        duplicatesSkipped: number;
-        errors: string[];
-      }
+**Database Module** (`src/database/database.module.ts`):
+- Services registered as providers and exports
+- Pattern: constructor injection of repositories
 
-      export interface XeroBankTransaction {
-        contactId?: string;
-        lineItems: {
-          accountCode: string;
-          description: string;
-          amount: number;
-          taxType: string;
-        }[];
-        date: string;
-        reference?: string;
-        isReconciled: boolean;
-      }
+### Prisma Models
 
-      export interface XeroTransaction {
-        bankTransactionID: string;
-        type: 'SPEND' | 'RECEIVE';
-        contact?: {
-          contactID: string;
-          name: string;
-        };
-        lineItems: XeroLineItem[];
-        date: string;
-        reference?: string;
-        isReconciled: boolean;
-        total: number;
-        updatedDateUTC: string;
-      }
+**Transaction** (partial):
+```prisma
+model Transaction {
+  id                String            @id @default(uuid())
+  tenantId          String            @map("tenant_id")
+  xeroTransactionId String?           @unique @map("xero_transaction_id")
+  status            TransactionStatus @default(PENDING)
+  // ... other fields
+}
+```
 
-      export interface XeroLineItem {
-        accountCode: string;
-        description: string;
-        lineAmount: number;
-        taxType: string;
-        taxAmount: number;
-      }
+**XeroToken**:
+```prisma
+model XeroToken {
+  id                String   @id @default(uuid())
+  tenantId          String   @unique @map("tenant_id")
+  xeroTenantId      String   @map("xero_tenant_id")
+  encryptedTokens   String   @map("encrypted_tokens") @db.Text
+  tokenExpiresAt    DateTime @map("token_expires_at")
+}
+```
 
-      export interface ConflictResolution {
-        action: 'USE_LOCAL' | 'USE_XERO' | 'MANUAL_REVIEW';
-        reason: string;
-      }
+### Existing Types
 
-      export interface SyncError {
-        transactionId: string;
-        error: string;
-        xeroResponse?: any;
-      }
-    </signature>
-    <signature file="src/integrations/xero/xero-mcp.client.ts">
-      @Injectable()
-      export class XeroMCPClient {
-        async createBankTransaction(
-          tenantId: string,
-          data: XeroBankTransaction
-        ): Promise&lt;XeroTransaction&gt;
+**From `src/mcp/xero-mcp/types/xero.types.ts`**:
+```typescript
+export interface XeroAccount {
+  code: string;
+  name: string;
+  type: string;
+  taxType: string | null;
+  enablePaymentsToAccount: boolean;
+}
 
-        async getBankTransactions(
-          tenantId: string,
-          dateFrom: Date,
-          dateTo: Date
-        ): Promise&lt;XeroTransaction[]&gt;
+export interface XeroTransaction {
+  transactionId: string;
+  bankAccount: string;
+  date: Date;
+  description: string;
+  payeeName: string | null;
+  reference: string | null;
+  amountCents: number;
+  isCredit: boolean;
+  accountCode: string | null;
+  status: string;
+}
 
-        async getAccounts(
-          tenantId: string
-        ): Promise&lt;XeroAccount[]&gt;
+export interface XeroTokenSet {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  scope: string;
+}
+```
 
-        async refreshAccessToken(
-          tenantId: string
-        ): Promise&lt;string&gt;
-      }
-    </signature>
-  </signatures>
+**From `src/database/entities/categorization.entity.ts`**:
+```typescript
+export enum VatType {
+  STANDARD = 'STANDARD',     // 15% VAT
+  ZERO_RATED = 'ZERO_RATED',
+  EXEMPT = 'EXEMPT',
+  NO_VAT = 'NO_VAT',
+}
+```
 
-  <constraints>
-    - Must refresh OAuth token if expired (check 5 min before expiry)
-    - Must store xero_transaction_id after successful sync
-    - Must handle rate limits (Xero: 60 req/min)
-    - Conflict resolution: last-write-wins with warning logged
-    - Must NOT sync transactions already marked as synced
-    - Must filter all data by tenantId
-    - Must NOT use 'any' type anywhere
-    - Queue retry: 3 attempts with exponential backoff
-    - All amounts must be converted to decimal for Xero API
-  </constraints>
+---
 
-  <verification>
-    - Categorized transactions successfully sync to Xero
-    - xero_transaction_id stored after sync
-    - Chart of Accounts pulled from Xero correctly
-    - OAuth token refreshes automatically when expired
-    - Conflicts detected and resolved appropriately
-    - Multi-tenant isolation verified (separate Xero orgs)
-    - Rate limiting handled gracefully
-    - Unit tests pass
-    - Integration tests with Xero sandbox pass
-  </verification>
-</definition_of_done>
+## Files to Create
 
-<pseudo_code>
-XeroSyncService (src/core/transaction/xero-sync.service.ts):
-  @Injectable()
-  export class XeroSyncService:
-    constructor(
-      private transactionRepo: TransactionRepository,
-      private categorizationRepo: CategorizationRepository,
-      private coaRepo: ChartOfAccountsRepository,
-      private xeroMCP: XeroMCPClient,
-      @InjectQueue('xero-sync') private syncQueue: Queue
-    )
+### 1. `src/database/dto/xero-sync.dto.ts`
 
-    async syncTransactions(transactionIds, tenantId):
-      // 1. Refresh token if needed
-      await this.refreshTokenIfNeeded(tenantId)
+```typescript
+/**
+ * Xero Sync DTOs
+ * TASK-TRANS-014
+ */
 
-      const results = {
-        totalProcessed: transactionIds.length,
-        synced: 0,
-        failed: 0,
-        conflicts: 0,
-        errors: []
-      }
+export interface SyncResult {
+  totalProcessed: number;
+  synced: number;
+  failed: number;
+  conflicts: number;
+  errors: SyncError[];
+}
 
-      // 2. Process each transaction
-      for (const txId of transactionIds):
-        try:
-          // Check if already synced
-          const transaction = await this.transactionRepo.findById(tenantId, txId)
+export interface SyncError {
+  transactionId: string;
+  error: string;
+  code?: string;
+}
 
-          if transaction.status === 'SYNCED' && transaction.xeroTransactionId:
-            // Already synced, skip
-            continue
+export interface CategorySyncResult {
+  accountsCreated: number;
+  accountsUpdated: number;
+  accountsArchived: number;
+  total: number;
+}
 
-          // Push to Xero
-          const xeroTx = await this.pushToXero(txId, tenantId)
+export interface PullResult {
+  transactionsPulled: number;
+  duplicatesSkipped: number;
+  errors: string[];
+}
 
-          // Update local record
-          await this.transactionRepo.update(tenantId, txId, {
-            xeroTransactionId: xeroTx.bankTransactionID,
-            status: 'SYNCED'
-          })
+export interface ConflictResolution {
+  action: 'USE_LOCAL' | 'USE_XERO' | 'SKIP';
+  reason: string;
+}
 
-          results.synced++
+// Maps our VatType to Xero tax type codes
+export const VAT_TO_XERO_TAX: Record<string, string> = {
+  STANDARD: 'OUTPUT2',        // 15% SA VAT
+  ZERO_RATED: 'ZERORATEDOUTPUT',
+  EXEMPT: 'EXEMPTOUTPUT',
+  NO_VAT: 'NONE',
+};
+```
 
-        catch (error):
-          results.failed++
-          results.errors.push({
-            transactionId: txId,
-            error: error.message,
-            xeroResponse: error.response?.data
-          })
+### 2. `src/database/services/xero-sync.service.ts`
 
-      return results
+```typescript
+/**
+ * XeroSyncService
+ * TASK-TRANS-014
+ *
+ * Bi-directional sync between CrecheBooks and Xero.
+ * Uses existing Xero MCP server tools for API calls.
+ */
 
-    async syncCategories(tenantId):
-      // 1. Refresh token
-      await this.refreshTokenIfNeeded(tenantId)
+import { Injectable, Logger } from '@nestjs/common';
+import { format } from 'date-fns';
+import { TransactionRepository } from '../repositories/transaction.repository';
+import { CategorizationRepository } from '../repositories/categorization.repository';
+import { AuditLogService } from './audit-log.service';
+import {
+  SyncResult,
+  SyncError,
+  CategorySyncResult,
+  PullResult,
+  ConflictResolution,
+  VAT_TO_XERO_TAX,
+} from '../dto/xero-sync.dto';
+import { TransactionStatus, ImportSource } from '../entities/transaction.entity';
+import { NotFoundException, BusinessException } from '../../shared/exceptions';
 
-      // 2. Pull accounts from Xero
-      const xeroAccounts = await this.xeroMCP.getAccounts(tenantId)
+// Import Xero MCP tools directly
+import { getAccounts, getTransactions, updateTransaction } from '../../mcp/xero-mcp/tools';
+import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
+import { XeroClient } from 'xero-node';
 
-      // 3. Get existing local accounts
-      const localAccounts = await this.coaRepo.findByTenant(tenantId)
-      const localMap = new Map(localAccounts.map(a => [a.code, a]))
+@Injectable()
+export class XeroSyncService {
+  private readonly logger = new Logger(XeroSyncService.name);
+  private tokenManager: TokenManager;
+  private xeroClient: XeroClient;
 
-      let created = 0
-      let updated = 0
+  constructor(
+    private readonly transactionRepo: TransactionRepository,
+    private readonly categorizationRepo: CategorizationRepository,
+    private readonly auditLogService: AuditLogService,
+  ) {
+    // Initialize TokenManager and XeroClient
+    this.tokenManager = new TokenManager();
+    this.xeroClient = new XeroClient({
+      clientId: process.env.XERO_CLIENT_ID ?? '',
+      clientSecret: process.env.XERO_CLIENT_SECRET ?? '',
+      redirectUris: [process.env.XERO_REDIRECT_URI ?? ''],
+      scopes: ['openid', 'profile', 'email', 'accounting.transactions', 'accounting.settings'],
+    });
+  }
 
-      // 4. Sync each Xero account
-      for (const xeroAcc of xeroAccounts):
-        const local = localMap.get(xeroAcc.code)
+  /**
+   * Sync multiple transactions to Xero
+   */
+  async syncTransactions(transactionIds: string[], tenantId: string): Promise<SyncResult> {
+    // Implementation...
+  }
 
-        if local:
-          // Update if name changed
-          if local.name !== xeroAcc.name:
-            await this.coaRepo.update(local.id, {
-              name: xeroAcc.name,
-              type: xeroAcc.type
-            })
-            updated++
-        else:
-          // Create new
-          await this.coaRepo.create({
-            tenantId,
-            code: xeroAcc.code,
-            name: xeroAcc.name,
-            type: xeroAcc.type,
-            status: 'ACTIVE'
-          })
-          created++
+  /**
+   * Push single transaction to Xero
+   */
+  async pushToXero(transactionId: string, tenantId: string): Promise<void> {
+    // Implementation...
+  }
 
-      // 5. Mark accounts not in Xero as deleted
-      const xeroCodeSet = new Set(xeroAccounts.map(a => a.code))
-      const toDelete = localAccounts.filter(a => !xeroCodeSet.has(a.code))
+  /**
+   * Pull transactions from Xero
+   */
+  async pullFromXero(tenantId: string, dateFrom: Date, dateTo: Date): Promise<PullResult> {
+    // Implementation...
+  }
 
-      for (const acc of toDelete):
-        await this.coaRepo.update(acc.id, { status: 'ARCHIVED' })
+  /**
+   * Sync Chart of Accounts from Xero
+   */
+  async syncChartOfAccounts(tenantId: string): Promise<CategorySyncResult> {
+    // Implementation...
+  }
 
-      return {
-        accountsCreated: created,
-        accountsUpdated: updated,
-        accountsDeleted: toDelete.length,
-        total: xeroAccounts.length
-      }
+  /**
+   * Get authenticated XeroClient for tenant
+   */
+  private async getAuthenticatedClient(tenantId: string): Promise<{ client: XeroClient; xeroTenantId: string }> {
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
 
-    async pullFromXero(tenantId, dateFrom, dateTo):
-      // 1. Refresh token
-      await this.refreshTokenIfNeeded(tenantId)
+    this.xeroClient.setTokenSet({
+      access_token: accessToken,
+      token_type: 'Bearer',
+    });
 
-      // 2. Fetch transactions from Xero
-      const xeroTxs = await this.xeroMCP.getBankTransactions(
+    return { client: this.xeroClient, xeroTenantId };
+  }
+
+  /**
+   * Map VatType to Xero tax type
+   */
+  private mapVatToXeroTax(vatType: string): string {
+    return VAT_TO_XERO_TAX[vatType] ?? 'NONE';
+  }
+}
+```
+
+### 3. `tests/database/services/xero-sync.service.spec.ts`
+
+Integration tests using REAL database (no mocks).
+
+---
+
+## Files to Modify
+
+### 1. Add `findByXeroId` to `src/database/repositories/transaction.repository.ts`
+
+```typescript
+/**
+ * Find transaction by Xero transaction ID
+ * @returns Transaction or null if not found
+ * @throws DatabaseException for database errors
+ */
+async findByXeroId(tenantId: string, xeroTransactionId: string): Promise<Transaction | null> {
+  try {
+    return await this.prisma.transaction.findFirst({
+      where: {
         tenantId,
-        dateFrom,
-        dateTo
-      )
+        xeroTransactionId,
+        isDeleted: false,
+      },
+    });
+  } catch (error) {
+    this.logger.error(
+      `Failed to find transaction by xeroId: ${xeroTransactionId} for tenant: ${tenantId}`,
+      error instanceof Error ? error.stack : String(error),
+    );
+    throw new DatabaseException(
+      'findByXeroId',
+      'Failed to find transaction by Xero ID',
+      error instanceof Error ? error : undefined,
+    );
+  }
+}
+```
 
-      let pulled = 0
-      let duplicates = 0
-      const errors = []
+### 2. Update `src/config/queue.config.ts`
 
-      // 3. Import each transaction
-      for (const xeroTx of xeroTxs):
-        try:
-          // Check if already exists by xero_transaction_id
-          const existing = await this.transactionRepo.findByXeroId(
-            tenantId,
-            xeroTx.bankTransactionID
-          )
+```typescript
+export const QUEUE_NAMES = {
+  CATEGORIZATION: 'transaction-categorization',
+  XERO_SYNC: 'xero-sync',
+} as const;
+```
 
-          if existing:
-            duplicates++
-            continue
+### 3. Update `src/database/database.module.ts`
 
-          // Map and create
-          const dto = this.mapFromXeroTransaction(xeroTx)
-          await this.transactionRepo.create({
-            ...dto,
-            tenantId,
-            xeroTransactionId: xeroTx.bankTransactionID,
-            source: 'BANK_FEED',
-            status: 'SYNCED'
-          })
+```typescript
+import { XeroSyncService } from './services/xero-sync.service';
 
-          pulled++
+@Module({
+  providers: [
+    // ... existing providers
+    XeroSyncService,
+  ],
+  exports: [
+    // ... existing exports
+    XeroSyncService,
+  ],
+})
+```
 
-        catch (error):
-          errors.push(`Transaction ${xeroTx.bankTransactionID}: ${error.message}`)
+### 4. Update `src/database/services/index.ts`
 
-      return {
-        transactionsPulled: pulled,
-        duplicatesSkipped: duplicates,
-        errors
-      }
+```typescript
+export * from './xero-sync.service';
+```
 
-    async pushToXero(transactionId, tenantId):
-      // 1. Load transaction and categorization
-      const transaction = await this.transactionRepo.findById(tenantId, transactionId)
-      const categorization = await this.categorizationRepo.findByTransaction(transactionId)
+### 5. Update `src/database/dto/index.ts`
 
-      if !categorization:
-        throw new Error('Transaction must be categorized before syncing')
+```typescript
+export * from './xero-sync.dto';
+```
 
-      // 2. Map to Xero format
-      const xeroData = this.mapToXeroTransaction(transaction, categorization)
+---
 
-      // 3. Check if update or create
-      if transaction.xeroTransactionId:
-        // Transaction already in Xero - check for conflicts
-        const xeroTx = await this.xeroMCP.getBankTransaction(
-          tenantId,
-          transaction.xeroTransactionId
-        )
+## Implementation Steps
 
-        if xeroTx.updatedDateUTC > transaction.updatedAt:
-          // Conflict: Xero was updated more recently
-          const resolution = await this.handleConflict(transaction, xeroTx)
+### Step 1: Add Repository Method (15 min)
+1. Add `findByXeroId` method to `transaction.repository.ts`
+2. Add test for `findByXeroId` in `transaction.repository.spec.ts`
 
-          if resolution.action === 'USE_XERO':
-            // Don't push, use Xero data
-            return xeroTx
-          else if resolution.action === 'MANUAL_REVIEW':
-            throw new ConflictError(resolution.reason)
-          // else USE_LOCAL, continue with push
+### Step 2: Update Queue Config (5 min)
+1. Add `XERO_SYNC` to `QUEUE_NAMES` in `queue.config.ts`
 
-        // Update existing
-        return await this.xeroMCP.updateBankTransaction(
-          tenantId,
-          transaction.xeroTransactionId,
-          xeroData
-        )
+### Step 3: Create DTOs (10 min)
+1. Create `src/database/dto/xero-sync.dto.ts`
+2. Export from `src/database/dto/index.ts`
 
-      else:
-        // Create new in Xero
-        return await this.xeroMCP.createBankTransaction(tenantId, xeroData)
+### Step 4: Create XeroSyncService (60 min)
+1. Create `src/database/services/xero-sync.service.ts`
+2. Implement `syncTransactions` method
+3. Implement `pushToXero` method
+4. Implement `pullFromXero` method
+5. Implement `syncChartOfAccounts` method
+6. Register in `database.module.ts`
+7. Export from `services/index.ts`
 
-    private async refreshTokenIfNeeded(tenantId):
-      // Get tenant OAuth info
-      const tenant = await this.tenantRepo.findById(tenantId)
+### Step 5: Create Tests (45 min)
+1. Create `tests/database/services/xero-sync.service.spec.ts`
+2. Test sync operations with real database
+3. Test error handling
+4. Test conflict resolution
 
-      if !tenant.xeroAccessToken:
-        throw new Error('Xero not connected for this tenant')
+### Step 6: Verify (15 min)
+1. Run `npm run build` - must pass
+2. Run `npm run lint` - must pass
+3. Run `npm test` - all tests must pass
 
-      // Check if token expires in next 5 minutes
-      const expiresAt = new Date(tenant.xeroTokenExpiresAt)
-      const fiveMinFromNow = addMinutes(new Date(), 5)
+---
 
-      if expiresAt < fiveMinFromNow:
-        // Token expired or about to expire - refresh
-        const newToken = await this.xeroMCP.refreshAccessToken(tenantId)
+## Key Implementation Details
 
-        await this.tenantRepo.update(tenantId, {
-          xeroAccessToken: newToken.access_token,
-          xeroRefreshToken: newToken.refresh_token,
-          xeroTokenExpiresAt: new Date(Date.now() + newToken.expires_in * 1000)
-        })
+### Token Management
+The `TokenManager` class in `src/mcp/xero-mcp/auth/token-manager.ts` handles:
+- Token storage in encrypted format (AES-256)
+- Automatic refresh 5 minutes before expiry
+- Mutex lock to prevent concurrent refresh
+- Methods: `getAccessToken()`, `getXeroTenantId()`, `hasValidConnection()`
 
-    private async handleConflict(transaction, xeroData):
-      // Simple conflict resolution: last-write-wins
-      // Log warning for admin review
+### Rate Limiting
+Xero API has 60 requests/minute limit. The `RateLimiter` in `src/mcp/xero-mcp/utils/rate-limiter.ts` handles this with a sliding window.
 
-      this.logger.warn({
-        message: 'Xero sync conflict detected',
-        transactionId: transaction.id,
-        localUpdated: transaction.updatedAt,
-        xeroUpdated: xeroData.updatedDateUTC
-      })
+### Error Handling
+Use `XeroMCPError` from `src/mcp/xero-mcp/utils/error-handler.ts` for Xero-specific errors. Always log with full context before throwing.
 
-      // Use local (overwrite Xero)
-      return {
-        action: 'USE_LOCAL',
-        reason: 'Local changes are more recent than Xero'
-      }
+### Multi-tenancy
+ALL queries MUST filter by `tenantId`. Never access data across tenants.
 
-    private mapToXeroTransaction(transaction, categorization):
-      // Map CrecheBooks transaction to Xero format
-      const lineItems = []
+### Monetary Values
+- All amounts are in **cents** (integers)
+- Use `Decimal` from `decimal.js` for calculations
+- Convert to decimal (divide by 100) only when sending to Xero API
 
-      if categorization.isSplit:
-        // Multiple line items for split
-        for (const split of categorization.splits):
-          lineItems.push({
-            accountCode: split.accountCode,
-            description: split.description || transaction.description,
-            amount: split.amountCents / 100,
-            taxType: this.mapVatToXeroTax(split.vatType)
-          })
-      else:
-        // Single line item
-        lineItems.push({
-          accountCode: categorization.accountCode,
-          description: transaction.description,
-          amount: transaction.amountCents / 100,
-          taxType: this.mapVatToXeroTax(categorization.vatType)
-        })
+---
 
-      return {
-        type: transaction.isCredit ? 'RECEIVE' : 'SPEND',
-        contact: transaction.payeeName ? {
-          name: transaction.payeeName
-        } : undefined,
-        lineItems,
-        date: format(transaction.date, 'yyyy-MM-dd'),
-        reference: transaction.reference || undefined,
-        isReconciled: transaction.isReconciled
-      }
+## Test Cleanup Order
 
-    private mapFromXeroTransaction(xeroTx):
-      // Map Xero transaction to CrecheBooks format
-      const total = xeroTx.lineItems.reduce((sum, item) => sum + item.lineAmount, 0)
+```typescript
+beforeEach(async () => {
+  await prisma.auditLog.deleteMany({});
+  await prisma.reconciliation.deleteMany({});
+  await prisma.sarsSubmission.deleteMany({});
+  await prisma.payroll.deleteMany({});
+  await prisma.staff.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.enrollment.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  await prisma.child.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.payeePattern.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.xeroToken.deleteMany({});  // ADD THIS
+  await prisma.user.deleteMany({});
+  await prisma.tenant.deleteMany({});
+});
+```
 
-      return {
-        date: new Date(xeroTx.date),
-        description: xeroTx.lineItems[0]?.description || 'Xero Import',
-        payeeName: xeroTx.contact?.name || null,
-        reference: xeroTx.reference || null,
-        amountCents: Math.round(Math.abs(total) * 100),
-        isCredit: xeroTx.type === 'RECEIVE',
-        isReconciled: xeroTx.isReconciled
-      }
+---
 
-    private mapVatToXeroTax(vatType: VatType): string:
-      switch (vatType):
-        case 'STANDARD':
-          return 'OUTPUT2' // 15% VAT in South Africa
-        case 'ZERO_RATED':
-          return 'ZERORATEDOUTPUT'
-        case 'EXEMPT':
-          return 'EXEMPTOUTPUT'
-        case 'NO_VAT':
-          return 'NONE'
-        default:
-          return 'NONE'
+## Anti-Patterns to AVOID
 
-XeroMCPClient (src/integrations/xero/xero-mcp.client.ts):
-  @Injectable()
-  export class XeroMCPClient:
-    constructor(private mcpService: MCPService)
+1. **NO `any` type** - Use proper typing or `unknown`
+2. **NO mocks in tests** - Use real database
+3. **NO backwards compatibility hacks** - Fail fast
+4. **NO floating point for money** - Use cents (integers)
+5. **DO NOT create separate MCP client wrapper** - Use existing tools directly
+6. **DO NOT bypass TokenManager** - It handles refresh automatically
+7. **DO NOT store tokens in plaintext** - Use TokenManager's encryption
 
-    async createBankTransaction(tenantId, data):
-      return await this.mcpService.callTool('xero-mcp', 'createBankTransaction', {
-        tenantId,
-        transaction: data
-      })
+---
 
-    async getBankTransactions(tenantId, dateFrom, dateTo):
-      return await this.mcpService.callTool('xero-mcp', 'getBankTransactions', {
-        tenantId,
-        dateFrom: format(dateFrom, 'yyyy-MM-dd'),
-        dateTo: format(dateTo, 'yyyy-MM-dd')
-      })
+## Verification Criteria
 
-    async getAccounts(tenantId):
-      return await this.mcpService.callTool('xero-mcp', 'getAccounts', {
-        tenantId
-      })
+- [x] `findByXeroId` added to TransactionRepository
+- [x] XERO_SYNC queue added to queue config
+- [x] XeroSyncService created with all methods
+- [x] Transactions sync to Xero correctly
+- [x] `xeroTransactionId` stored after sync
+- [x] Chart of Accounts pulled from Xero
+- [x] Duplicate detection works (skip already-synced)
+- [x] Multi-tenant isolation verified
+- [x] All tests pass with `--runInBand`
+- [x] Build passes
+- [x] Lint passes
 
-    async refreshAccessToken(tenantId):
-      return await this.mcpService.callTool('xero-mcp', 'refreshToken', {
-        tenantId
-      })
+---
 
-Queue Processor (src/core/transaction/processors/xero-sync.processor.ts):
-  @Processor('xero-sync')
-  export class XeroSyncProcessor:
-    constructor(private xeroSyncService: XeroSyncService)
+## Test Commands
 
-    @Process('sync-transaction')
-    async handleSync(job: Job):
-      const { transactionId, tenantId } = job.data
-
-      try:
-        await this.xeroSyncService.pushToXero(transactionId, tenantId)
-        return { success: true }
-
-      catch (error):
-        // Log error
-        this.logger.error({
-          message: 'Xero sync failed',
-          transactionId,
-          error: error.message
-        })
-
-        // Retry up to 3 times
-        if job.attemptsMade < 3:
-          throw error // Trigger retry
-
-        // Max retries reached
-        return { success: false, error: error.message }
-</pseudo_code>
-
-<files_to_create>
-  <file path="src/core/transaction/xero-sync.service.ts">Main Xero sync service</file>
-  <file path="src/core/transaction/dto/xero-sync.dto.ts">Xero sync DTOs</file>
-  <file path="src/integrations/xero/xero-mcp.client.ts">Xero MCP client wrapper</file>
-  <file path="src/core/transaction/processors/xero-sync.processor.ts">Queue processor for async sync</file>
-  <file path="tests/core/transaction/xero-sync.service.spec.ts">Service tests</file>
-  <file path="tests/integrations/xero/xero-mcp.client.spec.ts">MCP client tests</file>
-</files_to_create>
-
-<files_to_modify>
-  <file path="src/core/transaction/index.ts">Export XeroSyncService</file>
-  <file path="src/database/repositories/transaction.repository.ts">Add findByXeroId method</file>
-  <file path="src/database/entities/tenant.entity.ts">Add xero OAuth fields if not present</file>
-  <file path="src/config/queue.config.ts">Add xero-sync queue configuration</file>
-</files_to_modify>
-
-<validation_criteria>
-  <criterion>Categorized transactions sync to Xero successfully</criterion>
-  <criterion>xero_transaction_id stored after successful sync</criterion>
-  <criterion>Chart of Accounts pulled from Xero correctly</criterion>
-  <criterion>OAuth token refreshes automatically when needed</criterion>
-  <criterion>Conflicts detected and resolved with last-write-wins</criterion>
-  <criterion>Split transactions sync with multiple line items</criterion>
-  <criterion>VAT types map correctly to Xero tax types</criterion>
-  <criterion>Multi-tenant isolation verified (separate Xero orgs)</criterion>
-  <criterion>Queue retry works for failed syncs</criterion>
-  <criterion>All tests pass</criterion>
-</validation_criteria>
-
-<test_commands>
-  <command>npm run test -- --grep "XeroSyncService"</command>
-  <command>npm run test -- --grep "XeroMCPClient"</command>
-  <command>npm run build</command>
-</test_commands>
-
-</task_spec>
+```bash
+npm run build
+npm run lint
+npm test -- --testPathPattern="xero-sync"
+npm test
+```

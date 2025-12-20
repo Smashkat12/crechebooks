@@ -402,6 +402,36 @@ export class TransactionRepository {
   }
 
   /**
+   * Find transaction by Xero transaction ID
+   * @returns Transaction or null if not found
+   * @throws DatabaseException for database errors
+   */
+  async findByXeroId(
+    tenantId: string,
+    xeroTransactionId: string,
+  ): Promise<Transaction | null> {
+    try {
+      return await this.prisma.transaction.findFirst({
+        where: {
+          tenantId,
+          xeroTransactionId,
+          isDeleted: false,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find transaction by xeroId: ${xeroTransactionId} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByXeroId',
+        'Failed to find transaction by Xero ID',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Mark transaction as reconciled
    * @throws NotFoundException if transaction doesn't exist or belongs to different tenant
    * @throws DatabaseException for database errors

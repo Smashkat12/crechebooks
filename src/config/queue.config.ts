@@ -33,6 +33,8 @@ export default registerAs('queue', () => ({
 export const QUEUE_NAMES = {
   /** Queue for transaction categorization jobs */
   CATEGORIZATION: 'transaction-categorization',
+  /** Queue for Xero sync jobs */
+  XERO_SYNC: 'xero-sync',
 } as const;
 
 /**

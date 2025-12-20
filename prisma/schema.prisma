@@ -31,6 +31,16 @@ enum UserRole {
   ACCOUNTANT
 }
 
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  CATEGORIZE
+  MATCH
+  RECONCILE
+  SUBMIT
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -78,4 +88,28 @@ model User {
   @@index([tenantId])
   @@index([auth0Id])
   @@map("users")
+}
+
+model AuditLog {
+  id             String      @id @default(uuid())
+  tenantId       String      @map("tenant_id")
+  userId         String?     @map("user_id")
+  agentId        String?     @map("agent_id")
+  entityType     String      @map("entity_type")
+  entityId       String      @map("entity_id")
+  action         AuditAction
+  beforeValue    Json?       @map("before_value")
+  afterValue     Json?       @map("after_value")
+  changeSummary  String?     @map("change_summary")
+  ipAddress      String?     @map("ip_address") @db.VarChar(45)
+  userAgent      String?     @map("user_agent")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  // NOTE: No @updatedAt - this table is IMMUTABLE
+  // NOTE: No foreign keys - intentional for immutability
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
 }

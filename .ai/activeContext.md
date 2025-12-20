@@ -1,7 +1,7 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-CORE-003 Completed)
+2025-12-20 by AI Agent (TASK-CORE-004 Completed)
 
 ## Current Focus
 CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
@@ -11,55 +11,61 @@ CrecheBooks is an AI-powered bookkeeping system for South African creches and pr
 
 ## Active Task
 **Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003
-**Next**: TASK-CORE-004 (Audit Log Entity and Trail System)
+**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004
+**Next**: TASK-TRANS-001 (Transaction Entity and Migration)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
 
 ---
 
-## TASK-CORE-003 Summary (COMPLETED)
+## TASK-CORE-004 Summary (COMPLETED)
 
 ### What Was Built
-- User model in Prisma schema with UserRole enum
-- Database migration creating users table
-- IUser TypeScript interface
-- CreateUserDto and UpdateUserDto with class-validator
-- UserRepository with 8 methods (create, findById, findByAuth0Id, findByTenantAndEmail, findByTenant, update, updateLastLogin, deactivate)
+- AuditLog model in Prisma schema with AuditAction enum (7 values)
+- Database migration with PostgreSQL RULES for immutability
+- IAuditLog TypeScript interface
+- CreateAuditLogDto with class-validator (NO UpdateDto - immutable)
+- AuditLogService with 5 methods (logCreate, logUpdate, logDelete, logAction, getEntityHistory)
 - Comprehensive error handling with fail-fast pattern
-- 21 integration tests using REAL database (no mocks)
+- 16 integration tests using REAL database (no mocks)
+
+### Key Design Decisions
+1. **IMMUTABLE TABLE** - PostgreSQL RULES prevent UPDATE/DELETE at database level
+2. **No foreign keys** - Intentional, to maintain audit integrity if parent records deleted
+3. **Service pattern** - Used AuditLogService instead of repository (business logic)
+4. **Prisma.InputJsonValue** - Used for JSON field types to match Prisma's expectations
+5. **Prisma.DbNull** - Used for null JSON values
 
 ### Key Files Created
 ```
 src/database/
 ├── entities/
-│   ├── user.entity.ts         # IUser interface, UserRole enum
-│   └── index.ts               # Updated
+│   ├── audit-log.entity.ts      # IAuditLog interface, AuditAction enum
+│   └── index.ts                 # Updated
 ├── dto/
-│   ├── user.dto.ts            # CreateUserDto, UpdateUserDto
-│   └── index.ts               # Updated
-├── repositories/
-│   ├── user.repository.ts     # 8 methods with error handling
-│   └── index.ts               # Updated
-├── database.module.ts         # Updated with UserRepository
+│   ├── audit-log.dto.ts         # CreateAuditLogDto (NO update DTO)
+│   └── index.ts                 # Updated
+├── services/
+│   ├── audit-log.service.ts     # 5 methods with error handling
+│   └── index.ts                 # Created
+├── database.module.ts           # Updated with AuditLogService
+└── index.ts                     # Updated with services export
 
 prisma/
-├── schema.prisma              # User model, UserRole enum added
+├── schema.prisma                # AuditLog model, AuditAction enum added
 └── migrations/
-    └── 20251219233350_create_users/
+    └── 20251220000830_create_audit_logs/
+        └── migration.sql        # Includes immutability RULES
 
-tests/database/repositories/
-└── user.repository.spec.ts    # 21 tests with real DB
+tests/database/services/
+└── audit-log.service.spec.ts    # 16 tests with real DB + immutability tests
 ```
-
-### Commits
-- Latest commit includes User entity implementation
 
 ### Verification
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 99 unit + 1 e2e (all passing)
+- Tests: 115 unit + 1 e2e (all passing)
 
 ---
 
@@ -67,13 +73,14 @@ tests/database/repositories/
 
 ### Prisma Schema (prisma/schema.prisma)
 ```
-Enums: TaxStatus, SubscriptionStatus, UserRole
-Models: Tenant, User
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction
+Models: Tenant, User, AuditLog
 ```
 
 ### Migrations Applied
 1. `20251219225823_create_tenants`
 2. `20251219233350_create_users`
+3. `20251220000830_create_audit_logs` (with immutability rules)
 
 ### Project Structure
 ```
@@ -84,10 +91,11 @@ crechebooks/
 │   ├── config/
 │   ├── health/
 │   ├── database/
-│   │   ├── prisma/            # PrismaService, PrismaModule
-│   │   ├── entities/          # ITenant, IUser, enums
-│   │   ├── dto/               # Tenant, User DTOs
-│   │   └── repositories/      # TenantRepository, UserRepository
+│   │   ├── prisma/            # PrismaService, PrismaModule (GLOBAL)
+│   │   ├── entities/          # ITenant, IUser, IAuditLog, enums
+│   │   ├── dto/               # Tenant, User, AuditLog DTOs
+│   │   ├── repositories/      # TenantRepository, UserRepository
+│   │   └── services/          # AuditLogService (NEW)
 │   └── shared/
 │       ├── constants/
 │       ├── exceptions/        # Custom exceptions
@@ -100,25 +108,26 @@ crechebooks/
 ├── tests/
 │   ├── shared/
 │   └── database/
+│       ├── repositories/
+│       └── services/          # NEW
 └── test/
 ```
 
 ---
 
-## TASK-CORE-004 Requirements (NEXT)
+## TASK-TRANS-001 Requirements (NEXT)
 
 ### Purpose
-Create the AuditLog entity for immutable audit trail. This is CRITICAL for financial compliance.
+Create the Transaction entity for bank feed transactions. This is the core entity for the transaction categorization workflow.
 
 ### Key Differences from Previous Tasks
-1. **IMMUTABLE TABLE** - Database rules prevent UPDATE/DELETE
-2. **No foreign keys** - Intentional, to maintain immutability if parent records deleted
-3. **Service instead of Repository** - Uses AuditLogService pattern
-4. **7 action types** - CREATE, UPDATE, DELETE, CATEGORIZE, MATCH, RECONCILE, SUBMIT
+1. More complex entity with many fields
+2. Foreign key to Tenant
+3. Multiple related entities will reference this
+4. Will be imported from bank feeds
 
 ### Dependencies
 - TASK-CORE-002 (Tenant entity) - COMPLETED
-- Note: Does NOT depend on TASK-CORE-003 (User) - userId is just a string, not FK
 
 ---
 
@@ -129,6 +138,9 @@ Create the AuditLog entity for immutable audit trail. This is CRITICAL for finan
 | 2025-12-20 | Tests use real database | No mocks, DATABASE_URL required |
 | 2025-12-20 | Fail fast philosophy | Errors logged fully, then re-thrown |
 | 2025-12-20 | Repository pattern | CRUD in repositories, not services |
+| 2025-12-20 | AuditLog is SERVICE | Business logic pattern, not repository |
+| 2025-12-20 | Prisma.InputJsonValue | Use for JSON field types in service params |
+| 2025-12-20 | Prisma.DbNull | Use for null JSON values in Prisma create |
 
 ---
 
@@ -136,7 +148,7 @@ Create the AuditLog entity for immutable audit trail. This is CRITICAL for finan
 - Constitution: `specs/constitution.md`
 - Data Models: `specs/technical/data-models.md`
 - Task Index: `specs/tasks/_index.md`
-- Task Spec: `specs/tasks/TASK-CORE-004.md`
+- Task Spec: `specs/tasks/TASK-TRANS-001.md`
 - Progress: `.ai/progress.md`
 - Decisions: `.ai/decisionLog.md`
 
@@ -153,11 +165,11 @@ pnpm run test:e2e # E2E tests must pass
 ---
 
 ## Current Blockers
-- None - Ready to proceed with TASK-CORE-004
+- None - Ready to proceed with TASK-TRANS-001
 
 ---
 
 ## Session Notes
-TASK-CORE-003 completed with 99 unit tests + 1 e2e passing.
-Foundation Layer: 3/15 tasks complete (20%).
-Next: Audit Log Entity (immutable table with database rules).
+TASK-CORE-004 completed with 115 unit tests + 1 e2e passing.
+Foundation Layer: 4/15 tasks complete (26.7%).
+Next: Transaction Entity (core entity for categorization).

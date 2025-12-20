@@ -139,6 +139,25 @@ enum MatchedBy {
   USER
 }
 
+enum EmploymentType {
+  PERMANENT
+  CONTRACT
+  CASUAL
+}
+
+enum PayFrequency {
+  MONTHLY
+  WEEKLY
+  DAILY
+  HOURLY
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -173,6 +192,8 @@ model Tenant {
   children      Child[]
   invoices      Invoice[]
   payments      Payment[]
+  staff         Staff[]
+  payrolls      Payroll[]
 
   @@map("tenants")
 }
@@ -485,4 +506,67 @@ model Payment {
   @@index([tenantId, invoiceId])
   @@index([xeroPaymentId])
   @@map("payments")
+}
+
+model Staff {
+  id                String         @id @default(uuid())
+  tenantId          String         @map("tenant_id")
+  employeeNumber    String?        @map("employee_number") @db.VarChar(50)
+  firstName         String         @map("first_name") @db.VarChar(100)
+  lastName          String         @map("last_name") @db.VarChar(100)
+  idNumber          String         @map("id_number") @db.VarChar(13)
+  taxNumber         String?        @map("tax_number") @db.VarChar(20)
+  email             String?        @db.VarChar(255)
+  phone             String?        @db.VarChar(20)
+  dateOfBirth       DateTime       @map("date_of_birth") @db.Date
+  startDate         DateTime       @map("start_date") @db.Date
+  endDate           DateTime?      @map("end_date") @db.Date
+  employmentType    EmploymentType @map("employment_type")
+  payFrequency      PayFrequency   @default(MONTHLY) @map("pay_frequency")
+  basicSalaryCents  Int            @map("basic_salary_cents")
+  bankName          String?        @map("bank_name") @db.VarChar(100)
+  bankAccount       String?        @map("bank_account") @db.VarChar(20)
+  bankBranchCode    String?        @map("bank_branch_code") @db.VarChar(10)
+  medicalAidMembers Int            @default(0) @map("medical_aid_members")
+  isActive          Boolean        @default(true) @map("is_active")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  payrolls Payroll[]
+
+  @@unique([tenantId, idNumber])
+  @@index([tenantId, isActive])
+  @@map("staff")
+}
+
+model Payroll {
+  id                    String        @id @default(uuid())
+  tenantId              String        @map("tenant_id")
+  staffId               String        @map("staff_id")
+  payPeriodStart        DateTime      @map("pay_period_start") @db.Date
+  payPeriodEnd          DateTime      @map("pay_period_end") @db.Date
+  basicSalaryCents      Int           @map("basic_salary_cents")
+  overtimeCents         Int           @default(0) @map("overtime_cents")
+  bonusCents            Int           @default(0) @map("bonus_cents")
+  otherEarningsCents    Int           @default(0) @map("other_earnings_cents")
+  grossSalaryCents      Int           @map("gross_salary_cents")
+  payeCents             Int           @map("paye_cents")
+  uifEmployeeCents      Int           @map("uif_employee_cents")
+  uifEmployerCents      Int           @map("uif_employer_cents")
+  otherDeductionsCents  Int           @default(0) @map("other_deductions_cents")
+  netSalaryCents        Int           @map("net_salary_cents")
+  medicalAidCreditCents Int           @default(0) @map("medical_aid_credit_cents")
+  status                PayrollStatus @default(DRAFT)
+  paymentDate           DateTime?     @map("payment_date") @db.Date
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id])
+
+  @@unique([tenantId, staffId, payPeriodStart])
+  @@index([tenantId, status])
+  @@index([tenantId, payPeriodStart])
+  @@map("payrolls")
 }

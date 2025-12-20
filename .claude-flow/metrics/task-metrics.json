@@ -1,18 +1,10 @@
 [
   {
-    "id": "cmd-init-1766191491132",
+    "id": "cmd-init-1766235483174",
     "type": "init",
     "success": true,
-    "duration": 1.6001550000000009,
-    "timestamp": 1766191491133,
-    "metadata": {}
-  },
-  {
-    "id": "cmd-memory-1766198172757",
-    "type": "memory",
-    "success": true,
-    "duration": 381.57396300000005,
-    "timestamp": 1766198173138,
+    "duration": 1.1591870000000029,
+    "timestamp": 1766235483175,
     "metadata": {}
   }
 ]

@@ -298,4 +298,53 @@ Migration:
   <command>npm run test -- --grep "SarsSubmissionRepository"</command>
 </test_commands>
 
+<learned_context>
+  <!-- Context from TASK-SARS-001 implementation (Staff & Payroll entities) -->
+
+  <implementation_patterns>
+    - Repository methods should use BusinessException (not ValidationException) for status
+      transition errors - BusinessException accepts (message, code, context) signature
+    - Use PrismaClientKnownRequestError.code 'P2002' for unique constraint violations
+      and 'P2003' for foreign key constraint violations
+    - Date fields stored as @db.Date type in Prisma need careful comparison in tests:
+      set hours to 0,0,0,0 before comparing to avoid time portion mismatch
+    - All monetary values use _cents suffix consistently (grossSalaryCents, netSalaryCents)
+    - Test cleanup order is critical: sars_submissions must be deleted BEFORE staff/payroll
+      but AFTER any tables that reference it
+  </implementation_patterns>
+
+  <test_patterns>
+    - Use beforeEach to clean all tables in FK-respecting order
+    - Use onModuleInit() and onModuleDestroy() for Prisma lifecycle in tests
+    - Create test tenant with all required fields: name, addressLine1, city, province,
+      postalCode, phone, email
+    - Use Date.now() in email fields to ensure uniqueness across test runs
+    - Test status transitions thoroughly: DRAFT -> READY -> SUBMITTED -> ACKNOWLEDGED
+  </test_patterns>
+
+  <existing_entities>
+    - Staff and Payroll entities now exist (from TASK-SARS-001)
+    - Payroll contains PAYE and UIF fields: payeCents, uifEmployeeCents, uifEmployerCents
+    - EMP201 submissions can aggregate data from payrolls table for period totals
+    - Staff contains taxNumber field for IRP5 generation reference
+  </existing_entities>
+
+  <cleanup_order_update>
+    When adding sars_submissions table, update test cleanup order across ALL test files:
+    1. sars_submissions (references tenant, user)
+    2. payroll (references staff, tenant)
+    3. staff (references tenant)
+    4. payment (references invoice, parent)
+    5. invoice_lines (references invoice, fee_structure)
+    6. invoices (references tenant, parent)
+    7. enrollments (references child, fee_structure)
+    8. fee_structures (references tenant)
+    9. children (references parent)
+    10. parents (references tenant)
+    11. payee_patterns, categorizations, transactions
+    12. users (references tenant)
+    13. tenants
+  </cleanup_order_update>
+</learned_context>
+
 </task_spec>

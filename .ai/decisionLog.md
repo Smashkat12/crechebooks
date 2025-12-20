@@ -488,6 +488,160 @@ if (dto.isRecurring && dto.expectedAmountCents === undefined) {
 
 ---
 
+## DEC-027: Cascade Delete for Enrollments
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Enrollment cascades from Child, not from FeeStructure
+
+**Implementation**:
+```prisma
+model Enrollment {
+  child Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id])
+}
+```
+
+**Rationale**:
+- Deleting a child should remove all their enrollments
+- Deleting a fee structure should NOT delete enrollments (use deactivate instead)
+- Matches real-world business logic
+
+---
+
+## DEC-028: Soft Delete vs Deactivate for FeeStructure
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: FeeStructure uses deactivate() pattern with isActive flag
+
+**Implementation**:
+```typescript
+async deactivate(id: string): Promise<FeeStructure> {
+  return await this.prisma.feeStructure.update({
+    where: { id },
+    data: { isActive: false },
+  });
+}
+```
+
+**Rationale**:
+- Cannot hard delete if enrollments exist (FK constraint)
+- isActive flag preserves historical data
+- Active fee structures filtered in queries
+
+---
+
+## DEC-029: Date-Only Fields for Billing
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Use @db.Date for billing-related dates
+
+**Implementation**:
+```prisma
+model FeeStructure {
+  effectiveFrom DateTime @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+}
+
+model Enrollment {
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+}
+```
+
+**Test Pattern**:
+```typescript
+// WRONG - timestamp comparison fails on date-only fields
+expect(Math.abs(now.getTime() - endDate.getTime())).toBeLessThan(5000);
+
+// CORRECT - compare date components
+expect(endDate.getFullYear()).toBe(now.getFullYear());
+expect(endDate.getMonth()).toBe(now.getMonth());
+expect(endDate.getDate()).toBe(now.getDate());
+```
+
+**Rationale**:
+- Billing periods don't need time precision
+- PostgreSQL DATE type is more efficient
+- Avoids timezone confusion
+
+---
+
+## DEC-030: Sibling Discount Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Store discount percentage on FeeStructure, applied flag on Enrollment
+
+**Implementation**:
+```prisma
+model FeeStructure {
+  siblingDiscountPercent Decimal? @map("sibling_discount_percent") @db.Decimal(5, 2)
+}
+
+model Enrollment {
+  siblingDiscountApplied Boolean @default(false) @map("sibling_discount_applied")
+}
+```
+
+**Rationale**:
+- Fee structure defines available discount rate
+- Enrollment tracks whether discount was applied
+- Allows future audit of discount decisions
+
+---
+
+## DEC-031: Test Cleanup Order Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Delete tables in FK dependency order (leaf tables first)
+
+**Implementation**:
+```typescript
+beforeEach(async () => {
+  // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.enrollment.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  await prisma.child.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.payeePattern.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.tenant.deleteMany({});
+});
+```
+
+**Rationale**:
+- Foreign key constraints require child deletion before parent
+- Must update ALL existing test files when adding new tables
+- Order must be maintained across all test files
+
+---
+
+## DEC-032: Enrollment Withdraw Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Dedicated withdraw() method sets status and end date atomically
+
+**Implementation**:
+```typescript
+async withdraw(id: string): Promise<Enrollment> {
+  return await this.prisma.enrollment.update({
+    where: { id },
+    data: {
+      status: 'WITHDRAWN',
+      endDate: new Date(),
+    },
+  });
+}
+```
+
+**Rationale**:
+- Common operation needs dedicated method
+- Ensures status and endDate stay in sync
+- Clear audit trail of withdrawal date
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
@@ -498,3 +652,4 @@ if (dto.isRecurring && dto.expectedAmountCents === undefined) {
 | 2025-12-20 | DEC-017, DEC-018 added (TASK-CORE-003 learnings) | AI Agent |
 | 2025-12-20 | DEC-019 through DEC-022 added (TASK-TRANS-001 learnings) | AI Agent |
 | 2025-12-20 | DEC-023 through DEC-026 added (TASK-TRANS-003 learnings) | AI Agent |
+| 2025-12-20 | DEC-027 through DEC-032 added (TASK-BILL-002 learnings) | AI Agent |

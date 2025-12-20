@@ -44,7 +44,7 @@
 - [x] **TASK-TRANS-002**: Categorization Entity and Types - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-003**: Payee Pattern Entity - **COMPLETED 2025-12-20**
 - [x] **TASK-BILL-001**: Parent and Child Entities - **COMPLETED 2025-12-20**
-- [ ] TASK-BILL-002: Fee Structure and Enrollment Entities
+- [x] **TASK-BILL-002**: Fee Structure and Enrollment Entities - **COMPLETED 2025-12-20**
 - [ ] TASK-BILL-003: Invoice and Invoice Line Entities
 - [ ] TASK-PAY-001: Payment Entity and Types
 - [ ] TASK-SARS-001: Staff and Payroll Entities
@@ -52,7 +52,7 @@
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 8/15 (53.3%)**
+**Progress: 9/15 (60.0%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -157,15 +157,9 @@
 - Case-insensitive alias matching
 - Multi-tenant isolation
 
-**Verification**:
-- Build: PASS
-- Lint: PASS (0 errors, 0 warnings)
-- Tests: 200 tests (all passing with --runInBand)
-
-**GitHub**: https://github.com/Smashkat12/crechebooks
-
 ### TASK-BILL-001 Completion Summary
 **Date**: 2025-12-20
+**Commit**: b2c5986
 
 **Implemented**:
 - Gender enum in Prisma schema (MALE, FEMALE, OTHER)
@@ -183,20 +177,48 @@
 - IParent and IChild TypeScript interfaces
 - CreateParentDto, UpdateParentDto, ParentFilterDto with validation
 - CreateChildDto, UpdateChildDto, ChildFilterDto with validation
-- ParentRepository with 7 methods:
-  - create, findById, findByTenant (with filters)
-  - findByEmail, findByXeroContactId
-  - update, delete
-- ChildRepository with 7 methods:
-  - create, findById, findByParent, findByTenant (with filters)
-  - update, delete, getAgeInMonths
+- ParentRepository with 7 methods
+- ChildRepository with 7 methods + getAgeInMonths
 - Cascade delete verified (deleting parent deletes children)
-- 47 integration tests using REAL database (18 Parent + 20 Child + 9 updated existing)
+- 47 integration tests using REAL database
+
+### TASK-BILL-002 Completion Summary
+**Date**: 2025-12-20
+**Commit**: c60925c
+
+**Implemented**:
+- FeeType enum (FULL_DAY, HALF_DAY, HOURLY, CUSTOM)
+- EnrollmentStatus enum (ACTIVE, PENDING, WITHDRAWN, GRADUATED)
+- FeeStructure model in Prisma schema (13 columns)
+  - Sibling discount percentage field
+  - Effective date range (effectiveFrom, effectiveTo)
+  - VAT inclusive flag
+- Enrollment model in Prisma schema (11 columns)
+  - Links Child to FeeStructure
+  - Custom fee override for special cases
+  - Sibling discount applied flag
+  - Cascade delete from Child (onDelete: Cascade)
+- Database migration `20251220023800_create_fee_structures_and_enrollments`
+- IFeeStructure and IEnrollment TypeScript interfaces
+- CreateFeeStructureDto, UpdateFeeStructureDto, FeeStructureFilterDto
+- CreateEnrollmentDto, UpdateEnrollmentDto, EnrollmentFilterDto
+- FeeStructureRepository with 7 methods:
+  - create, findById, findByTenant (with filters)
+  - findActiveByTenant, findEffectiveOnDate
+  - update, deactivate, delete
+- EnrollmentRepository with 8 methods:
+  - create, findById, findByTenant, findByChild
+  - findActiveByChild, findByStatus
+  - update, delete, withdraw
+- 55 new integration tests using REAL database (no mocks)
+- Updated all 9 existing test files with new cleanup order
 
 **Verification**:
-- Build: PASS (0 errors)
+- Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 247 tests (all passing with --runInBand)
+- Tests: 304 tests (all passing with --runInBand)
+
+**GitHub**: https://github.com/Smashkat12/crechebooks
 
 ---
 
@@ -205,11 +227,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 8 |
+| Completed | 9 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 54 |
-| **Overall Progress** | **12.9%** |
+| Remaining | 53 |
+| **Overall Progress** | **14.5%** |
 
 ---
 
@@ -283,10 +305,18 @@
 5. **Composite FK**: Child references both tenantId and parentId for proper scoping
 6. **Optional Email**: Parent email is optional (nullable) but unique within tenant when provided
 
+### Key Learnings from TASK-BILL-002
+1. **FK Cleanup Order (CRITICAL)**: Delete in leaf-to-root order (enrollment → feeStructure → child → parent → ...)
+2. **Date-Only Comparison**: @db.Date fields strip time to 00:00:00 UTC; compare year/month/day, not milliseconds
+3. **Prisma Generate**: MUST run `pnpm prisma generate` after schema changes before build
+4. **Test Race Conditions**: Always run with `--runInBand` to avoid parallel conflicts
+5. **Deactivate vs Delete**: FeeStructure uses deactivate() when enrollments exist (FK constraint)
+6. **Withdraw Pattern**: Dedicated method sets status=WITHDRAWN and endDate atomically
+
 ### Current Database State
 ```prisma
-Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact
-Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, Parent, Child
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus
+Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child
 ```
 
 ### Applied Migrations
@@ -297,6 +327,23 @@ Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, Paren
 5. `20251220010512_create_categorizations` - Categorization table with FK to transactions
 6. `20251220014604_create_payee_patterns` - PayeePattern table with JSONB aliases
 7. `20251220020708_create_parents_and_children` - Parent and Child tables with cascade delete
+8. `20251220023800_create_fee_structures_and_enrollments` - FeeStructure and Enrollment tables
+
+### Test Cleanup Order (CRITICAL)
+```typescript
+beforeEach(async () => {
+  // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.enrollment.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  await prisma.child.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.payeePattern.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.tenant.deleteMany({});
+});
+```
 
 ### Project Structure
 ```
@@ -320,6 +367,8 @@ crechebooks/
 │   │   │   ├── payee-pattern.entity.ts
 │   │   │   ├── parent.entity.ts
 │   │   │   ├── child.entity.ts
+│   │   │   ├── fee-structure.entity.ts
+│   │   │   ├── enrollment.entity.ts
 │   │   │   └── index.ts
 │   │   ├── dto/
 │   │   │   ├── tenant.dto.ts
@@ -330,6 +379,8 @@ crechebooks/
 │   │   │   ├── payee-pattern.dto.ts
 │   │   │   ├── parent.dto.ts
 │   │   │   ├── child.dto.ts
+│   │   │   ├── fee-structure.dto.ts
+│   │   │   ├── enrollment.dto.ts
 │   │   │   └── index.ts
 │   │   ├── repositories/
 │   │   │   ├── tenant.repository.ts
@@ -339,6 +390,8 @@ crechebooks/
 │   │   │   ├── payee-pattern.repository.ts
 │   │   │   ├── parent.repository.ts
 │   │   │   ├── child.repository.ts
+│   │   │   ├── fee-structure.repository.ts
+│   │   │   ├── enrollment.repository.ts
 │   │   │   └── index.ts
 │   │   ├── services/
 │   │   │   ├── audit-log.service.ts
@@ -366,7 +419,9 @@ crechebooks/
 │       │   ├── categorization.repository.spec.ts
 │       │   ├── payee-pattern.repository.spec.ts
 │       │   ├── parent.repository.spec.ts
-│       │   └── child.repository.spec.ts
+│       │   ├── child.repository.spec.ts
+│       │   ├── fee-structure.repository.spec.ts
+│       │   └── enrollment.repository.spec.ts
 │       └── services/
 │           └── audit-log.service.spec.ts
 └── test/

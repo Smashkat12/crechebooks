@@ -1,7 +1,7 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-TRANS-003 Completed)
+2025-12-20 by AI Agent (TASK-BILL-002 Completed)
 
 ## Current Focus
 CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
@@ -11,71 +11,96 @@ CrecheBooks is an AI-powered bookkeeping system for South African creches and pr
 
 ## Active Task
 **Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003
-**Next**: TASK-BILL-001 (Parent and Child Entities)
+**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003, TASK-BILL-001, TASK-BILL-002
+**Next**: TASK-BILL-003 (Invoice and Invoice Line Entities)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
 
 ---
 
-## TASK-TRANS-003 Summary (COMPLETED)
+## TASK-BILL-002 Summary (COMPLETED)
 
 ### What Was Built
-- PayeePattern model in Prisma schema with 12 columns
-- JSONB column for payeeAliases array storage
-- Database migration `20251220014604_create_payee_patterns`
-- IPayeePattern TypeScript interface
-- CreatePayeePatternDto, UpdatePayeePatternDto, PayeePatternFilterDto
-- PayeePatternRepository with 7 methods:
+- FeeType enum (FULL_DAY, HALF_DAY, HOURLY, CUSTOM)
+- EnrollmentStatus enum (ACTIVE, PENDING, WITHDRAWN, GRADUATED)
+- FeeStructure model in Prisma schema (13 columns)
+  - Sibling discount percentage field
+  - Effective date range (effectiveFrom, effectiveTo)
+  - VAT inclusive flag
+- Enrollment model in Prisma schema (11 columns)
+  - Links Child to FeeStructure
+  - Custom fee override for special cases
+  - Sibling discount applied flag
+  - Cascade delete from Child (onDelete: Cascade)
+- Database migration `20251220023800_create_fee_structures_and_enrollments`
+- IFeeStructure and IEnrollment TypeScript interfaces
+- CreateFeeStructureDto, UpdateFeeStructureDto, FeeStructureFilterDto
+- CreateEnrollmentDto, UpdateEnrollmentDto, EnrollmentFilterDto
+- FeeStructureRepository with 7 methods:
   - create, findById, findByTenant (with filters)
-  - findByPayeeName (exact + alias matching)
-  - incrementMatchCount (atomic), update, delete
-- 20+ integration tests using REAL database (no mocks)
-- Business validation: recurring patterns require expectedAmountCents
-- Multi-tenant isolation on all queries
-- Case-insensitive alias matching
+  - findActiveByTenant, findEffectiveOnDate
+  - update, deactivate, delete
+- EnrollmentRepository with 8 methods:
+  - create, findById, findByTenant, findByChild
+  - findActiveByChild, findByStatus
+  - update, delete, withdraw
+- 55 new integration tests using REAL database (no mocks)
+- Updated all 7 existing test files with new cleanup order
 
 ### Key Design Decisions
-1. **JSONB for Aliases** - Store aliases as JSON array for flexible matching
-2. **Atomic Increment** - Use Prisma's { increment: 1 } for matchCount
-3. **Case-Insensitive Matching** - Both payeePattern and aliases match case-insensitively
-4. **Unique Constraint** - (tenantId, payeePattern) enforces one pattern per tenant
-5. **Recurring Validation** - isRecurring=true requires expectedAmountCents
+1. **Cascade Delete** - Enrollment cascades from Child (not FeeStructure)
+2. **Soft Delete for FeeStructure** - Use deactivate() instead of delete() when enrollments exist
+3. **Date-Only Fields** - Use @db.Date for effectiveFrom, effectiveTo, startDate, endDate
+4. **Sibling Discount** - Stored as Decimal(5,2) percentage on FeeStructure, boolean flag on Enrollment
+5. **Withdraw Method** - Sets status to WITHDRAWN and endDate to current date
+
+### Key Lessons Learned
+1. **FK Cleanup Order** - CRITICAL: Delete in leaf-to-root order (enrollment → feeStructure → child → parent → ...)
+2. **Date-Only Comparison** - @db.Date fields strip time to 00:00:00 UTC; compare year/month/day, not milliseconds
+3. **Prisma Generate** - MUST run `pnpm prisma generate` after schema changes before build
+4. **Test Race Conditions** - Always run with `--runInBand` to avoid parallel conflicts
 
 ### Key Files Created
 ```
 src/database/
 ├── entities/
-│   ├── payee-pattern.entity.ts  # IPayeePattern interface
+│   ├── fee-structure.entity.ts  # IFeeStructure interface, FeeType enum
+│   ├── enrollment.entity.ts     # IEnrollment interface, EnrollmentStatus enum
 │   └── index.ts                 # Updated
 ├── dto/
-│   ├── payee-pattern.dto.ts     # Create, Update, Filter DTOs
+│   ├── fee-structure.dto.ts     # Create, Update, Filter DTOs
+│   ├── enrollment.dto.ts        # Create, Update, Filter DTOs
 │   └── index.ts                 # Updated
 ├── repositories/
-│   ├── payee-pattern.repository.ts  # 7 methods
+│   ├── fee-structure.repository.ts  # 7 methods
+│   ├── enrollment.repository.ts     # 8 methods
 │   └── index.ts                 # Updated
 
 prisma/
-├── schema.prisma                # PayeePattern model, Tenant relation updated
+├── schema.prisma                # FeeStructure, Enrollment models, enums
 └── migrations/
-    └── 20251220014604_create_payee_patterns/
+    └── 20251220023800_create_fee_structures_and_enrollments/
         └── migration.sql
 
 tests/database/repositories/
-├── payee-pattern.repository.spec.ts  # 20+ tests with real DB
+├── fee-structure.repository.spec.ts  # 24 tests with real DB
+├── enrollment.repository.spec.ts     # 31 tests with real DB
 ├── tenant.repository.spec.ts         # Updated cleanup order
 ├── user.repository.spec.ts           # Updated cleanup order
 ├── transaction.repository.spec.ts    # Updated cleanup order
-└── categorization.repository.spec.ts # Updated cleanup order
+├── categorization.repository.spec.ts # Updated cleanup order
+├── payee-pattern.repository.spec.ts  # Updated cleanup order
+├── parent.repository.spec.ts         # Updated cleanup order
+└── child.repository.spec.ts          # Updated cleanup order
 ```
 
 ### Verification
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 200 tests (all passing with --runInBand)
-  - 31 new payee pattern tests
-  - 169 existing tests
+- Tests: 304 tests (all passing with --runInBand)
+  - 55 new tests (fee structure + enrollment)
+  - 249 existing tests
 
 ---
 
@@ -83,17 +108,35 @@ tests/database/repositories/
 
 ### Prisma Schema (prisma/schema.prisma)
 ```
-Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource
-Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus
+Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child
 ```
 
 ### Migrations Applied
 1. `20251219225823_create_tenants`
 2. `20251219233350_create_users`
 3. `20251220000830_create_audit_logs` (with immutability rules)
-4. `20251220XXXXXX_create_transactions`
-5. `20251220012120_create_categorizations`
+4. `20251220004833_create_transactions`
+5. `20251220010512_create_categorizations`
 6. `20251220014604_create_payee_patterns`
+7. `20251220020708_create_parents_and_children`
+8. `20251220023800_create_fee_structures_and_enrollments`
+
+### Test Cleanup Order (CRITICAL)
+```typescript
+beforeEach(async () => {
+  // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.enrollment.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  await prisma.child.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.payeePattern.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.tenant.deleteMany({});
+});
+```
 
 ### Project Structure
 ```
@@ -105,9 +148,9 @@ crechebooks/
 │   ├── health/
 │   ├── database/
 │   │   ├── prisma/            # PrismaService, PrismaModule (GLOBAL)
-│   │   ├── entities/          # ITenant, IUser, IAuditLog, ITransaction, ICategorization, IPayeePattern, enums
-│   │   ├── dto/               # Tenant, User, AuditLog, Transaction, Categorization, PayeePattern DTOs
-│   │   ├── repositories/      # TenantRepository, UserRepository, TransactionRepository, CategorizationRepository, PayeePatternRepository
+│   │   ├── entities/          # 10 entity files (tenant, user, audit-log, transaction, categorization, payee-pattern, parent, child, fee-structure, enrollment)
+│   │   ├── dto/               # 10 DTO files
+│   │   ├── repositories/      # 9 repositories (tenant, user, transaction, categorization, payee-pattern, parent, child, fee-structure, enrollment)
 │   │   └── services/          # AuditLogService
 │   └── shared/
 │       ├── constants/
@@ -116,12 +159,12 @@ crechebooks/
 │       └── utils/             # Money, Date utilities
 ├── prisma/
 │   ├── schema.prisma
-│   └── migrations/
+│   └── migrations/            # 8 migrations
 ├── prisma.config.ts           # Prisma 7 config
 ├── tests/
 │   ├── shared/
 │   └── database/
-│       ├── repositories/      # tenant, user, transaction, categorization, payee-pattern specs
+│       ├── repositories/      # 9 spec files (304 tests total)
 │       └── services/          # audit-log spec
 └── test/
 ```
@@ -131,10 +174,10 @@ crechebooks/
 ## Recent Decisions
 | Date | Decision | Impact |
 |------|----------|--------|
-| 2025-12-20 | JSONB for payeeAliases | Flexible array storage with JSON operations |
-| 2025-12-20 | Atomic matchCount increment | Use Prisma { increment: 1 } for thread safety |
-| 2025-12-20 | Case-insensitive matching | Both pattern and aliases match regardless of case |
-| 2025-12-20 | Recurring validation | BusinessException if isRecurring=true without expectedAmountCents |
+| 2025-12-20 | Cascade delete Enrollment from Child | Deleting child removes all enrollments |
+| 2025-12-20 | Soft delete for FeeStructure | Use deactivate() when enrollments exist |
+| 2025-12-20 | Date-only fields for billing dates | Compare year/month/day, not timestamps |
+| 2025-12-20 | Sibling discount on FeeStructure | Percentage stored as Decimal(5,2) |
 
 ---
 
@@ -151,20 +194,20 @@ crechebooks/
 ```bash
 pnpm run build           # Must compile without errors
 pnpm run lint            # Must pass with 0 warnings
-pnpm test --runInBand    # All tests must pass (200 tests)
+npx jest --runInBand     # All tests must pass (304 tests)
 pnpm run test:e2e        # E2E tests must pass
 ```
 
 ---
 
 ## Current Blockers
-- None - Ready for next task (TASK-BILL-001)
+- None - Ready for next task (TASK-BILL-003)
 
 ---
 
 ## Session Notes
-TASK-TRANS-003 completed with 200 tests passing.
-Foundation Layer: 7/15 tasks complete (46.7%).
-31 new payee pattern tests added.
-All business validations (recurring patterns, multi-tenant isolation) implemented.
-JSONB used for flexible alias storage and matching.
+TASK-BILL-002 completed with 304 tests passing.
+Foundation Layer: 9/15 tasks complete (60%).
+55 new tests added (fee structure + enrollment).
+All existing test files updated with new cleanup order.
+Commit c60925c pushed to origin/main.

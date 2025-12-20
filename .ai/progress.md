@@ -69,7 +69,7 @@
 - [x] **TASK-BILL-014**: Pro-rata Calculation Service - **COMPLETED 2025-12-20**
 - [x] **TASK-PAY-011**: Payment Matching Service - **COMPLETED 2025-12-20**
 - [x] **TASK-PAY-012**: Payment Allocation Service - **COMPLETED 2025-12-21**
-- [ ] **TASK-PAY-013**: Arrears Calculation Service
+- [x] **TASK-PAY-013**: Arrears Calculation Service - **COMPLETED 2025-12-21**
 - [ ] **TASK-PAY-014**: Payment Reminder Service
 - [ ] **TASK-SARS-011**: VAT Calculation Service
 - [ ] **TASK-SARS-012**: PAYE Calculation Service
@@ -81,7 +81,42 @@
 - [ ] **TASK-RECON-012**: Discrepancy Detection Service
 - [ ] **TASK-RECON-013**: Financial Report Service
 
-**Progress: 10/21 (47.6%)**
+**Progress: 11/21 (52.4%)**
+
+### TASK-PAY-013 Completion Summary
+**Date**: 2025-12-21
+
+**Implemented**:
+- ArrearsService with comprehensive arrears reporting
+- getArrearsReport() - full report with aging, top debtors, and invoices
+- calculateAging() - buckets: current (0-7d), 30 (8-30d), 60 (31-60d), 90+ (61+d)
+- getParentHistory() - payment patterns with on-time/late stats
+- getTopDebtors() - raw SQL for performance, sorted by outstanding amount
+- exportArrearsCSV() - proper CSV with escaping
+- Service-layer DTOs (arrears.dto.ts)
+
+**Key Features**:
+- All amounts in cents (integers)
+- Decimal.js with banker's rounding (ROUND_HALF_EVEN)
+- Raw SQL aggregation for top debtors performance
+- Proper aging bucket thresholds
+- Tenant isolation on all queries
+- Fail-fast error handling with logging
+
+**Files Created**:
+- `src/database/dto/arrears.dto.ts`
+- `src/database/services/arrears.service.ts`
+- `tests/database/services/arrears.service.spec.ts`
+
+**Files Modified**:
+- `src/database/database.module.ts` - Added ArrearsService
+- `src/database/dto/index.ts` - Export arrears DTOs
+- `src/database/services/index.ts` - Export ArrearsService
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 989 tests (44 new tests for TASK-PAY-013)
 
 ### TASK-TRANS-011 Completion Summary
 **Date**: 2025-12-20
@@ -657,11 +692,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 21 |
+| Completed | 26 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 41 |
-| **Overall Progress** | **33.9%** |
+| Remaining | 36 |
+| **Overall Progress** | **41.9%** |
 
 ---
 

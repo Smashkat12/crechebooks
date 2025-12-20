@@ -8,3 +8,4 @@ export * from './invoice-generation.service';
 export * from './invoice-delivery.service';
 export * from './pro-rata.service';
 export * from './payment-matching.service';
+export * from './payment-allocation.service';

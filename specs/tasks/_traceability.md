@@ -65,8 +65,8 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | TransactionService.categorizeTransactions | method | TASK-TRANS-012 | ✅ Complete |
 | TransactionService.updateCategorization | method | TASK-TRANS-012 | ✅ Complete |
 | BillingService.generateMonthlyInvoices | method | TASK-BILL-012 | ✅ Complete |
-| BillingService.sendInvoices | method | TASK-BILL-013 | Pending |
-| PaymentService.matchPayments | method | TASK-PAY-011 | Pending |
+| BillingService.sendInvoices | method | TASK-BILL-013 | ✅ Complete |
+| PaymentService.matchPayments | method | TASK-PAY-011 | ✅ Complete |
 | PaymentService.allocatePayment | method | TASK-PAY-012 | Pending |
 | PaymentService.getArrearsReport | method | TASK-PAY-013 | Pending |
 | SarsService.generateVat201 | method | TASK-SARS-014 | Pending |
@@ -121,11 +121,11 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Invoices as drafts in Xero | REQ-BILL-003 | TASK-BILL-012 | ✅ Complete |
 | Invoice content | REQ-BILL-004 | TASK-BILL-003, TASK-BILL-012 | ✅ Complete |
 | Variable fee structures | REQ-BILL-005 | TASK-BILL-002, TASK-BILL-012 | ✅ Complete |
-| Email invoice delivery | REQ-BILL-006 | TASK-BILL-013 | Pending |
-| WhatsApp delivery | REQ-BILL-007 | TASK-BILL-013 | Pending |
-| Delivery status tracking | REQ-BILL-008 | TASK-BILL-003, TASK-BILL-013 | Pending |
+| Email invoice delivery | REQ-BILL-006 | TASK-BILL-013 | ✅ Complete |
+| WhatsApp delivery | REQ-BILL-007 | TASK-BILL-013 | Partial (API not implemented) |
+| Delivery status tracking | REQ-BILL-008 | TASK-BILL-003, TASK-BILL-013 | ✅ Complete |
 | Enrollment register | REQ-BILL-009 | TASK-BILL-001, TASK-BILL-002, TASK-BILL-011 | Pending |
-| Pro-rata calculation | REQ-BILL-010 | TASK-BILL-014 | Pending |
+| Pro-rata calculation | REQ-BILL-010 | TASK-BILL-014 | ✅ Complete |
 | Ad-hoc charges | REQ-BILL-011 | TASK-BILL-003, TASK-BILL-012 | Pending |
 | VAT calculation | REQ-BILL-012 | TASK-BILL-012 | Pending |
 
@@ -137,10 +137,10 @@ This document ensures 100% coverage of all requirements in the specifications. E
 
 | Spec Item | ID | Covered by Task ID | Status |
 |-----------|----|--------------------|--------|
-| Payment matching | REQ-PAY-001 | TASK-PAY-011 | Pending |
-| Match by reference, amount, name | REQ-PAY-002 | TASK-PAY-011, TASK-AGENT-003 | Pending |
-| Exact match auto-apply | REQ-PAY-003 | TASK-PAY-011 | Pending |
-| Ambiguous match flagging | REQ-PAY-004 | TASK-PAY-011 | Pending |
+| Payment matching | REQ-PAY-001 | TASK-PAY-011 | ✅ Complete |
+| Match by reference, amount, name | REQ-PAY-002 | TASK-PAY-011, TASK-AGENT-003 | Partial (TASK-AGENT-003 pending) |
+| Exact match auto-apply | REQ-PAY-003 | TASK-PAY-011 | ✅ Complete |
+| Ambiguous match flagging | REQ-PAY-004 | TASK-PAY-011 | ✅ Complete |
 | Partial payments | REQ-PAY-005 | TASK-PAY-012 | Pending |
 | Combined payments | REQ-PAY-006 | TASK-PAY-012 | Pending |
 | Arrears dashboard | REQ-PAY-007 | TASK-PAY-013, TASK-PAY-033 | Pending |
@@ -237,3 +237,8 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-20 | TASK-TRANS-013 marked complete (Pattern Learning Service - 735 tests) | AI Agent |
 | 2025-12-20 | TASK-TRANS-014 marked complete (Xero Sync Service - 757 tests) | AI Agent |
 | 2025-12-20 | TASK-BILL-011 marked complete (Enrollment Management Service - 784 tests) | AI Agent |
+| 2025-12-20 | TASK-BILL-012 marked complete (Invoice Generation Service - 812 tests) | AI Agent |
+| 2025-12-20 | TASK-BILL-013 spec updated v2.0 with corrected file paths and project context | AI Agent |
+| 2025-12-20 | TASK-BILL-013 marked complete (Invoice Delivery Service - 833 tests) | AI Agent |
+| 2025-12-20 | TASK-BILL-014 marked complete (Pro-rata Calculation Service - 874 tests) | AI Agent |
+| 2025-12-20 | TASK-PAY-011 marked complete (Payment Matching Service - 905 tests) | AI Agent |

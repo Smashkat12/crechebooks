@@ -1,4 +1,4 @@
-<task_spec id="TASK-BILL-013" version="1.0">
+<task_spec id="TASK-BILL-013" version="2.0">
 
 <metadata>
   <title>Invoice Delivery Service</title>
@@ -12,646 +12,875 @@
   </implements>
   <depends_on>
     <task_ref>TASK-BILL-003</task_ref>
+    <task_ref>TASK-BILL-012</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
+  <last_updated>2025-12-20</last_updated>
 </metadata>
+
+<critical_context>
+## ABSOLUTE RULES - READ FIRST
+
+1. **NO BACKWARDS COMPATIBILITY** - System must work or fail fast with clear errors
+2. **NO WORKAROUNDS/FALLBACKS** - If something fails, throw with detailed error logging
+3. **NO MOCK DATA IN TESTS** - Use real database operations with test fixtures
+4. **FAIL FAST** - Robust error logging so failures are immediately debuggable
+
+## Project Structure (ACTUAL - NOT HYPOTHETICAL)
+
+Services are in: `src/database/services/`
+Repositories are in: `src/database/repositories/`
+DTOs are in: `src/database/dto/`
+Entities are in: `src/database/entities/`
+Module is: `src/database/database.module.ts`
+Tests are in: `tests/database/services/`
+
+**The `src/core/` directory DOES NOT EXIST. Do NOT create files there.**
+**The `src/integrations/` directory DOES NOT EXIST. Create it for Email/WhatsApp services.**
+</critical_context>
 
 <context>
 This task creates the InvoiceDeliveryService which handles multi-channel invoice
-delivery to parents via Email (using Email MCP) and WhatsApp (using WhatsApp MCP).
-The service tracks delivery status, handles delivery failures with retry logic,
-and updates invoice status appropriately. Parents can receive invoices via their
-preferred contact method (email, WhatsApp, or both), and the system tracks
-delivery attempts, successes, and failures with detailed logging.
+delivery to parents via Email and WhatsApp. The service:
+- Sends invoices via email (primary) and WhatsApp (optional)
+- Tracks delivery status (PENDING, SENT, DELIVERED, OPENED, FAILED)
+- Updates invoice status from DRAFT to SENT on successful delivery
+- Implements retry logic with exponential backoff for failed deliveries
+- Logs all delivery attempts for audit trail
+
+## Dependencies (Already Complete)
+- TASK-BILL-003: Invoice and InvoiceLine entities ✅
+- TASK-BILL-012: InvoiceGenerationService ✅ (invoices are generated as DRAFT)
 </context>
 
-<input_context_files>
-  <file purpose="requirements">specs/requirements/billing.md#REQ-BILL-006,REQ-BILL-007,REQ-BILL-008</file>
-  <file purpose="data_model">specs/technical/data-models.md#Invoice</file>
-  <file purpose="api_contract">specs/technical/api-contracts.md#BillingService</file>
-  <file purpose="entity_reference">src/database/entities/invoice.entity.ts</file>
-  <file purpose="parent_entity">src/database/entities/parent.entity.ts</file>
-  <file purpose="repository_reference">src/database/repositories/invoice.repository.ts</file>
-</input_context_files>
+<current_state>
+## What Already Exists
 
-<prerequisites>
-  <check>TASK-BILL-003 completed (Invoice entities exist)</check>
-  <check>InvoiceRepository available</check>
-  <check>ParentRepository available</check>
-  <check>Email MCP server configured and accessible</check>
-  <check>WhatsApp MCP server configured and accessible (optional)</check>
-</prerequisites>
+### Invoice Entity (src/database/entities/invoice.entity.ts)
+```typescript
+export enum InvoiceStatus {
+  DRAFT = 'DRAFT',
+  SENT = 'SENT',
+  VIEWED = 'VIEWED',
+  PARTIALLY_PAID = 'PARTIALLY_PAID',
+  PAID = 'PAID',
+  OVERDUE = 'OVERDUE',
+  VOID = 'VOID',
+}
 
-<scope>
-  <in_scope>
-    - Create InvoiceDeliveryService in src/core/billing/
-    - Implement sendInvoices batch method
-    - Implement sendEmail method using Email MCP
-    - Implement sendWhatsApp method using WhatsApp MCP
-    - Implement trackDelivery method for status updates
-    - Implement retryFailed method with exponential backoff
-    - Delivery status tracking (PENDING, SENT, DELIVERED, OPENED, FAILED)
-    - Update invoice status from DRAFT to SENT on successful delivery
-    - Handle delivery failures gracefully with logging
-    - Unit tests for all methods
-    - Integration tests with MCP mocks
-  </in_scope>
-  <out_of_scope>
-    - Invoice PDF generation (separate task)
-    - Invoice template rendering
-    - Parent contact management
-    - Email/WhatsApp template design
-    - Delivery scheduling/queuing (future enhancement)
-    - Read receipts for WhatsApp (track if MCP provides)
-  </out_of_scope>
-</scope>
+export enum DeliveryMethod {
+  EMAIL = 'EMAIL',
+  WHATSAPP = 'WHATSAPP',
+  BOTH = 'BOTH',
+}
+
+export enum DeliveryStatus {
+  PENDING = 'PENDING',
+  SENT = 'SENT',
+  DELIVERED = 'DELIVERED',
+  OPENED = 'OPENED',
+  FAILED = 'FAILED',
+}
+
+export interface IInvoice {
+  id: string;
+  tenantId: string;
+  xeroInvoiceId: string | null;
+  invoiceNumber: string;
+  parentId: string;
+  childId: string;
+  billingPeriodStart: Date;
+  billingPeriodEnd: Date;
+  issueDate: Date;
+  dueDate: Date;
+  subtotalCents: number;
+  vatCents: number;
+  totalCents: number;
+  amountPaidCents: number;
+  status: InvoiceStatus;
+  deliveryMethod: DeliveryMethod | null;
+  deliveryStatus: DeliveryStatus | null;
+  deliveredAt: Date | null;
+  notes: string | null;
+  isDeleted: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Parent Entity (src/database/entities/parent.entity.ts)
+```typescript
+export enum PreferredContact {
+  EMAIL = 'EMAIL',
+  WHATSAPP = 'WHATSAPP',
+  BOTH = 'BOTH',
+}
+
+export interface IParent {
+  id: string;
+  tenantId: string;
+  xeroContactId: string | null;
+  firstName: string;
+  lastName: string;
+  email: string | null;        // Email address
+  phone: string | null;        // Phone number (NOT for WhatsApp)
+  whatsapp: string | null;     // WhatsApp number (SEPARATE field)
+  preferredContact: PreferredContact;
+  idNumber: string | null;
+  address: string | null;
+  notes: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### InvoiceRepository (src/database/repositories/invoice.repository.ts)
+Key methods already available:
+- `findById(id: string)` - Returns Invoice or null (SINGLE ARG, NOT tenantId + id)
+- `findByIdWithLines(id: string)` - Returns Invoice with lines
+- `findByStatus(tenantId: string, status: InvoiceStatus)` - Get invoices by status
+- `update(id: string, dto: UpdateInvoiceDto)` - Update invoice
+- `updateDeliveryStatus(id: string, deliveryStatus: string, deliveredAt?: Date)` - Update delivery status
+
+### ParentRepository (src/database/repositories/parent.repository.ts)
+Key methods already available:
+- `findById(id: string)` - Returns Parent or null (SINGLE ARG, NOT tenantId + id)
+
+### TenantRepository (src/database/repositories/tenant.repository.ts)
+- `findById(id: string)` - Returns Tenant or null
+</current_state>
+
+<schema_changes_required>
+## Prisma Schema Changes
+
+Add `deliveryRetryCount` field to Invoice model in `prisma/schema.prisma`:
+
+```prisma
+model Invoice {
+  // ... existing fields ...
+  deliveryRetryCount Int @default(0) @map("delivery_retry_count")  // ADD THIS
+  // ... rest of fields ...
+}
+```
+
+After adding, run:
+```bash
+npx prisma migrate dev --name add_invoice_delivery_retry_count
+npx prisma generate
+```
+</schema_changes_required>
+
+<repository_changes_required>
+## InvoiceRepository Changes
+
+Add method to `src/database/repositories/invoice.repository.ts`:
+
+```typescript
+/**
+ * Find invoices by delivery status with optional cutoff date
+ * Used for retrying failed deliveries
+ */
+async findByDeliveryStatus(
+  tenantId: string,
+  deliveryStatus: DeliveryStatus,
+  cutoffDate?: Date,
+): Promise<Invoice[]> {
+  try {
+    const where: Prisma.InvoiceWhereInput = {
+      tenantId,
+      deliveryStatus,
+      isDeleted: false,
+    };
+
+    if (cutoffDate) {
+      where.updatedAt = { gte: cutoffDate };
+    }
+
+    return await this.prisma.invoice.findMany({
+      where,
+      orderBy: [{ updatedAt: 'asc' }],
+    });
+  } catch (error) {
+    this.logger.error(
+      `Failed to find invoices by delivery status ${deliveryStatus} for tenant: ${tenantId}`,
+      error instanceof Error ? error.stack : String(error),
+    );
+    throw new DatabaseException(
+      'findByDeliveryStatus',
+      'Failed to find invoices by delivery status',
+      error instanceof Error ? error : undefined,
+    );
+  }
+}
+
+/**
+ * Increment delivery retry count for an invoice
+ */
+async incrementDeliveryRetryCount(id: string): Promise<Invoice> {
+  try {
+    const existing = await this.findById(id);
+    if (!existing) {
+      throw new NotFoundException('Invoice', id);
+    }
+
+    return await this.prisma.invoice.update({
+      where: { id },
+      data: {
+        deliveryRetryCount: { increment: 1 },
+      },
+    });
+  } catch (error) {
+    if (error instanceof NotFoundException) {
+      throw error;
+    }
+    this.logger.error(
+      `Failed to increment delivery retry count for invoice: ${id}`,
+      error instanceof Error ? error.stack : String(error),
+    );
+    throw new DatabaseException(
+      'incrementDeliveryRetryCount',
+      'Failed to increment delivery retry count',
+      error instanceof Error ? error : undefined,
+    );
+  }
+}
+```
+
+Also update `UpdateInvoiceDto` in `src/database/dto/invoice.dto.ts` to include:
+```typescript
+@IsOptional()
+@IsInt()
+@Min(0)
+deliveryRetryCount?: number;
+```
+</repository_changes_required>
+
+<files_to_create>
+## Files to Create
+
+### 1. src/integrations/email/email.service.ts
+Email service for sending invoices. Uses nodemailer or similar.
+
+### 2. src/integrations/email/email.module.ts
+NestJS module for EmailService.
+
+### 3. src/integrations/whatsapp/whatsapp.service.ts
+WhatsApp service for sending messages. Uses WhatsApp Business API or similar.
+
+### 4. src/integrations/whatsapp/whatsapp.module.ts
+NestJS module for WhatsAppService.
+
+### 5. src/database/services/invoice-delivery.service.ts
+Main invoice delivery service.
+
+### 6. src/database/dto/invoice-delivery.dto.ts
+DTOs for invoice delivery operations.
+
+### 7. tests/database/services/invoice-delivery.service.spec.ts
+Integration tests using real database (no mock data).
+
+### 8. tests/integrations/email/email.service.spec.ts
+Unit tests for email service.
+
+### 9. tests/integrations/whatsapp/whatsapp.service.spec.ts
+Unit tests for WhatsApp service.
+</files_to_create>
 
 <definition_of_done>
-  <signatures>
-    <signature file="src/core/billing/invoice-delivery.service.ts">
-      import { Injectable, NotFoundException } from '@nestjs/common';
-      import { InvoiceRepository } from '../../database/repositories/invoice.repository';
-      import { ParentRepository } from '../../database/repositories/parent.repository';
-      import { EmailService } from '../../integrations/email/email.service';
-      import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
-      import { DeliveryMethod, DeliveryStatus, InvoiceStatus } from '../../database/entities/invoice.entity';
+<signatures>
+<signature file="src/database/dto/invoice-delivery.dto.ts">
+/**
+ * Invoice Delivery Service DTOs
+ * TASK-BILL-013: Invoice Delivery Service
+ *
+ * @module database/dto/invoice-delivery
+ */
 
-      export interface DeliveryResult {
-        sent: number;
-        failed: number;
-        failures: Array&lt;{
-          invoiceId: string;
-          reason: string;
-          channel?: 'EMAIL' | 'WHATSAPP';
-        }&gt;;
-      }
+import {
+  IsUUID,
+  IsString,
+  IsOptional,
+  IsArray,
+  IsEnum,
+  IsInt,
+  Min,
+} from 'class-validator';
+import { DeliveryMethod, DeliveryStatus } from '../entities/invoice.entity';
 
-      export interface DeliveryAttempt {
-        invoiceId: string;
-        channel: 'EMAIL' | 'WHATSAPP';
-        status: DeliveryStatus;
-        attemptedAt: Date;
-        error?: string;
-      }
+/**
+ * DTO for sending invoices
+ */
+export class SendInvoicesDto {
+  @IsUUID()
+  tenantId!: string;
 
-      @Injectable()
-      export class InvoiceDeliveryService {
-        private readonly MAX_RETRIES = 3;
-        private readonly RETRY_DELAY_MS = 5000;  // 5 seconds base delay
+  @IsArray()
+  @IsUUID('4', { each: true })
+  invoiceIds!: string[];
 
-        constructor(
-          private readonly invoiceRepo: InvoiceRepository,
-          private readonly parentRepo: ParentRepository,
-          private readonly emailService: EmailService,
-          private readonly whatsAppService: WhatsAppService,
-        ) {}
+  @IsOptional()
+  @IsEnum(DeliveryMethod)
+  method?: DeliveryMethod;
+}
 
-        /**
-         * Send invoices to parents via their preferred method(s)
-         * @param invoiceIds Array of invoice IDs to send
-         * @param method Optional override for delivery method
-         * @returns Summary of successful sends and failures
-         */
-        async sendInvoices(
-          tenantId: string,
-          invoiceIds: string[],
-          method?: DeliveryMethod,
-        ): Promise&lt;DeliveryResult&gt;;
+/**
+ * DTO for retrying failed deliveries
+ */
+export class RetryFailedDto {
+  @IsUUID()
+  tenantId!: string;
 
-        /**
-         * Send invoice via email using Email MCP
-         * @throws Error if email send fails after retries
-         */
-        async sendEmail(
-          invoice: Invoice,
-          parent: Parent,
-        ): Promise&lt;DeliveryAttempt&gt;;
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxAgeHours?: number;
+}
 
-        /**
-         * Send invoice via WhatsApp using WhatsApp MCP
-         * @throws Error if WhatsApp send fails after retries
-         */
-        async sendWhatsApp(
-          invoice: Invoice,
-          parent: Parent,
-        ): Promise&lt;DeliveryAttempt&gt;;
+/**
+ * Result of sending invoices
+ */
+export interface DeliveryResult {
+  sent: number;
+  failed: number;
+  failures: DeliveryFailure[];
+}
 
-        /**
-         * Track delivery status and update invoice
-         */
-        async trackDelivery(
-          tenantId: string,
-          invoiceId: string,
-          attempt: DeliveryAttempt,
-        ): Promise&lt;void&gt;;
+/**
+ * Individual delivery failure
+ */
+export interface DeliveryFailure {
+  invoiceId: string;
+  reason: string;
+  channel?: 'EMAIL' | 'WHATSAPP';
+  code: string;
+}
 
-        /**
-         * Retry failed deliveries with exponential backoff
-         * @param maxAge Maximum age in hours for failed invoices to retry
-         */
-        async retryFailed(
-          tenantId: string,
-          maxAge: number = 24,
-        ): Promise&lt;DeliveryResult&gt;;
-      }
-    </signature>
+/**
+ * Individual delivery attempt record
+ */
+export interface DeliveryAttempt {
+  invoiceId: string;
+  channel: 'EMAIL' | 'WHATSAPP';
+  status: DeliveryStatus;
+  attemptedAt: Date;
+  error?: string;
+}
+</signature>
 
-    <signature file="src/integrations/email/email.service.ts">
-      import { Injectable } from '@nestjs/common';
+<signature file="src/database/services/invoice-delivery.service.ts">
+/**
+ * InvoiceDeliveryService
+ * TASK-BILL-013
+ *
+ * Handles multi-channel invoice delivery via Email and WhatsApp.
+ *
+ * CRITICAL: All operations must filter by tenantId.
+ * CRITICAL: Fail fast with detailed error logging.
+ */
 
-      export interface EmailAttachment {
-        filename: string;
-        content: Buffer | string;
-        contentType: string;
-      }
+import { Injectable, Logger } from '@nestjs/common';
+import { InvoiceRepository } from '../repositories/invoice.repository';
+import { ParentRepository } from '../repositories/parent.repository';
+import { TenantRepository } from '../repositories/tenant.repository';
+import { AuditLogService } from './audit-log.service';
+import { EmailService } from '../../integrations/email/email.service';
+import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
+import {
+  DeliveryMethod,
+  DeliveryStatus,
+  InvoiceStatus,
+} from '../entities/invoice.entity';
+import { PreferredContact } from '../entities/parent.entity';
+import {
+  DeliveryResult,
+  DeliveryAttempt,
+  DeliveryFailure,
+} from '../dto/invoice-delivery.dto';
+import { NotFoundException, BusinessException } from '../../shared/exceptions';
 
-      @Injectable()
-      export class EmailService {
-        /**
-         * Send email via Email MCP
-         * Uses mcp__email__send MCP tool
-         */
-        async sendEmail(
-          to: string,
-          subject: string,
-          body: string,
-          attachments?: EmailAttachment[],
-        ): Promise&lt;{ messageId: string; status: string }&gt;;
-      }
-    </signature>
+@Injectable()
+export class InvoiceDeliveryService {
+  private readonly logger = new Logger(InvoiceDeliveryService.name);
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAY_MS = 5000; // 5 seconds base delay
 
-    <signature file="src/integrations/whatsapp/whatsapp.service.ts">
-      import { Injectable } from '@nestjs/common';
+  constructor(
+    private readonly invoiceRepo: InvoiceRepository,
+    private readonly parentRepo: ParentRepository,
+    private readonly tenantRepo: TenantRepository,
+    private readonly auditLogService: AuditLogService,
+    private readonly emailService: EmailService,
+    private readonly whatsAppService: WhatsAppService,
+  ) {}
 
-      @Injectable()
-      export class WhatsAppService {
-        /**
-         * Send WhatsApp message via WhatsApp MCP
-         * Uses mcp__whatsapp__send MCP tool
-         */
-        async sendMessage(
-          to: string,
-          message: string,
-          mediaUrl?: string,
-        ): Promise&lt;{ messageId: string; status: string }&gt;;
-      }
-    </signature>
-  </signatures>
+  /**
+   * Send invoices to parents via their preferred method(s)
+   * @param tenantId - Tenant ID (REQUIRED for multi-tenancy)
+   * @param invoiceIds - Array of invoice IDs to send
+   * @param method - Optional override for delivery method
+   * @returns Summary of successful sends and failures
+   * @throws BusinessException if tenant not found
+   */
+  async sendInvoices(
+    tenantId: string,
+    invoiceIds: string[],
+    method?: DeliveryMethod,
+  ): Promise&lt;DeliveryResult&gt;;
 
-  <constraints>
-    - Must validate invoice is in DRAFT status before sending
-    - Must validate parent has valid contact information for chosen method
-    - Must update invoice status to SENT only after successful delivery
-    - Must update deliveryStatus and deliveredAt on success
-    - Must log all delivery attempts with timestamps
-    - Must handle MCP service unavailability gracefully
-    - Must NOT mark as SENT if delivery fails
-    - Must respect parent's preferred contact method if no override
-    - Email subject format: "Invoice {invoiceNumber} - {TenantName}"
-    - WhatsApp message should include invoice summary and payment details
-    - Must NOT use 'any' type anywhere
-    - Must sanitize email addresses and phone numbers
-    - Retry logic should use exponential backoff (5s, 10s, 20s)
-  </constraints>
+  /**
+   * Send invoice via email
+   * @throws BusinessException if email send fails
+   */
+  async sendEmail(
+    invoiceId: string,
+    parentEmail: string,
+    invoiceNumber: string,
+    totalCents: number,
+    dueDate: Date,
+    childName: string,
+    tenantName: string,
+  ): Promise&lt;DeliveryAttempt&gt;;
 
-  <verification>
-    - TypeScript compiles without errors
-    - All unit tests pass
-    - sendInvoices processes batch correctly
-    - sendEmail calls Email MCP with correct parameters
-    - sendWhatsApp calls WhatsApp MCP with correct parameters
-    - Invoice status updated to SENT on success
-    - Invoice status remains DRAFT on failure
-    - deliveryStatus tracked correctly (SENT, DELIVERED, FAILED)
-    - retryFailed implements exponential backoff
-    - Failures logged with detailed error messages
-    - Both EMAIL and BOTH delivery methods work
-  </verification>
+  /**
+   * Send invoice via WhatsApp
+   * @throws BusinessException if WhatsApp send fails
+   */
+  async sendWhatsApp(
+    invoiceId: string,
+    parentWhatsapp: string,
+    parentFirstName: string,
+    invoiceNumber: string,
+    totalCents: number,
+    dueDate: Date,
+    childName: string,
+    tenantName: string,
+  ): Promise&lt;DeliveryAttempt&gt;;
+
+  /**
+   * Track delivery attempt in audit log
+   */
+  async trackDelivery(
+    tenantId: string,
+    invoiceId: string,
+    attempt: DeliveryAttempt,
+  ): Promise&lt;void&gt;;
+
+  /**
+   * Retry failed deliveries with exponential backoff
+   * @param tenantId - Tenant ID
+   * @param maxAgeHours - Maximum age in hours for failed invoices to retry (default 24)
+   * @returns Summary of retry results
+   */
+  async retryFailed(
+    tenantId: string,
+    maxAgeHours?: number,
+  ): Promise&lt;DeliveryResult&gt;;
+}
+</signature>
+
+<signature file="src/integrations/email/email.service.ts">
+/**
+ * EmailService
+ * TASK-BILL-013
+ *
+ * Handles email sending for invoice delivery.
+ * Uses nodemailer for SMTP.
+ */
+
+import { Injectable, Logger } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
+import { BusinessException } from '../../shared/exceptions';
+
+export interface EmailResult {
+  messageId: string;
+  status: 'sent' | 'failed';
+}
+
+@Injectable()
+export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
+  private transporter: nodemailer.Transporter;
+
+  constructor() {
+    // Initialize transporter from environment variables
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT ?? '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+
+  /**
+   * Send email
+   * @throws BusinessException if send fails
+   */
+  async sendEmail(
+    to: string,
+    subject: string,
+    body: string,
+    from?: string,
+  ): Promise&lt;EmailResult&gt;;
+
+  /**
+   * Validate email address format
+   */
+  isValidEmail(email: string): boolean;
+}
+</signature>
+
+<signature file="src/integrations/whatsapp/whatsapp.service.ts">
+/**
+ * WhatsAppService
+ * TASK-BILL-013
+ *
+ * Handles WhatsApp messaging for invoice delivery.
+ * Uses WhatsApp Business API.
+ */
+
+import { Injectable, Logger } from '@nestjs/common';
+import { BusinessException } from '../../shared/exceptions';
+
+export interface WhatsAppResult {
+  messageId: string;
+  status: 'sent' | 'failed';
+}
+
+@Injectable()
+export class WhatsAppService {
+  private readonly logger = new Logger(WhatsAppService.name);
+
+  /**
+   * Send WhatsApp message
+   * @param to - Phone number (will be sanitized to South African format)
+   * @param message - Message content
+   * @throws BusinessException if send fails
+   */
+  async sendMessage(
+    to: string,
+    message: string,
+  ): Promise&lt;WhatsAppResult&gt;;
+
+  /**
+   * Sanitize phone number to South African format
+   * Removes non-digits, converts 0XX to 27XX
+   */
+  sanitizePhoneNumber(phone: string): string;
+
+  /**
+   * Validate phone number
+   */
+  isValidPhoneNumber(phone: string): boolean;
+}
+</signature>
+</signatures>
+
+<constraints>
+- MUST validate invoice status is DRAFT before sending
+- MUST validate parent has valid contact info for chosen method
+- MUST update invoice status to SENT only after successful delivery
+- MUST update deliveryStatus and deliveredAt on success
+- MUST log all delivery attempts with timestamps via AuditLogService
+- MUST handle service unavailability gracefully with retry
+- MUST NOT mark as SENT if delivery fails
+- MUST respect parent's preferredContact if no override provided
+- Email subject format: "Invoice {invoiceNumber} - {TenantName}"
+- WhatsApp uses parent.whatsapp field, NOT parent.phone
+- Retry logic: exponential backoff (5s, 10s, 20s)
+- MAX_RETRIES = 3 before giving up
+- All financial amounts displayed in Rands (divide cents by 100)
+- Phone numbers sanitized to South African format (+27)
+</constraints>
+
+<verification>
+- TypeScript compiles without errors
+- npm run lint passes with no errors
+- npm run test passes all tests
+- sendInvoices validates invoice status is DRAFT
+- sendInvoices respects parent's preferredContact
+- sendEmail validates email format before sending
+- sendWhatsApp sanitizes phone to SA format
+- Invoice status updated to SENT on success
+- Invoice status remains DRAFT on failure
+- deliveryStatus tracked correctly
+- deliveredAt timestamp set on success
+- retryFailed implements exponential backoff
+- retryFailed respects MAX_RETRIES limit
+- BOTH delivery method requires both channels
+- All delivery attempts logged in audit trail
+- Tests use real database (no mock data)
+</verification>
 </definition_of_done>
 
 <pseudo_code>
-InvoiceDeliveryService (src/core/billing/invoice-delivery.service.ts):
+InvoiceDeliveryService.sendInvoices(tenantId, invoiceIds, method?):
+  result = { sent: 0, failed: 0, failures: [] }
 
-  async sendInvoices(tenantId, invoiceIds, method?):
-    result = {
-      sent: 0,
-      failed: 0,
-      failures: []
-    }
-
-    // Get tenant for email context
-    tenant = await tenantRepo.findById(tenantId)
-
-    // Process each invoice
-    for (invoiceId in invoiceIds) {
-      try {
-        // Get invoice with parent relationship
-        invoice = await invoiceRepo.findById(tenantId, invoiceId)
-        if (!invoice) {
-          result.failures.push({
-            invoiceId: invoiceId,
-            reason: 'Invoice not found'
-          })
-          result.failed++
-          continue
-        }
-
-        // Validate invoice is in DRAFT status
-        if (invoice.status !== InvoiceStatus.DRAFT) {
-          result.failures.push({
-            invoiceId: invoiceId,
-            reason: `Invoice status is ${invoice.status}, expected DRAFT`
-          })
-          result.failed++
-          continue
-        }
-
-        // Get parent
-        parent = await parentRepo.findById(tenantId, invoice.parentId)
-        if (!parent) {
-          result.failures.push({
-            invoiceId: invoiceId,
-            reason: 'Parent not found'
-          })
-          result.failed++
-          continue
-        }
-
-        // Determine delivery method
-        deliveryMethod = method || parent.preferredContact || DeliveryMethod.EMAIL
-
-        // Track delivery attempts
-        attempts = []
-        emailSuccess = false
-        whatsAppSuccess = false
-
-        // Send via email if required
-        if (deliveryMethod === DeliveryMethod.EMAIL || deliveryMethod === DeliveryMethod.BOTH) {
-          if (!parent.email) {
-            result.failures.push({
-              invoiceId: invoiceId,
-              reason: 'Parent has no email address',
-              channel: 'EMAIL'
-            })
-          } else {
-            try {
-              attempt = await this.sendEmail(invoice, parent)
-              attempts.push(attempt)
-
-              if (attempt.status === DeliveryStatus.SENT || attempt.status === DeliveryStatus.DELIVERED) {
-                emailSuccess = true
-              }
-            } catch (error) {
-              result.failures.push({
-                invoiceId: invoiceId,
-                reason: error.message,
-                channel: 'EMAIL'
-              })
-            }
-          }
-        }
-
-        // Send via WhatsApp if required
-        if (deliveryMethod === DeliveryMethod.WHATSAPP || deliveryMethod === DeliveryMethod.BOTH) {
-          if (!parent.phone) {
-            result.failures.push({
-              invoiceId: invoiceId,
-              reason: 'Parent has no phone number',
-              channel: 'WHATSAPP'
-            })
-          } else {
-            try {
-              attempt = await this.sendWhatsApp(invoice, parent)
-              attempts.push(attempt)
-
-              if (attempt.status === DeliveryStatus.SENT || attempt.status === DeliveryStatus.DELIVERED) {
-                whatsAppSuccess = true
-              }
-            } catch (error) {
-              result.failures.push({
-                invoiceId: invoiceId,
-                reason: error.message,
-                channel: 'WHATSAPP'
-              })
-            }
-          }
-        }
-
-        // Update invoice if any delivery succeeded
-        overallSuccess = false
-        if (deliveryMethod === DeliveryMethod.BOTH) {
-          // Both channels must succeed for BOTH method
-          overallSuccess = emailSuccess && whatsAppSuccess
-        } else {
-          overallSuccess = emailSuccess || whatsAppSuccess
-        }
-
-        if (overallSuccess) {
-          // Update invoice to SENT
-          await invoiceRepo.update(tenantId, invoiceId, {
-            status: InvoiceStatus.SENT,
-            deliveryMethod: deliveryMethod,
-            deliveryStatus: DeliveryStatus.SENT,
-            deliveredAt: new Date()
-          })
-
-          result.sent++
-        } else {
-          // Mark as failed
-          await invoiceRepo.update(tenantId, invoiceId, {
-            deliveryMethod: deliveryMethod,
-            deliveryStatus: DeliveryStatus.FAILED
-          })
-
-          result.failed++
-        }
-
-        // Track all delivery attempts
-        for (attempt in attempts) {
-          await this.trackDelivery(tenantId, invoiceId, attempt)
-        }
-
-      } catch (error) {
-        result.failures.push({
-          invoiceId: invoiceId,
-          reason: error.message
-        })
-        result.failed++
-      }
-    }
-
+  if invoiceIds.length === 0:
     return result
 
-  async sendEmail(invoice, parent):
-    // Build email subject
-    subject = `Invoice ${invoice.invoiceNumber} - ${invoice.tenant.name}`
+  // Get tenant for email context
+  tenant = await tenantRepo.findById(tenantId)
+  if !tenant:
+    throw BusinessException('Tenant not found', 'TENANT_NOT_FOUND')
 
-    // Build email body (plain text version)
-    totalAmount = (invoice.totalCents / 100).toFixed(2)
-    dueDate = invoice.dueDate.toISOString().split('T')[0]
-
-    body = `
-Dear ${parent.firstName} ${parent.lastName},
-
-Please find attached invoice ${invoice.invoiceNumber} for ${invoice.child.firstName} ${invoice.child.lastName}.
-
-Invoice Details:
-- Invoice Number: ${invoice.invoiceNumber}
-- Amount Due: R ${totalAmount}
-- Due Date: ${dueDate}
-
-Payment Details:
-[Payment instructions from tenant settings]
-
-If you have any questions, please contact us.
-
-Thank you,
-${invoice.tenant.name}
-    `.trim()
-
-    // TODO: Generate PDF attachment (future task)
-    // For now, send without attachment
-
-    try {
-      result = await emailService.sendEmail(
-        parent.email,
-        subject,
-        body,
-        // attachments: [pdfAttachment]  // Future
-      )
-
-      return {
-        invoiceId: invoice.id,
-        channel: 'EMAIL',
-        status: DeliveryStatus.SENT,
-        attemptedAt: new Date()
-      }
-    } catch (error) {
-      return {
-        invoiceId: invoice.id,
-        channel: 'EMAIL',
-        status: DeliveryStatus.FAILED,
-        attemptedAt: new Date(),
-        error: error.message
-      }
-    }
-
-  async sendWhatsApp(invoice, parent):
-    // Build WhatsApp message
-    totalAmount = (invoice.totalCents / 100).toFixed(2)
-    dueDate = invoice.dueDate.toISOString().split('T')[0]
-
-    message = `
-📄 *Invoice ${invoice.invoiceNumber}*
-
-Dear ${parent.firstName},
-
-Invoice for ${invoice.child.firstName} ${invoice.child.lastName}
-
-💰 Amount: *R ${totalAmount}*
-📅 Due: ${dueDate}
-
-[Payment details]
-
-Questions? Contact ${invoice.tenant.name}
-    `.trim()
-
-    try {
-      result = await whatsAppService.sendMessage(
-        parent.phone,
-        message
-      )
-
-      return {
-        invoiceId: invoice.id,
-        channel: 'WHATSAPP',
-        status: DeliveryStatus.SENT,
-        attemptedAt: new Date()
-      }
-    } catch (error) {
-      return {
-        invoiceId: invoice.id,
-        channel: 'WHATSAPP',
-        status: DeliveryStatus.FAILED,
-        attemptedAt: new Date(),
-        error: error.message
-      }
-    }
-
-  async trackDelivery(tenantId, invoiceId, attempt):
-    // Log delivery attempt to database or logging service
-    logger.info('Invoice delivery attempt', {
-      tenantId: tenantId,
-      invoiceId: invoiceId,
-      channel: attempt.channel,
-      status: attempt.status,
-      attemptedAt: attempt.attemptedAt,
-      error: attempt.error
-    })
-
-    // Could store in DeliveryLog table for audit trail (future enhancement)
-
-  async retryFailed(tenantId, maxAge):
-    // Get failed invoices within age limit
-    cutoffDate = new Date()
-    cutoffDate.setHours(cutoffDate.getHours() - maxAge)
-
-    failedInvoices = await invoiceRepo.findByDeliveryStatus(
-      tenantId,
-      DeliveryStatus.FAILED,
-      cutoffDate
-    )
-
-    result = {
-      sent: 0,
-      failed: 0,
-      failures: []
-    }
-
-    // Retry each failed invoice with exponential backoff
-    for (index, invoice in failedInvoices) {
-      // Calculate delay based on retry attempt (exponential backoff)
-      retryCount = invoice.deliveryRetryCount || 0
-
-      if (retryCount >= this.MAX_RETRIES) {
-        // Max retries reached, skip
+  for invoiceId in invoiceIds:
+    try:
+      // Get invoice - findById takes SINGLE arg
+      invoice = await invoiceRepo.findById(invoiceId)
+      if !invoice:
+        result.failures.push({ invoiceId, reason: 'Invoice not found', code: 'NOT_FOUND' })
+        result.failed++
         continue
-      }
 
-      // Exponential backoff: 5s, 10s, 20s
-      delay = this.RETRY_DELAY_MS * Math.pow(2, retryCount)
-      await sleep(delay)
-
-      // Attempt resend
-      try {
-        deliveryResult = await this.sendInvoices(
-          tenantId,
-          [invoice.id],
-          invoice.deliveryMethod
-        )
-
-        if (deliveryResult.sent > 0) {
-          result.sent++
-        } else {
-          result.failed++
-          result.failures.push(...deliveryResult.failures)
-
-          // Increment retry count
-          await invoiceRepo.update(tenantId, invoice.id, {
-            deliveryRetryCount: retryCount + 1
-          })
-        }
-      } catch (error) {
+      // Verify tenant isolation
+      if invoice.tenantId !== tenantId:
+        result.failures.push({ invoiceId, reason: 'Invoice belongs to different tenant', code: 'TENANT_MISMATCH' })
         result.failed++
+        continue
+
+      // Validate invoice status - MUST be DRAFT
+      if invoice.status !== InvoiceStatus.DRAFT:
         result.failures.push({
-          invoiceId: invoice.id,
-          reason: error.message
+          invoiceId,
+          reason: `Invoice status is ${invoice.status}, expected DRAFT`,
+          code: 'INVALID_STATUS'
         })
-      }
-    }
+        result.failed++
+        continue
 
-    return result
+      // Get parent - findById takes SINGLE arg
+      parent = await parentRepo.findById(invoice.parentId)
+      if !parent:
+        result.failures.push({ invoiceId, reason: 'Parent not found', code: 'PARENT_NOT_FOUND' })
+        result.failed++
+        continue
 
-EmailService (src/integrations/email/email.service.ts):
+      // Get child for name
+      child = await childRepo.findById(invoice.childId)
+      childName = child ? `${child.firstName} ${child.lastName}` : 'Unknown'
 
-  async sendEmail(to, subject, body, attachments?):
-    // Validate email address
-    if (!this.isValidEmail(to)) {
-      throw new Error('Invalid email address')
-    }
+      // Determine delivery method
+      deliveryMethod = method ?? this.mapPreferredContact(parent.preferredContact)
 
-    // Call Email MCP tool
-    result = await mcpClient.call('mcp__email__send', {
+      emailSuccess = false
+      whatsAppSuccess = false
+      attempts: DeliveryAttempt[] = []
+
+      // Send via EMAIL if required
+      if deliveryMethod === DeliveryMethod.EMAIL || deliveryMethod === DeliveryMethod.BOTH:
+        if !parent.email:
+          result.failures.push({ invoiceId, reason: 'Parent has no email address', channel: 'EMAIL', code: 'NO_EMAIL' })
+        else if !emailService.isValidEmail(parent.email):
+          result.failures.push({ invoiceId, reason: 'Invalid email address format', channel: 'EMAIL', code: 'INVALID_EMAIL' })
+        else:
+          attempt = await this.sendEmail(
+            invoiceId,
+            parent.email,
+            invoice.invoiceNumber,
+            invoice.totalCents,
+            invoice.dueDate,
+            childName,
+            tenant.name
+          )
+          attempts.push(attempt)
+          emailSuccess = attempt.status === DeliveryStatus.SENT
+
+      // Send via WHATSAPP if required - USE parent.whatsapp NOT parent.phone
+      if deliveryMethod === DeliveryMethod.WHATSAPP || deliveryMethod === DeliveryMethod.BOTH:
+        if !parent.whatsapp:
+          result.failures.push({ invoiceId, reason: 'Parent has no WhatsApp number', channel: 'WHATSAPP', code: 'NO_WHATSAPP' })
+        else if !whatsAppService.isValidPhoneNumber(parent.whatsapp):
+          result.failures.push({ invoiceId, reason: 'Invalid WhatsApp number', channel: 'WHATSAPP', code: 'INVALID_WHATSAPP' })
+        else:
+          attempt = await this.sendWhatsApp(
+            invoiceId,
+            parent.whatsapp,
+            parent.firstName,
+            invoice.invoiceNumber,
+            invoice.totalCents,
+            invoice.dueDate,
+            childName,
+            tenant.name
+          )
+          attempts.push(attempt)
+          whatsAppSuccess = attempt.status === DeliveryStatus.SENT
+
+      // Determine overall success
+      overallSuccess = false
+      if deliveryMethod === DeliveryMethod.BOTH:
+        overallSuccess = emailSuccess && whatsAppSuccess
+      else:
+        overallSuccess = emailSuccess || whatsAppSuccess
+
+      if overallSuccess:
+        // Update invoice to SENT
+        await invoiceRepo.update(invoiceId, {
+          status: InvoiceStatus.SENT,
+          deliveryMethod: deliveryMethod,
+          deliveryStatus: DeliveryStatus.SENT,
+        })
+        await invoiceRepo.updateDeliveryStatus(invoiceId, DeliveryStatus.SENT, new Date())
+        result.sent++
+      else:
+        // Mark as failed
+        await invoiceRepo.updateDeliveryStatus(invoiceId, DeliveryStatus.FAILED)
+        result.failed++
+
+      // Track all delivery attempts
+      for attempt in attempts:
+        await this.trackDelivery(tenantId, invoiceId, attempt)
+
+    catch error:
+      logger.error(`Failed to process invoice ${invoiceId}`, error.stack)
+      result.failures.push({ invoiceId, reason: error.message, code: 'UNEXPECTED_ERROR' })
+      result.failed++
+
+  return result
+
+InvoiceDeliveryService.retryFailed(tenantId, maxAgeHours = 24):
+  result = { sent: 0, failed: 0, failures: [] }
+
+  cutoffDate = new Date()
+  cutoffDate.setHours(cutoffDate.getHours() - maxAgeHours)
+
+  failedInvoices = await invoiceRepo.findByDeliveryStatus(
+    tenantId,
+    DeliveryStatus.FAILED,
+    cutoffDate
+  )
+
+  for invoice in failedInvoices:
+    // Check retry count
+    retryCount = invoice.deliveryRetryCount ?? 0
+    if retryCount >= MAX_RETRIES:
+      continue
+
+    // Exponential backoff delay
+    delay = RETRY_DELAY_MS * Math.pow(2, retryCount)
+    await sleep(delay)
+
+    // Attempt resend
+    try:
+      deliveryResult = await this.sendInvoices(tenantId, [invoice.id], invoice.deliveryMethod)
+
+      if deliveryResult.sent > 0:
+        result.sent++
+      else:
+        result.failed++
+        result.failures.push(...deliveryResult.failures)
+        // Increment retry count
+        await invoiceRepo.incrementDeliveryRetryCount(invoice.id)
+    catch error:
+      result.failed++
+      result.failures.push({ invoiceId: invoice.id, reason: error.message, code: 'RETRY_FAILED' })
+      await invoiceRepo.incrementDeliveryRetryCount(invoice.id)
+
+  return result
+
+EmailService.sendEmail(to, subject, body, from?):
+  if !this.isValidEmail(to):
+    throw BusinessException('Invalid email address', 'INVALID_EMAIL')
+
+  try:
+    result = await this.transporter.sendMail({
+      from: from ?? process.env.SMTP_FROM,
       to: to,
       subject: subject,
-      body: body,
-      attachments: attachments
+      text: body,
     })
 
-    return {
-      messageId: result.message_id,
-      status: result.status
-    }
+    return { messageId: result.messageId, status: 'sent' }
+  catch error:
+    logger.error(`Failed to send email to ${to}: ${error.message}`)
+    throw BusinessException(`Email send failed: ${error.message}`, 'EMAIL_SEND_FAILED')
 
-  private isValidEmail(email: string): boolean {
-    regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return regex.test(email)
-  }
+EmailService.isValidEmail(email):
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 
-WhatsAppService (src/integrations/whatsapp/whatsapp.service.ts):
+WhatsAppService.sendMessage(to, message):
+  sanitizedPhone = this.sanitizePhoneNumber(to)
+  if !this.isValidPhoneNumber(sanitizedPhone):
+    throw BusinessException('Invalid phone number', 'INVALID_PHONE')
 
-  async sendMessage(to, message, mediaUrl?):
-    // Sanitize phone number
-    sanitizedPhone = this.sanitizePhoneNumber(to)
+  try:
+    // TODO: Implement actual WhatsApp Business API call
+    // For now, throw NOT_IMPLEMENTED until WhatsApp MCP is available
+    throw BusinessException('WhatsApp integration not yet implemented', 'NOT_IMPLEMENTED')
+  catch error:
+    logger.error(`Failed to send WhatsApp to ${sanitizedPhone}: ${error.message}`)
+    throw error
 
-    // Call WhatsApp MCP tool
-    result = await mcpClient.call('mcp__whatsapp__send', {
-      to: sanitizedPhone,
-      message: message,
-      media_url: mediaUrl
-    })
+WhatsAppService.sanitizePhoneNumber(phone):
+  // Remove non-digit characters
+  digits = phone.replace(/\D/g, '')
 
-    return {
-      messageId: result.message_id,
-      status: result.status
-    }
+  // Convert SA format: 0XX... to 27XX...
+  if digits.length === 10 && digits.startsWith('0'):
+    digits = '27' + digits.substring(1)
 
-  private sanitizePhoneNumber(phone: string): string {
-    // Remove non-digit characters
-    digits = phone.replace(/\D/g, '')
+  // Add country code if missing
+  if digits.length === 9 && !digits.startsWith('27'):
+    digits = '27' + digits
 
-    // Add country code if missing (assume South Africa +27)
-    if (!digits.startsWith('27') && digits.length === 10) {
-      digits = '27' + digits.substring(1)  // Remove leading 0, add 27
-    }
+  return digits
 
-    return digits
-  }
+WhatsAppService.isValidPhoneNumber(phone):
+  sanitized = this.sanitizePhoneNumber(phone)
+  // South African numbers: 27 + 9 digits = 11 total
+  return /^27\d{9}$/.test(sanitized)
 </pseudo_code>
 
 <files_to_create>
-  <file path="src/core/billing/invoice-delivery.service.ts">InvoiceDeliveryService with all methods</file>
-  <file path="src/integrations/email/email.service.ts">EmailService for Email MCP integration</file>
-  <file path="src/integrations/email/email.module.ts">EmailModule for dependency injection</file>
-  <file path="src/integrations/whatsapp/whatsapp.service.ts">WhatsAppService for WhatsApp MCP integration</file>
-  <file path="src/integrations/whatsapp/whatsapp.module.ts">WhatsAppModule for dependency injection</file>
-  <file path="tests/core/billing/invoice-delivery.service.spec.ts">Unit tests for invoice delivery</file>
-  <file path="tests/integrations/email/email.service.spec.ts">Unit tests for email service</file>
-  <file path="tests/integrations/whatsapp/whatsapp.service.spec.ts">Unit tests for WhatsApp service</file>
+  <file path="src/integrations/email/email.service.ts">EmailService with sendEmail method</file>
+  <file path="src/integrations/email/email.module.ts">EmailModule for DI</file>
+  <file path="src/integrations/whatsapp/whatsapp.service.ts">WhatsAppService with sendMessage method</file>
+  <file path="src/integrations/whatsapp/whatsapp.module.ts">WhatsAppModule for DI</file>
+  <file path="src/database/services/invoice-delivery.service.ts">InvoiceDeliveryService</file>
+  <file path="src/database/dto/invoice-delivery.dto.ts">DTOs for invoice delivery</file>
+  <file path="tests/database/services/invoice-delivery.service.spec.ts">Integration tests</file>
+  <file path="tests/integrations/email/email.service.spec.ts">Email service tests</file>
+  <file path="tests/integrations/whatsapp/whatsapp.service.spec.ts">WhatsApp service tests</file>
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/core/billing/billing.module.ts">Import InvoiceDeliveryService, EmailModule, WhatsAppModule</file>
-  <file path="src/database/entities/invoice.entity.ts">Add deliveryRetryCount field if not present</file>
-  <file path="src/database/repositories/invoice.repository.ts">Add findByDeliveryStatus method</file>
-  <file path="prisma/schema.prisma">Add deliveryRetryCount to Invoice model if not present</file>
+  <file path="prisma/schema.prisma">Add deliveryRetryCount field to Invoice model</file>
+  <file path="src/database/repositories/invoice.repository.ts">Add findByDeliveryStatus and incrementDeliveryRetryCount methods</file>
+  <file path="src/database/dto/invoice.dto.ts">Add deliveryRetryCount to UpdateInvoiceDto</file>
+  <file path="src/database/database.module.ts">Import InvoiceDeliveryService</file>
+  <file path="src/app.module.ts">Import EmailModule and WhatsAppModule</file>
 </files_to_modify>
-
-<validation_criteria>
-  <criterion>InvoiceDeliveryService compiles without TypeScript errors</criterion>
-  <criterion>sendInvoices validates invoice status is DRAFT</criterion>
-  <criterion>sendInvoices respects parent's preferred contact method</criterion>
-  <criterion>sendEmail calls Email MCP with correct parameters</criterion>
-  <criterion>sendWhatsApp calls WhatsApp MCP with correct parameters</criterion>
-  <criterion>Email addresses validated before sending</criterion>
-  <criterion>Phone numbers sanitized (South African format)</criterion>
-  <criterion>Invoice status updated to SENT on success</criterion>
-  <criterion>Invoice status remains DRAFT on failure</criterion>
-  <criterion>deliveryStatus tracked correctly</criterion>
-  <criterion>deliveredAt timestamp set on success</criterion>
-  <criterion>retryFailed implements exponential backoff</criterion>
-  <criterion>retryFailed respects MAX_RETRIES limit</criterion>
-  <criterion>BOTH delivery method requires both channels to succeed</criterion>
-  <criterion>All delivery attempts logged</criterion>
-  <criterion>All unit tests pass with >80% coverage</criterion>
-</validation_criteria>
 
 <test_commands>
   <command>npm run build</command>
-  <command>npm run test -- invoice-delivery.service.spec.ts</command>
-  <command>npm run test -- email.service.spec.ts</command>
-  <command>npm run test -- whatsapp.service.spec.ts</command>
-  <command>npm run test:cov -- invoice-delivery.service.spec.ts</command>
+  <command>npm run lint</command>
+  <command>npm test -- invoice-delivery.service.spec.ts</command>
+  <command>npm test -- email.service.spec.ts</command>
+  <command>npm test -- whatsapp.service.spec.ts</command>
 </test_commands>
+
+<reasoning_guidance>
+## Recommended Reasoning Approach
+
+1. **Start with Schema Changes** - Add deliveryRetryCount field first, run migration
+2. **Update Repository** - Add new methods to InvoiceRepository
+3. **Create Integration Services** - EmailService and WhatsAppService
+4. **Create Core Service** - InvoiceDeliveryService
+5. **Write Tests** - Integration tests with real database
+6. **Verify** - Run linting and all tests
+
+## Key Pitfalls to Avoid
+
+1. **Repository method signatures**: findById takes 1 arg, NOT 2
+2. **WhatsApp field**: Use parent.whatsapp, NOT parent.phone
+3. **PreferredContact enum**: Maps to DeliveryMethod (EMAIL=EMAIL, WHATSAPP=WHATSAPP, BOTH=BOTH)
+4. **Test data**: Use real database fixtures, NOT mock data
+5. **Error handling**: Throw BusinessException with clear codes
+6. **Audit logging**: Use AuditLogService.logAction for all attempts
+</reasoning_guidance>
 
 </task_spec>

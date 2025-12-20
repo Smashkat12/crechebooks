@@ -199,6 +199,7 @@ model Tenant {
   subscriptionStatus SubscriptionStatus @default(TRIAL) @map("subscription_status")
   invoiceDayOfMonth  Int                @default(1) @map("invoice_day_of_month")
   invoiceDueDays     Int                @default(7) @map("invoice_due_days")
+  closureDates       Json               @default("[]") @map("closure_dates")
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
@@ -464,6 +465,7 @@ model Invoice {
   deliveryMethod     DeliveryMethod? @map("delivery_method")
   deliveryStatus     DeliveryStatus? @map("delivery_status")
   deliveredAt        DateTime?       @map("delivered_at")
+  deliveryRetryCount Int             @default(0) @map("delivery_retry_count")
   notes              String?
   isDeleted          Boolean         @default(false) @map("is_deleted")
   createdAt          DateTime        @default(now()) @map("created_at")

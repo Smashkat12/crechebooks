@@ -12,7 +12,11 @@ import {
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
-import { InvoiceStatus, DeliveryMethod } from '../entities/invoice.entity';
+import {
+  InvoiceStatus,
+  DeliveryMethod,
+  DeliveryStatus,
+} from '../entities/invoice.entity';
 
 export class CreateInvoiceDto {
   @IsUUID()
@@ -80,6 +84,20 @@ export class UpdateInvoiceDto extends PartialType(CreateInvoiceDto) {
   @IsInt()
   @Min(0)
   amountPaidCents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  deliveryRetryCount?: number;
+
+  @IsOptional()
+  @IsEnum(DeliveryStatus)
+  deliveryStatus?: DeliveryStatus;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  deliveredAt?: Date;
 }
 
 export class InvoiceFilterDto {

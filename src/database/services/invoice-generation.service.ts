@@ -210,8 +210,8 @@ export class InvoiceGenerationService {
             enrollment.customFeeOverrideCents ??
             enrollment.feeStructure.amountCents;
 
-          // NOTE: Pro-rata calculation is not implemented yet (TASK-BILL-014)
-          // For now, we use full monthly fee only
+          // Pro-rata calculation is available via ProRataService (TASK-BILL-014)
+          // Full monthly fee is used here; pro-rata is applied at enrollment level
 
           // Add monthly fee line
           lineItems.push({

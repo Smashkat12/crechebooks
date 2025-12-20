@@ -132,9 +132,9 @@ graph TD
 | 19 | TASK-TRANS-014 | Xero Sync Service | logic | TASK-MCP-001, TASK-TRANS-001 | ✅ Complete |
 | 20 | TASK-BILL-011 | Enrollment Management Service | logic | TASK-BILL-002 | ✅ Complete |
 | 21 | TASK-BILL-012 | Invoice Generation Service | logic | TASK-BILL-003, TASK-BILL-002 | ✅ Complete |
-| 22 | TASK-BILL-013 | Invoice Delivery Service | logic | TASK-BILL-003 | Pending |
-| 23 | TASK-BILL-014 | Pro-rata Calculation Service | logic | TASK-BILL-012 | Pending |
-| 24 | TASK-PAY-011 | Payment Matching Service | logic | TASK-PAY-001 | Pending |
+| 22 | TASK-BILL-013 | Invoice Delivery Service | logic | TASK-BILL-003 | ✅ Complete |
+| 23 | TASK-BILL-014 | Pro-rata Calculation Service | logic | TASK-BILL-012 | ✅ Complete |
+| 24 | TASK-PAY-011 | Payment Matching Service | logic | TASK-PAY-001 | ✅ Complete |
 | 25 | TASK-PAY-012 | Payment Allocation Service | logic | TASK-PAY-001, TASK-BILL-003 | Pending |
 | 26 | TASK-PAY-013 | Arrears Calculation Service | logic | TASK-PAY-001, TASK-BILL-003 | Pending |
 | 27 | TASK-PAY-014 | Payment Reminder Service | logic | TASK-PAY-013 | Pending |
@@ -196,13 +196,13 @@ graph TD
 | Phase | Tasks | Completed | Percentage |
 |-------|-------|-----------|------------|
 | Foundation | 15 | 15 | 100% |
-| Logic | 21 | 6 | 28.6% |
+| Logic | 21 | 9 | 42.9% |
 | Agents | 5 | 0 | 0% |
 | Surface | 16 | 0 | 0% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **62** | **21** | **33.9%** |
+| **Total** | **62** | **24** | **38.7%** |
 
-**Last Updated**: 2025-12-20 (TASK-BILL-012 completed - 812 tests)
+**Last Updated**: 2025-12-20 (TASK-PAY-011 completed - 905 tests)
 
 ---
 

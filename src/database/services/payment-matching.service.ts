@@ -1,0 +1,685 @@
+/**
+ * Payment Matching Service
+ * TASK-PAY-011: Payment Matching Service
+ *
+ * @module database/services/payment-matching
+ * @description Confidence-based payment matching service that matches
+ * bank transactions (credits) to outstanding invoices using a scoring algorithm.
+ *
+ * Confidence Scoring Algorithm (0-100 points):
+ * - Reference Match: 0-40 points (exact=40, contains=30, suffix=15)
+ * - Amount Match: 0-40 points (exact=40, 1%=35, 5%=25, 10%=15, partial=10)
+ * - Name Similarity: 0-20 points (exact=20, >0.8=15, >0.6=10, >0.4=5)
+ *
+ * Auto-apply rules:
+ * - Single match with confidence >= 80%: auto-apply
+ * - Multiple high-confidence matches: flag for review (ambiguous)
+ * - Confidence < 80%: flag for review
+ */
+
+import { Injectable, Logger } from '@nestjs/common';
+import { Invoice, Transaction, Parent, Child, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { PaymentRepository } from '../repositories/payment.repository';
+import { InvoiceRepository } from '../repositories/invoice.repository';
+import { AuditLogService } from './audit-log.service';
+import {
+  MatchingBatchResult,
+  TransactionMatchResult,
+  MatchCandidate,
+  AppliedMatch,
+  MatchConfidenceLevel,
+  ConfidenceResult,
+  MatchPaymentsDto,
+  ApplyMatchDto,
+} from '../dto/payment-matching.dto';
+import { MatchType, MatchedBy } from '../entities/payment.entity';
+import { InvoiceStatus } from '../entities/invoice.entity';
+import { AuditAction } from '../entities/audit-log.entity';
+import { NotFoundException, BusinessException } from '../../shared/exceptions';
+
+/** Confidence threshold for auto-apply (single high-confidence match) */
+const AUTO_APPLY_THRESHOLD = 80;
+
+/** Minimum confidence to include as a candidate for review */
+const CANDIDATE_THRESHOLD = 20;
+
+/** Maximum candidates to return for review */
+const MAX_CANDIDATES = 5;
+
+/** Invoice with parent and child relations */
+type InvoiceWithRelations = Invoice & { parent: Parent; child: Child };
+
+@Injectable()
+export class PaymentMatchingService {
+  private readonly logger = new Logger(PaymentMatchingService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paymentRepo: PaymentRepository,
+    private readonly invoiceRepo: InvoiceRepository,
+    private readonly auditLogService: AuditLogService,
+  ) {}
+
+  /**
+   * Match transactions to outstanding invoices
+   * @param dto - Contains tenantId and optional transactionIds
+   * @returns Batch result with statistics and individual results
+   */
+  async matchPayments(dto: MatchPaymentsDto): Promise<MatchingBatchResult> {
+    this.logger.log(`Starting payment matching for tenant ${dto.tenantId}`);
+
+    // 1. Get unallocated credit transactions
+    const transactions = await this.getUnallocatedCredits(
+      dto.tenantId,
+      dto.transactionIds,
+    );
+
+    if (transactions.length === 0) {
+      this.logger.log('No unallocated transactions to process');
+      return {
+        processed: 0,
+        autoApplied: 0,
+        reviewRequired: 0,
+        noMatch: 0,
+        results: [],
+      };
+    }
+
+    // 2. Get outstanding invoices with parent/child relations
+    const outstandingInvoices = await this.getOutstandingInvoices(dto.tenantId);
+
+    if (outstandingInvoices.length === 0) {
+      this.logger.log('No outstanding invoices to match against');
+      return {
+        processed: transactions.length,
+        autoApplied: 0,
+        reviewRequired: 0,
+        noMatch: transactions.length,
+        results: transactions.map((t) => ({
+          transactionId: t.id,
+          status: 'NO_MATCH' as const,
+          reason: 'No outstanding invoices found',
+        })),
+      };
+    }
+
+    // 3. Process each transaction
+    const results: TransactionMatchResult[] = [];
+    let autoApplied = 0;
+    let reviewRequired = 0;
+    let noMatch = 0;
+
+    for (const transaction of transactions) {
+      // Skip if already allocated (race condition check)
+      if (await this.isTransactionAllocated(transaction.id)) {
+        results.push({
+          transactionId: transaction.id,
+          status: 'NO_MATCH',
+          reason: 'Transaction already allocated',
+        });
+        noMatch++;
+        continue;
+      }
+
+      // Try exact matches first (reference + amount)
+      const exactMatches = this.findExactMatches(
+        transaction,
+        outstandingInvoices,
+      );
+
+      if (exactMatches.length === 1) {
+        // Single exact match - auto-apply
+        const applied = await this.autoApplyMatch(
+          exactMatches[0],
+          dto.tenantId,
+        );
+        results.push({
+          transactionId: transaction.id,
+          status: 'AUTO_APPLIED',
+          appliedMatch: applied,
+          reason: 'Exact match: reference and amount',
+        });
+        autoApplied++;
+        continue;
+      }
+
+      // Try partial/fuzzy matches
+      const partialMatches = this.findPartialMatches(
+        transaction,
+        outstandingInvoices,
+      );
+
+      if (partialMatches.length === 0) {
+        results.push({
+          transactionId: transaction.id,
+          status: 'NO_MATCH',
+          reason: 'No matching invoices found',
+        });
+        noMatch++;
+        continue;
+      }
+
+      // Check for single high-confidence match
+      const highConfidence = partialMatches.filter(
+        (m) => m.confidenceScore >= AUTO_APPLY_THRESHOLD,
+      );
+
+      if (highConfidence.length === 1) {
+        // Single high-confidence - auto-apply
+        const applied = await this.autoApplyMatch(
+          highConfidence[0],
+          dto.tenantId,
+        );
+        results.push({
+          transactionId: transaction.id,
+          status: 'AUTO_APPLIED',
+          appliedMatch: applied,
+          reason: `High confidence match (${highConfidence[0].confidenceScore}%)`,
+        });
+        autoApplied++;
+      } else {
+        // Multiple matches or low confidence - require review
+        results.push({
+          transactionId: transaction.id,
+          status: 'REVIEW_REQUIRED',
+          candidates: partialMatches.slice(0, MAX_CANDIDATES),
+          reason:
+            highConfidence.length > 1
+              ? 'Multiple high-confidence matches - manual selection required'
+              : 'No high-confidence match found',
+        });
+        reviewRequired++;
+      }
+    }
+
+    this.logger.log(
+      `Matching complete: ${autoApplied} auto-applied, ${reviewRequired} review, ${noMatch} no match`,
+    );
+
+    return {
+      processed: transactions.length,
+      autoApplied,
+      reviewRequired,
+      noMatch,
+      results,
+    };
+  }
+
+  /**
+   * Find exact matches for a transaction
+   * Exact = reference matches invoice number AND amounts match
+   * @returns Array of exact match candidates (should be 0 or 1)
+   */
+  findExactMatches(
+    transaction: Transaction,
+    outstandingInvoices: InvoiceWithRelations[],
+  ): MatchCandidate[] {
+    const candidates: MatchCandidate[] = [];
+
+    if (!transaction.reference) {
+      return candidates;
+    }
+
+    const normalizedRef = this.normalizeString(transaction.reference);
+    const transactionAmount = Math.abs(transaction.amountCents);
+
+    for (const invoice of outstandingInvoices) {
+      const normalizedInvoice = this.normalizeString(invoice.invoiceNumber);
+      const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
+
+      // Check for exact reference match AND exact amount match
+      if (
+        normalizedRef === normalizedInvoice &&
+        transactionAmount === outstandingAmount
+      ) {
+        const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+        candidates.push({
+          transactionId: transaction.id,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          confidenceLevel: MatchConfidenceLevel.EXACT,
+          confidenceScore: 100,
+          matchReasons: ['Exact reference match', 'Exact amount match'],
+          parentId: invoice.parentId,
+          parentName,
+          childName: invoice.child.firstName,
+          invoiceOutstandingCents: outstandingAmount,
+          transactionAmountCents: transactionAmount,
+        });
+      }
+    }
+
+    return candidates;
+  }
+
+  /**
+   * Find partial/fuzzy matches for a transaction
+   * Uses name similarity and amount proximity
+   * @returns Array of candidates sorted by confidence DESC
+   */
+  findPartialMatches(
+    transaction: Transaction,
+    outstandingInvoices: InvoiceWithRelations[],
+  ): MatchCandidate[] {
+    const candidates: MatchCandidate[] = [];
+
+    for (const invoice of outstandingInvoices) {
+      const { score, reasons } = this.calculateConfidence(transaction, invoice);
+
+      // Only include if meets minimum threshold
+      if (score >= CANDIDATE_THRESHOLD) {
+        const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+        const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
+
+        candidates.push({
+          transactionId: transaction.id,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          confidenceLevel: this.getConfidenceLevel(score),
+          confidenceScore: score,
+          matchReasons: reasons,
+          parentId: invoice.parentId,
+          parentName,
+          childName: invoice.child.firstName,
+          invoiceOutstandingCents: outstandingAmount,
+          transactionAmountCents: Math.abs(transaction.amountCents),
+        });
+      }
+    }
+
+    // Sort by confidence score descending
+    return candidates.sort((a, b) => b.confidenceScore - a.confidenceScore);
+  }
+
+  /**
+   * Calculate confidence score for a transaction-invoice pair
+   * @returns Score 0-100 with reasons
+   */
+  calculateConfidence(
+    transaction: Transaction,
+    invoice: InvoiceWithRelations,
+  ): ConfidenceResult {
+    let score = 0;
+    const reasons: string[] = [];
+
+    const transactionAmount = Math.abs(transaction.amountCents);
+    const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
+
+    // 1. REFERENCE MATCH (0-40 points)
+    if (transaction.reference) {
+      const normalizedRef = this.normalizeString(transaction.reference);
+      const normalizedInvoice = this.normalizeString(invoice.invoiceNumber);
+
+      if (normalizedRef === normalizedInvoice) {
+        score += 40;
+        reasons.push('Exact reference match');
+      } else if (normalizedRef.includes(normalizedInvoice)) {
+        score += 30;
+        reasons.push('Reference contains invoice number');
+      } else if (
+        normalizedInvoice.length >= 4 &&
+        normalizedRef.endsWith(normalizedInvoice.slice(-4))
+      ) {
+        score += 15;
+        reasons.push('Reference ends with invoice suffix');
+      }
+    }
+
+    // 2. AMOUNT MATCH (0-40 points)
+    const amountDiff = Math.abs(transactionAmount - outstandingAmount);
+    const percentDiff =
+      outstandingAmount > 0 ? amountDiff / outstandingAmount : 1;
+
+    if (amountDiff === 0) {
+      score += 40;
+      reasons.push('Exact amount match');
+    } else if (percentDiff <= 0.01 || amountDiff <= 100) {
+      // Within 1% or R1 (100 cents)
+      score += 35;
+      reasons.push('Amount within 1% or R1');
+    } else if (percentDiff <= 0.05) {
+      score += 25;
+      reasons.push('Amount within 5%');
+    } else if (percentDiff <= 0.1) {
+      score += 15;
+      reasons.push('Amount within 10%');
+    } else if (transactionAmount < outstandingAmount) {
+      score += 10;
+      reasons.push('Partial payment (less than outstanding)');
+    }
+
+    // 3. NAME SIMILARITY (0-20 points)
+    if (transaction.payeeName) {
+      const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+      const similarity = this.calculateStringSimilarity(
+        this.normalizeString(transaction.payeeName),
+        this.normalizeString(parentName),
+      );
+
+      if (similarity === 1) {
+        score += 20;
+        reasons.push('Exact name match');
+      } else if (similarity > 0.8) {
+        score += 15;
+        reasons.push(
+          `Strong name similarity (${Math.round(similarity * 100)}%)`,
+        );
+      } else if (similarity > 0.6) {
+        score += 10;
+        reasons.push(`Good name similarity (${Math.round(similarity * 100)}%)`);
+      } else if (similarity > 0.4) {
+        score += 5;
+        reasons.push(`Weak name similarity (${Math.round(similarity * 100)}%)`);
+      }
+    }
+
+    return { score: Math.min(score, 100), reasons };
+  }
+
+  /**
+   * Auto-apply a match (create Payment, update Invoice)
+   * @throws BusinessException if transaction already allocated
+   */
+  async autoApplyMatch(
+    candidate: MatchCandidate,
+    tenantId: string,
+  ): Promise<AppliedMatch> {
+    // Double-check not already allocated (race condition protection)
+    if (await this.isTransactionAllocated(candidate.transactionId)) {
+      throw new BusinessException(
+        `Transaction ${candidate.transactionId} is already allocated to a payment`,
+        'TRANSACTION_ALREADY_ALLOCATED',
+      );
+    }
+
+    // Determine match type based on confidence
+    const matchType =
+      candidate.confidenceScore === 100 ? MatchType.EXACT : MatchType.PARTIAL;
+
+    // Create payment record
+    const payment = await this.paymentRepo.create({
+      tenantId,
+      transactionId: candidate.transactionId,
+      invoiceId: candidate.invoiceId,
+      amountCents: candidate.transactionAmountCents,
+      paymentDate: new Date(),
+      matchType,
+      matchConfidence: candidate.confidenceScore,
+      matchedBy: MatchedBy.AI_AUTO,
+    });
+
+    // Update invoice with payment
+    await this.invoiceRepo.recordPayment(
+      candidate.invoiceId,
+      candidate.transactionAmountCents,
+    );
+
+    // Create audit log
+    await this.auditLogService.logAction({
+      tenantId,
+      entityType: 'Payment',
+      entityId: payment.id,
+      action: AuditAction.CREATE,
+      afterValue: {
+        transactionId: candidate.transactionId,
+        invoiceId: candidate.invoiceId,
+        invoiceNumber: candidate.invoiceNumber,
+        amountCents: candidate.transactionAmountCents,
+        confidenceScore: candidate.confidenceScore,
+        matchReasons: candidate.matchReasons,
+        matchType,
+      },
+      changeSummary: `Auto-matched transaction to invoice ${candidate.invoiceNumber} with ${candidate.confidenceScore}% confidence`,
+    });
+
+    this.logger.log(
+      `Auto-applied match: Transaction ${candidate.transactionId} → Invoice ${candidate.invoiceNumber} (${candidate.confidenceScore}%)`,
+    );
+
+    return {
+      paymentId: payment.id,
+      transactionId: candidate.transactionId,
+      invoiceId: candidate.invoiceId,
+      invoiceNumber: candidate.invoiceNumber,
+      amountCents: candidate.transactionAmountCents,
+      confidenceScore: candidate.confidenceScore,
+    };
+  }
+
+  /**
+   * Manually apply a suggested match (called from API)
+   * @throws NotFoundException if transaction or invoice not found
+   * @throws BusinessException if transaction already allocated
+   */
+  async applyMatch(dto: ApplyMatchDto): Promise<AppliedMatch> {
+    // Verify transaction exists and is a credit
+    const transaction = await this.prisma.transaction.findFirst({
+      where: {
+        id: dto.transactionId,
+        tenantId: dto.tenantId,
+        isCredit: true,
+        isDeleted: false,
+      },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction', dto.transactionId);
+    }
+
+    // Check if already allocated
+    if (await this.isTransactionAllocated(dto.transactionId)) {
+      throw new BusinessException(
+        `Transaction ${dto.transactionId} is already allocated to a payment`,
+        'TRANSACTION_ALREADY_ALLOCATED',
+      );
+    }
+
+    // Verify invoice exists and belongs to tenant
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        id: dto.invoiceId,
+        tenantId: dto.tenantId,
+        isDeleted: false,
+        status: { notIn: [InvoiceStatus.PAID, InvoiceStatus.VOID] },
+      },
+      include: { parent: true, child: true },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice', dto.invoiceId);
+    }
+
+    // Determine amount to apply
+    const amountCents = dto.amountCents ?? Math.abs(transaction.amountCents);
+    const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
+
+    // Validate amount doesn't exceed outstanding
+    if (amountCents > outstandingAmount) {
+      throw new BusinessException(
+        `Amount ${amountCents} exceeds outstanding amount ${outstandingAmount}`,
+        'AMOUNT_EXCEEDS_OUTSTANDING',
+        { amountCents, outstandingAmount },
+      );
+    }
+
+    // Create payment record
+    const payment = await this.paymentRepo.create({
+      tenantId: dto.tenantId,
+      transactionId: dto.transactionId,
+      invoiceId: dto.invoiceId,
+      amountCents,
+      paymentDate: new Date(),
+      matchType: MatchType.MANUAL,
+      matchConfidence: undefined,
+      matchedBy: MatchedBy.USER,
+    });
+
+    // Update invoice with payment
+    await this.invoiceRepo.recordPayment(dto.invoiceId, amountCents);
+
+    // Create audit log
+    await this.auditLogService.logAction({
+      tenantId: dto.tenantId,
+      entityType: 'Payment',
+      entityId: payment.id,
+      action: AuditAction.CREATE,
+      afterValue: {
+        transactionId: dto.transactionId,
+        invoiceId: dto.invoiceId,
+        invoiceNumber: invoice.invoiceNumber,
+        amountCents,
+        matchType: MatchType.MANUAL,
+      },
+      changeSummary: `Manually matched transaction to invoice ${invoice.invoiceNumber}`,
+    });
+
+    this.logger.log(
+      `Manual match applied: Transaction ${dto.transactionId} → Invoice ${invoice.invoiceNumber}`,
+    );
+
+    return {
+      paymentId: payment.id,
+      transactionId: dto.transactionId,
+      invoiceId: dto.invoiceId,
+      invoiceNumber: invoice.invoiceNumber,
+      amountCents,
+      confidenceScore: 0, // Manual match has no confidence score
+    };
+  }
+
+  /**
+   * Calculate string similarity using Levenshtein distance
+   * @returns Similarity score 0-1 (1 = identical)
+   */
+  private calculateStringSimilarity(str1: string, str2: string): number {
+    if (str1 === str2) return 1;
+    if (str1.length === 0 || str2.length === 0) return 0;
+
+    // Build Levenshtein distance matrix
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= str1.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= str2.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= str1.length; i++) {
+      for (let j = 1; j <= str2.length; j++) {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1, // deletion
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j - 1] + cost, // substitution
+        );
+      }
+    }
+
+    const distance = matrix[str1.length][str2.length];
+    const maxLength = Math.max(str1.length, str2.length);
+    return 1 - distance / maxLength;
+  }
+
+  /**
+   * Normalize string for comparison
+   * Converts to lowercase and removes non-alphanumeric characters
+   */
+  private normalizeString(str: string): string {
+    return str
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+  }
+
+  /**
+   * Get confidence level category from score
+   */
+  private getConfidenceLevel(score: number): MatchConfidenceLevel {
+    if (score === 100) return MatchConfidenceLevel.EXACT;
+    if (score >= 80) return MatchConfidenceLevel.HIGH;
+    if (score >= 50) return MatchConfidenceLevel.MEDIUM;
+    return MatchConfidenceLevel.LOW;
+  }
+
+  /**
+   * Get outstanding invoices for tenant with parent/child relations
+   */
+  private async getOutstandingInvoices(
+    tenantId: string,
+  ): Promise<InvoiceWithRelations[]> {
+    return this.prisma.invoice.findMany({
+      where: {
+        tenantId,
+        isDeleted: false,
+        status: { notIn: [InvoiceStatus.PAID, InvoiceStatus.VOID] },
+      },
+      include: {
+        parent: true,
+        child: true,
+      },
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
+  /**
+   * Get unallocated credit transactions for tenant
+   */
+  private async getUnallocatedCredits(
+    tenantId: string,
+    transactionIds?: string[],
+  ): Promise<Transaction[]> {
+    // Find transactions that don't have any non-reversed payments
+    const allocatedTransactionIds = await this.prisma.payment
+      .findMany({
+        where: {
+          tenantId,
+          isReversed: false,
+          transactionId: { not: null },
+        },
+        select: { transactionId: true },
+      })
+      .then((payments) =>
+        payments.map((p) => p.transactionId).filter((id): id is string => !!id),
+      );
+
+    const where: Prisma.TransactionWhereInput = {
+      tenantId,
+      isCredit: true,
+      isDeleted: false,
+    };
+
+    // If specific transaction IDs provided, filter to those
+    if (transactionIds && transactionIds.length > 0) {
+      // Filter to requested IDs that are not allocated
+      where.AND = [
+        { id: { in: transactionIds } },
+        { id: { notIn: allocatedTransactionIds } },
+      ];
+    } else {
+      // All unallocated credits
+      where.id = { notIn: allocatedTransactionIds };
+    }
+
+    return this.prisma.transaction.findMany({
+      where,
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  /**
+   * Check if transaction is already allocated to a payment
+   */
+  private async isTransactionAllocated(
+    transactionId: string,
+  ): Promise<boolean> {
+    const existingPayment = await this.prisma.payment.findFirst({
+      where: {
+        transactionId,
+        isReversed: false,
+      },
+    });
+    return existingPayment !== null;
+  }
+}

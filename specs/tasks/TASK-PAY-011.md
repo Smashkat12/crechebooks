@@ -1,4 +1,4 @@
-<task_spec id="TASK-PAY-011" version="1.0">
+<task_spec id="TASK-PAY-011" version="2.0">
 
 <metadata>
   <title>Payment Matching Service</title>
@@ -15,447 +15,988 @@
     <task_ref>TASK-PAY-001</task_ref>
   </depends_on>
   <estimated_complexity>high</estimated_complexity>
+  <last_updated>2025-12-20</last_updated>
 </metadata>
 
+<!-- ============================================================
+     CRITICAL IMPLEMENTATION RULES
+     ============================================================ -->
+
+<implementation_rules>
+  <rule id="NO_BACKWARDS_COMPAT">NO backwards compatibility code. System must work or FAIL FAST with clear errors.</rule>
+  <rule id="NO_WORKAROUNDS">NO workarounds or fallbacks. If something fails, throw BusinessException with details.</rule>
+  <rule id="NO_MOCK_DATA">Tests use REAL database. Only mock EXTERNAL services (APIs that require credentials).</rule>
+  <rule id="FAIL_FAST">All errors must throw immediately with full context for debugging.</rule>
+  <rule id="TENANT_ISOLATION">ALL operations MUST filter by tenantId - no cross-tenant data access.</rule>
+  <rule id="DECIMAL_JS">ALL monetary calculations use Decimal.js with banker's rounding.</rule>
+</implementation_rules>
+
+<!-- ============================================================
+     PROJECT CONTEXT (Current State as of 2025-12-20)
+     ============================================================ -->
+
+<project_context>
+  <test_count>874 tests currently passing</test_count>
+  <completed_tasks>
+    - TASK-PAY-001: Payment entity and repository (complete)
+    - TASK-BILL-003: Invoice and InvoiceLine entities (complete)
+    - TASK-TRANS-001: Transaction entity (complete)
+    - TASK-BILL-011: Enrollment Management Service (complete)
+    - TASK-BILL-012: Invoice Generation Service (complete)
+    - TASK-BILL-013: Invoice Delivery Service (complete)
+    - TASK-BILL-014: Pro-rata Calculation Service (complete)
+  </completed_tasks>
+
+  <file_structure>
+    Services go in: src/database/services/
+    DTOs go in: src/database/dto/
+    Repositories are in: src/database/repositories/
+    Entities are in: src/database/entities/
+    Tests go in: tests/database/services/
+    Module: src/database/database.module.ts
+    Constants: src/database/constants/
+  </file_structure>
+
+  <available_repositories>
+    - PaymentRepository: src/database/repositories/payment.repository.ts
+    - InvoiceRepository: src/database/repositories/invoice.repository.ts
+    - TransactionRepository: src/database/repositories/transaction.repository.ts
+    - ParentRepository: src/database/repositories/parent.repository.ts
+  </available_repositories>
+
+  <exception_classes>
+    All in src/shared/exceptions/base.exception.ts:
+    - NotFoundException(resource, identifier)
+    - BusinessException(message, code, details?)
+    - DatabaseException(operation, message, originalError?)
+    - ConflictException(message, details?)
+  </exception_classes>
+</project_context>
+
+<!-- ============================================================
+     EXISTING ENTITY SCHEMAS (For Reference)
+     ============================================================ -->
+
+<existing_entities>
+  <entity name="Payment" file="src/database/entities/payment.entity.ts">
+    ```typescript
+    export enum MatchType {
+      EXACT = 'EXACT',
+      PARTIAL = 'PARTIAL',
+      MANUAL = 'MANUAL',
+      OVERPAYMENT = 'OVERPAYMENT',
+    }
+
+    export enum MatchedBy {
+      AI_AUTO = 'AI_AUTO',
+      USER = 'USER',
+    }
+
+    export interface IPayment {
+      id: string;
+      tenantId: string;
+      xeroPaymentId: string | null;
+      transactionId: string | null;
+      invoiceId: string;
+      amountCents: number;
+      paymentDate: Date;
+      reference: string | null;
+      matchType: MatchType;
+      matchConfidence: number | null;  // 0-100
+      matchedBy: MatchedBy;
+      isReversed: boolean;
+      reversedAt: Date | null;
+      reversalReason: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }
+    ```
+  </entity>
+
+  <entity name="Invoice" file="src/database/entities/invoice.entity.ts">
+    ```typescript
+    export interface IInvoice {
+      id: string;
+      tenantId: string;
+      invoiceNumber: string;  // Format: INV-YYYY-NNNNN
+      parentId: string;
+      childId: string;
+      totalCents: number;
+      amountPaidCents: number;  // Track how much has been paid
+      status: InvoiceStatus;  // DRAFT, SENT, PARTIALLY_PAID, PAID, OVERDUE, VOID
+      dueDate: Date;
+      // ... other fields
+    }
+    ```
+  </entity>
+
+  <entity name="Transaction" file="src/database/entities/transaction.entity.ts">
+    ```typescript
+    export interface ITransaction {
+      id: string;
+      tenantId: string;
+      description: string;
+      payeeName: string | null;  // Bank description - may contain parent name
+      reference: string | null;  // May contain invoice number
+      amountCents: number;  // Negative for debits, positive for credits
+      isCredit: boolean;
+      date: Date;
+      status: TransactionStatus;
+      isReconciled: boolean;
+      // ... other fields
+    }
+    ```
+  </entity>
+
+  <entity name="Parent" file="src/database/entities/parent.entity.ts">
+    ```typescript
+    export interface IParent {
+      id: string;
+      tenantId: string;
+      firstName: string;
+      lastName: string;
+      // Full name for matching: `${firstName} ${lastName}`
+    }
+    ```
+  </entity>
+</existing_entities>
+
+<!-- ============================================================
+     EXISTING REPOSITORY METHODS (For Reference)
+     ============================================================ -->
+
+<existing_repository_methods>
+  <repository name="PaymentRepository" file="src/database/repositories/payment.repository.ts">
+    - create(dto: CreatePaymentDto): Promise&lt;Payment&gt;
+    - findById(id: string): Promise&lt;Payment | null&gt;
+    - findByTransactionId(transactionId: string): Promise&lt;Payment[]&gt;
+    - findByInvoiceId(invoiceId: string): Promise&lt;Payment[]&gt;
+    - findByTenantId(tenantId: string, filter?: PaymentFilterDto): Promise&lt;Payment[]&gt;
+    - calculateTotalPaidForInvoice(invoiceId: string): Promise&lt;number&gt;
+  </repository>
+
+  <repository name="InvoiceRepository" file="src/database/repositories/invoice.repository.ts">
+    - findById(id: string): Promise&lt;Invoice | null&gt;
+    - findByInvoiceNumber(tenantId: string, invoiceNumber: string): Promise&lt;Invoice | null&gt;
+    - findByTenant(tenantId: string, filter: InvoiceFilterDto): Promise&lt;Invoice[]&gt;
+    - findByStatus(tenantId: string, status: InvoiceStatus): Promise&lt;Invoice[]&gt;
+    - findOverdue(tenantId: string): Promise&lt;Invoice[]&gt;
+    - recordPayment(id: string, amountCents: number): Promise&lt;Invoice&gt;
+  </repository>
+
+  <repository name="TransactionRepository" file="src/database/repositories/transaction.repository.ts">
+    - findById(tenantId: string, id: string): Promise&lt;Transaction | null&gt;
+    - findByIds(tenantId: string, ids: string[]): Promise&lt;Transaction[]&gt;
+    - findByTenant(tenantId: string, filter: TransactionFilterDto): Promise&lt;PaginatedResult&lt;Transaction&gt;&gt;
+  </repository>
+
+  <repository name="ParentRepository" file="src/database/repositories/parent.repository.ts">
+    - findById(id: string): Promise&lt;Parent | null&gt;
+  </repository>
+</existing_repository_methods>
+
+<!-- ============================================================
+     TASK CONTEXT
+     ============================================================ -->
+
 <context>
-This task creates the PaymentMatchingService which uses AI-powered Claude Code agents to
-automatically match bank transactions to outstanding invoices. The service implements
-intelligent matching by reference number, amount, and payer name with confidence scoring.
-Matches with 100% confidence (exact) or >=80% confidence are automatically applied. Lower
-confidence matches are flagged for manual review. This dramatically reduces manual payment
-allocation work and ensures accurate invoice payment tracking.
+This task creates the PaymentMatchingService which matches bank transactions (credits)
+to outstanding invoices. The service uses a confidence scoring algorithm to identify matches:
+
+- **Exact Match (100%)**: Transaction reference exactly matches invoice number AND amounts match
+- **High Confidence (80-99%)**: Reference partial match + amount match + name similarity
+- **Medium Confidence (50-79%)**: Amount match + name similarity
+- **Low Confidence (&lt;50%)**: Weak correlation - flagged for manual review
+
+Auto-apply rules:
+- Single exact match (100%): Auto-apply immediately
+- Single high-confidence match (>=80%): Auto-apply immediately
+- Multiple high-confidence matches: Flag for review (ambiguous)
+- Low confidence: Flag for review
+
+This is a DETERMINISTIC matching service (no AI agent integration in this task).
+AI agent integration will be added in TASK-AGENT-003.
 </context>
 
-<input_context_files>
-  <file purpose="api_contracts">specs/technical/api-contracts.md#PaymentService</file>
-  <file purpose="naming_conventions">specs/constitution.md#coding_standards</file>
-  <file purpose="payment_entity">src/database/entities/payment.entity.ts</file>
-  <file purpose="invoice_entity">src/database/entities/invoice.entity.ts</file>
-  <file purpose="transaction_entity">src/database/entities/transaction.entity.ts</file>
-</input_context_files>
-
-<prerequisites>
-  <check>TASK-PAY-001 completed (Payment entity exists)</check>
-  <check>TASK-BILL-003 completed (Invoice entity exists)</check>
-  <check>TASK-TRANS-001 completed (Transaction entity exists)</check>
-  <check>Claude Code agent framework available</check>
-  <check>Payment repository available</check>
-</prerequisites>
+<!-- ============================================================
+     SCOPE
+     ============================================================ -->
 
 <scope>
   <in_scope>
-    - Create PaymentMatchingService
-    - Implement matchPayments method with Claude Code agent integration
-    - Implement findExactMatches (reference + amount + invoice)
-    - Implement findPartialMatches (fuzzy matching on payer name)
-    - Implement calculateConfidence scoring algorithm
-    - Implement autoApplyMatches for high-confidence matches
-    - Create MatchingResult DTOs
-    - Create AI agent prompt templates for payment matching
-    - Support multiple match candidates per transaction
-    - Handle edge cases (multiple invoices with same amount)
+    - Create PaymentMatchingService in src/database/services/
+    - Create payment-matching.dto.ts in src/database/dto/
+    - Implement matchPayments() - orchestrates matching for batch of transactions
+    - Implement findExactMatches() - reference + amount exact matching
+    - Implement findPartialMatches() - fuzzy matching on name/amount
+    - Implement calculateConfidence() - scoring algorithm
+    - Implement autoApplyMatch() - creates Payment record and updates Invoice
+    - String similarity function for fuzzy name matching
+    - Comprehensive integration tests using real database
+    - Add to database.module.ts providers/exports
+    - Add export to services/index.ts
+    - Add export to dto/index.ts
   </in_scope>
+
   <out_of_scope>
-    - Payment allocation logic (TASK-PAY-012)
-    - API endpoints (API layer tasks)
-    - Xero synchronization (handled by allocation service)
-    - Manual payment allocation UI
+    - AI agent integration (TASK-AGENT-003)
+    - Payment allocation for partial/split payments (TASK-PAY-012)
+    - Arrears calculation (TASK-PAY-013)
+    - API endpoints (TASK-PAY-031)
+    - Xero synchronization
   </out_of_scope>
 </scope>
 
+<!-- ============================================================
+     DEFINITION OF DONE - File Signatures
+     ============================================================ -->
+
 <definition_of_done>
   <signatures>
-    <signature file="src/core/payment/payment-matching.service.ts">
-      @Injectable()
-      export class PaymentMatchingService {
-        constructor(
-          private prisma: PrismaService,
-          private paymentRepository: PaymentRepository,
-          private invoiceRepository: InvoiceRepository,
-          private transactionRepository: TransactionRepository,
-          private claudeAgent: ClaudeAgentService
-        ) {}
+    <signature file="src/database/dto/payment-matching.dto.ts">
+      ```typescript
+      import { IsUUID, IsArray, IsOptional, IsInt, Min } from 'class-validator';
 
-        async matchPayments(
-          transactionIds?: string[],
-          tenantId: string
-        ): Promise&lt;MatchingResult&gt;
-
-        async findExactMatches(
-          transaction: Transaction,
-          invoices: Invoice[]
-        ): Promise&lt;MatchCandidate[]&gt;
-
-        async findPartialMatches(
-          transaction: Transaction,
-          invoices: Invoice[]
-        ): Promise&lt;MatchCandidate[]&gt;
-
-        async calculateConfidence(
-          transaction: Transaction,
-          invoice: Invoice
-        ): Promise&lt;number&gt;
-
-        async autoApplyMatches(
-          matches: MatchCandidate[],
-          userId: string
-        ): Promise&lt;AppliedMatch[]&gt;
-
-        private buildMatchingPrompt(
-          transaction: Transaction,
-          invoices: Invoice[]
-        ): string
-
-        private parseAgentResponse(
-          response: string
-        ): MatchCandidate[]
+      /**
+       * Match type for confidence scoring
+       */
+      export enum MatchConfidenceLevel {
+        EXACT = 'EXACT',           // 100% - reference + amount exact
+        HIGH = 'HIGH',             // 80-99% - strong correlation
+        MEDIUM = 'MEDIUM',         // 50-79% - moderate correlation
+        LOW = 'LOW',               // &lt;50% - weak correlation
       }
-    </signature>
-    <signature file="src/core/payment/dto/matching.dto.ts">
+
+      /**
+       * Candidate match for a transaction
+       */
       export interface MatchCandidate {
         transactionId: string;
         invoiceId: string;
         invoiceNumber: string;
-        matchType: MatchType;
-        confidence: number;
-        matchReason: string;
+        confidenceLevel: MatchConfidenceLevel;
+        confidenceScore: number;  // 0-100
+        matchReasons: string[];   // Human-readable explanations
+        parentId: string;
         parentName: string;
         childName: string;
-        invoiceAmount: number;
-        transactionAmount: number;
+        invoiceOutstandingCents: number;
+        transactionAmountCents: number;
       }
 
-      export interface MatchingResult {
-        autoMatched: number;
-        requiresReview: number;
-        noMatch: number;
-        matches: AppliedMatch[];
-        reviewRequired: ReviewMatch[];
+      /**
+       * Result of matching a single transaction
+       */
+      export interface TransactionMatchResult {
+        transactionId: string;
+        status: 'AUTO_APPLIED' | 'REVIEW_REQUIRED' | 'NO_MATCH';
+        appliedMatch?: AppliedMatch;
+        candidates?: MatchCandidate[];  // For review
+        reason: string;
       }
 
+      /**
+       * Successfully applied match
+       */
       export interface AppliedMatch {
+        paymentId: string;
         transactionId: string;
         invoiceId: string;
-        matchType: MatchType;
-        confidence: number;
-        autoApplied: boolean;
+        invoiceNumber: string;
+        amountCents: number;
+        confidenceScore: number;
       }
 
-      export interface ReviewMatch {
-        transactionId: string;
-        suggestedMatches: MatchCandidate[];
+      /**
+       * Batch matching result
+       */
+      export interface MatchingBatchResult {
+        processed: number;
+        autoApplied: number;
+        reviewRequired: number;
+        noMatch: number;
+        results: TransactionMatchResult[];
       }
+
+      /**
+       * DTO for initiating batch matching
+       */
+      export class MatchPaymentsDto {
+        @IsUUID()
+        tenantId!: string;
+
+        @IsOptional()
+        @IsArray()
+        @IsUUID('4', { each: true })
+        transactionIds?: string[];  // If empty, match all unallocated credits
+      }
+
+      /**
+       * DTO for manually applying a suggested match
+       */
+      export class ApplyMatchDto {
+        @IsUUID()
+        tenantId!: string;
+
+        @IsUUID()
+        transactionId!: string;
+
+        @IsUUID()
+        invoiceId!: string;
+
+        @IsOptional()
+        @IsInt()
+        @Min(1)
+        amountCents?: number;  // Optional override for partial payment
+      }
+      ```
+    </signature>
+
+    <signature file="src/database/services/payment-matching.service.ts">
+      ```typescript
+      import { Injectable, Logger } from '@nestjs/common';
+      import Decimal from 'decimal.js';
+      import { Payment, Invoice, Transaction, Parent, Child } from '@prisma/client';
+      import { PrismaService } from '../prisma/prisma.service';
+      import { PaymentRepository } from '../repositories/payment.repository';
+      import { InvoiceRepository } from '../repositories/invoice.repository';
+      import { TransactionRepository } from '../repositories/transaction.repository';
+      import { ParentRepository } from '../repositories/parent.repository';
+      import { AuditLogService } from './audit-log.service';
+      import {
+        MatchingBatchResult,
+        TransactionMatchResult,
+        MatchCandidate,
+        AppliedMatch,
+        MatchConfidenceLevel,
+        MatchPaymentsDto,
+        ApplyMatchDto,
+      } from '../dto/payment-matching.dto';
+      import { MatchType, MatchedBy } from '../entities/payment.entity';
+      import { InvoiceStatus } from '../entities/invoice.entity';
+      import { NotFoundException, BusinessException } from '../../shared/exceptions';
+
+      // Configure Decimal.js for banker's rounding
+      Decimal.set({
+        precision: 20,
+        rounding: Decimal.ROUND_HALF_EVEN,
+      });
+
+      /** Confidence threshold for auto-apply */
+      const AUTO_APPLY_THRESHOLD = 80;
+
+      /** Minimum confidence to include as candidate */
+      const CANDIDATE_THRESHOLD = 20;
+
+      @Injectable()
+      export class PaymentMatchingService {
+        private readonly logger = new Logger(PaymentMatchingService.name);
+
+        constructor(
+          private readonly prisma: PrismaService,
+          private readonly paymentRepo: PaymentRepository,
+          private readonly invoiceRepo: InvoiceRepository,
+          private readonly transactionRepo: TransactionRepository,
+          private readonly parentRepo: ParentRepository,
+          private readonly auditLogService: AuditLogService,
+        ) {}
+
+        /**
+         * Match transactions to outstanding invoices
+         * @param dto - Contains tenantId and optional transactionIds
+         * @returns Batch result with statistics and individual results
+         */
+        async matchPayments(dto: MatchPaymentsDto): Promise&lt;MatchingBatchResult&gt;;
+
+        /**
+         * Find exact matches for a transaction
+         * Exact = reference matches invoice number AND amounts match
+         * @returns Array of exact match candidates (should be 0 or 1)
+         */
+        async findExactMatches(
+          transaction: Transaction,
+          outstandingInvoices: Array&lt;Invoice & { parent: Parent; child: Child }&gt;,
+        ): Promise&lt;MatchCandidate[]&gt;;
+
+        /**
+         * Find partial/fuzzy matches for a transaction
+         * Uses name similarity and amount proximity
+         * @returns Array of candidates sorted by confidence DESC
+         */
+        async findPartialMatches(
+          transaction: Transaction,
+          outstandingInvoices: Array&lt;Invoice & { parent: Parent; child: Child }&gt;,
+        ): Promise&lt;MatchCandidate[]&gt;;
+
+        /**
+         * Calculate confidence score for a transaction-invoice pair
+         * @returns Score 0-100
+         */
+        calculateConfidence(
+          transaction: Transaction,
+          invoice: Invoice & { parent: Parent; child: Child },
+        ): { score: number; reasons: string[] };
+
+        /**
+         * Auto-apply a match (create Payment, update Invoice)
+         * @throws BusinessException if transaction already allocated
+         */
+        async autoApplyMatch(
+          candidate: MatchCandidate,
+          tenantId: string,
+        ): Promise&lt;AppliedMatch&gt;;
+
+        /**
+         * Manually apply a suggested match (called from API)
+         * @throws NotFoundException if transaction or invoice not found
+         * @throws BusinessException if transaction already allocated
+         */
+        async applyMatch(dto: ApplyMatchDto): Promise&lt;AppliedMatch&gt;;
+
+        /**
+         * Calculate string similarity (Levenshtein-based)
+         * @returns Similarity score 0-1 (1 = identical)
+         */
+        private calculateStringSimilarity(str1: string, str2: string): number;
+
+        /**
+         * Normalize string for comparison (lowercase, remove special chars)
+         */
+        private normalizeString(str: string): string;
+
+        /**
+         * Get outstanding invoices for tenant (with parent/child relations)
+         */
+        private async getOutstandingInvoices(
+          tenantId: string,
+        ): Promise&lt;Array&lt;Invoice & { parent: Parent; child: Child }&gt;&gt;;
+
+        /**
+         * Get unallocated credit transactions for tenant
+         */
+        private async getUnallocatedCredits(
+          tenantId: string,
+          transactionIds?: string[],
+        ): Promise&lt;Transaction[]&gt;;
+
+        /**
+         * Check if transaction is already allocated to a payment
+         */
+        private async isTransactionAllocated(transactionId: string): Promise&lt;boolean&gt;;
+      }
+      ```
     </signature>
   </signatures>
 
   <constraints>
-    - Must use Claude Code agent for intelligent matching
-    - Exact match: reference matches invoice number AND amount matches
-    - Confidence threshold for auto-apply: >=80%
-    - Confidence threshold for exact match: 100%
-    - Confidence threshold for review: <80%
-    - Must handle transactions without reference numbers
-    - Must handle fuzzy name matching (e.g., "J Smith" vs "John Smith")
-    - Must handle multiple invoices for same parent
-    - Must NOT auto-apply if multiple high-confidence matches exist
-    - Must log all AI agent decisions for audit
-    - Must handle edge case: payment exceeds invoice amount
-    - Must validate tenant isolation (all entities belong to same tenant)
+    - ALL monetary calculations MUST use Decimal.js with banker's rounding
+    - Confidence scores are integers 0-100
+    - Auto-apply ONLY when single match with confidence >= 80
+    - NEVER auto-apply when multiple high-confidence matches exist (ambiguous)
+    - ALWAYS log matching decisions to audit trail
+    - ALWAYS verify tenant isolation before any operation
+    - Transaction.amountCents is positive for credits (payments in), negative for debits
+    - Only match CREDIT transactions (isCredit = true)
+    - Invoice outstanding = totalCents - amountPaidCents
+    - Amount match tolerance: within 1% or R1, whichever is greater
+    - MUST check if transaction already allocated before creating payment
+    - MUST update Invoice.amountPaidCents and Invoice.status after payment
   </constraints>
 
   <verification>
-    - Service instantiates without errors
-    - matchPayments returns correct structure
-    - Exact matches have 100% confidence
-    - Reference + amount matches are identified
-    - Fuzzy name matching works correctly
-    - Auto-apply only triggers for confidence >=80%
-    - Multiple match candidates flag for review
-    - Claude Code agent integration works
-    - Unit tests pass with mocked agent
-    - Integration tests with real agent pass
+    - TypeScript compiles without errors
+    - All tests pass (target: 900+ total tests)
+    - Exact matches identified correctly (100% confidence)
+    - Partial matches scored correctly by algorithm
+    - Auto-apply triggers only for single high-confidence matches
+    - Multiple matches flag for review correctly
+    - Payment records created correctly
+    - Invoice amountPaidCents updated correctly
+    - Invoice status transitions correctly (SENT → PARTIALLY_PAID → PAID)
+    - Audit logs created for all matching decisions
+    - Tenant isolation enforced
+    - Already-allocated transactions rejected with BusinessException
   </verification>
 </definition_of_done>
 
+<!-- ============================================================
+     CONFIDENCE SCORING ALGORITHM
+     ============================================================ -->
+
+<confidence_algorithm>
+  ```
+  Score Components (max 100 points):
+
+  1. REFERENCE MATCH (0-40 points)
+     - Exact match: transaction.reference === invoice.invoiceNumber → +40
+     - Contains invoice number: transaction.reference.includes(invoiceNumber) → +30
+     - Last 4 digits match: reference ends with invoiceNumber.slice(-4) → +15
+     - No reference: +0
+
+  2. AMOUNT MATCH (0-40 points)
+     - Exact match: |transactionAmount - outstandingAmount| === 0 → +40
+     - Within 1% or R1: → +35
+     - Within 5%: → +25
+     - Within 10%: → +15
+     - Partial (transaction < outstanding): → +10
+     - No match: +0
+
+  3. NAME SIMILARITY (0-20 points)
+     - Check transaction.payeeName against parent full name
+     - Exact match (normalized): +20
+     - Similarity > 0.8: +15
+     - Similarity > 0.6: +10
+     - Similarity > 0.4: +5
+     - No payeeName: +0
+
+  Confidence Levels:
+  - EXACT: score === 100 (reference + amount exact match)
+  - HIGH: score >= 80
+  - MEDIUM: score >= 50
+  - LOW: score >= 20
+  - Below 20: not included as candidate
+  ```
+</confidence_algorithm>
+
+<!-- ============================================================
+     PSEUDO CODE
+     ============================================================ -->
+
 <pseudo_code>
-PaymentMatchingService (src/core/payment/payment-matching.service.ts):
-  @Injectable()
-  export class PaymentMatchingService:
-    constructor(
-      private prisma: PrismaService,
-      private paymentRepository: PaymentRepository,
-      private invoiceRepository: InvoiceRepository,
-      private transactionRepository: TransactionRepository,
-      private claudeAgent: ClaudeAgentService
-    )
+```typescript
+// payment-matching.service.ts
 
-    async matchPayments(transactionIds?: string[], tenantId: string): Promise<MatchingResult>:
-      // 1. Get unallocated credit transactions
-      transactions = transactionIds
-        ? await transactionRepository.findByIds(transactionIds, tenantId)
-        : await transactionRepository.findUnallocatedCredits(tenantId)
+async matchPayments(dto: MatchPaymentsDto): Promise<MatchingBatchResult> {
+  this.logger.log(`Starting payment matching for tenant ${dto.tenantId}`);
 
-      // 2. Get outstanding invoices for this tenant
-      outstandingInvoices = await invoiceRepository.findOutstanding(tenantId)
+  // 1. Get unallocated credit transactions
+  const transactions = await this.getUnallocatedCredits(dto.tenantId, dto.transactionIds);
 
-      // 3. Initialize result counters
-      result = {
-        autoMatched: 0,
-        requiresReview: 0,
-        noMatch: 0,
-        matches: [],
-        reviewRequired: []
-      }
+  if (transactions.length === 0) {
+    return { processed: 0, autoApplied: 0, reviewRequired: 0, noMatch: 0, results: [] };
+  }
 
-      // 4. Process each transaction
-      for transaction in transactions:
-        // Try exact matches first
-        exactMatches = await findExactMatches(transaction, outstandingInvoices)
+  // 2. Get outstanding invoices with parent/child relations
+  const outstandingInvoices = await this.getOutstandingInvoices(dto.tenantId);
 
-        if exactMatches.length === 1:
-          // Single exact match - auto apply
-          applied = await autoApplyMatches([exactMatches[0]], 'SYSTEM')
-          result.autoMatched++
-          result.matches.push(applied[0])
-          continue
+  if (outstandingInvoices.length === 0) {
+    // No invoices to match - all transactions are "no match"
+    return {
+      processed: transactions.length,
+      autoApplied: 0,
+      reviewRequired: 0,
+      noMatch: transactions.length,
+      results: transactions.map(t => ({
+        transactionId: t.id,
+        status: 'NO_MATCH',
+        reason: 'No outstanding invoices found',
+      })),
+    };
+  }
 
-        // Try AI-powered matching
-        candidates = await findPartialMatches(transaction, outstandingInvoices)
+  // 3. Process each transaction
+  const results: TransactionMatchResult[] = [];
+  let autoApplied = 0, reviewRequired = 0, noMatch = 0;
 
-        if candidates.length === 0:
-          result.noMatch++
-          continue
+  for (const transaction of transactions) {
+    // Skip if already allocated (race condition check)
+    if (await this.isTransactionAllocated(transaction.id)) {
+      results.push({
+        transactionId: transaction.id,
+        status: 'NO_MATCH',
+        reason: 'Transaction already allocated',
+      });
+      noMatch++;
+      continue;
+    }
 
-        // Check if we have high-confidence single match
-        highConfidence = candidates.filter(c => c.confidence >= 80)
+    // Try exact matches first
+    const exactMatches = await this.findExactMatches(transaction, outstandingInvoices);
 
-        if highConfidence.length === 1:
-          applied = await autoApplyMatches([highConfidence[0]], 'SYSTEM')
-          result.autoMatched++
-          result.matches.push(applied[0])
-        else:
-          // Multiple matches or low confidence - flag for review
-          result.requiresReview++
-          result.reviewRequired.push({
-            transactionId: transaction.id,
-            suggestedMatches: candidates.slice(0, 5) // Top 5 suggestions
-          })
+    if (exactMatches.length === 1) {
+      // Single exact match - auto-apply
+      const applied = await this.autoApplyMatch(exactMatches[0], dto.tenantId);
+      results.push({
+        transactionId: transaction.id,
+        status: 'AUTO_APPLIED',
+        appliedMatch: applied,
+        reason: 'Exact match: reference and amount',
+      });
+      autoApplied++;
+      continue;
+    }
 
-      return result
+    // Try partial matches
+    const partialMatches = await this.findPartialMatches(transaction, outstandingInvoices);
 
-    async findExactMatches(transaction: Transaction, invoices: Invoice[]): Promise<MatchCandidate[]>:
-      if !transaction.reference:
-        return []
+    if (partialMatches.length === 0) {
+      results.push({
+        transactionId: transaction.id,
+        status: 'NO_MATCH',
+        reason: 'No matching invoices found',
+      });
+      noMatch++;
+      continue;
+    }
 
-      matches = []
-      for invoice in invoices:
-        // Exact match: reference matches invoice number AND amount matches
-        if invoice.invoiceNumber === transaction.reference:
-          amountMatch = Math.abs(transaction.amountCents) === invoice.totalCents - invoice.amountPaidCents
+    // Check for single high-confidence match
+    const highConfidence = partialMatches.filter(m => m.confidenceScore >= AUTO_APPLY_THRESHOLD);
 
-          if amountMatch:
-            matches.push({
-              transactionId: transaction.id,
-              invoiceId: invoice.id,
-              invoiceNumber: invoice.invoiceNumber,
-              matchType: MatchType.EXACT,
-              confidence: 100,
-              matchReason: 'Reference and amount exact match',
-              parentName: invoice.parent.name,
-              childName: invoice.child.name,
-              invoiceAmount: invoice.totalCents / 100,
-              transactionAmount: Math.abs(transaction.amountCents) / 100
-            })
+    if (highConfidence.length === 1) {
+      // Single high-confidence - auto-apply
+      const applied = await this.autoApplyMatch(highConfidence[0], dto.tenantId);
+      results.push({
+        transactionId: transaction.id,
+        status: 'AUTO_APPLIED',
+        appliedMatch: applied,
+        reason: `High confidence match (${highConfidence[0].confidenceScore}%)`,
+      });
+      autoApplied++;
+    } else {
+      // Multiple matches or low confidence - require review
+      results.push({
+        transactionId: transaction.id,
+        status: 'REVIEW_REQUIRED',
+        candidates: partialMatches.slice(0, 5), // Top 5 suggestions
+        reason: highConfidence.length > 1
+          ? 'Multiple high-confidence matches - manual selection required'
+          : 'No high-confidence match found',
+      });
+      reviewRequired++;
+    }
+  }
 
-      return matches
+  this.logger.log(`Matching complete: ${autoApplied} auto-applied, ${reviewRequired} review, ${noMatch} no match`);
 
-    async findPartialMatches(transaction: Transaction, invoices: Invoice[]): Promise<MatchCandidate[]>:
-      // Build prompt for Claude Code agent
-      prompt = buildMatchingPrompt(transaction, invoices)
+  return {
+    processed: transactions.length,
+    autoApplied,
+    reviewRequired,
+    noMatch,
+    results,
+  };
+}
 
-      // Invoke Claude Code agent
-      agentResponse = await claudeAgent.invokeAgent('payment-matcher', prompt)
+calculateConfidence(
+  transaction: Transaction,
+  invoice: Invoice & { parent: Parent; child: Child },
+): { score: number; reasons: string[] } {
+  let score = 0;
+  const reasons: string[] = [];
 
-      // Parse agent response into match candidates
-      candidates = parseAgentResponse(agentResponse)
+  const transactionAmount = Math.abs(transaction.amountCents);
+  const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
 
-      // Calculate confidence for each candidate
-      for candidate in candidates:
-        candidate.confidence = await calculateConfidence(transaction, invoice)
+  // 1. REFERENCE MATCH (0-40 points)
+  if (transaction.reference) {
+    const normalizedRef = this.normalizeString(transaction.reference);
+    const normalizedInvoice = this.normalizeString(invoice.invoiceNumber);
 
-      // Sort by confidence descending
-      candidates.sort((a, b) => b.confidence - a.confidence)
+    if (normalizedRef === normalizedInvoice) {
+      score += 40;
+      reasons.push('Exact reference match');
+    } else if (normalizedRef.includes(normalizedInvoice)) {
+      score += 30;
+      reasons.push('Reference contains invoice number');
+    } else if (normalizedRef.endsWith(normalizedInvoice.slice(-4))) {
+      score += 15;
+      reasons.push('Reference ends with invoice suffix');
+    }
+  }
 
-      return candidates
+  // 2. AMOUNT MATCH (0-40 points)
+  const amountDiff = Math.abs(transactionAmount - outstandingAmount);
+  const percentDiff = outstandingAmount > 0 ? amountDiff / outstandingAmount : 1;
 
-    async calculateConfidence(transaction: Transaction, invoice: Invoice): Promise<number>:
-      score = 0
+  if (amountDiff === 0) {
+    score += 40;
+    reasons.push('Exact amount match');
+  } else if (percentDiff <= 0.01 || amountDiff <= 100) {
+    score += 35;
+    reasons.push('Amount within 1% or R1');
+  } else if (percentDiff <= 0.05) {
+    score += 25;
+    reasons.push('Amount within 5%');
+  } else if (percentDiff <= 0.10) {
+    score += 15;
+    reasons.push('Amount within 10%');
+  } else if (transactionAmount < outstandingAmount) {
+    score += 10;
+    reasons.push('Partial payment (less than outstanding)');
+  }
 
-      // Amount match (50 points)
-      transactionAmt = Math.abs(transaction.amountCents)
-      outstandingAmt = invoice.totalCents - invoice.amountPaidCents
+  // 3. NAME SIMILARITY (0-20 points)
+  if (transaction.payeeName) {
+    const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+    const similarity = this.calculateStringSimilarity(
+      this.normalizeString(transaction.payeeName),
+      this.normalizeString(parentName),
+    );
 
-      if transactionAmt === outstandingAmt:
-        score += 50
-      else if Math.abs(transactionAmt - outstandingAmt) / outstandingAmt < 0.05:
-        score += 40 // Within 5%
+    if (similarity === 1) {
+      score += 20;
+      reasons.push('Exact name match');
+    } else if (similarity > 0.8) {
+      score += 15;
+      reasons.push(`Strong name similarity (${Math.round(similarity * 100)}%)`);
+    } else if (similarity > 0.6) {
+      score += 10;
+      reasons.push(`Good name similarity (${Math.round(similarity * 100)}%)`);
+    } else if (similarity > 0.4) {
+      score += 5;
+      reasons.push(`Weak name similarity (${Math.round(similarity * 100)}%)`);
+    }
+  }
 
-      // Reference match (30 points)
-      if transaction.reference:
-        if transaction.reference === invoice.invoiceNumber:
-          score += 30
-        else if transaction.reference.includes(invoice.invoiceNumber.substr(-4)):
-          score += 20 // Partial reference match
+  return { score: Math.min(score, 100), reasons };
+}
 
-      // Payer name match (20 points)
-      if transaction.payeeName:
-        parentName = invoice.parent.name.toLowerCase()
-        payeeName = transaction.payeeName.toLowerCase()
+async autoApplyMatch(
+  candidate: MatchCandidate,
+  tenantId: string,
+): Promise<AppliedMatch> {
+  // Double-check not already allocated
+  if (await this.isTransactionAllocated(candidate.transactionId)) {
+    throw new BusinessException(
+      `Transaction ${candidate.transactionId} is already allocated to a payment`,
+      'TRANSACTION_ALREADY_ALLOCATED',
+    );
+  }
 
-        if payeeName.includes(parentName) || parentName.includes(payeeName):
-          score += 20
-        else:
-          // Fuzzy match using Levenshtein distance
-          similarity = calculateStringSimilarity(payeeName, parentName)
-          if similarity > 0.7:
-            score += 15
+  // Determine match type
+  const matchType = candidate.confidenceScore === 100 ? MatchType.EXACT : MatchType.PARTIAL;
 
-      return Math.min(score, 100)
+  // Create payment record
+  const payment = await this.paymentRepo.create({
+    tenantId,
+    transactionId: candidate.transactionId,
+    invoiceId: candidate.invoiceId,
+    amountCents: candidate.transactionAmountCents,
+    paymentDate: new Date(),  // Could also use transaction.date
+    matchType,
+    matchConfidence: candidate.confidenceScore,
+    matchedBy: MatchedBy.AI_AUTO,
+  });
 
-    async autoApplyMatches(matches: MatchCandidate[], userId: string): Promise<AppliedMatch[]>:
-      applied = []
+  // Update invoice with payment
+  await this.invoiceRepo.recordPayment(candidate.invoiceId, candidate.transactionAmountCents);
 
-      for match in matches:
-        // Create payment record (via allocation service in TASK-PAY-012)
-        // For now, just mark as matched
-        payment = await paymentRepository.create({
-          tenantId: match.tenantId,
-          transactionId: match.transactionId,
-          invoiceId: match.invoiceId,
-          amountCents: match.transactionAmount * 100,
-          paymentDate: match.transaction.date,
-          reference: match.transaction.reference,
-          matchType: match.matchType,
-          matchConfidence: match.confidence,
-          matchedBy: match.confidence === 100 ? MatchedBy.AI_AUTO : MatchedBy.AI_AUTO
-        })
+  // Create audit log
+  await this.auditLogService.logAction({
+    tenantId,
+    entityType: 'Payment',
+    entityId: payment.id,
+    action: 'CREATE',
+    afterValue: {
+      transactionId: candidate.transactionId,
+      invoiceId: candidate.invoiceId,
+      invoiceNumber: candidate.invoiceNumber,
+      amountCents: candidate.transactionAmountCents,
+      confidenceScore: candidate.confidenceScore,
+      matchReasons: candidate.matchReasons,
+    },
+    changeSummary: `Auto-matched transaction to invoice ${candidate.invoiceNumber} with ${candidate.confidenceScore}% confidence`,
+  });
 
-        applied.push({
-          transactionId: match.transactionId,
-          invoiceId: match.invoiceId,
-          matchType: match.matchType,
-          confidence: match.confidence,
-          autoApplied: true
-        })
+  this.logger.log(
+    `Auto-applied match: Transaction ${candidate.transactionId} → Invoice ${candidate.invoiceNumber} (${candidate.confidenceScore}%)`,
+  );
 
-      return applied
+  return {
+    paymentId: payment.id,
+    transactionId: candidate.transactionId,
+    invoiceId: candidate.invoiceId,
+    invoiceNumber: candidate.invoiceNumber,
+    amountCents: candidate.transactionAmountCents,
+    confidenceScore: candidate.confidenceScore,
+  };
+}
 
-    private buildMatchingPrompt(transaction: Transaction, invoices: Invoice[]): string:
-      return `
-        You are a payment matching expert for a South African creche.
+// Levenshtein-based similarity
+private calculateStringSimilarity(str1: string, str2: string): number {
+  if (str1 === str2) return 1;
+  if (str1.length === 0 || str2.length === 0) return 0;
 
-        Transaction to match:
-        - Date: ${transaction.date}
-        - Description: ${transaction.description}
-        - Payer: ${transaction.payeeName || 'Unknown'}
-        - Reference: ${transaction.reference || 'None'}
-        - Amount: R${Math.abs(transaction.amountCents) / 100}
+  const matrix: number[][] = [];
 
-        Outstanding invoices:
-        ${invoices.map(inv => `
-        - Invoice: ${inv.invoiceNumber}
-        - Parent: ${inv.parent.name}
-        - Child: ${inv.child.name}
-        - Amount due: R${(inv.totalCents - inv.amountPaidCents) / 100}
-        - Due date: ${inv.dueDate}
-        `).join('\n')}
+  for (let i = 0; i <= str1.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= str2.length; j++) {
+    matrix[0][j] = j;
+  }
 
-        Task: Identify which invoice(s) this transaction most likely pays.
-        Consider: reference numbers, amounts, payer names, and dates.
-        Return top 3 matches with reasoning.
-      `
+  for (let i = 1; i <= str1.length; i++) {
+    for (let j = 1; j <= str2.length; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost, // substitution
+      );
+    }
+  }
 
-    private parseAgentResponse(response: string): MatchCandidate[]:
-      // Parse Claude Code agent's structured response
-      // Expected format: JSON array of matches
-      try:
-        parsed = JSON.parse(response)
-        return parsed.map(p => ({
-          ...p,
-          matchType: MatchType.PARTIAL // Will be updated based on confidence
-        }))
-      catch error:
-        logger.error('Failed to parse agent response', error)
-        return []
+  const distance = matrix[str1.length][str2.length];
+  const maxLength = Math.max(str1.length, str2.length);
+  return 1 - distance / maxLength;
+}
 
-DTOs (src/core/payment/dto/matching.dto.ts):
-  export interface MatchCandidate:
-    transactionId: string
-    invoiceId: string
-    invoiceNumber: string
-    matchType: MatchType
-    confidence: number
-    matchReason: string
-    parentName: string
-    childName: string
-    invoiceAmount: number
-    transactionAmount: number
-
-  export interface MatchingResult:
-    autoMatched: number
-    requiresReview: number
-    noMatch: number
-    matches: AppliedMatch[]
-    reviewRequired: ReviewMatch[]
-
-  export interface AppliedMatch:
-    transactionId: string
-    invoiceId: string
-    matchType: MatchType
-    confidence: number
-    autoApplied: boolean
-
-  export interface ReviewMatch:
-    transactionId: string
-    suggestedMatches: MatchCandidate[]
-
-Agent Prompt Template (src/core/payment/prompts/payment-matching.prompt.ts):
-  export const PAYMENT_MATCHING_PROMPT = `...`
+private normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')  // Remove special chars
+    .trim();
+}
+```
 </pseudo_code>
 
+<!-- ============================================================
+     FILES TO CREATE
+     ============================================================ -->
+
 <files_to_create>
-  <file path="src/core/payment/payment-matching.service.ts">PaymentMatchingService with AI agent integration</file>
-  <file path="src/core/payment/dto/matching.dto.ts">MatchingResult and MatchCandidate DTOs</file>
-  <file path="src/core/payment/prompts/payment-matching.prompt.ts">Claude Code agent prompt templates</file>
-  <file path="tests/core/payment/payment-matching.service.spec.ts">Unit tests with mocked agent</file>
-  <file path="tests/core/payment/payment-matching.integration.spec.ts">Integration tests with real agent</file>
+  <file path="src/database/dto/payment-matching.dto.ts">
+    DTOs for payment matching: MatchCandidate, MatchingBatchResult, MatchPaymentsDto, ApplyMatchDto
+  </file>
+  <file path="src/database/services/payment-matching.service.ts">
+    PaymentMatchingService with confidence-based matching algorithm
+  </file>
+  <file path="tests/database/services/payment-matching.service.spec.ts">
+    Integration tests using real database (not mocks)
+  </file>
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/core/payment/index.ts">Export PaymentMatchingService</file>
-  <file path="src/core/payment/payment.module.ts">Register PaymentMatchingService</file>
+  <file path="src/database/services/index.ts">
+    Add: export * from './payment-matching.service';
+  </file>
+  <file path="src/database/dto/index.ts">
+    Add: export * from './payment-matching.dto';
+  </file>
+  <file path="src/database/database.module.ts">
+    Add PaymentMatchingService to providers and exports
+  </file>
 </files_to_modify>
 
-<validation_criteria>
-  <criterion>Service compiles without TypeScript errors</criterion>
-  <criterion>matchPayments correctly identifies exact matches (100% confidence)</criterion>
-  <criterion>Reference + amount matching works correctly</criterion>
-  <criterion>Fuzzy name matching identifies partial matches</criterion>
-  <criterion>Auto-apply only triggers for confidence >=80%</criterion>
-  <criterion>Multiple high-confidence matches flag for review</criterion>
-  <criterion>Claude Code agent integration works</criterion>
-  <criterion>Agent prompt is well-structured and clear</criterion>
-  <criterion>Edge cases handled: no reference, multiple invoices, overpayment</criterion>
-  <criterion>All matches respect tenant isolation</criterion>
-  <criterion>Unit tests achieve >90% coverage</criterion>
-  <criterion>Integration tests verify end-to-end matching</criterion>
-</validation_criteria>
+<!-- ============================================================
+     TEST REQUIREMENTS
+     ============================================================ -->
+
+<test_requirements>
+  <critical_rule>
+    Tests MUST use REAL database with REAL data.
+    NO mocks except for external APIs that require credentials.
+    Tests must actually verify the matching algorithm works correctly.
+  </critical_rule>
+
+  <test_structure>
+    ```typescript
+    // tests/database/services/payment-matching.service.spec.ts
+
+    import 'dotenv/config';
+    import { Test, TestingModule } from '@nestjs/testing';
+    import { PrismaService } from '../../../src/database/prisma/prisma.service';
+    import { PaymentMatchingService } from '../../../src/database/services/payment-matching.service';
+    import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
+    import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
+    import { TransactionRepository } from '../../../src/database/repositories/transaction.repository';
+    import { ParentRepository } from '../../../src/database/repositories/parent.repository';
+    import { AuditLogService } from '../../../src/database/services/audit-log.service';
+    // ... other imports
+
+    describe('PaymentMatchingService', () => {
+      let service: PaymentMatchingService;
+      let prisma: PrismaService;
+      let testTenant: Tenant;
+      let testParent: Parent;
+      let testChild: Child;
+
+      beforeAll(async () => {
+        // Create test module with REAL providers
+      });
+
+      beforeEach(async () => {
+        // Create fresh test data for each test
+      });
+
+      afterEach(async () => {
+        // Clean up test data
+      });
+
+      afterAll(async () => {
+        await prisma.$disconnect();
+      });
+
+      describe('matchPayments', () => {
+        // Test cases...
+      });
+    });
+    ```
+  </test_structure>
+
+  <test_cases>
+    <test name="Exact match - auto-apply">
+      Create transaction with reference = invoice number, amount = outstanding.
+      Verify: 100% confidence, auto-applied, payment created, invoice updated.
+    </test>
+    <test name="High confidence - auto-apply">
+      Create transaction with partial reference match + exact amount.
+      Verify: >= 80% confidence, auto-applied.
+    </test>
+    <test name="Low confidence - review required">
+      Create transaction with only amount match.
+      Verify: &lt; 80% confidence, flagged for review with candidates.
+    </test>
+    <test name="Multiple high confidence - review required">
+      Create 2 invoices with same amount, transaction matches both.
+      Verify: NOT auto-applied, flagged for review.
+    </test>
+    <test name="No match">
+      Create transaction with no matching invoice.
+      Verify: status = NO_MATCH.
+    </test>
+    <test name="Already allocated - rejected">
+      Create transaction that already has a payment.
+      Verify: BusinessException thrown.
+    </test>
+    <test name="Name similarity scoring">
+      Test various name variations (J. Smith, John Smith, Smith John).
+      Verify: correct similarity scores.
+    </test>
+    <test name="Invoice status updates">
+      Verify SENT → PARTIALLY_PAID → PAID transitions.
+    </test>
+    <test name="Tenant isolation">
+      Create invoices for different tenants.
+      Verify: only matches same-tenant invoices.
+    </test>
+    <test name="Partial payment">
+      Transaction amount &lt; invoice outstanding.
+      Verify: matched as partial, invoice becomes PARTIALLY_PAID.
+    </test>
+  </test_cases>
+</test_requirements>
+
+<!-- ============================================================
+     VALIDATION COMMANDS
+     ============================================================ -->
 
 <test_commands>
-  <command>npm run build</command>
-  <command>npm run test -- --grep "PaymentMatchingService"</command>
-  <command>npm run test:integration -- --grep "payment-matching"</command>
   <command>npm run lint</command>
+  <command>npm run build</command>
+  <command>npm test -- payment-matching.service.spec.ts</command>
+  <command>npm test</command>
 </test_commands>
+
+<success_criteria>
+  - npm run lint: No errors
+  - npm run build: No TypeScript errors
+  - npm test: All tests pass (target: 900+ total tests, ~26 new tests)
+  - Integration tests verify real database operations
+  - Matching algorithm produces correct confidence scores
+  - Auto-apply/review logic works correctly
+  - Tenant isolation verified
+</success_criteria>
 
 </task_spec>

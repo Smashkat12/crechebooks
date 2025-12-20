@@ -375,6 +375,15 @@ export class InvoiceRepository {
       if (dto.notes !== undefined) {
         updateData.notes = dto.notes;
       }
+      if (dto.deliveryStatus !== undefined) {
+        updateData.deliveryStatus = dto.deliveryStatus;
+      }
+      if (dto.deliveredAt !== undefined) {
+        updateData.deliveredAt = dto.deliveredAt;
+      }
+      if (dto.deliveryRetryCount !== undefined) {
+        updateData.deliveryRetryCount = dto.deliveryRetryCount;
+      }
 
       return await this.prisma.invoice.update({
         where: { id },
@@ -621,6 +630,78 @@ export class InvoiceRepository {
       throw new DatabaseException(
         'recordPayment',
         'Failed to record payment',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Find invoices by delivery status with optional cutoff date
+   * Used for retrying failed deliveries
+   * @throws DatabaseException for database errors
+   */
+  async findByDeliveryStatus(
+    tenantId: string,
+    deliveryStatus: 'PENDING' | 'SENT' | 'DELIVERED' | 'OPENED' | 'FAILED',
+    cutoffDate?: Date,
+  ): Promise<Invoice[]> {
+    try {
+      const where: Prisma.InvoiceWhereInput = {
+        tenantId,
+        deliveryStatus,
+        isDeleted: false,
+      };
+
+      if (cutoffDate) {
+        where.updatedAt = { gte: cutoffDate };
+      }
+
+      return await this.prisma.invoice.findMany({
+        where,
+        orderBy: [{ updatedAt: 'asc' }],
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find invoices by delivery status ${deliveryStatus} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByDeliveryStatus',
+        'Failed to find invoices by delivery status',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Increment delivery retry count for an invoice
+   * @throws NotFoundException if invoice doesn't exist
+   * @throws DatabaseException for database errors
+   */
+  async incrementDeliveryRetryCount(id: string): Promise<Invoice> {
+    try {
+      const existing = await this.findById(id);
+      if (!existing) {
+        throw new NotFoundException('Invoice', id);
+      }
+
+      return await this.prisma.invoice.update({
+        where: { id },
+        data: {
+          deliveryRetryCount: { increment: 1 },
+        },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to increment delivery retry count for invoice: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'incrementDeliveryRetryCount',
+        'Failed to increment delivery retry count',
         error instanceof Error ? error : undefined,
       );
     }

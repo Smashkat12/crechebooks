@@ -47,6 +47,7 @@ describe('InvoiceLineRepository', () => {
 
   beforeEach(async () => {
     // CRITICAL: Clean in FK order - leaf tables first!
+    await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.enrollment.deleteMany({});

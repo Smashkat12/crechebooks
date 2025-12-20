@@ -10,3 +10,4 @@ export * from './fee-structure.dto';
 export * from './enrollment.dto';
 export * from './invoice.dto';
 export * from './invoice-line.dto';
+export * from './payment.dto';

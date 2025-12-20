@@ -171,6 +171,12 @@ enum SubmissionStatus {
   ACKNOWLEDGED
 }
 
+enum ReconciliationStatus {
+  IN_PROGRESS
+  RECONCILED
+  DISCREPANCY
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -196,18 +202,19 @@ model Tenant {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  users           User[]
-  transactions    Transaction[]
-  payeePatterns   PayeePattern[]
-  feeStructures   FeeStructure[]
-  enrollments     Enrollment[]
-  parents         Parent[]
-  children        Child[]
-  invoices        Invoice[]
-  payments        Payment[]
-  staff           Staff[]
-  payrolls        Payroll[]
-  sarsSubmissions SarsSubmission[]
+  users            User[]
+  transactions     Transaction[]
+  payeePatterns    PayeePattern[]
+  feeStructures    FeeStructure[]
+  enrollments      Enrollment[]
+  parents          Parent[]
+  children         Child[]
+  invoices         Invoice[]
+  payments         Payment[]
+  staff            Staff[]
+  payrolls         Payroll[]
+  sarsSubmissions  SarsSubmission[]
+  reconciliations  Reconciliation[]
 
   @@map("tenants")
 }
@@ -227,6 +234,7 @@ model User {
 
   reviewedCategorizations Categorization[] @relation("ReviewedCategorizations")
   sarsSubmissions         SarsSubmission[]
+  reconciliations         Reconciliation[] @relation("ReconciliationReconciler")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -616,4 +624,29 @@ model Payroll {
   @@index([tenantId, status])
   @@index([tenantId, payPeriodStart])
   @@map("payrolls")
+}
+
+model Reconciliation {
+  id                     String               @id @default(uuid())
+  tenantId               String               @map("tenant_id")
+  bankAccount            String               @map("bank_account") @db.VarChar(50)
+  periodStart            DateTime             @map("period_start") @db.Date
+  periodEnd              DateTime             @map("period_end") @db.Date
+  openingBalanceCents    Int                  @map("opening_balance_cents")
+  closingBalanceCents    Int                  @map("closing_balance_cents")
+  calculatedBalanceCents Int                  @map("calculated_balance_cents")
+  discrepancyCents       Int                  @default(0) @map("discrepancy_cents")
+  status                 ReconciliationStatus @default(IN_PROGRESS)
+  reconciledBy           String?              @map("reconciled_by")
+  reconciledAt           DateTime?            @map("reconciled_at")
+  notes                  String?              @db.Text
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id])
+  reconciler             User?                @relation("ReconciliationReconciler", fields: [reconciledBy], references: [id])
+
+  @@unique([tenantId, bankAccount, periodStart])
+  @@index([tenantId, status])
+  @@map("reconciliations")
 }

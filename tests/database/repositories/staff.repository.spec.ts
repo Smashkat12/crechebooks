@@ -29,6 +29,7 @@ describe('StaffRepository', () => {
 
   beforeEach(async () => {
     // Clean database in exact order
+    await prisma.reconciliation.deleteMany({});
     await prisma.sarsSubmission.deleteMany({});
     await prisma.payroll.deleteMany({});
     await prisma.staff.deleteMany({});

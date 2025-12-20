@@ -19,3 +19,4 @@ export * from './import.dto';
 export * from './categorization-service.dto';
 export * from './pattern-learning.dto';
 export * from './xero-sync.dto';
+export * from './enrollment-service.dto';

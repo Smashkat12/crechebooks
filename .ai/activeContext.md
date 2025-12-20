@@ -1,7 +1,7 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-TRANS-002 Completed)
+2025-12-20 by AI Agent (TASK-TRANS-003 Completed)
 
 ## Current Focus
 CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
@@ -11,73 +11,71 @@ CrecheBooks is an AI-powered bookkeeping system for South African creches and pr
 
 ## Active Task
 **Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002
-**Next**: TASK-TRANS-003 (to be determined from task index)
+**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003
+**Next**: TASK-BILL-001 (Parent and Child Entities)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
 
 ---
 
-## TASK-TRANS-002 Summary (COMPLETED)
+## TASK-TRANS-003 Summary (COMPLETED)
 
 ### What Was Built
-- VatType enum (STANDARD, ZERO_RATED, EXEMPT, NO_VAT)
-- CategorizationSource enum (AI_AUTO, AI_SUGGESTED, USER_OVERRIDE, RULE_BASED)
-- Categorization model with Transaction and User relations
-- Database migration `20251220012120_create_categorizations` with 14 columns
-- ICategorization TypeScript interface
-- CreateCategorizationDto, UpdateCategorizationDto, ReviewCategorizationDto, CategorizationFilterDto
-- CategorizationRepository with 7 methods + 2 validation helpers:
-  - create, findById, findByTransaction, findPendingReview
-  - findWithFilters (paginated), review, update, delete
-  - validateSplitTransaction, validateVatCalculation
-- 28 integration tests using REAL database (no mocks)
-- Business validation: split transactions require splitAmountCents
-- Business validation: STANDARD VAT type requires vatAmountCents
-- Review workflow: sets reviewedBy, reviewedAt, changes source to USER_OVERRIDE
+- PayeePattern model in Prisma schema with 12 columns
+- JSONB column for payeeAliases array storage
+- Database migration `20251220014604_create_payee_patterns`
+- IPayeePattern TypeScript interface
+- CreatePayeePatternDto, UpdatePayeePatternDto, PayeePatternFilterDto
+- PayeePatternRepository with 7 methods:
+  - create, findById, findByTenant (with filters)
+  - findByPayeeName (exact + alias matching)
+  - incrementMatchCount (atomic), update, delete
+- 20+ integration tests using REAL database (no mocks)
+- Business validation: recurring patterns require expectedAmountCents
+- Multi-tenant isolation on all queries
+- Case-insensitive alias matching
 
 ### Key Design Decisions
-1. **Relation-based Reviewer Update** - Use `connect: { id }` for reviewer relation
-2. **P2025 Error Handling** - Handle missing connect records as NotFoundException
-3. **Confidence as Decimal(5,2)** - Store 0-100 with 2 decimal precision
-4. **ValidateIf Typing** - Type callback parameter to satisfy ESLint
-5. **Review Changes Source** - All reviewed categorizations become USER_OVERRIDE
+1. **JSONB for Aliases** - Store aliases as JSON array for flexible matching
+2. **Atomic Increment** - Use Prisma's { increment: 1 } for matchCount
+3. **Case-Insensitive Matching** - Both payeePattern and aliases match case-insensitively
+4. **Unique Constraint** - (tenantId, payeePattern) enforces one pattern per tenant
+5. **Recurring Validation** - isRecurring=true requires expectedAmountCents
 
 ### Key Files Created
 ```
 src/database/
 ├── entities/
-│   ├── categorization.entity.ts  # VatType, CategorizationSource, ICategorization
-│   └── index.ts                  # Updated
+│   ├── payee-pattern.entity.ts  # IPayeePattern interface
+│   └── index.ts                 # Updated
 ├── dto/
-│   ├── categorization.dto.ts     # Create, Update, Review, Filter DTOs
-│   └── index.ts                  # Updated
+│   ├── payee-pattern.dto.ts     # Create, Update, Filter DTOs
+│   └── index.ts                 # Updated
 ├── repositories/
-│   ├── categorization.repository.ts  # 7 methods + 2 validators
-│   └── index.ts                  # Updated
+│   ├── payee-pattern.repository.ts  # 7 methods
+│   └── index.ts                 # Updated
 
 prisma/
-├── schema.prisma                 # VatType, CategorizationSource enums, Categorization model
-│                                 # Updated Transaction (categorizations relation)
-│                                 # Updated User (reviewedCategorizations relation)
+├── schema.prisma                # PayeePattern model, Tenant relation updated
 └── migrations/
-    └── 20251220012120_create_categorizations/
+    └── 20251220014604_create_payee_patterns/
         └── migration.sql
 
 tests/database/repositories/
-├── categorization.repository.spec.ts  # 28 tests with real DB
-├── tenant.repository.spec.ts          # Updated cleanup order
-├── user.repository.spec.ts            # Updated cleanup order
-└── transaction.repository.spec.ts     # Updated cleanup order
+├── payee-pattern.repository.spec.ts  # 20+ tests with real DB
+├── tenant.repository.spec.ts         # Updated cleanup order
+├── user.repository.spec.ts           # Updated cleanup order
+├── transaction.repository.spec.ts    # Updated cleanup order
+└── categorization.repository.spec.ts # Updated cleanup order
 ```
 
 ### Verification
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 169 tests (all passing with --runInBand)
-  - 28 new categorization tests
-  - 141 existing tests
+- Tests: 200 tests (all passing with --runInBand)
+  - 31 new payee pattern tests
+  - 169 existing tests
 
 ---
 
@@ -86,7 +84,7 @@ tests/database/repositories/
 ### Prisma Schema (prisma/schema.prisma)
 ```
 Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource
-Models: Tenant, User, AuditLog, Transaction, Categorization
+Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern
 ```
 
 ### Migrations Applied
@@ -95,6 +93,7 @@ Models: Tenant, User, AuditLog, Transaction, Categorization
 3. `20251220000830_create_audit_logs` (with immutability rules)
 4. `20251220XXXXXX_create_transactions`
 5. `20251220012120_create_categorizations`
+6. `20251220014604_create_payee_patterns`
 
 ### Project Structure
 ```
@@ -106,9 +105,9 @@ crechebooks/
 │   ├── health/
 │   ├── database/
 │   │   ├── prisma/            # PrismaService, PrismaModule (GLOBAL)
-│   │   ├── entities/          # ITenant, IUser, IAuditLog, ITransaction, ICategorization, enums
-│   │   ├── dto/               # Tenant, User, AuditLog, Transaction, Categorization DTOs
-│   │   ├── repositories/      # TenantRepository, UserRepository, TransactionRepository, CategorizationRepository
+│   │   ├── entities/          # ITenant, IUser, IAuditLog, ITransaction, ICategorization, IPayeePattern, enums
+│   │   ├── dto/               # Tenant, User, AuditLog, Transaction, Categorization, PayeePattern DTOs
+│   │   ├── repositories/      # TenantRepository, UserRepository, TransactionRepository, CategorizationRepository, PayeePatternRepository
 │   │   └── services/          # AuditLogService
 │   └── shared/
 │       ├── constants/
@@ -122,7 +121,7 @@ crechebooks/
 ├── tests/
 │   ├── shared/
 │   └── database/
-│       ├── repositories/      # tenant, user, transaction, categorization specs
+│       ├── repositories/      # tenant, user, transaction, categorization, payee-pattern specs
 │       └── services/          # audit-log spec
 └── test/
 ```
@@ -132,15 +131,10 @@ crechebooks/
 ## Recent Decisions
 | Date | Decision | Impact |
 |------|----------|--------|
-| 2025-12-20 | Prisma 7 adapter pattern | Pool + PrismaPg adapter in service |
-| 2025-12-20 | Tests use real database | No mocks, DATABASE_URL required |
-| 2025-12-20 | Fail fast philosophy | Errors logged fully, then re-thrown |
-| 2025-12-20 | Repository pattern | CRUD in repositories, not services |
-| 2025-12-20 | Soft delete pattern | isDeleted + deletedAt fields |
-| 2025-12-20 | Run tests with --runInBand | Avoid parallel database conflicts |
-| 2025-12-20 | Import enums from entity | DTOs import from entity.ts, not @prisma/client |
-| 2025-12-20 | P2025 for connect errors | Handle missing relation records as NotFoundException |
-| 2025-12-20 | ValidateIf typed callbacks | Type DTO callback parameters to satisfy @typescript-eslint |
+| 2025-12-20 | JSONB for payeeAliases | Flexible array storage with JSON operations |
+| 2025-12-20 | Atomic matchCount increment | Use Prisma { increment: 1 } for thread safety |
+| 2025-12-20 | Case-insensitive matching | Both pattern and aliases match regardless of case |
+| 2025-12-20 | Recurring validation | BusinessException if isRecurring=true without expectedAmountCents |
 
 ---
 
@@ -157,20 +151,20 @@ crechebooks/
 ```bash
 pnpm run build           # Must compile without errors
 pnpm run lint            # Must pass with 0 warnings
-pnpm test --runInBand    # All tests must pass (169 tests)
+pnpm test --runInBand    # All tests must pass (200 tests)
 pnpm run test:e2e        # E2E tests must pass
 ```
 
 ---
 
 ## Current Blockers
-- None - Ready for next task
+- None - Ready for next task (TASK-BILL-001)
 
 ---
 
 ## Session Notes
-TASK-TRANS-002 completed with 169 tests passing.
-Foundation Layer: 6/15 tasks complete (40%).
-28 new categorization tests added.
-All business validations (split transactions, VAT calculations) implemented.
-Review workflow changes source to USER_OVERRIDE.
+TASK-TRANS-003 completed with 200 tests passing.
+Foundation Layer: 7/15 tasks complete (46.7%).
+31 new payee pattern tests added.
+All business validations (recurring patterns, multi-tenant isolation) implemented.
+JSONB used for flexible alias storage and matching.

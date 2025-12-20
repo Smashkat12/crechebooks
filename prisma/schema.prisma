@@ -96,6 +96,7 @@ model Tenant {
 
   users                User[]
   transactions         Transaction[]
+  payeePatterns        PayeePattern[]
 
   @@map("tenants")
 }
@@ -199,4 +200,26 @@ model Categorization {
   @@index([transactionId])
   @@index([accountCode])
   @@map("categorizations")
+}
+
+model PayeePattern {
+  id                      String   @id @default(uuid())
+  tenantId                String   @map("tenant_id")
+  payeePattern            String   @map("payee_pattern") @db.VarChar(200)
+  payeeAliases            Json     @default("[]") @map("payee_aliases")
+  defaultAccountCode      String   @map("default_account_code") @db.VarChar(20)
+  defaultAccountName      String   @map("default_account_name") @db.VarChar(100)
+  confidenceBoost         Decimal  @default(0) @map("confidence_boost") @db.Decimal(5, 2)
+  matchCount              Int      @default(0) @map("match_count")
+  isRecurring             Boolean  @default(false) @map("is_recurring")
+  expectedAmountCents     Int?     @map("expected_amount_cents")
+  amountVariancePercent   Decimal? @map("amount_variance_percent") @db.Decimal(5, 2)
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, payeePattern])
+  @@index([tenantId])
+  @@map("payee_patterns")
 }

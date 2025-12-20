@@ -42,7 +42,8 @@ describe('TransactionRepository', () => {
   });
 
   beforeEach(async () => {
-    // Clean in correct order: categorizations -> transactions -> users -> tenants
+    // CRITICAL: Clean in FK order - leaf tables first!
+    await prisma.payeePattern.deleteMany({});
     await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});
     await prisma.user.deleteMany({});

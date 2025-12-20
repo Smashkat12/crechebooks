@@ -41,8 +41,8 @@
 - [x] **TASK-CORE-003**: User Entity and Authentication Types - **COMPLETED 2025-12-20**
 - [x] **TASK-CORE-004**: Audit Log Entity and Trail System - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-001**: Transaction Entity and Migration - **COMPLETED 2025-12-20**
-- [ ] TASK-TRANS-002: Categorization Entity and Types ← **NEXT**
-- [ ] TASK-TRANS-003: Payee Pattern Entity
+- [x] **TASK-TRANS-002**: Categorization Entity and Types - **COMPLETED 2025-12-20**
+- [x] **TASK-TRANS-003**: Payee Pattern Entity - **COMPLETED 2025-12-20**
 - [ ] TASK-BILL-001: Parent and Child Entities
 - [ ] TASK-BILL-002: Fee Structure and Enrollment Entities
 - [ ] TASK-BILL-003: Invoice and Invoice Line Entities
@@ -52,7 +52,7 @@
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 5/15 (33.3%)**
+**Progress: 7/15 (46.7%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -125,10 +125,42 @@
 - Soft delete pattern (isDeleted + deletedAt)
 - 22 integration tests using REAL database
 
+### TASK-TRANS-002 Completion Summary
+**Date**: 2025-12-20
+**Commit**: 91ba845
+
+**Implemented**:
+- Categorization model in Prisma schema
+- VatType enum (STANDARD, ZERO_RATED, EXEMPT, NO_VAT)
+- CategorizationSource enum (AI_AUTO, AI_SUGGESTED, USER_OVERRIDE, RULE_BASED)
+- Database migration for categorizations table
+- ICategorization TypeScript interface
+- CreateCategorizationDto, UpdateCategorizationDto, ReviewCategorizationDto, CategorizationFilterDto
+- CategorizationRepository with 7 methods + 2 validators
+- 28 integration tests using REAL database
+
+### TASK-TRANS-003 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- PayeePattern model in Prisma schema (12 columns)
+- JSONB column for payeeAliases array storage
+- Database migration `20251220014604_create_payee_patterns`
+- IPayeePattern TypeScript interface
+- CreatePayeePatternDto, UpdatePayeePatternDto, PayeePatternFilterDto
+- PayeePatternRepository with 7 methods:
+  - create, findById, findByTenant (with filters)
+  - findByPayeeName (exact + alias matching)
+  - incrementMatchCount (atomic), update, delete
+- 20+ integration tests using REAL database
+- Recurring pattern validation
+- Case-insensitive alias matching
+- Multi-tenant isolation
+
 **Verification**:
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 141 tests (all passing with --runInBand)
+- Tests: 200 tests (all passing with --runInBand)
 
 **GitHub**: https://github.com/Smashkat12/crechebooks
 
@@ -139,11 +171,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 5 |
+| Completed | 7 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 57 |
-| **Overall Progress** | **8.1%** |
+| Remaining | 55 |
+| **Overall Progress** | **11.3%** |
 
 ---
 

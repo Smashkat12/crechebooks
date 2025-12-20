@@ -402,6 +402,92 @@ pnpm run test -- --runInBand
 
 ---
 
+---
+
+## DEC-023: JSONB for PayeeAliases Storage
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Store payee aliases as JSONB array in PostgreSQL
+
+**Context**: TASK-TRANS-003 required flexible alias storage for payee matching
+
+**Implementation**:
+```prisma
+model PayeePattern {
+  payeeAliases Json @default("[]") @map("payee_aliases")
+}
+```
+
+**Rationale**:
+- Flexible array storage without separate table
+- PostgreSQL JSONB supports efficient querying
+- Easy to add/remove aliases without migrations
+
+---
+
+## DEC-024: Atomic Match Count Increment
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Use Prisma's atomic increment for matchCount
+
+**Implementation**:
+```typescript
+await this.prisma.payeePattern.update({
+  where: { id },
+  data: { matchCount: { increment: 1 } },
+});
+```
+
+**Rationale**:
+- Thread-safe increment without race conditions
+- Single database operation
+- Prisma handles the SQL translation
+
+---
+
+## DEC-025: Case-Insensitive Payee Matching
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Match payee patterns and aliases case-insensitively
+
+**Implementation**:
+```typescript
+// Pattern matching
+payeePattern: { equals: payeeName, mode: 'insensitive' }
+
+// Alias matching
+aliases.some(alias => alias.toLowerCase() === payeeNameLower)
+```
+
+**Rationale**:
+- Bank feeds have inconsistent casing
+- "SMITH J" should match "Smith J" and "smith j"
+- Improves pattern recognition accuracy
+
+---
+
+## DEC-026: Recurring Pattern Validation
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Enforce expectedAmountCents for recurring patterns
+
+**Implementation**:
+```typescript
+if (dto.isRecurring && dto.expectedAmountCents === undefined) {
+  throw new BusinessException(
+    'Recurring patterns require expectedAmountCents',
+    'EXPECTED_AMOUNT_REQUIRED',
+  );
+}
+```
+
+**Rationale**:
+- Recurring patterns need expected amount for variance detection
+- Early validation prevents invalid data in database
+- Clear error message for debugging
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
@@ -411,3 +497,4 @@ pnpm run test -- --runInBand
 | 2025-12-20 | DEC-015, DEC-016 added (TASK-CORE-002 learnings) | AI Agent |
 | 2025-12-20 | DEC-017, DEC-018 added (TASK-CORE-003 learnings) | AI Agent |
 | 2025-12-20 | DEC-019 through DEC-022 added (TASK-TRANS-001 learnings) | AI Agent |
+| 2025-12-20 | DEC-023 through DEC-026 added (TASK-TRANS-003 learnings) | AI Agent |

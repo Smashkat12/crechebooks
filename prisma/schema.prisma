@@ -41,6 +41,20 @@ enum AuditAction {
   SUBMIT
 }
 
+enum ImportSource {
+  BANK_FEED
+  CSV_IMPORT
+  PDF_IMPORT
+  MANUAL
+}
+
+enum TransactionStatus {
+  PENDING
+  CATEGORIZED
+  REVIEW_REQUIRED
+  SYNCED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -67,6 +81,7 @@ model Tenant {
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
   users                User[]
+  transactions         Transaction[]
 
   @@map("tenants")
 }
@@ -112,4 +127,34 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
   @@map("audit_logs")
+}
+
+model Transaction {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  xeroTransactionId   String?           @unique @map("xero_transaction_id")
+  bankAccount         String            @map("bank_account") @db.VarChar(50)
+  date                DateTime          @db.Date
+  description         String
+  payeeName           String?           @map("payee_name") @db.VarChar(200)
+  reference           String?           @db.VarChar(100)
+  amountCents         Int               @map("amount_cents")
+  isCredit            Boolean           @map("is_credit")
+  source              ImportSource
+  importBatchId       String?           @map("import_batch_id")
+  status              TransactionStatus @default(PENDING)
+  isReconciled        Boolean           @default(false) @map("is_reconciled")
+  reconciledAt        DateTime?         @map("reconciled_at")
+  isDeleted           Boolean           @default(false) @map("is_deleted")
+  deletedAt           DateTime?         @map("deleted_at")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  tenant              Tenant            @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@index([tenantId, payeeName])
+  @@index([tenantId, isReconciled])
+  @@map("transactions")
 }

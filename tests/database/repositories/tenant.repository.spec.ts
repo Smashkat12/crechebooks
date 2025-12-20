@@ -44,8 +44,10 @@ describe('TenantRepository', () => {
   });
 
   beforeEach(async () => {
-    // Clean up before each test
-    await prisma.tenant.deleteMany();
+    // Clean up in correct order: transactions -> users -> tenants
+    await prisma.transaction.deleteMany({});
+    await prisma.user.deleteMany({});
+    await prisma.tenant.deleteMany({});
   });
 
   describe('create', () => {

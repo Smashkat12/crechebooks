@@ -37,7 +37,8 @@ describe('UserRepository', () => {
   });
 
   beforeEach(async () => {
-    // Clean up users first (due to foreign key), then tenants
+    // Clean up in correct order: transactions -> users -> tenants
+    await prisma.transaction.deleteMany({});
     await prisma.user.deleteMany({});
     await prisma.tenant.deleteMany({});
 

@@ -111,8 +111,8 @@ graph TD
 | 3 | TASK-CORE-003 | User Entity and Authentication Types | foundation | TASK-CORE-002 | ✅ Complete |
 | 4 | TASK-CORE-004 | Audit Log Entity and Trail System | foundation | TASK-CORE-002 | ✅ Complete |
 | 5 | TASK-TRANS-001 | Transaction Entity and Migration | foundation | TASK-CORE-002 | ✅ Complete |
-| 6 | TASK-TRANS-002 | Categorization Entity and Types | foundation | TASK-TRANS-001 | Pending |
-| 7 | TASK-TRANS-003 | Payee Pattern Entity | foundation | TASK-TRANS-001 | Pending |
+| 6 | TASK-TRANS-002 | Categorization Entity and Types | foundation | TASK-TRANS-001 | ✅ Complete |
+| 7 | TASK-TRANS-003 | Payee Pattern Entity | foundation | TASK-TRANS-001, TASK-TRANS-002 | Pending |
 | 8 | TASK-BILL-001 | Parent and Child Entities | foundation | TASK-CORE-002 | Pending |
 | 9 | TASK-BILL-002 | Fee Structure and Enrollment Entities | foundation | TASK-BILL-001 | Pending |
 | 10 | TASK-BILL-003 | Invoice and Invoice Line Entities | foundation | TASK-BILL-001 | Pending |
@@ -195,12 +195,12 @@ graph TD
 
 | Phase | Tasks | Completed | Percentage |
 |-------|-------|-----------|------------|
-| Foundation | 15 | 5 | 33.3% |
+| Foundation | 15 | 6 | 40% |
 | Logic | 21 | 0 | 0% |
 | Agents | 5 | 0 | 0% |
 | Surface | 16 | 0 | 0% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **62** | **5** | **8.1%** |
+| **Total** | **62** | **6** | **9.7%** |
 
 ---
 

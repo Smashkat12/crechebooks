@@ -246,7 +246,112 @@ Migration:
   <command>npx prisma migrate dev --name create_reconciliations</command>
   <command>npx prisma migrate reset</command>
   <command>npm run build</command>
-  <command>npm run test -- --grep "ReconciliationRepository"</command>
+  <command>npm run test -- -t "ReconciliationRepository" --runInBand</command>
 </test_commands>
+
+<implementation_context>
+  <!-- Learned from TASK-SARS-001 (Staff, Payroll) and TASK-SARS-002 (SarsSubmission) implementations -->
+
+  <database_patterns>
+    <pattern name="FK_CLEANUP_ORDER">
+      When adding new tables with FK relations to User and Tenant, ALL existing test files
+      must add the new table's `deleteMany()` as the FIRST cleanup operation in beforeEach.
+      Example: After adding Reconciliation, every test file needs:
+      ```typescript
+      beforeEach(async () => {
+        // CRITICAL: Clean in FK order - leaf tables first!
+        await prisma.reconciliation.deleteMany({});  // NEW TABLE FIRST
+        await prisma.sarsSubmission.deleteMany({});
+        await prisma.payroll.deleteMany({});
+        // ... rest of cleanup chain
+      });
+      ```
+    </pattern>
+
+    <pattern name="FK_ERROR_HANDLING">
+      Use error.message.includes('constraint_name') for FK violation detection:
+      ```typescript
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        if (error.message.includes('reconciled_by')) {
+          throw new NotFoundException('User', dto.reconciledBy);
+        }
+      }
+      ```
+    </pattern>
+
+    <pattern name="UNIQUE_CONSTRAINT">
+      Follow ConflictException pattern for unique constraints:
+      ```typescript
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException(
+          'Reconciliation',
+          'tenantId, bankAccount, periodStart',
+          `${dto.tenantId}, ${dto.bankAccount}, ${dto.periodStart}`,
+        );
+      }
+      ```
+    </pattern>
+  </database_patterns>
+
+  <test_patterns>
+    <pattern name="RUN_IN_BAND">
+      Always run tests with --runInBand to avoid parallel test execution issues:
+      `npm test -- -t "ReconciliationRepository" --runInBand`
+    </pattern>
+
+    <pattern name="JEST_FILTER">
+      Use -t flag for Jest test filtering (not --grep):
+      `npm test -- -t "pattern"` NOT `npm test -- --grep "pattern"`
+    </pattern>
+
+    <pattern name="REAL_DATA">
+      Tests MUST use real South African data - no mocks, no fake UUIDs for entities.
+      Real: Create actual Tenant, User records first
+      Wrong: Use '00000000-0000-0000-0000-000000000000' for FK tests
+    </pattern>
+  </test_patterns>
+
+  <status_patterns>
+    <pattern name="STATUS_IMMUTABILITY">
+      After status changes to RECONCILED, record becomes read-only:
+      ```typescript
+      async complete(id: string, dto: CompleteReconciliationDto): Promise<Reconciliation> {
+        const existing = await this.findById(id);
+        if (!existing) throw new NotFoundException('Reconciliation', id);
+        if (existing.status === ReconciliationStatus.RECONCILED) {
+          throw new BusinessException('Cannot modify a reconciled record');
+        }
+        // ... proceed with update
+      }
+      ```
+    </pattern>
+
+    <pattern name="STATUS_TRANSITION">
+      Valid transitions: IN_PROGRESS -> RECONCILED or IN_PROGRESS -> DISCREPANCY
+      Invalid: RECONCILED -> any, DISCREPANCY -> IN_PROGRESS
+    </pattern>
+  </status_patterns>
+
+  <existing_model_relations>
+    <!-- Current FK cleanup order (top = first to delete) -->
+    - sarsSubmission (FK to tenant, user)
+    - payroll (FK to tenant, staff)
+    - staff (FK to tenant)
+    - payment (FK to tenant, invoice, transaction)
+    - invoiceLine (FK to invoice)
+    - invoice (FK to tenant, parent, child)
+    - enrollment (FK to tenant, child, feeStructure)
+    - feeStructure (FK to tenant)
+    - child (FK to tenant, parent)
+    - parent (FK to tenant)
+    - payeePattern (FK to tenant)
+    - categorization (FK to transaction, user)
+    - transaction (FK to tenant)
+    - user (FK to tenant)
+    - tenant (base)
+
+    <!-- Reconciliation will need to be added AFTER sarsSubmission in this chain -->
+  </existing_model_relations>
+</implementation_context>
 
 </task_spec>

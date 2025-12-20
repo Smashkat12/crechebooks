@@ -13,3 +13,4 @@ export * from './invoice-line.entity';
 export * from './payment.entity';
 export * from './staff.entity';
 export * from './payroll.entity';
+export * from './sars-submission.entity';

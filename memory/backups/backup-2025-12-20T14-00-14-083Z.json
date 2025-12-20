@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-20T00:48:58.630Z",
+  "timestamp": "2025-12-20T14:00:14.083Z",
   "version": "1.0",
   "entries": [
     {
@@ -438,16 +438,269 @@
       "checksum": "7c4772f5f1f02a728e35baef5a3245900ca7d61c681d85ae7253eadb6aed9e14",
       "references": [],
       "dependencies": []
+    },
+    {
+      "id": "entry_mjdl0x4s_qud950516",
+      "key": "repository/transaction",
+      "value": {
+        "status": "done",
+        "file": "transaction.repository.ts",
+        "methods": [
+          "create",
+          "findById",
+          "findByTenant",
+          "findPending",
+          "update",
+          "softDelete",
+          "markReconciled"
+        ],
+        "location": "/home/smash/Documents/dev-env/Playground/ruv/crechebooks/src/database/repositories/transaction.repository.ts",
+        "patterns": [
+          "multi-tenant isolation",
+          "soft delete",
+          "error handling",
+          "logging",
+          "pagination"
+        ]
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T00:50:49.660Z",
+      "updatedAt": "2025-12-20T00:50:49.660Z",
+      "lastAccessedAt": "2025-12-20T00:50:49.660Z",
+      "version": 1,
+      "size": 395,
+      "compressed": false,
+      "checksum": "fea1693011ee32f9c0f1a176010df402a2a82a674622cd3c78c93649f2f89d96",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjdl56sh_xvgcddkpa",
+      "key": "tests/transaction",
+      "value": {
+        "status": "done",
+        "file": "transaction.repository.spec.ts",
+        "testCount": 22,
+        "categories": [
+          "initialization",
+          "create",
+          "findById",
+          "findByTenant",
+          "findPending",
+          "update",
+          "softDelete",
+          "markReconciled"
+        ],
+        "patterns": [
+          "real_database",
+          "no_mocks",
+          "multi_tenant_isolation",
+          "soft_delete",
+          "south_african_context"
+        ],
+        "location": "/home/smash/Documents/dev-env/Playground/ruv/crechebooks/tests/database/repositories/transaction.repository.spec.ts"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T00:54:08.801Z",
+      "updatedAt": "2025-12-20T00:54:08.801Z",
+      "lastAccessedAt": "2025-12-20T00:54:08.801Z",
+      "version": 1,
+      "size": 453,
+      "compressed": false,
+      "checksum": "e2aa3669433794982716262a27d02840a257b777b4c116f15a1273b9c3800a4b",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjdl8gh9_gemx5qc7w",
+      "key": "task/TASK-TRANS-001/complete",
+      "value": {
+        "status": "completed",
+        "taskId": "TASK-TRANS-001",
+        "title": "Transaction Entity and Migration",
+        "completedAt": "2025-12-20T00:56:00Z",
+        "verification": {
+          "build": "pass",
+          "lint": "pass",
+          "unitTests": "141 passed",
+          "e2eTests": "1 passed"
+        },
+        "artifacts": {
+          "schema": "prisma/schema.prisma",
+          "migration": "prisma/migrations/20251220004708_create_transactions",
+          "entity": "src/database/entities/transaction.entity.ts",
+          "dto": "src/database/dto/transaction.dto.ts",
+          "repository": "src/database/repositories/transaction.repository.ts",
+          "tests": "tests/database/repositories/transaction.repository.spec.ts"
+        }
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T00:56:41.325Z",
+      "updatedAt": "2025-12-20T00:56:41.325Z",
+      "lastAccessedAt": "2025-12-20T00:56:41.325Z",
+      "version": 1,
+      "size": 598,
+      "compressed": false,
+      "checksum": "ab79ae5100261599f87e3ae7a3e823ae2d927b89285cb02886d7c12900a5bdea",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjdm2wtb_s6sgdjy0k",
+      "key": "trans002/context",
+      "value": {
+        "task": "TASK-TRANS-002",
+        "description": "Categorization Entity and Types",
+        "dependencies": [
+          "TASK-TRANS-001"
+        ],
+        "status": "in_progress",
+        "startedAt": "2025-12-20T03:20:21+02:00"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T01:20:22.175Z",
+      "updatedAt": "2025-12-20T01:20:22.175Z",
+      "lastAccessedAt": "2025-12-20T01:20:22.175Z",
+      "version": 1,
+      "size": 199,
+      "compressed": false,
+      "checksum": "67f0a15172d702defbf9b45a9117d0b485db303be378f553aec18ffa3ec29451",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjdm4siy_tuedfxnsu",
+      "key": "trans002/schema",
+      "value": {
+        "migrationName": "20251220012120_create_categorizations",
+        "enums": [
+          "VatType",
+          "CategorizationSource"
+        ],
+        "model": "Categorization",
+        "relations": {
+          "Transaction": "categorizations",
+          "User": "reviewedCategorizations"
+        },
+        "status": "complete"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T01:21:49.930Z",
+      "updatedAt": "2025-12-20T01:21:49.930Z",
+      "lastAccessedAt": "2025-12-20T01:21:49.930Z",
+      "version": 1,
+      "size": 253,
+      "compressed": false,
+      "checksum": "6f42bbb094ff7ddf665747be5809b2b4e5641c7f6251ba6f24583e048e3e8da6",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjdmdfsb_5ipaawmxy",
+      "key": "trans002/result",
+      "value": {
+        "status": "COMPLETED",
+        "migration": "20251220012120_create_categorizations",
+        "testsTotal": 169,
+        "testsPassed": 169,
+        "testsFailed": 0,
+        "categorizationTests": 28,
+        "files": {
+          "created": [
+            "src/database/entities/categorization.entity.ts",
+            "src/database/dto/categorization.dto.ts",
+            "src/database/repositories/categorization.repository.ts",
+            "tests/database/repositories/categorization.repository.spec.ts"
+          ],
+          "modified": [
+            "prisma/schema.prisma",
+            "src/database/entities/index.ts",
+            "src/database/dto/index.ts",
+            "src/database/repositories/index.ts",
+            "tests/database/repositories/tenant.repository.spec.ts",
+            "tests/database/repositories/user.repository.spec.ts",
+            "tests/database/repositories/transaction.repository.spec.ts"
+          ]
+        }
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T01:28:33.323Z",
+      "updatedAt": "2025-12-20T01:28:33.323Z",
+      "lastAccessedAt": "2025-12-20T01:28:33.323Z",
+      "version": 1,
+      "size": 717,
+      "compressed": false,
+      "checksum": "891f438ce835ef2585c6887422a3de26259a7ea97b207373bdb034d6f17f0315",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjed83r6_j9qmvscie",
+      "key": "sars-submission/task-context",
+      "value": {
+        "taskId": "TASK-SARS-002",
+        "title": "SarsSubmission Entity",
+        "dependencies": [
+          "TASK-CORE-002",
+          "TASK-CORE-003"
+        ],
+        "status": "in_progress"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T14:00:14.082Z",
+      "updatedAt": "2025-12-20T14:00:14.082Z",
+      "lastAccessedAt": "2025-12-20T14:00:14.082Z",
+      "version": 1,
+      "size": 159,
+      "compressed": false,
+      "checksum": "c762da21d57586a7351726975da64917d36f51d7933aaa25b553a6526a7fde15",
+      "references": [],
+      "dependencies": []
     }
   ],
   "statistics": {
     "overview": {
-      "totalEntries": 14,
-      "totalSize": 3072,
+      "totalEntries": 21,
+      "totalSize": 5846,
       "compressedEntries": 0,
       "compressionRatio": 1,
-      "indexSize": 700,
-      "memoryUsage": 7804464,
+      "indexSize": 1050,
+      "memoryUsage": 7924184,
       "diskUsage": 0
     },
     "distribution": {
@@ -457,8 +710,8 @@
           "size": 49
         },
         "crechebooks": {
-          "count": 12,
-          "size": 2804
+          "count": 19,
+          "size": 5578
         },
         "default": {
           "count": 1,
@@ -467,29 +720,29 @@
       },
       "byType": {
         "object": {
-          "count": 14,
-          "size": 3072
+          "count": 21,
+          "size": 5846
         }
       },
       "byOwner": {
         "system": {
-          "count": 14,
-          "size": 3072
+          "count": 21,
+          "size": 5846
         }
       },
       "byAccessLevel": {
         "shared": {
-          "count": 14,
-          "size": 3072
+          "count": 21,
+          "size": 5846
         }
       }
     },
     "temporal": {
-      "entriesCreatedLast24h": 14,
-      "entriesUpdatedLast24h": 14,
-      "entriesAccessedLast24h": 14,
+      "entriesCreatedLast24h": 21,
+      "entriesUpdatedLast24h": 21,
+      "entriesAccessedLast24h": 21,
       "oldestEntry": "2025-12-19T23:03:44.618Z",
-      "newestEntry": "2025-12-20T00:48:58.629Z"
+      "newestEntry": "2025-12-20T14:00:14.082Z"
     },
     "performance": {
       "averageQueryTime": 0,

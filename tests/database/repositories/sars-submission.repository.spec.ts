@@ -70,7 +70,8 @@ describe('SarsSubmissionRepository', () => {
   });
 
   beforeEach(async () => {
-    // CRITICAL: Clean in FK order - sars_submissions depends on tenant and user!
+    // CRITICAL: Clean in FK order - sars_submissions and reconciliations depend on tenant and user!
+    await prisma.reconciliation.deleteMany({});
     await prisma.sarsSubmission.deleteMany({});
     await prisma.payroll.deleteMany({});
     await prisma.staff.deleteMany({});

@@ -762,6 +762,155 @@ async reorderLines(lineOrders: Array<{ id: string; sortOrder: number }>): Promis
 
 ---
 
+## DEC-038: Payroll Status Workflow
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Payroll status follows DRAFT → APPROVED → PAID workflow
+
+**Implementation**:
+```typescript
+// PayrollStatus enum
+enum PayrollStatus {
+  DRAFT = 'DRAFT',
+  APPROVED = 'APPROVED',
+  PAID = 'PAID',
+}
+
+// Transition methods
+async approve(id: string): Promise<Payroll> {
+  // Only DRAFT can be approved
+  if (existing.status !== PayrollStatus.DRAFT) {
+    throw new BusinessException('Can only approve DRAFT payroll', 'INVALID_STATUS_TRANSITION');
+  }
+}
+
+async markAsPaid(id: string): Promise<Payroll> {
+  // Only APPROVED can be marked as paid
+  if (existing.status !== PayrollStatus.APPROVED) {
+    throw new BusinessException('Can only mark APPROVED payroll as paid', 'INVALID_STATUS_TRANSITION');
+  }
+}
+```
+
+**Rationale**:
+- Enforces proper payroll processing workflow
+- Prevents accidental payments without approval
+- Clear audit trail of status changes
+
+---
+
+## DEC-039: Immutable PAID Payroll
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: PAID payrolls cannot be updated or deleted
+
+**Implementation**:
+```typescript
+async update(id: string, dto: UpdatePayrollDto): Promise<Payroll> {
+  if (existing.status === PayrollStatus.PAID) {
+    throw new BusinessException('Cannot update PAID payroll', 'PAYROLL_PAID');
+  }
+}
+
+async delete(id: string): Promise<void> {
+  if (existing.status === PayrollStatus.PAID) {
+    throw new BusinessException('Cannot delete PAID payroll', 'PAYROLL_PAID');
+  }
+}
+```
+
+**Rationale**:
+- Preserves historical payroll records for auditing
+- Prevents accidental modification of completed payrolls
+- SARS compliance requires accurate payroll history
+
+---
+
+## DEC-040: Staff Cascade Prevention
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Cannot delete staff with payroll records
+
+**Implementation**:
+```typescript
+async delete(tenantId: string, id: string): Promise<void> {
+  const payrollCount = await this.prisma.payroll.count({
+    where: { staffId: id },
+  });
+  if (payrollCount > 0) {
+    throw new BusinessException(
+      'Cannot delete staff with payroll records',
+      'STAFF_HAS_PAYROLL',
+      { payrollCount }
+    );
+  }
+}
+```
+
+**Rationale**:
+- Payroll records are legal documents for SARS
+- Staff must be deactivated instead of deleted
+- Preserves referential integrity
+
+---
+
+## DEC-041: Prisma Enum in Repository
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Use Prisma-generated enum in repository, custom enum in DTOs
+
+**Context**: ESLint `@typescript-eslint/no-unsafe-enum-comparison` error when comparing Prisma types with custom enums
+
+**Implementation**:
+```typescript
+// In repository - import from @prisma/client
+import { Payroll, Prisma, PayrollStatus } from '@prisma/client';
+
+// In DTO - use custom enum for validation
+import { PayrollStatus } from '../entities/payroll.entity';
+```
+
+**Rationale**:
+- Prisma generates its own enum types at runtime
+- Comparing Prisma's type with custom enum triggers ESLint error
+- Repository works with Prisma types directly
+- DTOs work with custom enums for class-validator
+
+---
+
+## DEC-042: Updated Test Cleanup Order
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Test cleanup must include payroll and staff in proper FK order
+
+**Implementation**:
+```typescript
+beforeEach(async () => {
+  // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.payroll.deleteMany({});  // NEW: payroll before staff
+  await prisma.staff.deleteMany({});     // NEW: staff before payment
+  await prisma.payment.deleteMany({});
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.enrollment.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  await prisma.child.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.payeePattern.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.tenant.deleteMany({});
+});
+```
+
+**Rationale**:
+- Payroll references Staff (FK constraint)
+- All test files must use same cleanup order
+- Must update ALL existing tests when adding new tables
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
@@ -774,3 +923,4 @@ async reorderLines(lineOrders: Array<{ id: string; sortOrder: number }>): Promis
 | 2025-12-20 | DEC-023 through DEC-026 added (TASK-TRANS-003 learnings) | AI Agent |
 | 2025-12-20 | DEC-027 through DEC-032 added (TASK-BILL-002 learnings) | AI Agent |
 | 2025-12-20 | DEC-033 through DEC-037 added (TASK-BILL-003 learnings) | AI Agent |
+| 2025-12-20 | DEC-038 through DEC-042 added (TASK-SARS-001 learnings) | AI Agent |

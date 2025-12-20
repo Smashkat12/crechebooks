@@ -46,13 +46,13 @@
 - [x] **TASK-BILL-001**: Parent and Child Entities - **COMPLETED 2025-12-20**
 - [x] **TASK-BILL-002**: Fee Structure and Enrollment Entities - **COMPLETED 2025-12-20**
 - [x] **TASK-BILL-003**: Invoice and Invoice Line Entities - **COMPLETED 2025-12-20**
-- [ ] TASK-PAY-001: Payment Entity and Types
-- [ ] TASK-SARS-001: Staff and Payroll Entities
+- [x] **TASK-PAY-001**: Payment Entity and Types - **COMPLETED 2025-12-20**
+- [x] **TASK-SARS-001**: Staff and Payroll Entities - **COMPLETED 2025-12-20**
 - [ ] TASK-SARS-002: SARS Submission Entity
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 10/15 (66.7%)**
+**Progress: 12/15 (80%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -242,6 +242,88 @@
 - Lint: PASS (0 errors, 0 warnings)
 - Tests: 378 tests (all passing with --runInBand)
 
+### TASK-PAY-001 Completion Summary
+**Date**: 2025-12-20
+**Commit**: a1cd9a8
+
+**Implemented**:
+- MatchType enum (EXACT, FUZZY, REFERENCE, AMOUNT, MANUAL, UNMATCHED)
+- MatchedBy enum (SYSTEM, USER)
+- Payment model in Prisma schema (17 columns)
+  - Links Invoice to Transaction (nullable)
+  - Match type and confidence tracking
+  - Allocation tracking (amountCents, balanceCents)
+  - Notes and timestamps
+- Database migration `20251220095923_create_payments`
+- IPayment TypeScript interface
+- CreatePaymentDto, UpdatePaymentDto, PaymentFilterDto with validation
+- PaymentRepository with 11 methods:
+  - create, findById, findByTenant (with filters)
+  - findByInvoice, findByTransaction, findByParent
+  - findUnallocated, update, allocate, delete
+  - getPaymentSummaryByParent
+- 31 new integration tests using REAL database (no mocks)
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 417 tests (all passing with --runInBand)
+
+### TASK-SARS-001 Completion Summary
+**Date**: 2025-12-20
+**Commit**: e3d0813
+
+**Implemented**:
+- EmploymentType enum (PERMANENT, CONTRACT, CASUAL)
+- PayFrequency enum (MONTHLY, WEEKLY, DAILY, HOURLY)
+- PayrollStatus enum (DRAFT, APPROVED, PAID)
+- Staff model in Prisma schema (22 columns)
+  - South African ID number (13 digits)
+  - Tax number for SARS
+  - Banking details (bank name, account, branch code)
+  - Medical aid members for tax credits
+  - Employment type and pay frequency
+  - Start/end dates with isActive flag
+  - FK to Tenant with composite unique on (tenantId, idNumber)
+- Payroll model in Prisma schema (18 columns)
+  - Basic salary, overtime, bonus, other earnings
+  - PAYE deduction (payeCents)
+  - UIF deductions (employee + employer)
+  - Medical aid credit
+  - Gross and net salary calculations
+  - Status workflow (DRAFT → APPROVED → PAID)
+  - FK to Staff and Tenant
+  - Composite unique on (tenantId, staffId, payPeriodStart)
+- Database migration `20251220131900_add_staff_payroll_entities`
+- IStaff and IPayroll TypeScript interfaces
+- CreateStaffDto, UpdateStaffDto, StaffFilterDto with validation
+- CreatePayrollDto, UpdatePayrollDto, PayrollFilterDto with validation
+- StaffRepository with 8 methods:
+  - create, findById, findByIdNumber
+  - findByTenantId (with filters), findActiveByTenantId
+  - update, deactivate, delete
+- PayrollRepository with 11 methods:
+  - create, findById, findByTenantStaffPeriod
+  - findByStaffId, findByTenantId, findByPeriod
+  - update, approve, markAsPaid, delete
+  - calculatePeriodTotals
+- 84 new integration tests using REAL database (no mocks)
+  - 37 tests for Staff repository
+  - 47 tests for Payroll repository
+- Updated all 13 existing test files with new cleanup order
+
+**Key Design Decisions**:
+1. Status Workflow - Payroll follows DRAFT → APPROVED → PAID transitions
+2. Immutable PAID - Cannot update or delete PAID payrolls
+3. Cascade Prevention - Cannot delete staff with payroll records
+4. BusinessException - Used for status transition errors
+5. Prisma Enum Import - Use @prisma/client enum for type safety in repository
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 493 tests (all passing with --runInBand)
+
 ---
 
 ## Overall Summary
@@ -249,11 +331,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 10 |
+| Completed | 12 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 52 |
-| **Overall Progress** | **16.1%** |
+| Remaining | 50 |
+| **Overall Progress** | **19.4%** |
 
 ---
 
@@ -337,8 +419,8 @@
 
 ### Current Database State
 ```prisma
-Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus
-Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus, InvoiceStatus, DeliveryMethod, DeliveryStatus, LineType, MatchType, MatchedBy, EmploymentType, PayFrequency, PayrollStatus
+Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child, Invoice, InvoiceLine, Payment, Staff, Payroll
 ```
 
 ### Applied Migrations
@@ -350,11 +432,19 @@ Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeSt
 6. `20251220014604_create_payee_patterns` - PayeePattern table with JSONB aliases
 7. `20251220020708_create_parents_and_children` - Parent and Child tables with cascade delete
 8. `20251220023800_create_fee_structures_and_enrollments` - FeeStructure and Enrollment tables
+9. `20251220033235_create_invoices_and_invoice_lines` - Invoice and InvoiceLine tables
+10. `20251220095923_create_payments` - Payment table with match tracking
+11. `20251220131900_add_staff_payroll_entities` - Staff and Payroll tables for SARS
 
 ### Test Cleanup Order (CRITICAL)
 ```typescript
 beforeEach(async () => {
   // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.payroll.deleteMany({});
+  await prisma.staff.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
   await prisma.enrollment.deleteMany({});
   await prisma.feeStructure.deleteMany({});
   await prisma.child.deleteMany({});
@@ -391,6 +481,11 @@ crechebooks/
 │   │   │   ├── child.entity.ts
 │   │   │   ├── fee-structure.entity.ts
 │   │   │   ├── enrollment.entity.ts
+│   │   │   ├── invoice.entity.ts
+│   │   │   ├── invoice-line.entity.ts
+│   │   │   ├── payment.entity.ts
+│   │   │   ├── staff.entity.ts
+│   │   │   ├── payroll.entity.ts
 │   │   │   └── index.ts
 │   │   ├── dto/
 │   │   │   ├── tenant.dto.ts
@@ -403,6 +498,11 @@ crechebooks/
 │   │   │   ├── child.dto.ts
 │   │   │   ├── fee-structure.dto.ts
 │   │   │   ├── enrollment.dto.ts
+│   │   │   ├── invoice.dto.ts
+│   │   │   ├── invoice-line.dto.ts
+│   │   │   ├── payment.dto.ts
+│   │   │   ├── staff.dto.ts
+│   │   │   ├── payroll.dto.ts
 │   │   │   └── index.ts
 │   │   ├── repositories/
 │   │   │   ├── tenant.repository.ts
@@ -414,6 +514,11 @@ crechebooks/
 │   │   │   ├── child.repository.ts
 │   │   │   ├── fee-structure.repository.ts
 │   │   │   ├── enrollment.repository.ts
+│   │   │   ├── invoice.repository.ts
+│   │   │   ├── invoice-line.repository.ts
+│   │   │   ├── payment.repository.ts
+│   │   │   ├── staff.repository.ts
+│   │   │   ├── payroll.repository.ts
 │   │   │   └── index.ts
 │   │   ├── services/
 │   │   │   ├── audit-log.service.ts
@@ -443,7 +548,12 @@ crechebooks/
 │       │   ├── parent.repository.spec.ts
 │       │   ├── child.repository.spec.ts
 │       │   ├── fee-structure.repository.spec.ts
-│       │   └── enrollment.repository.spec.ts
+│       │   ├── enrollment.repository.spec.ts
+│       │   ├── invoice.repository.spec.ts
+│       │   ├── invoice-line.repository.spec.ts
+│       │   ├── payment.repository.spec.ts
+│       │   ├── staff.repository.spec.ts
+│       │   └── payroll.repository.spec.ts
 │       └── services/
 │           └── audit-log.service.spec.ts
 └── test/

@@ -1,21 +1,62 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-SARS-001 Completed)
+2025-12-20 by AI Agent (TASK-MCP-001 Completed - Foundation Layer 100% Complete!)
 
 ## Current Focus
-CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
+CrecheBooks AI Bookkeeping System - Logic Layer Implementation (Phase 2)
 
 ## Project Overview
 CrecheBooks is an AI-powered bookkeeping system for South African creches and pre-schools, integrating with Xero and using Claude Code as the multi-agent orchestration layer.
 
 ## Active Task
-**Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003, TASK-BILL-001, TASK-BILL-002, TASK-BILL-003, TASK-PAY-001, TASK-SARS-001
-**Next**: TASK-SARS-002 (SARS Submission Entity)
+**Phase**: Foundation Layer COMPLETE ✅ | Ready for Logic Layer (Phase 2)
+**Completed**: All 15 Foundation Tasks (TASK-CORE-001 through TASK-MCP-001)
+**Next**: TASK-TRANS-011 (Transaction Import Service)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
+
+---
+
+## TASK-MCP-001 Summary (COMPLETED)
+
+### What Was Built
+- XeroToken model in Prisma schema for encrypted OAuth2 token storage
+- Database migration `20251220154623_add_xero_tokens`
+- Dependencies: xero-node, @modelcontextprotocol/sdk, crypto-js
+- MCP server at `src/mcp/xero-mcp/`:
+  - `auth/encryption.ts` - AES-256 encryption using crypto-js
+  - `auth/token-manager.ts` - OAuth2 token management with auto-refresh
+  - `utils/rate-limiter.ts` - Sliding window rate limiter (60 req/min)
+  - `utils/error-handler.ts` - Typed error hierarchy
+  - `utils/logger.ts` - Structured JSON logging with sensitive data sanitization
+  - `config.ts` - Configuration with environment validation
+  - `server.ts` - MCP server with stdio transport
+- 8 MCP tools implemented:
+  - `get_accounts` - Fetch Chart of Accounts
+  - `get_transactions` - Fetch bank transactions
+  - `update_transaction` - Update transaction category
+  - `create_invoice` - Create new invoice
+  - `get_invoices` - Fetch invoices
+  - `apply_payment` - Apply payment to invoice
+  - `get_contacts` - Fetch contacts
+  - `create_contact` - Create new contact
+- TypeScript types in `types/xero.types.ts` and `types/mcp.types.ts`
+- Integration tests in `tests/mcp/xero-mcp/` (no mocks, real database)
+
+### Key Design Decisions
+1. **AES-256 Encryption** - Tokens encrypted at rest using crypto-js
+2. **Token Auto-Refresh** - 5-minute buffer before expiry with mutex lock
+3. **Rate Limiting** - Sliding window pattern (60 req/min for Xero API)
+4. **Fail-Fast** - All errors logged with full context before throwing
+5. **Prisma Adapter** - Uses Pool + PrismaPg adapter (Prisma 7 requirement)
+
+### Verification
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 631 tests (all passing with --runInBand)
+- MCP Server: Starts correctly with stdio transport
 
 ---
 

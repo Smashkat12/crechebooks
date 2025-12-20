@@ -911,6 +911,218 @@ beforeEach(async () => {
 
 ---
 
+## DEC-043: Xero MCP Server Architecture
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Implement Xero integration as standalone MCP server with stdio transport
+
+**Context**: TASK-MCP-001 required Xero API integration
+
+**Implementation**:
+```
+src/mcp/xero-mcp/
+├── auth/
+│   ├── encryption.ts      # AES-256 encryption for tokens
+│   └── token-manager.ts   # OAuth2 token management
+├── tools/                 # 8 MCP tools
+├── types/                 # TypeScript interfaces
+├── utils/                 # Rate limiter, error handler, logger
+├── config.ts              # Environment configuration
+└── server.ts              # MCP server with stdio transport
+```
+
+**Rationale**:
+- Standalone server allows independent deployment
+- Stdio transport enables integration with Claude Code
+- Clear separation from NestJS application
+
+---
+
+## DEC-044: AES-256 Token Encryption
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Encrypt OAuth2 tokens at rest using AES-256 via crypto-js
+
+**Implementation**:
+```typescript
+import CryptoJS from 'crypto-js';
+
+encrypt(text: string): string {
+  return CryptoJS.AES.encrypt(text, this.key).toString();
+}
+
+decrypt(ciphertext: string): string {
+  const bytes = CryptoJS.AES.decrypt(ciphertext, this.key);
+  return bytes.toString(CryptoJS.enc.Utf8);
+}
+```
+
+**Rationale**:
+- SEC-07 compliance: Tokens never stored in plain text
+- crypto-js provides mature AES implementation
+- Key stored in environment variable (TOKEN_ENCRYPTION_KEY)
+
+---
+
+## DEC-045: Token Auto-Refresh Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Refresh tokens 5 minutes before expiry with mutex lock
+
+**Implementation**:
+```typescript
+private readonly REFRESH_BUFFER_MS = 5 * 60 * 1000;
+private readonly refreshLocks: Map<string, Promise<string>> = new Map();
+
+async getAccessToken(tenantId: string): Promise<string> {
+  if (Date.now() >= tokens.expiresAt - this.REFRESH_BUFFER_MS) {
+    return this.refreshAccessToken(tenantId);
+  }
+  return tokens.accessToken;
+}
+
+async refreshAccessToken(tenantId: string): Promise<string> {
+  const existingRefresh = this.refreshLocks.get(tenantId);
+  if (existingRefresh) return existingRefresh;
+  // ...
+}
+```
+
+**Rationale**:
+- 5-minute buffer prevents token expiry during API calls
+- Mutex lock prevents concurrent refresh requests for same tenant
+- Promise reuse ensures only one refresh per tenant in flight
+
+---
+
+## DEC-046: Sliding Window Rate Limiting
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Implement sliding window rate limiter (60 requests/minute)
+
+**Implementation**:
+```typescript
+class RateLimiter {
+  private timestamps: number[] = [];
+  private readonly maxRequests: number;
+  private readonly windowMs: number;
+
+  async acquire(): Promise<void> {
+    const now = Date.now();
+    this.timestamps = this.timestamps.filter(t => t > now - this.windowMs);
+    if (this.timestamps.length >= this.maxRequests) {
+      throw new RateLimitError(this.maxRequests, this.windowMs);
+    }
+    this.timestamps.push(now);
+  }
+}
+```
+
+**Rationale**:
+- Xero API has rate limits (60 requests/minute)
+- Sliding window is more accurate than fixed window
+- Fail-fast approach throws error when limit exceeded
+
+---
+
+## DEC-047: MCP Tool Input Validation
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Validate all tool inputs at runtime, fail fast on invalid data
+
+**Implementation**:
+```typescript
+private async handleToolCall(name: string, args: Record<string, unknown>) {
+  const tenantId = args.tenantId as string;
+  if (!tenantId) {
+    throw new XeroMCPError('tenantId is required', 'MISSING_TENANT_ID', 400);
+  }
+  // ...
+}
+```
+
+**Rationale**:
+- MCP tools receive untyped arguments
+- Fail-fast validation prevents silent failures
+- Clear error messages aid debugging
+
+---
+
+## DEC-048: XeroToken Model Design
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Store encrypted tokens in dedicated XeroToken model with tenant relation
+
+**Implementation**:
+```prisma
+model XeroToken {
+  id                String   @id @default(uuid())
+  tenantId          String   @unique @map("tenant_id")
+  xeroTenantId      String   @map("xero_tenant_id")
+  encryptedTokens   String   @map("encrypted_tokens") @db.Text
+  tokenExpiresAt    DateTime @map("token_expires_at")
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+}
+```
+
+**Rationale**:
+- One-to-one relationship with Tenant (each tenant has one Xero connection)
+- encryptedTokens stores AES-256 encrypted JSON (never plain text)
+- tokenExpiresAt enables proactive refresh scheduling
+- Text column type for unlimited encrypted data length
+
+---
+
+## DEC-049: MCP Error Hierarchy
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Create typed error hierarchy for MCP-specific errors
+
+**Implementation**:
+```typescript
+export class XeroMCPError extends Error {
+  constructor(message: string, public code: string, public statusCode: number) {}
+}
+
+export class TokenExpiredError extends XeroMCPError {}
+export class TokenNotFoundError extends XeroMCPError {}
+export class RateLimitError extends XeroMCPError {}
+export class XeroAPIError extends XeroMCPError {}
+export class EncryptionError extends XeroMCPError {}
+```
+
+**Rationale**:
+- Typed errors enable specific error handling
+- Error codes allow programmatic error handling by callers
+- Status codes map to HTTP semantics for consistency
+
+---
+
+## DEC-050: Prisma 7 Adapter in MCP Server
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: MCP server creates its own PrismaClient with Pool + PrismaPg adapter
+
+**Implementation**:
+```typescript
+constructor() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL environment variable is required');
+  }
+  this.pool = new Pool({ connectionString: databaseUrl });
+  const adapter = new PrismaPg(this.pool);
+  this.prisma = new PrismaClient({ adapter });
+}
+```
+
+**Rationale**:
+- Prisma 7 requires adapter for database connections
+- MCP server runs standalone (not in NestJS context)
+- Fail-fast on missing DATABASE_URL
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
@@ -924,3 +1136,4 @@ beforeEach(async () => {
 | 2025-12-20 | DEC-027 through DEC-032 added (TASK-BILL-002 learnings) | AI Agent |
 | 2025-12-20 | DEC-033 through DEC-037 added (TASK-BILL-003 learnings) | AI Agent |
 | 2025-12-20 | DEC-038 through DEC-042 added (TASK-SARS-001 learnings) | AI Agent |
+| 2025-12-20 | DEC-043 through DEC-050 added (TASK-MCP-001 learnings) | AI Agent |

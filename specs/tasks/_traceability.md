@@ -28,6 +28,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Payroll entity | data_model | TASK-SARS-001 | ✅ Complete |
 | SarsSubmission entity | data_model | TASK-SARS-002 | ✅ Complete |
 | Reconciliation entity | data_model | TASK-RECON-001 | ✅ Complete |
+| XeroToken entity | data_model | TASK-MCP-001 | ✅ Complete |
 
 ---
 
@@ -230,3 +231,4 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-20 | TASK-SARS-001 marked complete (Staff and Payroll entities) | AI Agent |
 | 2025-12-20 | TASK-SARS-002 marked complete (SarsSubmission entity) | AI Agent |
 | 2025-12-20 | TASK-RECON-001 marked complete (Reconciliation entity - 610 tests) | AI Agent |
+| 2025-12-20 | TASK-MCP-001 marked complete (Xero MCP Server Foundation - 631 tests) | AI Agent |

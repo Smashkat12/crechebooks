@@ -335,6 +335,73 @@ export class TransactionRepository {
   }
 
   /**
+   * Find multiple transactions by IDs with tenant isolation
+   * @returns Array of transactions (only those that exist and belong to tenant)
+   * @throws DatabaseException for database errors
+   */
+  async findByIds(tenantId: string, ids: string[]): Promise<Transaction[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    try {
+      return await this.prisma.transaction.findMany({
+        where: {
+          id: { in: ids },
+          tenantId,
+          isDeleted: false,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find transactions by ids: ${ids.join(', ')} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByIds',
+        'Failed to find transactions',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Update transaction status
+   * @throws NotFoundException if transaction doesn't exist or belongs to different tenant
+   * @throws DatabaseException for database errors
+   */
+  async updateStatus(
+    tenantId: string,
+    id: string,
+    status: 'PENDING' | 'CATEGORIZED' | 'REVIEW_REQUIRED' | 'SYNCED',
+  ): Promise<Transaction> {
+    try {
+      const existing = await this.findById(tenantId, id);
+      if (!existing) {
+        throw new NotFoundException('Transaction', id);
+      }
+
+      return await this.prisma.transaction.update({
+        where: { id },
+        data: { status },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to update transaction status: ${id} to ${status}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'updateStatus',
+        'Failed to update transaction status',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Mark transaction as reconciled
    * @throws NotFoundException if transaction doesn't exist or belongs to different tenant
    * @throws DatabaseException for database errors

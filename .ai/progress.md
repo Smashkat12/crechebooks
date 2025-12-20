@@ -60,8 +60,8 @@
 
 ### Tasks (21 total)
 - [x] **TASK-TRANS-011**: Transaction Import Service - **COMPLETED 2025-12-20**
-- [ ] **TASK-TRANS-012**: Transaction Categorization Service
-- [ ] **TASK-TRANS-013**: Payee Pattern Learning Service
+- [x] **TASK-TRANS-012**: Transaction Categorization Service - **COMPLETED 2025-12-20**
+- [x] **TASK-TRANS-013**: Payee Pattern Learning Service - **COMPLETED 2025-12-20**
 - [ ] **TASK-TRANS-014**: Xero Sync Service
 - [ ] **TASK-BILL-011**: Enrollment Management Service
 - [ ] **TASK-BILL-012**: Invoice Generation Service
@@ -81,7 +81,7 @@
 - [ ] **TASK-RECON-012**: Discrepancy Detection Service
 - [ ] **TASK-RECON-013**: Financial Report Service
 
-**Progress: 1/21 (4.8%)**
+**Progress: 3/21 (14.3%)**
 
 ### TASK-TRANS-011 Completion Summary
 **Date**: 2025-12-20
@@ -124,6 +124,86 @@
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
 - Tests: 678 tests (47 new tests for TASK-TRANS-011)
+
+### TASK-TRANS-012 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- CategorizationService with pattern matching and AI categorization
+- Transaction findByIds and updateStatus methods
+- Categorization findRecent and findSimilarByDescription methods
+- Service-layer DTOs (categorization-service.dto.ts)
+- 80% confidence threshold for auto-categorization
+- Split transaction validation (amounts must equal total)
+- VAT calculation (15% South African VAT)
+- Pattern matching with confidence boost
+- AI agent placeholder with deterministic categorization
+- Audit trail for all categorization operations
+
+**Key Features**:
+- Pattern match FIRST (fast path), then AI fallback
+- Low confidence (<80%) flagged as REVIEW_REQUIRED
+- Split transactions validate to 1 cent tolerance
+- Multi-tenant isolation on all operations
+- User override with pattern creation option
+- getSuggestions returns PATTERN, AI, SIMILAR_TX sources
+
+**Files Created**:
+- `src/database/dto/categorization-service.dto.ts`
+- `src/database/services/categorization.service.ts`
+- `tests/database/services/categorization.service.spec.ts`
+
+**Files Modified**:
+- `src/database/repositories/transaction.repository.ts` - Added findByIds, updateStatus
+- `src/database/repositories/categorization.repository.ts` - Added findRecent, findSimilarByDescription
+- `src/database/database.module.ts` - Registered CategorizationService, repositories
+- `src/database/services/index.ts` - Export CategorizationService
+- `src/database/dto/index.ts` - Export service DTOs
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 697 tests (19 new tests for TASK-TRANS-012)
+
+### TASK-TRANS-013 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- PatternLearningService with learning from user corrections
+- Pattern matching against transactions (EXACT_PAYEE, PARTIAL_PAYEE, KEYWORD, DESCRIPTION)
+- Recurring transaction detection with frequency classification
+- Pattern statistics (totalPatterns, activePatterns, avgMatchCount, topPatterns)
+- Payee name extraction from transaction descriptions
+- Keyword extraction with stop word filtering
+- Confidence boost calculation (10-15% range)
+- Integration with CategorizationService (learnFromCorrection on user override)
+- pattern-learning.dto.ts with PatternMatch, RecurringInfo, PatternStats interfaces
+
+**Key Features**:
+- Automatic pattern creation when user categorizes transactions
+- Confidence boost increases with successful matches (+1% per match, max 15%)
+- Confidence penalty on failed matches (-2%, min 5%)
+- Recurring detection window: 12 months, min 3 occurrences
+- Weekly/Monthly/Quarterly/Annual frequency detection
+- Interval variance analysis for recurring classification
+- Multi-tenant isolation on all operations
+
+**Files Created**:
+- `src/database/dto/pattern-learning.dto.ts`
+- `src/database/services/pattern-learning.service.ts`
+- `tests/database/services/pattern-learning.service.spec.ts`
+
+**Files Modified**:
+- `src/database/services/categorization.service.ts` - Added learnFromCorrection call
+- `src/database/database.module.ts` - Registered PatternLearningService
+- `src/database/dto/index.ts` - Export pattern-learning DTOs
+- `src/database/services/index.ts` - Export PatternLearningService
+- `tests/database/services/categorization.service.spec.ts` - Added PatternLearningService provider
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 735 tests (38 new tests for TASK-TRANS-013)
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -465,11 +545,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 16 |
+| Completed | 18 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 46 |
-| **Overall Progress** | **25.8%** |
+| Remaining | 44 |
+| **Overall Progress** | **29.0%** |
 
 ---
 

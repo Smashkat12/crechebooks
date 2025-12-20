@@ -421,6 +421,127 @@ export class CategorizationRepository {
   }
 
   /**
+   * Find recent categorizations for a tenant
+   * (useful for training patterns and suggestions)
+   * @returns Array of recent categorizations
+   * @throws DatabaseException for database errors
+   */
+  async findRecent(
+    tenantId: string,
+    limit: number = 100,
+  ): Promise<Categorization[]> {
+    try {
+      return await this.prisma.categorization.findMany({
+        where: {
+          transaction: {
+            tenantId,
+            isDeleted: false,
+          },
+          source: {
+            in: [
+              CategorizationSource.AI_AUTO,
+              CategorizationSource.USER_OVERRIDE,
+            ],
+          },
+        },
+        include: { transaction: true },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find recent categorizations for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findRecent',
+        'Failed to find recent categorizations',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Find similar categorizations by description keywords
+   * Used for generating suggestions based on past categorizations
+   * @returns Array of account codes with counts, sorted by frequency
+   * @throws DatabaseException for database errors
+   */
+  async findSimilarByDescription(
+    tenantId: string,
+    description: string,
+    limit: number = 5,
+  ): Promise<{ accountCode: string; accountName: string; count: number }[]> {
+    try {
+      // Extract keywords from description (first 3 significant words)
+      const keywords = description
+        .replace(/[^a-zA-Z\s]/g, '')
+        .split(/\s+/)
+        .filter((w) => w.length > 3)
+        .slice(0, 3);
+
+      if (keywords.length === 0) {
+        return [];
+      }
+
+      const categorizations = await this.prisma.categorization.findMany({
+        where: {
+          transaction: {
+            tenantId,
+            isDeleted: false,
+            description: {
+              contains: keywords[0],
+              mode: 'insensitive',
+            },
+          },
+          source: {
+            in: [
+              CategorizationSource.AI_AUTO,
+              CategorizationSource.USER_OVERRIDE,
+            ],
+          },
+        },
+        select: {
+          accountCode: true,
+          accountName: true,
+        },
+      });
+
+      // Group by accountCode and count
+      const counts = new Map<
+        string,
+        { accountCode: string; accountName: string; count: number }
+      >();
+      for (const cat of categorizations) {
+        const existing = counts.get(cat.accountCode);
+        if (existing) {
+          existing.count++;
+        } else {
+          counts.set(cat.accountCode, {
+            accountCode: cat.accountCode,
+            accountName: cat.accountName,
+            count: 1,
+          });
+        }
+      }
+
+      return Array.from(counts.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+    } catch (error) {
+      this.logger.error(
+        `Failed to find similar categorizations for: ${description}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findSimilarByDescription',
+        'Failed to find similar categorizations',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Validate split transaction rules
    * @throws BusinessException if isSplit=true but splitAmountCents is missing
    */

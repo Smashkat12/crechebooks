@@ -118,9 +118,9 @@ graph TD
 | 10 | TASK-BILL-003 | Invoice and Invoice Line Entities | foundation | TASK-BILL-001 | ✅ Complete |
 | 11 | TASK-PAY-001 | Payment Entity and Types | foundation | TASK-TRANS-001, TASK-BILL-003 | ✅ Complete |
 | 12 | TASK-SARS-001 | Staff and Payroll Entities | foundation | TASK-CORE-002 | ✅ Complete |
-| 13 | TASK-SARS-002 | SARS Submission Entity | foundation | TASK-SARS-001 | **Ready** |
-| 14 | TASK-RECON-001 | Reconciliation Entity | foundation | TASK-TRANS-001 | Pending |
-| 15 | TASK-MCP-001 | Xero MCP Server Foundation | foundation | TASK-CORE-001 | Pending |
+| 13 | TASK-SARS-002 | SARS Submission Entity | foundation | TASK-SARS-001 | ✅ Complete |
+| 14 | TASK-RECON-001 | Reconciliation Entity | foundation | TASK-TRANS-001 | ✅ Complete |
+| 15 | TASK-MCP-001 | Xero MCP Server Foundation | foundation | TASK-CORE-001 | **Ready** |
 
 ### Phase 2: Logic Layer
 
@@ -195,14 +195,14 @@ graph TD
 
 | Phase | Tasks | Completed | Percentage |
 |-------|-------|-----------|------------|
-| Foundation | 15 | 12 | 80% |
+| Foundation | 15 | 14 | 93% |
 | Logic | 21 | 0 | 0% |
 | Agents | 5 | 0 | 0% |
 | Surface | 16 | 0 | 0% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **62** | **12** | **19.4%** |
+| **Total** | **62** | **14** | **22.6%** |
 
-**Last Updated**: 2025-12-20 (TASK-SARS-001 completed - 493 tests passing)
+**Last Updated**: 2025-12-20 (TASK-RECON-001 completed - 610 tests passing)
 
 ---
 

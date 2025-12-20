@@ -45,6 +45,8 @@ describe('TenantRepository', () => {
 
   beforeEach(async () => {
     // CRITICAL: Clean in FK order - leaf tables first!
+    await prisma.invoiceLine.deleteMany({});
+    await prisma.invoice.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.feeStructure.deleteMany({});
     await prisma.child.deleteMany({});

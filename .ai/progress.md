@@ -45,14 +45,14 @@
 - [x] **TASK-TRANS-003**: Payee Pattern Entity - **COMPLETED 2025-12-20**
 - [x] **TASK-BILL-001**: Parent and Child Entities - **COMPLETED 2025-12-20**
 - [x] **TASK-BILL-002**: Fee Structure and Enrollment Entities - **COMPLETED 2025-12-20**
-- [ ] TASK-BILL-003: Invoice and Invoice Line Entities
+- [x] **TASK-BILL-003**: Invoice and Invoice Line Entities - **COMPLETED 2025-12-20**
 - [ ] TASK-PAY-001: Payment Entity and Types
 - [ ] TASK-SARS-001: Staff and Payroll Entities
 - [ ] TASK-SARS-002: SARS Submission Entity
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 9/15 (60.0%)**
+**Progress: 10/15 (66.7%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -220,6 +220,28 @@
 
 **GitHub**: https://github.com/Smashkat12/crechebooks
 
+### TASK-BILL-003 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- InvoiceStatus enum (DRAFT, SENT, VIEWED, PARTIALLY_PAID, PAID, OVERDUE, VOID)
+- DeliveryMethod enum (EMAIL, WHATSAPP, BOTH)
+- DeliveryStatus enum (PENDING, SENT, DELIVERED, OPENED, FAILED)
+- LineType enum (MONTHLY_FEE, REGISTRATION, EXTRA, DISCOUNT, CREDIT)
+- Invoice model in Prisma schema (21 columns)
+- InvoiceLine model in Prisma schema (12 columns)
+- Database migration `20251220033235_create_invoices_and_invoice_lines`
+- IInvoice and IInvoiceLine TypeScript interfaces
+- Invoice and InvoiceLine DTOs with validation
+- InvoiceRepository with 13 methods
+- InvoiceLineRepository with 8 methods
+- 66 new integration tests using REAL database
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 378 tests (all passing with --runInBand)
+
 ---
 
 ## Overall Summary
@@ -227,11 +249,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 9 |
+| Completed | 10 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 53 |
-| **Overall Progress** | **14.5%** |
+| Remaining | 52 |
+| **Overall Progress** | **16.1%** |
 
 ---
 

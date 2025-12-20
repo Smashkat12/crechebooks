@@ -95,6 +95,38 @@ enum EnrollmentStatus {
   GRADUATED
 }
 
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum DeliveryMethod {
+  EMAIL
+  WHATSAPP
+  BOTH
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  OPENED
+  FAILED
+}
+
+enum LineType {
+  MONTHLY_FEE
+  REGISTRATION
+  EXTRA
+  DISCOUNT
+  CREDIT
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -127,6 +159,7 @@ model Tenant {
   enrollments          Enrollment[]
   parents              Parent[]
   children             Child[]
+  invoices             Invoice[]
 
   @@map("tenants")
 }
@@ -319,6 +352,7 @@ model Parent {
 
   tenant            Tenant           @relation(fields: [tenantId], references: [id])
   children          Child[]
+  invoices          Invoice[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -344,9 +378,68 @@ model Child {
   tenant           Tenant       @relation(fields: [tenantId], references: [id])
   parent           Parent       @relation(fields: [parentId], references: [id], onDelete: Cascade)
   enrollments      Enrollment[]
+  invoices         Invoice[]
 
   @@index([tenantId])
   @@index([tenantId, parentId])
   @@index([tenantId, isActive])
   @@map("children")
+}
+
+model Invoice {
+  id                 String          @id @default(uuid())
+  tenantId           String          @map("tenant_id")
+  xeroInvoiceId      String?         @unique @map("xero_invoice_id")
+  invoiceNumber      String          @map("invoice_number") @db.VarChar(50)
+  parentId           String          @map("parent_id")
+  childId            String          @map("child_id")
+  billingPeriodStart DateTime        @map("billing_period_start") @db.Date
+  billingPeriodEnd   DateTime        @map("billing_period_end") @db.Date
+  issueDate          DateTime        @map("issue_date") @db.Date
+  dueDate            DateTime        @map("due_date") @db.Date
+  subtotalCents      Int             @map("subtotal_cents")
+  vatCents           Int             @default(0) @map("vat_cents")
+  totalCents         Int             @map("total_cents")
+  amountPaidCents    Int             @default(0) @map("amount_paid_cents")
+  status             InvoiceStatus   @default(DRAFT)
+  deliveryMethod     DeliveryMethod? @map("delivery_method")
+  deliveryStatus     DeliveryStatus? @map("delivery_status")
+  deliveredAt        DateTime?       @map("delivered_at")
+  notes              String?
+  isDeleted          Boolean         @default(false) @map("is_deleted")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  parent  Parent        @relation(fields: [parentId], references: [id])
+  child   Child         @relation(fields: [childId], references: [id])
+  lines   InvoiceLine[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, parentId])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@index([xeroInvoiceId])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id             String   @id @default(uuid())
+  invoiceId      String   @map("invoice_id")
+  description    String   @db.VarChar(500)
+  quantity       Decimal  @default(1) @db.Decimal(10, 2)
+  unitPriceCents Int      @map("unit_price_cents")
+  discountCents  Int      @default(0) @map("discount_cents")
+  subtotalCents  Int      @map("subtotal_cents")
+  vatCents       Int      @default(0) @map("vat_cents")
+  totalCents     Int      @map("total_cents")
+  lineType       LineType @map("line_type")
+  accountCode    String?  @map("account_code") @db.VarChar(20)
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, sortOrder])
+  @@map("invoice_lines")
 }

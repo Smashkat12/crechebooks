@@ -1,4 +1,4 @@
-<task_spec id="TASK-PAY-001" version="1.0">
+<task_spec id="TASK-PAY-001" version="2.0">
 
 <metadata>
   <title>Payment Entity and Types</title>
@@ -11,11 +11,162 @@
     <requirement_ref>REQ-PAY-005</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-TRANS-001</task_ref>
-    <task_ref>TASK-BILL-003</task_ref>
+    <task_ref status="complete">TASK-TRANS-001</task_ref>
+    <task_ref status="complete">TASK-BILL-003</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
 </metadata>
+
+<!-- ============================================ -->
+<!-- CRITICAL INSTRUCTIONS FOR AI AGENT -->
+<!-- ============================================ -->
+
+<critical_instructions>
+  <rule priority="1">NO BACKWARDS COMPATIBILITY - fail fast for debugging</rule>
+  <rule priority="2">NO WORKAROUNDS OR FALLBACKS - if something fails, ERROR OUT with robust logging</rule>
+  <rule priority="3">NO MOCK DATA IN TESTS - use real PostgreSQL database for integration tests</rule>
+  <rule priority="4">LOG THEN THROW - always log errors with full context before throwing</rule>
+  <rule priority="5">Tests must FAIL if project is broken - never pass falsely</rule>
+  <rule priority="6">Follow constitution.md error_handling rules exactly</rule>
+</critical_instructions>
+
+<!-- ============================================ -->
+<!-- CURRENT PROJECT STATE (as of 2025-12-20) -->
+<!-- ============================================ -->
+
+<project_state>
+  <completed_tasks>
+    <task id="TASK-CORE-001">Project Setup and Base Configuration</task>
+    <task id="TASK-CORE-002">Tenant Entity and Migration</task>
+    <task id="TASK-CORE-003">User Entity and Authentication Types</task>
+    <task id="TASK-CORE-004">Audit Log Entity and Trail System</task>
+    <task id="TASK-TRANS-001">Transaction Entity and Migration</task>
+    <task id="TASK-TRANS-002">Categorization Entity and Types</task>
+    <task id="TASK-TRANS-003">Payee Pattern Entity</task>
+    <task id="TASK-BILL-001">Parent and Child Entities</task>
+    <task id="TASK-BILL-002">Fee Structure and Enrollment Entities</task>
+    <task id="TASK-BILL-003">Invoice and Invoice Line Entities</task>
+  </completed_tasks>
+
+  <current_test_count>378 passing tests</current_test_count>
+  <test_command>npx jest --runInBand</test_command>
+
+  <existing_enums_in_schema>
+    TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource,
+    TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact,
+    FeeType, EnrollmentStatus, InvoiceStatus, DeliveryMethod, DeliveryStatus, LineType
+  </existing_enums_in_schema>
+
+  <existing_models_in_schema>
+    Tenant, User, AuditLog, Transaction, Categorization, PayeePattern,
+    FeeStructure, Enrollment, Parent, Child, Invoice, InvoiceLine
+  </existing_models_in_schema>
+</project_state>
+
+<!-- ============================================ -->
+<!-- LESSONS LEARNED FROM PREVIOUS TASKS -->
+<!-- ============================================ -->
+
+<lessons_learned>
+  <lesson id="1" severity="critical">
+    <title>Test Cleanup Order - FK Dependencies</title>
+    <problem>Foreign key constraint violations during test cleanup</problem>
+    <solution>Delete in FK order - leaf tables first. The EXACT order is:
+      1. Payment (new - has FK to Transaction, Invoice)
+      2. InvoiceLine
+      3. Invoice
+      4. Enrollment
+      5. FeeStructure
+      6. Child
+      7. Parent
+      8. PayeePattern
+      9. Categorization
+      10. Transaction
+      11. User
+      12. Tenant
+    </solution>
+    <code_pattern>
+beforeEach(async () => {
+  // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.payment.deleteMany({});
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.enrollment.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  await prisma.child.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.payeePattern.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.tenant.deleteMany({});
+});
+    </code_pattern>
+  </lesson>
+
+  <lesson id="2" severity="critical">
+    <title>Date-Only Fields (@db.Date) Comparison</title>
+    <problem>Test failed comparing timestamps on date-only fields</problem>
+    <solution>Date-only fields strip time to 00:00:00 UTC. Compare year/month/day, not milliseconds.</solution>
+    <code_pattern>
+// WRONG - fails on @db.Date fields:
+expect(Math.abs(now.getTime() - dateField.getTime())).toBeLessThan(5000);
+
+// CORRECT - compare date components:
+expect(dateField.getFullYear()).toBe(now.getFullYear());
+expect(dateField.getMonth()).toBe(now.getMonth());
+expect(dateField.getDate()).toBe(now.getDate());
+    </code_pattern>
+  </lesson>
+
+  <lesson id="3" severity="critical">
+    <title>Prisma Client Regeneration</title>
+    <problem>Build failed with "Module '@prisma/client' has no exported member 'Payment'"</problem>
+    <solution>After schema changes, MUST run: pnpm prisma generate</solution>
+  </lesson>
+
+  <lesson id="4" severity="high">
+    <title>Test Race Conditions</title>
+    <problem>Tests failed intermittently due to shared database state</problem>
+    <solution>Always run tests with --runInBand flag: npx jest --runInBand</solution>
+  </lesson>
+
+  <lesson id="5" severity="high">
+    <title>Error Handling Pattern</title>
+    <problem>Constitution requires log-then-throw pattern</problem>
+    <solution>Always log with context before throwing. Use existing exception classes.</solution>
+    <code_pattern>
+// From constitution.md error_handling:
+try {
+  // operation
+} catch (error) {
+  this.logger.error(
+    `Failed to [operation]: ${JSON.stringify(dto)}`,
+    error instanceof Error ? error.stack : String(error),
+  );
+
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error.code === 'P2003') {
+      throw new NotFoundException('Entity', id);
+    }
+  }
+  throw new DatabaseException('operation', 'Failed to...', error instanceof Error ? error : undefined);
+}
+    </code_pattern>
+  </lesson>
+
+  <lesson id="6" severity="medium">
+    <title>Decimal Fields in Prisma</title>
+    <problem>Prisma returns Decimal as Prisma.Decimal, not number</problem>
+    <solution>Use @db.Decimal(precision, scale) and handle conversion in TypeScript interface as number</solution>
+  </lesson>
+
+  <lesson id="7" severity="high">
+    <title>Nullable FK Relations</title>
+    <problem>Payment.transactionId can be null (for manual payments not from bank feed)</problem>
+    <solution>Use optional relation syntax in Prisma: transaction Transaction? @relation(...)</solution>
+  </lesson>
+</lessons_learned>
 
 <context>
 This task creates the Payment entity which links bank transactions to invoices,
@@ -23,6 +174,10 @@ enabling automated payment matching and allocation. The Payment model supports
 exact matches, partial payments, overpayments, and manual allocations. It tracks
 match confidence scores and allows reversal of incorrect matches. This is a
 critical entity for the automated payment matching workflow and Xero synchronization.
+
+South African context:
+- Currency: ZAR (stored as cents)
+- All amounts stored as integers (cents) per constitution.md
 </context>
 
 <input_context_files>

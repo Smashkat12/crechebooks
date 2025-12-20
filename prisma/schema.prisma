@@ -55,6 +55,20 @@ enum TransactionStatus {
   SYNCED
 }
 
+enum VatType {
+  STANDARD
+  ZERO_RATED
+  EXEMPT
+  NO_VAT
+}
+
+enum CategorizationSource {
+  AI_AUTO
+  AI_SUGGESTED
+  USER_OVERRIDE
+  RULE_BASED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -98,6 +112,8 @@ model User {
   lastLoginAt DateTime? @map("last_login_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  reviewedCategorizations Categorization[] @relation("ReviewedCategorizations")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -151,10 +167,36 @@ model Transaction {
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
   tenant              Tenant            @relation(fields: [tenantId], references: [id])
+  categorizations     Categorization[]
 
   @@index([tenantId, date])
   @@index([tenantId, status])
   @@index([tenantId, payeeName])
   @@index([tenantId, isReconciled])
   @@map("transactions")
+}
+
+model Categorization {
+  id                  String               @id @default(uuid())
+  transactionId       String               @map("transaction_id")
+  accountCode         String               @map("account_code") @db.VarChar(20)
+  accountName         String               @map("account_name") @db.VarChar(100)
+  confidenceScore     Decimal              @map("confidence_score") @db.Decimal(5, 2)
+  reasoning           String?
+  source              CategorizationSource
+  isSplit             Boolean              @default(false) @map("is_split")
+  splitAmountCents    Int?                 @map("split_amount_cents")
+  vatAmountCents      Int?                 @map("vat_amount_cents")
+  vatType             VatType              @default(STANDARD) @map("vat_type")
+  reviewedBy          String?              @map("reviewed_by")
+  reviewedAt          DateTime?            @map("reviewed_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+
+  transaction         Transaction          @relation(fields: [transactionId], references: [id])
+  reviewer            User?                @relation("ReviewedCategorizations", fields: [reviewedBy], references: [id])
+
+  @@index([transactionId])
+  @@index([accountCode])
+  @@map("categorizations")
 }

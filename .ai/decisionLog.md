@@ -297,6 +297,111 @@ beforeEach(async () => {
 
 ---
 
+## DEC-019: Soft Delete Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Use soft delete with isDeleted and deletedAt fields
+
+**Context**: TASK-TRANS-001 required transaction deletion
+
+**Implementation**:
+```prisma
+model Transaction {
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  deletedAt   DateTime? @map("deleted_at")
+}
+```
+
+**Repository Pattern**:
+```typescript
+async softDelete(tenantId: string, id: string): Promise<void> {
+  await this.prisma.transaction.update({
+    where: { id },
+    data: { isDeleted: true, deletedAt: new Date() }
+  });
+}
+
+// All queries exclude soft-deleted records
+where: { tenantId, isDeleted: false }
+```
+
+**Consequences**:
+- Records never truly deleted (audit trail)
+- All queries must filter isDeleted: false
+- Unique constraints may need compound key with isDeleted
+
+---
+
+## DEC-020: Import Enums from Entity Files
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: DTOs must import enums from entity files, NOT from @prisma/client
+
+**Context**: TASK-TRANS-001 required consistent enum usage
+
+**Implementation**:
+```typescript
+// src/database/dto/transaction.dto.ts
+import { ImportSource, TransactionStatus } from '../entities/transaction.entity';
+
+// NOT:
+// import { ImportSource } from '@prisma/client';  // WRONG
+```
+
+**Rationale**:
+- Entity file is the canonical source
+- Maintains separation from Prisma internals
+- Makes code more testable
+
+---
+
+## DEC-021: Interface Nullable Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: In TypeScript interfaces, use `string | null` not `string?`
+
+**Context**: TASK-TRANS-001 interface definition
+
+**Implementation**:
+```typescript
+// CORRECT
+export interface ITransaction {
+  payeeName: string | null;
+  reference: string | null;
+}
+
+// WRONG
+export interface ITransaction {
+  payeeName?: string;  // This means optional, not nullable
+}
+```
+
+**Rationale**:
+- `string | null` explicitly models database nullable columns
+- `string?` means the property may not exist, which is different
+- Matches Prisma's generated types
+
+---
+
+## DEC-022: Run Tests with --runInBand
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Run integration tests with --runInBand to avoid parallel conflicts
+
+**Context**: TASK-TRANS-001 tests failed when run in parallel
+
+**Implementation**:
+```bash
+pnpm run test -- --runInBand
+```
+
+**Rationale**:
+- Multiple test files share the same database
+- Parallel runs cause cleanup conflicts
+- --runInBand ensures sequential execution
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
@@ -305,3 +410,4 @@ beforeEach(async () => {
 | 2025-12-20 | DEC-010 through DEC-014 added (TASK-CORE-001 learnings) | AI Agent |
 | 2025-12-20 | DEC-015, DEC-016 added (TASK-CORE-002 learnings) | AI Agent |
 | 2025-12-20 | DEC-017, DEC-018 added (TASK-CORE-003 learnings) | AI Agent |
+| 2025-12-20 | DEC-019 through DEC-022 added (TASK-TRANS-001 learnings) | AI Agent |

@@ -14,7 +14,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Tenant entity | data_model | TASK-CORE-002 | ✅ Complete |
 | User entity | data_model | TASK-CORE-003 | ✅ Complete |
 | AuditLog entity | data_model | TASK-CORE-004 | ✅ Complete |
-| Transaction entity | data_model | TASK-TRANS-001 | Pending |
+| Transaction entity | data_model | TASK-TRANS-001 | ✅ Complete |
 | Categorization entity | data_model | TASK-TRANS-002 | Pending |
 | PayeePattern entity | data_model | TASK-TRANS-003 | Pending |
 | Parent entity | data_model | TASK-BILL-001 | Pending |
@@ -219,3 +219,5 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Date | Change | Author |
 |------|--------|--------|
 | 2025-12-19 | Initial traceability matrix created | AI Agent |
+| 2025-12-20 | TASK-CORE-002, TASK-CORE-003, TASK-CORE-004 marked complete | AI Agent |
+| 2025-12-20 | TASK-TRANS-001 marked complete | AI Agent |

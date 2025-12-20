@@ -39,9 +39,9 @@
 - [x] **TASK-CORE-001**: Project Setup and Base Configuration - **COMPLETED 2025-12-20**
 - [x] **TASK-CORE-002**: Tenant Entity and Migration - **COMPLETED 2025-12-20**
 - [x] **TASK-CORE-003**: User Entity and Authentication Types - **COMPLETED 2025-12-20**
-- [ ] TASK-CORE-004: Audit Log Entity and Trail System ← **NEXT**
-- [ ] TASK-TRANS-001: Transaction Entity and Migration
-- [ ] TASK-TRANS-002: Categorization Entity and Types
+- [x] **TASK-CORE-004**: Audit Log Entity and Trail System - **COMPLETED 2025-12-20**
+- [x] **TASK-TRANS-001**: Transaction Entity and Migration - **COMPLETED 2025-12-20**
+- [ ] TASK-TRANS-002: Categorization Entity and Types ← **NEXT**
 - [ ] TASK-TRANS-003: Payee Pattern Entity
 - [ ] TASK-BILL-001: Parent and Child Entities
 - [ ] TASK-BILL-002: Fee Structure and Enrollment Entities
@@ -52,7 +52,7 @@
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 3/15 (20%)**
+**Progress: 5/15 (33.3%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -84,7 +84,6 @@
 
 ### TASK-CORE-003 Completion Summary
 **Date**: 2025-12-20
-**Commit**: (latest)
 
 **Implemented**:
 - UserRole enum in Prisma schema (OWNER, ADMIN, VIEWER, ACCOUNTANT)
@@ -92,17 +91,44 @@
 - Database migration for users table (20251219233350_create_users)
 - IUser TypeScript interface
 - CreateUserDto and UpdateUserDto with class-validator
-- UserRepository with 8 methods:
-  - create, findById, findByAuth0Id
-  - findByTenantAndEmail, findByTenant
-  - update, updateLastLogin, deactivate
+- UserRepository with 8 methods
 - Fail-fast error handling on all methods
 - 21 integration tests using REAL database (no mocks)
+
+### TASK-CORE-004 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- AuditLog model in Prisma schema with AuditAction enum (7 values)
+- Database migration with PostgreSQL RULES for immutability
+- IAuditLog TypeScript interface
+- CreateAuditLogDto with class-validator (NO UpdateDto - immutable)
+- AuditLogService with 5 methods (logCreate, logUpdate, logDelete, logAction, getEntityHistory)
+- 16 integration tests including immutability verification
+
+### TASK-TRANS-001 Completion Summary
+**Date**: 2025-12-20
+**Commit**: 166de0f
+
+**Implemented**:
+- Transaction model in Prisma schema (18 columns)
+- ImportSource enum (BANK_FEED, CSV_IMPORT, PDF_IMPORT, MANUAL)
+- TransactionStatus enum (PENDING, CATEGORIZED, REVIEW_REQUIRED, SYNCED)
+- Database migration for transactions table with indexes
+- ITransaction TypeScript interface
+- CreateTransactionDto, UpdateTransactionDto, TransactionFilterDto
+- TransactionRepository with 7 methods:
+  - create, findById, findByTenant (paginated)
+  - findPending, update, softDelete, markReconciled
+- PaginatedResult<T> interface for list queries
+- Multi-tenant isolation on all queries
+- Soft delete pattern (isDeleted + deletedAt)
+- 22 integration tests using REAL database
 
 **Verification**:
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 99 unit + 1 e2e (all passing)
+- Tests: 141 tests (all passing with --runInBand)
 
 **GitHub**: https://github.com/Smashkat12/crechebooks
 
@@ -113,11 +139,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 3 |
+| Completed | 5 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 59 |
-| **Overall Progress** | **4.8%** |
+| Remaining | 57 |
+| **Overall Progress** | **8.1%** |
 
 ---
 
@@ -168,15 +194,32 @@
 4. **Repository Methods**: 8 standard methods cover all use cases
 5. **Test Cleanup**: Delete child records (users) before parent (tenants) due to FK
 
+### Key Learnings from TASK-CORE-004
+1. **Immutable Tables**: PostgreSQL RULES prevent UPDATE/DELETE at database level
+2. **No Foreign Keys**: Intentional for audit integrity if parent records deleted
+3. **Service vs Repository**: Use Service pattern for business logic
+4. **Prisma.InputJsonValue**: Use for JSON field types
+5. **Prisma.DbNull**: Use for null JSON values
+
+### Key Learnings from TASK-TRANS-001
+1. **Soft Delete Pattern**: isDeleted + deletedAt fields, filter in all queries
+2. **Run Tests with --runInBand**: Avoid parallel database conflicts
+3. **Import Enums from Entity**: DTOs import from entity.ts, not @prisma/client
+4. **Interface Nullable**: Use `string | null` not `string?`
+5. **Regenerate Client**: Run `npx prisma generate` after migration
+6. **FK Cleanup Order**: Clean child tables before parent in tests
+
 ### Current Database State
 ```prisma
-Enums: TaxStatus, SubscriptionStatus, UserRole
-Models: Tenant (with users relation), User (with tenant relation)
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus
+Models: Tenant, User, AuditLog, Transaction
 ```
 
 ### Applied Migrations
 1. `20251219225823_create_tenants` - Tenant table
 2. `20251219233350_create_users` - User table with FK to tenants
+3. `20251220000830_create_audit_logs` - AuditLog table with immutability rules
+4. `20251220XXXXXX_create_transactions` - Transaction table with indexes
 
 ### Project Structure
 ```
@@ -194,14 +237,22 @@ crechebooks/
 │   │   ├── entities/
 │   │   │   ├── tenant.entity.ts
 │   │   │   ├── user.entity.ts
+│   │   │   ├── audit-log.entity.ts
+│   │   │   ├── transaction.entity.ts
 │   │   │   └── index.ts
 │   │   ├── dto/
 │   │   │   ├── tenant.dto.ts
 │   │   │   ├── user.dto.ts
+│   │   │   ├── audit-log.dto.ts
+│   │   │   ├── transaction.dto.ts
 │   │   │   └── index.ts
 │   │   ├── repositories/
 │   │   │   ├── tenant.repository.ts
 │   │   │   ├── user.repository.ts
+│   │   │   ├── transaction.repository.ts
+│   │   │   └── index.ts
+│   │   ├── services/
+│   │   │   ├── audit-log.service.ts
 │   │   │   └── index.ts
 │   │   ├── database.module.ts
 │   │   └── index.ts
@@ -219,9 +270,12 @@ crechebooks/
 ├── tests/
 │   ├── shared/
 │   └── database/
-│       └── repositories/
-│           ├── tenant.repository.spec.ts
-│           └── user.repository.spec.ts
+│       ├── repositories/
+│       │   ├── tenant.repository.spec.ts
+│       │   ├── user.repository.spec.ts
+│       │   └── transaction.repository.spec.ts
+│       └── services/
+│           └── audit-log.service.spec.ts
 └── test/
     └── app.e2e-spec.ts
 ```

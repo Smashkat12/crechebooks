@@ -37,7 +37,8 @@ describe('UserRepository', () => {
   });
 
   beforeEach(async () => {
-    // Clean up in correct order: transactions -> users -> tenants
+    // Clean up in correct order: categorizations -> transactions -> users -> tenants
+    await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});
     await prisma.user.deleteMany({});
     await prisma.tenant.deleteMany({});

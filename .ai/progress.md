@@ -62,7 +62,7 @@
 - [x] **TASK-TRANS-011**: Transaction Import Service - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-012**: Transaction Categorization Service - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-013**: Payee Pattern Learning Service - **COMPLETED 2025-12-20**
-- [ ] **TASK-TRANS-014**: Xero Sync Service
+- [x] **TASK-TRANS-014**: Xero Sync Service - **COMPLETED 2025-12-20**
 - [ ] **TASK-BILL-011**: Enrollment Management Service
 - [ ] **TASK-BILL-012**: Invoice Generation Service
 - [ ] **TASK-BILL-013**: Invoice Delivery Service
@@ -81,7 +81,7 @@
 - [ ] **TASK-RECON-012**: Discrepancy Detection Service
 - [ ] **TASK-RECON-013**: Financial Report Service
 
-**Progress: 3/21 (14.3%)**
+**Progress: 4/21 (19.0%)**
 
 ### TASK-TRANS-011 Completion Summary
 **Date**: 2025-12-20
@@ -204,6 +204,45 @@
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
 - Tests: 735 tests (38 new tests for TASK-TRANS-013)
+
+### TASK-TRANS-014 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- XeroSyncService for bi-directional sync with Xero
+- syncTransactions() - batch sync multiple transactions to Xero
+- pushToXero() - push single categorized transaction with account code
+- pullFromXero() - pull transactions from Xero into CrecheBooks
+- syncChartOfAccounts() - fetch accounts from Xero
+- hasValidConnection() - check if tenant has valid Xero OAuth token
+- VAT type mapping (CrecheBooks → Xero tax types)
+- Skip already-synced transactions (status === SYNCED)
+- Skip transactions without Xero ID (local-only transactions)
+- Duplicate detection on pull (check xeroTransactionId)
+
+**Key Features**:
+- Uses existing Xero MCP tools (getAccounts, getTransactions, updateTransaction)
+- TokenManager handles OAuth refresh automatically (5-min buffer)
+- Multi-tenant isolation on all operations
+- Audit trail for sync operations
+- Proper error handling with BusinessException codes
+
+**Files Created**:
+- `src/database/dto/xero-sync.dto.ts`
+- `src/database/services/xero-sync.service.ts`
+- `tests/database/services/xero-sync.service.spec.ts`
+
+**Files Modified**:
+- `src/database/repositories/transaction.repository.ts` - Added findByXeroId
+- `src/config/queue.config.ts` - Added XERO_SYNC queue
+- `src/database/database.module.ts` - Registered XeroSyncService
+- `src/database/dto/index.ts` - Export xero-sync DTOs
+- `src/database/services/index.ts` - Export XeroSyncService
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 757 tests (22 new tests for TASK-TRANS-014)
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20

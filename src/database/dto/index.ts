@@ -18,3 +18,4 @@ export * from './reconciliation.dto';
 export * from './import.dto';
 export * from './categorization-service.dto';
 export * from './pattern-learning.dto';
+export * from './xero-sync.dto';

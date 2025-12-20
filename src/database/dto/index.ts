@@ -6,3 +6,5 @@ export * from './categorization.dto';
 export * from './payee-pattern.dto';
 export * from './parent.dto';
 export * from './child.dto';
+export * from './fee-structure.dto';
+export * from './enrollment.dto';

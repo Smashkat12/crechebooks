@@ -81,6 +81,20 @@ enum PreferredContact {
   BOTH
 }
 
+enum FeeType {
+  FULL_DAY
+  HALF_DAY
+  HOURLY
+  CUSTOM
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PENDING
+  WITHDRAWN
+  GRADUATED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -109,6 +123,8 @@ model Tenant {
   users                User[]
   transactions         Transaction[]
   payeePatterns        PayeePattern[]
+  feeStructures        FeeStructure[]
+  enrollments          Enrollment[]
   parents              Parent[]
   children             Child[]
 
@@ -238,6 +254,52 @@ model PayeePattern {
   @@map("payee_patterns")
 }
 
+model FeeStructure {
+  id                     String    @id @default(uuid())
+  tenantId               String    @map("tenant_id")
+  name                   String    @db.VarChar(100)
+  description            String?
+  feeType                FeeType   @map("fee_type")
+  amountCents            Int       @map("amount_cents")
+  vatInclusive           Boolean   @default(true) @map("vat_inclusive")
+  siblingDiscountPercent Decimal?  @map("sibling_discount_percent") @db.Decimal(5, 2)
+  effectiveFrom          DateTime  @map("effective_from") @db.Date
+  effectiveTo            DateTime? @map("effective_to") @db.Date
+  isActive               Boolean   @default(true) @map("is_active")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  enrollments Enrollment[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, effectiveFrom])
+  @@map("fee_structures")
+}
+
+model Enrollment {
+  id                     String           @id @default(uuid())
+  tenantId               String           @map("tenant_id")
+  childId                String           @map("child_id")
+  feeStructureId         String           @map("fee_structure_id")
+  startDate              DateTime         @map("start_date") @db.Date
+  endDate                DateTime?        @map("end_date") @db.Date
+  status                 EnrollmentStatus @default(ACTIVE)
+  siblingDiscountApplied Boolean          @default(false) @map("sibling_discount_applied")
+  customFeeOverrideCents Int?             @map("custom_fee_override_cents")
+  notes                  String?
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  child        Child        @relation(fields: [childId], references: [id], onDelete: Cascade)
+  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id])
+
+  @@index([tenantId, childId, status])
+  @@index([tenantId, status, startDate])
+  @@map("enrollments")
+}
+
 model Parent {
   id                String           @id @default(uuid())
   tenantId          String           @map("tenant_id")
@@ -279,8 +341,9 @@ model Child {
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
 
-  tenant           Tenant    @relation(fields: [tenantId], references: [id])
-  parent           Parent    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  parent           Parent       @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  enrollments      Enrollment[]
 
   @@index([tenantId])
   @@index([tenantId, parentId])

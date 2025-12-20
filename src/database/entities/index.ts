@@ -6,3 +6,5 @@ export * from './categorization.entity';
 export * from './payee-pattern.entity';
 export * from './parent.entity';
 export * from './child.entity';
+export * from './fee-structure.entity';
+export * from './enrollment.entity';

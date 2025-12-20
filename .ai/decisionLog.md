@@ -642,6 +642,126 @@ async withdraw(id: string): Promise<Enrollment> {
 
 ---
 
+## DEC-033: Invoice Cascade Delete Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: InvoiceLine cascades from Invoice (onDelete: Cascade)
+
+**Implementation**:
+```prisma
+model InvoiceLine {
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+```
+
+**Rationale**:
+- Deleting an invoice should remove all its lines atomically
+- Lines have no meaning without their parent invoice
+- Matches business logic expectations
+
+---
+
+## DEC-034: Invoice Soft Delete Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Invoice uses isDeleted flag for soft delete
+
+**Implementation**:
+```prisma
+model Invoice {
+  isDeleted Boolean @default(false) @map("is_deleted")
+}
+```
+
+**Rationale**:
+- Invoices are financial records that may need audit trail
+- Soft delete preserves historical data
+- Can be restored if needed
+
+---
+
+## DEC-035: Invoice Payment Tracking Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: recordPayment method auto-updates invoice status based on payment amount
+
+**Implementation**:
+```typescript
+async recordPayment(id: string, amountCents: number): Promise<Invoice> {
+  const newAmountPaid = existing.amountPaidCents + amountCents;
+  let newStatus: InvoiceStatus = existing.status as InvoiceStatus;
+
+  if (newAmountPaid >= existing.totalCents) {
+    newStatus = InvoiceStatus.PAID;
+  } else if (newAmountPaid > 0) {
+    newStatus = InvoiceStatus.PARTIALLY_PAID;
+  }
+  // ...
+}
+```
+
+**Rationale**:
+- Automatic status updates prevent inconsistent states
+- Single method handles all payment scenarios
+- Clear audit trail of payment progression
+
+---
+
+## DEC-036: Invoice Composite Unique Constraint
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: Invoice number is unique per tenant using composite unique constraint
+
+**Implementation**:
+```prisma
+model Invoice {
+  @@unique([tenantId, invoiceNumber])
+}
+```
+
+**Query Pattern**:
+```typescript
+findUnique({ where: { tenantId_invoiceNumber: { tenantId, invoiceNumber } } })
+```
+
+**Rationale**:
+- Each tenant can use their own numbering scheme
+- Prevents duplicate invoice numbers within a tenant
+- Allows reuse of invoice numbers across tenants
+
+---
+
+## DEC-037: InvoiceLine Sort Order Pattern
+**Date**: 2025-12-20
+**Status**: Final
+**Decision**: InvoiceLine uses sortOrder for display ordering with dedicated reorder method
+
+**Implementation**:
+```prisma
+model InvoiceLine {
+  sortOrder Int @default(0) @map("sort_order")
+  @@index([invoiceId, sortOrder])
+}
+```
+
+**Repository Method**:
+```typescript
+async reorderLines(lineOrders: Array<{ id: string; sortOrder: number }>): Promise<void> {
+  await this.prisma.$transaction(
+    lineOrders.map(({ id, sortOrder }) =>
+      this.prisma.invoiceLine.update({ where: { id }, data: { sortOrder } })
+    )
+  );
+}
+```
+
+**Rationale**:
+- Lines need consistent display ordering
+- Index improves query performance
+- Transaction ensures atomic reorder operation
+
+---
+
 ## Change Log
 
 | Date | Decision | Author |
@@ -653,3 +773,4 @@ async withdraw(id: string): Promise<Enrollment> {
 | 2025-12-20 | DEC-019 through DEC-022 added (TASK-TRANS-001 learnings) | AI Agent |
 | 2025-12-20 | DEC-023 through DEC-026 added (TASK-TRANS-003 learnings) | AI Agent |
 | 2025-12-20 | DEC-027 through DEC-032 added (TASK-BILL-002 learnings) | AI Agent |
+| 2025-12-20 | DEC-033 through DEC-037 added (TASK-BILL-003 learnings) | AI Agent |

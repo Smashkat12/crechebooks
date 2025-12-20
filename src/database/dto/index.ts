@@ -8,3 +8,5 @@ export * from './parent.dto';
 export * from './child.dto';
 export * from './fee-structure.dto';
 export * from './enrollment.dto';
+export * from './invoice.dto';
+export * from './invoice-line.dto';

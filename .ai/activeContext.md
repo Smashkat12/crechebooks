@@ -1,7 +1,7 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-BILL-002 Completed)
+2025-12-20 by AI Agent (TASK-BILL-003 Completed)
 
 ## Current Focus
 CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
@@ -11,11 +11,97 @@ CrecheBooks is an AI-powered bookkeeping system for South African creches and pr
 
 ## Active Task
 **Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003, TASK-BILL-001, TASK-BILL-002
-**Next**: TASK-BILL-003 (Invoice and Invoice Line Entities)
+**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003, TASK-BILL-001, TASK-BILL-002, TASK-BILL-003
+**Next**: TASK-PAY-001 (Payment Entity and Types)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
+
+---
+
+## TASK-BILL-003 Summary (COMPLETED)
+
+### What Was Built
+- InvoiceStatus enum (DRAFT, SENT, VIEWED, PARTIALLY_PAID, PAID, OVERDUE, VOID)
+- DeliveryMethod enum (EMAIL, WHATSAPP, BOTH)
+- DeliveryStatus enum (PENDING, SENT, DELIVERED, OPENED, FAILED)
+- LineType enum (MONTHLY_FEE, REGISTRATION, EXTRA, DISCOUNT, CREDIT)
+- Invoice model in Prisma schema (21 columns)
+  - Xero integration field (xeroInvoiceId, unique)
+  - Billing period tracking (billingPeriodStart, billingPeriodEnd)
+  - Payment tracking (subtotalCents, vatCents, totalCents, amountPaidCents)
+  - Delivery tracking (deliveryMethod, deliveryStatus, deliveredAt)
+  - Soft delete pattern (isDeleted)
+  - FK to Parent and Child
+- InvoiceLine model in Prisma schema (12 columns)
+  - Line item details (description, quantity, unitPriceCents)
+  - VAT calculation support (vatCents, subtotalCents, totalCents)
+  - Line types for categorization
+  - Cascade delete from Invoice (onDelete: Cascade)
+- Database migration `20251220033235_create_invoices_and_invoice_lines`
+- IInvoice and IInvoiceLine TypeScript interfaces
+- CreateInvoiceDto, UpdateInvoiceDto, InvoiceFilterDto with validation
+- CreateInvoiceLineDto, UpdateInvoiceLineDto, BatchCreateInvoiceLinesDto
+- InvoiceRepository with 13 methods:
+  - create, findById, findByIdWithLines
+  - findByTenant (with filters), findByInvoiceNumber
+  - findByParent, findByChild, findByStatus, findOverdue
+  - update, softDelete, delete
+  - updateDeliveryStatus, recordPayment
+- InvoiceLineRepository with 8 methods:
+  - create, createMany, findById, findByInvoice
+  - update, delete, deleteByInvoice, reorderLines
+- 66 new integration tests using REAL database (no mocks)
+- Updated all 9 existing test files with new cleanup order
+
+### Key Design Decisions
+1. **Cascade Delete** - InvoiceLine cascades from Invoice (onDelete: Cascade)
+2. **Soft Delete for Invoice** - Use isDeleted flag instead of hard delete
+3. **Date-Only Fields** - Use @db.Date for billing period and dates
+4. **Unique Invoice Number** - Composite unique on (tenantId, invoiceNumber)
+5. **Payment Tracking** - amountPaidCents accumulates payments, status auto-updates
+6. **Delivery Status** - Tracks delivery lifecycle (PENDING → SENT → DELIVERED → OPENED)
+
+### Key Lessons Learned
+1. **FK Cleanup Order** - CRITICAL: InvoiceLine first, then Invoice (new tables at top)
+2. **Composite Unique Naming** - Prisma names it `tenantId_invoiceNumber` for queries
+3. **findByIdWithLines** - Use `include` to fetch related lines in one query
+4. **recordPayment** - Auto-updates status based on payment vs total amounts
+
+### Key Files Created
+```
+src/database/
+├── entities/
+│   ├── invoice.entity.ts         # IInvoice, InvoiceStatus, DeliveryMethod, DeliveryStatus
+│   ├── invoice-line.entity.ts    # IInvoiceLine, LineType
+│   └── index.ts                  # Updated
+├── dto/
+│   ├── invoice.dto.ts            # Create, Update, Filter DTOs
+│   ├── invoice-line.dto.ts       # Create, Update, Batch DTOs
+│   └── index.ts                  # Updated
+├── repositories/
+│   ├── invoice.repository.ts     # 13 methods
+│   ├── invoice-line.repository.ts # 8 methods
+│   └── index.ts                  # Updated
+
+prisma/
+├── schema.prisma                 # Invoice, InvoiceLine models, 4 enums
+└── migrations/
+    └── 20251220033235_create_invoices_and_invoice_lines/
+        └── migration.sql
+
+tests/database/repositories/
+├── invoice.repository.spec.ts       # 37 tests with real DB
+├── invoice-line.repository.spec.ts  # 29 tests with real DB
+└── (9 existing files updated with new cleanup order)
+```
+
+### Verification
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 378 tests (all passing with --runInBand)
+  - 66 new tests (invoice + invoice-line)
+  - 312 existing tests
 
 ---
 
@@ -108,8 +194,8 @@ tests/database/repositories/
 
 ### Prisma Schema (prisma/schema.prisma)
 ```
-Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus
-Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus, InvoiceStatus, DeliveryMethod, DeliveryStatus, LineType
+Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child, Invoice, InvoiceLine
 ```
 
 ### Migrations Applied
@@ -121,11 +207,14 @@ Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeSt
 6. `20251220014604_create_payee_patterns`
 7. `20251220020708_create_parents_and_children`
 8. `20251220023800_create_fee_structures_and_enrollments`
+9. `20251220033235_create_invoices_and_invoice_lines`
 
 ### Test Cleanup Order (CRITICAL)
 ```typescript
 beforeEach(async () => {
   // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
   await prisma.enrollment.deleteMany({});
   await prisma.feeStructure.deleteMany({});
   await prisma.child.deleteMany({});
@@ -148,9 +237,9 @@ crechebooks/
 │   ├── health/
 │   ├── database/
 │   │   ├── prisma/            # PrismaService, PrismaModule (GLOBAL)
-│   │   ├── entities/          # 10 entity files (tenant, user, audit-log, transaction, categorization, payee-pattern, parent, child, fee-structure, enrollment)
-│   │   ├── dto/               # 10 DTO files
-│   │   ├── repositories/      # 9 repositories (tenant, user, transaction, categorization, payee-pattern, parent, child, fee-structure, enrollment)
+│   │   ├── entities/          # 12 entity files
+│   │   ├── dto/               # 12 DTO files
+│   │   ├── repositories/      # 11 repositories
 │   │   └── services/          # AuditLogService
 │   └── shared/
 │       ├── constants/
@@ -159,12 +248,12 @@ crechebooks/
 │       └── utils/             # Money, Date utilities
 ├── prisma/
 │   ├── schema.prisma
-│   └── migrations/            # 8 migrations
+│   └── migrations/            # 9 migrations
 ├── prisma.config.ts           # Prisma 7 config
 ├── tests/
 │   ├── shared/
 │   └── database/
-│       ├── repositories/      # 9 spec files (304 tests total)
+│       ├── repositories/      # 11 spec files (378 tests total)
 │       └── services/          # audit-log spec
 └── test/
 ```
@@ -174,10 +263,10 @@ crechebooks/
 ## Recent Decisions
 | Date | Decision | Impact |
 |------|----------|--------|
-| 2025-12-20 | Cascade delete Enrollment from Child | Deleting child removes all enrollments |
-| 2025-12-20 | Soft delete for FeeStructure | Use deactivate() when enrollments exist |
-| 2025-12-20 | Date-only fields for billing dates | Compare year/month/day, not timestamps |
-| 2025-12-20 | Sibling discount on FeeStructure | Percentage stored as Decimal(5,2) |
+| 2025-12-20 | Cascade delete InvoiceLine from Invoice | Deleting invoice removes all lines |
+| 2025-12-20 | Soft delete for Invoice | Use isDeleted flag instead of hard delete |
+| 2025-12-20 | recordPayment auto-updates status | Tracks partial vs full payment |
+| 2025-12-20 | Composite unique (tenantId, invoiceNumber) | Ensures unique invoice numbers per tenant |
 
 ---
 
@@ -194,20 +283,19 @@ crechebooks/
 ```bash
 pnpm run build           # Must compile without errors
 pnpm run lint            # Must pass with 0 warnings
-npx jest --runInBand     # All tests must pass (304 tests)
+npx jest --runInBand     # All tests must pass (378 tests)
 pnpm run test:e2e        # E2E tests must pass
 ```
 
 ---
 
 ## Current Blockers
-- None - Ready for next task (TASK-BILL-003)
+- None - Ready for next task (TASK-PAY-001)
 
 ---
 
 ## Session Notes
-TASK-BILL-002 completed with 304 tests passing.
-Foundation Layer: 9/15 tasks complete (60%).
-55 new tests added (fee structure + enrollment).
+TASK-BILL-003 completed with 378 tests passing.
+Foundation Layer: 10/15 tasks complete (66.7%).
+66 new tests added (invoice + invoice-line).
 All existing test files updated with new cleanup order.
-Commit c60925c pushed to origin/main.

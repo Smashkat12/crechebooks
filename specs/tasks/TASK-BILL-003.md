@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Invoice and Invoice Line Entities</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>foundation</layer>
   <sequence>10</sequence>
   <implements>
@@ -48,7 +48,7 @@
     <task id="TASK-BILL-002">Fee Structure and Enrollment Entities</task>
   </completed_tasks>
 
-  <current_test_count>304 passing tests</current_test_count>
+  <current_test_count>378 passing tests</current_test_count>
   <test_command>npx jest --runInBand</test_command>
 
   <existing_enums_in_schema>

@@ -64,7 +64,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | TransactionService.importFromFile | method | TASK-TRANS-011 | ✅ Complete |
 | TransactionService.categorizeTransactions | method | TASK-TRANS-012 | ✅ Complete |
 | TransactionService.updateCategorization | method | TASK-TRANS-012 | ✅ Complete |
-| BillingService.generateMonthlyInvoices | method | TASK-BILL-012 | Pending |
+| BillingService.generateMonthlyInvoices | method | TASK-BILL-012 | ✅ Complete |
 | BillingService.sendInvoices | method | TASK-BILL-013 | Pending |
 | PaymentService.matchPayments | method | TASK-PAY-011 | Pending |
 | PaymentService.allocatePayment | method | TASK-PAY-012 | Pending |
@@ -116,11 +116,11 @@ This document ensures 100% coverage of all requirements in the specifications. E
 
 | Spec Item | ID | Covered by Task ID | Status |
 |-----------|----|--------------------|--------|
-| Monthly invoice generation | REQ-BILL-001 | TASK-BILL-012 | Pending |
-| Configurable generation date | REQ-BILL-002 | TASK-BILL-012 | Pending |
-| Invoices as drafts in Xero | REQ-BILL-003 | TASK-BILL-012 | Pending |
-| Invoice content | REQ-BILL-004 | TASK-BILL-003, TASK-BILL-012 | Pending |
-| Variable fee structures | REQ-BILL-005 | TASK-BILL-002, TASK-BILL-012 | Pending |
+| Monthly invoice generation | REQ-BILL-001 | TASK-BILL-012 | ✅ Complete |
+| Configurable generation date | REQ-BILL-002 | TASK-BILL-012 | ✅ Complete |
+| Invoices as drafts in Xero | REQ-BILL-003 | TASK-BILL-012 | ✅ Complete |
+| Invoice content | REQ-BILL-004 | TASK-BILL-003, TASK-BILL-012 | ✅ Complete |
+| Variable fee structures | REQ-BILL-005 | TASK-BILL-002, TASK-BILL-012 | ✅ Complete |
 | Email invoice delivery | REQ-BILL-006 | TASK-BILL-013 | Pending |
 | WhatsApp delivery | REQ-BILL-007 | TASK-BILL-013 | Pending |
 | Delivery status tracking | REQ-BILL-008 | TASK-BILL-003, TASK-BILL-013 | Pending |

@@ -4,3 +4,4 @@ export * from './categorization.service';
 export * from './pattern-learning.service';
 export * from './xero-sync.service';
 export * from './enrollment.service';
+export * from './invoice-generation.service';

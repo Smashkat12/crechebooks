@@ -63,8 +63,8 @@
 - [x] **TASK-TRANS-012**: Transaction Categorization Service - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-013**: Payee Pattern Learning Service - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-014**: Xero Sync Service - **COMPLETED 2025-12-20**
-- [ ] **TASK-BILL-011**: Enrollment Management Service
-- [ ] **TASK-BILL-012**: Invoice Generation Service
+- [x] **TASK-BILL-011**: Enrollment Management Service - **COMPLETED 2025-12-20**
+- [x] **TASK-BILL-012**: Invoice Generation Service - **COMPLETED 2025-12-20**
 - [ ] **TASK-BILL-013**: Invoice Delivery Service
 - [ ] **TASK-BILL-014**: Pro-rata Calculation Service
 - [ ] **TASK-PAY-011**: Payment Matching Service
@@ -81,7 +81,7 @@
 - [ ] **TASK-RECON-012**: Discrepancy Detection Service
 - [ ] **TASK-RECON-013**: Financial Report Service
 
-**Progress: 4/21 (19.0%)**
+**Progress: 6/21 (28.6%)**
 
 ### TASK-TRANS-011 Completion Summary
 **Date**: 2025-12-20
@@ -243,6 +243,79 @@
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
 - Tests: 757 tests (22 new tests for TASK-TRANS-014)
+
+### TASK-BILL-011 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- EnrollmentService with enrollment lifecycle management
+- Sibling discount calculation (10% for 2 kids, 15%/20% for 3+ kids)
+- Enrollment status workflow (ACTIVE → WITHDRAWN/GRADUATED)
+- Fee override management for custom pricing
+- Integration with FeeStructureRepository for fee lookup
+- Effective fee calculation with discounts applied
+- Service-layer DTOs (enrollment-service.dto.ts)
+- Audit trail for all enrollment operations
+
+**Key Features**:
+- Automatic sibling discount when multiple children from same parent
+- Custom fee override takes precedence over standard fees
+- Status transitions validated (cannot revert from WITHDRAWN)
+- Multi-tenant isolation on all operations
+- getMonthlyFee returns effective fee in cents
+
+**Files Created**:
+- `src/database/dto/enrollment-service.dto.ts`
+- `src/database/services/enrollment.service.ts`
+- `tests/database/services/enrollment.service.spec.ts`
+
+**Files Modified**:
+- `src/database/database.module.ts` - Registered EnrollmentService
+- `src/database/dto/index.ts` - Export enrollment-service DTOs
+- `src/database/services/index.ts` - Export EnrollmentService
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 784 tests (27 new tests for TASK-BILL-011)
+
+### TASK-BILL-012 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- InvoiceGenerationService with monthly invoice generation
+- Invoice number generation (INV-{YYYY}-{sequential})
+- VAT calculation using Decimal.js with banker's rounding (ROUND_HALF_EVEN)
+- Sibling discount integration from EnrollmentService
+- Line item creation with VAT breakdown
+- Xero invoice sync via XeroSyncService.createInvoiceDraft()
+- Service-layer DTOs (invoice-generation.dto.ts)
+- Audit trail for all invoice operations
+
+**Key Features**:
+- 15% South African VAT rate for VAT_REGISTERED tenants
+- Invoice numbers are sequential per year, reset to 001 each January
+- Billing period auto-calculated from month string (e.g., "2025-01")
+- Discount lines have negative unitPriceCents, no VAT
+- Xero sync optional - local invoice created even if Xero fails
+- Multi-tenant isolation on all operations
+
+**Files Created**:
+- `src/database/dto/invoice-generation.dto.ts`
+- `src/database/services/invoice-generation.service.ts`
+- `tests/database/services/invoice-generation.service.spec.ts`
+
+**Files Modified**:
+- `src/database/repositories/invoice.repository.ts` - Added findLastInvoiceForYear, findByBillingPeriod
+- `src/database/services/xero-sync.service.ts` - Added createInvoiceDraft method
+- `src/database/database.module.ts` - Registered InvoiceGenerationService
+- `src/database/dto/index.ts` - Export invoice-generation DTOs
+- `src/database/services/index.ts` - Export InvoiceGenerationService
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 812 tests (28 new tests for TASK-BILL-012)
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -584,11 +657,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 20 |
+| Completed | 21 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 42 |
-| **Overall Progress** | **32.3%** |
+| Remaining | 41 |
+| **Overall Progress** | **33.9%** |
 
 ---
 

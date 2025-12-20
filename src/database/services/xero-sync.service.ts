@@ -11,7 +11,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { format } from 'date-fns';
-import { XeroClient } from 'xero-node';
+import { XeroClient, Invoice as XeroInvoice } from 'xero-node';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
 import { AuditLogService } from './audit-log.service';
@@ -385,5 +385,99 @@ export class XeroSyncService {
    */
   mapXeroTaxToVat(xeroTaxType: string): string {
     return XERO_TAX_TO_VAT[xeroTaxType] ?? 'NO_VAT';
+  }
+
+  /**
+   * Create invoice in Xero as DRAFT via MCP
+   *
+   * @param tenantId - CrecheBooks tenant ID
+   * @param invoiceNumber - Invoice number
+   * @param dueDate - Invoice due date
+   * @param xeroContactId - Xero contact ID for the parent
+   * @param lineItems - Array of line items
+   * @returns Xero invoice ID or null if sync failed
+   * @throws BusinessException if no valid Xero connection
+   */
+  async createInvoiceDraft(
+    tenantId: string,
+    invoiceNumber: string,
+    dueDate: Date,
+    xeroContactId: string,
+    lineItems: Array<{
+      description: string;
+      quantity: number;
+      unitAmount: number;
+      accountCode: string;
+      taxType: 'OUTPUT' | 'NONE';
+    }>,
+  ): Promise<string | null> {
+    this.logger.log(
+      `Creating Xero invoice draft ${invoiceNumber} for tenant ${tenantId}`,
+    );
+
+    try {
+      // Get authenticated client
+      const { client, xeroTenantId } =
+        await this.getAuthenticatedClient(tenantId);
+
+      // Format due date for Xero API
+      const formattedDueDate = format(dueDate, 'yyyy-MM-dd');
+
+      // Create invoice via Xero API
+      const response = await client.accountingApi.createInvoices(xeroTenantId, {
+        invoices: [
+          {
+            type: XeroInvoice.TypeEnum.ACCREC, // Accounts Receivable
+            contact: { contactID: xeroContactId },
+            invoiceNumber,
+            dueDate: formattedDueDate,
+            status: XeroInvoice.StatusEnum.DRAFT,
+            lineItems: lineItems.map((item) => ({
+              description: item.description,
+              quantity: item.quantity,
+              unitAmount: item.unitAmount,
+              accountCode: item.accountCode,
+              taxType: item.taxType,
+            })),
+          },
+        ],
+      });
+
+      const createdInvoice = response.body.invoices?.[0];
+      if (createdInvoice?.invoiceID) {
+        this.logger.log(
+          `Created Xero invoice ${createdInvoice.invoiceID} for ${invoiceNumber}`,
+        );
+
+        // Log audit trail
+        await this.auditLogService.logAction({
+          tenantId,
+          entityType: 'Invoice',
+          entityId: invoiceNumber,
+          action: AuditAction.CREATE,
+          afterValue: {
+            xeroInvoiceId: createdInvoice.invoiceID,
+            xeroStatus: createdInvoice.status,
+            syncedAt: new Date().toISOString(),
+            syncType: 'XERO_INVOICE_SYNC',
+          },
+          changeSummary: `Created invoice draft in Xero: ${createdInvoice.invoiceID}`,
+        });
+
+        return createdInvoice.invoiceID;
+      }
+
+      this.logger.warn(
+        `Xero invoice creation returned no invoiceID for ${invoiceNumber}`,
+      );
+      return null;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create Xero invoice for ${invoiceNumber}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      // Don't throw - allow local invoice to exist without Xero sync
+      return null;
+    }
   }
 }

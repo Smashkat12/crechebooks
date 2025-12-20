@@ -469,6 +469,81 @@ export class InvoiceRepository {
   }
 
   /**
+   * Find the last invoice for a given tenant and year
+   * Used for generating sequential invoice numbers
+   * @returns Last invoice for year or null if none exist
+   * @throws DatabaseException for database errors
+   */
+  async findLastInvoiceForYear(
+    tenantId: string,
+    year: number,
+  ): Promise<Invoice | null> {
+    try {
+      const yearStart = new Date(year, 0, 1);
+      const yearEnd = new Date(year + 1, 0, 1);
+
+      return await this.prisma.invoice.findFirst({
+        where: {
+          tenantId,
+          issueDate: {
+            gte: yearStart,
+            lt: yearEnd,
+          },
+          invoiceNumber: {
+            startsWith: `INV-${year}-`,
+          },
+        },
+        orderBy: { invoiceNumber: 'desc' },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find last invoice for year ${year} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findLastInvoiceForYear',
+        'Failed to find last invoice for year',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Find invoice by billing period for a specific child
+   * Used to prevent duplicate invoice generation
+   * @returns Invoice or null if not found
+   * @throws DatabaseException for database errors
+   */
+  async findByBillingPeriod(
+    tenantId: string,
+    childId: string,
+    billingPeriodStart: Date,
+    billingPeriodEnd: Date,
+  ): Promise<Invoice | null> {
+    try {
+      return await this.prisma.invoice.findFirst({
+        where: {
+          tenantId,
+          childId,
+          billingPeriodStart,
+          billingPeriodEnd,
+          isDeleted: false,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find invoice by billing period for child: ${childId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByBillingPeriod',
+        'Failed to find invoice by billing period',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Update delivery status for an invoice
    * @throws NotFoundException if invoice doesn't exist
    * @throws DatabaseException for database errors

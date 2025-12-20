@@ -215,6 +215,7 @@ model Tenant {
   payrolls         Payroll[]
   sarsSubmissions  SarsSubmission[]
   reconciliations  Reconciliation[]
+  xeroToken        XeroToken?
 
   @@map("tenants")
 }
@@ -649,4 +650,19 @@ model Reconciliation {
   @@unique([tenantId, bankAccount, periodStart])
   @@index([tenantId, status])
   @@map("reconciliations")
+}
+
+model XeroToken {
+  id                String   @id @default(uuid())
+  tenantId          String   @unique @map("tenant_id")
+  xeroTenantId      String   @map("xero_tenant_id")
+  encryptedTokens   String   @map("encrypted_tokens") @db.Text
+  tokenExpiresAt    DateTime @map("token_expires_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("xero_tokens")
 }

@@ -116,8 +116,8 @@ graph TD
 | 8 | TASK-BILL-001 | Parent and Child Entities | foundation | TASK-CORE-002 | ✅ Complete |
 | 9 | TASK-BILL-002 | Fee Structure and Enrollment Entities | foundation | TASK-BILL-001 | ✅ Complete |
 | 10 | TASK-BILL-003 | Invoice and Invoice Line Entities | foundation | TASK-BILL-001 | ✅ Complete |
-| 11 | TASK-PAY-001 | Payment Entity and Types | foundation | TASK-TRANS-001, TASK-BILL-003 | **Ready** |
-| 12 | TASK-SARS-001 | Staff and Payroll Entities | foundation | TASK-CORE-002 | Pending |
+| 11 | TASK-PAY-001 | Payment Entity and Types | foundation | TASK-TRANS-001, TASK-BILL-003 | ✅ Complete |
+| 12 | TASK-SARS-001 | Staff and Payroll Entities | foundation | TASK-CORE-002 | **Ready** |
 | 13 | TASK-SARS-002 | SARS Submission Entity | foundation | TASK-CORE-002 | Pending |
 | 14 | TASK-RECON-001 | Reconciliation Entity | foundation | TASK-TRANS-001 | Pending |
 | 15 | TASK-MCP-001 | Xero MCP Server Foundation | foundation | TASK-CORE-001 | Pending |
@@ -195,14 +195,14 @@ graph TD
 
 | Phase | Tasks | Completed | Percentage |
 |-------|-------|-----------|------------|
-| Foundation | 15 | 10 | 66.7% |
+| Foundation | 15 | 11 | 73.3% |
 | Logic | 21 | 0 | 0% |
 | Agents | 5 | 0 | 0% |
 | Surface | 16 | 0 | 0% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **62** | **10** | **16.1%** |
+| **Total** | **62** | **11** | **17.7%** |
 
-**Last Updated**: 2025-12-20 (TASK-BILL-003 completed - 378 tests passing)
+**Last Updated**: 2025-12-20 (TASK-PAY-001 completed - 417 tests passing)
 
 ---
 

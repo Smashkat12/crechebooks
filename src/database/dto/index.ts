@@ -16,3 +16,5 @@ export * from './payroll.dto';
 export * from './sars-submission.dto';
 export * from './reconciliation.dto';
 export * from './import.dto';
+export * from './categorization-service.dto';
+export * from './pattern-learning.dto';

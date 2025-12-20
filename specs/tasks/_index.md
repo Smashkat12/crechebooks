@@ -127,8 +127,8 @@ graph TD
 | Order | Task ID | Title | Layer | Dependencies | Status |
 |-------|---------|-------|-------|--------------|--------|
 | 16 | TASK-TRANS-011 | Transaction Import Service | logic | TASK-TRANS-001 | ✅ Complete |
-| 17 | TASK-TRANS-012 | Transaction Categorization Service | logic | TASK-TRANS-002, TASK-TRANS-003 | Pending |
-| 18 | TASK-TRANS-013 | Payee Pattern Learning Service | logic | TASK-TRANS-003 | Pending |
+| 17 | TASK-TRANS-012 | Transaction Categorization Service | logic | TASK-TRANS-002, TASK-TRANS-003 | ✅ Complete |
+| 18 | TASK-TRANS-013 | Payee Pattern Learning Service | logic | TASK-TRANS-003 | ✅ Complete |
 | 19 | TASK-TRANS-014 | Xero Sync Service | logic | TASK-MCP-001, TASK-TRANS-001 | Pending |
 | 20 | TASK-BILL-011 | Enrollment Management Service | logic | TASK-BILL-002 | Pending |
 | 21 | TASK-BILL-012 | Invoice Generation Service | logic | TASK-BILL-003, TASK-BILL-002 | Pending |
@@ -196,13 +196,13 @@ graph TD
 | Phase | Tasks | Completed | Percentage |
 |-------|-------|-----------|------------|
 | Foundation | 15 | 15 | 100% |
-| Logic | 21 | 1 | 4.8% |
+| Logic | 21 | 3 | 14.3% |
 | Agents | 5 | 0 | 0% |
 | Surface | 16 | 0 | 0% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **62** | **16** | **25.8%** |
+| **Total** | **62** | **18** | **29.0%** |
 
-**Last Updated**: 2025-12-20 (TASK-TRANS-011 completed - 678 tests, Logic Layer started)
+**Last Updated**: 2025-12-20 (TASK-TRANS-013 completed - 735 tests)
 
 ---
 

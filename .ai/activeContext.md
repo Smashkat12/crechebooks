@@ -1,7 +1,7 @@
 # Active Context
 
 ## Last Updated
-2025-12-20 by AI Agent (TASK-BILL-003 Completed)
+2025-12-20 by AI Agent (TASK-SARS-001 Completed)
 
 ## Current Focus
 CrecheBooks AI Bookkeeping System - Foundation Layer Implementation
@@ -11,182 +11,131 @@ CrecheBooks is an AI-powered bookkeeping system for South African creches and pr
 
 ## Active Task
 **Phase**: Foundation Layer (Phase 1)
-**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003, TASK-BILL-001, TASK-BILL-002, TASK-BILL-003
-**Next**: TASK-PAY-001 (Payment Entity and Types)
+**Completed**: TASK-CORE-001, TASK-CORE-002, TASK-CORE-003, TASK-CORE-004, TASK-TRANS-001, TASK-TRANS-002, TASK-TRANS-003, TASK-BILL-001, TASK-BILL-002, TASK-BILL-003, TASK-PAY-001, TASK-SARS-001
+**Next**: TASK-SARS-002 (SARS Submission Entity)
 
 ## GitHub Repository
 https://github.com/Smashkat12/crechebooks
 
 ---
 
-## TASK-BILL-003 Summary (COMPLETED)
+## TASK-SARS-001 Summary (COMPLETED)
 
 ### What Was Built
-- InvoiceStatus enum (DRAFT, SENT, VIEWED, PARTIALLY_PAID, PAID, OVERDUE, VOID)
-- DeliveryMethod enum (EMAIL, WHATSAPP, BOTH)
-- DeliveryStatus enum (PENDING, SENT, DELIVERED, OPENED, FAILED)
-- LineType enum (MONTHLY_FEE, REGISTRATION, EXTRA, DISCOUNT, CREDIT)
-- Invoice model in Prisma schema (21 columns)
-  - Xero integration field (xeroInvoiceId, unique)
-  - Billing period tracking (billingPeriodStart, billingPeriodEnd)
-  - Payment tracking (subtotalCents, vatCents, totalCents, amountPaidCents)
-  - Delivery tracking (deliveryMethod, deliveryStatus, deliveredAt)
-  - Soft delete pattern (isDeleted)
-  - FK to Parent and Child
-- InvoiceLine model in Prisma schema (12 columns)
-  - Line item details (description, quantity, unitPriceCents)
-  - VAT calculation support (vatCents, subtotalCents, totalCents)
-  - Line types for categorization
-  - Cascade delete from Invoice (onDelete: Cascade)
-- Database migration `20251220033235_create_invoices_and_invoice_lines`
-- IInvoice and IInvoiceLine TypeScript interfaces
-- CreateInvoiceDto, UpdateInvoiceDto, InvoiceFilterDto with validation
-- CreateInvoiceLineDto, UpdateInvoiceLineDto, BatchCreateInvoiceLinesDto
-- InvoiceRepository with 13 methods:
-  - create, findById, findByIdWithLines
-  - findByTenant (with filters), findByInvoiceNumber
-  - findByParent, findByChild, findByStatus, findOverdue
-  - update, softDelete, delete
-  - updateDeliveryStatus, recordPayment
-- InvoiceLineRepository with 8 methods:
-  - create, createMany, findById, findByInvoice
-  - update, delete, deleteByInvoice, reorderLines
-- 66 new integration tests using REAL database (no mocks)
-- Updated all 9 existing test files with new cleanup order
+- EmploymentType enum (PERMANENT, CONTRACT, CASUAL)
+- PayFrequency enum (MONTHLY, WEEKLY, DAILY, HOURLY)
+- PayrollStatus enum (DRAFT, APPROVED, PAID)
+- Staff model in Prisma schema (22 columns)
+  - South African ID number (13 digits)
+  - Tax number for SARS
+  - Banking details (bank name, account, branch code)
+  - Medical aid members for tax credits
+  - Employment type and pay frequency
+  - Start/end dates with isActive flag
+  - FK to Tenant with composite unique on (tenantId, idNumber)
+- Payroll model in Prisma schema (18 columns)
+  - Basic salary, overtime, bonus, other earnings
+  - PAYE deduction (payeCents)
+  - UIF deductions (employee + employer)
+  - Medical aid credit
+  - Gross and net salary calculations
+  - Status workflow (DRAFT → APPROVED → PAID)
+  - FK to Staff and Tenant
+  - Composite unique on (tenantId, staffId, payPeriodStart)
+- Database migration `20251220131900_add_staff_payroll_entities`
+- IStaff and IPayroll TypeScript interfaces
+- CreateStaffDto, UpdateStaffDto, StaffFilterDto with validation
+- CreatePayrollDto, UpdatePayrollDto, PayrollFilterDto with validation
+- StaffRepository with 8 methods:
+  - create, findById, findByIdNumber
+  - findByTenantId (with filters), findActiveByTenantId
+  - update, deactivate, delete
+- PayrollRepository with 11 methods:
+  - create, findById, findByTenantStaffPeriod
+  - findByStaffId, findByTenantId, findByPeriod
+  - update, approve, markAsPaid, delete
+  - calculatePeriodTotals
+- 84 new integration tests using REAL database (no mocks)
+  - 37 tests for Staff repository
+  - 47 tests for Payroll repository
+- Updated all 13 existing test files with new cleanup order
 
 ### Key Design Decisions
-1. **Cascade Delete** - InvoiceLine cascades from Invoice (onDelete: Cascade)
-2. **Soft Delete for Invoice** - Use isDeleted flag instead of hard delete
-3. **Date-Only Fields** - Use @db.Date for billing period and dates
-4. **Unique Invoice Number** - Composite unique on (tenantId, invoiceNumber)
-5. **Payment Tracking** - amountPaidCents accumulates payments, status auto-updates
-6. **Delivery Status** - Tracks delivery lifecycle (PENDING → SENT → DELIVERED → OPENED)
+1. **Status Workflow** - Payroll follows DRAFT → APPROVED → PAID transitions
+2. **Immutable PAID** - Cannot update or delete PAID payrolls
+3. **Cascade Prevention** - Cannot delete staff with payroll records
+4. **BusinessException** - Used for status transition errors
+5. **Prisma Enum Import** - Use @prisma/client enum for type safety in repository
+6. **Date-Only Fields** - Use @db.Date for periods and dates
 
 ### Key Lessons Learned
-1. **FK Cleanup Order** - CRITICAL: InvoiceLine first, then Invoice (new tables at top)
-2. **Composite Unique Naming** - Prisma names it `tenantId_invoiceNumber` for queries
-3. **findByIdWithLines** - Use `include` to fetch related lines in one query
-4. **recordPayment** - Auto-updates status based on payment vs total amounts
+1. **FK Cleanup Order** - CRITICAL: payroll → staff → payment → (rest)
+2. **Prisma Enum vs Custom** - Use Prisma's generated enum in repositories, custom in DTOs
+3. **Date-Only Comparison** - Set hours to 0,0,0,0 for @db.Date field comparisons
+4. **BusinessException Signature** - (message, code, context) for status errors
+5. **Log-Then-Throw** - Always log error context before throwing
 
 ### Key Files Created
 ```
 src/database/
 ├── entities/
-│   ├── invoice.entity.ts         # IInvoice, InvoiceStatus, DeliveryMethod, DeliveryStatus
-│   ├── invoice-line.entity.ts    # IInvoiceLine, LineType
-│   └── index.ts                  # Updated
+│   ├── staff.entity.ts         # IStaff, EmploymentType, PayFrequency
+│   ├── payroll.entity.ts       # IPayroll, PayrollStatus
+│   └── index.ts                # Updated
 ├── dto/
-│   ├── invoice.dto.ts            # Create, Update, Filter DTOs
-│   ├── invoice-line.dto.ts       # Create, Update, Batch DTOs
-│   └── index.ts                  # Updated
+│   ├── staff.dto.ts            # Create, Update, Filter DTOs
+│   ├── payroll.dto.ts          # Create, Update, Filter DTOs
+│   └── index.ts                # Updated
 ├── repositories/
-│   ├── invoice.repository.ts     # 13 methods
-│   ├── invoice-line.repository.ts # 8 methods
-│   └── index.ts                  # Updated
+│   ├── staff.repository.ts     # 8 methods
+│   ├── payroll.repository.ts   # 11 methods
+│   └── index.ts                # Updated
 
 prisma/
-├── schema.prisma                 # Invoice, InvoiceLine models, 4 enums
+├── schema.prisma               # Staff, Payroll models, 3 enums
 └── migrations/
-    └── 20251220033235_create_invoices_and_invoice_lines/
+    └── 20251220131900_add_staff_payroll_entities/
         └── migration.sql
 
 tests/database/repositories/
-├── invoice.repository.spec.ts       # 37 tests with real DB
-├── invoice-line.repository.spec.ts  # 29 tests with real DB
-└── (9 existing files updated with new cleanup order)
+├── staff.repository.spec.ts       # 37 tests with real DB
+├── payroll.repository.spec.ts     # 47 tests with real DB
+└── (13 existing files updated with new cleanup order)
 ```
 
 ### Verification
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 378 tests (all passing with --runInBand)
-  - 66 new tests (invoice + invoice-line)
-  - 312 existing tests
+- Tests: 493 tests (all passing with --runInBand)
+  - 84 new tests (staff + payroll)
+  - 409 existing tests
 
 ---
 
-## TASK-BILL-002 Summary (COMPLETED)
+## TASK-PAY-001 Summary (COMPLETED)
 
 ### What Was Built
-- FeeType enum (FULL_DAY, HALF_DAY, HOURLY, CUSTOM)
-- EnrollmentStatus enum (ACTIVE, PENDING, WITHDRAWN, GRADUATED)
-- FeeStructure model in Prisma schema (13 columns)
-  - Sibling discount percentage field
-  - Effective date range (effectiveFrom, effectiveTo)
-  - VAT inclusive flag
-- Enrollment model in Prisma schema (11 columns)
-  - Links Child to FeeStructure
-  - Custom fee override for special cases
-  - Sibling discount applied flag
-  - Cascade delete from Child (onDelete: Cascade)
-- Database migration `20251220023800_create_fee_structures_and_enrollments`
-- IFeeStructure and IEnrollment TypeScript interfaces
-- CreateFeeStructureDto, UpdateFeeStructureDto, FeeStructureFilterDto
-- CreateEnrollmentDto, UpdateEnrollmentDto, EnrollmentFilterDto
-- FeeStructureRepository with 7 methods:
+- MatchType enum (EXACT, FUZZY, REFERENCE, AMOUNT, MANUAL, UNMATCHED)
+- MatchedBy enum (SYSTEM, USER)
+- Payment model in Prisma schema (17 columns)
+  - Links Invoice to Transaction (nullable)
+  - Match type and confidence tracking
+  - Allocation tracking (amountCents, balanceCents)
+  - Notes and timestamps
+- Database migration `20251220095923_create_payments`
+- IPayment TypeScript interface
+- CreatePaymentDto, UpdatePaymentDto, PaymentFilterDto with validation
+- PaymentRepository with 11 methods:
   - create, findById, findByTenant (with filters)
-  - findActiveByTenant, findEffectiveOnDate
-  - update, deactivate, delete
-- EnrollmentRepository with 8 methods:
-  - create, findById, findByTenant, findByChild
-  - findActiveByChild, findByStatus
-  - update, delete, withdraw
-- 55 new integration tests using REAL database (no mocks)
-- Updated all 7 existing test files with new cleanup order
-
-### Key Design Decisions
-1. **Cascade Delete** - Enrollment cascades from Child (not FeeStructure)
-2. **Soft Delete for FeeStructure** - Use deactivate() instead of delete() when enrollments exist
-3. **Date-Only Fields** - Use @db.Date for effectiveFrom, effectiveTo, startDate, endDate
-4. **Sibling Discount** - Stored as Decimal(5,2) percentage on FeeStructure, boolean flag on Enrollment
-5. **Withdraw Method** - Sets status to WITHDRAWN and endDate to current date
-
-### Key Lessons Learned
-1. **FK Cleanup Order** - CRITICAL: Delete in leaf-to-root order (enrollment → feeStructure → child → parent → ...)
-2. **Date-Only Comparison** - @db.Date fields strip time to 00:00:00 UTC; compare year/month/day, not milliseconds
-3. **Prisma Generate** - MUST run `pnpm prisma generate` after schema changes before build
-4. **Test Race Conditions** - Always run with `--runInBand` to avoid parallel conflicts
-
-### Key Files Created
-```
-src/database/
-├── entities/
-│   ├── fee-structure.entity.ts  # IFeeStructure interface, FeeType enum
-│   ├── enrollment.entity.ts     # IEnrollment interface, EnrollmentStatus enum
-│   └── index.ts                 # Updated
-├── dto/
-│   ├── fee-structure.dto.ts     # Create, Update, Filter DTOs
-│   ├── enrollment.dto.ts        # Create, Update, Filter DTOs
-│   └── index.ts                 # Updated
-├── repositories/
-│   ├── fee-structure.repository.ts  # 7 methods
-│   ├── enrollment.repository.ts     # 8 methods
-│   └── index.ts                 # Updated
-
-prisma/
-├── schema.prisma                # FeeStructure, Enrollment models, enums
-└── migrations/
-    └── 20251220023800_create_fee_structures_and_enrollments/
-        └── migration.sql
-
-tests/database/repositories/
-├── fee-structure.repository.spec.ts  # 24 tests with real DB
-├── enrollment.repository.spec.ts     # 31 tests with real DB
-├── tenant.repository.spec.ts         # Updated cleanup order
-├── user.repository.spec.ts           # Updated cleanup order
-├── transaction.repository.spec.ts    # Updated cleanup order
-├── categorization.repository.spec.ts # Updated cleanup order
-├── payee-pattern.repository.spec.ts  # Updated cleanup order
-├── parent.repository.spec.ts         # Updated cleanup order
-└── child.repository.spec.ts          # Updated cleanup order
-```
+  - findByInvoice, findByTransaction, findByParent
+  - findUnallocated, update, allocate, delete
+  - getPaymentSummaryByParent
+- 31 new integration tests using REAL database (no mocks)
 
 ### Verification
 - Build: PASS
 - Lint: PASS (0 errors, 0 warnings)
-- Tests: 304 tests (all passing with --runInBand)
-  - 55 new tests (fee structure + enrollment)
-  - 249 existing tests
+- Tests: 417 tests (all passing with --runInBand)
 
 ---
 
@@ -194,8 +143,8 @@ tests/database/repositories/
 
 ### Prisma Schema (prisma/schema.prisma)
 ```
-Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus, InvoiceStatus, DeliveryMethod, DeliveryStatus, LineType
-Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child, Invoice, InvoiceLine
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact, FeeType, EnrollmentStatus, InvoiceStatus, DeliveryMethod, DeliveryStatus, LineType, MatchType, MatchedBy, EmploymentType, PayFrequency, PayrollStatus
+Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeStructure, Enrollment, Parent, Child, Invoice, InvoiceLine, Payment, Staff, Payroll
 ```
 
 ### Migrations Applied
@@ -208,11 +157,16 @@ Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, FeeSt
 7. `20251220020708_create_parents_and_children`
 8. `20251220023800_create_fee_structures_and_enrollments`
 9. `20251220033235_create_invoices_and_invoice_lines`
+10. `20251220095923_create_payments`
+11. `20251220131900_add_staff_payroll_entities`
 
 ### Test Cleanup Order (CRITICAL)
 ```typescript
 beforeEach(async () => {
   // CRITICAL: Clean in FK order - leaf tables first!
+  await prisma.payroll.deleteMany({});
+  await prisma.staff.deleteMany({});
+  await prisma.payment.deleteMany({});
   await prisma.invoiceLine.deleteMany({});
   await prisma.invoice.deleteMany({});
   await prisma.enrollment.deleteMany({});
@@ -237,9 +191,9 @@ crechebooks/
 │   ├── health/
 │   ├── database/
 │   │   ├── prisma/            # PrismaService, PrismaModule (GLOBAL)
-│   │   ├── entities/          # 12 entity files
-│   │   ├── dto/               # 12 DTO files
-│   │   ├── repositories/      # 11 repositories
+│   │   ├── entities/          # 14 entity files
+│   │   ├── dto/               # 14 DTO files
+│   │   ├── repositories/      # 13 repositories
 │   │   └── services/          # AuditLogService
 │   └── shared/
 │       ├── constants/
@@ -248,12 +202,12 @@ crechebooks/
 │       └── utils/             # Money, Date utilities
 ├── prisma/
 │   ├── schema.prisma
-│   └── migrations/            # 9 migrations
+│   └── migrations/            # 11 migrations
 ├── prisma.config.ts           # Prisma 7 config
 ├── tests/
 │   ├── shared/
 │   └── database/
-│       ├── repositories/      # 11 spec files (378 tests total)
+│       ├── repositories/      # 16 spec files (493 tests total)
 │       └── services/          # audit-log spec
 └── test/
 ```
@@ -263,10 +217,10 @@ crechebooks/
 ## Recent Decisions
 | Date | Decision | Impact |
 |------|----------|--------|
-| 2025-12-20 | Cascade delete InvoiceLine from Invoice | Deleting invoice removes all lines |
-| 2025-12-20 | Soft delete for Invoice | Use isDeleted flag instead of hard delete |
-| 2025-12-20 | recordPayment auto-updates status | Tracks partial vs full payment |
-| 2025-12-20 | Composite unique (tenantId, invoiceNumber) | Ensures unique invoice numbers per tenant |
+| 2025-12-20 | Payroll status workflow DRAFT → APPROVED → PAID | Enforces proper payroll processing |
+| 2025-12-20 | Cannot delete staff with payroll records | Preserves payroll history |
+| 2025-12-20 | Use Prisma enum in repository, custom in DTO | Type safety with ESLint compliance |
+| 2025-12-20 | BusinessException for status transitions | Clear error codes for workflow errors |
 
 ---
 
@@ -281,21 +235,21 @@ crechebooks/
 
 ## Verification Commands
 ```bash
-pnpm run build           # Must compile without errors
-pnpm run lint            # Must pass with 0 warnings
-npx jest --runInBand     # All tests must pass (378 tests)
-pnpm run test:e2e        # E2E tests must pass
+npm run build           # Must compile without errors
+npm run lint            # Must pass with 0 warnings
+npm test -- --runInBand # All tests must pass (493 tests)
+npm run test:e2e        # E2E tests must pass
 ```
 
 ---
 
 ## Current Blockers
-- None - Ready for next task (TASK-PAY-001)
+- None - Ready for next task (TASK-SARS-002)
 
 ---
 
 ## Session Notes
-TASK-BILL-003 completed with 378 tests passing.
-Foundation Layer: 10/15 tasks complete (66.7%).
-66 new tests added (invoice + invoice-line).
+TASK-SARS-001 completed with 493 tests passing.
+Foundation Layer: 12/15 tasks complete (80%).
+84 new tests added (staff + payroll).
 All existing test files updated with new cleanup order.

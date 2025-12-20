@@ -158,6 +158,19 @@ enum PayrollStatus {
   PAID
 }
 
+enum SubmissionType {
+  VAT201
+  EMP201
+  IRP5
+}
+
+enum SubmissionStatus {
+  DRAFT
+  READY
+  SUBMITTED
+  ACKNOWLEDGED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -183,17 +196,18 @@ model Tenant {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  users         User[]
-  transactions  Transaction[]
-  payeePatterns PayeePattern[]
-  feeStructures FeeStructure[]
-  enrollments   Enrollment[]
-  parents       Parent[]
-  children      Child[]
-  invoices      Invoice[]
-  payments      Payment[]
-  staff         Staff[]
-  payrolls      Payroll[]
+  users           User[]
+  transactions    Transaction[]
+  payeePatterns   PayeePattern[]
+  feeStructures   FeeStructure[]
+  enrollments     Enrollment[]
+  parents         Parent[]
+  children        Child[]
+  invoices        Invoice[]
+  payments        Payment[]
+  staff           Staff[]
+  payrolls        Payroll[]
+  sarsSubmissions SarsSubmission[]
 
   @@map("tenants")
 }
@@ -212,6 +226,7 @@ model User {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   reviewedCategorizations Categorization[] @relation("ReviewedCategorizations")
+  sarsSubmissions         SarsSubmission[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -532,12 +547,44 @@ model Staff {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id])
-  payrolls Payroll[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  payrolls        Payroll[]
 
   @@unique([tenantId, idNumber])
   @@index([tenantId, isActive])
   @@map("staff")
+}
+
+model SarsSubmission {
+  id              String           @id @default(uuid())
+  tenantId        String           @map("tenant_id")
+  submissionType  SubmissionType   @map("submission_type")
+  periodStart     DateTime         @map("period_start") @db.Date
+  periodEnd       DateTime         @map("period_end") @db.Date
+  deadline        DateTime         @db.Date
+  outputVatCents  Int?             @map("output_vat_cents")
+  inputVatCents   Int?             @map("input_vat_cents")
+  netVatCents     Int?             @map("net_vat_cents")
+  totalPayeCents  Int?             @map("total_paye_cents")
+  totalUifCents   Int?             @map("total_uif_cents")
+  totalSdlCents   Int?             @map("total_sdl_cents")
+  status          SubmissionStatus @default(DRAFT)
+  submittedAt     DateTime?        @map("submitted_at")
+  submittedBy     String?          @map("submitted_by")
+  sarsReference   String?          @map("sars_reference") @db.VarChar(100)
+  documentData    Json             @default("{}") @map("document_data")
+  notes           String?          @db.Text
+  isFinalized     Boolean          @default(false) @map("is_finalized")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  submitter       User?            @relation(fields: [submittedBy], references: [id])
+
+  @@unique([tenantId, submissionType, periodStart])
+  @@index([tenantId, status])
+  @@index([deadline])
+  @@map("sars_submissions")
 }
 
 model Payroll {

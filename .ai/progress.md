@@ -3,7 +3,7 @@
 ## CrecheBooks AI Bookkeeping System
 
 **Last Updated**: 2025-12-20
-**Current Phase**: Foundation Layer (Phase 1)
+**Current Phase**: Logic Layer (Phase 2)
 
 ---
 
@@ -12,8 +12,8 @@
 | Phase | Description | Status |
 |-------|-------------|--------|
 | Phase 0 | Specification & Planning | Complete |
-| Phase 1 | Foundation Layer | **In Progress** |
-| Phase 2 | Logic Layer | Not Started |
+| Phase 1 | Foundation Layer | ✅ Complete |
+| Phase 2 | Logic Layer | **In Progress** |
 | Phase 3 | Agent Layer | Not Started |
 | Phase 4 | Surface Layer | Not Started |
 | Phase 5 | Integration & Testing | Not Started |
@@ -53,6 +53,77 @@
 - [x] **TASK-MCP-001**: Xero MCP Server Foundation - **COMPLETED 2025-12-20**
 
 **Progress: 15/15 (100%) - FOUNDATION LAYER COMPLETE! ✅**
+
+---
+
+## Phase 2: Logic Layer
+
+### Tasks (21 total)
+- [x] **TASK-TRANS-011**: Transaction Import Service - **COMPLETED 2025-12-20**
+- [ ] **TASK-TRANS-012**: Transaction Categorization Service
+- [ ] **TASK-TRANS-013**: Payee Pattern Learning Service
+- [ ] **TASK-TRANS-014**: Xero Sync Service
+- [ ] **TASK-BILL-011**: Enrollment Management Service
+- [ ] **TASK-BILL-012**: Invoice Generation Service
+- [ ] **TASK-BILL-013**: Invoice Delivery Service
+- [ ] **TASK-BILL-014**: Pro-rata Calculation Service
+- [ ] **TASK-PAY-011**: Payment Matching Service
+- [ ] **TASK-PAY-012**: Payment Allocation Service
+- [ ] **TASK-PAY-013**: Arrears Calculation Service
+- [ ] **TASK-PAY-014**: Payment Reminder Service
+- [ ] **TASK-SARS-011**: VAT Calculation Service
+- [ ] **TASK-SARS-012**: PAYE Calculation Service
+- [ ] **TASK-SARS-013**: UIF Calculation Service
+- [ ] **TASK-SARS-014**: VAT201 Generation Service
+- [ ] **TASK-SARS-015**: EMP201 Generation Service
+- [ ] **TASK-SARS-016**: IRP5 Generation Service
+- [ ] **TASK-RECON-011**: Bank Reconciliation Service
+- [ ] **TASK-RECON-012**: Discrepancy Detection Service
+- [ ] **TASK-RECON-013**: Financial Report Service
+
+**Progress: 1/21 (4.8%)**
+
+### TASK-TRANS-011 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- CSV parser with auto-delimiter detection (comma, semicolon, tab)
+- PDF parser supporting Standard Bank, FNB, ABSA formats
+- Parse utilities for SA currency/date formats
+- TransactionImportService with file validation
+- Duplicate detection with 90-day lookback window
+- Hash-based O(1) duplicate lookup
+- Multi-tenant isolation for duplicates
+- Bulk insert via createMany() method
+- Queue configuration (placeholder for categorization)
+
+**Key Features**:
+- 10MB file size limit
+- CSV/PDF only (validation)
+- Auto-bank detection from PDF content
+- Intra-file duplicate detection
+- Robust error logging (fail-fast)
+
+**Files Created**:
+- `src/database/dto/import.dto.ts`
+- `src/database/parsers/parse-utils.ts`
+- `src/database/parsers/csv-parser.ts`
+- `src/database/parsers/pdf-parser.ts`
+- `src/database/parsers/index.ts`
+- `src/config/queue.config.ts`
+- `src/database/services/transaction-import.service.ts`
+- `tests/database/parsers/parse-utils.spec.ts`
+- `tests/database/parsers/csv-parser.spec.ts`
+- `tests/database/services/transaction-import.service.spec.ts`
+
+**Files Modified**:
+- `src/database/repositories/transaction.repository.ts` - Added createMany()
+- `src/database/database.module.ts` - Registered TransactionImportService
+
+**Verification**:
+- Build: PASS
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 678 tests (47 new tests for TASK-TRANS-011)
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -394,11 +465,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 15 |
+| Completed | 16 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 47 |
-| **Overall Progress** | **24.2%** |
+| Remaining | 46 |
+| **Overall Progress** | **25.8%** |
 
 ---
 

@@ -4,3 +4,5 @@ export * from './audit-log.dto';
 export * from './transaction.dto';
 export * from './categorization.dto';
 export * from './payee-pattern.dto';
+export * from './parent.dto';
+export * from './child.dto';

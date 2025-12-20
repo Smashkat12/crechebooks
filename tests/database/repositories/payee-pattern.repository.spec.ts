@@ -44,6 +44,8 @@ describe('PayeePatternRepository', () => {
 
   beforeEach(async () => {
     // CRITICAL: Clean in FK order - leaf tables first!
+    await prisma.child.deleteMany({});
+    await prisma.parent.deleteMany({});
     await prisma.payeePattern.deleteMany({});
     await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});

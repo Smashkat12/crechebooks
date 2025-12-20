@@ -69,6 +69,18 @@ enum CategorizationSource {
   RULE_BASED
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum PreferredContact {
+  EMAIL
+  WHATSAPP
+  BOTH
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -97,6 +109,8 @@ model Tenant {
   users                User[]
   transactions         Transaction[]
   payeePatterns        PayeePattern[]
+  parents              Parent[]
+  children             Child[]
 
   @@map("tenants")
 }
@@ -222,4 +236,54 @@ model PayeePattern {
   @@unique([tenantId, payeePattern])
   @@index([tenantId])
   @@map("payee_patterns")
+}
+
+model Parent {
+  id                String           @id @default(uuid())
+  tenantId          String           @map("tenant_id")
+  xeroContactId     String?          @unique @map("xero_contact_id")
+  firstName         String           @map("first_name") @db.VarChar(100)
+  lastName          String           @map("last_name") @db.VarChar(100)
+  email             String?          @db.VarChar(255)
+  phone             String?          @db.VarChar(20)
+  whatsapp          String?          @db.VarChar(20)
+  preferredContact  PreferredContact @default(EMAIL) @map("preferred_contact")
+  idNumber          String?          @map("id_number") @db.VarChar(20)
+  address           String?
+  notes             String?
+  isActive          Boolean          @default(true) @map("is_active")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  tenant            Tenant           @relation(fields: [tenantId], references: [id])
+  children          Child[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([tenantId, lastName, firstName])
+  @@map("parents")
+}
+
+model Child {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  parentId         String    @map("parent_id")
+  firstName        String    @map("first_name") @db.VarChar(100)
+  lastName         String    @map("last_name") @db.VarChar(100)
+  dateOfBirth      DateTime  @map("date_of_birth") @db.Date
+  gender           Gender?
+  medicalNotes     String?   @map("medical_notes")
+  emergencyContact String?   @map("emergency_contact") @db.VarChar(200)
+  emergencyPhone   String?   @map("emergency_phone") @db.VarChar(20)
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  parent           Parent    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, isActive])
+  @@map("children")
 }

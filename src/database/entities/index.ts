@@ -4,3 +4,5 @@ export * from './audit-log.entity';
 export * from './transaction.entity';
 export * from './categorization.entity';
 export * from './payee-pattern.entity';
+export * from './parent.entity';
+export * from './child.entity';

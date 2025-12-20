@@ -43,7 +43,7 @@
 - [x] **TASK-TRANS-001**: Transaction Entity and Migration - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-002**: Categorization Entity and Types - **COMPLETED 2025-12-20**
 - [x] **TASK-TRANS-003**: Payee Pattern Entity - **COMPLETED 2025-12-20**
-- [ ] TASK-BILL-001: Parent and Child Entities
+- [x] **TASK-BILL-001**: Parent and Child Entities - **COMPLETED 2025-12-20**
 - [ ] TASK-BILL-002: Fee Structure and Enrollment Entities
 - [ ] TASK-BILL-003: Invoice and Invoice Line Entities
 - [ ] TASK-PAY-001: Payment Entity and Types
@@ -52,7 +52,7 @@
 - [ ] TASK-RECON-001: Reconciliation Entity
 - [ ] TASK-MCP-001: Xero MCP Server Foundation
 
-**Progress: 7/15 (46.7%)**
+**Progress: 8/15 (53.3%)**
 
 ### TASK-CORE-001 Completion Summary
 **Date**: 2025-12-20
@@ -164,6 +164,40 @@
 
 **GitHub**: https://github.com/Smashkat12/crechebooks
 
+### TASK-BILL-001 Completion Summary
+**Date**: 2025-12-20
+
+**Implemented**:
+- Gender enum in Prisma schema (MALE, FEMALE, OTHER)
+- PreferredContact enum in Prisma schema (EMAIL, WHATSAPP, BOTH)
+- Parent model in Prisma schema (15 columns)
+  - Xero integration field (xeroContactId)
+  - Preferred contact method for invoice delivery
+  - SA ID number field for compliance
+  - Multi-tenant with composite unique on email
+- Child model in Prisma schema (13 columns)
+  - Age-based fee calculation support (dateOfBirth)
+  - Medical notes and emergency contact fields
+  - Cascade delete from Parent (onDelete: Cascade)
+- Database migration `20251220020708_create_parents_and_children`
+- IParent and IChild TypeScript interfaces
+- CreateParentDto, UpdateParentDto, ParentFilterDto with validation
+- CreateChildDto, UpdateChildDto, ChildFilterDto with validation
+- ParentRepository with 7 methods:
+  - create, findById, findByTenant (with filters)
+  - findByEmail, findByXeroContactId
+  - update, delete
+- ChildRepository with 7 methods:
+  - create, findById, findByParent, findByTenant (with filters)
+  - update, delete, getAgeInMonths
+- Cascade delete verified (deleting parent deletes children)
+- 47 integration tests using REAL database (18 Parent + 20 Child + 9 updated existing)
+
+**Verification**:
+- Build: PASS (0 errors)
+- Lint: PASS (0 errors, 0 warnings)
+- Tests: 247 tests (all passing with --runInBand)
+
 ---
 
 ## Overall Summary
@@ -171,11 +205,11 @@
 | Metric | Value |
 |--------|-------|
 | Total Tasks | 62 |
-| Completed | 7 |
+| Completed | 8 |
 | In Progress | 0 |
 | Blocked | 0 |
-| Remaining | 55 |
-| **Overall Progress** | **11.3%** |
+| Remaining | 54 |
+| **Overall Progress** | **12.9%** |
 
 ---
 
@@ -241,17 +275,28 @@
 5. **Regenerate Client**: Run `npx prisma generate` after migration
 6. **FK Cleanup Order**: Clean child tables before parent in tests
 
+### Key Learnings from TASK-BILL-001
+1. **Cascade Delete**: Use `onDelete: Cascade` in Prisma for parent-child relationships
+2. **P2025 vs P2003**: Nested `connect` throws P2025 (not P2003) when record not found
+3. **Age Calculation**: Store dateOfBirth as Date, calculate age in months at runtime
+4. **Test Cleanup Expansion**: Update ALL existing tests when adding new entities to cleanup order
+5. **Composite FK**: Child references both tenantId and parentId for proper scoping
+6. **Optional Email**: Parent email is optional (nullable) but unique within tenant when provided
+
 ### Current Database State
 ```prisma
-Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus
-Models: Tenant, User, AuditLog, Transaction
+Enums: TaxStatus, SubscriptionStatus, UserRole, AuditAction, ImportSource, TransactionStatus, VatType, CategorizationSource, Gender, PreferredContact
+Models: Tenant, User, AuditLog, Transaction, Categorization, PayeePattern, Parent, Child
 ```
 
 ### Applied Migrations
 1. `20251219225823_create_tenants` - Tenant table
 2. `20251219233350_create_users` - User table with FK to tenants
 3. `20251220000830_create_audit_logs` - AuditLog table with immutability rules
-4. `20251220XXXXXX_create_transactions` - Transaction table with indexes
+4. `20251220004833_create_transactions` - Transaction table with indexes
+5. `20251220010512_create_categorizations` - Categorization table with FK to transactions
+6. `20251220014604_create_payee_patterns` - PayeePattern table with JSONB aliases
+7. `20251220020708_create_parents_and_children` - Parent and Child tables with cascade delete
 
 ### Project Structure
 ```
@@ -271,17 +316,29 @@ crechebooks/
 │   │   │   ├── user.entity.ts
 │   │   │   ├── audit-log.entity.ts
 │   │   │   ├── transaction.entity.ts
+│   │   │   ├── categorization.entity.ts
+│   │   │   ├── payee-pattern.entity.ts
+│   │   │   ├── parent.entity.ts
+│   │   │   ├── child.entity.ts
 │   │   │   └── index.ts
 │   │   ├── dto/
 │   │   │   ├── tenant.dto.ts
 │   │   │   ├── user.dto.ts
 │   │   │   ├── audit-log.dto.ts
 │   │   │   ├── transaction.dto.ts
+│   │   │   ├── categorization.dto.ts
+│   │   │   ├── payee-pattern.dto.ts
+│   │   │   ├── parent.dto.ts
+│   │   │   ├── child.dto.ts
 │   │   │   └── index.ts
 │   │   ├── repositories/
 │   │   │   ├── tenant.repository.ts
 │   │   │   ├── user.repository.ts
 │   │   │   ├── transaction.repository.ts
+│   │   │   ├── categorization.repository.ts
+│   │   │   ├── payee-pattern.repository.ts
+│   │   │   ├── parent.repository.ts
+│   │   │   ├── child.repository.ts
 │   │   │   └── index.ts
 │   │   ├── services/
 │   │   │   ├── audit-log.service.ts
@@ -305,7 +362,11 @@ crechebooks/
 │       ├── repositories/
 │       │   ├── tenant.repository.spec.ts
 │       │   ├── user.repository.spec.ts
-│       │   └── transaction.repository.spec.ts
+│       │   ├── transaction.repository.spec.ts
+│       │   ├── categorization.repository.spec.ts
+│       │   ├── payee-pattern.repository.spec.ts
+│       │   ├── parent.repository.spec.ts
+│       │   └── child.repository.spec.ts
 │       └── services/
 │           └── audit-log.service.spec.ts
 └── test/

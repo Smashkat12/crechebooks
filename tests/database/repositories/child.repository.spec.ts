@@ -44,6 +44,8 @@ describe('ChildRepository', () => {
 
   beforeEach(async () => {
     // CRITICAL: Clean in FK order - leaf tables first!
+    await prisma.enrollment.deleteMany({});
+    await prisma.feeStructure.deleteMany({});
     await prisma.child.deleteMany({});
     await prisma.parent.deleteMany({});
     await prisma.payeePattern.deleteMany({});

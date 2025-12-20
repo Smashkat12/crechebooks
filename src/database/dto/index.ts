@@ -25,3 +25,4 @@ export * from './invoice-delivery.dto';
 export * from './pro-rata.dto';
 export * from './payment-matching.dto';
 export * from './payment-allocation.dto';
+export * from './arrears.dto';

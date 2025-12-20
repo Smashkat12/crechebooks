@@ -190,6 +190,71 @@ export class EnrollmentRepository {
   }
 
   /**
+   * Find all enrollments for children of a specific parent
+   * @returns Array of enrollments
+   * @throws DatabaseException for database errors
+   */
+  async findByParentId(
+    tenantId: string,
+    parentId: string,
+  ): Promise<Enrollment[]> {
+    try {
+      return await this.prisma.enrollment.findMany({
+        where: {
+          tenantId,
+          child: {
+            parentId,
+          },
+        },
+        orderBy: [{ startDate: 'asc' }],
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find enrollments for parent: ${parentId} in tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByParentId',
+        'Failed to find enrollments by parent',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Find all active enrollments for children of a specific parent
+   * @returns Array of active enrollments
+   * @throws DatabaseException for database errors
+   */
+  async findActiveByParentId(
+    tenantId: string,
+    parentId: string,
+  ): Promise<Enrollment[]> {
+    try {
+      return await this.prisma.enrollment.findMany({
+        where: {
+          tenantId,
+          status: 'ACTIVE',
+          child: {
+            parentId,
+          },
+        },
+        orderBy: [{ startDate: 'asc' }],
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find active enrollments for parent: ${parentId} in tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findActiveByParentId',
+        'Failed to find active enrollments by parent',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Find all enrollments with a specific status
    * @returns Array of enrollments
    * @throws DatabaseException for database errors

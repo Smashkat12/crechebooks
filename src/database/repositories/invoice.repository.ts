@@ -610,6 +610,8 @@ export class InvoiceRepository {
         newStatus = InvoiceStatus.PAID;
       } else if (newAmountPaid > 0) {
         newStatus = InvoiceStatus.PARTIALLY_PAID;
+      } else if (newAmountPaid === 0) {
+        newStatus = InvoiceStatus.SENT;
       }
 
       return await this.prisma.invoice.update({

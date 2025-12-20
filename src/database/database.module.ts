@@ -21,6 +21,7 @@ import { InvoiceGenerationService } from './services/invoice-generation.service'
 import { InvoiceDeliveryService } from './services/invoice-delivery.service';
 import { ProRataService } from './services/pro-rata.service';
 import { PaymentMatchingService } from './services/payment-matching.service';
+import { PaymentAllocationService } from './services/payment-allocation.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 
@@ -49,6 +50,7 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     InvoiceDeliveryService,
     ProRataService,
     PaymentMatchingService,
+    PaymentAllocationService,
   ],
   exports: [
     TenantRepository,
@@ -73,6 +75,7 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     InvoiceDeliveryService,
     ProRataService,
     PaymentMatchingService,
+    PaymentAllocationService,
   ],
 })
 export class DatabaseModule {}

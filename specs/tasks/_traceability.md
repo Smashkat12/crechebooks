@@ -67,7 +67,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | BillingService.generateMonthlyInvoices | method | TASK-BILL-012 | ✅ Complete |
 | BillingService.sendInvoices | method | TASK-BILL-013 | ✅ Complete |
 | PaymentService.matchPayments | method | TASK-PAY-011 | ✅ Complete |
-| PaymentService.allocatePayment | method | TASK-PAY-012 | Pending |
+| PaymentService.allocatePayment | method | TASK-PAY-012 | ✅ Complete |
 | PaymentService.getArrearsReport | method | TASK-PAY-013 | Pending |
 | SarsService.generateVat201 | method | TASK-SARS-014 | Pending |
 | SarsService.generateEmp201 | method | TASK-SARS-015 | Pending |
@@ -141,8 +141,8 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Match by reference, amount, name | REQ-PAY-002 | TASK-PAY-011, TASK-AGENT-003 | Partial (TASK-AGENT-003 pending) |
 | Exact match auto-apply | REQ-PAY-003 | TASK-PAY-011 | ✅ Complete |
 | Ambiguous match flagging | REQ-PAY-004 | TASK-PAY-011 | ✅ Complete |
-| Partial payments | REQ-PAY-005 | TASK-PAY-012 | Pending |
-| Combined payments | REQ-PAY-006 | TASK-PAY-012 | Pending |
+| Partial payments | REQ-PAY-005 | TASK-PAY-012 | ✅ Complete |
+| Combined payments | REQ-PAY-006 | TASK-PAY-012 | ✅ Complete |
 | Arrears dashboard | REQ-PAY-007 | TASK-PAY-013, TASK-PAY-033 | Pending |
 | Parent payment history | REQ-PAY-008 | TASK-PAY-013 | Pending |
 | Automated reminders | REQ-PAY-009 | TASK-PAY-014 | Pending |
@@ -242,3 +242,4 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-20 | TASK-BILL-013 marked complete (Invoice Delivery Service - 833 tests) | AI Agent |
 | 2025-12-20 | TASK-BILL-014 marked complete (Pro-rata Calculation Service - 874 tests) | AI Agent |
 | 2025-12-20 | TASK-PAY-011 marked complete (Payment Matching Service - 905 tests) | AI Agent |
+| 2025-12-21 | TASK-PAY-012 marked complete (Payment Allocation Service - 945 tests) | AI Agent |

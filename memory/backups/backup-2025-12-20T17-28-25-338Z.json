@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-20T00:56:41.327Z",
+  "timestamp": "2025-12-20T17:28:25.338Z",
   "version": "1.0",
   "entries": [
     {
@@ -559,16 +559,552 @@
       "checksum": "ab79ae5100261599f87e3ae7a3e823ae2d927b89285cb02886d7c12900a5bdea",
       "references": [],
       "dependencies": []
+    },
+    {
+      "id": "entry_mjdm2wtb_s6sgdjy0k",
+      "key": "trans002/context",
+      "value": {
+        "task": "TASK-TRANS-002",
+        "description": "Categorization Entity and Types",
+        "dependencies": [
+          "TASK-TRANS-001"
+        ],
+        "status": "in_progress",
+        "startedAt": "2025-12-20T03:20:21+02:00"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T01:20:22.175Z",
+      "updatedAt": "2025-12-20T01:20:22.175Z",
+      "lastAccessedAt": "2025-12-20T01:20:22.175Z",
+      "version": 1,
+      "size": 199,
+      "compressed": false,
+      "checksum": "67f0a15172d702defbf9b45a9117d0b485db303be378f553aec18ffa3ec29451",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjdm4siy_tuedfxnsu",
+      "key": "trans002/schema",
+      "value": {
+        "migrationName": "20251220012120_create_categorizations",
+        "enums": [
+          "VatType",
+          "CategorizationSource"
+        ],
+        "model": "Categorization",
+        "relations": {
+          "Transaction": "categorizations",
+          "User": "reviewedCategorizations"
+        },
+        "status": "complete"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T01:21:49.930Z",
+      "updatedAt": "2025-12-20T01:21:49.930Z",
+      "lastAccessedAt": "2025-12-20T01:21:49.930Z",
+      "version": 1,
+      "size": 253,
+      "compressed": false,
+      "checksum": "6f42bbb094ff7ddf665747be5809b2b4e5641c7f6251ba6f24583e048e3e8da6",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjdmdfsb_5ipaawmxy",
+      "key": "trans002/result",
+      "value": {
+        "status": "COMPLETED",
+        "migration": "20251220012120_create_categorizations",
+        "testsTotal": 169,
+        "testsPassed": 169,
+        "testsFailed": 0,
+        "categorizationTests": 28,
+        "files": {
+          "created": [
+            "src/database/entities/categorization.entity.ts",
+            "src/database/dto/categorization.dto.ts",
+            "src/database/repositories/categorization.repository.ts",
+            "tests/database/repositories/categorization.repository.spec.ts"
+          ],
+          "modified": [
+            "prisma/schema.prisma",
+            "src/database/entities/index.ts",
+            "src/database/dto/index.ts",
+            "src/database/repositories/index.ts",
+            "tests/database/repositories/tenant.repository.spec.ts",
+            "tests/database/repositories/user.repository.spec.ts",
+            "tests/database/repositories/transaction.repository.spec.ts"
+          ]
+        }
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T01:28:33.323Z",
+      "updatedAt": "2025-12-20T01:28:33.323Z",
+      "lastAccessedAt": "2025-12-20T01:28:33.323Z",
+      "version": 1,
+      "size": 717,
+      "compressed": false,
+      "checksum": "891f438ce835ef2585c6887422a3de26259a7ea97b207373bdb034d6f17f0315",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjed83r6_j9qmvscie",
+      "key": "sars-submission/task-context",
+      "value": {
+        "taskId": "TASK-SARS-002",
+        "title": "SarsSubmission Entity",
+        "dependencies": [
+          "TASK-CORE-002",
+          "TASK-CORE-003"
+        ],
+        "status": "in_progress"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T14:00:14.082Z",
+      "updatedAt": "2025-12-20T14:00:14.082Z",
+      "lastAccessedAt": "2025-12-20T14:00:14.082Z",
+      "version": 1,
+      "size": 159,
+      "compressed": false,
+      "checksum": "c762da21d57586a7351726975da64917d36f51d7933aaa25b553a6526a7fde15",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjeh1wa8_snmgtk2mk",
+      "key": "agent1/schema",
+      "value": {
+        "model": "XeroToken",
+        "migration": "add_xero_tokens",
+        "migrationTimestamp": "20251220154623",
+        "status": "complete",
+        "tenantRelationAdded": true,
+        "testsPass": true,
+        "schemaLocation": "/home/smash/Documents/dev-env/Playground/ruv/crechebooks/prisma/schema.prisma",
+        "migrationLocation": "/home/smash/Documents/dev-env/Playground/ruv/crechebooks/prisma/migrations/20251220154623_add_xero_tokens/migration.sql"
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T15:47:22.928Z",
+      "updatedAt": "2025-12-20T15:47:22.928Z",
+      "lastAccessedAt": "2025-12-20T16:01:35.212Z",
+      "version": 1,
+      "size": 421,
+      "compressed": false,
+      "checksum": "782d6cbf6cbd94a415033b8a406a5074738790b25a9b4ebdc4af53d2818f6210",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjehi022_cctmabkwg",
+      "key": "agent2/deps",
+      "value": {
+        "packages": [
+          "xero-node",
+          "@modelcontextprotocol/sdk",
+          "crypto-js",
+          "@types/crypto-js"
+        ],
+        "status": "installed",
+        "directories": [
+          "src/mcp/xero-mcp/auth",
+          "src/mcp/xero-mcp/tools",
+          "src/mcp/xero-mcp/types",
+          "src/mcp/xero-mcp/utils",
+          "tests/mcp/xero-mcp/tools"
+        ],
+        "envUpdated": true,
+        "packageJsonUpdated": true
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T15:59:54.314Z",
+      "updatedAt": "2025-12-20T15:59:54.314Z",
+      "lastAccessedAt": "2025-12-20T16:01:39.392Z",
+      "version": 1,
+      "size": 321,
+      "compressed": false,
+      "checksum": "43cb2a6ad3609bf85addbcd5a9a0bc6f5eff558a1029d7ea28cf061591ef84f5",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjehmq5c_0y9mo7b7u",
+      "key": "agent3/types",
+      "value": {
+        "files": [
+          "src/mcp/xero-mcp/types/xero.types.ts",
+          "src/mcp/xero-mcp/types/mcp.types.ts",
+          "src/mcp/xero-mcp/types/index.ts"
+        ],
+        "status": "complete",
+        "typesCreated": [
+          "XeroAccount",
+          "XeroTransaction",
+          "XeroContact",
+          "XeroInvoice",
+          "XeroPayment",
+          "XeroTokenSet",
+          "GetAccountsInput",
+          "GetTransactionsInput",
+          "UpdateTransactionInput",
+          "CreateInvoiceInput",
+          "CreateInvoiceLineItem",
+          "GetInvoicesInput",
+          "ApplyPaymentInput",
+          "GetContactsInput",
+          "CreateContactInput",
+          "UpdateTransactionResult",
+          "CreatedInvoice",
+          "CreatedPayment",
+          "CreatedContact",
+          "MCPErrorResponse"
+        ],
+        "constitutionCompliance": {
+          "noAnyTypes": true,
+          "monetaryFieldsInCents": 11,
+          "kebabCaseFiles": true,
+          "pascalCaseTypes": true
+        },
+        "lineCount": 178
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T16:03:34.752Z",
+      "updatedAt": "2025-12-20T16:03:34.752Z",
+      "lastAccessedAt": "2025-12-20T16:03:42.896Z",
+      "version": 1,
+      "size": 697,
+      "compressed": false,
+      "checksum": "e2ef372e297bcc8f15e1d8f58431160499da6120df2f8682dfaadc6ddf3920d6",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjehqgs1_t2scay1q2",
+      "key": "agent4/utils",
+      "value": {
+        "files": [
+          "src/mcp/xero-mcp/utils/error-handler.ts",
+          "src/mcp/xero-mcp/utils/rate-limiter.ts",
+          "src/mcp/xero-mcp/utils/logger.ts",
+          "src/mcp/xero-mcp/utils/index.ts"
+        ],
+        "classes": [
+          "XeroMCPError",
+          "TokenExpiredError",
+          "TokenNotFoundError",
+          "RateLimitError",
+          "XeroAPIError",
+          "EncryptionError",
+          "RateLimiter",
+          "Logger"
+        ],
+        "status": "complete",
+        "timestamp": "2025-12-20T00:00:00.000Z"
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T16:06:29.233Z",
+      "updatedAt": "2025-12-20T16:06:29.233Z",
+      "lastAccessedAt": "2025-12-20T16:06:29.233Z",
+      "version": 1,
+      "size": 392,
+      "compressed": false,
+      "checksum": "66a26a6a48e5403c6c8288a6a5a80c7880bfe98ddd4fd2c19f99442a11d24e51",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjehtkbq_gwzm9hjg3",
+      "key": "agent5/auth",
+      "value": {
+        "files": [
+          "src/mcp/xero-mcp/auth/encryption.ts",
+          "src/mcp/xero-mcp/auth/token-manager.ts",
+          "src/mcp/xero-mcp/auth/index.ts"
+        ],
+        "classes": [
+          "Encryption",
+          "TokenManager"
+        ],
+        "interface": "TokenSet",
+        "status": "complete",
+        "features": [
+          "AES-256 encryption",
+          "OAuth2 token management",
+          "Atomic token refresh with mutex",
+          "5-minute refresh buffer",
+          "Tenant token storage",
+          "Token expiry checking"
+        ],
+        "dependencies": [
+          "crypto-js",
+          "xero-node",
+          "@prisma/client"
+        ]
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T16:08:53.798Z",
+      "updatedAt": "2025-12-20T16:08:53.798Z",
+      "lastAccessedAt": "2025-12-20T16:08:53.798Z",
+      "version": 1,
+      "size": 460,
+      "compressed": false,
+      "checksum": "be0ba540df3da8ba96b7e196e885e9c95090b461bc32bc3576e27eafc3cc3e9c",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjehygho_1jbigsjr6",
+      "key": "agent6/tools",
+      "value": {
+        "files": [
+          "get-accounts.ts",
+          "get-transactions.ts",
+          "update-transaction.ts",
+          "create-invoice.ts",
+          "get-invoices.ts",
+          "apply-payment.ts",
+          "get-contacts.ts",
+          "create-contact.ts",
+          "index.ts"
+        ],
+        "toolCount": 8,
+        "status": "complete",
+        "timestamp": "2025-12-20T18:12:41+02:00"
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T16:12:42.108Z",
+      "updatedAt": "2025-12-20T16:12:42.108Z",
+      "lastAccessedAt": "2025-12-20T16:12:42.108Z",
+      "version": 1,
+      "size": 284,
+      "compressed": false,
+      "checksum": "7a8643c04da4c046ddbec1a797bc0095bb1269ddea48c18ade812e2efa7e6db5",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjei2gye_wzppwg43m",
+      "key": "agent7/server",
+      "value": {
+        "files": [
+          "src/mcp/xero-mcp/config.ts",
+          "src/mcp/xero-mcp/server.ts",
+          "src/mcp/xero-mcp/index.ts"
+        ],
+        "class": "XeroMCPServer",
+        "toolsRegistered": 8,
+        "status": "complete"
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T16:15:49.334Z",
+      "updatedAt": "2025-12-20T16:15:49.334Z",
+      "lastAccessedAt": "2025-12-20T16:15:49.334Z",
+      "version": 1,
+      "size": 190,
+      "compressed": false,
+      "checksum": "cdd6591cd80b5c01789322a57be27bc7f49e5e463e044043adbe12abe8d89095",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjei6dvi_1bj2wszdc",
+      "key": "agent8/tests",
+      "value": {
+        "files": [
+          "tests/mcp/xero-mcp/rate-limiter.spec.ts",
+          "tests/mcp/xero-mcp/token-manager.spec.ts",
+          "tests/mcp/xero-mcp/tools/get-accounts.spec.ts"
+        ],
+        "testCount": 20,
+        "status": "complete",
+        "patterns": [
+          "real_database_integration",
+          "no_mocks",
+          "fk_order_cleanup",
+          "xero_token_cleanup",
+          "fail_fast_validation"
+        ],
+        "coverage": {
+          "rateLimiter": 7,
+          "tokenManager": 10,
+          "toolValidation": 3
+        }
+      },
+      "type": "object",
+      "namespace": "mcp-001",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T16:18:51.966Z",
+      "updatedAt": "2025-12-20T16:18:51.966Z",
+      "lastAccessedAt": "2025-12-20T16:18:51.966Z",
+      "version": 1,
+      "size": 389,
+      "compressed": false,
+      "checksum": "89973f4ec15ee9b77fca47556f89bb3e31888ea747aa0ff7ea49ae5613cd806d",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjekgxy8_eqn3zej2u",
+      "key": "trans011/phase1",
+      "value": {
+        "dependencies_installed": true,
+        "packages": [
+          "csv-parse",
+          "pdf-parse",
+          "@nestjs/bull",
+          "@types/pdf-parse"
+        ],
+        "tests_passing": false,
+        "test_failures": 406,
+        "test_passes": 225,
+        "note": "Database connection issues in tests - 17 test suites failing"
+      },
+      "type": "object",
+      "namespace": "project",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T17:23:03.776Z",
+      "updatedAt": "2025-12-20T17:23:03.776Z",
+      "lastAccessedAt": "2025-12-20T17:25:40.688Z",
+      "version": 1,
+      "size": 261,
+      "compressed": false,
+      "checksum": "9c61675d16e58af22111efe98ba2d94280db86dd7b374ecccbe04fc268ccbdcd",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjekkw3c_h5anj5yd3",
+      "key": "trans011/phase2",
+      "value": {
+        "file": "src/database/dto/import.dto.ts",
+        "interfaces": [
+          "ParsedTransaction",
+          "ImportResult",
+          "DuplicateCheckResult",
+          "ImportError"
+        ],
+        "classes": [
+          "ImportFileDto"
+        ],
+        "completed": true,
+        "timestamp": "2025-12-20T19:26:07+02:00"
+      },
+      "type": "object",
+      "namespace": "project",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T17:26:07.992Z",
+      "updatedAt": "2025-12-20T17:26:07.992Z",
+      "lastAccessedAt": "2025-12-20T17:27:23.195Z",
+      "version": 1,
+      "size": 242,
+      "compressed": false,
+      "checksum": "6d049bae8a78d0e7bb91f5d9fbd36266e594164446be458620cc8334f3824b2a",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjeknu2g_p56snetyb",
+      "key": "trans011/phase3",
+      "value": {
+        "file": "src/database/parsers/parse-utils.ts",
+        "functions": [
+          "parseCurrency",
+          "parseDate",
+          "extractPayeeName"
+        ],
+        "completed": true,
+        "timestamp": "2025-12-20T19:27:23+02:00"
+      },
+      "type": "object",
+      "namespace": "project",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T17:28:25.336Z",
+      "updatedAt": "2025-12-20T17:28:25.336Z",
+      "lastAccessedAt": "2025-12-20T17:28:25.336Z",
+      "version": 1,
+      "size": 193,
+      "compressed": false,
+      "checksum": "ae54968a5f26586b663ad5503e0de0cefd8a7fdb7ac98a81b53001cd680cca91",
+      "references": [],
+      "dependencies": []
     }
   ],
   "statistics": {
     "overview": {
-      "totalEntries": 17,
-      "totalSize": 4518,
+      "totalEntries": 32,
+      "totalSize": 9696,
       "compressedEntries": 0,
       "compressionRatio": 1,
-      "indexSize": 850,
-      "memoryUsage": 7877984,
+      "indexSize": 1600,
+      "memoryUsage": 7110528,
       "diskUsage": 0
     },
     "distribution": {
@@ -578,43 +1114,51 @@
           "size": 49
         },
         "crechebooks": {
-          "count": 15,
-          "size": 4250
+          "count": 19,
+          "size": 5578
         },
         "default": {
           "count": 1,
           "size": 219
+        },
+        "mcp-001": {
+          "count": 8,
+          "size": 3154
+        },
+        "project": {
+          "count": 3,
+          "size": 696
         }
       },
       "byType": {
         "object": {
-          "count": 17,
-          "size": 4518
+          "count": 32,
+          "size": 9696
         }
       },
       "byOwner": {
         "system": {
-          "count": 17,
-          "size": 4518
+          "count": 32,
+          "size": 9696
         }
       },
       "byAccessLevel": {
         "shared": {
-          "count": 17,
-          "size": 4518
+          "count": 32,
+          "size": 9696
         }
       }
     },
     "temporal": {
-      "entriesCreatedLast24h": 17,
-      "entriesUpdatedLast24h": 17,
-      "entriesAccessedLast24h": 17,
+      "entriesCreatedLast24h": 32,
+      "entriesUpdatedLast24h": 32,
+      "entriesAccessedLast24h": 32,
       "oldestEntry": "2025-12-19T23:03:44.618Z",
-      "newestEntry": "2025-12-20T00:56:41.325Z"
+      "newestEntry": "2025-12-20T17:28:25.336Z"
     },
     "performance": {
       "averageQueryTime": 0,
-      "averageWriteTime": 0,
+      "averageWriteTime": 1,
       "cacheHitRatio": 0,
       "indexEfficiency": 0.95
     },

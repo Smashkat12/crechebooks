@@ -63,6 +63,65 @@ export class TransactionRepository {
   }
 
   /**
+   * Create multiple transactions in a single batch
+   * Uses Prisma's createMany for optimal performance
+   * @param dtos - Array of transaction DTOs to create
+   * @returns Array of created transactions
+   * @throws NotFoundException if tenant doesn't exist
+   * @throws DatabaseException for database errors
+   */
+  async createMany(dtos: CreateTransactionDto[]): Promise<Transaction[]> {
+    if (dtos.length === 0) {
+      return [];
+    }
+
+    try {
+      // Verify tenant exists (check first dto's tenant)
+      const tenantId = dtos[0].tenantId;
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+      });
+      if (!tenant) {
+        throw new NotFoundException('Tenant', tenantId);
+      }
+
+      // Bulk insert using createMany
+      await this.prisma.transaction.createMany({
+        data: dtos,
+        skipDuplicates: true, // Skip any xeroTransactionId conflicts
+      });
+
+      // Fetch the created transactions by importBatchId
+      const importBatchId = dtos[0].importBatchId;
+      if (importBatchId) {
+        return await this.prisma.transaction.findMany({
+          where: {
+            tenantId,
+            importBatchId,
+          },
+          orderBy: { date: 'asc' },
+        });
+      }
+
+      // If no batch ID, return empty (shouldn't happen in import flow)
+      return [];
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to create batch of ${dtos.length} transactions`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'createMany',
+        'Failed to create transactions batch',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Find transaction by ID with tenant isolation
    * @returns Transaction or null if not found
    * @throws DatabaseException for database errors

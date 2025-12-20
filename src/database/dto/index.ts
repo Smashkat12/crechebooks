@@ -15,3 +15,4 @@ export * from './staff.dto';
 export * from './payroll.dto';
 export * from './sars-submission.dto';
 export * from './reconciliation.dto';
+export * from './import.dto';

@@ -53,6 +53,8 @@ describe('CategorizationRepository', () => {
 
   beforeEach(async () => {
     // CRITICAL: Clean in FK order - leaf tables first!
+    await prisma.payroll.deleteMany({});
+    await prisma.staff.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
     await prisma.invoice.deleteMany({});

@@ -27,6 +27,10 @@ describe('AuditLogService', () => {
   });
 
   beforeEach(async () => {
+    // CRITICAL: Clean in FK order - leaf tables first!
+    await prisma.payroll.deleteMany({});
+    await prisma.staff.deleteMany({});
+
     // Create a unique test tenant for each test
     // NOTE: We do NOT delete audit logs - they are immutable
     testTenant = await prisma.tenant.create({

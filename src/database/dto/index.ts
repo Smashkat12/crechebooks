@@ -11,3 +11,5 @@ export * from './enrollment.dto';
 export * from './invoice.dto';
 export * from './invoice-line.dto';
 export * from './payment.dto';
+export * from './staff.dto';
+export * from './payroll.dto';

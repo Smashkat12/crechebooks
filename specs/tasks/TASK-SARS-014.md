@@ -1,8 +1,8 @@
-<task_spec id="TASK-SARS-014" version="1.0">
+<task_spec id="TASK-SARS-014" version="3.0">
 
 <metadata>
   <title>VAT201 Generation Service</title>
-  <status>ready</status>
+  <status>COMPLETE</status>
   <layer>logic</layer>
   <sequence>31</sequence>
   <implements>
@@ -12,420 +12,272 @@
     <task_ref>TASK-SARS-011</task_ref>
     <task_ref>TASK-SARS-002</task_ref>
   </depends_on>
-  <estimated_complexity>high</estimated_complexity>
+  <completed_date>2025-12-21</completed_date>
+  <test_count>1139</test_count>
 </metadata>
 
 <context>
-This task creates the VAT201Service which generates the South African VAT201 return
-document. The service uses the VATService to calculate output and input VAT for a
-period, populates the VAT201 form fields according to SARS specifications, validates
-the submission data, calculates net VAT due/refundable, and generates the submission
-record with document structure. The service handles all 15 fields of the VAT201 form
-with Decimal.js precision.
+Vat201Service generates South African VAT201 return documents.
+
+**What it does:**
+- Uses VatService to calculate output and input VAT
+- Populates 19-field VAT201 structure per SARS specifications
+- Validates VAT number format, period dates, flagged items
+- Calculates net VAT (output - input): positive = due to SARS, negative = refund
+- Stores submission as DRAFT with deadline calculation
+- Flags items requiring review before submission
+
+**CRITICAL RULES:**
+- ALL monetary values are CENTS (integers)
+- Use Decimal.js ONLY for calculations, return integers
+- Banker's rounding (ROUND_HALF_EVEN)
+- Tenant MUST be VAT_REGISTERED with valid vatNumber
+- Deadline = last business day of month following period end
+- Store as DRAFT initially (never auto-submit)
+- NO backwards compatibility - fail fast with descriptive errors
 </context>
 
-<input_context_files>
-  <file purpose="technical_spec">specs/technical/api-contracts.md#SarsService</file>
-  <file purpose="vat_requirements">specs/requirements/sars-requirements.md</file>
-  <file purpose="vat_service">src/core/sars/vat.service.ts</file>
-  <file purpose="sars_submission_entity">src/database/entities/sars-submission.entity.ts</file>
-  <file purpose="naming_conventions">specs/constitution.md#coding_standards</file>
-</input_context_files>
+<project_structure>
+ACTUAL file locations (DO NOT use src/core/sars/ - it doesn't exist):
 
-<prerequisites>
-  <check>TASK-SARS-011 completed (VATService exists)</check>
-  <check>TASK-SARS-002 completed (SarsSubmission entity exists)</check>
-  <check>Decimal.js library installed</check>
-  <check>TypeScript compilation working</check>
-</prerequisites>
+```
+src/database/
+├── services/
+│   ├── vat.service.ts          # VatService (dependency)
+│   └── vat201.service.ts       # Vat201Service class
+├── dto/
+│   ├── vat.dto.ts              # VatCalculationResult, VatFlaggedItem
+│   └── vat201.dto.ts           # VAT201 specific DTOs
+├── constants/
+│   └── vat.constants.ts        # VAT_CONSTANTS.VAT_NUMBER_REGEX
+└── database.module.ts          # Add to providers and exports
 
-<scope>
-  <in_scope>
-    - Create VAT201Service class in src/core/sars/
-    - Implement generateVAT201 method (main generation logic)
-    - Implement populateFields method (populate all 15 VAT201 fields)
-    - Implement validateSubmission method (pre-submission validation)
-    - Implement generateDocument method (create document structure)
-    - Implement calculateNetVAT method (field 19: output - input)
-    - Use VATService for output and input VAT calculations
-    - Create VAT201Document interface matching SARS format
-    - Create VAT201Fields interface for all 15 fields
-    - Handle negative net VAT (refund due)
-    - Store submission as DRAFT with SarsSubmissionRepository
-    - Use Decimal.js banker's rounding
-    - Unit tests with realistic scenarios
-  </in_scope>
-  <out_of_scope>
-    - API endpoints
-    - PDF rendering of VAT201
-    - eFiling integration
-    - Historical period submissions
-    - Import/export VAT calculations
-    - Bad debt adjustments
-    - VAT201 amendment logic
-  </out_of_scope>
-</scope>
+tests/database/services/
+└── vat201.service.spec.ts      # Integration tests with real DB
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/core/sars/vat201.service.ts">
-      import Decimal from 'decimal.js';
-      import { VATService } from './vat.service';
+prisma/schema.prisma:
+- SarsSubmission model with documentData JSON field
+- SubmissionType.VAT201 enum value
+- SubmissionStatus.DRAFT enum value
+- TaxStatus.VAT_REGISTERED for tenant validation
+```
+</project_structure>
 
-      interface VAT201Fields {
-        field1: Decimal;   // Output tax on standard-rated supplies
-        field2: Decimal;   // Output tax on zero-rated supplies
-        field3: Decimal;   // Output tax on exempt supplies
-        field4: Decimal;   // Total output tax (1+2+3)
-        field5: Decimal;   // Input tax
-        field6: Decimal;   // Total deductible input tax
-        field7: Decimal;   // Adjustments
-        field8: Decimal;   // Imported services
-        field9: Decimal;   // Bad debts recovered
-        field10: Decimal;  // Reverse adjustments
-        field11: Decimal;  // Credit transfer
-        field12: Decimal;  // Vendor number
-        field13: Decimal;  // Provisional payments
-        field14: Decimal;  // Total (sum of applicable fields)
-        field15: Decimal;  // Net VAT (refund if negative)
-        field16: Decimal;  // Payments made
-        field17: Decimal;  // Interest
-        field18: Decimal;  // Penalty
-        field19: Decimal;  // Total amount due/refundable
-      }
+<existing_infrastructure>
+Already in prisma/schema.prisma:
+```prisma
+enum SubmissionType {
+  VAT201
+  EMP201
+  IRP5
+  EMP501
+}
 
-      interface VAT201Document {
-        submissionId: string;
-        tenantId: string;
-        vatNumber: string;
-        periodStart: Date;
-        periodEnd: Date;
-        fields: VAT201Fields;
-        netVAT: Decimal;
-        isDueToSARS: boolean;
-        isRefundDue: boolean;
-        flaggedItems: VATFlaggedItem[];
-        generatedAt: Date;
-      }
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
 
-      @Injectable()
-      export class VAT201Service {
-        constructor(
-          private vatService: VATService,
-          private sarsSubmissionRepository: SarsSubmissionRepository
-        ) {}
+model SarsSubmission {
+  id              String           @id @default(uuid())
+  tenantId        String           @map("tenant_id")
+  submissionType  SubmissionType   @map("submission_type")
+  periodStart     DateTime         @map("period_start") @db.Date
+  periodEnd       DateTime         @map("period_end") @db.Date
+  deadline        DateTime         @db.Date
+  outputVatCents  Int?             @map("output_vat_cents")
+  inputVatCents   Int?             @map("input_vat_cents")
+  netVatCents     Int?             @map("net_vat_cents")
+  status          SubmissionStatus @default(DRAFT)
+  documentData    Json?            @map("document_data")
+}
 
-        async generateVAT201(
-          tenantId: string,
-          periodStart: Date,
-          periodEnd: Date
-        ): Promise&lt;SarsSubmission&gt;;
+model Tenant {
+  taxStatus   TaxStatus  @default(NOT_REGISTERED)
+  vatNumber   String?    @map("vat_number")
+}
+```
 
-        populateFields(
-          outputVAT: VATCalculationResult,
-          inputVAT: VATCalculationResult
-        ): VAT201Fields;
+Dependencies to inject:
+- PrismaService
+- VatService
+</existing_infrastructure>
 
-        validateSubmission(
-          document: VAT201Document
-        ): ValidationResult;
+<files_created>
+1. src/database/dto/vat201.dto.ts
+2. src/database/services/vat201.service.ts
+3. tests/database/services/vat201.service.spec.ts
+</files_created>
 
-        generateDocument(
-          tenantId: string,
-          vatNumber: string,
-          periodStart: Date,
-          periodEnd: Date,
-          fields: VAT201Fields,
-          flaggedItems: VATFlaggedItem[]
-        ): VAT201Document;
+<files_modified>
+1. src/database/services/index.ts - `export { Vat201Service } from './vat201.service';`
+2. src/database/dto/index.ts - `export * from './vat201.dto';`
+3. src/database/database.module.ts - Add Vat201Service to providers and exports arrays
+</files_modified>
 
-        calculateNetVAT(fields: VAT201Fields): Decimal;
-      }
-    </signature>
-    <signature file="src/core/sars/interfaces/vat201.interface.ts">
-      export interface VAT201Fields {
-        field1: Decimal;
-        field2: Decimal;
-        field3: Decimal;
-        field4: Decimal;
-        field5: Decimal;
-        field6: Decimal;
-        field7: Decimal;
-        field8: Decimal;
-        field9: Decimal;
-        field10: Decimal;
-        field11: Decimal;
-        field12: Decimal;
-        field13: Decimal;
-        field14: Decimal;
-        field15: Decimal;
-        field16: Decimal;
-        field17: Decimal;
-        field18: Decimal;
-        field19: Decimal;
-      }
+<implementation_reference>
 
-      export interface VAT201Document {
-        submissionId: string;
-        tenantId: string;
-        vatNumber: string;
-        periodStart: Date;
-        periodEnd: Date;
-        fields: VAT201Fields;
-        netVAT: Decimal;
-        isDueToSARS: boolean;
-        isRefundDue: boolean;
-        flaggedItems: VATFlaggedItem[];
-        generatedAt: Date;
-      }
-    </signature>
-  </signatures>
+## DTO (src/database/dto/vat201.dto.ts)
+```typescript
+import { VatFlaggedItem } from './vat.dto';
 
-  <constraints>
-    - Must use Decimal.js for ALL monetary calculations
-    - Must use banker's rounding (ROUND_HALF_EVEN)
-    - Must populate all 15 standard VAT201 fields
-    - Field 1 = Output VAT on standard-rated supplies
-    - Field 4 = Total output tax
-    - Field 5 = Input tax (deductible)
-    - Field 19 = Net VAT (positive = due, negative = refund)
-    - Must NOT use 'any' type anywhere
-    - Must validate VAT number format (10 digits)
-    - Must check period is complete month(s)
-    - Zero-rated supplies in field 2 (0 VAT amount)
-    - Exempt supplies in field 3 (0 VAT amount)
-    - Must flag items requiring review before submission
-    - Document must be stored as JSON in sars_submissions table
-    - Status must be DRAFT initially
-    - Must include flagged items in document
-    - Net VAT calculation: field 4 - field 5 (simplified for initial version)
-  </constraints>
+export interface Vat201Fields {
+  field1OutputStandardCents: number;  // Output VAT on standard-rated
+  field2OutputZeroRatedCents: number; // Output on zero-rated (0)
+  field3OutputExemptCents: number;    // Output on exempt (0)
+  field4TotalOutputCents: number;     // Total output VAT
+  field5InputTaxCents: number;        // Input tax
+  field6DeductibleInputCents: number; // Deductible input
+  field7AdjustmentsCents: number;     // Adjustments
+  field8ImportedServicesCents: number;
+  field9BadDebtsCents: number;
+  field10ReverseAdjustmentsCents: number;
+  field11CreditTransferCents: number;
+  field12VendorCents: number;
+  field13ProvisionalCents: number;
+  field14TotalCents: number;
+  field15NetVatCents: number;
+  field16PaymentsCents: number;
+  field17InterestCents: number;
+  field18PenaltyCents: number;
+  field19TotalDueCents: number;       // Net amount due/refundable
+}
 
-  <verification>
-    - TypeScript compiles without errors
-    - Unit tests pass with 100% coverage
-    - Output VAT R10,000, Input VAT R3,000: Net VAT = R7,000 (due to SARS)
-    - Output VAT R5,000, Input VAT R8,000: Net VAT = -R3,000 (refund)
-    - All 15 fields populated with Decimal values
-    - Banker's rounding applied to all fields
-    - Zero-rated supplies counted separately
-    - Flagged items included in document
-    - Submission stored with DRAFT status
-    - VAT number validation catches invalid formats
-    - Period validation ensures complete months
-    - isDueToSARS flag set correctly (netVAT > 0)
-    - isRefundDue flag set correctly (netVAT < 0)
-  </verification>
-</definition_of_done>
+export interface Vat201Document {
+  submissionId: string;
+  tenantId: string;
+  vatNumber: string;
+  periodStart: Date;
+  periodEnd: Date;
+  fields: Vat201Fields;
+  netVatCents: number;
+  isDueToSars: boolean;   // netVatCents > 0
+  isRefundDue: boolean;   // netVatCents < 0
+  flaggedItems: VatFlaggedItem[];
+  generatedAt: Date;
+}
 
-<pseudo_code>
-VAT201Service Implementation (src/core/sars/vat201.service.ts):
+export interface Vat201ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
 
-  Configure Decimal.js:
-    Decimal.set({
-      precision: 20,
-      rounding: Decimal.ROUND_HALF_EVEN
-    })
+export interface GenerateVat201Dto {
+  tenantId: string;
+  periodStart: Date;
+  periodEnd: Date;
+}
+```
 
-  generateVAT201(tenantId, periodStart, periodEnd):
-    // Step 1: Get tenant details and validate
-    tenant = await tenantRepository.findById(tenantId)
-    If !tenant.isVATRegistered OR !tenant.vatNumber:
-      Throw error "Tenant not VAT registered"
+## Service Methods
+```typescript
+@Injectable()
+export class Vat201Service {
+  private readonly logger = new Logger(Vat201Service.name);
 
-    // Step 2: Get transactions and invoices for period
-    invoices = await invoiceRepository.findByPeriod(tenantId, periodStart, periodEnd)
-    transactions = await transactionRepository.findByPeriod(tenantId, periodStart, periodEnd)
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly vatService: VatService,
+  ) {}
 
-    // Step 3: Calculate output VAT (sales)
-    outputVAT = await vatService.calculateOutputVAT(invoices, periodStart, periodEnd)
+  // Main generation - creates SarsSubmission record
+  async generateVat201(dto: GenerateVat201Dto): Promise<SarsSubmission>;
 
-    // Step 4: Calculate input VAT (purchases)
-    inputVAT = await vatService.calculateInputVAT(transactions, periodStart, periodEnd)
+  // Populate fields from VatService calculations
+  populateFields(outputVat: VatCalculationResult, inputVat: VatCalculationResult): Vat201Fields;
 
-    // Step 5: Get flagged items requiring review
-    flaggedItems = vatService.getFlaggedItems(transactions, invoices)
+  // Validate before submission
+  validateSubmission(document: Vat201Document): Vat201ValidationResult;
 
-    // Step 6: Populate VAT201 fields
-    fields = populateFields(outputVAT, inputVAT)
+  // Create document structure
+  generateDocument(
+    tenantId: string,
+    vatNumber: string,
+    periodStart: Date,
+    periodEnd: Date,
+    fields: Vat201Fields,
+    flaggedItems: VatFlaggedItem[],
+  ): Vat201Document;
 
-    // Step 7: Generate document structure
-    document = generateDocument(
-      tenantId,
-      tenant.vatNumber,
-      periodStart,
-      periodEnd,
-      fields,
-      flaggedItems
-    )
+  // Calculate net VAT (output - input)
+  calculateNetVat(fields: Vat201Fields): number;
 
-    // Step 8: Validate document
-    validationResult = validateSubmission(document)
-    If !validationResult.isValid:
-      Log warnings
+  // Calculate deadline (last business day of following month)
+  private calculateDeadline(periodEnd: Date): Date;
+}
+```
+</implementation_reference>
 
-    // Step 9: Store submission as DRAFT
-    submission = await sarsSubmissionRepository.create({
-      tenantId,
-      submissionType: 'VAT201',
-      period: format(periodStart, 'yyyy-MM'),
-      status: 'DRAFT',
-      documentData: JSON.stringify(document),
-      flaggedItemsCount: flaggedItems.length
-    })
+<test_requirements>
+CRITICAL: Tests use REAL PostgreSQL database.
 
-    Return submission
+```typescript
+beforeAll(async () => {
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [PrismaService, VatService, Vat201Service],
+  }).compile();
+  // ...
+});
 
-  populateFields(outputVAT, inputVAT):
-    fields = {
-      field1: outputVAT.standardRated,        // Standard-rated output VAT
-      field2: new Decimal(0),                 // Zero-rated output (0 VAT)
-      field3: new Decimal(0),                 // Exempt output (0 VAT)
-      field4: outputVAT.vatAmount,            // Total output tax
-      field5: inputVAT.vatAmount,             // Input tax
-      field6: inputVAT.vatAmount,             // Total deductible input
-      field7: new Decimal(0),                 // Adjustments (future)
-      field8: new Decimal(0),                 // Imported services (future)
-      field9: new Decimal(0),                 // Bad debts (future)
-      field10: new Decimal(0),                // Reverse adjustments (future)
-      field11: new Decimal(0),                // Credit transfer (future)
-      field12: new Decimal(0),                // Vendor number (N/A)
-      field13: new Decimal(0),                // Provisional payments
-      field14: outputVAT.vatAmount,           // Total
-      field15: calculateNetVAT(fields),       // Net VAT
-      field16: new Decimal(0),                // Payments made
-      field17: new Decimal(0),                // Interest
-      field18: new Decimal(0),                // Penalty
-      field19: new Decimal(0)                 // Total due/refundable
-    }
+beforeEach(async () => {
+  // Clean in FK order
+  await prisma.sarsSubmission.deleteMany({});
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.tenant.deleteMany({});
 
-    // Calculate field 19 (net amount)
-    fields.field19 = calculateNetVAT(fields)
+  // Create VAT-registered tenant
+  testTenant = await prisma.tenant.create({
+    data: {
+      name: 'VAT201 Test Creche',
+      taxStatus: 'VAT_REGISTERED',
+      vatNumber: '4123456789',
+      // ...
+    },
+  });
+});
+```
 
-    Return fields
+**Test scenarios implemented:**
+- Standard generation: Output R15,000, Input R5,500 → Net R9,500 due
+- Refund scenario: Output R3,000, Input R8,000 → Net -R5,000 refund
+- Flagged items included in document
+- Invalid VAT number format rejection
+- Non-VAT-registered tenant rejection
+- Period validation (start < end)
+- Deadline calculation (last business day of following month)
+- isDueToSars / isRefundDue flags
+- Document stored as JSON in SarsSubmission
+- Status is DRAFT
+</test_requirements>
 
-  validateSubmission(document):
-    errors = []
-    warnings = []
+<lessons_learned>
+1. **VatService must be injected** - Vat201Service depends on VatService for calculations
+2. **documentData is JSON** - use `JSON.parse(JSON.stringify(document)) as object` for Prisma
+3. **Deadline calculation handles weekends** - Friday if Saturday/Sunday
+4. **Validate tenant.taxStatus** - must be VAT_REGISTERED
+5. **netVatCents determines isDueToSars/isRefundDue** - positive = due, negative = refund
+6. **Store raw document, not formatted** - let API layer format for display
+</lessons_learned>
 
-    // Validate VAT number format
-    If !document.vatNumber.match(/^\d{10}$/):
-      errors.push("Invalid VAT number format (must be 10 digits)")
-
-    // Validate period dates
-    If document.periodStart >= document.periodEnd:
-      errors.push("Invalid period: start date must be before end date")
-
-    // Check for flagged items
-    If document.flaggedItems.length > 0:
-      warnings.push(`${document.flaggedItems.length} items require review`)
-
-    // Validate net VAT is reasonable
-    If document.netVAT.abs() > new Decimal(1000000):
-      warnings.push("Net VAT amount is unusually large")
-
-    Return {
-      isValid: errors.length === 0,
-      errors,
-      warnings
-    }
-
-  generateDocument(tenantId, vatNumber, periodStart, periodEnd, fields, flaggedItems):
-    netVAT = calculateNetVAT(fields)
-
-    Return VAT201Document:
-      submissionId: uuid()
-      tenantId
-      vatNumber
-      periodStart
-      periodEnd
-      fields
-      netVAT
-      isDueToSARS: netVAT > 0
-      isRefundDue: netVAT < 0
-      flaggedItems
-      generatedAt: new Date()
-
-  calculateNetVAT(fields: VAT201Fields): Decimal:
-    // Simplified: Output VAT - Input VAT
-    // Field 4 (total output) - Field 5 (input tax)
-    netVAT = fields.field4.minus(fields.field5)
-
-    // Add adjustments when implemented
-    // netVAT = netVAT.plus(fields.field7)
-
-    Return netVAT
-
-Unit Tests (tests/core/sars/vat201.service.spec.ts):
-  Test case: Standard VAT201 generation
-    Input:
-      - Period: Jan 2025
-      - Output VAT: R15,000
-      - Input VAT: R5,500
-    Expected:
-      - field1: R15,000
-      - field4: R15,000
-      - field5: R5,500
-      - field19: R9,500 (due to SARS)
-      - isDueToSARS: true
-      - status: DRAFT
-
-  Test case: Refund scenario
-    Input:
-      - Output VAT: R3,000
-      - Input VAT: R8,000
-    Expected:
-      - field19: -R5,000 (refund)
-      - isRefundDue: true
-      - isDueToSARS: false
-
-  Test case: Flagged items included
-    Input:
-      - 3 transactions missing VAT numbers
-    Expected:
-      - flaggedItems.length: 3
-      - flaggedItemsCount: 3 in submission
-
-  Test case: Invalid VAT number
-    Input: vatNumber = "12345" (too short)
-    Expected: ValidationError thrown
-
-  Test case: Invalid period
-    Input: periodStart > periodEnd
-    Expected: ValidationError thrown
-</pseudo_code>
-
-<files_to_create>
-  <file path="src/core/sars/vat201.service.ts">VAT201Service class</file>
-  <file path="src/core/sars/interfaces/vat201.interface.ts">VAT201 interfaces</file>
-  <file path="tests/core/sars/vat201.service.spec.ts">Comprehensive unit tests</file>
-</files_to_create>
-
-<files_to_modify>
-  <file path="src/core/sars/index.ts">Export VAT201Service and interfaces</file>
-</files_to_modify>
-
-<validation_criteria>
-  <criterion>VAT201Service compiles without TypeScript errors</criterion>
-  <criterion>All 15 VAT201 fields populated correctly</criterion>
-  <criterion>Decimal.js used for all monetary calculations</criterion>
-  <criterion>Banker's rounding applied throughout</criterion>
-  <criterion>Net VAT calculation accurate (output - input)</criterion>
-  <criterion>isDueToSARS flag set when net VAT positive</criterion>
-  <criterion>isRefundDue flag set when net VAT negative</criterion>
-  <criterion>Flagged items included in document</criterion>
-  <criterion>Submission stored with DRAFT status</criterion>
-  <criterion>VAT number validation works</criterion>
-  <criterion>Period validation works</criterion>
-  <criterion>Document structure matches SARS format</criterion>
-  <criterion>Unit tests cover due and refund scenarios</criterion>
-  <criterion>No 'any' types used</criterion>
-</validation_criteria>
-
-<test_commands>
-  <command>npm run build</command>
-  <command>npm run test -- --grep "VAT201Service"</command>
-  <command>npm run lint -- src/core/sars/vat201.service.ts</command>
-</test_commands>
+<validation_completed>
+- TypeScript compiles without errors (npm run build)
+- Lint passes (npm run lint)
+- All tests pass with real PostgreSQL database
+- All 19 VAT201 fields populated correctly
+- Net VAT calculation accurate (output - input)
+- isDueToSars/isRefundDue flags correct
+- Flagged items included in document
+- Submission stored with DRAFT status
+- VAT number validation works (10 digits)
+- Period validation works
+- Deadline calculation correct
+- No 'any' types used
+</validation_completed>
 
 </task_spec>

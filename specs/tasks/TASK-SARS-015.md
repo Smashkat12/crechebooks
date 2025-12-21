@@ -1,8 +1,8 @@
-<task_spec id="TASK-SARS-015" version="1.0">
+<task_spec id="TASK-SARS-015" version="3.0">
 
 <metadata>
   <title>EMP201 Generation Service</title>
-  <status>ready</status>
+  <status>COMPLETE</status>
   <layer>logic</layer>
   <sequence>32</sequence>
   <implements>
@@ -13,470 +13,347 @@
     <task_ref>TASK-SARS-013</task_ref>
     <task_ref>TASK-SARS-002</task_ref>
   </depends_on>
-  <estimated_complexity>high</estimated_complexity>
+  <completed_date>2025-12-21</completed_date>
+  <test_count>1155</test_count>
 </metadata>
 
 <context>
-This task creates the EMP201Service which generates the South African EMP201 monthly
-employer reconciliation return. The service aggregates all payroll records for a month,
-calculates total PAYE and UIF contributions using PAYEService and UIFService, validates
-employee data, and generates the EMP201 document structure according to SARS
-specifications. The EMP201 is submitted monthly by employers to declare total employee
-taxes and UIF collected. All calculations use Decimal.js with banker's rounding.
+Emp201Service generates South African EMP201 monthly employer reconciliation returns.
+
+**What it does:**
+- Aggregates all approved payroll records for a month
+- Calculates totals: PAYE, UIF (employee + employer), SDL
+- Builds employee-level breakdown with validation
+- Creates submission record with DRAFT status
+- Calculates deadline (7th of following month)
+- Handles SDL exemption (annual payroll < R500,000)
+
+**CRITICAL RULES:**
+- ALL monetary values are CENTS (integers)
+- Use Decimal.js ONLY for calculations, return integers
+- Banker's rounding (ROUND_HALF_EVEN)
+- Period format: YYYY-MM (e.g., "2025-01")
+- SDL exempt if estimated annual payroll < R500,000
+- Deadline = 7th of following month (or next business day if weekend)
+- Store as DRAFT initially (never auto-submit)
+- Flag validation issues but don't block generation
+- NO backwards compatibility - fail fast with descriptive errors
 </context>
 
-<input_context_files>
-  <file purpose="technical_spec">specs/technical/api-contracts.md#SarsService</file>
-  <file purpose="emp201_requirements">specs/requirements/sars-requirements.md</file>
-  <file purpose="paye_service">src/core/sars/paye.service.ts</file>
-  <file purpose="uif_service">src/core/sars/uif.service.ts</file>
-  <file purpose="payroll_entity">src/database/entities/payroll.entity.ts</file>
-  <file purpose="staff_entity">src/database/entities/staff.entity.ts</file>
-  <file purpose="sars_submission_entity">src/database/entities/sars-submission.entity.ts</file>
-  <file purpose="naming_conventions">specs/constitution.md#coding_standards</file>
-</input_context_files>
+<project_structure>
+ACTUAL file locations (DO NOT use src/core/sars/ - it doesn't exist):
 
-<prerequisites>
-  <check>TASK-SARS-012 completed (PAYEService exists)</check>
-  <check>TASK-SARS-013 completed (UIFService exists)</check>
-  <check>TASK-SARS-002 completed (SarsSubmission entity exists)</check>
-  <check>Decimal.js library installed</check>
-  <check>TypeScript compilation working</check>
-</prerequisites>
+```
+src/database/
+├── services/
+│   ├── paye.service.ts          # PayeService (dependency)
+│   ├── uif.service.ts           # UifService (dependency)
+│   └── emp201.service.ts        # Emp201Service class
+├── dto/
+│   └── emp201.dto.ts            # EMP201 specific DTOs
+├── constants/
+│   └── emp201.constants.ts      # SDL rate, thresholds, validation
+└── database.module.ts           # Add to providers and exports
 
-<scope>
-  <in_scope>
-    - Create EMP201Service class in src/core/sars/
-    - Implement generateEMP201 method (main generation logic)
-    - Implement aggregatePayroll method (sum all payroll for month)
-    - Implement validateEmployeeData method (validate staff records)
-    - Implement generateDocument method (create EMP201 structure)
-    - Use PAYEService and UIFService for calculations
-    - Create EMP201Document interface matching SARS format
-    - Create EMP201Summary interface for totals
-    - Handle PAYE, UIF employee, UIF employer totals
-    - Include SDL (Skills Development Levy) placeholder (1% of payroll)
-    - Store submission as DRAFT with SarsSubmissionRepository
-    - Use Decimal.js banker's rounding
-    - Unit tests with multi-employee scenarios
-  </in_scope>
-  <out_of_scope>
-    - API endpoints
-    - PDF rendering of EMP201
-    - eFiling integration
-    - Historical period submissions
-    - EMP501 annual reconciliation
-    - ETI (Employment Tax Incentive) calculations
-    - EMP201 amendment logic
-  </out_of_scope>
-</scope>
+tests/database/services/
+└── emp201.service.spec.ts       # Integration tests with real DB
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/core/sars/emp201.service.ts">
-      import Decimal from 'decimal.js';
-      import { PAYEService } from './paye.service';
-      import { UIFService } from './uif.service';
+prisma/schema.prisma:
+- SarsSubmission model with documentData JSON field
+- SubmissionType.EMP201 enum value
+- PayrollStatus.APPROVED for filtering payrolls
+```
+</project_structure>
 
-      interface EMP201Summary {
-        employeeCount: number;
-        totalGrossRemuneration: Decimal;
-        totalPAYE: Decimal;
-        totalUIFEmployee: Decimal;
-        totalUIFEmployer: Decimal;
-        totalUIF: Decimal;
-        totalSDL: Decimal;
-        totalDue: Decimal;
-      }
+<existing_infrastructure>
+Already in prisma/schema.prisma:
+```prisma
+enum SubmissionType {
+  VAT201
+  EMP201
+  IRP5
+  EMP501
+}
 
-      interface EMP201EmployeeRecord {
-        staffId: string;
-        employeeNumber: string | null;
-        fullName: string;
-        idNumber: string;
-        taxNumber: string | null;
-        grossRemuneration: Decimal;
-        paye: Decimal;
-        uifEmployee: Decimal;
-        uifEmployer: Decimal;
-      }
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+}
 
-      interface EMP201Document {
-        submissionId: string;
-        tenantId: string;
-        payeReference: string;
-        periodMonth: string;
-        summary: EMP201Summary;
-        employees: EMP201EmployeeRecord[];
-        validationIssues: string[];
-        generatedAt: Date;
-      }
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
 
-      @Injectable()
-      export class EMP201Service {
-        private readonly SDL_RATE = new Decimal('0.01'); // 1% SDL
+model SarsSubmission {
+  id              String           @id @default(uuid())
+  tenantId        String           @map("tenant_id")
+  submissionType  SubmissionType   @map("submission_type")
+  periodStart     DateTime         @map("period_start") @db.Date
+  periodEnd       DateTime         @map("period_end") @db.Date
+  deadline        DateTime         @db.Date
+  totalPayeCents  Int?             @map("total_paye_cents")
+  totalUifCents   Int?             @map("total_uif_cents")
+  totalSdlCents   Int?             @map("total_sdl_cents")
+  status          SubmissionStatus @default(DRAFT)
+  documentData    Json?            @map("document_data")
+}
 
-        constructor(
-          private payeService: PAYEService,
-          private uifService: UIFService,
-          private payrollRepository: PayrollRepository,
-          private staffRepository: StaffRepository,
-          private sarsSubmissionRepository: SarsSubmissionRepository
-        ) {}
+model Payroll {
+  id                  String        @id @default(uuid())
+  tenantId            String        @map("tenant_id")
+  staffId             String        @map("staff_id")
+  staff               Staff         @relation(...)
+  payPeriodStart      DateTime      @map("pay_period_start") @db.Date
+  payPeriodEnd        DateTime      @map("pay_period_end") @db.Date
+  status              PayrollStatus @default(DRAFT)
+  grossSalaryCents    Int           @map("gross_salary_cents")
+  payeCents           Int           @map("paye_cents")
+  uifEmployeeCents    Int           @map("uif_employee_cents")
+  uifEmployerCents    Int           @map("uif_employer_cents")
+}
 
-        async generateEMP201(
-          tenantId: string,
-          periodMonth: string
-        ): Promise&lt;SarsSubmission&gt;;
+model Tenant {
+  registrationNumber  String?       @map("registration_number")  // PAYE reference
+  tradingName         String?       @map("trading_name")
+}
+```
 
-        async aggregatePayroll(
-          tenantId: string,
-          periodMonth: string
-        ): Promise&lt;EMP201Summary&gt;;
+Dependencies to inject:
+- PrismaService
+- PayeService
+- UifService
+</existing_infrastructure>
 
-        validateEmployeeData(
-          staff: Staff[],
-          payrolls: Payroll[]
-        ): string[];
+<files_created>
+1. src/database/constants/emp201.constants.ts
+2. src/database/dto/emp201.dto.ts
+3. src/database/services/emp201.service.ts
+4. tests/database/services/emp201.service.spec.ts
+</files_created>
 
-        generateDocument(
-          tenantId: string,
-          payeReference: string,
-          periodMonth: string,
-          summary: EMP201Summary,
-          employees: EMP201EmployeeRecord[],
-          validationIssues: string[]
-        ): EMP201Document;
+<files_modified>
+1. src/database/services/index.ts - `export { Emp201Service } from './emp201.service';`
+2. src/database/dto/index.ts - `export * from './emp201.dto';`
+3. src/database/database.module.ts - Add Emp201Service to providers and exports arrays
+</files_modified>
 
-        private calculateSDL(totalGross: Decimal): Decimal;
-      }
-    </signature>
-    <signature file="src/core/sars/interfaces/emp201.interface.ts">
-      export interface EMP201Summary {
-        employeeCount: number;
-        totalGrossRemuneration: Decimal;
-        totalPAYE: Decimal;
-        totalUIFEmployee: Decimal;
-        totalUIFEmployer: Decimal;
-        totalUIF: Decimal;
-        totalSDL: Decimal;
-        totalDue: Decimal;
-      }
+<implementation_reference>
 
-      export interface EMP201EmployeeRecord {
-        staffId: string;
-        employeeNumber: string | null;
-        fullName: string;
-        idNumber: string;
-        taxNumber: string | null;
-        grossRemuneration: Decimal;
-        paye: Decimal;
-        uifEmployee: Decimal;
-        uifEmployer: Decimal;
-      }
+## Constants (src/database/constants/emp201.constants.ts)
+```typescript
+import Decimal from 'decimal.js';
 
-      export interface EMP201Document {
-        submissionId: string;
-        tenantId: string;
-        payeReference: string;
-        periodMonth: string;
-        summary: EMP201Summary;
-        employees: EMP201EmployeeRecord[];
-        validationIssues: string[];
-        generatedAt: Date;
-      }
-    </signature>
-  </signatures>
+export const EMP201_CONSTANTS = {
+  // SDL rate (1% of payroll)
+  SDL_RATE: new Decimal('0.01'),
 
-  <constraints>
-    - Must use Decimal.js for ALL monetary calculations
-    - Must use banker's rounding (ROUND_HALF_EVEN)
-    - Must aggregate all approved payroll records for month
-    - SDL rate is 1% of gross payroll (2025)
-    - Must NOT use 'any' type anywhere
-    - Must validate all staff have ID numbers
-    - Must warn if staff missing tax numbers
-    - Total due = PAYE + UIF Employee + UIF Employer + SDL
-    - Period must be in format "YYYY-MM"
-    - Must include employee-level breakdown
-    - Must flag validation issues but not block generation
-    - Document must be stored as JSON in sars_submissions table
-    - Status must be DRAFT initially
-    - Employee count must match number of unique staff in payroll
-    - All totals must reconcile to employee records
-  </constraints>
+  // SDL exemption threshold: R500,000 annual (in cents)
+  SDL_EXEMPTION_THRESHOLD_CENTS: 50000000,
 
-  <verification>
-    - TypeScript compiles without errors
-    - Unit tests pass with 100% coverage
-    - 5 employees, avg R15,000 gross: Reasonable PAYE, UIF, SDL totals
-    - Total due = PAYE + UIF + SDL
-    - Employee count matches unique staff
-    - Missing tax number triggers warning, not error
-    - Banker's rounding applied to all calculations
-    - SDL = 1% of total gross remuneration
-    - UIF capped at R177.12 per employee
-    - Submission stored with DRAFT status
-    - Period format validated (YYYY-MM)
-    - Employee records include all payroll for month
-    - Validation issues listed in document
-  </verification>
-</definition_of_done>
+  // Period format regex (YYYY-MM)
+  PERIOD_FORMAT_REGEX: /^\d{4}-(0[1-9]|1[0-2])$/,
 
-<pseudo_code>
-EMP201Service Implementation (src/core/sars/emp201.service.ts):
+  // Max employees per submission (SARS limit)
+  MAX_EMPLOYEES_PER_SUBMISSION: 500,
+};
 
-  Configure Decimal.js:
-    Decimal.set({
-      precision: 20,
-      rounding: Decimal.ROUND_HALF_EVEN
-    })
+export const EMP201_VALIDATION = {
+  // Warn if average salary > R100,000/month
+  HIGH_AVERAGE_SALARY_CENTS: 10000000,
+};
+```
 
-  generateEMP201(tenantId, periodMonth):
-    // Step 1: Validate period format
-    If !periodMonth.match(/^\d{4}-\d{2}$/):
-      Throw error "Invalid period format (expected YYYY-MM)"
+## DTO (src/database/dto/emp201.dto.ts)
+```typescript
+export interface Emp201EmployeeRecord {
+  staffId: string;
+  employeeNumber: string | null;
+  fullName: string;
+  idNumber: string;
+  taxNumber: string | null;
+  grossRemunerationCents: number;
+  payeCents: number;
+  uifEmployeeCents: number;
+  uifEmployerCents: number;
+}
 
-    // Step 2: Get tenant details
-    tenant = await tenantRepository.findById(tenantId)
-    If !tenant.payeReference:
-      Throw error "Tenant PAYE reference not configured"
+export interface Emp201Summary {
+  employeeCount: number;
+  totalGrossRemunerationCents: number;
+  totalPayeCents: number;
+  totalUifEmployeeCents: number;
+  totalUifEmployerCents: number;
+  totalUifCents: number;
+  totalSdlCents: number;
+  totalDueCents: number;
+}
 
-    // Step 3: Parse period dates
-    periodStart = startOfMonth(parseISO(periodMonth + '-01'))
-    periodEnd = endOfMonth(periodStart)
+export interface Emp201Document {
+  submissionId: string;
+  tenantId: string;
+  payeReference: string | null;
+  tradingName: string;
+  periodMonth: string;
+  periodStart: Date;
+  periodEnd: Date;
+  summary: Emp201Summary;
+  employees: Emp201EmployeeRecord[];
+  validationIssues: string[];
+  sdlApplicable: boolean;
+  generatedAt: Date;
+}
 
-    // Step 4: Get approved payroll records for month
-    payrolls = await payrollRepository.findByPeriod(
-      tenantId,
-      periodStart,
-      periodEnd,
-      { status: 'APPROVED' }
-    )
+export interface GenerateEmp201Dto {
+  tenantId: string;
+  periodMonth: string;
+}
 
-    If payrolls.length === 0:
-      Throw error "No approved payroll records for period"
+export interface Emp201ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+```
 
-    // Step 5: Get staff records
-    staffIds = payrolls.map(p => p.staffId)
-    staff = await staffRepository.findByIds(staffIds)
+## Service Methods
+```typescript
+@Injectable()
+export class Emp201Service {
+  private readonly logger = new Logger(Emp201Service.name);
 
-    // Step 6: Validate employee data
-    validationIssues = validateEmployeeData(staff, payrolls)
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly payeService: PayeService,
+    private readonly uifService: UifService,
+  ) {}
 
-    // Step 7: Build employee records with calculations
-    employees = []
-    totalGross = new Decimal(0)
-    totalPAYE = new Decimal(0)
-    totalUIFEmployee = new Decimal(0)
-    totalUIFEmployer = new Decimal(0)
+  // Main generation - creates SarsSubmission record
+  async generateEmp201(dto: GenerateEmp201Dto): Promise<SarsSubmission>;
 
-    For each payroll in payrolls:
-      staffRecord = staff.find(s => s.id === payroll.staffId)
+  // Aggregate payroll without creating submission
+  async aggregatePayroll(tenantId: string, periodMonth: string): Promise<Emp201Summary>;
 
-      employeeRecord = {
-        staffId: staffRecord.id,
-        employeeNumber: staffRecord.employeeNumber,
-        fullName: `${staffRecord.firstName} ${staffRecord.lastName}`,
-        idNumber: staffRecord.idNumber,
-        taxNumber: staffRecord.taxNumber,
-        grossRemuneration: new Decimal(payroll.grossSalaryCents).div(100),
-        paye: new Decimal(payroll.payeCents).div(100),
-        uifEmployee: new Decimal(payroll.uifEmployeeCents).div(100),
-        uifEmployer: new Decimal(payroll.uifEmployerCents).div(100)
-      }
+  // Validate employee data, return issues list
+  validateEmployeeData(employees: Emp201EmployeeRecord[]): string[];
 
-      employees.push(employeeRecord)
+  // Generate document structure
+  generateDocument(
+    tenantId: string,
+    payeReference: string | null,
+    tradingName: string,
+    periodMonth: string,
+    periodStart: Date,
+    periodEnd: Date,
+    summary: Emp201Summary,
+    employees: Emp201EmployeeRecord[],
+    validationIssues: string[],
+    sdlApplicable: boolean,
+  ): Emp201Document;
 
-      totalGross = totalGross.plus(employeeRecord.grossRemuneration)
-      totalPAYE = totalPAYE.plus(employeeRecord.paye)
-      totalUIFEmployee = totalUIFEmployee.plus(employeeRecord.uifEmployee)
-      totalUIFEmployer = totalUIFEmployer.plus(employeeRecord.uifEmployer)
+  // Validate document before submission
+  validateSubmission(document: Emp201Document): Emp201ValidationResult;
 
-    // Step 8: Calculate SDL
-    totalSDL = calculateSDL(totalGross)
+  // Calculate SDL with exemption check
+  calculateSdl(totalGrossCents: number): {
+    sdlCents: number;
+    sdlApplicable: boolean;
+  };
 
-    // Step 9: Create summary
-    summary = {
-      employeeCount: employees.length,
-      totalGrossRemuneration: totalGross,
-      totalPAYE,
-      totalUIFEmployee,
-      totalUIFEmployer,
-      totalUIF: totalUIFEmployee.plus(totalUIFEmployer),
-      totalSDL,
-      totalDue: totalPAYE.plus(totalUIFEmployee).plus(totalUIFEmployer).plus(totalSDL)
-    }
+  // Calculate deadline (7th of following month)
+  private calculateDeadline(periodEnd: Date): Date;
+}
+```
+</implementation_reference>
 
-    // Step 10: Generate document
-    document = generateDocument(
-      tenantId,
-      tenant.payeReference,
-      periodMonth,
-      summary,
-      employees,
-      validationIssues
-    )
+<test_requirements>
+CRITICAL: Tests use REAL PostgreSQL database.
 
-    // Step 11: Store submission as DRAFT
-    submission = await sarsSubmissionRepository.create({
-      tenantId,
-      submissionType: 'EMP201',
-      period: periodMonth,
-      status: 'DRAFT',
-      documentData: JSON.stringify(document),
-      flaggedItemsCount: validationIssues.length
-    })
+```typescript
+beforeAll(async () => {
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [PrismaService, PayeService, UifService, Emp201Service],
+  }).compile();
+  // ...
+});
 
-    Return submission
+beforeEach(async () => {
+  // Clean in FK order - VERY IMPORTANT
+  await prisma.sarsSubmission.deleteMany({});
+  await prisma.reminder.deleteMany({});
+  await prisma.reconciliation.deleteMany({});
+  await prisma.payroll.deleteMany({});
+  await prisma.staff.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.enrollment.deleteMany({});
+  await prisma.feeStructure.deleteMany({});
+  await prisma.child.deleteMany({});
+  await prisma.parent.deleteMany({});
+  await prisma.payeePattern.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.tenant.deleteMany({});
 
-  aggregatePayroll(tenantId, periodMonth):
-    // Get payrolls and calculate totals
-    periodStart = startOfMonth(parseISO(periodMonth + '-01'))
-    periodEnd = endOfMonth(periodStart)
+  // Create tenant with PAYE reference (registrationNumber field)
+  testTenant = await prisma.tenant.create({
+    data: {
+      name: 'EMP201 Test Creche',
+      tradingName: 'Happy Kids Creche',
+      registrationNumber: '1234567ABC',  // This is the PAYE reference
+      // ... other required fields
+    },
+  });
+});
+```
 
-    payrolls = await payrollRepository.findByPeriod(tenantId, periodStart, periodEnd)
+**Test scenarios implemented:**
+- Single employee: R20,000 gross, PAYE R2,500, UIF R200 → Total due calculated
+- Multiple employees: 5 employees, various salaries → Totals sum correctly
+- SDL calculation: 1% of total gross (if above R500k threshold)
+- SDL exemption: Monthly payroll under R41,667 → SDL = 0
+- Missing tax number: Warning in validationIssues, document still generates
+- Invalid ID number (not 13 digits): Error in validationIssues
+- No payrolls: Error thrown
+- Invalid period format: Error thrown ("2025/01" → should be "2025-01")
+- Deadline calculation: 7th of following month
+- Weekend deadline adjustment: Saturday → Monday
+- DRAFT status on creation
+- Document stored as JSON in SarsSubmission
+- Employee count matches unique staff in payroll
+</test_requirements>
 
-    summary = {
-      employeeCount: new Set(payrolls.map(p => p.staffId)).size,
-      totalGrossRemuneration: new Decimal(0),
-      totalPAYE: new Decimal(0),
-      totalUIFEmployee: new Decimal(0),
-      totalUIFEmployer: new Decimal(0),
-      totalUIF: new Decimal(0),
-      totalSDL: new Decimal(0),
-      totalDue: new Decimal(0)
-    }
+<lessons_learned>
+1. **SDL has exemption threshold** - Annual payroll < R500,000 = SDL exempt (check monthly * 12)
+2. **Period format YYYY-MM not YYYY/MM** - Use regex `/^\d{4}-(0[1-9]|1[0-2])$/`
+3. **registrationNumber is PAYE reference** - Tenant model uses registrationNumber for PAYE reference
+4. **Deadline is 7th, not last business day** - EMP201 due 7th of following month
+5. **Include both PayeService and UifService** - Even though we read from payroll, may need for validation
+6. **sdlApplicable flag in document** - Indicates whether SDL was calculated
+7. **validationIssues includes "(warning)" suffix** - Distinguishes warnings from errors
+8. **Multiple payrolls per staff possible** - Handle case where staff has multiple payroll entries
+9. **Use tradingName for display** - Fall back to name if tradingName not set
+10. **documentData uses JSON.parse(JSON.stringify())** - Convert to plain object for Prisma
+</lessons_learned>
 
-    For each payroll in payrolls:
-      summary.totalGrossRemuneration = summary.totalGrossRemuneration
-        .plus(new Decimal(payroll.grossSalaryCents).div(100))
-      summary.totalPAYE = summary.totalPAYE
-        .plus(new Decimal(payroll.payeCents).div(100))
-      summary.totalUIFEmployee = summary.totalUIFEmployee
-        .plus(new Decimal(payroll.uifEmployeeCents).div(100))
-      summary.totalUIFEmployer = summary.totalUIFEmployer
-        .plus(new Decimal(payroll.uifEmployerCents).div(100))
-
-    summary.totalUIF = summary.totalUIFEmployee.plus(summary.totalUIFEmployer)
-    summary.totalSDL = calculateSDL(summary.totalGrossRemuneration)
-    summary.totalDue = summary.totalPAYE
-      .plus(summary.totalUIF)
-      .plus(summary.totalSDL)
-
-    Return summary
-
-  validateEmployeeData(staff, payrolls):
-    issues = []
-
-    For each staffRecord in staff:
-      // Check ID number
-      If !staffRecord.idNumber OR staffRecord.idNumber.length !== 13:
-        issues.push(`Employee ${staffRecord.firstName} ${staffRecord.lastName}: Invalid ID number`)
-
-      // Warn about missing tax number
-      If !staffRecord.taxNumber:
-        issues.push(`Employee ${staffRecord.firstName} ${staffRecord.lastName}: Missing tax number`)
-
-    // Check all payrolls have matching staff
-    For each payroll in payrolls:
-      If !staff.find(s => s.id === payroll.staffId):
-        issues.push(`Payroll ${payroll.id}: Staff record not found`)
-
-    Return issues
-
-  generateDocument(tenantId, payeReference, periodMonth, summary, employees, validationIssues):
-    Return EMP201Document:
-      submissionId: uuid()
-      tenantId
-      payeReference
-      periodMonth
-      summary
-      employees
-      validationIssues
-      generatedAt: new Date()
-
-  private calculateSDL(totalGross: Decimal): Decimal:
-    // SDL = 1% of total gross payroll
-    sdl = totalGross.mul(SDL_RATE)
-    Return sdl
-
-Unit Tests (tests/core/sars/emp201.service.spec.ts):
-  Test case: Single employee
-    Input:
-      - 1 employee, R20,000 gross
-      - PAYE R2,500, UIF R200 (R100 each)
-    Expected:
-      - employeeCount: 1
-      - totalGross: R20,000
-      - totalPAYE: R2,500
-      - totalUIF: R200
-      - totalSDL: R200 (1%)
-      - totalDue: R2,900
-
-  Test case: Multiple employees
-    Input:
-      - 5 employees, various salaries
-    Expected:
-      - employeeCount: 5
-      - Totals sum correctly
-      - Each employee record present
-
-  Test case: Missing tax number
-    Input:
-      - Employee without tax number
-    Expected:
-      - Warning in validationIssues
-      - Document still generated
-
-  Test case: Invalid ID number
-    Input:
-      - Employee with 12-digit ID
-    Expected:
-      - Error in validationIssues
-
-  Test case: No payrolls
-    Input:
-      - Period with no approved payroll
-    Expected:
-      - Error thrown
-
-  Test case: Invalid period format
-    Input: "2025/01" instead of "2025-01"
-    Expected: ValidationError thrown
-</pseudo_code>
-
-<files_to_create>
-  <file path="src/core/sars/emp201.service.ts">EMP201Service class</file>
-  <file path="src/core/sars/interfaces/emp201.interface.ts">EMP201 interfaces</file>
-  <file path="tests/core/sars/emp201.service.spec.ts">Comprehensive unit tests</file>
-</files_to_create>
-
-<files_to_modify>
-  <file path="src/core/sars/index.ts">Export EMP201Service and interfaces</file>
-</files_to_modify>
-
-<validation_criteria>
-  <criterion>EMP201Service compiles without TypeScript errors</criterion>
-  <criterion>Decimal.js used for all monetary calculations</criterion>
-  <criterion>Banker's rounding applied throughout</criterion>
-  <criterion>SDL calculated as 1% of gross payroll</criterion>
-  <criterion>Total due = PAYE + UIF + SDL</criterion>
-  <criterion>Employee count matches unique staff</criterion>
-  <criterion>All employee records included</criterion>
-  <criterion>Validation issues logged but don't block generation</criterion>
-  <criterion>Missing tax numbers trigger warnings</criterion>
-  <criterion>Invalid ID numbers trigger errors</criterion>
-  <criterion>Submission stored with DRAFT status</criterion>
-  <criterion>Period format validated (YYYY-MM)</criterion>
-  <criterion>Unit tests cover single and multiple employees</criterion>
-  <criterion>No 'any' types used</criterion>
-</validation_criteria>
-
-<test_commands>
-  <command>npm run build</command>
-  <command>npm run test -- --grep "EMP201Service"</command>
-  <command>npm run lint -- src/core/sars/emp201.service.ts</command>
-</test_commands>
+<validation_completed>
+- TypeScript compiles without errors (npm run build)
+- Lint passes (npm run lint)
+- All tests pass with real PostgreSQL database
+- SDL calculation: 1% of gross when above threshold
+- SDL exemption working for small payrolls
+- Total due = PAYE + UIF employee + UIF employer + SDL
+- Employee count matches payroll count
+- Validation issues flagged but don't block generation
+- DRAFT status on submission creation
+- Deadline calculation handles weekends
+- Period format validated (YYYY-MM)
+- No 'any' types used
+</validation_completed>
 
 </task_spec>

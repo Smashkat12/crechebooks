@@ -33,7 +33,9 @@ export class UifService {
    * @returns UIF calculation result with employee and employer contributions
    */
   // eslint-disable-next-line @typescript-eslint/require-await
-  async calculateUif(grossRemunerationCents: number): Promise<UifCalculationResult> {
+  async calculateUif(
+    grossRemunerationCents: number,
+  ): Promise<UifCalculationResult> {
     this.logger.log(
       `Calculating UIF for gross ${grossRemunerationCents} cents`,
     );

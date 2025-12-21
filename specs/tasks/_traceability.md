@@ -145,9 +145,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Combined payments | REQ-PAY-006 | TASK-PAY-012 | ✅ Complete |
 | Arrears dashboard | REQ-PAY-007 | TASK-PAY-013, TASK-PAY-033 | Partial (TASK-PAY-013 ✅, TASK-PAY-033 pending) |
 | Parent payment history | REQ-PAY-008 | TASK-PAY-013 | ✅ Complete |
-| Automated reminders | REQ-PAY-009 | TASK-PAY-014 | Pending |
-| Reminder templates | REQ-PAY-010 | TASK-PAY-014 | Pending |
-| Escalation after reminders | REQ-PAY-011 | TASK-PAY-014 | Pending |
+| Automated reminders | REQ-PAY-009 | TASK-PAY-014 | ✅ Complete |
+| Reminder templates | REQ-PAY-010 | TASK-PAY-014 | ✅ Complete |
+| Escalation after reminders | REQ-PAY-011 | TASK-PAY-014 | ✅ Complete |
 | Arrears report export | REQ-PAY-012 | TASK-PAY-033 | Pending |
 
 ---
@@ -244,3 +244,4 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-20 | TASK-PAY-011 marked complete (Payment Matching Service - 905 tests) | AI Agent |
 | 2025-12-21 | TASK-PAY-012 marked complete (Payment Allocation Service - 945 tests) | AI Agent |
 | 2025-12-21 | TASK-PAY-013 marked complete (Arrears Calculation Service - 989 tests) | AI Agent |
+| 2025-12-21 | TASK-PAY-014 marked complete (Payment Reminder Service - 1027 tests) | AI Agent |

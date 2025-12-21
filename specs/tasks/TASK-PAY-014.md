@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Payment Reminder Service</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>27</sequence>
   <implements>

@@ -14,3 +14,4 @@ export * from './staff.repository';
 export * from './payroll.repository';
 export * from './sars-submission.repository';
 export * from './reconciliation.repository';
+export * from './reminder.repository';

@@ -10,3 +10,4 @@ export * from './pro-rata.service';
 export * from './payment-matching.service';
 export * from './payment-allocation.service';
 export * from './arrears.service';
+export * from './reminder.service';

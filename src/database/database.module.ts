@@ -23,6 +23,8 @@ import { ProRataService } from './services/pro-rata.service';
 import { PaymentMatchingService } from './services/payment-matching.service';
 import { PaymentAllocationService } from './services/payment-allocation.service';
 import { ArrearsService } from './services/arrears.service';
+import { ReminderRepository } from './repositories/reminder.repository';
+import { ReminderService } from './services/reminder.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 
@@ -53,6 +55,8 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     PaymentMatchingService,
     PaymentAllocationService,
     ArrearsService,
+    ReminderRepository,
+    ReminderService,
   ],
   exports: [
     TenantRepository,
@@ -79,6 +83,8 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     PaymentMatchingService,
     PaymentAllocationService,
     ArrearsService,
+    ReminderRepository,
+    ReminderService,
   ],
 })
 export class DatabaseModule {}

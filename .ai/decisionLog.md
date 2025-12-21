@@ -1,5 +1,29 @@
 # Decision Log
 
+## 2025-12-22: TASK-TRANS-031 Transaction Controller
+
+### Decision: Type Import for Decorator Compatibility
+- Used `import type { IUser }` instead of regular import
+- TypeScript `isolatedModules` + `emitDecoratorMetadata` requires type-only imports for decorator parameters
+
+### Decision: Prisma Decimal Conversion
+- Used `Number(primary.confidenceScore)` for Prisma Decimal to number conversion
+- Avoids Decimal type mismatch in DTO (TS2322)
+
+### Decision: Enum Type Casting
+- Used `primary.source as unknown as CategorizationSourceEnum` for Prisma enum compatibility
+- Prisma generates separate enum types from entity definitions
+
+### Decision: Reusable Pagination DTO
+- Created PaginationMetaDto in src/shared/dto/ for reuse across all API endpoints
+- Follows DRY principle for Surface Layer APIs
+
+### Decision: Snake_case API Query Parameters
+- Used snake_case for query params (date_from, is_reconciled) per REST conventions
+- Internal DTO converts to camelCase (dateFrom, isReconciled) for repository
+
+---
+
 ## 2025-12-21: TASK-TRANS-015 LLMWhisperer Integration
 
 ### Decision: Multi-line Parsing for LLMWhisperer Output

@@ -1,4 +1,4 @@
-<task_spec id="TASK-BILL-031" version="1.0">
+<task_spec id="TASK-BILL-031" version="3.0">
 
 <metadata>
   <title>Invoice Controller and DTOs</title>
@@ -10,315 +10,405 @@
   </implements>
   <depends_on>
     <task_ref>TASK-BILL-012</task_ref>
+    <task_ref>TASK-API-001</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
 </metadata>
 
+<critical_context>
+CRITICAL: You are an AI agent implementing this task. Read ALL sections before coding.
+
+PROJECT STATE:
+- NestJS 10.x backend with Prisma ORM
+- PostgreSQL database with multi-tenant isolation via tenantId
+- All monetary values stored as CENTS (integers), displayed as decimals
+- Authentication via Auth0 JWT with @CurrentUser() decorator
+- All API responses use snake_case per REST conventions
+- Tests must NOT use mock data - test real service interactions
+- NO backwards compatibility - fail fast with robust error logging
+</critical_context>
+
+<actual_file_paths>
+CRITICAL: These are the REAL paths verified against git history. DO NOT use paths from older specs.
+
+SERVICES (already exist):
+- src/database/services/invoice-generation.service.ts (InvoiceGenerationService)
+- src/database/services/invoice-delivery.service.ts (InvoiceDeliveryService)
+- src/database/services/enrollment.service.ts (EnrollmentService)
+
+REPOSITORIES (already exist):
+- src/database/repositories/invoice.repository.ts (InvoiceRepository)
+- src/database/repositories/invoice-line.repository.ts (InvoiceLineRepository)
+- src/database/repositories/parent.repository.ts (ParentRepository)
+- src/database/repositories/child.repository.ts (ChildRepository)
+
+ENTITIES (already exist):
+- src/database/entities/invoice.entity.ts (IInvoice, InvoiceStatus, DeliveryStatus, DeliveryMethod)
+- src/database/entities/invoice-line.entity.ts (IInvoiceLine, LineType)
+- src/database/entities/parent.entity.ts (IParent, PreferredContact)
+- src/database/entities/child.entity.ts (IChild, Gender)
+- src/database/entities/user.entity.ts (IUser, UserRole - from @prisma/client)
+
+DTOs (already exist):
+- src/database/dto/invoice.dto.ts (CreateInvoiceDto, UpdateInvoiceDto, InvoiceFilterDto)
+- src/database/dto/invoice-generation.dto.ts (InvoiceGenerationResult, GeneratedInvoiceInfo)
+
+AUTH (already exists):
+- src/api/auth/guards/jwt-auth.guard.ts (JwtAuthGuard)
+- src/api/auth/guards/roles.guard.ts (RolesGuard)
+- src/api/auth/decorators/current-user.decorator.ts (@CurrentUser)
+- src/api/auth/decorators/roles.decorator.ts (@Roles)
+
+API STRUCTURE PATTERN (follow this exactly):
+- src/api/transaction/transaction.controller.ts (reference for controller pattern)
+- src/api/transaction/transaction.module.ts (reference for module pattern)
+- src/api/transaction/dto/*.ts (reference for DTO pattern)
+
+MODULE REGISTRATION:
+- src/api/api.module.ts (must import BillingModule here)
+</actual_file_paths>
+
 <context>
-This task creates the Surface Layer invoice endpoints for the CrecheBooks system. It
-implements the REST API controller for listing invoices with filtering by status, parent,
-child, and date range. The controller exposes the BillingService business logic with
-proper DTOs including parent/child relationship data.
+This task creates the Invoice Controller with GET /invoices list endpoint for CrecheBooks.
+It exposes the existing InvoiceRepository with proper DTOs including parent/child relationship data.
+
+INVOICE DATA STRUCTURE (from invoice.entity.ts):
+- id: string (UUID)
+- tenantId: string (for multi-tenant isolation)
+- invoiceNumber: string (format: INV-YYYY-NNN)
+- parentId: string (FK to Parent)
+- childId: string (FK to Child)
+- billingPeriodStart/End: Date
+- issueDate: Date
+- dueDate: Date
+- subtotalCents: number (integer, amount before VAT)
+- vatCents: number (integer, VAT amount - 15%)
+- totalCents: number (integer, subtotal + VAT)
+- amountPaidCents: number (integer, amount paid so far)
+- status: InvoiceStatus enum (DRAFT, SENT, VIEWED, PARTIALLY_PAID, PAID, OVERDUE, VOID)
+- deliveryStatus: DeliveryStatus enum | null
+- isDeleted: boolean (soft delete flag)
+
+CRITICAL CONVERSIONS:
+- Store: cents (integer) → Display: decimal (divide by 100)
+- Store: Date object → Display: YYYY-MM-DD string
+- Store: camelCase → API: snake_case
 </context>
-
-<input_context_files>
-  <file purpose="billing_service">src/core/billing/billing.service.ts</file>
-  <file purpose="invoice_entity">src/core/billing/entities/invoice.entity.ts</file>
-  <file purpose="api_contracts">specs/technical/api-contracts.md#invoice_endpoints</file>
-</input_context_files>
-
-<prerequisites>
-  <check>TASK-BILL-012 completed (Billing service)</check>
-  <check>TASK-API-001 completed (Auth guards)</check>
-  <check>Invoice entities created</check>
-</prerequisites>
 
 <scope>
   <in_scope>
     - Create InvoiceController with GET /invoices endpoint
-    - Implement filtering by status, parent, child, date range
-    - Create response DTOs with parent/child information
-    - Create query/filter DTOs with validation
+    - Create BillingModule for API layer
+    - Create ListInvoicesQueryDto with filtering (status, parent_id, child_id, date_from, date_to)
+    - Create InvoiceResponseDto with parent/child summary data
+    - Create InvoiceListResponseDto with pagination
+    - Add pagination support (page, limit with defaults 1/20, max 100)
+    - Include parent name and email in response
+    - Include child name in response
+    - Apply tenant isolation using JWT tenantId
     - Add Swagger/OpenAPI annotations
-    - Implement pagination for invoice listing
-    - Add tenant isolation using JWT tenant_id
+    - Create controller unit tests
   </in_scope>
   <out_of_scope>
     - Invoice generation endpoint (TASK-BILL-032)
     - Invoice delivery endpoint (TASK-BILL-033)
-    - Invoice PDF generation (in service layer)
-    - Business logic (already in services)
+    - Business logic (already in InvoiceRepository/InvoiceGenerationService)
   </out_of_scope>
 </scope>
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/api/billing/invoice.controller.ts">
-      @Controller('invoices')
-      @ApiTags('Invoices')
-      @UseGuards(JwtAuthGuard)
-      export class InvoiceController {
-        @Get()
-        @ApiOperation({ summary: 'List invoices with filtering' })
-        @ApiResponse({ status: 200, type: InvoiceListResponseDto })
-        async listInvoices(
-          @Query() query: ListInvoicesQueryDto,
-          @CurrentUser() user: User
-        ): Promise&lt;InvoiceListResponseDto&gt;;
-      }
-    </signature>
-    <signature file="src/api/billing/dto/list-invoices.dto.ts">
-      export class ListInvoicesQueryDto {
-        @IsOptional()
-        @IsInt()
-        @Min(1)
-        @Type(() => Number)
-        @ApiProperty({ required: false, default: 1 })
-        page?: number = 1;
-
-        @IsOptional()
-        @IsInt()
-        @Min(1)
-        @Max(100)
-        @Type(() => Number)
-        @ApiProperty({ required: false, default: 20 })
-        limit?: number = 20;
-
-        @IsOptional()
-        @IsEnum(InvoiceStatus)
-        @ApiProperty({ enum: InvoiceStatus, required: false })
-        status?: InvoiceStatus;
-
-        @IsOptional()
-        @IsUUID()
-        @ApiProperty({ required: false })
-        parent_id?: string;
-
-        @IsOptional()
-        @IsUUID()
-        @ApiProperty({ required: false })
-        child_id?: string;
-
-        @IsOptional()
-        @IsISO8601()
-        @ApiProperty({ required: false, example: '2025-01-01' })
-        date_from?: string;
-
-        @IsOptional()
-        @IsISO8601()
-        @ApiProperty({ required: false, example: '2025-01-31' })
-        date_to?: string;
-      }
-    </signature>
-    <signature file="src/api/billing/dto/invoice-response.dto.ts">
-      export class ParentSummaryDto {
-        @ApiProperty()
-        id: string;
-
-        @ApiProperty()
-        name: string;
-
-        @ApiProperty({ required: false })
-        email?: string;
-      }
-
-      export class ChildSummaryDto {
-        @ApiProperty()
-        id: string;
-
-        @ApiProperty()
-        name: string;
-      }
-
-      export class InvoiceResponseDto {
-        @ApiProperty()
-        id: string;
-
-        @ApiProperty({ example: 'INV-2025-001' })
-        invoice_number: string;
-
-        @ApiProperty({ type: ParentSummaryDto })
-        parent: ParentSummaryDto;
-
-        @ApiProperty({ type: ChildSummaryDto })
-        child: ChildSummaryDto;
-
-        @ApiProperty({ example: '2025-01-01' })
-        issue_date: string;
-
-        @ApiProperty({ example: '2025-01-08' })
-        due_date: string;
-
-        @ApiProperty({ example: 3000.00 })
-        subtotal: number;
-
-        @ApiProperty({ example: 450.00 })
-        vat: number;
-
-        @ApiProperty({ example: 3450.00 })
-        total: number;
-
-        @ApiProperty({ example: 0.00 })
-        amount_paid: number;
-
-        @ApiProperty({ enum: InvoiceStatus })
-        status: InvoiceStatus;
-
-        @ApiProperty({ enum: DeliveryStatus, required: false })
-        delivery_status?: DeliveryStatus;
-
-        @ApiProperty({ required: false })
-        created_at: Date;
-      }
-
-      export class InvoiceListResponseDto {
-        @ApiProperty()
-        success: boolean;
-
-        @ApiProperty({ type: [InvoiceResponseDto] })
-        data: InvoiceResponseDto[];
-
-        @ApiProperty({ type: PaginationMetaDto })
-        meta: PaginationMetaDto;
-      }
-    </signature>
-  </signatures>
-
-  <constraints>
-    - All DTOs must use class-validator decorators
-    - All endpoints must have Swagger/OpenAPI documentation
-    - Pagination defaults: page=1, limit=20, max=100
-    - Dates must be in YYYY-MM-DD format
-    - Amounts must be in decimal format (not cents)
-    - Must filter by tenant_id from JWT
-    - Parent and child data must be embedded (not just IDs)
-    - Invoice number format: INV-YYYY-NNN
-  </constraints>
-
-  <verification>
-    - GET /invoices returns paginated list with defaults
-    - Filtering by status works correctly
-    - Filtering by parent_id works
-    - Filtering by child_id works
-    - Date range filtering works (inclusive)
-    - Parent and child info included in response
-    - Only returns invoices for current tenant
-    - Swagger UI shows all filters correctly
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-InvoiceController (src/api/billing/invoice.controller.ts):
-  @Controller('invoices')
-  @ApiTags('Invoices')
-  @UseGuards(JwtAuthGuard)
-  class InvoiceController:
-    constructor(private billingService: BillingService)
-
-    @Get()
-    @ApiOperation({ summary: 'List invoices with filtering' })
-    async listInvoices(query: ListInvoicesQueryDto, user: User):
-      # Extract tenant from JWT
-      tenantId = user.tenantId
-
-      # Build filter object
-      filters = {
-        status: query.status,
-        parentId: query.parent_id,
-        childId: query.child_id,
-        dateFrom: query.date_from ? new Date(query.date_from) : undefined,
-        dateTo: query.date_to ? new Date(query.date_to) : undefined
-      }
-
-      # Call service with pagination
-      result = await billingService.findInvoices({
-        tenantId,
-        filters,
-        page: query.page || 1,
-        limit: query.limit || 20
-      })
-
-      # Transform to response DTO
-      return {
-        success: true,
-        data: result.items.map(invoice => ({
-          id: invoice.id,
-          invoice_number: invoice.invoiceNumber,
-          parent: {
-            id: invoice.parent.id,
-            name: `${invoice.parent.firstName} ${invoice.parent.lastName}`,
-            email: invoice.parent.email
-          },
-          child: {
-            id: invoice.child.id,
-            name: `${invoice.child.firstName} ${invoice.child.lastName}`
-          },
-          issue_date: invoice.issueDate.toISOString().split('T')[0],
-          due_date: invoice.dueDate.toISOString().split('T')[0],
-          subtotal: invoice.subtotal.toNumber(),
-          vat: invoice.vat.toNumber(),
-          total: invoice.total.toNumber(),
-          amount_paid: invoice.amountPaid.toNumber(),
-          status: invoice.status,
-          delivery_status: invoice.deliveryStatus,
-          created_at: invoice.createdAt
-        })),
-        meta: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          totalPages: Math.ceil(result.total / result.limit)
-        }
-      }
-
-DTO Transformations:
-  # Parent name concatenation
-  parent.name = `${parent.firstName} ${parent.lastName}`
-
-  # Child name concatenation
-  child.name = `${child.firstName} ${child.lastName}`
-
-  # Decimal to number conversion
-  subtotal: invoice.subtotal.toNumber()
-  vat: invoice.vat.toNumber()
-  total: invoice.total.toNumber()
-
-  # Date to YYYY-MM-DD
-  issue_date: invoice.issueDate.toISOString().split('T')[0]
-</pseudo_code>
-
 <files_to_create>
-  <file path="src/api/billing/invoice.controller.ts">Invoice controller with list endpoint</file>
-  <file path="src/api/billing/billing.module.ts">Billing API module</file>
-  <file path="src/api/billing/dto/list-invoices.dto.ts">Query parameters DTO</file>
-  <file path="src/api/billing/dto/invoice-response.dto.ts">Invoice response DTOs</file>
-  <file path="src/api/billing/dto/parent-summary.dto.ts">Parent summary DTO</file>
-  <file path="src/api/billing/dto/child-summary.dto.ts">Child summary DTO</file>
-  <file path="tests/api/billing/invoice.controller.spec.ts">Invoice controller unit tests</file>
-  <file path="tests/api/billing/invoice.e2e-spec.ts">Invoice E2E tests</file>
+  <file path="src/api/billing/billing.module.ts">
+    Billing API module - imports repositories and services
+  </file>
+  <file path="src/api/billing/invoice.controller.ts">
+    Invoice controller with GET /invoices endpoint
+  </file>
+  <file path="src/api/billing/dto/index.ts">
+    DTO barrel export
+  </file>
+  <file path="src/api/billing/dto/list-invoices.dto.ts">
+    Query parameters DTO with validation
+  </file>
+  <file path="src/api/billing/dto/invoice-response.dto.ts">
+    Invoice response DTOs including parent/child summary
+  </file>
+  <file path="tests/api/billing/invoice.controller.spec.ts">
+    Invoice controller unit tests (minimum 8 tests)
+  </file>
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/app.module.ts">Import BillingApiModule</file>
+  <file path="src/api/api.module.ts">
+    Add BillingModule to imports array
+  </file>
 </files_to_modify>
+
+<implementation_signatures>
+// src/api/billing/dto/list-invoices.dto.ts
+import { IsOptional, IsInt, Min, Max, IsEnum, IsUUID, IsISO8601 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
+import { InvoiceStatus } from '../../../database/entities/invoice.entity';
+
+export class ListInvoicesQueryDto {
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  @ApiProperty({ required: false, default: 1 })
+  page?: number = 1;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @Type(() => Number)
+  @ApiProperty({ required: false, default: 20 })
+  limit?: number = 20;
+
+  @IsOptional()
+  @IsEnum(InvoiceStatus)
+  @ApiProperty({ enum: InvoiceStatus, required: false })
+  status?: InvoiceStatus;
+
+  @IsOptional()
+  @IsUUID()
+  @ApiProperty({ required: false, description: 'Filter by parent UUID' })
+  parent_id?: string;
+
+  @IsOptional()
+  @IsUUID()
+  @ApiProperty({ required: false, description: 'Filter by child UUID' })
+  child_id?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  @ApiProperty({ required: false, example: '2025-01-01', description: 'Issue date from (YYYY-MM-DD)' })
+  date_from?: string;
+
+  @IsOptional()
+  @IsISO8601()
+  @ApiProperty({ required: false, example: '2025-01-31', description: 'Issue date to (YYYY-MM-DD)' })
+  date_to?: string;
+}
+
+// src/api/billing/dto/invoice-response.dto.ts
+import { ApiProperty } from '@nestjs/swagger';
+import { InvoiceStatus, DeliveryStatus } from '../../../database/entities/invoice.entity';
+
+export class ParentSummaryDto {
+  @ApiProperty({ description: 'Parent UUID' })
+  id: string;
+
+  @ApiProperty({ example: 'John Smith' })
+  name: string;
+
+  @ApiProperty({ required: false, example: 'john@example.com' })
+  email?: string;
+}
+
+export class ChildSummaryDto {
+  @ApiProperty({ description: 'Child UUID' })
+  id: string;
+
+  @ApiProperty({ example: 'Emma Smith' })
+  name: string;
+}
+
+export class InvoiceResponseDto {
+  @ApiProperty({ description: 'Invoice UUID' })
+  id: string;
+
+  @ApiProperty({ example: 'INV-2025-001' })
+  invoice_number: string;
+
+  @ApiProperty({ type: ParentSummaryDto })
+  parent: ParentSummaryDto;
+
+  @ApiProperty({ type: ChildSummaryDto })
+  child: ChildSummaryDto;
+
+  @ApiProperty({ example: '2025-01-01', description: 'Billing period start (YYYY-MM-DD)' })
+  billing_period_start: string;
+
+  @ApiProperty({ example: '2025-01-31', description: 'Billing period end (YYYY-MM-DD)' })
+  billing_period_end: string;
+
+  @ApiProperty({ example: '2025-01-01', description: 'Invoice issue date (YYYY-MM-DD)' })
+  issue_date: string;
+
+  @ApiProperty({ example: '2025-01-08', description: 'Payment due date (YYYY-MM-DD)' })
+  due_date: string;
+
+  @ApiProperty({ example: 3000.00, description: 'Subtotal before VAT (in Rands, not cents)' })
+  subtotal: number;
+
+  @ApiProperty({ example: 450.00, description: 'VAT amount (in Rands, not cents)' })
+  vat: number;
+
+  @ApiProperty({ example: 3450.00, description: 'Total including VAT (in Rands, not cents)' })
+  total: number;
+
+  @ApiProperty({ example: 0.00, description: 'Amount already paid (in Rands, not cents)' })
+  amount_paid: number;
+
+  @ApiProperty({ example: 3450.00, description: 'Outstanding balance (in Rands, not cents)' })
+  balance_due: number;
+
+  @ApiProperty({ enum: InvoiceStatus })
+  status: InvoiceStatus;
+
+  @ApiProperty({ enum: DeliveryStatus, required: false })
+  delivery_status?: DeliveryStatus;
+
+  @ApiProperty()
+  created_at: Date;
+}
+
+export class PaginationMetaDto {
+  @ApiProperty()
+  page: number;
+
+  @ApiProperty()
+  limit: number;
+
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  totalPages: number;
+}
+
+export class InvoiceListResponseDto {
+  @ApiProperty()
+  success: boolean;
+
+  @ApiProperty({ type: [InvoiceResponseDto] })
+  data: InvoiceResponseDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  meta: PaginationMetaDto;
+}
+
+// src/api/billing/invoice.controller.ts
+@Controller('invoices')
+@ApiTags('Invoices')
+@ApiBearerAuth('JWT-auth')
+export class InvoiceController {
+  private readonly logger = new Logger(InvoiceController.name);
+
+  constructor(
+    private readonly invoiceRepo: InvoiceRepository,
+    private readonly parentRepo: ParentRepository,
+    private readonly childRepo: ChildRepository,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List invoices with filtering and pagination' })
+  @ApiResponse({ status: 200, type: InvoiceListResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async listInvoices(
+    @Query() query: ListInvoicesQueryDto,
+    @CurrentUser() user: IUser,
+  ): Promise<InvoiceListResponseDto>;
+}
+</implementation_signatures>
+
+<pseudo_code>
+InvoiceController.listInvoices():
+  1. Extract tenantId from user JWT
+  2. Build filter object from query params:
+     - status: query.status (if provided)
+     - parentId: query.parent_id (if provided)
+     - childId: query.child_id (if provided)
+  3. Call invoiceRepo.findByTenant(tenantId, filter)
+  4. Apply date range filter on results if date_from/date_to provided
+  5. Apply pagination (slice array based on page/limit)
+  6. For each invoice, fetch parent and child data:
+     - parent = await parentRepo.findById(invoice.parentId)
+     - child = await childRepo.findById(invoice.childId)
+  7. Transform to response DTO:
+     - Convert cents to decimal (divide by 100)
+     - Convert dates to YYYY-MM-DD strings
+     - Build parent/child summary objects
+     - Calculate balance_due = totalCents - amountPaidCents
+  8. Return { success: true, data: [...], meta: { page, limit, total, totalPages } }
+
+CRITICAL TRANSFORMATIONS:
+  - invoice.subtotalCents / 100 → subtotal (decimal)
+  - invoice.vatCents / 100 → vat (decimal)
+  - invoice.totalCents / 100 → total (decimal)
+  - invoice.amountPaidCents / 100 → amount_paid (decimal)
+  - (invoice.totalCents - invoice.amountPaidCents) / 100 → balance_due (decimal)
+  - invoice.issueDate.toISOString().split('T')[0] → issue_date (string)
+  - `${parent.firstName} ${parent.lastName}` → parent.name
+  - `${child.firstName} ${child.lastName}` → child.name
+</pseudo_code>
+
+<test_requirements>
+Create tests/api/billing/invoice.controller.spec.ts with minimum 8 tests:
+
+1. "should return paginated invoices with default params"
+2. "should apply status filter"
+3. "should apply parent_id filter"
+4. "should apply child_id filter"
+5. "should apply date range filters"
+6. "should include parent and child summary in response"
+7. "should convert cents to decimal amounts"
+8. "should enforce tenant isolation"
+
+TEST SETUP:
+- Mock InvoiceRepository, ParentRepository, ChildRepository
+- Use realistic test data with actual cents values (e.g., 345000 = R3450.00)
+- Verify cents → decimal conversion in assertions
+- Verify date → string conversion in assertions
+- Verify parent/child name concatenation in assertions
+
+REFERENCE: tests/api/transaction/transaction.controller.spec.ts for test patterns
+</test_requirements>
 
 <validation_criteria>
   <criterion>GET /invoices returns 200 with paginated data</criterion>
   <criterion>Default pagination works (page=1, limit=20)</criterion>
-  <criterion>All filters work (status, parent, child, dates)</criterion>
-  <criterion>Parent/child data embedded in response</criterion>
-  <criterion>Tenant isolation enforced</criterion>
-  <criterion>Amounts in decimal format</criterion>
-  <criterion>Dates in YYYY-MM-DD format</criterion>
+  <criterion>All filters work (status, parent_id, child_id, date_from, date_to)</criterion>
+  <criterion>Parent/child data embedded in response (not just IDs)</criterion>
+  <criterion>Tenant isolation enforced via user.tenantId</criterion>
+  <criterion>Amounts displayed as decimals (not cents)</criterion>
+  <criterion>Dates displayed as YYYY-MM-DD strings</criterion>
   <criterion>Swagger documentation complete</criterion>
-  <criterion>All tests pass with >80% coverage</criterion>
+  <criterion>All tests pass (minimum 8 tests)</criterion>
+  <criterion>npm run build passes</criterion>
+  <criterion>npm run lint passes with 0 warnings</criterion>
 </validation_criteria>
 
+<error_handling>
+CRITICAL: Fail fast with clear errors. No silent failures.
+
+1. Missing JWT token → 401 Unauthorized (handled by JwtAuthGuard)
+2. Invalid filter values → 400 Bad Request (handled by class-validator)
+3. Database errors → Log full error with context, throw appropriate HTTP exception
+4. Parent/child not found → Log warning, set name to 'Unknown' (don't fail entire request)
+
+LOGGING PATTERN:
+this.logger.debug(`Listing invoices for tenant=${tenantId}, filters=${JSON.stringify(filter)}`);
+this.logger.error(`Failed to fetch parent ${parentId}: ${error.message}`);
+</error_handling>
+
 <test_commands>
-  <command>npm run test -- invoice.controller.spec</command>
-  <command>npm run test:e2e -- invoice.e2e-spec</command>
-  <command>curl -H "Authorization: Bearer TOKEN" http://localhost:3000/v1/invoices</command>
-  <command>curl -H "Authorization: Bearer TOKEN" "http://localhost:3000/v1/invoices?status=SENT&amp;parent_id=UUID"</command>
+  <command>npm run test -- tests/api/billing/invoice.controller.spec.ts</command>
+  <command>npm run build</command>
+  <command>npm run lint</command>
 </test_commands>
+
+<learnings_from_similar_tasks>
+From TASK-TRANS-031, TASK-TRANS-032, TASK-TRANS-033:
+1. All services used by controller must be mocked in test providers array
+2. Import UserRole from '@prisma/client' for enum compatibility
+3. Use Type(() => Number) decorator for query params that need number conversion
+4. API responses use snake_case, internal code uses camelCase
+5. Date string format: date.toISOString().split('T')[0] produces YYYY-MM-DD
+6. PaginationMetaDto should match transaction pattern: { page, limit, total, totalPages }
+7. All repository/service mocks need jest.fn() for each method called
+</learnings_from_similar_tasks>
 
 </task_spec>

@@ -6,16 +6,9 @@
  * @description User entity interface matching Prisma schema exactly
  */
 
-/**
- * User roles in the system
- * Must match Prisma enum exactly
- */
-export enum UserRole {
-  OWNER = 'OWNER',
-  ADMIN = 'ADMIN',
-  VIEWER = 'VIEWER',
-  ACCOUNTANT = 'ACCOUNTANT',
-}
+// Re-export UserRole from Prisma to ensure type compatibility
+import { UserRole } from '@prisma/client';
+export { UserRole };
 
 /**
  * User entity interface

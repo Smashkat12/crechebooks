@@ -165,8 +165,8 @@ graph TD
 |-------|---------|-------|-------|--------------|--------|
 | 42 | TASK-API-001 | Authentication Controller and Guards | surface | TASK-CORE-003 | ✅ Complete |
 | 43 | TASK-TRANS-031 | Transaction Controller and DTOs | surface | TASK-TRANS-011, TASK-TRANS-012 | ✅ Complete |
-| 44 | TASK-TRANS-032 | Transaction Import Endpoint | surface | TASK-TRANS-031 | Pending |
-| 45 | TASK-TRANS-033 | Categorization Endpoint | surface | TASK-TRANS-031, TASK-AGENT-002 | Pending |
+| 44 | TASK-TRANS-032 | Transaction Import Endpoint | surface | TASK-TRANS-031 | ✅ Complete |
+| 45 | TASK-TRANS-033 | Categorization Endpoint | surface | TASK-TRANS-031, TASK-AGENT-002 | ✅ Complete |
 | 46 | TASK-BILL-031 | Invoice Controller and DTOs | surface | TASK-BILL-012 | Pending |
 | 47 | TASK-BILL-032 | Invoice Generation Endpoint | surface | TASK-BILL-031 | Pending |
 | 48 | TASK-BILL-033 | Invoice Delivery Endpoint | surface | TASK-BILL-031, TASK-BILL-013 | Pending |
@@ -199,11 +199,11 @@ graph TD
 | Foundation | 15 | 15 | 100% |
 | Logic | 22 | 22 | 100% |
 | Agents | 5 | 5 | 100% |
-| Surface | 16 | 2 | 12.5% |
+| Surface | 16 | 4 | 25% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **63** | **44** | **69.8%** |
+| **Total** | **63** | **46** | **73%** |
 
-**Last Updated**: 2025-12-22 (TASK-TRANS-031 completed - Transaction Controller/DTOs/GET endpoint - 9 new tests, total 1381 tests)
+**Last Updated**: 2025-12-22 (TASK-TRANS-032 and TASK-TRANS-033 completed - Import endpoint + Categorization endpoints - 24 controller tests, total 1396 tests)
 
 ---
 

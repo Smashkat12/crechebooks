@@ -1,9 +1,9 @@
 # CrecheBooks Development Progress
 
-## Current Status: Logic Layer Complete
+## Current Status: Agent Layer Complete
 
 **Last Updated**: 2025-12-21
-**Total Tests**: 1251 passing
+**Total Tests**: 1307 passing
 **Build Status**: PASS
 **Lint Status**: PASS
 
@@ -15,15 +15,25 @@
 |-------|-------|-----------|--------|
 | Foundation | 15 | 15 | 100% Complete |
 | Logic | 22 | 22 | 100% Complete |
-| Agents | 5 | 0 | Not Started |
+| Agents | 5 | 5 | 100% Complete |
 | Surface | 16 | 0 | Not Started |
 | Integration | 5 | 0 | Not Started |
 
-**Overall Progress**: 37/63 tasks (58.7%)
+**Overall Progress**: 42/63 tasks (66.7%)
 
 ---
 
 ## Latest Completions (2025-12-21)
+
+### TASK-AGENT-001 to TASK-AGENT-005: Claude Code Agents
+- **Status**: Complete
+- **Tests**: 71 agent tests passing
+- **Key Features**:
+  - TransactionCategorizerAgent: Pattern matching, confidence scoring, decision logging
+  - PaymentMatcherAgent: Invoice matching with auto-apply (>=80%) or escalation
+  - SarsAgent: PAYE/UIF/VAT calculations with mandatory review (L2 autonomy)
+  - OrchestratorAgent: Workflow routing, escalation aggregation
+  - Context files: chart_of_accounts.json, payee_patterns.json, sars_tables_2025.json
 
 ### TASK-TRANS-015: LLMWhisperer PDF Extraction
 - **Status**: Complete

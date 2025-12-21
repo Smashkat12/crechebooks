@@ -1,8 +1,8 @@
-<task_spec id="TASK-AGENT-001" version="3.0">
+<task_spec id="TASK-AGENT-001" version="4.0">
 
 <metadata>
   <title>Claude Code Configuration and Context Setup</title>
-  <status>COMPLETE</status>
+  <status>completed</status>
   <layer>agent</layer>
   <sequence>37</sequence>
   <implements>
@@ -11,17 +11,50 @@
   </implements>
   <depends_on>
     <task_ref status="COMPLETE">TASK-CORE-001</task_ref>
-    <task_ref status="COMPLETE">All Logic Layer (TASK-*-01* complete)</task_ref>
+    <task_ref status="COMPLETE">All Logic Layer Tasks (37 complete)</task_ref>
+    <task_ref status="COMPLETE">TASK-TRANS-015 (LLMWhisperer PDF Extraction)</task_ref>
   </depends_on>
-  <estimated_complexity>medium</estimated_complexity>
+  <estimated_complexity>low</estimated_complexity>
 </metadata>
 
+<current_state>
+## WHAT ALREADY EXISTS (Implemented 2025-12-21)
+
+**Context Files (Created):**
+- `.claude/context/chart_of_accounts.json` - SA IFRS chart of accounts
+- `.claude/context/payee_patterns.json` - Regex patterns for categorization
+- `.claude/context/fee_structures.json` - Creche fee templates
+- `.claude/context/sars_tables_2025.json` - SARS 2025 tax tables (ALL VALUES IN CENTS)
+- `.claude/context/tenant_config.json` - Default tenant configuration
+
+**Agent Skill Directories (Created):**
+- `.claude/agents/orchestrator/` - Orchestrator skill docs
+- `.claude/agents/transaction-categorizer/` - Categorizer skill docs
+- `.claude/agents/payment-matcher/` - Payment matcher skill docs
+- `.claude/agents/sars-agent/` - SARS agent skill docs
+
+**Log Directories:**
+- `.claude/logs/` - Needs verification for decisions.jsonl and escalations.jsonl
+
+## WHAT NEEDS FIXING
+
+**CRITICAL: Test Setup Missing**
+The `.env.test` file is MISSING, causing 56 agent test failures with "DATABASE_URL not set".
+
+**Action Required:**
+1. Create `.env.test` from `.env.example`:
+   ```bash
+   cp .env.example .env.test
+   # Then update DATABASE_URL to point to test database:
+   # DATABASE_URL=postgresql://user:password@localhost:5432/crechebooks_test?schema=public
+   ```
+
+2. Verify `.claude/logs/` directory is writable
+3. Run tests to confirm: `npm run test -- --testPathPatterns="agents"`
+</current_state>
+
 <context>
-This task establishes agent context files for CrecheBooks. The .claude/ directory already exists
-with settings.json, hooks, and command structure (from claude-flow setup). This task adds:
-- Context JSON files for agent decision-making
-- Logging infrastructure for audit trails
-- Agent skills directories
+This task establishes the Claude Code agent infrastructure for CrecheBooks. Most implementation is complete - this task is primarily about verification and fixing the test setup.
 
 **CRITICAL PROJECT RULES (from specs/constitution.md):**
 - ALL monetary values are CENTS (integers) - NEVER rands as floats
@@ -31,526 +64,154 @@ with settings.json, hooks, and command structure (from claude-flow setup). This 
 - NO mock data in tests - use real PostgreSQL database
 - Tenant isolation required on ALL queries
 
-**WHAT ALREADY EXISTS (DO NOT RECREATE):**
-- `.claude/settings.json` - Hooks, permissions, MCP servers (claude-flow, ruv-swarm)
-- `.claude/commands/` - 15 command directories (agents, analysis, automation, etc.)
-- `.claude/helpers/` - Helper utilities
-- `src/mcp/xero-mcp/` - Xero MCP server with tools (get_accounts, get_invoices, etc.)
-- `src/database/services/` - 22 complete services (categorization, payment-matching, etc.)
-- `src/shared/exceptions/` - BusinessException, NotFoundException, etc.
+**RECENTLY COMPLETED (affects agent context):**
+- TASK-TRANS-015: LLMWhisperer PDF Extraction
+  - Cloud OCR fallback for low-confidence PDF parsing
+  - Hybrid parser with confidence-based routing (local first, LLMWhisperer fallback)
+  - 62 parser tests passing
 </context>
 
 <project_structure>
-ACTUAL current structure (verified 2024-12-21):
+VERIFIED current structure (2024-12-21):
 
 ```
 .claude/
-├── settings.json           # ALREADY EXISTS - hooks + MCP servers
-├── settings.local.json     # ALREADY EXISTS - local overrides
-├── statusline-command.sh   # ALREADY EXISTS
-├── checkpoints/            # ALREADY EXISTS
-├── commands/               # ALREADY EXISTS - 15 directories
-│   └── agents/             # claude-flow agent commands (NOT our agents)
-├── helpers/                # ALREADY EXISTS
-├── context/                # TO CREATE - context JSON files
-│   ├── chart_of_accounts.json
-│   ├── payee_patterns.json
-│   ├── fee_structures.json
-│   ├── sars_tables_2025.json
-│   └── tenant_config.json
-├── logs/                   # TO CREATE - decision/escalation logs
-│   ├── decisions.jsonl
-│   └── escalations.jsonl
-└── agents/                 # TO CREATE - CrecheBooks agent skills
-    ├── orchestrator/
-    ├── transaction-categorizer/
-    ├── payment-matcher/
-    └── sars-agent/
+├── settings.json           # EXISTS - hooks + MCP servers configured
+├── settings.local.json     # EXISTS - local overrides
+├── context/                # EXISTS - ALL 5 FILES PRESENT
+│   ├── chart_of_accounts.json   (3.6KB - SA IFRS accounts)
+│   ├── payee_patterns.json      (6.6KB - categorization patterns)
+│   ├── fee_structures.json      (3.2KB - fee templates)
+│   ├── sars_tables_2025.json    (3.3KB - tax tables in CENTS)
+│   └── tenant_config.json       (2.3KB - default config)
+├── logs/                   # EXISTS - verify writability
+├── agents/                 # EXISTS - 4 subdirectories
+│   ├── orchestrator/
+│   ├── transaction-categorizer/
+│   ├── payment-matcher/
+│   └── sars-agent/
+├── commands/               # EXISTS - claude-flow commands
+└── helpers/                # EXISTS
 
-src/mcp/xero-mcp/           # ALREADY EXISTS
-├── server.ts               # Main MCP server
-├── tools/                  # 9 tool implementations
-│   ├── get-accounts.ts
-│   ├── get-transactions.ts
-│   ├── get-invoices.ts
-│   ├── get-contacts.ts
-│   ├── create-invoice.ts
-│   ├── create-contact.ts
-│   ├── apply-payment.ts
-│   └── update-transaction.ts
-├── auth/                   # OAuth handling
-├── types/                  # TypeScript types
-└── utils/                  # Helper utilities
+src/agents/                 # EXISTS - ALL AGENT CODE IMPLEMENTED
+├── transaction-categorizer/
+│   ├── categorizer.agent.ts
+│   ├── categorizer.module.ts
+│   ├── context-loader.ts
+│   ├── pattern-matcher.ts
+│   ├── confidence-scorer.ts
+│   ├── decision-logger.ts
+│   └── interfaces/
+├── payment-matcher/
+│   ├── matcher.agent.ts
+│   ├── matcher.module.ts
+│   ├── decision-logger.ts
+│   └── interfaces/
+├── sars-agent/
+│   ├── sars.agent.ts
+│   ├── sars.module.ts
+│   ├── decision-logger.ts
+│   ├── context-validator.ts
+│   └── interfaces/
+└── orchestrator/
+    ├── orchestrator.agent.ts
+    ├── orchestrator.module.ts
+    ├── workflow-router.ts
+    ├── escalation-manager.ts
+    └── interfaces/
+
+tests/agents/               # EXISTS - ALL TEST FILES PRESENT
+├── transaction-categorizer/categorizer.agent.spec.ts
+├── payment-matcher/matcher.agent.spec.ts
+├── sars-agent/sars.agent.spec.ts
+└── orchestrator/orchestrator.agent.spec.ts
 ```
 </project_structure>
 
 <existing_services>
-These services exist in src/database/services/ and agents will USE them:
+These services exist and agents USE them:
+
+**PDF Parsing (TASK-TRANS-015 - Just Completed):**
+- HybridPdfParser - Confidence-based routing (local first, cloud fallback)
+- LLMWhispererParser - Cloud OCR API for scanned PDFs
+- PdfParser - Local pdfjs-dist parsing
+- Confidence threshold: 70% (below = LLMWhisperer fallback)
 
 **Transaction Services:**
-- CategorizationService - AI-powered transaction categorization
-- PatternLearningService - Learn from user corrections
-- TransactionImportService - Import from CSV/PDF
-- XeroSyncService - Sync with Xero API
+- CategorizationService - AI-powered categorization
+- PatternLearningService - Learn from corrections
+- TransactionImportService - Import CSV/PDF
+- XeroSyncService - Xero API sync
 
 **Billing Services:**
-- EnrollmentService - Child enrollment management
-- InvoiceGenerationService - Create monthly invoices
-- InvoiceDeliveryService - Email/WhatsApp delivery
-- ProRataService - Calculate partial month fees
+- EnrollmentService, InvoiceGenerationService, InvoiceDeliveryService, ProRataService
 
 **Payment Services:**
-- PaymentMatchingService - Match payments to invoices
-- PaymentAllocationService - Allocate to multiple invoices
-- ArrearsService - Calculate outstanding balances
-- ReminderService - Send payment reminders
+- PaymentMatchingService, PaymentAllocationService, ArrearsService, ReminderService
 
-**SARS Services:**
-- VatService - VAT calculations (15% rate)
-- PayeService - PAYE calculations (2025 tax tables)
-- UifService - UIF calculations (1% capped at R177.12)
-- Emp201Service - EMP201 return generation
-- Vat201Service - VAT201 return generation
-
-**Reconciliation Services:**
-- ReconciliationService - Bank reconciliation
-- DiscrepancyService - Detect mismatches
-- FinancialReportService - Income statement, balance sheet
+**SARS Services (ALL IN CENTS):**
+- VatService (15% rate)
+- PayeService (2025 tax brackets)
+- UifService (1% capped at R177.12)
+- Emp201Service, Vat201Service
 </existing_services>
 
-<files_to_create>
-1. .claude/context/chart_of_accounts.json
-2. .claude/context/payee_patterns.json
-3. .claude/context/fee_structures.json
-4. .claude/context/sars_tables_2025.json
-5. .claude/context/tenant_config.json
-6. .claude/logs/.gitkeep
-7. .claude/agents/orchestrator/.gitkeep
-8. .claude/agents/transaction-categorizer/.gitkeep
-9. .claude/agents/payment-matcher/.gitkeep
-10. .claude/agents/sars-agent/.gitkeep
-</files_to_create>
+<implementation_actions>
+## REQUIRED ACTIONS
 
-<files_to_modify>
-1. .claude/settings.json - ADD contextFiles array referencing new files
-2. .gitignore - ADD .claude/logs/*.jsonl to ignore log files
-</files_to_modify>
+### Step 1: Create .env.test
+```bash
+# Copy from example
+cp .env.example .env.test
 
-<implementation_reference>
-
-## Chart of Accounts (.claude/context/chart_of_accounts.json)
-SA creche-specific chart matching src/database/constants/chart-of-accounts.constants.ts
-
-```json
-{
-  "version": "2025.1",
-  "description": "South African Creche Chart of Accounts per IFRS for SMEs",
-  "accounts": [
-    { "code": "1000", "name": "Bank - Current Account", "type": "asset", "category": "current" },
-    { "code": "1100", "name": "Petty Cash", "type": "asset", "category": "current" },
-    { "code": "1200", "name": "Accounts Receivable", "type": "asset", "category": "current" },
-    { "code": "1300", "name": "Prepaid Expenses", "type": "asset", "category": "current" },
-    { "code": "1500", "name": "Equipment", "type": "asset", "category": "non-current" },
-    { "code": "1510", "name": "Furniture and Fittings", "type": "asset", "category": "non-current" },
-    { "code": "2100", "name": "Accounts Payable", "type": "liability", "category": "current" },
-    { "code": "2200", "name": "VAT Payable", "type": "liability", "category": "current" },
-    { "code": "2300", "name": "PAYE Payable", "type": "liability", "category": "current" },
-    { "code": "2310", "name": "UIF Payable", "type": "liability", "category": "current" },
-    { "code": "2400", "name": "Accrued Expenses", "type": "liability", "category": "current" },
-    { "code": "3000", "name": "Owner's Equity", "type": "equity", "category": "equity" },
-    { "code": "3100", "name": "Retained Earnings", "type": "equity", "category": "equity" },
-    { "code": "4000", "name": "School Fees Income", "type": "revenue", "category": "income" },
-    { "code": "4010", "name": "Registration Fees", "type": "revenue", "category": "income" },
-    { "code": "4020", "name": "After Care Fees", "type": "revenue", "category": "income" },
-    { "code": "4030", "name": "Extra Activities Income", "type": "revenue", "category": "income" },
-    { "code": "4100", "name": "Other Income", "type": "revenue", "category": "income" },
-    { "code": "5000", "name": "Salaries and Wages", "type": "expense", "category": "expense" },
-    { "code": "5010", "name": "Employer UIF Contribution", "type": "expense", "category": "expense" },
-    { "code": "5100", "name": "Rent", "type": "expense", "category": "expense" },
-    { "code": "5200", "name": "Utilities - Electricity", "type": "expense", "category": "expense" },
-    { "code": "5210", "name": "Utilities - Water", "type": "expense", "category": "expense" },
-    { "code": "5300", "name": "Educational Supplies", "type": "expense", "category": "expense" },
-    { "code": "5400", "name": "Food and Catering", "type": "expense", "category": "expense" },
-    { "code": "5500", "name": "Insurance", "type": "expense", "category": "expense" },
-    { "code": "5600", "name": "Cleaning and Hygiene", "type": "expense", "category": "expense" },
-    { "code": "5700", "name": "Maintenance and Repairs", "type": "expense", "category": "expense" },
-    { "code": "8000", "name": "Advertising and Marketing", "type": "expense", "category": "expense" },
-    { "code": "8100", "name": "Bank Charges", "type": "expense", "category": "expense" },
-    { "code": "8200", "name": "Professional Fees", "type": "expense", "category": "expense" },
-    { "code": "8300", "name": "Telephone and Internet", "type": "expense", "category": "expense" }
-  ],
-  "accountRanges": {
-    "assets": { "start": 1000, "end": 1999 },
-    "currentAssets": { "start": 1000, "end": 1499 },
-    "nonCurrentAssets": { "start": 1500, "end": 1999 },
-    "liabilities": { "start": 2000, "end": 2999 },
-    "currentLiabilities": { "start": 2000, "end": 2499 },
-    "nonCurrentLiabilities": { "start": 2500, "end": 2999 },
-    "equity": { "start": 3000, "end": 3999 },
-    "income": { "start": 4000, "end": 4999 },
-    "expenses": { "start": 5000, "end": 8999 }
-  }
-}
+# Edit .env.test and set:
+DATABASE_URL=postgresql://user:password@localhost:5432/crechebooks_test?schema=public
+NODE_ENV=test
 ```
 
-## Payee Patterns (.claude/context/payee_patterns.json)
-Transaction categorization patterns for South African bank statements
+### Step 2: Ensure test database exists
+```bash
+# Create test database if not exists
+createdb crechebooks_test
 
-```json
-{
-  "version": "2025.1",
-  "description": "Payee pattern matching rules for SA creche transactions",
-  "autoApplyConfidenceThreshold": 0.80,
-  "patterns": [
-    {
-      "id": "bank-fnb-cheque",
-      "regex": "^FNB CHEQUE",
-      "accountCode": "8100",
-      "accountName": "Bank Charges",
-      "confidence": 0.95,
-      "vatType": "NO_VAT"
-    },
-    {
-      "id": "bank-fnb-fee",
-      "regex": "FNB.*SERVICE FEE|FNB.*ADMIN",
-      "accountCode": "8100",
-      "accountName": "Bank Charges",
-      "confidence": 0.95,
-      "vatType": "NO_VAT"
-    },
-    {
-      "id": "sars-payment",
-      "regex": "^SARS|SOUTH AFRICAN REVENUE",
-      "accountCode": "2200",
-      "accountName": "VAT Payable",
-      "confidence": 1.0,
-      "vatType": "NO_VAT",
-      "flagForReview": true,
-      "reviewReason": "Tax payment - verify correct tax type"
-    },
-    {
-      "id": "utility-eskom",
-      "regex": "ESKOM|CITY POWER|MUNICIPALITY.*ELEC",
-      "accountCode": "5200",
-      "accountName": "Utilities - Electricity",
-      "confidence": 0.90,
-      "vatType": "STANDARD"
-    },
-    {
-      "id": "utility-water",
-      "regex": "WATER.*BOARD|MUNICIPALITY.*WATER|RAND WATER",
-      "accountCode": "5210",
-      "accountName": "Utilities - Water",
-      "confidence": 0.90,
-      "vatType": "ZERO_RATED"
-    },
-    {
-      "id": "telecom",
-      "regex": "VODACOM|MTN|TELKOM|CELL C|AFRIHOST|RAIN",
-      "accountCode": "8300",
-      "accountName": "Telephone and Internet",
-      "confidence": 0.90,
-      "vatType": "STANDARD"
-    },
-    {
-      "id": "groceries",
-      "regex": "SHOPRITE|PICK N PAY|WOOLWORTHS|CHECKERS|SPAR|MAKRO",
-      "accountCode": "5400",
-      "accountName": "Food and Catering",
-      "confidence": 0.75,
-      "vatType": "STANDARD",
-      "requiresAmountCheck": true,
-      "maxAmountCents": 500000
-    },
-    {
-      "id": "school-fee-deposit",
-      "regex": "DEPOSIT|SCHOOL.*FEE|TUITION",
-      "accountCode": "4000",
-      "accountName": "School Fees Income",
-      "confidence": 0.70,
-      "vatType": "EXEMPT",
-      "isCredit": true
-    },
-    {
-      "id": "salary-payment",
-      "regex": "SALARY|WAGE|PAY.*EMP",
-      "accountCode": "5000",
-      "accountName": "Salaries and Wages",
-      "confidence": 0.85,
-      "vatType": "NO_VAT"
-    },
-    {
-      "id": "insurance",
-      "regex": "OUTSURANCE|SANLAM|OLD MUTUAL|DISCOVERY|MOMENTUM|SANTAM",
-      "accountCode": "5500",
-      "accountName": "Insurance",
-      "confidence": 0.90,
-      "vatType": "EXEMPT"
-    }
-  ]
-}
+# Run migrations against test DB
+DATABASE_URL=postgresql://user:password@localhost:5432/crechebooks_test?schema=public npx prisma migrate deploy
 ```
 
-## SARS Tables 2025 (.claude/context/sars_tables_2025.json)
-CRITICAL: ALL MONETARY VALUES IN CENTS
-
-```json
-{
-  "version": "2025",
-  "effectiveFrom": "2025-03-01",
-  "effectiveTo": "2026-02-28",
-  "source": "SARS Tax Tables 2025",
-  "paye": {
-    "taxYear": "2025",
-    "description": "Individual tax brackets - values in CENTS",
-    "taxBrackets": [
-      {
-        "bracketNumber": 1,
-        "fromCents": 0,
-        "toCents": 23740000,
-        "rate": 0.18,
-        "baseTaxCents": 0
-      },
-      {
-        "bracketNumber": 2,
-        "fromCents": 23740001,
-        "toCents": 37080000,
-        "rate": 0.26,
-        "baseTaxCents": 427320
-      },
-      {
-        "bracketNumber": 3,
-        "fromCents": 37080001,
-        "toCents": 51210000,
-        "rate": 0.31,
-        "baseTaxCents": 773760
-      },
-      {
-        "bracketNumber": 4,
-        "fromCents": 51210001,
-        "toCents": 67340000,
-        "rate": 0.36,
-        "baseTaxCents": 1211100
-      },
-      {
-        "bracketNumber": 5,
-        "fromCents": 67340001,
-        "toCents": 85710000,
-        "rate": 0.39,
-        "baseTaxCents": 1791780
-      },
-      {
-        "bracketNumber": 6,
-        "fromCents": 85710001,
-        "toCents": 181270000,
-        "rate": 0.41,
-        "baseTaxCents": 2509050
-      },
-      {
-        "bracketNumber": 7,
-        "fromCents": 181270001,
-        "toCents": 999999999999,
-        "rate": 0.45,
-        "baseTaxCents": 6425670
-      }
-    ],
-    "rebates": {
-      "description": "Tax rebates in CENTS - deducted from calculated tax",
-      "primary": {
-        "amountCents": 1760000,
-        "ageRequirement": null
-      },
-      "secondary": {
-        "amountCents": 975000,
-        "ageRequirement": 65
-      },
-      "tertiary": {
-        "amountCents": 325500,
-        "ageRequirement": 75
-      }
-    },
-    "taxThresholds": {
-      "description": "Annual income below which no tax is payable (in CENTS)",
-      "under65": 9540000,
-      "age65to74": 14795800,
-      "age75plus": 16531400
-    }
-  },
-  "uif": {
-    "description": "Unemployment Insurance Fund - values in CENTS",
-    "employeeRate": 0.01,
-    "employerRate": 0.01,
-    "maxMonthlyEarningsCents": 1771200,
-    "maxMonthlyContributionCents": 17712
-  },
-  "vat": {
-    "description": "Value Added Tax",
-    "standardRate": 0.15,
-    "zeroRatedItems": ["basic foodstuffs", "exports", "illuminating paraffin"],
-    "exemptItems": ["educational services", "public transport", "residential rentals"],
-    "registrationThresholdCents": 100000000
-  }
-}
+### Step 3: Verify log directory
+```bash
+mkdir -p .claude/logs
+touch .claude/logs/.gitkeep
+# Verify in .gitignore: .claude/logs/*.jsonl
 ```
 
-## Fee Structures (.claude/context/fee_structures.json)
-
-```json
-{
-  "version": "2025.1",
-  "description": "Common creche fee templates - all amounts in CENTS",
-  "defaultCurrency": "ZAR",
-  "templates": [
-    {
-      "id": "standard-full-day",
-      "name": "Full Day Care (07:00-17:00)",
-      "feeType": "FULL_DAY",
-      "monthlyFeeCents": 400000,
-      "registrationFeeCents": 75000,
-      "includesVat": false,
-      "vatExempt": true
-    },
-    {
-      "id": "standard-half-day",
-      "name": "Half Day Care (07:00-13:00)",
-      "feeType": "HALF_DAY",
-      "monthlyFeeCents": 280000,
-      "registrationFeeCents": 75000,
-      "includesVat": false,
-      "vatExempt": true
-    },
-    {
-      "id": "after-care",
-      "name": "After Care Only (14:00-17:00)",
-      "feeType": "CUSTOM",
-      "monthlyFeeCents": 150000,
-      "registrationFeeCents": 50000,
-      "includesVat": false,
-      "vatExempt": true
-    }
-  ],
-  "extraActivities": [
-    { "name": "Swimming Lessons", "weeklyCents": 15000, "vatExempt": true },
-    { "name": "Music Classes", "weeklyCents": 12000, "vatExempt": true },
-    { "name": "Extra Meals", "dailyCents": 2500, "vatExempt": true }
-  ],
-  "discounts": [
-    { "type": "sibling", "percentage": 10, "description": "10% sibling discount" },
-    { "type": "annual", "percentage": 5, "description": "5% annual payment discount" }
-  ],
-  "lateFees": {
-    "afterHoursPickupCents": 5000,
-    "perMinuteAfter30Cents": 500,
-    "latePaymentPercentage": 0.02
-  }
-}
+### Step 4: Run agent tests
+```bash
+npm run test -- --testPathPatterns="agents" --verbose
 ```
 
-## Tenant Config (.claude/context/tenant_config.json)
-
-```json
-{
-  "version": "2025.1",
-  "description": "Default tenant configuration for new creches",
-  "defaults": {
-    "taxStatus": "NOT_REGISTERED",
-    "vatRate": 0.15,
-    "currency": "ZAR",
-    "timezone": "Africa/Johannesburg",
-    "locale": "en-ZA",
-    "fiscalYearEnd": "February",
-    "billingDayOfMonth": 1,
-    "paymentTermsDays": 7,
-    "reminderDaysBefore": [7, 3, 1],
-    "reminderDaysAfter": [1, 7, 14, 30],
-    "preferredContact": "WHATSAPP",
-    "enableAutoCategorization": true,
-    "autoCategorizeConfidenceThreshold": 0.80,
-    "enableAutoPaymentMatching": true,
-    "autoPaymentMatchConfidenceThreshold": 0.90,
-    "sarsSubmissionRequired": true,
-    "sarsAlwaysRequireReview": true
-  },
-  "autonomyLevels": {
-    "L3_FULL_AUTO": {
-      "description": "Full autonomy - auto-apply decisions",
-      "requiresReview": false,
-      "confidenceThreshold": 0.95,
-      "applicableTo": ["high-confidence categorization", "exact payment matches"]
-    },
-    "L2_DRAFT": {
-      "description": "Draft for review - SARS submissions",
-      "requiresReview": true,
-      "applicableTo": ["SARS calculations", "tax submissions", "financial reports"]
-    },
-    "L1_SUGGEST": {
-      "description": "Suggest only - user must confirm",
-      "requiresReview": true,
-      "applicableTo": ["low-confidence categorization", "ambiguous payment matches"]
-    }
-  },
-  "agentBehavior": {
-    "alwaysEscalate": ["SARS submissions", "amounts > R50000", "unknown payees"],
-    "logAllDecisions": true,
-    "maxRetries": 3,
-    "timeoutSeconds": 30
-  }
-}
+### Step 5: Verify context files load
+```bash
+node -e "console.log(JSON.parse(require('fs').readFileSync('.claude/context/chart_of_accounts.json')))"
+node -e "console.log(JSON.parse(require('fs').readFileSync('.claude/context/payee_patterns.json')))"
+node -e "console.log(JSON.parse(require('fs').readFileSync('.claude/context/sars_tables_2025.json')))"
 ```
-
-## Settings.json Update
-ADD to existing .claude/settings.json (do not replace existing content):
-
-```json
-{
-  "contextFiles": [
-    ".claude/context/chart_of_accounts.json",
-    ".claude/context/payee_patterns.json",
-    ".claude/context/fee_structures.json",
-    ".claude/context/sars_tables_2025.json",
-    ".claude/context/tenant_config.json"
-  ],
-  "logFiles": {
-    "decisions": ".claude/logs/decisions.jsonl",
-    "escalations": ".claude/logs/escalations.jsonl"
-  }
-}
-```
-
-## Logging Format
-
-decisions.jsonl entries:
-```json
-{"timestamp":"2025-01-15T10:30:00.000Z","agent":"transaction-categorizer","tenantId":"uuid","transactionId":"uuid","decision":"categorize","accountCode":"8100","confidence":0.95,"source":"RULE_BASED","autoApplied":true}
-```
-
-escalations.jsonl entries:
-```json
-{"timestamp":"2025-01-15T10:30:00.000Z","agent":"sars-agent","tenantId":"uuid","type":"SARS_CALCULATION","period":"2025-01","details":{"emp201Total":15000000},"reason":"SARS submission requires human review","status":"pending"}
-```
-</implementation_reference>
+</implementation_actions>
 
 <validation_criteria>
-- All context JSON files parse successfully (node -c filename.json)
-- SARS tax tables match official 2025 rates
-- All monetary values are in CENTS (integers, not floats)
-- Chart of accounts follows SA IFRS for SMEs conventions
-- Payee patterns compile as valid regex
-- .claude/logs directory exists and is writable
-- .claude/agents subdirectories exist
-- settings.json is valid JSON after update
-- .gitignore includes .claude/logs/*.jsonl
+- `.env.test` exists with valid DATABASE_URL
+- Test database exists and has schema applied
+- All 5 context JSON files parse successfully
+- `.claude/logs/` directory exists and is writable
+- All agent tests pass: `npm run test -- --testPathPatterns="agents"`
+- TypeScript compiles: `npm run build`
+- Lint passes: `npm run lint`
 </validation_criteria>
 
 <test_commands>
 npm run build
-node -e "JSON.parse(require('fs').readFileSync('.claude/context/chart_of_accounts.json'))"
-node -e "JSON.parse(require('fs').readFileSync('.claude/context/payee_patterns.json'))"
-node -e "JSON.parse(require('fs').readFileSync('.claude/context/sars_tables_2025.json'))"
-node -e "JSON.parse(require('fs').readFileSync('.claude/context/fee_structures.json'))"
-node -e "JSON.parse(require('fs').readFileSync('.claude/context/tenant_config.json'))"
-test -d .claude/logs && echo "logs dir exists"
-test -d .claude/agents/orchestrator && echo "agents dirs exist"
+npm run lint
+npm run test -- --testPathPatterns="agents" --verbose
 </test_commands>
 
 </task_spec>

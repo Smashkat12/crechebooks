@@ -38,8 +38,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 
 | Tech Spec Item | Type | Covered by Task ID | Status |
 |----------------|------|-------------------|--------|
-| POST /auth/login | endpoint | TASK-API-001 | Pending |
-| POST /auth/callback | endpoint | TASK-API-001 | Pending |
+| POST /auth/login | endpoint | TASK-API-001 | ✅ Complete |
+| POST /auth/callback | endpoint | TASK-API-001 | ✅ Complete |
+| POST /auth/refresh | endpoint | TASK-API-001 | ✅ Complete |
 | GET /transactions | endpoint | TASK-TRANS-031 | Pending |
 | POST /transactions/import | endpoint | TASK-TRANS-032 | Pending |
 | PUT /transactions/{id}/categorize | endpoint | TASK-TRANS-033 | Pending |
@@ -264,3 +265,5 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-21 | TASK-RECON-012 marked complete (Discrepancy Detection Service - 17 tests) | AI Agent |
 | 2025-12-21 | TASK-RECON-013 marked complete (Financial Report Service - 12 tests, total 1211) | AI Agent |
 | 2025-12-21 | TASK-TRANS-015 marked complete (LLMWhisperer PDF Extraction - 62 parser tests, total 1251) | AI Agent |
+| 2025-12-21 | TASK-AGENT-001 to TASK-AGENT-005 marked complete (Claude Code Agents - 56 tests, total 1307) | AI Agent |
+| 2025-12-21 | TASK-API-001 marked complete (Auth Controller/Guards/Service - 65 auth tests, total 1372) | AI Agent |

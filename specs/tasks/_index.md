@@ -163,7 +163,7 @@ graph TD
 
 | Order | Task ID | Title | Layer | Dependencies | Status |
 |-------|---------|-------|-------|--------------|--------|
-| 42 | TASK-API-001 | Authentication Controller and Guards | surface | TASK-CORE-003 | Pending |
+| 42 | TASK-API-001 | Authentication Controller and Guards | surface | TASK-CORE-003 | ✅ Complete |
 | 43 | TASK-TRANS-031 | Transaction Controller and DTOs | surface | TASK-TRANS-011, TASK-TRANS-012 | Pending |
 | 44 | TASK-TRANS-032 | Transaction Import Endpoint | surface | TASK-TRANS-031 | Pending |
 | 45 | TASK-TRANS-033 | Categorization Endpoint | surface | TASK-TRANS-031, TASK-AGENT-002 | Pending |
@@ -199,11 +199,11 @@ graph TD
 | Foundation | 15 | 15 | 100% |
 | Logic | 22 | 22 | 100% |
 | Agents | 5 | 5 | 100% |
-| Surface | 16 | 0 | 0% |
+| Surface | 16 | 1 | 6.25% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **63** | **42** | **66.7%** |
+| **Total** | **63** | **43** | **68.3%** |
 
-**Last Updated**: 2025-12-21 (TASK-AGENT-001 to TASK-AGENT-005 completed - 71 agent tests, total 1307 tests)
+**Last Updated**: 2025-12-21 (TASK-API-001 completed - Authentication Controller/Guards/Auth Service - 65 auth tests, total 1372 tests)
 
 ---
 

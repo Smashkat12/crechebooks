@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-21T00:04:07.481Z",
+  "timestamp": "2025-12-21T22:26:33.225Z",
   "version": "1.0",
   "entries": [
     {
@@ -1673,16 +1673,731 @@
       "checksum": "0f49ff854a27b9b492900f8900cb5f201703e142bde97c138cb71a744ae5d5fe",
       "references": [],
       "dependencies": []
+    },
+    {
+      "id": "entry_mjeyzp3p_e9i3e07w7",
+      "key": "agent5/module",
+      "value": {
+        "files": [
+          "src/database/database.module.ts",
+          "src/database/services/index.ts",
+          "src/database/repositories/index.ts"
+        ],
+        "added": [
+          "ReminderRepository",
+          "ReminderService"
+        ],
+        "status": "registered",
+        "exports": {
+          "dto": "already_added_by_agent2",
+          "services": "added",
+          "repositories": "added",
+          "module_providers": "added",
+          "module_exports": "added"
+        },
+        "next_agents": [
+          "agent6_tests",
+          "agent7_validation"
+        ]
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T00:09:33.397Z",
+      "updatedAt": "2025-12-21T00:09:33.397Z",
+      "lastAccessedAt": "2025-12-21T00:09:33.397Z",
+      "version": 1,
+      "size": 404,
+      "compressed": false,
+      "checksum": "c96f63a92bb0926c05bff77baee87cd3f074d6a92d988fec37591aafac75e6cf",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjez0hu7_q44g5qy0z",
+      "key": "agent5/summary",
+      "value": "{\"agent\":\"agent5_module_registration\",\"status\":\"complete\",\"timestamp\":\"2025-12-21T00:09:33Z\",\"modifications\":[{\"file\":\"src/database/database.module.ts\",\"changes\":[\"Added ReminderRepository import\",\"Added ReminderService import\",\"Added ReminderRepository to providers\",\"Added ReminderService to providers\",\"Added ReminderRepository to exports\",\"Added ReminderService to exports\"]},{\"file\":\"src/database/services/index.ts\",\"changes\":[\"Added export for reminder.service\"]},{\"file\":\"src/database/repositories/index.ts\",\"changes\":[\"Added export for reminder.repository\"]},{\"file\":\"src/database/dto/index.ts\",\"changes\":[\"Already exported by agent2 - verified\"]}],\"verification\":{\"typescript_compilation\":\"passed\",\"all_exports_added\":true},\"for_next_agents\":{\"agent6\":\"Write comprehensive tests at tests/database/services/reminder.service.spec.ts\",\"agent7\":\"Final validation and integration checks\",\"test_requirements\":{\"coverage_target\":\"90%\",\"test_types\":[\"unit\",\"integration\"],\"dependencies\":[\"ReminderRepository\",\"InvoiceRepository\",\"PaymentRepository\",\"EmailService\",\"WhatsAppService\"]}}}",
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T00:10:10.639Z",
+      "updatedAt": "2025-12-21T00:10:10.639Z",
+      "lastAccessedAt": "2025-12-21T00:10:10.639Z",
+      "version": 1,
+      "size": 1214,
+      "compressed": true,
+      "checksum": "461c80e9e4a36ff0f3a2f4e10acf7c630403926e5fc3303123af5264955cb6a1",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjez0q7z_4guakgr08",
+      "key": "agent5/registration_details",
+      "value": {
+        "reminder_repository": {
+          "class": "ReminderRepository",
+          "file": "src/database/repositories/reminder.repository.ts",
+          "exported_in": [
+            "src/database/repositories/index.ts",
+            "src/database/database.module.ts"
+          ],
+          "available_for_injection": true
+        },
+        "reminder_service": {
+          "class": "ReminderService",
+          "file": "src/database/services/reminder.service.ts",
+          "exported_in": [
+            "src/database/services/index.ts",
+            "src/database/database.module.ts"
+          ],
+          "dependencies": [
+            "ReminderRepository",
+            "InvoiceRepository",
+            "PaymentRepository",
+            "EmailService",
+            "WhatsAppService"
+          ],
+          "available_for_injection": true
+        },
+        "module_status": {
+          "database_module": "fully_registered",
+          "all_index_files": "updated",
+          "typescript_compilation": "verified",
+          "ready_for_testing": true
+        }
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T00:10:21.504Z",
+      "updatedAt": "2025-12-21T00:10:21.504Z",
+      "lastAccessedAt": "2025-12-21T00:10:21.504Z",
+      "version": 1,
+      "size": 726,
+      "compressed": false,
+      "checksum": "a0e58ebed6429a386b8412f89a06052d0172efbae0b8c3295b0ddf41771a7981",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjez5d2d_tohnn46da",
+      "key": "agent6/tests",
+      "value": {
+        "file": "tests/database/services/reminder.service.spec.ts",
+        "testCount": 45,
+        "describes": [
+          "sendReminders",
+          "generateReminderContent",
+          "scheduleReminder",
+          "escalateOverdue",
+          "getReminderHistory",
+          "determineEscalationLevel"
+        ],
+        "status": "completed",
+        "coverage": [
+          "real database operations",
+          "mocked external services only",
+          "proper FK cleanup",
+          "40+ comprehensive tests",
+          "all business logic paths covered"
+        ]
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T00:13:57.733Z",
+      "updatedAt": "2025-12-21T00:13:57.733Z",
+      "lastAccessedAt": "2025-12-21T00:13:57.733Z",
+      "version": 1,
+      "size": 418,
+      "compressed": false,
+      "checksum": "cebde32a44c49746071a6b85d8ae719936540a863312fc618cf9c13692ca44d2",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjez9wtq_e6iepnbz1",
+      "key": "agent6/completion",
+      "value": {
+        "task": "TASK-PAY-014 Integration Tests",
+        "file": "tests/database/services/reminder.service.spec.ts",
+        "testCount": 38,
+        "allPassing": true,
+        "describes": [
+          "sendReminders (12 tests)",
+          "generateReminderContent (8 tests)",
+          "scheduleReminder (4 tests)",
+          "escalateOverdue (5 tests)",
+          "getReminderHistory (4 tests)",
+          "determineEscalationLevel (5 tests)"
+        ],
+        "keyFeatures": [
+          "Real PostgreSQL database",
+          "Mocked external services only (Email, WhatsApp)",
+          "Proper FK-order cleanup in afterEach",
+          "Comprehensive business logic coverage",
+          "Escalation level testing",
+          "Multi-channel delivery testing",
+          "Duplicate prevention testing",
+          "Batch processing testing"
+        ],
+        "readyForAgent7": true
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T00:17:29.966Z",
+      "updatedAt": "2025-12-21T00:17:29.966Z",
+      "lastAccessedAt": "2025-12-21T00:17:29.966Z",
+      "version": 1,
+      "size": 675,
+      "compressed": false,
+      "checksum": "304c81eb3b23a480f6dd42c8eef49fce71832596e5298e125fd54be2d9717439",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8hdwv_ikm9x8101",
+      "key": "auth/packages",
+      "value": {
+        "installed": true,
+        "packages": [
+          "@nestjs/passport",
+          "@nestjs/jwt",
+          "@nestjs/swagger",
+          "passport",
+          "passport-jwt",
+          "jwks-rsa",
+          "swagger-ui-express"
+        ],
+        "versions": {
+          "@nestjs/passport": "^11.0.5",
+          "@nestjs/jwt": "^11.0.2",
+          "@nestjs/swagger": "^11.2.3",
+          "passport": "^0.7.0",
+          "passport-jwt": "^4.0.1",
+          "jwks-rsa": "^3.2.0",
+          "swagger-ui-express": "^5.0.1",
+          "@types/passport-jwt": "^4.0.1"
+        },
+        "timestamp": "2025-12-21T00:00:00Z"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:23:01.423Z",
+      "updatedAt": "2025-12-21T21:23:01.423Z",
+      "lastAccessedAt": "2025-12-21T21:23:01.423Z",
+      "version": 1,
+      "size": 423,
+      "compressed": false,
+      "checksum": "a53468ed59d2e4afb74661c41553894957fa275400bb8ecb373e8fb641926f9b",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8k1x6_arpvm0tbt",
+      "key": "auth/dtos",
+      "value": {
+        "created": true,
+        "files": [
+          "login.dto.ts",
+          "callback.dto.ts",
+          "refresh.dto.ts",
+          "user-response.dto.ts",
+          "index.ts"
+        ],
+        "path": "src/api/auth/dto/",
+        "userRoleImport": "../../../database/entities/user.entity",
+        "timestamp": "2025-12-21T00:00:00Z"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:25:05.850Z",
+      "updatedAt": "2025-12-21T21:25:05.850Z",
+      "lastAccessedAt": "2025-12-21T21:25:05.850Z",
+      "version": 1,
+      "size": 259,
+      "compressed": false,
+      "checksum": "37899ecb8ffe82fbd373b24e435375d4e0c5c14d2ebe26ea527d117e082e4068",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8m2hh_2uokax0ri",
+      "key": "auth/decorators",
+      "value": {
+        "created": true,
+        "files": [
+          "public.decorator.ts",
+          "roles.decorator.ts",
+          "current-user.decorator.ts",
+          "index.ts"
+        ],
+        "exports": [
+          "IS_PUBLIC_KEY",
+          "ROLES_KEY",
+          "Public",
+          "Roles",
+          "CurrentUser"
+        ],
+        "path": "src/api/auth/decorators/"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:26:39.893Z",
+      "updatedAt": "2025-12-21T21:26:39.893Z",
+      "lastAccessedAt": "2025-12-21T21:26:39.893Z",
+      "version": 1,
+      "size": 242,
+      "compressed": false,
+      "checksum": "1fa7b88c236d8df02a8ecb60d9b9d984037dddcb3b31f74e26c7cd73c4c43a6f",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8o3hs_ligk60gi9",
+      "key": "auth/strategy",
+      "value": {
+        "created": true,
+        "file": "jwt.strategy.ts",
+        "exports": [
+          "JwtStrategy",
+          "JwtPayload"
+        ],
+        "path": "src/api/auth/strategies/"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:28:14.512Z",
+      "updatedAt": "2025-12-21T21:28:14.512Z",
+      "lastAccessedAt": "2025-12-21T21:28:14.512Z",
+      "version": 1,
+      "size": 143,
+      "compressed": false,
+      "checksum": "5c43613766f5d81b7466b6cc8d90fe4538e65012506f0f428e38d0c6e676120d",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8qbv0_oli1mg7a8",
+      "key": "auth/guards",
+      "value": {
+        "created": true,
+        "files": [
+          "jwt-auth.guard.ts",
+          "roles.guard.ts",
+          "index.ts"
+        ],
+        "exports": [
+          "JwtAuthGuard",
+          "RolesGuard"
+        ],
+        "path": "src/api/auth/guards/"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:29:58.668Z",
+      "updatedAt": "2025-12-21T21:29:58.668Z",
+      "lastAccessedAt": "2025-12-21T21:29:58.668Z",
+      "version": 1,
+      "size": 173,
+      "compressed": false,
+      "checksum": "89b39da8a4ec81a5e6aa9dd856aa42b63945f8d9e8b46e49193a68ed2c652191",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8tcxj_2e8ar9jr2",
+      "key": "auth/service",
+      "value": {
+        "created": true,
+        "file": "auth.service.ts",
+        "exports": [
+          "AuthService",
+          "AuthTokens",
+          "AuthResult"
+        ],
+        "methods": [
+          "getAuthorizationUrl",
+          "handleCallback",
+          "refreshAccessToken",
+          "validateUser"
+        ],
+        "path": "src/api/auth/",
+        "features": [
+          "Auth0 OAuth integration",
+          "CSRF state protection",
+          "Token refresh",
+          "User validation",
+          "Error logging"
+        ],
+        "dependencies": [
+          "PrismaService",
+          "ConfigService",
+          "JwtService"
+        ]
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:32:20.023Z",
+      "updatedAt": "2025-12-21T21:32:20.023Z",
+      "lastAccessedAt": "2025-12-21T21:32:20.023Z",
+      "version": 1,
+      "size": 407,
+      "compressed": false,
+      "checksum": "d8f4592fe627e2b09c27ae7b183aa345c4107eb040f6db03639d703c66ae02b2",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8v8dt_2veba6e8n",
+      "key": "auth/controller",
+      "value": {
+        "created": true,
+        "file": "auth.controller.ts",
+        "endpoints": [
+          "/auth/login",
+          "/auth/callback",
+          "/auth/refresh"
+        ],
+        "path": "src/api/auth/"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:33:47.441Z",
+      "updatedAt": "2025-12-21T21:33:47.441Z",
+      "lastAccessedAt": "2025-12-21T21:33:47.441Z",
+      "version": 1,
+      "size": 157,
+      "compressed": false,
+      "checksum": "7c240504583cb4f56ba9ec2983872368edc1099d88aa04d16618522a7d066e5c",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8wyyv_d981iyq5x",
+      "key": "auth/modules",
+      "value": {
+        "created": true,
+        "files": [
+          "auth.module.ts",
+          "api.module.ts"
+        ],
+        "exports": [
+          "AuthModule",
+          "ApiModule"
+        ],
+        "path": "src/api/"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:35:08.551Z",
+      "updatedAt": "2025-12-21T21:35:08.551Z",
+      "lastAccessedAt": "2025-12-21T21:35:08.551Z",
+      "version": 1,
+      "size": 143,
+      "compressed": false,
+      "checksum": "f43069c58be26d0736392663d9b1c4dba43e52a91aaa51363d4a68235824f87f",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjg8znw3_8cxtcsc06",
+      "key": "auth/integration",
+      "value": {
+        "complete": true,
+        "guards": "global",
+        "swagger": "enabled",
+        "validation": "strict",
+        "files": [
+          "src/app.module.ts",
+          "src/main.ts"
+        ],
+        "timestamp": "2025-12-21"
+      },
+      "type": "object",
+      "namespace": "crechebooks/api",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T21:37:14.163Z",
+      "updatedAt": "2025-12-21T21:37:14.163Z",
+      "lastAccessedAt": "2025-12-21T21:37:14.163Z",
+      "version": 1,
+      "size": 175,
+      "compressed": false,
+      "checksum": "35ddd73a51909a93edda5726e060f4b381c284782531319ded813fb8149fed2f",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgadeaj_ihxpndvr8",
+      "key": "task/trans031/context",
+      "value": {
+        "taskId": "TASK-TRANS-031",
+        "version": "3.0",
+        "status": "implementing",
+        "agentCount": 6
+      },
+      "type": "object",
+      "namespace": "project/trans031",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T22:15:54.523Z",
+      "updatedAt": "2025-12-21T22:15:54.523Z",
+      "lastAccessedAt": "2025-12-21T22:15:54.523Z",
+      "version": 1,
+      "size": 111,
+      "compressed": false,
+      "checksum": "36670977c9210f15e29ac2f30e7201c64c26fe9c0e5e6198984955e3dc600051",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgaesbu_25kb3cmx2",
+      "key": "dtos/shared",
+      "value": {
+        "files": [
+          "src/shared/dto/pagination-meta.dto.ts",
+          "src/shared/dto/index.ts"
+        ],
+        "exports": [
+          "PaginationMetaDto"
+        ],
+        "status": "complete"
+      },
+      "type": "object",
+      "namespace": "project/trans031",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T22:16:59.370Z",
+      "updatedAt": "2025-12-21T22:16:59.370Z",
+      "lastAccessedAt": "2025-12-21T22:20:43.170Z",
+      "version": 1,
+      "size": 158,
+      "compressed": false,
+      "checksum": "4eb26c0b1c1b2633b3d2d224ac21f4cc3b0c1fc8cb3dadac44d223324c78af44",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgahyjw_dwf1osw81",
+      "key": "dtos/transaction",
+      "value": {
+        "files": [
+          "src/api/transaction/dto/list-transactions.dto.ts",
+          "src/api/transaction/dto/categorization-response.dto.ts",
+          "src/api/transaction/dto/transaction-response.dto.ts",
+          "src/api/transaction/dto/index.ts"
+        ],
+        "exports": [
+          "ListTransactionsQueryDto",
+          "TransactionResponseDto",
+          "TransactionListResponseDto",
+          "CategorizationResponseDto"
+        ],
+        "status": "complete"
+      },
+      "type": "object",
+      "namespace": "project/trans031",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T22:19:27.404Z",
+      "updatedAt": "2025-12-21T22:19:27.404Z",
+      "lastAccessedAt": "2025-12-21T22:22:34.041Z",
+      "version": 1,
+      "size": 378,
+      "compressed": false,
+      "checksum": "fa1d77111fc81156ca0655d76e3314856bb489a98dcffaf3a1bd5bd7980d6319",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgakdx1_ylasn8vpx",
+      "key": "controller/transaction",
+      "value": {
+        "file": "src/api/transaction/transaction.controller.ts",
+        "class": "TransactionController",
+        "endpoints": [
+          "GET /transactions"
+        ],
+        "status": "complete"
+      },
+      "type": "object",
+      "namespace": "project/trans031",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T22:21:20.629Z",
+      "updatedAt": "2025-12-21T22:21:20.629Z",
+      "lastAccessedAt": "2025-12-21T22:22:29.617Z",
+      "version": 1,
+      "size": 171,
+      "compressed": false,
+      "checksum": "6479d7055ef3b57709919cf8ca9b039e90d9910273ef019639ed6a34bb9c0b03",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgamjjl_nvhdh2akf",
+      "key": "module/transaction",
+      "value": {
+        "files": [
+          "src/api/transaction/transaction.module.ts",
+          "src/api/api.module.ts"
+        ],
+        "status": "complete",
+        "moduleRegistered": true
+      },
+      "type": "object",
+      "namespace": "project/trans031",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T22:23:01.233Z",
+      "updatedAt": "2025-12-21T22:23:01.233Z",
+      "lastAccessedAt": "2025-12-21T22:26:05.872Z",
+      "version": 1,
+      "size": 152,
+      "compressed": false,
+      "checksum": "4064e57b559274106ed76973d5079490f0a0a0ab29297df27b2e61e7ab02ea44",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgap6rb_ykykbrrin",
+      "key": "tests/transaction",
+      "value": {
+        "file": "tests/api/transaction/transaction.controller.spec.ts",
+        "testCount": 9,
+        "status": "complete"
+      },
+      "type": "object",
+      "namespace": "project/trans031",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T22:25:04.631Z",
+      "updatedAt": "2025-12-21T22:25:04.631Z",
+      "lastAccessedAt": "2025-12-21T22:26:01.478Z",
+      "version": 1,
+      "size": 126,
+      "compressed": false,
+      "checksum": "df54fb4b8d5033730f67a8d9d7328fa7421ad92a13353788e958b0252f2d7016",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgar347_7rpr73acn",
+      "key": "validation/trans031",
+      "value": {
+        "buildStatus": "fail",
+        "testStatus": "not_run",
+        "testCount": 9,
+        "errors": [
+          {
+            "file": "src/api/transaction/transaction.controller.ts",
+            "line": 45,
+            "code": "TS1272",
+            "message": "IUser import must use import type"
+          },
+          {
+            "file": "src/api/transaction/transaction.controller.ts",
+            "line": 79,
+            "code": "TS2322",
+            "message": "Decimal type not assignable to number"
+          },
+          {
+            "file": "src/api/transaction/transaction.controller.ts",
+            "line": 80,
+            "code": "TS2322",
+            "message": "Prisma enum not assignable to entity enum"
+          }
+        ],
+        "timestamp": "2025-12-22T22:26:05Z"
+      },
+      "type": "object",
+      "namespace": "project/trans031",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T22:26:33.223Z",
+      "updatedAt": "2025-12-21T22:26:33.223Z",
+      "lastAccessedAt": "2025-12-21T22:26:33.223Z",
+      "version": 1,
+      "size": 533,
+      "compressed": false,
+      "checksum": "2465a1f475f817a43cd4095781c2565f118ace84102401f19b106a13b057558e",
+      "references": [],
+      "dependencies": []
     }
   ],
   "statistics": {
     "overview": {
-      "totalEntries": 49,
-      "totalSize": 24144,
-      "compressedEntries": 2,
-      "compressionRatio": 0.3397056800990235,
-      "indexSize": 2450,
-      "memoryUsage": 7646560,
+      "totalEntries": 70,
+      "totalSize": 31332,
+      "compressedEntries": 3,
+      "compressionRatio": 0.4728017157340612,
+      "indexSize": 3500,
+      "memoryUsage": 8087336,
       "diskUsage": 0
     },
     "distribution": {
@@ -1712,14 +2427,22 @@
           "size": 3128
         },
         "task-pay-014": {
-          "count": 4,
-          "size": 1737
+          "count": 9,
+          "size": 5174
+        },
+        "crechebooks/api": {
+          "count": 9,
+          "size": 2122
+        },
+        "project/trans031": {
+          "count": 7,
+          "size": 1629
         }
       },
       "byType": {
         "object": {
-          "count": 48,
-          "size": 16335
+          "count": 69,
+          "size": 23523
         },
         "string": {
           "count": 1,
@@ -1728,27 +2451,27 @@
       },
       "byOwner": {
         "system": {
-          "count": 49,
-          "size": 24144
+          "count": 70,
+          "size": 31332
         }
       },
       "byAccessLevel": {
         "shared": {
-          "count": 49,
-          "size": 24144
+          "count": 70,
+          "size": 31332
         }
       }
     },
     "temporal": {
-      "entriesCreatedLast24h": 40,
-      "entriesUpdatedLast24h": 40,
-      "entriesAccessedLast24h": 40,
+      "entriesCreatedLast24h": 36,
+      "entriesUpdatedLast24h": 36,
+      "entriesAccessedLast24h": 36,
       "oldestEntry": "2025-12-19T23:03:44.618Z",
-      "newestEntry": "2025-12-21T00:04:07.479Z"
+      "newestEntry": "2025-12-21T22:26:33.223Z"
     },
     "performance": {
       "averageQueryTime": 0,
-      "averageWriteTime": 0,
+      "averageWriteTime": 1,
       "cacheHitRatio": 0,
       "indexEfficiency": 0.95
     },

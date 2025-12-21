@@ -41,7 +41,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | POST /auth/login | endpoint | TASK-API-001 | ✅ Complete |
 | POST /auth/callback | endpoint | TASK-API-001 | ✅ Complete |
 | POST /auth/refresh | endpoint | TASK-API-001 | ✅ Complete |
-| GET /transactions | endpoint | TASK-TRANS-031 | Pending |
+| GET /transactions | endpoint | TASK-TRANS-031 | ✅ Complete |
 | POST /transactions/import | endpoint | TASK-TRANS-032 | Pending |
 | PUT /transactions/{id}/categorize | endpoint | TASK-TRANS-033 | Pending |
 | POST /transactions/categorize/batch | endpoint | TASK-TRANS-033 | Pending |
@@ -267,3 +267,4 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-21 | TASK-TRANS-015 marked complete (LLMWhisperer PDF Extraction - 62 parser tests, total 1251) | AI Agent |
 | 2025-12-21 | TASK-AGENT-001 to TASK-AGENT-005 marked complete (Claude Code Agents - 56 tests, total 1307) | AI Agent |
 | 2025-12-21 | TASK-API-001 marked complete (Auth Controller/Guards/Service - 65 auth tests, total 1372) | AI Agent |
+| 2025-12-22 | TASK-TRANS-031 marked complete (Transaction Controller/DTOs - 9 controller tests, total 1381) | AI Agent |

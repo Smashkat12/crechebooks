@@ -17,3 +17,6 @@ export * from './uif.service';
 export * from './vat201.service';
 export * from './emp201.service';
 export * from './irp5.service';
+export * from './reconciliation.service';
+export * from './discrepancy.service';
+export * from './financial-report.service';

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-20T17:29:34.118Z",
+  "timestamp": "2025-12-21T00:04:07.481Z",
   "version": "1.0",
   "entries": [
     {
@@ -1095,16 +1095,594 @@
       "checksum": "ae54968a5f26586b663ad5503e0de0cefd8a7fdb7ac98a81b53001cd680cca91",
       "references": [],
       "dependencies": []
+    },
+    {
+      "id": "entry_mjekqc0n_s6j2f1h1c",
+      "key": "trans011/phase4",
+      "value": {
+        "file": "src/database/parsers/csv-parser.ts",
+        "class": "CsvParser",
+        "method": "parse",
+        "completed": true,
+        "timestamp": "2025-12-20T19:29:00+02:00"
+      },
+      "type": "object",
+      "namespace": "project",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T17:30:21.911Z",
+      "updatedAt": "2025-12-20T17:30:21.911Z",
+      "lastAccessedAt": "2025-12-20T17:31:30.813Z",
+      "version": 1,
+      "size": 168,
+      "compressed": false,
+      "checksum": "cb5a58f08b31d368b3ad62bb0cc35cd0c487609994ba0c4af4701b6be3a6e8ce",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjekt80l_pvkzkit8m",
+      "key": "trans011/phase5",
+      "value": {
+        "file": "src/database/parsers/pdf-parser.ts",
+        "class": "PdfParser",
+        "banks": [
+          "Standard Bank",
+          "FNB",
+          "ABSA"
+        ],
+        "completed": true,
+        "timestamp": "2025-12-20T19:33:00+02:00"
+      },
+      "type": "object",
+      "namespace": "project",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T17:32:36.693Z",
+      "updatedAt": "2025-12-20T17:32:36.693Z",
+      "lastAccessedAt": "2025-12-20T17:32:36.693Z",
+      "version": 1,
+      "size": 190,
+      "compressed": false,
+      "checksum": "25e1db791b6a66901945e73e294dab68dc52470378074edba81ea64ef86bbc03",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjevgisu_y0ajw2izy",
+      "key": "task/context",
+      "value": {
+        "taskId": "TASK-PAY-012",
+        "title": "Payment Allocation Service",
+        "status": "started",
+        "timestamp": "2025-12-21T00:00:00Z"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T22:30:39.918Z",
+      "updatedAt": "2025-12-20T22:30:39.918Z",
+      "lastAccessedAt": "2025-12-20T22:30:39.918Z",
+      "version": 1,
+      "size": 145,
+      "compressed": false,
+      "checksum": "cf36a479deb34ff7667d8e0a422177751620a646d16f3d9c0c8fcbb5e2961ca5",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjevjdxc_jztrypway",
+      "key": "analysis/payment-allocation-patterns",
+      "value": "{\n  \"timestamp\": \"2025-12-21T00:32:53+02:00\",\n  \"patterns\": {\n    \"servicePattern\": {\n      \"imports\": [\n        \"Injectable, Logger from @nestjs/common\",\n        \"Entity types from @prisma/client\",\n        \"PrismaService from ../prisma/prisma.service\",\n        \"PaymentRepository, InvoiceRepository from ../repositories\",\n        \"AuditLogService from ./audit-log.service\",\n        \"DTOs and entity enums from ../dto and ../entities\"\n      ],\n      \"constructor\": {\n        \"decorator\": \"@Injectable()\",\n        \"parameters\": [\n          \"private readonly prisma: PrismaService\",\n          \"private readonly paymentRepo: PaymentRepository\",\n          \"private readonly invoiceRepo: InvoiceRepository\",\n          \"private readonly auditLogService: AuditLogService\"\n        ],\n        \"logger\": \"private readonly logger = new Logger(ClassName.name);\"\n      },\n      \"pattern\": \"Dependency injection via NestJS constructor, Logger initialized with class name\"\n    },\n    \"dtoPattern\": {\n      \"validationDecorators\": [\n        \"@IsUUID() - for tenant/transaction/invoice IDs\",\n        \"@IsArray() - for arrays\",\n        \"@IsOptional() - for optional fields\",\n        \"@IsInt() - for amount integers\",\n        \"@Min(1) - for minimum values\"\n      ],\n      \"structure\": {\n        \"required_fields\": \"Marked with \\! property assertion\",\n        \"optional_fields\": \"Marked with @IsOptional()\",\n        \"export_format\": \"Named exports for interfaces and classes\"\n      }\n    },\n    \"exceptionHandling\": {\n      \"businessException\": \"throw new BusinessException(message, code, details?)\",\n      \"notFoundException\": \"throw new NotFoundException(resource, identifier)\",\n      \"conflictException\": \"throw new ConflictException(message, details?)\",\n      \"databaseException\": \"throw new DatabaseException(operation, message, originalError?)\",\n      \"pattern\": \"All throw with clear error messages and optional details object\"\n    },\n    \"auditLogging\": {\n      \"method\": \"this.auditLogService.logAction(params)\",\n      \"interface\": {\n        \"required\": [\"tenantId\", \"entityType\", \"entityId\", \"action\"],\n        \"optional\": [\"userId\", \"agentId\", \"beforeValue\", \"afterValue\", \"changeSummary\", \"ipAddress\", \"userAgent\"]\n      },\n      \"example\": {\n        \"code\": \"await this.auditLogService.logAction({ tenantId, entityType: Payment, entityId: payment.id, action: AuditAction.CREATE, afterValue: {...}, changeSummary: ... })\"\n      }\n    }\n  },\n  \"paymentRepositoryMethods\": {\n    \"create\": \"async create(dto: CreatePaymentDto): Promise<Payment>\",\n    \"findById\": \"async findById(id: string): Promise<Payment | null>\",\n    \"findByXeroPaymentId\": \"async findByXeroPaymentId(xeroPaymentId: string): Promise<Payment | null>\",\n    \"findByTransactionId\": \"async findByTransactionId(transactionId: string): Promise<Payment[]>\",\n    \"findByInvoiceId\": \"async findByInvoiceId(invoiceId: string): Promise<Payment[]>\",\n    \"findByTenantId\": \"async findByTenantId(tenantId: string, filter?: PaymentFilterDto): Promise<Payment[]>\",\n    \"update\": \"async update(id: string, dto: UpdatePaymentDto): Promise<Payment>\",\n    \"reverse\": \"async reverse(id: string, dto: ReversePaymentDto): Promise<Payment>\",\n    \"delete\": \"async delete(id: string): Promise<void>\",\n    \"calculateTotalPaidForInvoice\": \"async calculateTotalPaidForInvoice(invoiceId: string): Promise<number>\",\n    \"findActiveByTenantId\": \"async findActiveByTenantId(tenantId: string): Promise<Payment[]>\",\n    \"description\": \"All methods include try-catch error handling with NotFoundException, ConflictException, and DatabaseException\"\n  },\n  \"invoiceRepositoryMethods\": {\n    \"create\": \"async create(dto: CreateInvoiceDto): Promise<Invoice>\",\n    \"findById\": \"async findById(id: string): Promise<Invoice | null>\",\n    \"findByIdWithLines\": \"async findByIdWithLines(id: string): Promise<Invoice & {lines: InvoiceLine[]} | null>\",\n    \"findByTenant\": \"async findByTenant(tenantId: string, filter: InvoiceFilterDto): Promise<Invoice[]>\",\n    \"findByInvoiceNumber\": \"async findByInvoiceNumber(tenantId: string, invoiceNumber: string): Promise<Invoice | null>\",\n    \"findByParent\": \"async findByParent(tenantId: string, parentId: string): Promise<Invoice[]>\",\n    \"findByChild\": \"async findByChild(tenantId: string, childId: string): Promise<Invoice[]>\",\n    \"findByStatus\": \"async findByStatus(tenantId: string, status: InvoiceStatus): Promise<Invoice[]>\",\n    \"findOverdue\": \"async findOverdue(tenantId: string): Promise<Invoice[]>\",\n    \"update\": \"async update(id: string, dto: UpdateInvoiceDto): Promise<Invoice>\",\n    \"softDelete\": \"async softDelete(id: string): Promise<Invoice>\",\n    \"delete\": \"async delete(id: string): Promise<void>\",\n    \"findLastInvoiceForYear\": \"async findLastInvoiceForYear(tenantId: string, year: number): Promise<Invoice | null>\",\n    \"findByBillingPeriod\": \"async findByBillingPeriod(tenantId: string, childId: string, start: Date, end: Date): Promise<Invoice | null>\",\n    \"updateDeliveryStatus\": \"async updateDeliveryStatus(id: string, status: string, deliveredAt?: Date): Promise<Invoice>\",\n    \"recordPayment\": \"async recordPayment(id: string, amountCents: number): Promise<Invoice>\",\n    \"findByDeliveryStatus\": \"async findByDeliveryStatus(tenantId: string, status: string, cutoffDate?: Date): Promise<Invoice[]>\",\n    \"incrementDeliveryRetryCount\": \"async incrementDeliveryRetryCount(id: string): Promise<Invoice>\",\n    \"description\": \"recordPayment updates amountPaidCents and automatically sets status to PAID/PARTIALLY_PAID\"\n  },\n  \"paymentEnums\": {\n    \"MatchType\": {\n      \"EXACT\": \"Reference and amount both match exactly\",\n      \"PARTIAL\": \"Fuzzy match with confidence scoring\",\n      \"MANUAL\": \"User manually selected the match\",\n      \"OVERPAYMENT\": \"Payment exceeds invoice amount\"\n    },\n    \"MatchedBy\": {\n      \"AI_AUTO\": \"Automatically matched by confidence algorithm\",\n      \"USER\": \"Manually matched by user selection\"\n    }\n  },\n  \"invoiceEnums\": {\n    \"InvoiceStatus\": {\n      \"DRAFT\": \"Not yet sent to parent\",\n      \"SENT\": \"Sent but not opened\",\n      \"VIEWED\": \"Parent has viewed it\",\n      \"PARTIALLY_PAID\": \"Some payment received\",\n      \"PAID\": \"Fully paid\",\n      \"OVERDUE\": \"Past due date and not paid\",\n      \"VOID\": \"Cancelled/voided invoice\"\n    }\n  },\n  \"moduleRegistration\": {\n    \"pattern\": \"Services added to providers array and exports array in DatabaseModule\",\n    \"location\": \"src/database/database.module.ts\",\n    \"exports\": \"All services must be exported from DatabaseModule for use in other modules\"\n  }\n}",
+      "type": "string",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T22:32:53.568Z",
+      "updatedAt": "2025-12-20T22:32:53.568Z",
+      "lastAccessedAt": "2025-12-20T22:42:20.311Z",
+      "version": 1,
+      "size": 7809,
+      "compressed": true,
+      "checksum": "4a2097272d0b4a99d4aaba677439bf6630615175ef9badd6a3cc301eb4aaea6a",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjevmq79_dsslk47ux",
+      "key": "dto/payment-allocation",
+      "value": {
+        "created": true,
+        "path": "src/database/dto/payment-allocation.dto.ts",
+        "exports": [
+          "AllocationDto",
+          "AllocatePaymentDto",
+          "ReverseAllocationDto",
+          "AllocationResult",
+          "AllocationError",
+          "XeroSyncStatus"
+        ],
+        "timestamp": "2025-12-21T00:35:00+02:00",
+        "validation": {
+          "allAmountsInCents": true,
+          "classValidatorDecorators": true,
+          "exportedToIndex": true
+        }
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T22:35:29.445Z",
+      "updatedAt": "2025-12-20T22:35:29.445Z",
+      "lastAccessedAt": "2025-12-20T22:37:19.074Z",
+      "version": 1,
+      "size": 358,
+      "compressed": false,
+      "checksum": "03d660db3b35af567817f9d254c2308e09c81c5cb97b69ce034e7fe5f50fe27f",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjevrocg_c36zwh5zw",
+      "key": "service/payment-allocation",
+      "value": {
+        "created": true,
+        "path": "src/database/services/payment-allocation.service.ts",
+        "methods": [
+          "allocatePayment",
+          "allocateToMultipleInvoices",
+          "handleOverpayment",
+          "handlePartialPayment",
+          "reverseAllocation"
+        ],
+        "privateHelpers": [
+          "validateAllocations",
+          "syncToXero"
+        ],
+        "dependencies": [
+          "PrismaService",
+          "PaymentRepository",
+          "InvoiceRepository",
+          "TransactionRepository",
+          "AuditLogService"
+        ],
+        "usesDecimalJs": true,
+        "allAmountsInCents": true,
+        "tenantIsolation": true,
+        "auditLogging": true,
+        "timestamp": "2025-12-21T00:40:00+02:00"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T22:39:20.320Z",
+      "updatedAt": "2025-12-20T22:39:20.320Z",
+      "lastAccessedAt": "2025-12-20T22:42:15.897Z",
+      "version": 1,
+      "size": 526,
+      "compressed": false,
+      "checksum": "2bb73486593e160b5d4c9816aed939ad70df414e508da5e63a4048a33a61a606",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjevylb1_k6zffxs22",
+      "key": "tests/payment-allocation",
+      "value": {
+        "created": true,
+        "path": "tests/database/services/payment-allocation.service.spec.ts",
+        "testCount": 33,
+        "testCategories": [
+          "initialization",
+          "exactMatch",
+          "partialPayment",
+          "overpayment",
+          "multiInvoice",
+          "reversal",
+          "validation",
+          "paymentDetails",
+          "complexScenarios",
+          "edgeCases"
+        ],
+        "realDatabase": true,
+        "allTestsPassWithActualDB": true,
+        "timestamp": "2025-12-21T00:42:00+02:00"
+      },
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T22:44:42.973Z",
+      "updatedAt": "2025-12-20T22:44:42.973Z",
+      "lastAccessedAt": "2025-12-20T22:44:42.973Z",
+      "version": 1,
+      "size": 387,
+      "compressed": false,
+      "checksum": "241510307bf3e2a1696c2b5d5b5a8a237f24dd019f098f219b0dd57379c234d5",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjewyu7i_1whzi42na",
+      "key": "agent1/service-pattern",
+      "value": {
+        "imports": [
+          "@nestjs/common",
+          "Decimal",
+          "@prisma/client",
+          "repositories",
+          "services"
+        ],
+        "constructor": "private readonly logger + 5 dependencies",
+        "decorators": "@Injectable()",
+        "errorHandling": "try-catch with logger.error and custom exceptions"
+      },
+      "type": "object",
+      "namespace": "arrears",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:12:54.126Z",
+      "updatedAt": "2025-12-20T23:12:54.126Z",
+      "lastAccessedAt": "2025-12-20T23:12:54.126Z",
+      "version": 1,
+      "size": 266,
+      "compressed": false,
+      "checksum": "7179657888ef824e4faa709ed286b054bb8b135d834dfa75ece5bb01bc3998a8",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjewyxlf_2gx6lhmel",
+      "key": "agent1/dto-pattern",
+      "value": {
+        "decorators": [
+          "@IsUUID",
+          "@IsArray",
+          "@ValidateNested",
+          "@IsInt",
+          "@Min",
+          "@IsOptional",
+          "@IsString",
+          "@MinLength"
+        ],
+        "transformer": "@Type(() => DTO)",
+        "interfaces": "AllocationError, AllocationResult",
+        "enums": "XeroSyncStatus"
+      },
+      "type": "object",
+      "namespace": "arrears",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:12:58.515Z",
+      "updatedAt": "2025-12-20T23:12:58.515Z",
+      "lastAccessedAt": "2025-12-20T23:13:58.428Z",
+      "version": 1,
+      "size": 246,
+      "compressed": false,
+      "checksum": "0f01fe147a17a49317ce1ed65d402a5ede024c603c8e61adf05d46d668614745",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjewz0yr_3g0j6a7mu",
+      "key": "agent1/module-pattern",
+      "value": {
+        "providers": [
+          "repositories",
+          "services"
+        ],
+        "exports": "same as providers",
+        "imports": "EmailModule, WhatsAppModule",
+        "structure": "consistent array format"
+      },
+      "type": "object",
+      "namespace": "arrears",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:13:02.883Z",
+      "updatedAt": "2025-12-20T23:13:02.883Z",
+      "lastAccessedAt": "2025-12-20T23:13:02.883Z",
+      "version": 1,
+      "size": 178,
+      "compressed": false,
+      "checksum": "be48e84e903423e28ab0928537d179dc621bca96964f1f4b20320707516e14a7",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjex12ky_63s5798m2",
+      "key": "agent2/dto-complete",
+      "value": {
+        "file": "src/database/dto/arrears.dto.ts",
+        "types": [
+          "ArrearsFiltersDto",
+          "AgingBucketType",
+          "AgingBuckets",
+          "ArrearsReportSummary",
+          "DebtorSummary",
+          "ArrearsInvoice",
+          "ArrearsReport",
+          "PaymentHistoryEntry",
+          "ParentPaymentHistory"
+        ],
+        "exported": true,
+        "timestamp": "2025-12-21T01:14:00.000Z"
+      },
+      "type": "object",
+      "namespace": "arrears",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:14:38.290Z",
+      "updatedAt": "2025-12-20T23:14:38.290Z",
+      "lastAccessedAt": "2025-12-20T23:14:38.290Z",
+      "version": 1,
+      "size": 306,
+      "compressed": false,
+      "checksum": "1a712a2081a47d30b72e9125e919cba7e3ae8cf76c525808a27805bef80c0a68",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjex4ncq_q5lcy3b17",
+      "key": "agent3/service-complete",
+      "value": {
+        "file": "src/database/services/arrears.service.ts",
+        "methods": [
+          "getArrearsReport",
+          "calculateAging",
+          "getParentHistory",
+          "getTopDebtors",
+          "exportArrearsCSV"
+        ],
+        "timestamp": "2025-12-21T01:17:24+02:00",
+        "notes": "Service uses Decimal.js, proper error handling, raw SQL for getTopDebtors, tenant isolation in all queries"
+      },
+      "type": "object",
+      "namespace": "arrears",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:17:25.178Z",
+      "updatedAt": "2025-12-20T23:17:25.178Z",
+      "lastAccessedAt": "2025-12-20T23:17:25.178Z",
+      "version": 1,
+      "size": 339,
+      "compressed": false,
+      "checksum": "f757f20bd4e189acf08a2404c9f2cdbe821fd14dceac29dbcb1856c5719dfd65",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjex6vuc_wg583c5me",
+      "key": "agent3/handoff-notes",
+      "value": "{\"service_file\":\"src/database/services/arrears.service.ts\",\"exported_in\":\"src/database/services/index.ts\",\"methods_implemented\":[{\"name\":\"getArrearsReport\",\"returns\":\"ArrearsReport\",\"parameters\":[\"tenantId: string\",\"filters?: ArrearsFiltersDto\"],\"description\":\"Main report with summary, top debtors, and invoices\"},{\"name\":\"calculateAging\",\"returns\":\"AgingBuckets\",\"parameters\":[\"invoices: InvoiceWithRelations[]\"],\"description\":\"Calculates aging buckets (current, 30, 60, 90+)\"},{\"name\":\"getParentHistory\",\"returns\":\"ParentPaymentHistory\",\"parameters\":[\"parentId: string\",\"tenantId: string\"],\"description\":\"Complete payment history with on-time/late stats\"},{\"name\":\"getTopDebtors\",\"returns\":\"DebtorSummary[]\",\"parameters\":[\"tenantId: string\",\"limit?: number\"],\"description\":\"Top debtors using raw SQL for performance\"},{\"name\":\"exportArrearsCSV\",\"returns\":\"string\",\"parameters\":[\"tenantId: string\",\"filters?: ArrearsFiltersDto\"],\"description\":\"CSV export with proper escaping\"}],\"dependencies\":[\"PrismaService\",\"InvoiceRepository\",\"PaymentRepository\",\"ParentRepository\"],\"key_features\":[\"Uses Decimal.js with ROUND_HALF_EVEN for all calculations\",\"Tenant isolation in all queries\",\"Raw SQL for getTopDebtors performance optimization\",\"Comprehensive error handling with DatabaseException\",\"Read-only service - no audit log required\",\"CSV export with proper value escaping\",\"Aging buckets: current (0-7), 30 (8-30), 60 (31-60), 90+ (61+)\",\"All amounts in cents throughout\"],\"next_steps_for_agent4\":\"Add ArrearsService to DatabaseModule providers\",\"next_steps_for_agent5\":\"Create arrears.service.spec.ts with comprehensive tests\"}",
+      "type": "object",
+      "namespace": "arrears",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:19:09.492Z",
+      "updatedAt": "2025-12-20T23:19:09.492Z",
+      "lastAccessedAt": "2025-12-20T23:19:09.492Z",
+      "version": 1,
+      "size": 1793,
+      "compressed": true,
+      "checksum": "8b388ebc7c84cbfa69558825004618e5672410d27010ade6129d6d8aaf779025",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjey9yr1_6ujttxucm",
+      "key": "agent1/schema",
+      "value": {
+        "enums": [
+          "EscalationLevel",
+          "ReminderStatus"
+        ],
+        "model": "Reminder",
+        "relations": [
+          "Tenant",
+          "Invoice",
+          "Parent"
+        ],
+        "migration": "add_reminders",
+        "status": "SUCCESS",
+        "timestamp": "2025-12-20T23:49:12Z"
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:49:32.845Z",
+      "updatedAt": "2025-12-20T23:49:32.845Z",
+      "lastAccessedAt": "2025-12-20T23:49:32.845Z",
+      "version": 1,
+      "size": 218,
+      "compressed": false,
+      "checksum": "dd6a4cb0bb59e3e23010494c7db29c233f7daf52d3dd070d43fa2b1d8ee4ddda",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjeydiq7_cpfdxzgpi",
+      "key": "agent2/dtos",
+      "value": {
+        "files": [
+          "src/database/dto/reminder.dto.ts",
+          "src/database/constants/reminder-templates.ts"
+        ],
+        "enums": [
+          "EscalationLevel",
+          "ReminderStatus",
+          "DeliveryChannel"
+        ],
+        "classes": [
+          "SendRemindersDto",
+          "ScheduleReminderDto"
+        ],
+        "interfaces": [
+          "ReminderContent",
+          "ReminderResult",
+          "ReminderDetail",
+          "EscalationResult",
+          "ReminderHistoryEntry"
+        ],
+        "exports": "Added to src/database/dto/index.ts",
+        "templates": {
+          "email": [
+            "FRIENDLY",
+            "FIRM",
+            "FINAL"
+          ],
+          "whatsapp": [
+            "FRIENDLY",
+            "FIRM",
+            "FINAL"
+          ]
+        },
+        "placeholders": [
+          "parentName",
+          "childName",
+          "invoiceNumber",
+          "amount",
+          "dueDate",
+          "daysOverdue",
+          "crecheName",
+          "crechePhone",
+          "crecheEmail",
+          "bankName",
+          "accountNumber",
+          "branchCode"
+        ]
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-20T23:52:18.703Z",
+      "updatedAt": "2025-12-20T23:52:18.703Z",
+      "lastAccessedAt": "2025-12-20T23:52:18.703Z",
+      "version": 1,
+      "size": 655,
+      "compressed": false,
+      "checksum": "e8b3408799146bb52fefed26f775e2d5314103e1a5869afff55ed6e22a3758c5",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjeyohne_kevv0qhj9",
+      "key": "agent4/service",
+      "value": {
+        "file": "src/database/services/reminder.service.ts",
+        "class": "ReminderService",
+        "publicMethods": [
+          "sendReminders",
+          "generateReminderContent",
+          "scheduleReminder",
+          "escalateOverdue",
+          "getReminderHistory"
+        ],
+        "privateMethods": [
+          "determineEscalationLevel",
+          "hasRecentReminder",
+          "sendViaEmail",
+          "sendViaWhatsApp",
+          "renderTemplate",
+          "formatCentsToRand",
+          "calculateDaysOverdue",
+          "mapPreferredContactToChannel",
+          "formatDate"
+        ],
+        "constants": [
+          "MIN_DAYS_BETWEEN_REMINDERS=3"
+        ],
+        "lineCount": 733
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T00:00:50.522Z",
+      "updatedAt": "2025-12-21T00:00:50.522Z",
+      "lastAccessedAt": "2025-12-21T00:00:50.522Z",
+      "version": 1,
+      "size": 489,
+      "compressed": false,
+      "checksum": "3d44028dbd866050e293685528e4ff3bab320c3e40b5d8c45ac0df7fcf8d1ada",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjeyspmf_x2nhv9r8a",
+      "key": "agent4/completion",
+      "value": {
+        "status": "complete",
+        "file": "src/database/services/reminder.service.ts",
+        "linesOfCode": 795,
+        "allMethodsImplemented": true,
+        "lintPassing": true,
+        "buildPassing": true,
+        "notes": "Bank details fields not yet in Tenant model - used empty strings as placeholders. Next agent should add bank fields to Tenant schema.",
+        "nextAgent": "Agent 5 (Module registration)"
+      },
+      "type": "object",
+      "namespace": "task-pay-014",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-21T00:04:07.479Z",
+      "updatedAt": "2025-12-21T00:04:07.479Z",
+      "lastAccessedAt": "2025-12-21T00:04:07.479Z",
+      "version": 1,
+      "size": 375,
+      "compressed": false,
+      "checksum": "0f49ff854a27b9b492900f8900cb5f201703e142bde97c138cb71a744ae5d5fe",
+      "references": [],
+      "dependencies": []
     }
   ],
   "statistics": {
     "overview": {
-      "totalEntries": 32,
-      "totalSize": 9696,
-      "compressedEntries": 0,
-      "compressionRatio": 1,
-      "indexSize": 1600,
-      "memoryUsage": 7145616,
+      "totalEntries": 49,
+      "totalSize": 24144,
+      "compressedEntries": 2,
+      "compressionRatio": 0.3397056800990235,
+      "indexSize": 2450,
+      "memoryUsage": 7646560,
       "diskUsage": 0
     },
     "distribution": {
@@ -1114,8 +1692,8 @@
           "size": 49
         },
         "crechebooks": {
-          "count": 19,
-          "size": 5578
+          "count": 24,
+          "size": 14803
         },
         "default": {
           "count": 1,
@@ -1126,35 +1704,47 @@
           "size": 3154
         },
         "project": {
-          "count": 3,
-          "size": 696
+          "count": 5,
+          "size": 1054
+        },
+        "arrears": {
+          "count": 6,
+          "size": 3128
+        },
+        "task-pay-014": {
+          "count": 4,
+          "size": 1737
         }
       },
       "byType": {
         "object": {
-          "count": 32,
-          "size": 9696
+          "count": 48,
+          "size": 16335
+        },
+        "string": {
+          "count": 1,
+          "size": 7809
         }
       },
       "byOwner": {
         "system": {
-          "count": 32,
-          "size": 9696
+          "count": 49,
+          "size": 24144
         }
       },
       "byAccessLevel": {
         "shared": {
-          "count": 32,
-          "size": 9696
+          "count": 49,
+          "size": 24144
         }
       }
     },
     "temporal": {
-      "entriesCreatedLast24h": 32,
-      "entriesUpdatedLast24h": 32,
-      "entriesAccessedLast24h": 32,
+      "entriesCreatedLast24h": 40,
+      "entriesUpdatedLast24h": 40,
+      "entriesAccessedLast24h": 40,
       "oldestEntry": "2025-12-19T23:03:44.618Z",
-      "newestEntry": "2025-12-20T17:28:25.336Z"
+      "newestEntry": "2025-12-21T00:04:07.479Z"
     },
     "performance": {
       "averageQueryTime": 0,
@@ -1165,16 +1755,18 @@
     "health": {
       "expiredEntries": 0,
       "orphanedReferences": 0,
-      "duplicateKeys": 0,
+      "duplicateKeys": 1,
       "corruptedEntries": 0,
       "recommendedCleanup": false
     },
     "optimization": {
-      "suggestions": [],
+      "suggestions": [
+        "1 duplicate keys found"
+      ],
       "potentialSavings": {
         "compression": 0,
         "cleanup": 0,
-        "deduplication": 0
+        "deduplication": 145
       },
       "indexOptimization": [
         "Consider periodic index rebuilding for optimal performance"

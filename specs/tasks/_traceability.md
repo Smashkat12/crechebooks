@@ -42,9 +42,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | POST /auth/callback | endpoint | TASK-API-001 | ✅ Complete |
 | POST /auth/refresh | endpoint | TASK-API-001 | ✅ Complete |
 | GET /transactions | endpoint | TASK-TRANS-031 | ✅ Complete |
-| POST /transactions/import | endpoint | TASK-TRANS-032 | Pending |
-| PUT /transactions/{id}/categorize | endpoint | TASK-TRANS-033 | Pending |
-| POST /transactions/categorize/batch | endpoint | TASK-TRANS-033 | Pending |
+| POST /transactions/import | endpoint | TASK-TRANS-032 | ✅ Complete |
+| PUT /transactions/{id}/categorize | endpoint | TASK-TRANS-033 | ✅ Complete |
+| POST /transactions/categorize/batch | endpoint | TASK-TRANS-033 | ✅ Complete |
 | GET /invoices | endpoint | TASK-BILL-031 | Pending |
 | POST /invoices/generate | endpoint | TASK-BILL-032 | Pending |
 | POST /invoices/send | endpoint | TASK-BILL-033 | Pending |
@@ -268,3 +268,5 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-21 | TASK-AGENT-001 to TASK-AGENT-005 marked complete (Claude Code Agents - 56 tests, total 1307) | AI Agent |
 | 2025-12-21 | TASK-API-001 marked complete (Auth Controller/Guards/Service - 65 auth tests, total 1372) | AI Agent |
 | 2025-12-22 | TASK-TRANS-031 marked complete (Transaction Controller/DTOs - 9 controller tests, total 1381) | AI Agent |
+| 2025-12-22 | TASK-TRANS-032 marked complete (Transaction Import Endpoint - 7 tests, total 1388) | AI Agent |
+| 2025-12-22 | TASK-TRANS-033 marked complete (Categorization Endpoints - 8 tests, total 1396) | AI Agent |

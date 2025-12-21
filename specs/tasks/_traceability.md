@@ -69,9 +69,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | PaymentService.matchPayments | method | TASK-PAY-011 | ✅ Complete |
 | PaymentService.allocatePayment | method | TASK-PAY-012 | ✅ Complete |
 | PaymentService.getArrearsReport | method | TASK-PAY-013 | ✅ Complete |
-| SarsService.generateVat201 | method | TASK-SARS-014 | Pending |
-| SarsService.generateEmp201 | method | TASK-SARS-015 | Pending |
-| SarsService.markSubmitted | method | TASK-SARS-002 | Pending |
+| SarsService.generateVat201 | method | TASK-SARS-014 | ✅ Complete |
+| SarsService.generateEmp201 | method | TASK-SARS-015 | ✅ Complete |
+| SarsService.markSubmitted | method | TASK-SARS-002 | ✅ Complete |
 | ReconciliationService.reconcile | method | TASK-RECON-011 | Pending |
 | ReconciliationService.generateIncomeStatement | method | TASK-RECON-013 | Pending |
 
@@ -158,18 +158,18 @@ This document ensures 100% coverage of all requirements in the specifications. E
 
 | Spec Item | ID | Covered by Task ID | Status |
 |-----------|----|--------------------|--------|
-| VAT output calculation | REQ-SARS-001 | TASK-SARS-011 | Pending |
-| VAT input calculation | REQ-SARS-002 | TASK-SARS-011 | Pending |
-| VAT201 generation | REQ-SARS-003 | TASK-SARS-014 | Pending |
-| Zero-rated vs exempt | REQ-SARS-004 | TASK-SARS-011 | Pending |
-| Missing VAT details flagging | REQ-SARS-005 | TASK-SARS-011 | Pending |
-| Payroll data integration | REQ-SARS-006 | TASK-SARS-001 | Pending |
-| PAYE calculation | REQ-SARS-007 | TASK-SARS-012 | Pending |
-| UIF calculation | REQ-SARS-008 | TASK-SARS-013 | Pending |
-| EMP201 generation | REQ-SARS-009 | TASK-SARS-015 | Pending |
-| IRP5 generation | REQ-SARS-010 | TASK-SARS-016 | Pending |
-| Deadline calendar | REQ-SARS-011 | TASK-SARS-002 | Pending |
-| Submission tracking | REQ-SARS-012 | TASK-SARS-002 | Pending |
+| VAT output calculation | REQ-SARS-001 | TASK-SARS-011 | ✅ Complete |
+| VAT input calculation | REQ-SARS-002 | TASK-SARS-011 | ✅ Complete |
+| VAT201 generation | REQ-SARS-003 | TASK-SARS-014 | ✅ Complete |
+| Zero-rated vs exempt | REQ-SARS-004 | TASK-SARS-011 | ✅ Complete |
+| Missing VAT details flagging | REQ-SARS-005 | TASK-SARS-011 | ✅ Complete |
+| Payroll data integration | REQ-SARS-006 | TASK-SARS-001 | ✅ Complete |
+| PAYE calculation | REQ-SARS-007 | TASK-SARS-012 | ✅ Complete |
+| UIF calculation | REQ-SARS-008 | TASK-SARS-013 | ✅ Complete |
+| EMP201 generation | REQ-SARS-009 | TASK-SARS-015 | ✅ Complete |
+| IRP5 generation | REQ-SARS-010 | TASK-SARS-016 | ✅ Complete |
+| Deadline calendar | REQ-SARS-011 | TASK-SARS-002 | ✅ Complete |
+| Submission tracking | REQ-SARS-012 | TASK-SARS-002 | ✅ Complete |
 
 ---
 
@@ -245,3 +245,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-21 | TASK-PAY-012 marked complete (Payment Allocation Service - 945 tests) | AI Agent |
 | 2025-12-21 | TASK-PAY-013 marked complete (Arrears Calculation Service - 989 tests) | AI Agent |
 | 2025-12-21 | TASK-PAY-014 marked complete (Payment Reminder Service - 1027 tests) | AI Agent |
+| 2025-12-21 | TASK-SARS-011 marked complete (VAT Calculation Service - 1076 tests) | AI Agent |
+| 2025-12-21 | TASK-SARS-012 marked complete (PAYE Calculation Service - 1097 tests) | AI Agent |
+| 2025-12-21 | TASK-SARS-013 marked complete (UIF Calculation Service - 1118 tests) | AI Agent |
+| 2025-12-21 | TASK-SARS-014 marked complete (VAT201 Generation Service - 1139 tests) | AI Agent |
+| 2025-12-21 | TASK-SARS-015 marked complete (EMP201 Generation Service - 1152 tests) | AI Agent |
+| 2025-12-21 | TASK-SARS-016 marked complete (IRP5 Generation Service - 1166 tests) | AI Agent |

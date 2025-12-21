@@ -1,4 +1,4 @@
-<task_spec id="TASK-SARS-011" version="1.0">
+<task_spec id="TASK-SARS-011" version="2.0">
 
 <metadata>
   <title>VAT Calculation Service</title>
@@ -16,338 +16,249 @@
     <task_ref>TASK-BILL-003</task_ref>
   </depends_on>
   <estimated_complexity>high</estimated_complexity>
+  <last_updated>2025-12-21</last_updated>
 </metadata>
 
 <context>
-This task creates the VATService which handles all Value-Added Tax calculations for
+This task creates the VatService which handles all Value-Added Tax calculations for
 South African SARS compliance. The service calculates output VAT (on sales/invoices)
 and input VAT (on purchases), distinguishes between standard-rated (15%), zero-rated,
 and exempt supplies, and flags missing VAT details required for VAT201 submissions.
-The service must use Decimal.js with banker's rounding for all monetary calculations
-to ensure accuracy and SARS compliance.
+
+CRITICAL RULES:
+- All monetary values stored as CENTS (integers) in database
+- All calculations use Decimal.js with banker's rounding (ROUND_HALF_EVEN)
+- No backwards compatibility - fail fast with clear error messages
+- No mock data in tests - use real PostgreSQL database
+- Tenant isolation required on all queries
 </context>
 
-<input_context_files>
-  <file purpose="technical_spec">specs/technical/api-contracts.md#SarsService</file>
-  <file purpose="vat_requirements">specs/requirements/sars-requirements.md</file>
-  <file purpose="transaction_entity">src/database/entities/transaction.entity.ts</file>
-  <file purpose="invoice_entity">src/database/entities/invoice.entity.ts</file>
-  <file purpose="naming_conventions">specs/constitution.md#coding_standards</file>
-</input_context_files>
+<project_structure>
+ACTUAL file locations in this project:
+- Services: src/database/services/*.service.ts
+- DTOs: src/database/dto/*.dto.ts
+- Constants: src/database/constants/*.ts
+- Repositories: src/database/repositories/*.repository.ts
+- Tests: tests/database/services/*.service.spec.ts
+- Module: src/database/database.module.ts
+- Prisma Schema: prisma/schema.prisma
 
-<prerequisites>
-  <check>TASK-TRANS-002 completed (Transaction categorization exists)</check>
-  <check>TASK-BILL-003 completed (Invoice entities exist)</check>
-  <check>Decimal.js library installed</check>
-  <check>TypeScript compilation working</check>
-</prerequisites>
+DO NOT use src/core/sars/ - that path does not exist.
+</project_structure>
 
-<scope>
-  <in_scope>
-    - Create VATService class in src/core/sars/
-    - Implement calculateOutputVAT method (for invoices/sales)
-    - Implement calculateInputVAT method (for expenses/purchases)
-    - Implement classifyVATType method (STANDARD, ZERO_RATED, EXEMPT, NO_VAT)
-    - Implement validateVATDetails method
-    - Implement getFlaggedItems method for missing VAT info
-    - Use South African VAT rate of 15% (configurable constant)
-    - Use Decimal.js banker's rounding for all calculations
-    - Handle zero-rated vs exempt distinction
-    - Create VATCalculationResult interface
-    - Create VATFlaggedItem interface
-    - Unit tests with edge cases
-  </in_scope>
-  <out_of_scope>
-    - VAT201 document generation (TASK-SARS-014)
-    - API endpoints
-    - Database persistence of calculations
-    - Historical VAT rate changes
-    - Foreign currency VAT calculations
-  </out_of_scope>
-</scope>
+<existing_infrastructure>
+Already implemented in prisma/schema.prisma:
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/core/sars/vat.service.ts">
-      import Decimal from 'decimal.js';
+enum VatType {
+  STANDARD
+  ZERO_RATED
+  EXEMPT
+  NO_VAT
+}
 
-      enum VATType {
-        STANDARD = 'STANDARD',
-        ZERO_RATED = 'ZERO_RATED',
-        EXEMPT = 'EXEMPT',
-        NO_VAT = 'NO_VAT'
-      }
+model Transaction {
+  id            String            @id @default(uuid())
+  tenantId      String            @map("tenant_id")
+  amountCents   Int               @map("amount_cents")
+  isCredit      Boolean           @map("is_credit")
+  status        TransactionStatus @default(PENDING)
+  // ... categorizations relation contains vatType, vatAmountCents
+}
 
-      interface VATCalculationResult {
-        totalExcludingVAT: Decimal;
-        vatAmount: Decimal;
-        totalIncludingVAT: Decimal;
-        standardRated: Decimal;
-        zeroRated: Decimal;
-        exempt: Decimal;
-        itemCount: number;
-      }
+model Categorization {
+  vatAmountCents Int?    @map("vat_amount_cents")
+  vatType        VatType @default(STANDARD) @map("vat_type")
+}
 
-      interface VATFlaggedItem {
-        transactionId?: string;
-        invoiceId?: string;
-        description: string;
-        issue: string;
-        amount: Decimal;
-        severity: 'WARNING' | 'ERROR';
-      }
+model Invoice {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  subtotalCents Int    @map("subtotal_cents")
+  vatCents    Int      @default(0) @map("vat_cents")
+  totalCents  Int      @map("total_cents")
+  issueDate   DateTime @map("issue_date") @db.Date
+  status      InvoiceStatus
+}
 
-      @Injectable()
-      export class VATService {
-        private readonly VAT_RATE = new Decimal('0.15'); // SA 15% VAT
-
-        async calculateOutputVAT(
-          invoices: Invoice[],
-          periodStart: Date,
-          periodEnd: Date
-        ): Promise&lt;VATCalculationResult&gt;;
-
-        async calculateInputVAT(
-          transactions: Transaction[],
-          periodStart: Date,
-          periodEnd: Date
-        ): Promise&lt;VATCalculationResult&gt;;
-
-        classifyVATType(
-          accountCode: string,
-          description: string,
-          supplierVATNumber?: string
-        ): VATType;
-
-        validateVATDetails(
-          transaction: Transaction | Invoice
-        ): ValidationResult;
-
-        getFlaggedItems(
-          transactions: Transaction[],
-          invoices: Invoice[]
-        ): VATFlaggedItem[];
-
-        private calculateVAT(amount: Decimal, vatType: VATType): Decimal;
-        private extractVATFromInclusive(amountIncVAT: Decimal): Decimal;
-      }
-    </signature>
-    <signature file="src/core/sars/interfaces/vat.interface.ts">
-      export enum VATType {
-        STANDARD = 'STANDARD',
-        ZERO_RATED = 'ZERO_RATED',
-        EXEMPT = 'EXEMPT',
-        NO_VAT = 'NO_VAT'
-      }
-
-      export interface VATCalculationResult {
-        totalExcludingVAT: Decimal;
-        vatAmount: Decimal;
-        totalIncludingVAT: Decimal;
-        standardRated: Decimal;
-        zeroRated: Decimal;
-        exempt: Decimal;
-        itemCount: number;
-      }
-
-      export interface VATFlaggedItem {
-        transactionId?: string;
-        invoiceId?: string;
-        description: string;
-        issue: string;
-        amount: Decimal;
-        severity: 'WARNING' | 'ERROR';
-      }
-
-      export interface ValidationResult {
-        isValid: boolean;
-        errors: string[];
-        warnings: string[];
-      }
-    </signature>
-  </signatures>
-
-  <constraints>
-    - Must use Decimal.js for ALL monetary calculations
-    - Must use banker's rounding (ROUND_HALF_EVEN)
-    - VAT rate must be 15% (SA current rate)
-    - Must NOT use 'any' type anywhere
-    - Must distinguish zero-rated (0% but claimable) vs exempt (0% not claimable)
-    - calculateOutputVAT must only process invoices in period
-    - calculateInputVAT must only process categorized expense transactions
-    - Flagged items must include severity level
-    - Must handle both VAT-inclusive and VAT-exclusive amounts
-    - Zero-rated items: Exports, basic foodstuffs (per SA VAT Act)
-    - Exempt items: Financial services, residential rent
-    - All methods must be async to allow future DB queries
-    - Must validate VAT numbers format (10 digits for SA)
-  </constraints>
-
-  <verification>
-    - TypeScript compiles without errors
-    - Unit tests pass with 100% coverage
-    - VAT calculation with R1000 excl VAT yields R150 VAT exactly
-    - Banker's rounding test: R100.125 rounds to R100.12, R100.135 rounds to R100.14
-    - Zero-rated items return 0 VAT but are counted separately from exempt
-    - Missing VAT number on expense >R5000 triggers ERROR flag
-    - Output VAT on invoice with 15% matches expected value
-    - Input VAT extraction from inclusive amount is accurate
-    - getFlaggedItems identifies missing supplier details
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-VATService Implementation (src/core/sars/vat.service.ts):
-
-  Configure Decimal.js:
-    Decimal.set({
-      precision: 20,
-      rounding: Decimal.ROUND_HALF_EVEN,
-      toExpPos: 9e15,
-      minE: -9e15
-    })
-
-  calculateOutputVAT(invoices, periodStart, periodEnd):
-    Filter invoices by date range (issue_date >= periodStart AND <= periodEnd)
-    Initialize totals with Decimal.js
-
-    For each invoice:
-      Get vatType from classifyVATType
-      Add to appropriate bucket (standard/zero/exempt)
-      Calculate VAT amount using calculateVAT
-      Accumulate totals
-
-    Return VATCalculationResult:
-      totalExcludingVAT = sum of all subtotals
-      vatAmount = sum of all VAT
-      totalIncludingVAT = totalExcludingVAT + vatAmount
-      standardRated, zeroRated, exempt = respective buckets
-      itemCount = invoice count
-
-  calculateInputVAT(transactions, periodStart, periodEnd):
-    Filter transactions:
-      - date >= periodStart AND <= periodEnd
-      - is_credit = false (expenses only)
-      - status = CATEGORIZED
-      - account category is expense
-
-    Initialize totals with Decimal.js
-
-    For each transaction:
-      Get vatType from classifyVATType
-      Determine if amount is VAT-inclusive or exclusive
-      Calculate/extract VAT using extractVATFromInclusive or calculateVAT
-      Add to appropriate bucket
-      Accumulate totals
-
-    Return VATCalculationResult
-
-  classifyVATType(accountCode, description, supplierVATNumber):
-    Check account code against mapping:
-      - If account in ZERO_RATED_ACCOUNTS: return ZERO_RATED
-        Examples: 1200 (Exports), certain food accounts
-      - If account in EXEMPT_ACCOUNTS: return EXEMPT
-        Examples: 8100 (Bank charges), 8200 (Interest)
-      - If supplierVATNumber is null/empty: return NO_VAT
-      - Else: return STANDARD
-
-    Fallback description keyword matching:
-      - Contains "export": ZERO_RATED
-      - Contains "bank charge", "interest": EXEMPT
-      - Default: STANDARD if supplier has VAT number
-
-  validateVATDetails(item):
-    errors = []
-    warnings = []
-
-    If item is Transaction (expense):
-      If amount > R5000 AND no supplier VAT number:
-        errors.push("VAT number required for expense > R5000")
-      If amount > R2000 AND no supplier name:
-        warnings.push("Supplier name recommended")
-
-    If item is Invoice (output):
-      If vatType = STANDARD AND vatCents = 0:
-        errors.push("Missing VAT on standard-rated invoice")
-      If total != subtotal + VAT (with 1 cent tolerance):
-        errors.push("VAT calculation mismatch")
-
-    Return { isValid: errors.length === 0, errors, warnings }
-
-  getFlaggedItems(transactions, invoices):
-    flagged = []
-
-    For each transaction:
-      validationResult = validateVATDetails(transaction)
-      If validationResult has errors:
-        flagged.push({
-          transactionId: transaction.id,
-          description: transaction.description,
-          issue: errors.join('; '),
-          amount: new Decimal(transaction.amountCents).div(100),
-          severity: 'ERROR'
-        })
-      If validationResult has warnings:
-        flagged.push({ ... severity: 'WARNING' })
-
-    For each invoice:
-      validationResult = validateVATDetails(invoice)
-      If issues found:
-        flagged.push similar structure
-
-    Return flagged
-
-  private calculateVAT(amount: Decimal, vatType: VATType):
-    If vatType === STANDARD:
-      Return amount.mul(VAT_RATE) // 15% of amount
-    Else:
-      Return new Decimal(0)
-
-  private extractVATFromInclusive(amountIncVAT: Decimal):
-    // VAT-inclusive amount to VAT amount
-    // VAT = amountIncVAT - (amountIncVAT / 1.15)
-    // Simplified: amountIncVAT * (0.15 / 1.15)
-    divisor = new Decimal(1).plus(VAT_RATE) // 1.15
-    exclusive = amountIncVAT.div(divisor)
-    vat = amountIncVAT.minus(exclusive)
-    Return vat
-
-Constants:
-  ZERO_RATED_ACCOUNTS = ['1200', '4100'] // Exports, basic food
-  EXEMPT_ACCOUNTS = ['8100', '8200', '4200'] // Bank charges, interest, rent
-  VAT_NUMBER_REGEX = /^\d{10}$/
-</pseudo_code>
+Existing repositories to use:
+- TransactionRepository: src/database/repositories/transaction.repository.ts
+- InvoiceRepository: src/database/repositories/invoice.repository.ts
+- CategorizationRepository: src/database/repositories/categorization.repository.ts
+</existing_infrastructure>
 
 <files_to_create>
-  <file path="src/core/sars/vat.service.ts">VATService class with all methods</file>
-  <file path="src/core/sars/interfaces/vat.interface.ts">VAT interfaces and enums</file>
-  <file path="src/core/sars/constants/vat.constants.ts">VAT rate and account mappings</file>
-  <file path="tests/core/sars/vat.service.spec.ts">Comprehensive unit tests</file>
+1. src/database/dto/vat.dto.ts - DTOs and interfaces
+2. src/database/constants/vat.constants.ts - VAT rate and account mappings
+3. src/database/services/vat.service.ts - VatService class
+4. tests/database/services/vat.service.spec.ts - Integration tests
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/core/sars/index.ts">Export VATService and interfaces</file>
+1. src/database/services/index.ts - Add export for VatService
+2. src/database/dto/index.ts - Add export for VAT DTOs
+3. src/database/database.module.ts - Add VatService to providers/exports
 </files_to_modify>
 
+<implementation_details>
+
+## File 1: src/database/dto/vat.dto.ts
+
+```typescript
+import Decimal from 'decimal.js';
+
+// Re-export VatType from Prisma for convenience
+export { VatType } from '@prisma/client';
+
+export interface VatCalculationResult {
+  totalExcludingVatCents: number;      // Stored as cents
+  vatAmountCents: number;              // Stored as cents
+  totalIncludingVatCents: number;      // Stored as cents
+  standardRatedCents: number;          // Amount at 15%
+  zeroRatedCents: number;              // Amount at 0% (claimable)
+  exemptCents: number;                 // Amount at 0% (not claimable)
+  itemCount: number;
+}
+
+export interface VatFlaggedItem {
+  transactionId?: string;
+  invoiceId?: string;
+  description: string;
+  issue: string;
+  amountCents: number;
+  severity: 'WARNING' | 'ERROR';
+}
+
+export interface VatValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+```
+
+## File 2: src/database/constants/vat.constants.ts
+
+```typescript
+import Decimal from 'decimal.js';
+
+// Configure Decimal.js for banker's rounding
+Decimal.set({
+  precision: 20,
+  rounding: Decimal.ROUND_HALF_EVEN,
+});
+
+export const VAT_CONSTANTS = {
+  // South African VAT rate (15%)
+  VAT_RATE: new Decimal('0.15'),
+  VAT_RATE_PERCENT: 15,
+
+  // VAT-inclusive divisor (1.15)
+  VAT_DIVISOR: new Decimal('1.15'),
+
+  // Threshold for requiring supplier VAT number (R5000 = 500000 cents)
+  VAT_NUMBER_REQUIRED_THRESHOLD_CENTS: 500000,
+
+  // Threshold for supplier name warning (R2000 = 200000 cents)
+  SUPPLIER_NAME_WARNING_THRESHOLD_CENTS: 200000,
+
+  // Valid SA VAT number format (10 digits)
+  VAT_NUMBER_REGEX: /^\d{10}$/,
+};
+
+// Account codes that are zero-rated (0% VAT but claimable input VAT)
+export const ZERO_RATED_ACCOUNTS = [
+  '1200', // Exports
+  '4100', // Basic foodstuffs
+];
+
+// Account codes that are exempt (no VAT, not claimable)
+export const EXEMPT_ACCOUNTS = [
+  '8100', // Bank charges
+  '8200', // Interest expense
+  '4200', // Residential rent
+];
+```
+
+## File 3: src/database/services/vat.service.ts
+
+Key methods to implement:
+- calculateOutputVat(tenantId, periodStart, periodEnd): VatCalculationResult
+- calculateInputVat(tenantId, periodStart, periodEnd): VatCalculationResult
+- classifyVatType(accountCode, description, supplierVatNumber?): VatType
+- validateVatDetails(item): VatValidationResult
+- getFlaggedItems(tenantId, periodStart, periodEnd): VatFlaggedItem[]
+
+Dependencies to inject:
+- PrismaService
+- InvoiceRepository
+- TransactionRepository
+- CategorizationRepository
+
+## File 4: tests/database/services/vat.service.spec.ts
+
+Integration tests using real database:
+- Test VAT calculation: R1000 excl VAT yields R150 VAT exactly
+- Test banker's rounding: R100.125 rounds to R100.12
+- Test zero-rated vs exempt distinction
+- Test flagging missing VAT numbers on expenses > R5000
+- Test output VAT aggregation for invoice period
+- Test input VAT extraction from VAT-inclusive amounts
+</implementation_details>
+
+<test_requirements>
+CRITICAL: Tests must use REAL PostgreSQL database, not mocks.
+
+Test setup pattern (from existing tests):
+```typescript
+beforeAll(async () => {
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [PrismaService, VatService, /* dependencies */],
+  }).compile();
+  prisma = module.get<PrismaService>(PrismaService);
+  service = module.get<VatService>(VatService);
+  await prisma.onModuleInit();
+});
+
+beforeEach(async () => {
+  // Clean in FK order - MUST include all related tables
+  await prisma.reminder.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.invoiceLine.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.categorization.deleteMany({});
+  await prisma.transaction.deleteMany({});
+  await prisma.tenant.deleteMany({});
+
+  // Create test tenant
+  testTenant = await prisma.tenant.create({
+    data: {
+      name: 'VAT Test Creche',
+      taxStatus: 'VAT_REGISTERED',
+      vatNumber: '4123456789', // Valid 10-digit VAT number
+      // ... required fields
+    },
+  });
+});
+```
+</test_requirements>
+
 <validation_criteria>
-  <criterion>VATService compiles without TypeScript errors</criterion>
-  <criterion>All methods use Decimal.js for monetary calculations</criterion>
-  <criterion>Banker's rounding applied correctly (ROUND_HALF_EVEN)</criterion>
-  <criterion>15% VAT rate used consistently</criterion>
-  <criterion>Zero-rated and exempt properly distinguished</criterion>
-  <criterion>Output VAT calculation accurate for invoice period</criterion>
-  <criterion>Input VAT calculation accurate for expense period</criterion>
-  <criterion>VAT extraction from inclusive amounts is precise</criterion>
-  <criterion>Missing VAT details correctly flagged</criterion>
-  <criterion>Unit tests cover edge cases (zero amounts, null values, boundary dates)</criterion>
-  <criterion>No 'any' types used</criterion>
-  <criterion>All public methods documented with JSDoc</criterion>
+1. TypeScript compiles without errors (npm run build)
+2. Lint passes (npm run lint)
+3. All tests pass with real database
+4. VAT calculation: R1000 excl = R150 VAT exactly (15%)
+5. Banker's rounding applied (R100.125 -> R100.12, R100.135 -> R100.14)
+6. Zero-rated items return 0 VAT but counted separately from exempt
+7. Missing VAT number on expense > R5000 triggers ERROR flag
+8. VAT extraction from inclusive: R115 inclusive = R15 VAT
+9. Tenant isolation: Queries filter by tenantId
+10. No 'any' types used
 </validation_criteria>
 
-<test_commands>
-  <command>npm run build</command>
-  <command>npm run test -- --grep "VATService"</command>
-  <command>npm run lint -- src/core/sars/vat.service.ts</command>
-</test_commands>
+<error_handling>
+NO fallbacks or workarounds. Fail fast with descriptive errors:
+- throw new Error(`VAT calculation failed: ${reason}`)
+- Use Logger.error() before throwing
+- Include tenantId, invoiceId, transactionId in error messages
+</error_handling>
 
 </task_spec>

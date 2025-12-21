@@ -25,6 +25,12 @@ import { PaymentAllocationService } from './services/payment-allocation.service'
 import { ArrearsService } from './services/arrears.service';
 import { ReminderRepository } from './repositories/reminder.repository';
 import { ReminderService } from './services/reminder.service';
+import { VatService } from './services/vat.service';
+import { PayeService } from './services/paye.service';
+import { UifService } from './services/uif.service';
+import { Vat201Service } from './services/vat201.service';
+import { Emp201Service } from './services/emp201.service';
+import { Irp5Service } from './services/irp5.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 
@@ -57,6 +63,12 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     ArrearsService,
     ReminderRepository,
     ReminderService,
+    VatService,
+    PayeService,
+    UifService,
+    Vat201Service,
+    Emp201Service,
+    Irp5Service,
   ],
   exports: [
     TenantRepository,
@@ -85,6 +97,12 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     ArrearsService,
     ReminderRepository,
     ReminderService,
+    VatService,
+    PayeService,
+    UifService,
+    Vat201Service,
+    Emp201Service,
+    Irp5Service,
   ],
 })
 export class DatabaseModule {}

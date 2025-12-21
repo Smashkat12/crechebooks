@@ -292,18 +292,41 @@ Create tests/api/billing/generate-invoices.controller.spec.ts with minimum 8 tes
 7. "should include errors in response"
 8. "should enforce OWNER/ADMIN role restriction"
 
+CRITICAL TESTING PHILOSOPHY:
+- NO MOCK DATA that masks real issues
+- Tests must verify ACTUAL behavior, not pass superficially
+- If a test passes when the system is broken, the test is WRONG
+- Every test must fail if the underlying functionality breaks
+
 TEST SETUP:
-- Mock InvoiceGenerationService with generateMonthlyInvoices returning InvoiceGenerationResult
+- Use jest.spyOn() on service methods to control return values
+- Use REALISTIC test data that matches actual service response:
+  - InvoiceGenerationResult with all fields populated
+  - Invoices with real cents values (e.g., 345000 = R3450.00)
+  - Errors with actual error codes (DUPLICATE_INVOICE, NOT_FOUND)
 - Mock user with OWNER/ADMIN role for success tests
 - Mock user with VIEWER role for forbidden test
-- Use realistic test data: totalAmountCents: 690000 → total_amount: 6900.00
 
-CRITICAL MOCKING:
-The controller depends on:
+WHAT TO TEST:
+- Service called with CORRECT parameters (tenantId, billingMonth, userId, childIds)
+- Future month validation rejects correctly (compare dates properly)
+- Response structure EXACTLY matches DTO specification
+- Cents → decimal conversion is mathematically correct (345000 → 3450.00)
+- Error objects properly transformed (camelCase → snake_case)
+- Role guard enforced (VIEWER gets 403, OWNER/ADMIN gets 201)
+
+CONTROLLER DEPENDENCIES TO MOCK:
 - InvoiceGenerationService (must mock generateMonthlyInvoices)
-- InvoiceRepository (from TASK-BILL-031, still needed)
-- ParentRepository (from TASK-BILL-031, still needed)
-- ChildRepository (from TASK-BILL-031, still needed)
+- InvoiceRepository (from TASK-BILL-031, still needed in providers)
+- ParentRepository (from TASK-BILL-031, still needed in providers)
+- ChildRepository (from TASK-BILL-031, still needed in providers)
+
+DO NOT:
+- Create tests that always pass regardless of implementation
+- Use empty mocks that don't verify method calls
+- Skip testing error scenarios
+- Ignore the cents→decimal conversion verification
+- Test role guard with only one role
 
 REFERENCE: tests/api/transaction/categorize.controller.spec.ts for role guard testing
 </test_requirements>
@@ -324,20 +347,34 @@ REFERENCE: tests/api/transaction/categorize.controller.spec.ts for role guard te
 </validation_criteria>
 
 <error_handling>
-CRITICAL: Fail fast with clear errors. No silent failures.
+CRITICAL: Fail fast with clear errors. NO SILENT FAILURES. NO WORKAROUNDS.
 
+PRINCIPLES:
+- If something fails, it MUST error out with a clear message
+- NO try-catch blocks that swallow errors silently
+- NO fallback values that mask real problems
+- Every error must be LOGGED with full context before being thrown
+- The system must be DEBUGGABLE - when it fails, we know EXACTLY what failed
+
+ERROR RESPONSES:
 1. Missing JWT token → 401 Unauthorized (handled by JwtAuthGuard)
 2. Insufficient role → 403 Forbidden (handled by RolesGuard)
-3. Invalid billing_month format → 400 Bad Request (handled by class-validator)
-4. Future billing_month → 400 Bad Request (throw in controller)
-5. Service errors → Log full error with context, throw InternalServerErrorException
+3. Invalid billing_month format → 400 BadRequest with clear message (handled by class-validator)
+4. Future billing_month → 400 BadRequest: "Cannot generate invoices for future months"
+5. Service throws → Log full error with stack trace, throw InternalServerErrorException
 
-LOGGING PATTERN:
+REQUIRED LOGGING (every endpoint call MUST log):
 this.logger.log(`Generate invoices: tenant=${tenantId}, month=${dto.billing_month}, childIds=${dto.child_ids?.length ?? 'all'}`);
-this.logger.warn(`Future month requested: ${dto.billing_month}`);
-this.logger.error(`Invoice generation failed: ${error.message}`, error.stack);
+this.logger.log(`Generation complete: created=${result.invoicesCreated}, errors=${result.errors.length}, total=${result.totalAmountCents}c`);
 
-ERROR RESPONSE FORMAT (from InvoiceGenerationService):
+ERROR LOGGING:
+this.logger.warn(`Future month rejected: ${dto.billing_month} > current month`);
+this.logger.error(`Invoice generation failed for tenant=${tenantId}: ${error.message}`, error.stack);
+
+PARTIAL FAILURES (errors array from service):
+The service returns errors for individual children that failed. These are NOT thrown as exceptions.
+They are returned in the response so the caller knows what succeeded and what failed.
+Format (from InvoiceGenerationService):
 {
   childId: 'child-001',
   enrollmentId: 'enroll-001',
@@ -345,12 +382,18 @@ ERROR RESPONSE FORMAT (from InvoiceGenerationService):
   code: 'DUPLICATE_INVOICE'
 }
 
-Possible error codes from service:
+Possible error codes:
 - DUPLICATE_INVOICE: Invoice already exists for this child/period
 - NOT_FOUND: Enrollment or related entity not found
 - VALIDATION_ERROR: Invalid data
 - CONFLICT: Conflicting state
 - GENERATION_ERROR: Generic generation failure
+
+DO NOT:
+- Catch service errors and return empty success response
+- Ignore the errors array from service
+- Use try-catch without re-throwing
+- Return 200 when service throws exception
 </error_handling>
 
 <test_commands>

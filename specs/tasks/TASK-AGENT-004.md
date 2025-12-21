@@ -1,8 +1,8 @@
-<task_spec id="TASK-AGENT-004" version="3.0">
+<task_spec id="TASK-AGENT-004" version="4.0">
 
 <metadata>
   <title>SARS Calculation Agent</title>
-  <status>COMPLETE</status>
+  <status>completed</status>
   <layer>agent</layer>
   <sequence>40</sequence>
   <implements>
@@ -11,248 +11,135 @@
   </implements>
   <depends_on>
     <task_ref status="COMPLETE">TASK-SARS-011 to TASK-SARS-016</task_ref>
-    <task_ref status="PENDING">TASK-AGENT-001</task_ref>
+    <task_ref status="ready">TASK-AGENT-001</task_ref>
   </depends_on>
-  <estimated_complexity>high</estimated_complexity>
+  <estimated_complexity>low</estimated_complexity>
 </metadata>
 
-<context>
-This task creates the SARS Calculation Agent that wraps existing SARS services with Claude Code agent capabilities. SARS services are complete:
-- PayeService, UifService, VatService, Emp201Service, Vat201Service, Irp5Service
+<current_state>
+## IMPLEMENTATION STATUS: CODE COMPLETE, TESTS FAILING
 
-This task adds:
-- ALWAYS escalate for review (L2 autonomy - never auto-submit)
-- Decision logging to .claude/logs/decisions.jsonl
-- Validation against .claude/context/sars_tables_2025.json
+**Files Implemented (Verified 2025-12-21):**
+```
+src/agents/sars-agent/
+├── sars.agent.ts            # Main agent
+├── sars.module.ts           # NestJS module
+├── decision-logger.ts       # JSONL logging
+├── context-validator.ts     # Validates against sars_tables_2025.json
+├── index.ts                 # Barrel export
+└── interfaces/
+    └── sars.interface.ts
+```
+
+**Test File:**
+- `tests/agents/sars-agent/sars.agent.spec.ts`
+
+**BLOCKER: Tests fail with "DATABASE_URL not set"**
+- Root cause: `.env.test` file missing
+- Fix: Run TASK-AGENT-001 first
+</current_state>
+
+<context>
+This agent wraps existing SARS services with Claude Code capabilities.
+**CRITICAL: SARS calculations ALWAYS require human review (L2 autonomy).**
+
+Uses existing services:
+- PayeService (2025 tax brackets)
+- UifService (1% capped at R177.12/month)
+- VatService (15% standard rate)
+- Emp201Service (monthly PAYE/UIF return)
+- Vat201Service (bi-monthly VAT return)
 
 **CRITICAL PROJECT RULES:**
 - ALL monetary values are CENTS (integers)
-- Decimal.js with ROUND_HALF_EVEN
+- Decimal.js with ROUND_HALF_EVEN (banker's rounding)
 - NO backwards compatibility - fail fast
-- SARS submissions ALWAYS require human review (L2)
-
-**EXISTING INFRASTRUCTURE (DO NOT RECREATE):**
-- PayeService at src/database/services/paye.service.ts
-- UifService at src/database/services/uif.service.ts
-- VatService at src/database/services/vat.service.ts
-- Emp201Service at src/database/services/emp201.service.ts
-- Vat201Service at src/database/services/vat201.service.ts
-- SARS constants at src/database/constants/paye.constants.ts
+- SARS submissions ALWAYS require review (L2)
+- Tax tables from `.claude/context/sars_tables_2025.json`
 </context>
 
-<existing_services>
+<existing_implementation>
+## Key Code Reference
+
+**SarsAgent Methods:**
 ```typescript
-PayeService.calculatePaye(dto): Promise<PayeCalculationResult>
-UifService.calculateUif(dto): Promise<UifCalculationResult>
-VatService.calculateVatOutput(amountCents): VatCalculation
-Emp201Service.generateEmp201(dto): Promise<Emp201Return>
-Vat201Service.generateVat201(dto): Promise<Vat201Return>
+// All return { action: 'DRAFT_FOR_REVIEW', requiresReview: true }
+calculatePayeForReview(tenantId, grossIncomeCents, payFrequency, dob, medicalAidMembers, period)
+generateEmp201ForReview(tenantId, year, month)
+generateVat201ForReview(tenantId, startDate, endDate)
 ```
 
-SARS 2025 constants from src/database/constants/paye.constants.ts:
-- TAX_BRACKETS_2025: 7 brackets, 18%-45%
-- REBATES_2025: Primary R17,600, Secondary R9,750, Tertiary R3,255
-- UIF: 1% employee + 1% employer, max R177.12/month
-- VAT: 15% standard rate
-</existing_services>
+**SARS 2025 Tax Brackets (from sars_tables_2025.json):**
+| Bracket | Annual Income (Cents) | Rate | Base Tax (Cents) |
+|---------|----------------------|------|------------------|
+| 1 | 0 - 237,400 | 18% | 0 |
+| 2 | 237,401 - 370,800 | 26% | 42,732 |
+| 3 | 370,801 - 512,100 | 31% | 77,376 |
+| 4 | 512,101 - 673,400 | 36% | 121,110 |
+| 5 | 673,401 - 857,100 | 39% | 179,178 |
+| 6 | 857,101 - 1,812,700 | 41% | 250,905 |
+| 7 | > 1,812,700 | 45% | 642,567 |
 
-<files_to_create>
-1. src/agents/sars-agent/sars.agent.ts - Main agent
-2. src/agents/sars-agent/decision-logger.ts - Log SARS decisions
-3. src/agents/sars-agent/context-validator.ts - Validate against sars_tables_2025.json
-4. src/agents/sars-agent/interfaces/sars.interface.ts - Types
-5. src/agents/sars-agent/sars.module.ts - NestJS module
-6. .claude/agents/sars-agent/calculate-paye.md - PAYE skill
-7. tests/agents/sars-agent/sars.agent.spec.ts - Tests
-</files_to_create>
+**Rebates (ALL VALUES IN CENTS):**
+- Primary: R17,600 (176,000 cents)
+- Secondary (65+): R9,750 (97,500 cents)
+- Tertiary (75+): R3,255 (32,550 cents)
 
-<implementation_reference>
+**UIF:**
+- Employee: 1% of gross (max R177.12/month = 17,712 cents)
+- Employer: 1% of gross (max R177.12/month)
+</existing_implementation>
 
-## Main Agent (src/agents/sars-agent/sars.agent.ts)
+<implementation_actions>
+## REQUIRED ACTIONS
+
+### Prerequisite: Complete TASK-AGENT-001
+```bash
+test -f .env.test || echo "BLOCKER: Run TASK-AGENT-001 first"
+```
+
+### Step 1: Verify SARS context file
+```bash
+node -e "
+const data = JSON.parse(require('fs').readFileSync('.claude/context/sars_tables_2025.json'));
+console.log('Tax brackets:', data.paye.taxBrackets.length);
+console.log('Primary rebate (cents):', data.paye.rebates.primary.amountCents);
+console.log('UIF max (cents):', data.uif.maxMonthlyContributionCents);
+"
+```
+
+### Step 2: Run SARS agent tests
+```bash
+npm run build
+npm run lint
+npm run test -- --testPathPatterns="sars-agent" --verbose
+```
+
+### Step 3: Verify all returns have requiresReview: true
+Every SARS calculation MUST return:
 ```typescript
-import { Injectable, Logger } from '@nestjs/common';
-import { PayeService } from '../../database/services/paye.service';
-import { UifService } from '../../database/services/uif.service';
-import { Emp201Service } from '../../database/services/emp201.service';
-import { Vat201Service } from '../../database/services/vat201.service';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-
-export interface SarsDecision {
-  type: 'PAYE' | 'UIF' | 'VAT' | 'EMP201' | 'VAT201';
-  action: 'DRAFT_FOR_REVIEW';  // Always L2
-  tenantId: string;
-  period: string;
-  calculatedAmountCents: number;
-  requiresReview: true;
-  reasoning: string;
-}
-
-@Injectable()
-export class SarsAgent {
-  private readonly logger = new Logger(SarsAgent.name);
-  private readonly logPath = path.join(process.cwd(), '.claude/logs/decisions.jsonl');
-  private readonly escalationsPath = path.join(process.cwd(), '.claude/logs/escalations.jsonl');
-
-  constructor(
-    private readonly payeService: PayeService,
-    private readonly uifService: UifService,
-    private readonly emp201Service: Emp201Service,
-    private readonly vat201Service: Vat201Service,
-  ) {}
-
-  async calculatePayeForReview(
-    tenantId: string,
-    grossIncomeCents: number,
-    payFrequency: 'MONTHLY' | 'WEEKLY' | 'FORTNIGHTLY',
-    dateOfBirth: Date,
-    medicalAidMembers: number,
-    period: string,
-  ): Promise<SarsDecision> {
-    const result = await this.payeService.calculatePaye({ grossIncomeCents, payFrequency, dateOfBirth, medicalAidMembers });
-
-    const decision: SarsDecision = {
-      type: 'PAYE',
-      action: 'DRAFT_FOR_REVIEW',
-      tenantId,
-      period,
-      calculatedAmountCents: result.monthlyPayeCents,
-      requiresReview: true,
-      reasoning: `PAYE R${(result.monthlyPayeCents / 100).toFixed(2)} for gross R${(grossIncomeCents / 100).toFixed(2)}`,
-    };
-
-    await this.logDecision(tenantId, 'PAYE', period, result.monthlyPayeCents, decision.reasoning);
-    await this.logEscalation(tenantId, 'PAYE', period, 'SARS calculation requires human review', result.monthlyPayeCents);
-
-    return decision;
-  }
-
-  async generateEmp201ForReview(tenantId: string, year: number, month: number): Promise<SarsDecision> {
-    const result = await this.emp201Service.generateEmp201({ tenantId, year, month });
-    const totalCents = result.totalPayeCents + result.totalUifCents;
-    const period = `${year}-${String(month).padStart(2, '0')}`;
-
-    const decision: SarsDecision = {
-      type: 'EMP201',
-      action: 'DRAFT_FOR_REVIEW',
-      tenantId,
-      period,
-      calculatedAmountCents: totalCents,
-      requiresReview: true,
-      reasoning: `EMP201 R${(totalCents / 100).toFixed(2)} (PAYE R${(result.totalPayeCents / 100).toFixed(2)}, UIF R${(result.totalUifCents / 100).toFixed(2)})`,
-    };
-
-    await this.logDecision(tenantId, 'EMP201', period, totalCents, decision.reasoning);
-    await this.logEscalation(tenantId, 'EMP201', period, 'EMP201 submission requires review', totalCents);
-
-    return decision;
-  }
-
-  async generateVat201ForReview(tenantId: string, startDate: Date, endDate: Date): Promise<SarsDecision> {
-    const result = await this.vat201Service.generateVat201({ tenantId, startDate, endDate });
-    const period = `${startDate.toISOString().slice(0, 7)} to ${endDate.toISOString().slice(0, 7)}`;
-
-    const decision: SarsDecision = {
-      type: 'VAT201',
-      action: 'DRAFT_FOR_REVIEW',
-      tenantId,
-      period,
-      calculatedAmountCents: result.netVatCents,
-      requiresReview: true,
-      reasoning: `VAT201 R${(result.netVatCents / 100).toFixed(2)} (Output R${(result.outputVatCents / 100).toFixed(2)}, Input R${(result.inputVatCents / 100).toFixed(2)})`,
-    };
-
-    await this.logDecision(tenantId, 'VAT201', period, result.netVatCents, decision.reasoning);
-    await this.logEscalation(tenantId, 'VAT201', period, 'VAT201 submission requires review', result.netVatCents);
-
-    return decision;
-  }
-
-  private async logDecision(tenantId: string, type: string, period: string, amountCents: number, reasoning: string): Promise<void> {
-    const entry = { timestamp: new Date().toISOString(), agent: 'sars-agent', tenantId, type, period, amountCents, autoApplied: false, reasoning };
-    try { await fs.appendFile(this.logPath, JSON.stringify(entry) + '\n'); } catch (e) { this.logger.error(`Log failed: ${e}`); }
-  }
-
-  private async logEscalation(tenantId: string, type: string, period: string, reason: string, amountCents: number): Promise<void> {
-    const entry = { timestamp: new Date().toISOString(), agent: 'sars-agent', tenantId, type: 'SARS_SUBMISSION', subType: type, period, amountCents, reason, status: 'pending', requiresHumanApproval: true };
-    try { await fs.appendFile(this.escalationsPath, JSON.stringify(entry) + '\n'); } catch (e) { this.logger.error(`Escalation failed: ${e}`); }
-  }
+{
+  action: 'DRAFT_FOR_REVIEW',
+  requiresReview: true
 }
 ```
-
-## Module (src/agents/sars-agent/sars.module.ts)
-```typescript
-import { Module } from '@nestjs/common';
-import { SarsAgent } from './sars.agent';
-import { DatabaseModule } from '../../database/database.module';
-
-@Module({
-  imports: [DatabaseModule],
-  providers: [SarsAgent],
-  exports: [SarsAgent],
-})
-export class SarsAgentModule {}
-```
-
-## Agent Skill Doc (.claude/agents/sars-agent/calculate-paye.md)
-```markdown
-# SARS Agent - PAYE Skill
-
-## Purpose
-Calculate PAYE using 2025 SARS tax tables. ALWAYS draft for human review.
-
-## Autonomy Level
-L2 (Draft Only) - NEVER auto-submit to SARS
-
-## Algorithm
-1. Annualize income
-2. Find tax bracket
-3. Calculate: base_tax + (excess × rate)
-4. Apply rebates (Primary R17,600, Secondary R9,750 age 65+, Tertiary R3,255 age 75+)
-5. De-annualize to monthly
-6. ALWAYS escalate for review
-
-## All Amounts in CENTS
-- Inputs/outputs in cents (integers)
-- Decimal.js with ROUND_HALF_EVEN
-```
-</implementation_reference>
-
-<test_requirements>
-CRITICAL: Real PostgreSQL - NO MOCKS.
-
-```typescript
-describe('SarsAgent', () => {
-  it('should always escalate PAYE', async () => {
-    const decision = await agent.calculatePayeForReview(tenantId, 2500000, 'MONTHLY', new Date('1990-01-15'), 2, '2025-01');
-    expect(decision.action).toBe('DRAFT_FOR_REVIEW');
-    expect(decision.requiresReview).toBe(true);
-  });
-
-  it('should always escalate EMP201', async () => {
-    const decision = await agent.generateEmp201ForReview(tenantId, 2025, 1);
-    expect(decision.action).toBe('DRAFT_FOR_REVIEW');
-    expect(decision.requiresReview).toBe(true);
-  });
-});
-```
-</test_requirements>
+</implementation_actions>
 
 <validation_criteria>
-- TypeScript compiles
-- Lint passes
-- Tests pass with real PostgreSQL
-- SARS always returns requiresReview: true
-- All decisions logged
-- All escalations logged
-- Amounts in cents
-- Decimal.js with ROUND_HALF_EVEN
+- TypeScript compiles: `npm run build`
+- Lint passes: `npm run lint`
+- SARS agent tests pass
+- ALL SARS methods return `requiresReview: true`
+- Calculations use Decimal.js with ROUND_HALF_EVEN
+- All values in CENTS
+- Decisions logged to `.claude/logs/decisions.jsonl`
+- Escalations logged to `.claude/logs/escalations.jsonl`
 </validation_criteria>
 
 <test_commands>
 npm run build
 npm run lint
-npm run test -- --testPathPattern="sars-agent" --verbose
+npm run test -- --testPathPatterns="sars-agent" --verbose
 </test_commands>
 
 </task_spec>

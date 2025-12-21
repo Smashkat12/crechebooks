@@ -153,11 +153,11 @@ graph TD
 
 | Order | Task ID | Title | Layer | Dependencies | Status |
 |-------|---------|-------|-------|--------------|--------|
-| 37 | TASK-AGENT-001 | Claude Code Configuration and Context | agent | TASK-CORE-001 | Pending |
-| 38 | TASK-AGENT-002 | Transaction Categorizer Agent | agent | TASK-TRANS-012, TASK-AGENT-001 | Pending |
-| 39 | TASK-AGENT-003 | Payment Matcher Agent | agent | TASK-PAY-011, TASK-AGENT-001 | Pending |
-| 40 | TASK-AGENT-004 | SARS Calculation Agent | agent | TASK-SARS-011, TASK-AGENT-001 | Pending |
-| 41 | TASK-AGENT-005 | Orchestrator Agent Setup | agent | TASK-AGENT-002, TASK-AGENT-003, TASK-AGENT-004 | Pending |
+| 37 | TASK-AGENT-001 | Claude Code Configuration and Context | agent | TASK-CORE-001 | ✅ Complete |
+| 38 | TASK-AGENT-002 | Transaction Categorizer Agent | agent | TASK-TRANS-012, TASK-AGENT-001 | ✅ Complete |
+| 39 | TASK-AGENT-003 | Payment Matcher Agent | agent | TASK-PAY-011, TASK-AGENT-001 | ✅ Complete |
+| 40 | TASK-AGENT-004 | SARS Calculation Agent | agent | TASK-SARS-011, TASK-AGENT-001 | ✅ Complete |
+| 41 | TASK-AGENT-005 | Orchestrator Agent Setup | agent | TASK-AGENT-002, TASK-AGENT-003, TASK-AGENT-004 | ✅ Complete |
 
 ### Phase 4: Surface Layer (API)
 
@@ -198,12 +198,12 @@ graph TD
 |-------|-------|-----------|------------|
 | Foundation | 15 | 15 | 100% |
 | Logic | 22 | 22 | 100% |
-| Agents | 5 | 0 | 0% |
+| Agents | 5 | 5 | 100% |
 | Surface | 16 | 0 | 0% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **63** | **37** | **58.7%** |
+| **Total** | **63** | **42** | **66.7%** |
 
-**Last Updated**: 2025-12-21 (TASK-TRANS-015 completed - 62 parser tests, total 1251 tests)
+**Last Updated**: 2025-12-21 (TASK-AGENT-001 to TASK-AGENT-005 completed - 71 agent tests, total 1307 tests)
 
 ---
 

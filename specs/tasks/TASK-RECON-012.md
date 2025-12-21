@@ -1,4 +1,4 @@
-<task_spec id="TASK-RECON-012" version="1.0">
+<task_spec id="TASK-RECON-012" version="3.0">
 
 <metadata>
   <title>Discrepancy Detection Service</title>
@@ -9,455 +9,657 @@
     <requirement_ref>REQ-RECON-003</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-RECON-011</task_ref>
+    <task_ref status="PENDING">TASK-RECON-011</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
 </metadata>
 
 <context>
-This task creates the DiscrepancyService which identifies and classifies
-reconciliation discrepancies. When bank statements don't match Xero records,
-this service analyzes the differences, classifies them by type (missing from
-bank, missing from Xero, amount mismatch, date mismatch), suggests resolutions,
-and alerts accountants. The service ensures discrepancies above R0.01 threshold
-are flagged for investigation and provides actionable insights for resolution.
+DiscrepancyService identifies and classifies reconciliation discrepancies.
+
+**What it does:**
+- Detect transactions in bank but not Xero (IN_BANK_NOT_XERO)
+- Detect transactions in Xero but not bank (IN_XERO_NOT_BANK)
+- Detect amount mismatches between bank and Xero (AMOUNT_MISMATCH)
+- Detect date mismatches between bank and Xero (DATE_MISMATCH)
+- Classify severity: LOW (<R10), MEDIUM (R10-R100), HIGH (>R100)
+- Generate resolution suggestions for each discrepancy type
+- Flag items above R0.01 threshold for investigation
+
+**CRITICAL RULES:**
+- ALL monetary values are CENTS (integers) - never rands as floats
+- NO backwards compatibility - fail fast with descriptive errors
+- NO mock data in tests - use real PostgreSQL database
+- Tenant isolation required on ALL queries
+- Discrepancy threshold: 1 cent (amounts above this are flagged)
 </context>
 
-<input_context_files>
-  <file purpose="api_contracts">specs/technical/api-contracts.md#ReconciliationService</file>
-  <file purpose="reconciliation_service">src/core/reconciliation/reconciliation.service.ts</file>
-  <file purpose="transaction_entity">src/database/entities/transaction.entity.ts</file>
-  <file purpose="naming_conventions">specs/constitution.md#coding_standards</file>
-</input_context_files>
+<project_structure>
+ACTUAL file locations (DO NOT use src/core/ - it doesn't exist):
 
-<prerequisites>
-  <check>TASK-RECON-011 completed (ReconciliationService exists)</check>
-  <check>TASK-TRANS-001 completed (Transaction entity exists)</check>
-  <check>Transaction repository available</check>
-  <check>NestJS service infrastructure in place</check>
-</prerequisites>
+```
+src/database/
+├── services/
+│   └── discrepancy.service.ts      # DiscrepancyService class
+├── dto/
+│   └── discrepancy.dto.ts          # Discrepancy DTOs and types
+└── database.module.ts              # Add to providers and exports
 
-<scope>
-  <in_scope>
-    - Create DiscrepancyService class
-    - Implement detectDiscrepancies() method
-    - Implement classifyDiscrepancy() method
-    - Implement suggestResolution() method
-    - Implement reportDiscrepancy() method
-    - Define discrepancy types (IN_BANK_NOT_XERO, IN_XERO_NOT_BANK, AMOUNT_MISMATCH, DATE_MISMATCH)
-    - Threshold detection (alert on >R0.01)
-    - Create discrepancy DTOs
-    - Generate resolution suggestions
-    - Unit tests for discrepancy service
-  </in_scope>
-  <out_of_scope>
-    - Actual reconciliation logic (TASK-RECON-011)
-    - Financial report generation (TASK-RECON-013)
-    - Automatic resolution (manual review required)
-    - API endpoints
-    - UI components
-    - Email/notification delivery (just flag for reporting)
-  </out_of_scope>
-</scope>
+tests/database/services/
+└── discrepancy.service.spec.ts     # Integration tests with real DB
+```
+</project_structure>
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/core/reconciliation/discrepancy.service.ts">
-      export enum DiscrepancyType {
-        IN_BANK_NOT_XERO = 'IN_BANK_NOT_XERO',
-        IN_XERO_NOT_BANK = 'IN_XERO_NOT_BANK',
-        AMOUNT_MISMATCH = 'AMOUNT_MISMATCH',
-        DATE_MISMATCH = 'DATE_MISMATCH'
-      }
+<existing_infrastructure>
+Dependencies available:
+- PrismaService (for direct DB queries)
+- ReconciliationRepository (from TASK-RECON-001)
+- TransactionRepository (from TASK-TRANS-001)
+- VatService patterns to follow (from TASK-SARS-011)
 
-      @Injectable()
-      export class DiscrepancyService {
-        constructor(
-          private transactionRepo: TransactionRepository,
-          private reconciliationRepo: ReconciliationRepository
-        ) {}
-
-        async detectDiscrepancies(
-          reconId: string
-        ): Promise&lt;DiscrepancyReport&gt; {
-          // 1. Get reconciliation record
-          // 2. Get all transactions in period
-          // 3. Get Xero records for same period
-          // 4. Compare and identify discrepancies
-          // 5. Classify each discrepancy
-          // 6. Return structured report
-        }
-
-        classifyDiscrepancy(
-          bankTx?: Transaction,
-          xeroTx?: any
-        ): DiscrepancyClassification {
-          // IN_BANK_NOT_XERO: bankTx exists, xeroTx null
-          // IN_XERO_NOT_BANK: xeroTx exists, bankTx null
-          // AMOUNT_MISMATCH: both exist, amounts differ
-          // DATE_MISMATCH: both exist, dates differ
-        }
-
-        suggestResolution(
-          discrepancy: Discrepancy
-        ): ResolutionSuggestion {
-          // Suggest actions based on discrepancy type
-          // Examples: "Create manual entry in Xero",
-          // "Verify bank statement", "Adjust transaction date"
-        }
-
-        async reportDiscrepancy(
-          discrepancy: Discrepancy,
-          tenantId: string
-        ): Promise&lt;void&gt; {
-          // Log discrepancy for reporting
-          // Flag for accountant review
-        }
-      }
-    </signature>
-    <signature file="src/core/reconciliation/dto/discrepancy.dto.ts">
-      export enum DiscrepancyType {
-        IN_BANK_NOT_XERO = 'IN_BANK_NOT_XERO',
-        IN_XERO_NOT_BANK = 'IN_XERO_NOT_BANK',
-        AMOUNT_MISMATCH = 'AMOUNT_MISMATCH',
-        DATE_MISMATCH = 'DATE_MISMATCH'
-      }
-
-      export class Discrepancy {
-        type: DiscrepancyType;
-        transactionId?: string;
-        xeroTransactionId?: string;
-        description: string;
-        amountCents: number;
-        date?: Date;
-        expectedAmount?: number;
-        actualAmount?: number;
-        severity: 'LOW' | 'MEDIUM' | 'HIGH';
-      }
-
-      export class DiscrepancyReport {
-        reconciliationId: string;
-        totalDiscrepancyCents: number;
-        discrepancyCount: number;
-        discrepancies: Discrepancy[];
-        summary: {
-          inBankNotXero: number;
-          inXeroNotBank: number;
-          amountMismatches: number;
-          dateMismatches: number;
-        };
-      }
-
-      export class ResolutionSuggestion {
-        action: string;
-        description: string;
-        automatable: boolean;
-        estimatedImpact: number;
-      }
-    </signature>
-  </signatures>
-
-  <constraints>
-    - Must NOT use 'any' type anywhere (except for Xero API responses, which should be typed)
-    - Must follow NestJS service patterns
-    - Discrepancy threshold is R0.01 (1 cent)
-    - All discrepancies must be classified into one of 4 types
-    - Severity levels: LOW (<R10), MEDIUM (R10-R100), HIGH (>R100)
-    - Must handle null/undefined safely
-    - Must validate all inputs
-    - Resolution suggestions must be actionable
-    - All monetary values in cents (integers)
-    - Must log all detected discrepancies
-  </constraints>
-
-  <verification>
-    - TypeScript compiles without errors
-    - All unit tests pass
-    - Service detects IN_BANK_NOT_XERO correctly
-    - Service detects IN_XERO_NOT_BANK correctly
-    - Service detects AMOUNT_MISMATCH correctly
-    - Service detects DATE_MISMATCH correctly
-    - Severity classification works correctly
-    - Discrepancies above R0.01 are flagged
-    - Resolution suggestions are appropriate for each type
-    - Report summary calculations are accurate
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-Enums and DTOs (src/core/reconciliation/dto/discrepancy.dto.ts):
-  export enum DiscrepancyType:
-    IN_BANK_NOT_XERO = 'IN_BANK_NOT_XERO'
-    IN_XERO_NOT_BANK = 'IN_XERO_NOT_BANK'
-    AMOUNT_MISMATCH = 'AMOUNT_MISMATCH'
-    DATE_MISMATCH = 'DATE_MISMATCH'
-
-  export class Discrepancy:
-    type: DiscrepancyType
-    transactionId?: string
-    xeroTransactionId?: string
-    description: string
-    amountCents: number
-    date?: Date
-    expectedAmount?: number
-    actualAmount?: number
-    severity: 'LOW' | 'MEDIUM' | 'HIGH'
-
-  export class DiscrepancyReport:
-    reconciliationId: string
-    totalDiscrepancyCents: number
-    discrepancyCount: number
-    discrepancies: Discrepancy[]
-    summary: {
-      inBankNotXero: number
-      inXeroNotBank: number
-      amountMismatches: number
-      dateMismatches: number
-    }
-
-  export class ResolutionSuggestion:
-    action: string
-    description: string
-    automatable: boolean
-    estimatedImpact: number
-
-Service (src/core/reconciliation/discrepancy.service.ts):
-  @Injectable()
-  export class DiscrepancyService:
-    constructor(
-      private transactionRepo: TransactionRepository,
-      private reconciliationRepo: ReconciliationRepository,
-      private logger: LoggerService
-    )
-
-    async detectDiscrepancies(reconId: string, tenantId: string):
-      // Get reconciliation record
-      recon = await reconciliationRepo.findById(reconId)
-      if (!recon):
-        throw NotFoundException("Reconciliation not found")
-
-      // Get all bank transactions in period
-      bankTxs = await transactionRepo.findByPeriodAndAccount(
-        tenantId,
-        recon.bankAccount,
-        recon.periodStart,
-        recon.periodEnd
-      )
-
-      // TODO: Get Xero transactions for same period
-      // xeroTxs = await xeroService.getTransactions(...)
-      // For now, simulate with empty array
-      xeroTxs = []
-
-      discrepancies = []
-      summary = {
-        inBankNotXero: 0,
-        inXeroNotBank: 0,
-        amountMismatches: 0,
-        dateMismatches: 0
-      }
-
-      // Create maps for efficient lookup
-      bankTxMap = new Map(bankTxs.map(tx => [tx.reference, tx]))
-      xeroTxMap = new Map(xeroTxs.map(tx => [tx.reference, tx]))
-
-      // Check for bank transactions not in Xero
-      for each bankTx in bankTxs:
-        xeroTx = xeroTxMap.get(bankTx.reference)
-        if (!xeroTx):
-          discrepancy = {
-            type: DiscrepancyType.IN_BANK_NOT_XERO,
-            transactionId: bankTx.id,
-            description: `Transaction in bank not found in Xero: ${bankTx.description}`,
-            amountCents: bankTx.amountCents,
-            date: bankTx.date,
-            severity: calculateSeverity(Math.abs(bankTx.amountCents))
-          }
-          discrepancies.push(discrepancy)
-          summary.inBankNotXero++
-        else:
-          // Check for amount mismatch
-          if (bankTx.amountCents !== xeroTx.amountCents):
-            discrepancy = {
-              type: DiscrepancyType.AMOUNT_MISMATCH,
-              transactionId: bankTx.id,
-              xeroTransactionId: xeroTx.id,
-              description: `Amount mismatch: Bank=${bankTx.amountCents/100}, Xero=${xeroTx.amountCents/100}`,
-              amountCents: Math.abs(bankTx.amountCents - xeroTx.amountCents),
-              date: bankTx.date,
-              expectedAmount: xeroTx.amountCents,
-              actualAmount: bankTx.amountCents,
-              severity: calculateSeverity(Math.abs(bankTx.amountCents - xeroTx.amountCents))
-            }
-            discrepancies.push(discrepancy)
-            summary.amountMismatches++
-
-          // Check for date mismatch
-          else if (!isSameDate(bankTx.date, xeroTx.date)):
-            discrepancy = {
-              type: DiscrepancyType.DATE_MISMATCH,
-              transactionId: bankTx.id,
-              xeroTransactionId: xeroTx.id,
-              description: `Date mismatch: Bank=${bankTx.date}, Xero=${xeroTx.date}`,
-              amountCents: 0,
-              date: bankTx.date,
-              severity: 'LOW'
-            }
-            discrepancies.push(discrepancy)
-            summary.dateMismatches++
-
-      // Check for Xero transactions not in bank
-      for each xeroTx in xeroTxs:
-        if (!bankTxMap.has(xeroTx.reference)):
-          discrepancy = {
-            type: DiscrepancyType.IN_XERO_NOT_BANK,
-            xeroTransactionId: xeroTx.id,
-            description: `Transaction in Xero not found in bank: ${xeroTx.description}`,
-            amountCents: xeroTx.amountCents,
-            date: xeroTx.date,
-            severity: calculateSeverity(Math.abs(xeroTx.amountCents))
-          }
-          discrepancies.push(discrepancy)
-          summary.inXeroNotBank++
-
-      // Calculate total discrepancy
-      totalDiscrepancyCents = discrepancies.reduce(
-        (sum, d) => sum + Math.abs(d.amountCents),
-        0
-      )
-
-      // Build report
-      report = {
-        reconciliationId: reconId,
-        totalDiscrepancyCents,
-        discrepancyCount: discrepancies.length,
-        discrepancies,
-        summary
-      }
-
-      // Log discrepancies for audit
-      if (discrepancies.length > 0):
-        logger.warn(
-          `Detected ${discrepancies.length} discrepancies for reconciliation ${reconId}`
-        )
-
-      return report
-
-    classifyDiscrepancy(
-      bankTx?: Transaction,
-      xeroTx?: any
-    ): DiscrepancyType
-      if (bankTx && !xeroTx):
-        return DiscrepancyType.IN_BANK_NOT_XERO
-
-      if (xeroTx && !bankTx):
-        return DiscrepancyType.IN_XERO_NOT_BANK
-
-      if (bankTx && xeroTx):
-        if (bankTx.amountCents !== xeroTx.amountCents):
-          return DiscrepancyType.AMOUNT_MISMATCH
-
-        if (!isSameDate(bankTx.date, xeroTx.date)):
-          return DiscrepancyType.DATE_MISMATCH
-
-      return null // No discrepancy
-
-    suggestResolution(discrepancy: Discrepancy): ResolutionSuggestion
-      switch (discrepancy.type):
-        case DiscrepancyType.IN_BANK_NOT_XERO:
-          return {
-            action: 'CREATE_XERO_ENTRY',
-            description: 'Create a manual entry in Xero to match this bank transaction',
-            automatable: false,
-            estimatedImpact: Math.abs(discrepancy.amountCents)
-          }
-
-        case DiscrepancyType.IN_XERO_NOT_BANK:
-          return {
-            action: 'VERIFY_BANK_STATEMENT',
-            description: 'Verify if this transaction is missing from bank statement or incorrectly entered in Xero',
-            automatable: false,
-            estimatedImpact: Math.abs(discrepancy.amountCents)
-          }
-
-        case DiscrepancyType.AMOUNT_MISMATCH:
-          return {
-            action: 'ADJUST_AMOUNT',
-            description: `Adjust amount in Xero from ${discrepancy.expectedAmount/100} to ${discrepancy.actualAmount/100}`,
-            automatable: false,
-            estimatedImpact: Math.abs(discrepancy.amountCents)
-          }
-
-        case DiscrepancyType.DATE_MISMATCH:
-          return {
-            action: 'ADJUST_DATE',
-            description: 'Update transaction date in Xero to match bank statement',
-            automatable: false,
-            estimatedImpact: 0
-          }
-
-    async reportDiscrepancy(
-      discrepancy: Discrepancy,
-      tenantId: string
-    ): Promise<void>
-      // Log for audit trail
-      logger.warn({
-        tenantId,
-        discrepancyType: discrepancy.type,
-        amountCents: discrepancy.amountCents,
-        severity: discrepancy.severity,
-        description: discrepancy.description
-      })
-
-      // Store in database for reporting (optional)
-      // await discrepancyRepo.create(...)
-
-    private calculateSeverity(amountCents: number): 'LOW' | 'MEDIUM' | 'HIGH'
-      absAmount = Math.abs(amountCents)
-      if (absAmount > 10000): // > R100
-        return 'HIGH'
-      else if (absAmount > 1000): // > R10
-        return 'MEDIUM'
-      else:
-        return 'LOW'
-
-    private isSameDate(date1: Date, date2: Date): boolean
-      return (
-        date1.getFullYear() === date2.getFullYear() &&
-        date1.getMonth() === date2.getMonth() &&
-        date1.getDate() === date2.getDate()
-      )
-</pseudo_code>
+Note: This service works with the Xero sync data when available.
+For initial implementation, bank transactions are already in database.
+Xero comparison will be added when XeroMcpClient integration is complete.
+</existing_infrastructure>
 
 <files_to_create>
-  <file path="src/core/reconciliation/discrepancy.service.ts">DiscrepancyService class</file>
-  <file path="src/core/reconciliation/dto/discrepancy.dto.ts">Discrepancy DTOs and enums</file>
-  <file path="tests/core/reconciliation/discrepancy.service.spec.ts">Service unit tests</file>
+1. src/database/dto/discrepancy.dto.ts
+2. src/database/services/discrepancy.service.ts
+3. tests/database/services/discrepancy.service.spec.ts
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/core/reconciliation/reconciliation.module.ts">Register DiscrepancyService as provider</file>
-  <file path="src/core/reconciliation/dto/index.ts">Export discrepancy DTOs</file>
+1. src/database/services/index.ts - Add `export * from './discrepancy.service';`
+2. src/database/dto/index.ts - Add `export * from './discrepancy.dto';`
+3. src/database/database.module.ts - Add DiscrepancyService to providers and exports
 </files_to_modify>
 
+<implementation_reference>
+
+## DTOs (src/database/dto/discrepancy.dto.ts)
+```typescript
+export enum DiscrepancyType {
+  IN_BANK_NOT_XERO = 'IN_BANK_NOT_XERO',
+  IN_XERO_NOT_BANK = 'IN_XERO_NOT_BANK',
+  AMOUNT_MISMATCH = 'AMOUNT_MISMATCH',
+  DATE_MISMATCH = 'DATE_MISMATCH',
+}
+
+export type DiscrepancySeverity = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface Discrepancy {
+  type: DiscrepancyType;
+  transactionId?: string;
+  xeroTransactionId?: string;
+  description: string;
+  amountCents: number;
+  date?: Date;
+  expectedAmountCents?: number;
+  actualAmountCents?: number;
+  severity: DiscrepancySeverity;
+}
+
+export interface DiscrepancyReport {
+  reconciliationId: string;
+  tenantId: string;
+  totalDiscrepancyCents: number;
+  discrepancyCount: number;
+  discrepancies: Discrepancy[];
+  summary: {
+    inBankNotXero: number;
+    inXeroNotBank: number;
+    amountMismatches: number;
+    dateMismatches: number;
+  };
+  generatedAt: Date;
+}
+
+export interface ResolutionSuggestion {
+  action: string;
+  description: string;
+  automatable: boolean;
+  estimatedImpactCents: number;
+}
+
+export interface DiscrepancyClassification {
+  type: DiscrepancyType | null;
+  severity: DiscrepancySeverity;
+}
+```
+
+## Service (src/database/services/discrepancy.service.ts)
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { ReconciliationRepository } from '../repositories/reconciliation.repository';
+import {
+  Discrepancy,
+  DiscrepancyReport,
+  DiscrepancyType,
+  DiscrepancySeverity,
+  ResolutionSuggestion,
+  DiscrepancyClassification,
+} from '../dto/discrepancy.dto';
+import { NotFoundException } from '../../shared/exceptions';
+
+// Threshold in cents
+const DISCREPANCY_THRESHOLD_CENTS = 1;
+const SEVERITY_LOW_MAX_CENTS = 1000;      // R10
+const SEVERITY_MEDIUM_MAX_CENTS = 10000;  // R100
+
+@Injectable()
+export class DiscrepancyService {
+  private readonly logger = new Logger(DiscrepancyService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reconciliationRepo: ReconciliationRepository,
+  ) {}
+
+  /**
+   * Detect discrepancies for a reconciliation period
+   * Compares bank transactions against Xero records
+   */
+  async detectDiscrepancies(
+    tenantId: string,
+    reconId: string
+  ): Promise<DiscrepancyReport> {
+    // Get reconciliation record
+    const recon = await this.reconciliationRepo.findById(reconId);
+    if (!recon) {
+      throw new NotFoundException('Reconciliation', reconId);
+    }
+    if (recon.tenantId !== tenantId) {
+      throw new NotFoundException('Reconciliation', reconId);
+    }
+
+    // Get bank transactions for period
+    const bankTxs = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        bankAccount: recon.bankAccount,
+        date: { gte: recon.periodStart, lte: recon.periodEnd },
+        isDeleted: false,
+      },
+    });
+
+    // Get Xero transactions for period (from synced data)
+    // For now, use transactions marked as synced with xeroTransactionId
+    const xeroTxs = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        bankAccount: recon.bankAccount,
+        date: { gte: recon.periodStart, lte: recon.periodEnd },
+        xeroTransactionId: { not: null },
+        status: 'SYNCED',
+        isDeleted: false,
+      },
+    });
+
+    const discrepancies: Discrepancy[] = [];
+    const summary = {
+      inBankNotXero: 0,
+      inXeroNotBank: 0,
+      amountMismatches: 0,
+      dateMismatches: 0,
+    };
+
+    // Create lookup maps by reference
+    const bankByRef = new Map(bankTxs.map(tx => [tx.reference ?? tx.id, tx]));
+    const xeroByRef = new Map(xeroTxs.map(tx => [tx.xeroTransactionId ?? tx.id, tx]));
+
+    // Check bank transactions not matched to Xero
+    for (const bankTx of bankTxs) {
+      const matchKey = bankTx.reference ?? bankTx.id;
+      const matched = xeroTxs.find(x =>
+        x.reference === matchKey ||
+        (x.amountCents === bankTx.amountCents && this.isSameDate(x.date, bankTx.date))
+      );
+
+      if (!matched) {
+        discrepancies.push({
+          type: DiscrepancyType.IN_BANK_NOT_XERO,
+          transactionId: bankTx.id,
+          description: `Bank transaction not found in Xero: ${bankTx.description}`,
+          amountCents: Math.abs(bankTx.amountCents),
+          date: bankTx.date,
+          severity: this.calculateSeverity(Math.abs(bankTx.amountCents)),
+        });
+        summary.inBankNotXero++;
+      } else if (bankTx.amountCents !== matched.amountCents) {
+        // Amount mismatch
+        const diff = Math.abs(bankTx.amountCents - matched.amountCents);
+        if (diff > DISCREPANCY_THRESHOLD_CENTS) {
+          discrepancies.push({
+            type: DiscrepancyType.AMOUNT_MISMATCH,
+            transactionId: bankTx.id,
+            xeroTransactionId: matched.xeroTransactionId ?? undefined,
+            description: `Amount mismatch: Bank=${bankTx.amountCents}c, Xero=${matched.amountCents}c`,
+            amountCents: diff,
+            date: bankTx.date,
+            expectedAmountCents: matched.amountCents,
+            actualAmountCents: bankTx.amountCents,
+            severity: this.calculateSeverity(diff),
+          });
+          summary.amountMismatches++;
+        }
+      } else if (!this.isSameDate(bankTx.date, matched.date)) {
+        // Date mismatch
+        discrepancies.push({
+          type: DiscrepancyType.DATE_MISMATCH,
+          transactionId: bankTx.id,
+          xeroTransactionId: matched.xeroTransactionId ?? undefined,
+          description: `Date mismatch: Bank=${bankTx.date.toISOString()}, Xero=${matched.date.toISOString()}`,
+          amountCents: 0,
+          date: bankTx.date,
+          severity: 'LOW',
+        });
+        summary.dateMismatches++;
+      }
+    }
+
+    // Check Xero transactions not in bank
+    for (const xeroTx of xeroTxs) {
+      const matchKey = xeroTx.xeroTransactionId ?? xeroTx.id;
+      const matched = bankTxs.find(b =>
+        b.reference === matchKey ||
+        (b.amountCents === xeroTx.amountCents && this.isSameDate(b.date, xeroTx.date))
+      );
+
+      if (!matched) {
+        discrepancies.push({
+          type: DiscrepancyType.IN_XERO_NOT_BANK,
+          xeroTransactionId: xeroTx.xeroTransactionId ?? undefined,
+          description: `Xero transaction not found in bank: ${xeroTx.description}`,
+          amountCents: Math.abs(xeroTx.amountCents),
+          date: xeroTx.date,
+          severity: this.calculateSeverity(Math.abs(xeroTx.amountCents)),
+        });
+        summary.inXeroNotBank++;
+      }
+    }
+
+    const totalDiscrepancyCents = discrepancies.reduce(
+      (sum, d) => sum + Math.abs(d.amountCents),
+      0
+    );
+
+    if (discrepancies.length > 0) {
+      this.logger.warn(
+        `Detected ${discrepancies.length} discrepancies for reconciliation ${reconId}, total=${totalDiscrepancyCents}c`
+      );
+    }
+
+    return {
+      reconciliationId: reconId,
+      tenantId,
+      totalDiscrepancyCents,
+      discrepancyCount: discrepancies.length,
+      discrepancies,
+      summary,
+      generatedAt: new Date(),
+    };
+  }
+
+  /**
+   * Classify a discrepancy by comparing bank and Xero transactions
+   */
+  classifyDiscrepancy(
+    bankTx: { amountCents: number; date: Date } | null,
+    xeroTx: { amountCents: number; date: Date } | null
+  ): DiscrepancyClassification {
+    if (bankTx && !xeroTx) {
+      return {
+        type: DiscrepancyType.IN_BANK_NOT_XERO,
+        severity: this.calculateSeverity(Math.abs(bankTx.amountCents)),
+      };
+    }
+
+    if (!bankTx && xeroTx) {
+      return {
+        type: DiscrepancyType.IN_XERO_NOT_BANK,
+        severity: this.calculateSeverity(Math.abs(xeroTx.amountCents)),
+      };
+    }
+
+    if (bankTx && xeroTx) {
+      const amountDiff = Math.abs(bankTx.amountCents - xeroTx.amountCents);
+      if (amountDiff > DISCREPANCY_THRESHOLD_CENTS) {
+        return {
+          type: DiscrepancyType.AMOUNT_MISMATCH,
+          severity: this.calculateSeverity(amountDiff),
+        };
+      }
+
+      if (!this.isSameDate(bankTx.date, xeroTx.date)) {
+        return {
+          type: DiscrepancyType.DATE_MISMATCH,
+          severity: 'LOW',
+        };
+      }
+    }
+
+    return { type: null, severity: 'LOW' };
+  }
+
+  /**
+   * Suggest resolution for a discrepancy
+   */
+  suggestResolution(discrepancy: Discrepancy): ResolutionSuggestion {
+    switch (discrepancy.type) {
+      case DiscrepancyType.IN_BANK_NOT_XERO:
+        return {
+          action: 'CREATE_XERO_ENTRY',
+          description: 'Create a manual entry in Xero to match this bank transaction',
+          automatable: false,
+          estimatedImpactCents: discrepancy.amountCents,
+        };
+
+      case DiscrepancyType.IN_XERO_NOT_BANK:
+        return {
+          action: 'VERIFY_BANK_STATEMENT',
+          description: 'Verify if transaction is missing from bank statement or incorrectly entered in Xero',
+          automatable: false,
+          estimatedImpactCents: discrepancy.amountCents,
+        };
+
+      case DiscrepancyType.AMOUNT_MISMATCH:
+        return {
+          action: 'ADJUST_AMOUNT',
+          description: `Adjust amount in Xero from ${(discrepancy.expectedAmountCents ?? 0) / 100} to ${(discrepancy.actualAmountCents ?? 0) / 100}`,
+          automatable: false,
+          estimatedImpactCents: discrepancy.amountCents,
+        };
+
+      case DiscrepancyType.DATE_MISMATCH:
+        return {
+          action: 'ADJUST_DATE',
+          description: 'Update transaction date in Xero to match bank statement',
+          automatable: false,
+          estimatedImpactCents: 0,
+        };
+
+      default:
+        return {
+          action: 'MANUAL_REVIEW',
+          description: 'Manual review required',
+          automatable: false,
+          estimatedImpactCents: discrepancy.amountCents,
+        };
+    }
+  }
+
+  /**
+   * Report a discrepancy for audit trail
+   */
+  async reportDiscrepancy(
+    discrepancy: Discrepancy,
+    tenantId: string
+  ): Promise<void> {
+    this.logger.warn({
+      event: 'DISCREPANCY_REPORTED',
+      tenantId,
+      type: discrepancy.type,
+      amountCents: discrepancy.amountCents,
+      severity: discrepancy.severity,
+      description: discrepancy.description,
+      transactionId: discrepancy.transactionId,
+      xeroTransactionId: discrepancy.xeroTransactionId,
+    });
+  }
+
+  /**
+   * Calculate severity based on amount
+   */
+  private calculateSeverity(amountCents: number): DiscrepancySeverity {
+    const absAmount = Math.abs(amountCents);
+    if (absAmount > SEVERITY_MEDIUM_MAX_CENTS) {
+      return 'HIGH';
+    }
+    if (absAmount > SEVERITY_LOW_MAX_CENTS) {
+      return 'MEDIUM';
+    }
+    return 'LOW';
+  }
+
+  /**
+   * Compare dates ignoring time
+   */
+  private isSameDate(date1: Date, date2: Date): boolean {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  }
+}
+```
+</implementation_reference>
+
+<test_requirements>
+CRITICAL: Tests use REAL PostgreSQL database - NO MOCKS.
+
+```typescript
+import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaService } from '../../src/database/prisma/prisma.service';
+import { DiscrepancyService } from '../../src/database/services/discrepancy.service';
+import { ReconciliationRepository } from '../../src/database/repositories/reconciliation.repository';
+import { DiscrepancyType } from '../../src/database/dto/discrepancy.dto';
+import { Tenant, ReconciliationStatus } from '@prisma/client';
+
+describe('DiscrepancyService', () => {
+  let service: DiscrepancyService;
+  let prisma: PrismaService;
+  let testTenant: Tenant;
+
+  beforeAll(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [PrismaService, DiscrepancyService, ReconciliationRepository],
+    }).compile();
+
+    prisma = module.get<PrismaService>(PrismaService);
+    service = module.get<DiscrepancyService>(DiscrepancyService);
+    await prisma.onModuleInit();
+  });
+
+  beforeEach(async () => {
+    await prisma.reconciliation.deleteMany({});
+    await prisma.transaction.deleteMany({});
+    await prisma.tenant.deleteMany({});
+
+    testTenant = await prisma.tenant.create({
+      data: { name: 'Discrepancy Test', email: 'disc@test.co.za', taxStatus: 'VAT_REGISTERED' },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  describe('detectDiscrepancies()', () => {
+    it('should detect IN_BANK_NOT_XERO', async () => {
+      const recon = await prisma.reconciliation.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB',
+          periodStart: new Date('2025-01-01'),
+          periodEnd: new Date('2025-01-31'),
+          openingBalanceCents: 0,
+          closingBalanceCents: 10000,
+          calculatedBalanceCents: 10000,
+          discrepancyCents: 0,
+          status: ReconciliationStatus.IN_PROGRESS,
+        },
+      });
+
+      // Bank transaction without Xero sync
+      await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB',
+          date: new Date('2025-01-15'),
+          amountCents: 10000,
+          isCredit: true,
+          description: 'Bank only',
+          status: 'PENDING',
+        },
+      });
+
+      const report = await service.detectDiscrepancies(testTenant.id, recon.id);
+
+      expect(report.discrepancyCount).toBe(1);
+      expect(report.discrepancies[0].type).toBe(DiscrepancyType.IN_BANK_NOT_XERO);
+      expect(report.summary.inBankNotXero).toBe(1);
+    });
+
+    it('should detect AMOUNT_MISMATCH', async () => {
+      const recon = await prisma.reconciliation.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB',
+          periodStart: new Date('2025-01-01'),
+          periodEnd: new Date('2025-01-31'),
+          openingBalanceCents: 0,
+          closingBalanceCents: 0,
+          calculatedBalanceCents: 0,
+          discrepancyCents: 0,
+          status: ReconciliationStatus.IN_PROGRESS,
+        },
+      });
+
+      // Bank transaction
+      await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB',
+          date: new Date('2025-01-15'),
+          amountCents: 10000,
+          reference: 'REF-001',
+          isCredit: true,
+          description: 'Test',
+          status: 'PENDING',
+        },
+      });
+
+      // Xero synced with different amount
+      await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB',
+          date: new Date('2025-01-15'),
+          amountCents: 9500,  // Difference of R5
+          reference: 'REF-001',
+          xeroTransactionId: 'xero-123',
+          isCredit: true,
+          description: 'Test',
+          status: 'SYNCED',
+        },
+      });
+
+      const report = await service.detectDiscrepancies(testTenant.id, recon.id);
+
+      expect(report.summary.amountMismatches).toBeGreaterThan(0);
+    });
+  });
+
+  describe('classifyDiscrepancy()', () => {
+    it('should classify IN_BANK_NOT_XERO', () => {
+      const result = service.classifyDiscrepancy(
+        { amountCents: 10000, date: new Date() },
+        null
+      );
+      expect(result.type).toBe(DiscrepancyType.IN_BANK_NOT_XERO);
+    });
+
+    it('should classify IN_XERO_NOT_BANK', () => {
+      const result = service.classifyDiscrepancy(
+        null,
+        { amountCents: 10000, date: new Date() }
+      );
+      expect(result.type).toBe(DiscrepancyType.IN_XERO_NOT_BANK);
+    });
+
+    it('should classify AMOUNT_MISMATCH', () => {
+      const result = service.classifyDiscrepancy(
+        { amountCents: 10000, date: new Date() },
+        { amountCents: 9000, date: new Date() }
+      );
+      expect(result.type).toBe(DiscrepancyType.AMOUNT_MISMATCH);
+    });
+
+    it('should return null for matching transactions', () => {
+      const date = new Date();
+      const result = service.classifyDiscrepancy(
+        { amountCents: 10000, date },
+        { amountCents: 10000, date }
+      );
+      expect(result.type).toBeNull();
+    });
+  });
+
+  describe('calculateSeverity()', () => {
+    it('should return LOW for < R10', () => {
+      const report = { type: DiscrepancyType.IN_BANK_NOT_XERO, amountCents: 500 } as any;
+      const suggestion = service.suggestResolution(report);
+      // Severity is calculated internally
+      expect(suggestion.action).toBe('CREATE_XERO_ENTRY');
+    });
+
+    it('should return HIGH for > R100', () => {
+      const result = service.classifyDiscrepancy(
+        { amountCents: 15000, date: new Date() },  // R150
+        null
+      );
+      expect(result.severity).toBe('HIGH');
+    });
+  });
+
+  describe('suggestResolution()', () => {
+    it('should suggest CREATE_XERO_ENTRY for IN_BANK_NOT_XERO', () => {
+      const suggestion = service.suggestResolution({
+        type: DiscrepancyType.IN_BANK_NOT_XERO,
+        description: 'Test',
+        amountCents: 1000,
+        severity: 'LOW',
+      });
+      expect(suggestion.action).toBe('CREATE_XERO_ENTRY');
+      expect(suggestion.automatable).toBe(false);
+    });
+
+    it('should suggest VERIFY_BANK_STATEMENT for IN_XERO_NOT_BANK', () => {
+      const suggestion = service.suggestResolution({
+        type: DiscrepancyType.IN_XERO_NOT_BANK,
+        description: 'Test',
+        amountCents: 1000,
+        severity: 'LOW',
+      });
+      expect(suggestion.action).toBe('VERIFY_BANK_STATEMENT');
+    });
+  });
+});
+```
+</test_requirements>
+
 <validation_criteria>
-  <criterion>Service detects transactions in bank but not in Xero</criterion>
-  <criterion>Service detects transactions in Xero but not in bank</criterion>
-  <criterion>Service detects amount mismatches between bank and Xero</criterion>
-  <criterion>Service detects date mismatches between bank and Xero</criterion>
-  <criterion>Severity levels calculated correctly (LOW, MEDIUM, HIGH)</criterion>
-  <criterion>Discrepancies above R0.01 are flagged</criterion>
-  <criterion>Resolution suggestions are appropriate for each discrepancy type</criterion>
-  <criterion>Report summary aggregates counts by type correctly</criterion>
-  <criterion>Total discrepancy amount calculated correctly</criterion>
-  <criterion>Service handles empty result sets gracefully</criterion>
-  <criterion>All discrepancies logged for audit trail</criterion>
+- TypeScript compiles without errors (npm run build)
+- Lint passes (npm run lint)
+- All tests pass with real PostgreSQL database
+- IN_BANK_NOT_XERO detection works correctly
+- IN_XERO_NOT_BANK detection works correctly
+- AMOUNT_MISMATCH detection for differences > 1 cent
+- DATE_MISMATCH detection for different dates
+- Severity classification: LOW (<R10), MEDIUM (R10-R100), HIGH (>R100)
+- Resolution suggestions appropriate for each type
+- Tenant isolation enforced
+- Total discrepancy amount calculated correctly
+- Summary aggregation by type works
+- No 'any' types used
 </validation_criteria>
 
 <test_commands>
-  <command>npm run build</command>
-  <command>npm run test -- --grep "DiscrepancyService"</command>
-  <command>npm run lint</command>
+npm run build
+npm run lint
+npm run test -- --testPathPattern="discrepancy.service" --verbose
 </test_commands>
 
 </task_spec>

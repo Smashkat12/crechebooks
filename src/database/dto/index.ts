@@ -33,3 +33,6 @@ export * from './uif.dto';
 export * from './vat201.dto';
 export * from './emp201.dto';
 export * from './irp5.dto';
+export * from './reconciliation-service.dto';
+export * from './discrepancy.dto';
+export * from './financial-report.dto';

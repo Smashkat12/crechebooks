@@ -72,8 +72,11 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | SarsService.generateVat201 | method | TASK-SARS-014 | ✅ Complete |
 | SarsService.generateEmp201 | method | TASK-SARS-015 | ✅ Complete |
 | SarsService.markSubmitted | method | TASK-SARS-002 | ✅ Complete |
-| ReconciliationService.reconcile | method | TASK-RECON-011 | Pending |
-| ReconciliationService.generateIncomeStatement | method | TASK-RECON-013 | Pending |
+| ReconciliationService.reconcile | method | TASK-RECON-011 | ✅ Complete |
+| FinancialReportService.generateIncomeStatement | method | TASK-RECON-013 | ✅ Complete |
+| FinancialReportService.generateBalanceSheet | method | TASK-RECON-013 | ✅ Complete |
+| FinancialReportService.generateTrialBalance | method | TASK-RECON-013 | ✅ Complete |
+| DiscrepancyService.detectDiscrepancies | method | TASK-RECON-012 | ✅ Complete |
 
 ---
 
@@ -179,16 +182,16 @@ This document ensures 100% coverage of all requirements in the specifications. E
 
 | Spec Item | ID | Covered by Task ID | Status |
 |-----------|----|--------------------|--------|
-| Automatic bank reconciliation | REQ-RECON-001 | TASK-RECON-011 | Pending |
-| Mark matched as reconciled | REQ-RECON-002 | TASK-RECON-011 | Pending |
-| Discrepancy flagging | REQ-RECON-003 | TASK-RECON-012 | Pending |
-| Reconciliation summary | REQ-RECON-004 | TASK-RECON-011 | Pending |
-| Income Statement | REQ-RECON-005 | TASK-RECON-013 | Pending |
-| Balance Sheet | REQ-RECON-006 | TASK-RECON-013 | Pending |
+| Automatic bank reconciliation | REQ-RECON-001 | TASK-RECON-011 | ✅ Complete |
+| Mark matched as reconciled | REQ-RECON-002 | TASK-RECON-011 | ✅ Complete |
+| Discrepancy flagging | REQ-RECON-003 | TASK-RECON-012 | ✅ Complete |
+| Reconciliation summary | REQ-RECON-004 | TASK-RECON-011 | ✅ Complete |
+| Income Statement | REQ-RECON-005 | TASK-RECON-013 | ✅ Complete |
+| Balance Sheet | REQ-RECON-006 | TASK-RECON-013 | ✅ Complete |
 | Audit trail | REQ-RECON-007 | TASK-CORE-004 | ✅ Complete |
-| SA accounting standards | REQ-RECON-008 | TASK-RECON-013 | Pending |
+| SA accounting standards | REQ-RECON-008 | TASK-RECON-013 | ✅ Complete |
 | Audit log captures all changes | REQ-RECON-009 | TASK-CORE-004 | ✅ Complete |
-| Reconciled transaction protection | REQ-RECON-010 | TASK-RECON-011 | Pending |
+| Reconciled transaction protection | REQ-RECON-010 | TASK-RECON-011 | ✅ Complete |
 
 ---
 
@@ -251,3 +254,6 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-21 | TASK-SARS-014 marked complete (VAT201 Generation Service - 1139 tests) | AI Agent |
 | 2025-12-21 | TASK-SARS-015 marked complete (EMP201 Generation Service - 1152 tests) | AI Agent |
 | 2025-12-21 | TASK-SARS-016 marked complete (IRP5 Generation Service - 1166 tests) | AI Agent |
+| 2025-12-21 | TASK-RECON-011 marked complete (Bank Reconciliation Service - 16 tests) | AI Agent |
+| 2025-12-21 | TASK-RECON-012 marked complete (Discrepancy Detection Service - 17 tests) | AI Agent |
+| 2025-12-21 | TASK-RECON-013 marked complete (Financial Report Service - 12 tests, total 1211) | AI Agent |

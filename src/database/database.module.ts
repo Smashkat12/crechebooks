@@ -31,6 +31,10 @@ import { UifService } from './services/uif.service';
 import { Vat201Service } from './services/vat201.service';
 import { Emp201Service } from './services/emp201.service';
 import { Irp5Service } from './services/irp5.service';
+import { ReconciliationRepository } from './repositories/reconciliation.repository';
+import { ReconciliationService } from './services/reconciliation.service';
+import { DiscrepancyService } from './services/discrepancy.service';
+import { FinancialReportService } from './services/financial-report.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 
@@ -69,6 +73,10 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     Vat201Service,
     Emp201Service,
     Irp5Service,
+    ReconciliationRepository,
+    ReconciliationService,
+    DiscrepancyService,
+    FinancialReportService,
   ],
   exports: [
     TenantRepository,
@@ -103,6 +111,10 @@ import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
     Vat201Service,
     Emp201Service,
     Irp5Service,
+    ReconciliationRepository,
+    ReconciliationService,
+    DiscrepancyService,
+    FinancialReportService,
   ],
 })
 export class DatabaseModule {}

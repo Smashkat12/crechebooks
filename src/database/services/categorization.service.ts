@@ -7,7 +7,13 @@
  * Handles pattern matching, AI categorization, and split transactions.
  */
 
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Inject,
+  forwardRef,
+  Optional,
+} from '@nestjs/common';
 import { Transaction } from '@prisma/client';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
@@ -31,6 +37,7 @@ import {
 import { TransactionStatus } from '../entities/transaction.entity';
 import { CreateCategorizationDto } from '../dto/categorization.dto';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
+import { TransactionCategorizerAgent } from '../../agents/transaction-categorizer/categorizer.agent';
 
 @Injectable()
 export class CategorizationService {
@@ -43,6 +50,8 @@ export class CategorizationService {
     private readonly auditLogService: AuditLogService,
     @Inject(forwardRef(() => PatternLearningService))
     private readonly patternLearningService: PatternLearningService,
+    @Optional()
+    private readonly categorizerAgent?: TransactionCategorizerAgent,
   ) {}
 
   /**
@@ -494,23 +503,43 @@ export class CategorizationService {
 
   /**
    * Invoke AI agent for categorization
-   * This is a placeholder that returns deterministic categorizations
-   * Will be replaced with actual Claude API in TASK-AGENT-002
+   * Uses TransactionCategorizerAgent if available, otherwise falls back to placeholder
    *
    * @param transaction - Transaction to categorize
-   * @param _tenantId - Tenant ID (unused in placeholder)
+   * @param tenantId - Tenant ID for isolation
    * @returns AI categorization result
    */
-  // eslint-disable-next-line @typescript-eslint/require-await
   private async invokeAIAgent(
     transaction: Transaction,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _tenantId: string,
+    tenantId: string,
   ): Promise<AICategorization> {
+    // Use TransactionCategorizerAgent if available
+    if (this.categorizerAgent) {
+      try {
+        const result = await this.categorizerAgent.categorize(
+          transaction,
+          tenantId,
+        );
+        return {
+          accountCode: result.accountCode,
+          accountName: result.accountName,
+          confidenceScore: result.confidenceScore,
+          reasoning: result.reasoning,
+          vatType: result.vatType,
+          isSplit: result.isSplit,
+        };
+      } catch (error) {
+        this.logger.error(
+          `TransactionCategorizerAgent failed for ${transaction.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // Fall through to placeholder if agent fails
+      }
+    }
+
+    // Fallback placeholder (deterministic based on keywords)
     const description = transaction.description.toUpperCase();
     const isCredit = transaction.isCredit;
 
-    // Deterministic placeholder based on keywords
     if (
       description.includes('WOOLWORTHS') ||
       description.includes('CHECKERS') ||

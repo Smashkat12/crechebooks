@@ -39,3 +39,10 @@ prisma/*.db-journal
 tmp/
 temp/
 *.tmp
+
+# Test data - bank statements contain sensitive financial data
+bank-statements/
+output.txt
+
+# Claude agent logs (contain sensitive decision data)
+.claude/logs/*.jsonl

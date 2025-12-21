@@ -37,9 +37,18 @@ import { DiscrepancyService } from './services/discrepancy.service';
 import { FinancialReportService } from './services/financial-report.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
+import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
+import { PaymentMatcherModule } from '../agents/payment-matcher/matcher.module';
+import { SarsAgentModule } from '../agents/sars-agent/sars.module';
 
 @Module({
-  imports: [EmailModule, WhatsAppModule],
+  imports: [
+    EmailModule,
+    WhatsAppModule,
+    TransactionCategorizerModule,
+    PaymentMatcherModule,
+    SarsAgentModule,
+  ],
   providers: [
     TenantRepository,
     UserRepository,

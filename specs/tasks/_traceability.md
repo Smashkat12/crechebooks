@@ -77,6 +77,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | FinancialReportService.generateBalanceSheet | method | TASK-RECON-013 | ✅ Complete |
 | FinancialReportService.generateTrialBalance | method | TASK-RECON-013 | ✅ Complete |
 | DiscrepancyService.detectDiscrepancies | method | TASK-RECON-012 | ✅ Complete |
+| LLMWhispererParser.parse | method | TASK-TRANS-015 | ✅ Complete |
+| HybridPdfParser.parse | method | TASK-TRANS-015 | ✅ Complete |
+| PdfParser.parseWithConfidence | method | TASK-TRANS-015 | ✅ Complete |
 
 ---
 
@@ -96,6 +99,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Xero bi-directional sync | REQ-TRANS-008 | TASK-TRANS-014 | ✅ Complete |
 | Split transactions | REQ-TRANS-009 | TASK-TRANS-002, TASK-TRANS-012 | Pending |
 | Payee aliases | REQ-TRANS-010 | TASK-TRANS-003, TASK-TRANS-013 | ✅ Complete |
+| Cloud OCR fallback for low-confidence PDF extraction | REQ-TRANS-011 | TASK-TRANS-015 | ✅ Complete |
 
 ### Edge Cases
 
@@ -110,6 +114,8 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Learning mode indicator | EC-TRANS-007 | TASK-TRANS-012 | Partial (placeholder) |
 | Duplicate detection | EC-TRANS-008 | TASK-TRANS-011 | ✅ Complete |
 | Conflicting corrections | EC-TRANS-009 | TASK-TRANS-013 | Pending |
+| Low-confidence PDF extraction fallback | EC-TRANS-010 | TASK-TRANS-015 | ✅ Complete |
+| Scanned PDF with no text (OCR required) | EC-TRANS-011 | TASK-TRANS-015 | ✅ Complete |
 
 ---
 
@@ -257,3 +263,4 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-21 | TASK-RECON-011 marked complete (Bank Reconciliation Service - 16 tests) | AI Agent |
 | 2025-12-21 | TASK-RECON-012 marked complete (Discrepancy Detection Service - 17 tests) | AI Agent |
 | 2025-12-21 | TASK-RECON-013 marked complete (Financial Report Service - 12 tests, total 1211) | AI Agent |
+| 2025-12-21 | TASK-TRANS-015 marked complete (LLMWhisperer PDF Extraction - 62 parser tests, total 1251) | AI Agent |

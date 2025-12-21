@@ -1,391 +1,316 @@
-<task_spec id="TASK-AGENT-003" version="1.0">
+<task_spec id="TASK-AGENT-003" version="3.0">
 
 <metadata>
   <title>Payment Matcher Agent</title>
-  <status>ready</status>
+  <status>COMPLETE</status>
   <layer>agent</layer>
   <sequence>39</sequence>
   <implements>
     <requirement_ref>REQ-PAY-002</requirement_ref>
+    <requirement_ref>REQ-PAY-003</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-PAY-011</task_ref>
-    <task_ref>TASK-AGENT-001</task_ref>
+    <task_ref status="COMPLETE">TASK-PAY-011</task_ref>
+    <task_ref status="PENDING">TASK-AGENT-001</task_ref>
   </depends_on>
   <estimated_complexity>high</estimated_complexity>
 </metadata>
 
 <context>
-This task implements the Payment Matcher agent, a specialized Claude Code subagent that
-automatically matches incoming payments to outstanding invoices. The agent uses multiple
-matching strategies (reference number, exact amount, partial amount, payee name) and
-calculates confidence scores for each match. It operates with L3 autonomy (auto-execute
-with logging) for exact matches with high confidence (>=90%), and escalates ambiguous
-or partial matches to human review. This ensures accurate payment allocation while
-minimizing manual reconciliation effort.
+This task creates the Payment Matcher Agent that wraps the existing PaymentMatchingService
+with Claude Code agent capabilities. The PaymentMatchingService already exists in
+src/database/services/payment-matching.service.ts with a confidence-based scoring algorithm.
+This task adds:
+- Decision logging to .claude/logs/decisions.jsonl
+- Escalation logging for ambiguous matches
+- Context-aware matching using fee_structures.json
+- Integration with tenant_config.json for thresholds
+
+**CRITICAL PROJECT RULES:**
+- ALL monetary values are CENTS (integers) - NEVER rands as floats
+- NO backwards compatibility - fail fast with descriptive errors
+- NO mock data in tests - use real PostgreSQL database
+- Tenant isolation required on ALL queries
+- 80% confidence threshold for auto-apply (L3 autonomy)
+
+**EXISTING INFRASTRUCTURE (DO NOT RECREATE):**
+- PaymentMatchingService at src/database/services/payment-matching.service.ts
+- PaymentAllocationService at src/database/services/payment-allocation.service.ts
+- PaymentRepository at src/database/repositories/payment.repository.ts
+- InvoiceRepository at src/database/repositories/invoice.repository.ts
+- Existing confidence scoring algorithm (0-100 points):
+  - Reference Match: 0-40 points
+  - Amount Match: 0-40 points
+  - Name Similarity: 0-20 points
 </context>
 
-<input_context_files>
-  <file purpose="agent_definition">specs/technical/architecture.md#payment_matcher</file>
-  <file purpose="matching_logic">specs/logic/payment-logic.md#matching_algorithm</file>
-  <file purpose="confidence_thresholds">specs/constitution.md#autonomy_levels</file>
-  <file purpose="payment_requirements">specs/requirements/payment.md</file>
-</input_context_files>
+<existing_service>
+PaymentMatchingService (src/database/services/payment-matching.service.ts) key methods:
 
-<prerequisites>
-  <check>TASK-AGENT-001 completed (.claude/ structure exists)</check>
-  <check>TASK-PAY-011 completed (Payment service implemented)</check>
-  <check>Xero MCP server configured and accessible</check>
-  <check>Invoice and payment data available in database</check>
-</prerequisites>
+```typescript
+// ALREADY EXISTS - these methods work
+matchPayments(dto: MatchPaymentsDto): Promise<MatchingBatchResult>
+findMatchCandidates(transactionId: string, tenantId: string): Promise<MatchCandidate[]>
+applyMatch(dto: ApplyMatchDto): Promise<AppliedMatch>
 
-<scope>
-  <in_scope>
-    - Create agent definition in src/agents/payment-matcher/
-    - Implement skills file: match-payments.md
-    - Matching strategies:
-      - Reference number matching (e.g., "INV-12345")
-      - Exact amount matching
-      - Partial amount matching (multiple invoices)
-      - Payee name fuzzy matching
-    - Confidence scoring algorithm (0-100%)
-    - Integration with MCP tools:
-      - mcp__xero__apply_payment
-      - mcp__xero__get_invoices
-    - Decision logging to .claude/logs/decisions.jsonl
-    - Escalation logic for:
-      - Confidence < 90%
-      - Partial matches requiring split
-      - Multiple possible matches
-    - Handle overpayments and underpayments
-  </in_scope>
-  <out_of_scope>
-    - Manual payment entry UI (TASK-PAY-001)
-    - Payment reminder logic (TASK-BILL-004)
-    - Xero MCP server implementation (TASK-MCP-001)
-    - Arrears calculation (TASK-PAY-003)
-  </out_of_scope>
-</scope>
+// Constants
+const AUTO_APPLY_THRESHOLD = 80;
+const CANDIDATE_THRESHOLD = 20;
+const MAX_CANDIDATES = 5;
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/agents/payment-matcher/matcher.agent.ts">
-      export class PaymentMatcherAgent {
-        async matchPayment(
-          payment: Payment,
-          context: MatchingContext
-        ): Promise&lt;MatchingResult&gt;;
+// Confidence scoring already implemented:
+// - calculateReferenceScore() - 0-40 points
+// - calculateAmountScore() - 0-40 points
+// - calculateNameScore() - 0-20 points
+```
 
-        async matchBatch(
-          payments: Payment[]
-        ): Promise&lt;MatchingResult[]&gt;;
+Key types from src/database/dto/payment-matching.dto.ts:
+```typescript
+interface MatchCandidate {
+  invoiceId: string;
+  invoiceNumber: string;
+  childName: string;
+  parentName: string;
+  outstandingCents: number;
+  confidenceScore: number;
+  confidenceLevel: MatchConfidenceLevel;
+  matchReasons: string[];
+}
 
-        private findCandidateInvoices(
-          payment: Payment,
-          tenant: Tenant
-        ): Promise&lt;Invoice[]&gt;;
-
-        private calculateMatchConfidence(
-          payment: Payment,
-          invoice: Invoice,
-          matchType: MatchType
-        ): number;
-
-        private applyPaymentToInvoice(
-          payment: Payment,
-          invoice: Invoice,
-          amount: Decimal
-        ): Promise&lt;void&gt;;
-      }
-    </signature>
-    <signature file=".claude/agents/payment-matcher/match-payments.md">
-      # Match Payments Skill
-
-      ## Context
-      [Load outstanding invoices, payment patterns]
-
-      ## Matching Algorithm
-      1. Reference number match (highest priority)
-      2. Exact amount + payee name match
-      3. Partial amount match (check invoice combinations)
-      4. Fuzzy payee name match
-      5. Calculate confidence for each candidate
-      6. If confidence >= 90% and exact match: auto-apply
-      7. If confidence < 90% or ambiguous: escalate
-
-      ## MCP Tools
-      - mcp__xero__get_invoices
-      - mcp__xero__apply_payment
-    </signature>
-    <signature file="src/agents/payment-matcher/matching-strategies.ts">
-      export interface MatchingStrategy {
-        match(payment: Payment, invoices: Invoice[]): MatchCandidate[];
-      }
-
-      export class ReferenceNumberStrategy implements MatchingStrategy {...}
-      export class ExactAmountStrategy implements MatchingStrategy {...}
-      export class PartialAmountStrategy implements MatchingStrategy {...}
-      export class PayeeNameStrategy implements MatchingStrategy {...}
-    </signature>
-  </signatures>
-
-  <constraints>
-    - Must achieve >=90% confidence for auto-application
-    - Must log ALL matching attempts to decisions.jsonl
-    - Must NOT apply payments directly (use Xero MCP)
-    - Must handle partial payments (split across multiple invoices)
-    - Must handle overpayments (credit note required)
-    - Escalations must include all candidate matches and reasoning
-    - Must preserve payment audit trail
-    - Confidence calculation must be deterministic and auditable
-  </constraints>
-
-  <verification>
-    - Agent auto-applies exact reference + amount matches (100% confidence)
-    - Agent escalates partial matches for review
-    - Agent handles overpayments correctly (creates credit note)
-    - Batch processing handles 100 payments in < 60 seconds
-    - All decisions logged to decisions.jsonl
-    - MCP tool calls use correct authentication
-    - Unit tests cover all matching strategies
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-Agent Structure:
-  src/agents/payment-matcher/
-    matcher.agent.ts            # Main agent class
-    matching-strategies.ts      # Strategy pattern for matching
-    confidence-scorer.ts        # Confidence calculation
-    context-loader.ts           # Load invoices and patterns
-    matcher.module.ts           # NestJS module
-    matcher.service.ts          # Service for API layer
-
-Matching Algorithm:
-  async function matchPayment(payment):
-    # 1. Load outstanding invoices for tenant
-    outstandingInvoices = await mcpXeroGetInvoices({
-      tenantId: payment.tenantId,
-      status: 'AUTHORISED',
-      where: 'AmountDue > 0'
-    })
-
-    # 2. Extract reference from payment description
-    extractedRef = extractInvoiceReference(payment.description)
-
-    # 3. Try matching strategies in priority order
-    candidates = []
-
-    # Strategy 1: Reference number match
-    if extractedRef:
-      refMatches = outstandingInvoices.filter(inv =>
-        inv.invoiceNumber === extractedRef
-      )
-      for invoice in refMatches:
-        candidates.push({
-          invoice: invoice,
-          matchType: 'reference',
-          confidence: calculateConfidence(payment, invoice, 'reference'),
-          amountMatch: payment.amount.equals(invoice.amountDue)
-        })
-
-    # Strategy 2: Exact amount + payee match
-    exactAmountMatches = outstandingInvoices.filter(inv =>
-      payment.amount.equals(inv.amountDue)
-    )
-    for invoice in exactAmountMatches:
-      similarity = calculateNameSimilarity(payment.payeeName, invoice.contact.name)
-      if similarity >= 0.7:
-        candidates.push({
-          invoice: invoice,
-          matchType: 'exact_amount_payee',
-          confidence: calculateConfidence(payment, invoice, 'exact_amount_payee'),
-          amountMatch: true
-        })
-
-    # Strategy 3: Partial amount match (multiple invoices)
-    if payment.amount.greaterThan(0):
-      partialCombinations = findInvoiceCombinations(
-        outstandingInvoices.filter(inv => inv.contact.name matches payment.payeeName),
-        payment.amount
-      )
-      for combination in partialCombinations:
-        candidates.push({
-          invoices: combination,
-          matchType: 'partial_multi',
-          confidence: calculateConfidence(payment, combination, 'partial_multi'),
-          amountMatch: sumAmounts(combination).equals(payment.amount)
-        })
-
-    # Strategy 4: Fuzzy payee name match
-    for invoice in outstandingInvoices:
-      similarity = calculateNameSimilarity(payment.payeeName, invoice.contact.name)
-      if similarity >= 0.6:
-        candidates.push({
-          invoice: invoice,
-          matchType: 'fuzzy_payee',
-          confidence: calculateConfidence(payment, invoice, 'fuzzy_payee'),
-          amountMatch: false
-        })
-
-    # 4. Sort candidates by confidence
-    candidates.sort((a, b) => b.confidence - a.confidence)
-
-    # 5. Make decision
-    bestMatch = candidates[0]
-    result = {
-      paymentId: payment.id,
-      candidates: candidates,
-      bestMatch: bestMatch,
-      confidence: bestMatch?.confidence || 0,
-      reasoning: buildMatchingExplanation(payment, candidates),
-      autoApplied: false
-    }
-
-    # 6. Auto-apply or escalate
-    if bestMatch and bestMatch.confidence >= 0.90 and bestMatch.amountMatch:
-      if bestMatch.matchType === 'partial_multi':
-        # Apply to multiple invoices
-        for invoice in bestMatch.invoices:
-          await mcpXeroApplyPayment({
-            invoiceId: invoice.id,
-            paymentId: payment.xeroId,
-            amount: invoice.amountDue
-          })
-      else:
-        # Apply to single invoice
-        await mcpXeroApplyPayment({
-          invoiceId: bestMatch.invoice.id,
-          paymentId: payment.xeroId,
-          amount: payment.amount
-        })
-
-      result.autoApplied = true
-      await logDecision('auto_matched', result)
-    else:
-      await logEscalation('ambiguous_payment_match', result,
-        `Confidence ${bestMatch?.confidence * 100}% or multiple candidates`)
-      await logDecision('escalated', result)
-
-    return result
-
-Confidence Scoring:
-  function calculateConfidence(payment, invoice, matchType):
-    let score = 0
-
-    switch matchType:
-      case 'reference':
-        score = 100 # Exact reference match = 100%
-        if not payment.amount.equals(invoice.amountDue):
-          score -= 10 # Reduce if amount doesn't match
-        break
-
-      case 'exact_amount_payee':
-        amountMatch = 40 # Exact amount
-        nameSimilarity = calculateNameSimilarity(payment.payeeName, invoice.contact.name)
-        nameMatch = nameSimilarity * 60 # Name similarity up to 60 points
-        score = amountMatch + nameMatch
-        break
-
-      case 'partial_multi':
-        amountMatch = payment.amount.equals(sumAmounts(invoices)) ? 50 : 0
-        nameSimilarity = calculateNameSimilarity(payment.payeeName, invoices[0].contact.name)
-        nameMatch = nameSimilarity * 30
-        multiInvoicePenalty = -10 # Penalize for complexity
-        score = amountMatch + nameMatch + multiInvoicePenalty
-        break
-
-      case 'fuzzy_payee':
-        nameSimilarity = calculateNameSimilarity(payment.payeeName, invoice.contact.name)
-        score = nameSimilarity * 50 # Max 50% confidence for name-only match
-        break
-
-    return Math.max(0, Math.min(100, score))
-
-Name Similarity (Levenshtein-based):
-  function calculateNameSimilarity(name1, name2):
-    # Normalize names
-    n1 = name1.toLowerCase().replace(/[^a-z0-9]/g, '')
-    n2 = name2.toLowerCase().replace(/[^a-z0-9]/g, '')
-
-    # Calculate Levenshtein distance
-    distance = levenshteinDistance(n1, n2)
-    maxLength = Math.max(n1.length, n2.length)
-
-    # Convert to similarity score (0-1)
-    similarity = 1 - (distance / maxLength)
-
-    return similarity
-
-Invoice Combination Finder:
-  function findInvoiceCombinations(invoices, targetAmount):
-    # Find all combinations of invoices that sum to targetAmount
-    # Use dynamic programming or subset sum algorithm
-    # Return top 3 combinations by likelihood
-
-    combinations = []
-    # ... subset sum implementation ...
-    return combinations.slice(0, 3)
-
-Reference Extractor:
-  function extractInvoiceReference(description):
-    # Try common patterns
-    patterns = [
-      /INV[- ]?(\d+)/i,
-      /invoice[- ]?(\d+)/i,
-      /ref[- ]?(\d+)/i,
-      /(\d{5,})/  # 5+ digit number
-    ]
-
-    for pattern in patterns:
-      match = description.match(pattern)
-      if match:
-        return match[1]
-
-    return null
-</pseudo_code>
+type MatchConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
+```
+</existing_service>
 
 <files_to_create>
-  <file path="src/agents/payment-matcher/matcher.agent.ts">Main agent class with matching logic</file>
-  <file path="src/agents/payment-matcher/matching-strategies.ts">Strategy pattern implementations</file>
-  <file path="src/agents/payment-matcher/confidence-scorer.ts">Confidence calculation algorithm</file>
-  <file path="src/agents/payment-matcher/context-loader.ts">Load invoices and payment data</file>
-  <file path="src/agents/payment-matcher/reference-extractor.ts">Extract invoice references from descriptions</file>
-  <file path="src/agents/payment-matcher/name-matcher.ts">Fuzzy name matching utility</file>
-  <file path="src/agents/payment-matcher/matcher.module.ts">NestJS module definition</file>
-  <file path="src/agents/payment-matcher/matcher.service.ts">Service layer for API integration</file>
-  <file path=".claude/agents/payment-matcher/match-payments.md">Agent skill documentation</file>
-  <file path="src/agents/payment-matcher/interfaces/matching.interface.ts">TypeScript interfaces</file>
-  <file path="tests/agents/payment-matcher/matcher.spec.ts">Unit tests</file>
-  <file path="tests/agents/payment-matcher/strategies.spec.ts">Strategy tests</file>
-  <file path="tests/agents/payment-matcher/name-matcher.spec.ts">Name matching tests</file>
+1. src/agents/payment-matcher/matcher.agent.ts - Main agent wrapping service
+2. src/agents/payment-matcher/decision-logger.ts - Log matching decisions
+3. src/agents/payment-matcher/context-loader.ts - Load fee_structures.json
+4. src/agents/payment-matcher/interfaces/matcher.interface.ts - TypeScript types
+5. src/agents/payment-matcher/matcher.module.ts - NestJS module
+6. .claude/agents/payment-matcher/match-payments.md - Agent skill doc
+7. tests/agents/payment-matcher/matcher.agent.spec.ts - Integration tests
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/app.module.ts">
-    Import PaymentMatcherModule
-  </file>
-  <file path="src/modules/payment/payment.service.ts">
-    Inject and use MatcherService for auto-matching
-  </file>
+1. src/database/services/payment-matching.service.ts - Use PaymentMatcherAgent for decisions
+2. src/app.module.ts - Import PaymentMatcherModule
 </files_to_modify>
 
+<implementation_reference>
+
+## Agent Structure
+```
+src/agents/
+└── payment-matcher/
+    ├── matcher.agent.ts      # Main agent class
+    ├── decision-logger.ts    # JSONL logging
+    ├── context-loader.ts     # Load fee structures
+    ├── matcher.module.ts     # NestJS module
+    └── interfaces/
+        └── matcher.interface.ts
+```
+
+## Main Agent (src/agents/payment-matcher/matcher.agent.ts)
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+import { Transaction, Invoice } from '@prisma/client';
+import { PrismaService } from '../../database/prisma/prisma.service';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+export interface MatchDecision {
+  transactionId: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  confidence: number;
+  action: 'AUTO_APPLY' | 'REVIEW_REQUIRED' | 'NO_MATCH';
+  reasoning: string;
+  alternatives: Array<{ invoiceId: string; confidence: number }>;
+}
+
+export interface MatchDecisionLog {
+  timestamp: string;
+  agent: 'payment-matcher';
+  tenantId: string;
+  transactionId: string;
+  transactionAmountCents: number;
+  decision: 'match' | 'escalate' | 'no_match';
+  invoiceId?: string;
+  invoiceNumber?: string;
+  confidence: number;
+  autoApplied: boolean;
+  reasoning: string;
+  candidateCount: number;
+}
+
+@Injectable()
+export class PaymentMatcherAgent {
+  private readonly logger = new Logger(PaymentMatcherAgent.name);
+  private readonly decisionsLogPath = path.join(process.cwd(), '.claude/logs/decisions.jsonl');
+  private readonly escalationsLogPath = path.join(process.cwd(), '.claude/logs/escalations.jsonl');
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async makeMatchDecision(
+    transaction: Transaction,
+    candidates: Array<{
+      invoice: Invoice;
+      confidence: number;
+      matchReasons: string[];
+    }>,
+    tenantId: string,
+    autoApplyThreshold: number = 80,
+  ): Promise<MatchDecision> {
+    const highConfidenceCandidates = candidates.filter(c => c.confidence >= autoApplyThreshold);
+    const allCandidates = candidates.filter(c => c.confidence >= 20);
+
+    let decision: MatchDecision;
+
+    if (candidates.length === 0) {
+      decision = {
+        transactionId: transaction.id,
+        confidence: 0,
+        action: 'NO_MATCH',
+        reasoning: 'No matching invoices found',
+        alternatives: [],
+      };
+      await this.logDecision({ tenantId, transactionId: transaction.id, transactionAmountCents: transaction.amountCents, decision: 'no_match', confidence: 0, autoApplied: false, reasoning: 'No matching invoices', candidateCount: 0 });
+    } else if (highConfidenceCandidates.length === 1) {
+      const best = highConfidenceCandidates[0];
+      decision = {
+        transactionId: transaction.id,
+        invoiceId: best.invoice.id,
+        invoiceNumber: best.invoice.invoiceNumber,
+        confidence: best.confidence,
+        action: 'AUTO_APPLY',
+        reasoning: best.matchReasons.join('; '),
+        alternatives: allCandidates.filter(c => c.invoice.id !== best.invoice.id).map(c => ({ invoiceId: c.invoice.id, confidence: c.confidence })),
+      };
+      await this.logDecision({ tenantId, transactionId: transaction.id, transactionAmountCents: transaction.amountCents, decision: 'match', invoiceId: best.invoice.id, invoiceNumber: best.invoice.invoiceNumber, confidence: best.confidence, autoApplied: true, reasoning: best.matchReasons.join('; '), candidateCount: allCandidates.length });
+    } else if (highConfidenceCandidates.length > 1) {
+      const best = candidates.sort((a, b) => b.confidence - a.confidence)[0];
+      decision = {
+        transactionId: transaction.id,
+        invoiceId: best.invoice.id,
+        invoiceNumber: best.invoice.invoiceNumber,
+        confidence: best.confidence,
+        action: 'REVIEW_REQUIRED',
+        reasoning: `Ambiguous: ${highConfidenceCandidates.length} high-confidence matches`,
+        alternatives: allCandidates.map(c => ({ invoiceId: c.invoice.id, confidence: c.confidence })),
+      };
+      await this.logDecision({ tenantId, transactionId: transaction.id, transactionAmountCents: transaction.amountCents, decision: 'escalate', invoiceId: best.invoice.id, invoiceNumber: best.invoice.invoiceNumber, confidence: best.confidence, autoApplied: false, reasoning: `Ambiguous: ${highConfidenceCandidates.length} matches`, candidateCount: allCandidates.length });
+      await this.logEscalation(tenantId, transaction.id, 'AMBIGUOUS_MATCH', `${highConfidenceCandidates.length} invoices >= ${autoApplyThreshold}%`, highConfidenceCandidates.map(c => c.invoice.id));
+    } else {
+      const best = candidates.sort((a, b) => b.confidence - a.confidence)[0];
+      decision = {
+        transactionId: transaction.id,
+        invoiceId: best.invoice.id,
+        invoiceNumber: best.invoice.invoiceNumber,
+        confidence: best.confidence,
+        action: 'REVIEW_REQUIRED',
+        reasoning: `Confidence ${best.confidence}% < ${autoApplyThreshold}%`,
+        alternatives: allCandidates.map(c => ({ invoiceId: c.invoice.id, confidence: c.confidence })),
+      };
+      await this.logDecision({ tenantId, transactionId: transaction.id, transactionAmountCents: transaction.amountCents, decision: 'escalate', invoiceId: best.invoice.id, invoiceNumber: best.invoice.invoiceNumber, confidence: best.confidence, autoApplied: false, reasoning: `Confidence ${best.confidence}% below threshold`, candidateCount: allCandidates.length });
+      await this.logEscalation(tenantId, transaction.id, 'LOW_CONFIDENCE', `Best ${best.invoice.invoiceNumber} at ${best.confidence}%`, allCandidates.map(c => c.invoice.id));
+    }
+
+    return decision;
+  }
+
+  private async logDecision(entry: Omit<MatchDecisionLog, 'timestamp' | 'agent'>): Promise<void> {
+    const fullEntry: MatchDecisionLog = { timestamp: new Date().toISOString(), agent: 'payment-matcher', ...entry };
+    try { await fs.appendFile(this.decisionsLogPath, JSON.stringify(fullEntry) + '\n'); } catch (e) { this.logger.error(`Log failed: ${e}`); }
+  }
+
+  private async logEscalation(tenantId: string, txId: string, type: string, reason: string, invoiceIds: string[]): Promise<void> {
+    const entry = { timestamp: new Date().toISOString(), agent: 'payment-matcher', tenantId, transactionId: txId, type, reason, candidateInvoiceIds: invoiceIds, status: 'pending' };
+    try { await fs.appendFile(this.escalationsLogPath, JSON.stringify(entry) + '\n'); } catch (e) { this.logger.error(`Escalation log failed: ${e}`); }
+  }
+}
+```
+
+## Module (src/agents/payment-matcher/matcher.module.ts)
+```typescript
+import { Module } from '@nestjs/common';
+import { PaymentMatcherAgent } from './matcher.agent';
+import { DatabaseModule } from '../../database/database.module';
+
+@Module({
+  imports: [DatabaseModule],
+  providers: [PaymentMatcherAgent],
+  exports: [PaymentMatcherAgent],
+})
+export class PaymentMatcherModule {}
+```
+
+## Agent Skill Doc (.claude/agents/payment-matcher/match-payments.md)
+```markdown
+# Payment Matcher Agent Skill
+
+## Purpose
+Match incoming bank payments (credit transactions) to outstanding invoices.
+
+## Algorithm (0-100 points)
+- Reference Match: 0-40 pts (exact=40, contains=30, suffix=15)
+- Amount Match: 0-40 pts (exact=40, 1%=35, 5%=25, 10%=15)
+- Name Similarity: 0-20 pts (exact=20, >0.8=15, >0.6=10)
+
+## Decision Rules
+- Single >= 80%: AUTO_APPLY
+- Multiple >= 80%: REVIEW (ambiguous)
+- Best < 80%: REVIEW (low confidence)
+- No >= 20%: NO_MATCH
+
+## Autonomy Level
+- L3: Single high-confidence match
+- L1: Multiple matches or low confidence
+```
+</implementation_reference>
+
+<test_requirements>
+CRITICAL: Tests use REAL PostgreSQL - NO MOCKS.
+
+```typescript
+describe('PaymentMatcherAgent', () => {
+  it('should auto-apply single high-confidence match', async () => {
+    const decision = await agent.makeMatchDecision(transaction, [{ invoice, confidence: 95, matchReasons: ['Exact ref'] }], tenantId);
+    expect(decision.action).toBe('AUTO_APPLY');
+  });
+
+  it('should escalate ambiguous matches', async () => {
+    const decision = await agent.makeMatchDecision(transaction, [
+      { invoice: inv1, confidence: 85, matchReasons: [] },
+      { invoice: inv2, confidence: 82, matchReasons: [] },
+    ], tenantId);
+    expect(decision.action).toBe('REVIEW_REQUIRED');
+    expect(decision.reasoning).toContain('Ambiguous');
+  });
+
+  it('should escalate low-confidence', async () => {
+    const decision = await agent.makeMatchDecision(transaction, [{ invoice, confidence: 55, matchReasons: [] }], tenantId);
+    expect(decision.action).toBe('REVIEW_REQUIRED');
+  });
+});
+```
+</test_requirements>
+
 <validation_criteria>
-  <criterion>Agent auto-applies exact reference + amount matches with 100% confidence</criterion>
-  <criterion>Agent escalates partial matches and ambiguous cases</criterion>
-  <criterion>Name similarity algorithm achieves >85% accuracy on test dataset</criterion>
-  <criterion>Agent correctly handles overpayments (creates credit note)</criterion>
-  <criterion>Batch processing completes 100 payments in under 60 seconds</criterion>
-  <criterion>All decisions logged to decisions.jsonl with complete context</criterion>
-  <criterion>MCP tool integration works with real Xero API</criterion>
-  <criterion>Unit tests achieve >90% code coverage</criterion>
+- TypeScript compiles
+- Lint passes
+- Tests pass with real PostgreSQL
+- Auto-apply only single >= 80%
+- Escalate ambiguous (multiple >= 80%)
+- Escalate low confidence (< 80%)
+- All decisions logged to .claude/logs/decisions.jsonl
+- All escalations logged
+- Amounts in cents
 </validation_criteria>
 
 <test_commands>
-  <command>npm run test -- payment-matcher</command>
-  <command>npm run test:e2e -- agents/matcher</command>
-  <command>npm run lint</command>
-  <command>npm run build</command>
+npm run build
+npm run lint
+npm run test -- --testPathPattern="payment-matcher" --verbose
 </test_commands>
 
 </task_spec>

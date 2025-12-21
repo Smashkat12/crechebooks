@@ -3,7 +3,7 @@
 ## Current Status: Logic Layer Complete
 
 **Last Updated**: 2025-12-21
-**Total Tests**: 1211 passing
+**Total Tests**: 1251 passing
 **Build Status**: PASS
 **Lint Status**: PASS
 
@@ -14,16 +14,26 @@
 | Phase | Tasks | Completed | Status |
 |-------|-------|-----------|--------|
 | Foundation | 15 | 15 | 100% Complete |
-| Logic | 21 | 21 | 100% Complete |
+| Logic | 22 | 22 | 100% Complete |
 | Agents | 5 | 0 | Not Started |
 | Surface | 16 | 0 | Not Started |
 | Integration | 5 | 0 | Not Started |
 
-**Overall Progress**: 36/62 tasks (58.1%)
+**Overall Progress**: 37/63 tasks (58.7%)
 
 ---
 
 ## Latest Completions (2025-12-21)
+
+### TASK-TRANS-015: LLMWhisperer PDF Extraction
+- **Status**: Complete
+- **Tests**: 62 parser tests passing
+- **Key Features**:
+  - LLMWhisperer cloud API integration
+  - Confidence-based hybrid routing (local first, LLM fallback)
+  - Multi-line FNB bank statement parsing
+  - Bank charges handling (optional trailing line)
+  - Real PDF testing with 28 FNB statements
 
 ### TASK-RECON-011: Bank Reconciliation Service
 - **Status**: Complete

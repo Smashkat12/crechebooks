@@ -6,11 +6,14 @@
 - TASK-RECON-011: Bank Reconciliation Service (16 tests)
 - TASK-RECON-012: Discrepancy Detection Service (17 tests)
 - TASK-RECON-013: Financial Report Service (12 tests)
+- TASK-TRANS-015: LLMWhisperer PDF Extraction (62 parser tests)
 
 ### Key Decisions Made
 1. Used afterEach cleanup per tenant to avoid FK constraint issues
 2. FinancialReportService uses InvoiceRepository pattern for invoice-based income
 3. Discrepancy types based on Xero sync status
+4. LLMWhisperer multi-line parsing for bank charges handling
+5. Confidence-based hybrid routing: local parser first, LLMWhisperer fallback
 
 ### Next Steps
 1. Phase 3: Claude Code Agents (TASK-AGENT-001 to TASK-AGENT-005)

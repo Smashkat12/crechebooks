@@ -14,7 +14,7 @@ import { randomUUID } from 'crypto';
 import { subDays, format } from 'date-fns';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CsvParser } from '../parsers/csv-parser';
-import { PdfParser } from '../parsers/pdf-parser';
+import { HybridPdfParser } from '../parsers/hybrid-pdf-parser';
 import {
   ParsedTransaction,
   ImportResult,
@@ -43,7 +43,7 @@ export interface ImportFile {
 export class TransactionImportService {
   private readonly logger = new Logger(TransactionImportService.name);
   private readonly csvParser = new CsvParser();
-  private readonly pdfParser = new PdfParser();
+  private readonly pdfParser = new HybridPdfParser();
 
   constructor(private readonly transactionRepo: TransactionRepository) {}
 

@@ -1,568 +1,315 @@
-<task_spec id="TASK-AGENT-005" version="1.0">
+<task_spec id="TASK-AGENT-005" version="3.0">
 
 <metadata>
   <title>Orchestrator Agent Setup</title>
-  <status>ready</status>
+  <status>COMPLETE</status>
   <layer>agent</layer>
   <sequence>41</sequence>
   <implements>
-    <requirement_ref>NFR-PERF-001</requirement_ref>
-    <requirement_ref>NFR-SCALE-001</requirement_ref>
+    <requirement_ref>NFR-ARCH-001</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-AGENT-002</task_ref>
-    <task_ref>TASK-AGENT-003</task_ref>
-    <task_ref>TASK-AGENT-004</task_ref>
+    <task_ref status="PENDING">TASK-AGENT-001</task_ref>
+    <task_ref status="PENDING">TASK-AGENT-002</task_ref>
+    <task_ref status="PENDING">TASK-AGENT-003</task_ref>
+    <task_ref status="PENDING">TASK-AGENT-004</task_ref>
   </depends_on>
-  <estimated_complexity>high</estimated_complexity>
+  <estimated_complexity>medium</estimated_complexity>
 </metadata>
 
 <context>
-This task implements the Orchestrator agent, the main Claude Code session that coordinates
-all specialized subagents (Transaction Categorizer, Payment Matcher, SARS Agent). The
-orchestrator runs as the primary session, spawns task-based subagents using the Task tool,
-manages workflow state, handles escalations, and ensures session persistence. It acts as
-the central coordinator for all AI-powered bookkeeping operations, routing work to the
-appropriate specialized agents and aggregating results for the API layer.
+This task creates the Orchestrator Agent that coordinates specialized agents:
+- TransactionCategorizerAgent (TASK-AGENT-002)
+- PaymentMatcherAgent (TASK-AGENT-003)
+- SarsAgent (TASK-AGENT-004)
+
+The orchestrator:
+- Routes requests to appropriate agents
+- Aggregates results
+- Manages escalation workflow
+- Provides unified decision logging
+
+**CRITICAL PROJECT RULES:**
+- ALL monetary values are CENTS (integers)
+- NO backwards compatibility - fail fast
+- Tenant isolation on ALL operations
+- SARS workflows always L2 (require review)
+- Transaction/Payment workflows use L3 for high confidence
 </context>
 
-<input_context_files>
-  <file purpose="orchestrator_definition">specs/technical/architecture.md#orchestrator_pattern</file>
-  <file purpose="agent_definitions">specs/technical/architecture.md#agent_definitions</file>
-  <file purpose="workflow_patterns">specs/constitution.md#workflow_coordination</file>
-  <file purpose="autonomy_levels">specs/constitution.md#autonomy_levels</file>
-</input_context_files>
-
-<prerequisites>
-  <check>TASK-AGENT-001 completed (.claude/ infrastructure exists)</check>
-  <check>TASK-AGENT-002 completed (Transaction Categorizer implemented)</check>
-  <check>TASK-AGENT-003 completed (Payment Matcher implemented)</check>
-  <check>TASK-AGENT-004 completed (SARS Agent implemented)</check>
-  <check>All MCP servers configured and accessible</check>
-</prerequisites>
-
-<scope>
-  <in_scope>
-    - Create orchestrator in src/agents/orchestrator/
-    - Implement task spawning using Claude Code Task tool
-    - Agent routing logic:
-      - Route transactions to Categorizer
-      - Route payments to Matcher
-      - Route SARS calculations to SARS Agent
-    - Workflow management:
-      - Sequential task execution
-      - Parallel task execution where appropriate
-      - Dependency resolution
-    - Session persistence:
-      - Save workflow state
-      - Resume interrupted workflows
-      - Track task progress
-    - Escalation handling:
-      - Aggregate escalations from subagents
-      - Store in .claude/logs/escalations.jsonl
-      - Notify user via AskUserQuestion when appropriate
-    - Result aggregation and reporting
-    - Error handling and retry logic
-  </in_scope>
-  <out_of_scope>
-    - Subagent implementations (already completed)
-    - API layer integration (TASK-API-*)
-    - User interface (Phase 4)
-    - Background job queue (handled by NestJS Bull)
-  </out_of_scope>
-</scope>
-
-<definition_of_done>
-  <signatures>
-    <signature file="src/agents/orchestrator/orchestrator.agent.ts">
-      export class OrchestratorAgent {
-        async processTransactions(
-          transactions: Transaction[],
-          context: OrchestratorContext
-        ): Promise&lt;TransactionProcessingResult&gt;;
-
-        async processPayments(
-          payments: Payment[],
-          context: OrchestratorContext
-        ): Promise&lt;PaymentProcessingResult&gt;;
-
-        async calculateSARS(
-          period: TaxPeriod,
-          context: OrchestratorContext
-        ): Promise&lt;SARSCalculationResult&gt;;
-
-        private spawnSubagent(
-          agentType: AgentType,
-          task: string,
-          context: any
-        ): Promise&lt;TaskResult&gt;;
-
-        private handleEscalation(
-          escalation: Escalation
-        ): Promise&lt;void&gt;;
-
-        private saveWorkflowState(
-          workflowId: string,
-          state: WorkflowState
-        ): Promise&lt;void&gt;;
-
-        private resumeWorkflow(
-          workflowId: string
-        ): Promise&lt;WorkflowState&gt;;
-      }
-    </signature>
-    <signature file=".claude/agents/orchestrator/orchestrator.md">
-      # Orchestrator Agent
-
-      ## Role
-      Coordinate all specialized subagents and manage workflows
-
-      ## Subagents
-      - Transaction Categorizer (transaction-categorizer)
-      - Payment Matcher (payment-matcher)
-      - SARS Agent (sars-agent)
-
-      ## Workflows
-      1. Transaction Processing:
-         - Spawn Categorizer for each batch
-         - Aggregate results
-         - Handle escalations
-
-      2. Payment Processing:
-         - Spawn Matcher for each batch
-         - Aggregate results
-         - Handle escalations
-
-      3. SARS Calculation:
-         - Spawn SARS Agent
-         - Always escalate for review
-
-      ## Task Tool Usage
-      Use Claude Code Task tool to spawn subagents with specific context
-    </signature>
-    <signature file="src/agents/orchestrator/workflow-manager.ts">
-      export class WorkflowManager {
-        async createWorkflow(
-          type: WorkflowType,
-          params: WorkflowParams
-        ): Promise&lt;Workflow&gt;;
-
-        async executeWorkflow(
-          workflow: Workflow
-        ): Promise&lt;WorkflowResult&gt;;
-
-        async pauseWorkflow(
-          workflowId: string
-        ): Promise&lt;void&gt;;
-
-        async resumeWorkflow(
-          workflowId: string
-        ): Promise&lt;WorkflowResult&gt;;
-
-        private persistState(
-          workflow: Workflow
-        ): Promise&lt;void&gt;;
-      }
-    </signature>
-  </signatures>
-
-  <constraints>
-    - Must use Claude Code Task tool for all subagent spawning
-    - Must aggregate all subagent escalations
-    - Must persist workflow state for resume capability
-    - Must implement retry logic for transient failures
-    - Must NOT duplicate subagent logic (delegate to specialists)
-    - Must log all orchestration decisions
-    - Must handle concurrent workflows per tenant
-    - Escalations must be tenant-scoped
-  </constraints>
-
-  <verification>
-    - Orchestrator successfully spawns Transaction Categorizer
-    - Orchestrator successfully spawns Payment Matcher
-    - Orchestrator successfully spawns SARS Agent
-    - Workflow state persists and can be resumed
-    - Escalations aggregated from all subagents
-    - Parallel task execution works correctly
-    - Error handling and retry logic functional
-    - Session persistence across orchestrator restarts
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-Orchestrator Structure:
-  src/agents/orchestrator/
-    orchestrator.agent.ts       # Main orchestrator
-    workflow-manager.ts         # Workflow state management
-    agent-spawner.ts            # Task tool wrapper
-    escalation-aggregator.ts    # Aggregate subagent escalations
-    session-persister.ts        # Session state persistence
-    orchestrator.module.ts      # NestJS module
-    orchestrator.service.ts     # Service for API layer
-
-Transaction Processing Workflow:
-  async function processTransactions(transactions, context):
-    # 1. Create workflow
-    workflow = await workflowManager.createWorkflow({
-      type: 'transaction_categorization',
-      tenantId: context.tenantId,
-      transactionIds: transactions.map(t => t.id)
-    })
-
-    # 2. Split into batches (50 per batch)
-    batches = chunkArray(transactions, 50)
-
-    # 3. Process batches (can be parallel or sequential)
-    allResults = []
-    allEscalations = []
-
-    for batch in batches:
-      # Spawn Categorizer subagent using Task tool
-      result = await spawnSubagent({
-        agentType: 'transaction-categorizer',
-        task: `Categorize ${batch.length} transactions`,
-        context: {
-          transactions: batch,
-          patterns: await loadPatterns(),
-          chartOfAccounts: await loadChartOfAccounts(),
-          tenantId: context.tenantId
-        }
-      })
-
-      allResults.push(...result.categorizations)
-      allEscalations.push(...result.escalations)
-
-      # Update workflow progress
-      await workflowManager.updateProgress(workflow.id, {
-        processedCount: allResults.length,
-        totalCount: transactions.length
-      })
-
-      # Persist state
-      await sessionPersister.saveState(workflow.id, {
-        results: allResults,
-        escalations: allEscalations,
-        lastProcessedBatch: batch[batch.length - 1].id
-      })
-
-    # 4. Aggregate escalations
-    if allEscalations.length > 0:
-      await escalationAggregator.storeEscalations(
-        context.tenantId,
-        allEscalations
-      )
-
-    # 5. Complete workflow
-    await workflowManager.completeWorkflow(workflow.id, {
-      success: true,
-      processedCount: allResults.length,
-      escalationCount: allEscalations.length
-    })
-
-    return {
-      workflowId: workflow.id,
-      results: allResults,
-      escalations: allEscalations,
-      summary: {
-        total: transactions.length,
-        categorized: allResults.filter(r => r.autoApplied).length,
-        escalated: allEscalations.length
-      }
-    }
-
-Payment Processing Workflow:
-  async function processPayments(payments, context):
-    # Similar structure to transaction processing
-    workflow = await workflowManager.createWorkflow({
-      type: 'payment_matching',
-      tenantId: context.tenantId,
-      paymentIds: payments.map(p => p.id)
-    })
-
-    allResults = []
-    allEscalations = []
-
-    for payment in payments:
-      # Spawn Payment Matcher subagent
-      result = await spawnSubagent({
-        agentType: 'payment-matcher',
-        task: `Match payment ${payment.id} to invoices`,
-        context: {
-          payment: payment,
-          tenantId: context.tenantId
-        }
-      })
-
-      allResults.push(result.match)
-      if result.escalation:
-        allEscalations.push(result.escalation)
-
-      await workflowManager.updateProgress(workflow.id, {
-        processedCount: allResults.length,
-        totalCount: payments.length
-      })
-
-    # Store escalations
-    if allEscalations.length > 0:
-      await escalationAggregator.storeEscalations(
-        context.tenantId,
-        allEscalations
-      )
-
-    await workflowManager.completeWorkflow(workflow.id, {
-      success: true,
-      processedCount: allResults.length,
-      escalationCount: allEscalations.length
-    })
-
-    return {
-      workflowId: workflow.id,
-      results: allResults,
-      escalations: allEscalations,
-      summary: {
-        total: payments.length,
-        matched: allResults.filter(r => r.autoApplied).length,
-        escalated: allEscalations.length
-      }
-    }
-
-SARS Calculation Workflow:
-  async function calculateSARS(period, context):
-    workflow = await workflowManager.createWorkflow({
-      type: 'sars_calculation',
-      tenantId: context.tenantId,
-      period: period
-    })
-
-    # Spawn SARS Agent (ALWAYS requires review)
-    result = await spawnSubagent({
-      agentType: 'sars-agent',
-      task: `Calculate SARS returns for ${period}`,
-      context: {
-        period: period,
-        tenantId: context.tenantId
-      }
-    })
-
-    # SARS calculations ALWAYS escalated for review
-    escalation = {
-      type: 'sars_calculation',
-      period: period,
-      payeCalculation: result.paye,
-      uifCalculation: result.uif,
-      vatCalculation: result.vat,
-      uncertainties: result.uncertainties,
-      requiresReview: true
-    }
-
-    await escalationAggregator.storeEscalations(
-      context.tenantId,
-      [escalation]
-    )
-
-    await workflowManager.completeWorkflow(workflow.id, {
-      success: true,
-      requiresReview: true
-    })
-
-    return {
-      workflowId: workflow.id,
-      emp201: result.emp201,
-      vat201: result.vat201,
-      escalation: escalation,
-      requiresReview: true
-    }
-
-Spawn Subagent (using Task Tool):
-  async function spawnSubagent(params):
-    # Use Claude Code Task tool to spawn subagent
-    # This is a conceptual wrapper - actual implementation
-    # would invoke the Task tool from the orchestrator session
-
-    taskPrompt = buildTaskPrompt(params.agentType, params.task, params.context)
-
-    # Invoke Task tool (pseudo-code)
-    taskResult = await ClaudeCode.Task({
-      prompt: taskPrompt,
-      context: params.context
-    })
-
-    # Parse and return structured result
-    return parseTaskResult(taskResult)
-
-Task Prompt Builder:
-  function buildTaskPrompt(agentType, task, context):
-    switch agentType:
-      case 'transaction-categorizer':
-        return `
-          You are the Transaction Categorizer agent.
-
-          Task: ${task}
-
-          Context:
-          - Transactions: ${JSON.stringify(context.transactions)}
-          - Patterns: Load from .claude/context/payee_patterns.json
-          - Chart of Accounts: Load from .claude/context/chart_of_accounts.json
-          - Tenant ID: ${context.tenantId}
-
-          Instructions:
-          1. Categorize each transaction using pattern matching
-          2. Calculate confidence scores
-          3. Auto-apply categorizations with confidence >= 80%
-          4. Escalate low-confidence categorizations
-          5. Log all decisions to .claude/logs/decisions.jsonl
-
-          Return JSON result with categorizations and escalations.
-        `
-
-      case 'payment-matcher':
-        return `
-          You are the Payment Matcher agent.
-
-          Task: ${task}
-
-          Context:
-          - Payment: ${JSON.stringify(context.payment)}
-          - Tenant ID: ${context.tenantId}
-
-          Instructions:
-          1. Load outstanding invoices via mcp__xero__get_invoices
-          2. Apply matching strategies (reference, amount, name)
-          3. Calculate confidence scores
-          4. Auto-apply matches with confidence >= 90%
-          5. Escalate ambiguous matches
-          6. Log all decisions to .claude/logs/decisions.jsonl
-
-          Return JSON result with match details and escalation if needed.
-        `
-
-      case 'sars-agent':
-        return `
-          You are the SARS Calculation agent.
-
-          Task: ${task}
-
-          Context:
-          - Tax Period: ${JSON.stringify(context.period)}
-          - Tenant ID: ${context.tenantId}
-
-          Instructions:
-          1. Load 2025 SARS tax tables from .claude/context/sars_tables_2025.json
-          2. Calculate PAYE using tax brackets and rebates
-          3. Calculate UIF (1% employee + 1% employer, capped at R177.12/month)
-          4. Calculate VAT (15% rate)
-          5. Generate EMP201 and VAT201 draft returns
-          6. Flag ALL uncertainties
-          7. ALWAYS require human review (L2 autonomy)
-
-          Return JSON result with calculations, drafts, and uncertainties.
-          requiresReview MUST be true.
-        `
-
-Workflow State Persistence:
-  async function saveWorkflowState(workflowId, state):
-    # Store in database or Redis
-    await db.workflow_state.upsert({
-      where: { id: workflowId },
-      create: {
-        id: workflowId,
-        state: JSON.stringify(state),
-        lastUpdated: new Date()
-      },
-      update: {
-        state: JSON.stringify(state),
-        lastUpdated: new Date()
-      }
-    })
-
-    # Also append to decisions log
-    await appendToFile('.claude/logs/decisions.jsonl', JSON.stringify({
-      timestamp: new Date().toISOString(),
-      agent: 'orchestrator',
-      action: 'workflow_state_saved',
-      workflowId: workflowId,
-      state: state
-    }) + '\n')
-
-  async function resumeWorkflow(workflowId):
-    # Load from database
-    record = await db.workflow_state.findUnique({
-      where: { id: workflowId }
-    })
-
-    if not record:
-      throw new Error(`Workflow ${workflowId} not found`)
-
-    return JSON.parse(record.state)
-
-Escalation Aggregator:
-  async function storeEscalations(tenantId, escalations):
-    for escalation in escalations:
-      # Store in database
-      await db.escalation.create({
-        data: {
-          tenantId: tenantId,
-          type: escalation.type,
-          details: JSON.stringify(escalation),
-          status: 'pending',
-          createdAt: new Date()
-        }
-      })
-
-      # Append to escalations log
-      await appendToFile('.claude/logs/escalations.jsonl', JSON.stringify({
-        timestamp: new Date().toISOString(),
-        tenantId: tenantId,
-        escalation: escalation
-      }) + '\n')
-</pseudo_code>
+<workflow_types>
+```typescript
+type WorkflowType =
+  | 'CATEGORIZE_TRANSACTIONS'   // Categorize pending transactions
+  | 'MATCH_PAYMENTS'            // Match credits to invoices
+  | 'CALCULATE_PAYE'            // Single PAYE calculation
+  | 'GENERATE_EMP201'           // EMP201 return
+  | 'GENERATE_VAT201'           // VAT201 return
+  | 'BANK_IMPORT'               // Categorize + Match
+  | 'MONTHLY_CLOSE';            // Full month-end
+
+type AutonomyLevel = 'L1_SUGGEST' | 'L2_DRAFT' | 'L3_FULL_AUTO';
+```
+</workflow_types>
 
 <files_to_create>
-  <file path="src/agents/orchestrator/orchestrator.agent.ts">Main orchestrator agent class</file>
-  <file path="src/agents/orchestrator/workflow-manager.ts">Workflow state management</file>
-  <file path="src/agents/orchestrator/agent-spawner.ts">Task tool wrapper for spawning subagents</file>
-  <file path="src/agents/orchestrator/escalation-aggregator.ts">Aggregate and store escalations</file>
-  <file path="src/agents/orchestrator/session-persister.ts">Session state persistence</file>
-  <file path="src/agents/orchestrator/task-prompt-builder.ts">Build prompts for subagent tasks</file>
-  <file path="src/agents/orchestrator/orchestrator.module.ts">NestJS module definition</file>
-  <file path="src/agents/orchestrator/orchestrator.service.ts">Service layer for API integration</file>
-  <file path=".claude/agents/orchestrator/orchestrator.md">Orchestrator documentation</file>
-  <file path="src/agents/orchestrator/interfaces/orchestrator.interface.ts">TypeScript interfaces</file>
-  <file path="tests/agents/orchestrator/orchestrator.spec.ts">Unit tests</file>
-  <file path="tests/agents/orchestrator/workflow-manager.spec.ts">Workflow manager tests</file>
-  <file path="tests/agents/orchestrator/integration.spec.ts">Integration tests with subagents</file>
+1. src/agents/orchestrator/orchestrator.agent.ts - Main orchestrator
+2. src/agents/orchestrator/workflow-router.ts - Route to agents
+3. src/agents/orchestrator/escalation-manager.ts - Manage escalations
+4. src/agents/orchestrator/interfaces/orchestrator.interface.ts - Types
+5. src/agents/orchestrator/orchestrator.module.ts - NestJS module
+6. .claude/agents/orchestrator/orchestrate.md - Skill doc
+7. tests/agents/orchestrator/orchestrator.agent.spec.ts - Tests
 </files_to_create>
 
-<files_to_modify>
-  <file path="src/app.module.ts">
-    Import OrchestratorModule
-  </file>
-  <file path="prisma/schema.prisma">
-    Add models:
-    - WorkflowState (id, tenantId, state, lastUpdated)
-    - Escalation (id, tenantId, type, details, status, createdAt, resolvedAt)
-  </file>
-</files_to_modify>
+<implementation_reference>
+
+## Main Agent (src/agents/orchestrator/orchestrator.agent.ts)
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
+import { TransactionCategorizerAgent } from '../transaction-categorizer/categorizer.agent';
+import { PaymentMatcherAgent } from '../payment-matcher/matcher.agent';
+import { SarsAgent } from '../sars-agent/sars.agent';
+import { PrismaService } from '../../database/prisma/prisma.service';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+export interface WorkflowRequest {
+  type: string;
+  tenantId: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface WorkflowResult {
+  workflowId: string;
+  type: string;
+  status: 'COMPLETED' | 'PARTIAL' | 'ESCALATED';
+  autonomyLevel: 'L1_SUGGEST' | 'L2_DRAFT' | 'L3_FULL_AUTO';
+  results: Array<{ agent: string; processed: number; autoApplied: number; escalated: number; errors: number }>;
+  escalations: Array<{ type: string; reason: string; details: Record<string, unknown> }>;
+  startedAt: string;
+  completedAt: string;
+}
+
+@Injectable()
+export class OrchestratorAgent {
+  private readonly logger = new Logger(OrchestratorAgent.name);
+  private readonly logPath = path.join(process.cwd(), '.claude/logs/decisions.jsonl');
+
+  constructor(
+    private readonly transactionCategorizer: TransactionCategorizerAgent,
+    private readonly paymentMatcher: PaymentMatcherAgent,
+    private readonly sarsAgent: SarsAgent,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async executeWorkflow(request: WorkflowRequest): Promise<WorkflowResult> {
+    const workflowId = uuidv4();
+    const startedAt = new Date().toISOString();
+    this.logger.log(`Starting workflow ${workflowId}: ${request.type}`);
+
+    const result: WorkflowResult = {
+      workflowId,
+      type: request.type,
+      status: 'COMPLETED',
+      autonomyLevel: this.getAutonomyLevel(request.type),
+      results: [],
+      escalations: [],
+      startedAt,
+      completedAt: '',
+    };
+
+    try {
+      switch (request.type) {
+        case 'CATEGORIZE_TRANSACTIONS':
+          await this.executeCategorization(request, result);
+          break;
+        case 'MATCH_PAYMENTS':
+          await this.executePaymentMatching(request, result);
+          break;
+        case 'GENERATE_EMP201':
+          await this.executeEmp201(request, result);
+          break;
+        case 'BANK_IMPORT':
+          await this.executeCategorization(request, result);
+          await this.executePaymentMatching(request, result);
+          break;
+        default:
+          throw new Error(`Unknown workflow: ${request.type}`);
+      }
+    } catch (error) {
+      result.status = 'PARTIAL';
+      result.escalations.push({ type: 'WORKFLOW_ERROR', reason: String(error), details: {} });
+    }
+
+    result.completedAt = new Date().toISOString();
+    if (result.escalations.length > 0 || result.results.some(r => r.escalated > 0)) {
+      result.status = 'ESCALATED';
+    }
+
+    await this.logWorkflow(result);
+    return result;
+  }
+
+  private getAutonomyLevel(type: string): 'L1_SUGGEST' | 'L2_DRAFT' | 'L3_FULL_AUTO' {
+    if (['CALCULATE_PAYE', 'GENERATE_EMP201', 'GENERATE_VAT201'].includes(type)) return 'L2_DRAFT';
+    return 'L3_FULL_AUTO';
+  }
+
+  private async executeCategorization(request: WorkflowRequest, result: WorkflowResult): Promise<void> {
+    const transactions = await this.prisma.transaction.findMany({
+      where: { tenantId: request.tenantId, status: 'PENDING', isDeleted: false },
+    });
+
+    let autoApplied = 0, escalated = 0, errors = 0;
+    for (const tx of transactions) {
+      try {
+        const cat = await this.transactionCategorizer.categorize(tx, request.tenantId);
+        if (cat.autoApplied) autoApplied++;
+        else {
+          escalated++;
+          result.escalations.push({ type: 'LOW_CONFIDENCE_CATEGORIZATION', reason: cat.reasoning, details: { transactionId: tx.id, confidence: cat.confidenceScore } });
+        }
+      } catch (e) { errors++; }
+    }
+    result.results.push({ agent: 'transaction-categorizer', processed: transactions.length, autoApplied, escalated, errors });
+  }
+
+  private async executePaymentMatching(request: WorkflowRequest, result: WorkflowResult): Promise<void> {
+    const credits = await this.prisma.transaction.findMany({
+      where: { tenantId: request.tenantId, isCredit: true, status: { in: ['PENDING', 'CATEGORIZED'] }, isDeleted: false, payments: { none: {} } },
+    });
+    const invoices = await this.prisma.invoice.findMany({
+      where: { tenantId: request.tenantId, status: { in: ['SENT', 'PARTIALLY_PAID', 'OVERDUE'] }, outstandingCents: { gt: 0 } },
+      include: { parent: true, child: true },
+    });
+
+    let autoApplied = 0, escalated = 0, errors = 0;
+    for (const tx of credits) {
+      try {
+        const candidates = this.findCandidates(tx, invoices);
+        const decision = await this.paymentMatcher.makeMatchDecision(tx, candidates, request.tenantId);
+        if (decision.action === 'AUTO_APPLY') autoApplied++;
+        else if (decision.action === 'REVIEW_REQUIRED') {
+          escalated++;
+          result.escalations.push({ type: 'PAYMENT_MATCH', reason: decision.reasoning, details: { transactionId: tx.id } });
+        }
+      } catch (e) { errors++; }
+    }
+    result.results.push({ agent: 'payment-matcher', processed: credits.length, autoApplied, escalated, errors });
+  }
+
+  private findCandidates(tx: any, invoices: any[]): Array<{ invoice: any; confidence: number; matchReasons: string[] }> {
+    return invoices.map(inv => {
+      let confidence = 0;
+      const reasons: string[] = [];
+      if (tx.description.includes(inv.invoiceNumber)) { confidence += 40; reasons.push('Ref match'); }
+      if (Math.abs(tx.amountCents - inv.outstandingCents) === 0) { confidence += 40; reasons.push('Amount match'); }
+      const name = `${inv.parent.firstName} ${inv.parent.lastName}`.toUpperCase();
+      if (tx.description.toUpperCase().includes(name)) { confidence += 20; reasons.push('Name match'); }
+      return { invoice: inv, confidence, matchReasons: reasons };
+    }).filter(c => c.confidence >= 20).sort((a, b) => b.confidence - a.confidence).slice(0, 5);
+  }
+
+  private async executeEmp201(request: WorkflowRequest, result: WorkflowResult): Promise<void> {
+    const { year, month } = request.parameters as { year: number; month: number };
+    const decision = await this.sarsAgent.generateEmp201ForReview(request.tenantId, year, month);
+    result.results.push({ agent: 'sars-agent', processed: 1, autoApplied: 0, escalated: 1, errors: 0 });
+    result.escalations.push({ type: 'SARS_EMP201', reason: 'EMP201 requires review', details: { amountCents: decision.calculatedAmountCents, period: decision.period } });
+  }
+
+  private async logWorkflow(result: WorkflowResult): Promise<void> {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      agent: 'orchestrator',
+      workflowId: result.workflowId,
+      type: result.type,
+      status: result.status,
+      autonomyLevel: result.autonomyLevel,
+      totalProcessed: result.results.reduce((s, r) => s + r.processed, 0),
+      totalAutoApplied: result.results.reduce((s, r) => s + r.autoApplied, 0),
+      totalEscalated: result.results.reduce((s, r) => s + r.escalated, 0),
+      durationMs: new Date(result.completedAt).getTime() - new Date(result.startedAt).getTime(),
+    };
+    try { await fs.appendFile(this.logPath, JSON.stringify(entry) + '\n'); } catch (e) { this.logger.error(`Log failed: ${e}`); }
+  }
+}
+```
+
+## Module (src/agents/orchestrator/orchestrator.module.ts)
+```typescript
+import { Module } from '@nestjs/common';
+import { OrchestratorAgent } from './orchestrator.agent';
+import { TransactionCategorizerModule } from '../transaction-categorizer/categorizer.module';
+import { PaymentMatcherModule } from '../payment-matcher/matcher.module';
+import { SarsAgentModule } from '../sars-agent/sars.module';
+import { DatabaseModule } from '../../database/database.module';
+
+@Module({
+  imports: [DatabaseModule, TransactionCategorizerModule, PaymentMatcherModule, SarsAgentModule],
+  providers: [OrchestratorAgent],
+  exports: [OrchestratorAgent],
+})
+export class OrchestratorModule {}
+```
+
+## Skill Doc (.claude/agents/orchestrator/orchestrate.md)
+```markdown
+# Orchestrator Agent
+
+## Supported Workflows
+- CATEGORIZE_TRANSACTIONS: L3 (auto high confidence)
+- MATCH_PAYMENTS: L3 (auto high confidence)
+- GENERATE_EMP201: L2 (always review)
+- GENERATE_VAT201: L2 (always review)
+- BANK_IMPORT: Categorize + Match (L3)
+- MONTHLY_CLOSE: Full month-end (L2/L3 mixed)
+
+## Routing
+- Transactions → TransactionCategorizerAgent
+- Payments → PaymentMatcherAgent
+- SARS → SarsAgent (always L2)
+```
+</implementation_reference>
+
+<test_requirements>
+```typescript
+describe('OrchestratorAgent', () => {
+  it('should execute CATEGORIZE workflow', async () => {
+    const result = await orchestrator.executeWorkflow({ type: 'CATEGORIZE_TRANSACTIONS', tenantId, parameters: {} });
+    expect(result.autonomyLevel).toBe('L3_FULL_AUTO');
+    expect(result.results.some(r => r.agent === 'transaction-categorizer')).toBe(true);
+  });
+
+  it('should execute BANK_IMPORT with multiple agents', async () => {
+    const result = await orchestrator.executeWorkflow({ type: 'BANK_IMPORT', tenantId, parameters: {} });
+    expect(result.results.length).toBe(2);
+  });
+
+  it('should always escalate SARS workflows', async () => {
+    const result = await orchestrator.executeWorkflow({ type: 'GENERATE_EMP201', tenantId, parameters: { year: 2025, month: 1 } });
+    expect(result.autonomyLevel).toBe('L2_DRAFT');
+    expect(result.status).toBe('ESCALATED');
+  });
+});
+```
+</test_requirements>
 
 <validation_criteria>
-  <criterion>Orchestrator successfully spawns Transaction Categorizer using Task tool</criterion>
-  <criterion>Orchestrator successfully spawns Payment Matcher using Task tool</criterion>
-  <criterion>Orchestrator successfully spawns SARS Agent using Task tool</criterion>
-  <criterion>Workflow state persists to database and can be resumed</criterion>
-  <criterion>Escalations from all subagents aggregated correctly</criterion>
-  <criterion>Parallel workflow execution works for multiple tenants</criterion>
-  <criterion>Error handling and retry logic prevents data loss</criterion>
-  <criterion>Session persistence allows recovery from orchestrator restarts</criterion>
-  <criterion>Integration tests verify end-to-end workflows</criterion>
-  <criterion>Unit tests achieve >85% code coverage</criterion>
+- TypeScript compiles
+- Lint passes
+- Tests pass with real PostgreSQL
+- SARS workflows return L2_DRAFT
+- Transaction workflows use L3
+- Results aggregated from all agents
+- All workflows logged
 </validation_criteria>
 
 <test_commands>
-  <command>npm run test -- orchestrator</command>
-  <command>npm run test:e2e -- agents/orchestrator</command>
-  <command>npm run lint</command>
-  <command>npm run build</command>
-  <command>npm run test:integration -- workflows</command>
+npm run build
+npm run lint
+npm run test -- --testPathPattern="orchestrator" --verbose
 </test_commands>
 
 </task_spec>

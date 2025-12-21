@@ -26,6 +26,18 @@ export interface ParsedTransaction {
 }
 
 /**
+ * Parsed transaction with confidence scoring for hybrid parsing.
+ * TASK-TRANS-015 - Confidence-based fallback to LLMWhisperer
+ */
+export interface ParsedTransactionWithConfidence extends ParsedTransaction {
+  /** Parsing confidence score 0-100 */
+  parsingConfidence: number;
+
+  /** Reasons for confidence adjustments */
+  confidenceReasons: string[];
+}
+
+/**
  * Result of a transaction import operation.
  * Provides comprehensive feedback about the import process.
  */

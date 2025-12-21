@@ -2,7 +2,10 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse');
 import { Logger } from '@nestjs/common';
-import { ParsedTransaction } from '../dto/import.dto';
+import {
+  ParsedTransaction,
+  ParsedTransactionWithConfidence,
+} from '../dto/import.dto';
 import { parseCurrency, parseDate, extractPayeeName } from './parse-utils';
 import {
   ValidationException,
@@ -170,8 +173,13 @@ export class PdfParser {
 
   /**
    * Parse FNB statement format.
-   * Pattern: DD MMM YYYY Description Amount
-   * Requires month name normalization (Jan, Feb, etc.)
+   * FNB PDFs have compact format with optional bank charges at end:
+   *
+   * Credit: "01 OctFNB App Payment450.00Cr6,744.42Cr"
+   * Debit:  "01 OctMagtape Debit D6Group897.006,847.42Cr12.00"
+   * Cash Deposit: "02 OctADT Cash Deposit1,300.00Cr8,088.42Cr22.68"
+   *
+   * Pattern: DD Mon + Description + Amount[Cr] + BalanceCr + [BankCharges]
    */
   private parseFNB(text: string): ParsedTransaction[] {
     const transactions: ParsedTransaction[] = [];
@@ -193,24 +201,42 @@ export class PdfParser {
       dec: '12',
     };
 
-    // Regex: DD MMM YYYY followed by description and amount
-    const linePattern =
-      /(\d{1,2})\s+([a-z]{3})\s+(\d{4})\s+(.+?)\s+([-]?\d[\d\s,]*\.?\d*)\s*$/i;
+    // Extract year from statement period line (e.g., "Statement Period : 30 September 2025 to 31 October 2025")
+    let statementYear = new Date().getFullYear().toString();
+    for (const line of lines) {
+      const periodMatch = line.match(/Statement Period.*?(\d{4})/i);
+      if (periodMatch) {
+        statementYear = periodMatch[1];
+        break;
+      }
+    }
+
+    // FNB compact format regex with optional bank charges:
+    // Group 1: Day (1-2 digits)
+    // Group 2: Month name
+    // Group 3: Description (non-greedy, stops at first amount)
+    // Group 4: Transaction amount (with optional commas)
+    // Group 5: Cr/Dr suffix OR start of balance (indicates credit vs debit)
+    // Note: Bank charges at end are ignored (not captured)
+    //
+    // Examples:
+    // "01 OctFNB App Payment450.00Cr6,744.42Cr" → Credit (ends with Cr after amount)
+    // "01 OctMagtape Debit897.006,847.42Cr12.00" → Debit (amount followed by balance, then charges)
+    // "02 OctADT Cash Deposit1,300.00Cr8,088.42Cr22.68" → Credit with deposit fee
+    const compactPattern =
+      /^(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(.+?)([\d,]+\.\d{2})(Cr|Dr|[\d,]+)/i;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
-      const match = line.match(linePattern);
+      const match = line.match(compactPattern);
       if (!match) {
-        this.logger.debug(
-          `Skipping unparseable line ${i + 1}: ${line.substring(0, 50)}`,
-        );
         continue;
       }
 
       try {
-        const [, day, monthName, year, description, amountStr] = match;
+        const [, day, monthName, description, amountStr, typeOrBalance] = match;
 
         // Normalize month name to number
         const monthNum = monthMap[monthName.toLowerCase()];
@@ -219,24 +245,31 @@ export class PdfParser {
           continue;
         }
 
-        // Create ISO format date string
-        const isoDateStr = `${year}-${monthNum}-${day.padStart(2, '0')}`;
+        // Create ISO format date string using statement year
+        const isoDateStr = `${statementYear}-${monthNum}-${day.padStart(2, '0')}`;
 
         // Parse date
         const date = parseDate(isoDateStr);
 
-        // Parse amount
-        const amountCents = Math.abs(parseCurrency(amountStr));
+        // Parse amount (remove commas)
+        const cleanAmount = amountStr.replace(/,/g, '');
+        const amountCents = Math.round(parseFloat(cleanAmount) * 100);
 
-        // Determine if credit or debit based on sign
-        const isCredit = !amountStr.trim().startsWith('-');
+        // Determine if credit or debit:
+        // - If typeOrBalance is "Cr", it's a credit
+        // - If typeOrBalance is "Dr", it's a debit
+        // - If typeOrBalance starts with a digit (next amount = balance), it's a debit
+        const isCredit = typeOrBalance.toLowerCase() === 'cr';
+
+        // Clean up description
+        const cleanDescription = description.trim();
 
         // Extract payee name
-        const payeeName = extractPayeeName(description);
+        const payeeName = extractPayeeName(cleanDescription);
 
         transactions.push({
           date,
-          description: description.trim(),
+          description: cleanDescription,
           payeeName,
           reference: null,
           amountCents,
@@ -314,5 +347,71 @@ export class PdfParser {
       `Parsed ${transactions.length} transactions from ABSA statement`,
     );
     return transactions;
+  }
+
+  /**
+   * Parse PDF with confidence scoring
+   * TASK-TRANS-015 - Confidence-based fallback support
+   */
+  async parseWithConfidence(
+    buffer: Buffer,
+  ): Promise<ParsedTransactionWithConfidence[]> {
+    const transactions = await this.parse(buffer);
+    return transactions.map((tx) => this.addConfidenceScore(tx));
+  }
+
+  /**
+   * Calculate confidence score for a parsed transaction
+   */
+  private addConfidenceScore(
+    tx: ParsedTransaction,
+  ): ParsedTransactionWithConfidence {
+    let confidence = 100;
+    const reasons: string[] = [];
+
+    // Date quality check
+    if (!tx.date || isNaN(tx.date.getTime())) {
+      confidence -= 30;
+      reasons.push('Invalid date');
+    }
+
+    // Amount validation
+    if (tx.amountCents <= 0) {
+      confidence -= 25;
+      reasons.push('Invalid amount');
+    }
+
+    // Description quality
+    if (!tx.description || tx.description.length < 5) {
+      confidence -= 15;
+      reasons.push('Short description');
+    } else if (tx.description.length < 10) {
+      confidence -= 5;
+      reasons.push('Brief description');
+    }
+
+    // Payee extraction success
+    if (!tx.payeeName) {
+      confidence -= 10;
+      reasons.push('No payee extracted');
+    }
+
+    // Multi-line check (description contains unusual characters)
+    if (tx.description && /[\n\r\t]/.test(tx.description)) {
+      confidence -= 20;
+      reasons.push('Multi-line description');
+    }
+
+    // Check for truncated or garbled text
+    if (tx.description && /[^\x20-\x7E\xA0-\xFF]/.test(tx.description)) {
+      confidence -= 15;
+      reasons.push('Non-printable characters');
+    }
+
+    return {
+      ...tx,
+      parsingConfidence: Math.max(0, confidence),
+      confidenceReasons: reasons,
+    };
   }
 }

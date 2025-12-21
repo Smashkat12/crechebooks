@@ -1,0 +1,128 @@
+{
+  "version": "2025.1",
+  "description": "Common creche fee templates - all amounts in CENTS",
+  "defaultCurrency": "ZAR",
+  "templates": [
+    {
+      "id": "standard-full-day",
+      "name": "Full Day Care (07:00-17:00)",
+      "feeType": "FULL_DAY",
+      "monthlyFeeCents": 400000,
+      "registrationFeeCents": 75000,
+      "includesVat": false,
+      "vatExempt": true,
+      "description": "Standard full-day care including meals"
+    },
+    {
+      "id": "standard-half-day",
+      "name": "Half Day Care (07:00-13:00)",
+      "feeType": "HALF_DAY",
+      "monthlyFeeCents": 280000,
+      "registrationFeeCents": 75000,
+      "includesVat": false,
+      "vatExempt": true,
+      "description": "Morning session with lunch"
+    },
+    {
+      "id": "after-care",
+      "name": "After Care Only (14:00-17:00)",
+      "feeType": "CUSTOM",
+      "monthlyFeeCents": 150000,
+      "registrationFeeCents": 50000,
+      "includesVat": false,
+      "vatExempt": true,
+      "description": "Afternoon care for school-going children"
+    },
+    {
+      "id": "baby-care",
+      "name": "Baby Care (0-12 months)",
+      "feeType": "FULL_DAY",
+      "monthlyFeeCents": 550000,
+      "registrationFeeCents": 100000,
+      "includesVat": false,
+      "vatExempt": true,
+      "description": "Specialized care for infants with lower ratios"
+    },
+    {
+      "id": "toddler-care",
+      "name": "Toddler Care (1-2 years)",
+      "feeType": "FULL_DAY",
+      "monthlyFeeCents": 480000,
+      "registrationFeeCents": 85000,
+      "includesVat": false,
+      "vatExempt": true,
+      "description": "Care for toddlers with developmental activities"
+    }
+  ],
+  "extraActivities": [
+    {
+      "id": "swimming",
+      "name": "Swimming Lessons",
+      "weeklyCents": 15000,
+      "vatExempt": true
+    },
+    {
+      "id": "music",
+      "name": "Music Classes",
+      "weeklyCents": 12000,
+      "vatExempt": true
+    },
+    {
+      "id": "art",
+      "name": "Art Classes",
+      "weeklyCents": 10000,
+      "vatExempt": true
+    },
+    {
+      "id": "extra-meals",
+      "name": "Extra Meals",
+      "dailyCents": 2500,
+      "vatExempt": true
+    },
+    {
+      "id": "transport",
+      "name": "Transport Service",
+      "monthlyFeeCents": 80000,
+      "vatExempt": false,
+      "vatRate": 0.15
+    }
+  ],
+  "discounts": [
+    {
+      "type": "sibling",
+      "percentage": 10,
+      "description": "10% sibling discount on second child onwards",
+      "stackable": true
+    },
+    {
+      "type": "annual",
+      "percentage": 5,
+      "description": "5% discount for annual upfront payment",
+      "stackable": true
+    },
+    {
+      "type": "staff",
+      "percentage": 20,
+      "description": "20% staff discount",
+      "stackable": false
+    },
+    {
+      "type": "referral",
+      "fixedAmountCents": 50000,
+      "description": "R500 credit for successful referral",
+      "stackable": true
+    }
+  ],
+  "lateFees": {
+    "afterHoursPickupCents": 5000,
+    "perMinuteAfter30Cents": 500,
+    "latePaymentPercentage": 0.02,
+    "latePaymentMinCents": 10000,
+    "gracePeriodDays": 7
+  },
+  "depositPolicy": {
+    "requiredMonths": 1,
+    "refundableDays": 30,
+    "description": "One month deposit required, refundable after 30 days notice"
+  }
+}

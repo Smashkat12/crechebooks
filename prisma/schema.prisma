@@ -177,6 +177,20 @@ enum ReconciliationStatus {
   DISCREPANCY
 }
 
+enum EscalationLevel {
+  FRIENDLY
+  FIRM
+  FINAL
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -217,6 +231,7 @@ model Tenant {
   sarsSubmissions  SarsSubmission[]
   reconciliations  Reconciliation[]
   xeroToken        XeroToken?
+  reminders        Reminder[]
 
   @@map("tenants")
 }
@@ -410,9 +425,10 @@ model Parent {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id])
-  children Child[]
-  invoices Invoice[]
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  children  Child[]
+  invoices  Invoice[]
+  reminders Reminder[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -471,11 +487,12 @@ model Invoice {
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")
 
-  tenant   Tenant        @relation(fields: [tenantId], references: [id])
-  parent   Parent        @relation(fields: [parentId], references: [id])
-  child    Child         @relation(fields: [childId], references: [id])
-  lines    InvoiceLine[]
-  payments Payment[]
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  parent    Parent        @relation(fields: [parentId], references: [id])
+  child     Child         @relation(fields: [childId], references: [id])
+  lines     InvoiceLine[]
+  payments  Payment[]
+  reminders Reminder[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, parentId])
@@ -667,4 +684,32 @@ model XeroToken {
 
   @@index([tenantId])
   @@map("xero_tokens")
+}
+
+model Reminder {
+  id               String           @id @default(uuid())
+  tenantId         String           @map("tenant_id")
+  invoiceId        String           @map("invoice_id")
+  parentId         String           @map("parent_id")
+  escalationLevel  EscalationLevel  @map("escalation_level")
+  deliveryMethod   DeliveryMethod   @map("delivery_method")
+  reminderStatus   ReminderStatus   @default(PENDING) @map("reminder_status")
+  scheduledFor     DateTime?        @map("scheduled_for")
+  sentAt           DateTime?        @map("sent_at")
+  deliveredAt      DateTime?        @map("delivered_at")
+  readAt           DateTime?        @map("read_at")
+  content          String           @db.Text
+  subject          String?          @db.VarChar(500)
+  failureReason    String?          @map("failure_reason") @db.Text
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  parent  Parent  @relation(fields: [parentId], references: [id])
+
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, scheduledFor])
+  @@map("reminders")
 }

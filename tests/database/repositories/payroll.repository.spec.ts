@@ -60,6 +60,7 @@ describe('PayrollRepository', () => {
     await prisma.staff.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
+    await prisma.reminder.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.feeStructure.deleteMany({});

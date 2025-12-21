@@ -357,12 +357,34 @@ Create tests/api/billing/invoice.controller.spec.ts with minimum 8 tests:
 7. "should convert cents to decimal amounts"
 8. "should enforce tenant isolation"
 
+CRITICAL TESTING PHILOSOPHY:
+- NO MOCK DATA that masks real issues
+- Tests must verify ACTUAL behavior, not pass superficially
+- If a test passes when the system is broken, the test is WRONG
+- Every test must fail if the underlying functionality breaks
+
 TEST SETUP:
-- Mock InvoiceRepository, ParentRepository, ChildRepository
-- Use realistic test data with actual cents values (e.g., 345000 = R3450.00)
-- Verify cents → decimal conversion in assertions
-- Verify date → string conversion in assertions
-- Verify parent/child name concatenation in assertions
+- Use jest.spyOn() on repository methods to control return values
+- Use REALISTIC test data that matches actual database schemas:
+  - Invoice with all required fields (id, tenantId, invoiceNumber, subtotalCents, etc.)
+  - Parent with firstName, lastName, email
+  - Child with firstName, lastName
+- Use actual cents values (e.g., 345000 = R3450.00) and verify conversion
+- Verify EXACT field names and types in response
+
+WHAT TO TEST:
+- Repository methods called with CORRECT parameters (tenantId, filters)
+- Response structure EXACTLY matches DTO specification
+- Cents → decimal conversion is mathematically correct
+- Date → string conversion produces valid YYYY-MM-DD
+- Parent/child name concatenation produces "FirstName LastName"
+- Missing parent/child handled gracefully (log warning, use 'Unknown')
+
+DO NOT:
+- Create tests that always pass regardless of implementation
+- Use empty mocks that don't verify behavior
+- Skip error case testing
+- Ignore edge cases (empty results, missing relations)
 
 REFERENCE: tests/api/transaction/transaction.controller.spec.ts for test patterns
 </test_requirements>
@@ -382,16 +404,32 @@ REFERENCE: tests/api/transaction/transaction.controller.spec.ts for test pattern
 </validation_criteria>
 
 <error_handling>
-CRITICAL: Fail fast with clear errors. No silent failures.
+CRITICAL: Fail fast with clear errors. NO SILENT FAILURES. NO WORKAROUNDS.
 
+PRINCIPLES:
+- If something fails, it MUST error out with a clear message
+- NO try-catch blocks that swallow errors silently
+- NO fallback values that mask real problems
+- Every error must be LOGGED with full context before being thrown
+- The system must be DEBUGGABLE - when it fails, we know EXACTLY what failed
+
+ERROR RESPONSES:
 1. Missing JWT token → 401 Unauthorized (handled by JwtAuthGuard)
 2. Invalid filter values → 400 Bad Request (handled by class-validator)
-3. Database errors → Log full error with context, throw appropriate HTTP exception
-4. Parent/child not found → Log warning, set name to 'Unknown' (don't fail entire request)
+3. Database errors → Log full error with stack trace, throw HttpException
+4. Parent/child not found for invoice → Log WARNING with invoice/parent/child IDs, use 'Unknown' for name
+   (This is the ONLY acceptable fallback - prevents entire list from failing due to orphaned data)
 
-LOGGING PATTERN:
-this.logger.debug(`Listing invoices for tenant=${tenantId}, filters=${JSON.stringify(filter)}`);
-this.logger.error(`Failed to fetch parent ${parentId}: ${error.message}`);
+REQUIRED LOGGING:
+this.logger.debug(`Listing invoices: tenant=${tenantId}, page=${page}, limit=${limit}, filters=${JSON.stringify(filter)}`);
+this.logger.warn(`Parent ${parentId} not found for invoice ${invoiceId} - using 'Unknown' name`);
+this.logger.error(`Database error in listInvoices: ${error.message}`, error.stack);
+
+DO NOT:
+- Catch and ignore exceptions
+- Return empty arrays when database fails
+- Use default values that hide configuration problems
+- Skip logging "to reduce noise"
 </error_handling>
 
 <test_commands>

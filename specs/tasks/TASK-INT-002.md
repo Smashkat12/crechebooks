@@ -1,4 +1,4 @@
-<task_spec id="TASK-INT-002" version="1.0">
+<task_spec id="TASK-INT-002" version="3.0">
 
 <metadata>
   <title>E2E Billing Cycle Flow</title>
@@ -10,472 +10,292 @@
     <requirement_ref>REQ-BILL-006</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-BILL-033</task_ref>
+    <task_ref status="complete">TASK-BILL-033</task_ref>
   </depends_on>
   <estimated_complexity>high</estimated_complexity>
+  <last_updated>2025-12-22</last_updated>
 </metadata>
 
-<context>
-This is a complete end-to-end integration test for the monthly billing cycle workflow.
-It tests the entire user journey from child enrollment through invoice generation,
-pro-rata calculations, sibling discounts, VAT calculations, multi-channel delivery
-(email and WhatsApp), and payment receipt. This test MUST use real data and real
-system components - no mocks except for external services (email, WhatsApp, Xero).
-The test validates complex calculations including mid-month enrollments and multiple
-discount scenarios.
-</context>
+<executive_summary>
+Complete E2E integration test for the monthly billing cycle workflow. Tests child enrollment,
+invoice generation with pro-rata calculations, sibling discounts, VAT at 15%, ad-hoc charges,
+multi-channel delivery (email/WhatsApp), and payment receipt. Uses real database and services,
+mocks only external delivery services (email, WhatsApp, Xero).
+</executive_summary>
 
-<input_context_files>
-  <file purpose="api_contracts">specs/technical/api-contracts.md#invoice_endpoints</file>
-  <file purpose="requirements">specs/requirements/REQ-BILL.md</file>
-  <file purpose="billing_rules">specs/business-rules/billing-calculations.md</file>
-  <file purpose="test_data">specs/technical/test-data-requirements.md</file>
-</input_context_files>
+<critical_rules>
+  <rule>NO BACKWARDS COMPATIBILITY - fail fast or work correctly</rule>
+  <rule>NO MOCK DATA IN TESTS - use real services with actual database</rule>
+  <rule>NO WORKAROUNDS OR FALLBACKS - errors must propagate with clear messages</rule>
+  <rule>API uses snake_case (e.g., parent_id, billing_month, invoice_ids)</rule>
+  <rule>Internal services use camelCase (e.g., parentId, billingMonth, invoiceIds)</rule>
+  <rule>API amounts in decimal Rands, internal amounts in cents</rule>
+  <rule>Use Decimal.js for all financial calculations - no floating point arithmetic</rule>
+  <rule>Sibling discount: 10% second child, 15% third child onward</rule>
+  <rule>VAT rate: 15% exactly</rule>
+</critical_rules>
 
-<prerequisites>
-  <check>All Phase 3 billing tasks completed</check>
-  <check>Database seeded with test tenant (VAT registered)</check>
-  <check>Fee structures defined (Full Day, Half Day, After-care)</check>
-  <check>Email MCP mock server running</check>
-  <check>WhatsApp MCP mock server running</check>
-  <check>Xero MCP mock server running</check>
-  <check>PDF generation service accessible</check>
-</prerequisites>
+<project_context>
+  <test_count>1536 tests currently passing</test_count>
+  <surface_layer_status>100% complete (all 16 Surface Layer tasks done)</surface_layer_status>
+  <currency>ZAR (South African Rand)</currency>
+  <vat_rate>15%</vat_rate>
+  <sibling_discount_2nd>10%</sibling_discount_2nd>
+  <sibling_discount_3rd_plus>15%</sibling_discount_3rd_plus>
+</project_context>
 
-<scope>
-  <in_scope>
-    - E2E test: Child enrollment with fee structure
-    - E2E test: Monthly invoice generation for all active enrollments
-    - E2E test: Pro-rata calculation for mid-month enrollment
-    - E2E test: Sibling discount calculation (2+ children)
-    - E2E test: VAT calculation at 15%
-    - E2E test: Ad-hoc charge inclusion
-    - E2E test: Email delivery with PDF attachment
-    - E2E test: WhatsApp delivery with payment link
-    - E2E test: Payment receipt and invoice status update
-    - Edge case: Mid-month start (pro-rata)
-    - Edge case: Mid-month withdrawal (pro-rata)
-    - Edge case: Invalid email address handling
-  </in_scope>
-  <out_of_scope>
-    - Real email/WhatsApp integration (use mocks)
-    - Real Xero integration (use mock)
-    - Credit note generation (future phase)
-    - Payment plan setup (future phase)
-  </out_of_scope>
-</scope>
+<existing_infrastructure>
+  <file path="src/api/billing/child.controller.ts" purpose="Child enrollment endpoints">
+    Key endpoints:
+    - POST /children - Register child with initial enrollment
+    - GET /children - List children with pagination
+    - GET /children/:id - Get child details
+    - PUT /children/:id - Update child details
 
-<definition_of_done>
-  <signatures>
-    <signature file="tests/e2e/billing-cycle.e2e.spec.ts">
-      describe('E2E: Billing Cycle Flow', () => {
-        it('enrolls children with different fee structures');
-        it('generates monthly invoices with correct amounts');
-        it('calculates pro-rata for mid-month enrollment');
-        it('applies sibling discount correctly');
-        it('calculates VAT at 15%');
-        it('includes ad-hoc charges in invoice');
-        it('delivers invoices via email with PDF');
-        it('delivers invoices via WhatsApp');
-        it('handles failed deliveries gracefully');
-        it('updates invoice status on payment receipt');
-      });
-    </signature>
-  </signatures>
+    Request body: { parent_id, first_name, last_name, date_of_birth, fee_structure_id, start_date, ... }
+    Response: { success: true, data: { child: {...}, enrollment: {...} } }
+  </file>
 
-  <constraints>
-    - MUST use real database (not in-memory)
-    - MUST use real calculation logic (not mocked)
-    - Pro-rata MUST be exact to the day
-    - Sibling discount MUST be 10% on 2nd child, 15% on 3rd+
-    - VAT MUST be exactly 15% of subtotal
-    - All monetary calculations MUST use Decimal.js
-    - NO rounding errors allowed (test to 2 decimal places)
-    - Delivery failures MUST NOT block other deliveries
-    - Invoice status transitions MUST be atomic
-  </constraints>
+  <file path="src/api/billing/invoice.controller.ts" purpose="Invoice endpoints">
+    Key endpoints:
+    - GET /invoices - List invoices with filters
+    - POST /invoices/generate - Generate monthly invoices
+    - POST /invoices/send - Send invoices via email/WhatsApp
 
-  <verification>
-    - npm run test:e2e -- billing-cycle.e2e.spec.ts passes
-    - All calculations match expected values exactly
-    - Email mock receives correctly formatted messages
-    - WhatsApp mock receives correctly formatted messages
-    - Xero mock receives correct invoice data
-    - Failed deliveries logged with clear reasons
-    - Invoice status transitions are correct
-  </verification>
-</definition_of_done>
+    POST /invoices/generate body:
+    { billing_month: "YYYY-MM", child_ids?: string[], include_adhoc?: boolean }
 
-<pseudo_code>
-Test Setup:
-  beforeAll:
-    await app.init()
-    testTenant = await createTestTenant({
-      vat_registered: true,
-      vat_rate: 0.15,
-      sibling_discount_2nd: 0.10,
-      sibling_discount_3rd_plus: 0.15
-    })
-    testUser = await createTestUser(testTenant, 'OWNER')
-    authToken = await getAuthToken(testUser)
+    POST /invoices/send body:
+    { invoice_ids: string[], delivery_method: "EMAIL" | "WHATSAPP" }
+  </file>
 
-    # Create fee structures
-    fullDayFee = await createFeeStructure(testTenant, {
-      name: 'Full Day',
-      amount: 3000_00, # R3000 in cents
-      billing_frequency: 'MONTHLY'
-    })
+  <file path="src/api/billing/dto/index.ts" purpose="Billing DTOs">
+    Exports:
+    - EnrollChildDto, EnrollChildResponseDto
+    - ListChildrenQueryDto, ChildListResponseDto, ChildDetailResponseDto
+    - ListInvoicesQueryDto, InvoiceListResponseDto, InvoiceResponseDto
+    - GenerateInvoicesDto (billing_month, child_ids?, include_adhoc?)
+    - GenerateInvoicesResponseDto (invoices_created, total_amount, invoices[], errors[])
+    - ApiSendInvoicesDto (invoice_ids, delivery_method)
+    - SendInvoicesResponseDto (sent, failed, failures[])
+  </file>
 
-    halfDayFee = await createFeeStructure(testTenant, {
-      name: 'Half Day',
-      amount: 2000_00, # R2000 in cents
-      billing_frequency: 'MONTHLY'
-    })
+  <file path="src/database/services/invoice-generation.service.ts" purpose="Invoice generation">
+    InvoiceGenerationService.generateMonthlyInvoices(tenantId, billingMonth, userId, childIds?)
+    Returns: { invoicesCreated, totalAmountCents, invoices[], errors[] }
 
-    # Start mock servers
-    emailMock = await startEmailMockServer()
-    whatsappMock = await startWhatsAppMockServer()
-    xeroMock = await startXeroMockServer()
+    Handles:
+    - Fee structure lookup
+    - Pro-rata calculation for mid-month enrollments
+    - Sibling discount application
+    - VAT calculation at 15%
+    - Ad-hoc charge inclusion
+  </file>
 
-Test Flow 1: Enrollment Setup
-  # Create parent and children
-  parent1 = await db.parent.create({
-    data: {
-      tenant_id: testTenant.id,
-      first_name: 'John',
-      last_name: 'Smith',
-      email: 'john.smith@test.com',
-      phone: '+27821234567',
-      preferred_contact: 'EMAIL'
-    }
-  })
+  <file path="src/database/services/pro-rata.service.ts" purpose="Pro-rata calculation">
+    ProRataService.calculateProRata(monthlyAmountCents, startDate, endDate, billingMonth)
+    Uses calendar days in month for exact pro-rata calculation.
+  </file>
 
-  # Enroll first child (Full Day)
-  child1Response = POST /children
-    body: {
-      parent_id: parent1.id,
-      first_name: 'Emily',
-      last_name: 'Smith',
-      date_of_birth: '2020-03-15',
-      fee_structure_id: fullDayFee.id,
-      start_date: '2025-01-01' # Full month
-    }
+  <file path="src/database/services/invoice-delivery.service.ts" purpose="Invoice delivery">
+    InvoiceDeliveryService.sendInvoices({ tenantId, invoiceIds, method })
+    Returns: { sent, failed, failures[] }
 
-  expect(child1Response.status).toBe(201)
-  child1 = child1Response.data.child
+    Handles:
+    - Email delivery with PDF attachment
+    - WhatsApp delivery with payment link
+    - Partial success/failure tracking
+    - Delivery status updates
+  </file>
 
-  # Enroll second child (Half Day) - sibling discount applies
-  child2Response = POST /children
-    body: {
-      parent_id: parent1.id,
-      first_name: 'Oliver',
-      last_name: 'Smith',
-      date_of_birth: '2021-08-20',
-      fee_structure_id: halfDayFee.id,
-      start_date: '2025-01-01'
-    }
+  <file path="src/database/services/enrollment.service.ts" purpose="Enrollment management">
+    EnrollmentService.enrollChild(tenantId, childId, feeStructureId, startDate, userId)
+    EnrollmentService.updateEnrollment(enrollmentId, updates, userId)
+    EnrollmentService.endEnrollment(enrollmentId, endDate, userId)
+  </file>
 
-  expect(child2Response.status).toBe(201)
-  child2 = child2Response.data.child
+  <file path="src/database/entities/invoice.entity.ts" purpose="Invoice entity">
+    InvoiceStatus: DRAFT, SENT, PARTIALLY_PAID, PAID, OVERDUE, CANCELLED
+    DeliveryStatus: PENDING, SENT, DELIVERED, FAILED
+    Fields: tenantId, parentId, childId, invoiceNumber, billingPeriodStart/End,
+            subtotalCents, vatCents, totalCents, amountPaidCents, status, deliveryStatus
+  </file>
 
-  # Enroll third child mid-month (pro-rata applies)
-  child3Response = POST /children
-    body: {
-      parent_id: parent1.id,
-      first_name: 'Sophie',
-      last_name: 'Smith',
-      date_of_birth: '2022-11-10',
-      fee_structure_id: fullDayFee.id,
-      start_date: '2025-01-15' # Mid-month
-    }
+  <file path="src/database/entities/enrollment.entity.ts" purpose="Enrollment entity">
+    EnrollmentStatus: ACTIVE, SUSPENDED, WITHDRAWN
+    Fields: tenantId, childId, feeStructureId, startDate, endDate, status, siblingOrder
+  </file>
 
-  expect(child3Response.status).toBe(201)
-  child3 = child3Response.data.child
+  <file path="src/database/entities/fee-structure.entity.ts" purpose="Fee structure entity">
+    BillingFrequency: MONTHLY, WEEKLY, DAILY
+    Fields: tenantId, name, amountCents, billingFrequency, includesVat
+  </file>
 
-Test Flow 2: Invoice Generation with Complex Calculations
-  # Add ad-hoc charge for first child
-  adhocCharge = await db.adhocCharge.create({
-    data: {
-      tenant_id: testTenant.id,
-      child_id: child1.id,
-      description: 'Extra art supplies',
-      amount: 250_00, # R250
-      charge_date: '2025-01-10',
-      status: 'PENDING'
-    }
-  })
-
-  # Generate invoices for January 2025
-  generateResponse = POST /invoices/generate
-    body: {
-      billing_month: '2025-01',
-      include_adhoc: true
-    }
-
-  expect(generateResponse.status).toBe(201)
-  invoicesCreated = generateResponse.data.invoices_created
-  expect(invoicesCreated).toBe(3) # One per child
-
-  # Verify invoices in database
-  invoices = await db.invoice.findMany({
-    where: { tenant_id: testTenant.id, billing_month: '2025-01' },
-    include: { line_items: true, child: true }
-  })
-
-  expect(invoices.length).toBe(3)
-
-Test Flow 3: Detailed Calculation Verification
-  # Invoice 1: Emily (Full Day, no discount, with ad-hoc)
-  invoice1 = invoices.find(i => i.child_id === child1.id)
-
-  expectedSubtotal1 = 3000 + 250 # Fee + ad-hoc
-  expectedVat1 = Math.round(expectedSubtotal1 * 0.15 * 100) / 100
-  expectedTotal1 = expectedSubtotal1 + expectedVat1
-
-  expect(invoice1.subtotal_cents / 100).toBe(expectedSubtotal1)
-  expect(invoice1.vat_cents / 100).toBe(expectedVat1)
-  expect(invoice1.total_cents / 100).toBe(expectedTotal1)
-  expect(invoice1.line_items.length).toBe(2) # Fee + ad-hoc
-
-  # Invoice 2: Oliver (Half Day, 10% sibling discount)
-  invoice2 = invoices.find(i => i.child_id === child2.id)
-
-  baseFee2 = 2000
-  discountAmount2 = Math.round(baseFee2 * 0.10 * 100) / 100 # 10% sibling discount
-  discountedFee2 = baseFee2 - discountAmount2
-  expectedVat2 = Math.round(discountedFee2 * 0.15 * 100) / 100
-  expectedTotal2 = discountedFee2 + expectedVat2
-
-  expect(invoice2.subtotal_cents / 100).toBe(discountedFee2)
-  expect(invoice2.vat_cents / 100).toBe(expectedVat2)
-  expect(invoice2.total_cents / 100).toBe(expectedTotal2)
-
-  # Verify discount line item
-  discountItem = invoice2.line_items.find(li => li.description.includes('Sibling'))
-  expect(discountItem).toBeDefined()
-  expect(discountItem.amount_cents).toBe(-(discountAmount2 * 100))
-
-  # Invoice 3: Sophie (Full Day, 15% sibling discount, pro-rata)
-  invoice3 = invoices.find(i => i.child_id === child3.id)
-
-  # Pro-rata: started Jan 15, month has 31 days, so 17 days (15-31 inclusive)
-  daysInMonth = 31
-  daysEnrolled = 17
-  proRataFee3 = Math.round((3000 * daysEnrolled / daysInMonth) * 100) / 100
-  discountAmount3 = Math.round(proRataFee3 * 0.15 * 100) / 100 # 15% for 3rd child
-  finalFee3 = proRataFee3 - discountAmount3
-  expectedVat3 = Math.round(finalFee3 * 0.15 * 100) / 100
-  expectedTotal3 = finalFee3 + expectedVat3
-
-  expect(invoice3.subtotal_cents / 100).toBeCloseTo(finalFee3, 2)
-  expect(invoice3.vat_cents / 100).toBeCloseTo(expectedVat3, 2)
-  expect(invoice3.total_cents / 100).toBeCloseTo(expectedTotal3, 2)
-
-  # Verify pro-rata and discount line items
-  proRataItem = invoice3.line_items.find(li => li.description.includes('Pro-rata'))
-  expect(proRataItem).toBeDefined()
-
-  discountItem3 = invoice3.line_items.find(li => li.description.includes('Sibling'))
-  expect(discountItem3).toBeDefined()
-
-Test Flow 4: Multi-Channel Delivery
-  # Update invoices to DRAFT status (ready to send)
-  await db.invoice.updateMany({
-    where: { id: { in: invoices.map(i => i.id) } },
-    data: { status: 'DRAFT' }
-  })
-
-  # Send invoices via email
-  sendEmailResponse = POST /invoices/send
-    body: {
-      invoice_ids: [invoice1.id, invoice2.id],
-      delivery_method: 'EMAIL'
-    }
-
-  expect(sendEmailResponse.status).toBe(200)
-  expect(sendEmailResponse.data.sent).toBe(2)
-  expect(sendEmailResponse.data.failed).toBe(0)
-
-  # Verify email mock received requests
-  emailRequests = emailMock.getRequests()
-  expect(emailRequests.length).toBe(2)
-
-  emailForInvoice1 = emailRequests.find(r => r.body.includes(invoice1.invoice_number))
-  expect(emailForInvoice1).toBeDefined()
-  expect(emailForInvoice1.to).toBe(parent1.email)
-  expect(emailForInvoice1.attachments[0].filename).toMatch(/\.pdf$/)
-
-  # Send invoice via WhatsApp
-  sendWhatsAppResponse = POST /invoices/send
-    body: {
-      invoice_ids: [invoice3.id],
-      delivery_method: 'WHATSAPP'
-    }
-
-  expect(sendWhatsAppResponse.status).toBe(200)
-  expect(sendWhatsAppResponse.data.sent).toBe(1)
-
-  # Verify WhatsApp mock received request
-  whatsappRequests = whatsappMock.getRequests()
-  expect(whatsappRequests.length).toBe(1)
-  expect(whatsappRequests[0].to).toBe(parent1.phone)
-  expect(whatsappRequests[0].body).toContain(invoice3.invoice_number)
-  expect(whatsappRequests[0].body).toContain('payment link')
-
-Test Flow 5: Delivery Failure Handling
-  # Create parent with invalid email
-  parent2 = await db.parent.create({
-    data: {
-      tenant_id: testTenant.id,
-      first_name: 'Jane',
-      last_name: 'Doe',
-      email: 'invalid-email', # Invalid format
-      phone: '+27821234568',
-      preferred_contact: 'EMAIL'
-    }
-  })
-
-  child4Response = POST /children
-    body: {
-      parent_id: parent2.id,
-      first_name: 'Test',
-      last_name: 'Child',
-      date_of_birth: '2021-05-01',
-      fee_structure_id: fullDayFee.id,
-      start_date: '2025-01-01'
-    }
-
-  await POST /invoices/generate { billing_month: '2025-01' }
-
-  invoice4 = await db.invoice.findFirst({
-    where: { child_id: child4Response.data.child.id }
-  })
-
-  # Attempt to send with invalid email
-  sendFailResponse = POST /invoices/send
-    body: { invoice_ids: [invoice4.id], delivery_method: 'EMAIL' }
-
-  expect(sendFailResponse.status).toBe(200)
-  expect(sendFailResponse.data.sent).toBe(0)
-  expect(sendFailResponse.data.failed).toBe(1)
-  expect(sendFailResponse.data.failures[0].reason).toContain('Invalid email')
-
-  # Verify invoice status NOT changed to SENT
-  failedInvoice = await db.invoice.findUnique({ where: { id: invoice4.id } })
-  expect(failedInvoice.status).toBe('DRAFT')
-  expect(failedInvoice.delivery_status).toBe('FAILED')
-
-Test Flow 6: Payment Receipt and Status Update
-  # Simulate payment received for invoice 1
-  # (This would typically come from payment matching, but we test directly)
-  payment = await db.payment.create({
-    data: {
-      tenant_id: testTenant.id,
-      invoice_id: invoice1.id,
-      transaction_id: null, # Manual payment
-      amount_cents: invoice1.total_cents,
-      payment_date: new Date('2025-01-05'),
-      payment_method: 'BANK_TRANSFER',
-      created_by: testUser.id
-    }
-  })
-
-  # Update invoice status
-  await db.invoice.update({
-    where: { id: invoice1.id },
-    data: {
-      amount_paid_cents: invoice1.total_cents,
-      status: 'PAID'
-    }
-  })
-
-  # Verify invoice marked as paid
-  paidInvoice = GET /invoices/{invoice1.id}
-  expect(paidInvoice.data.status).toBe('PAID')
-  expect(paidInvoice.data.amount_paid).toBe(paidInvoice.data.total)
-
-  # Simulate partial payment for invoice 2
-  partialPayment = await db.payment.create({
-    data: {
-      tenant_id: testTenant.id,
-      invoice_id: invoice2.id,
-      amount_cents: Math.floor(invoice2.total_cents / 2),
-      payment_date: new Date('2025-01-06'),
-      payment_method: 'CASH',
-      created_by: testUser.id
-    }
-  })
-
-  await db.invoice.update({
-    where: { id: invoice2.id },
-    data: {
-      amount_paid_cents: partialPayment.amount_cents,
-      status: 'PARTIALLY_PAID'
-    }
-  })
-
-  # Verify partial payment status
-  partialInvoice = GET /invoices/{invoice2.id}
-  expect(partialInvoice.data.status).toBe('PARTIALLY_PAID')
-  expect(partialInvoice.data.amount_paid).toBe(partialInvoice.data.total / 2)
-
-Test Flow 7: Xero Synchronization
-  # Verify Xero mock received invoice creation requests
-  xeroRequests = xeroMock.getRequests()
-  invoiceCreationRequests = xeroRequests.filter(r =>
-    r.method === 'POST' && r.path === '/Invoices'
-  )
-
-  expect(invoiceCreationRequests.length).toBeGreaterThanOrEqual(3)
-
-  # Verify invoice 1 data format
-  invoice1Xero = invoiceCreationRequests.find(r =>
-    r.body.Reference === invoice1.invoice_number
-  )
-
-  expect(invoice1Xero).toBeDefined()
-  expect(invoice1Xero.body.Type).toBe('ACCREC')
-  expect(invoice1Xero.body.Total).toBe(invoice1.total_cents / 100)
-  expect(invoice1Xero.body.LineItems.length).toBe(invoice1.line_items.length)
-
-Test Teardown:
-  afterAll:
-    await emailMock.stop()
-    await whatsappMock.stop()
-    await xeroMock.stop()
-    await db.payment.deleteMany({ tenant_id: testTenant.id })
-    await db.invoice.deleteMany({ tenant_id: testTenant.id })
-    await db.enrollment.deleteMany({ tenant_id: testTenant.id })
-    await db.child.deleteMany({ tenant_id: testTenant.id })
-    await db.parent.deleteMany({ tenant_id: testTenant.id })
-    await db.tenant.delete({ where: { id: testTenant.id } })
-    await app.close()
-</pseudo_code>
+  <file path="tests/api/billing/invoice.controller.spec.ts" purpose="Controller tests">
+    Pattern for testing: Use Test.createTestingModule with providers.
+    Use jest.spyOn() for service method verification.
+  </file>
+</existing_infrastructure>
 
 <files_to_create>
-  <file path="tests/e2e/billing-cycle.e2e.spec.ts">Complete E2E test suite</file>
-  <file path="tests/helpers/email-mock.ts">Email service mock server</file>
-  <file path="tests/helpers/whatsapp-mock.ts">WhatsApp service mock server</file>
-  <file path="tests/helpers/billing-calculators.ts">Expected calculation helpers for verification</file>
-  <file path="tests/fixtures/billing/test-scenarios.json">Predefined billing scenarios</file>
+  <file path="tests/e2e/billing-cycle.e2e.spec.ts">
+    Complete E2E test suite:
+
+    ```typescript
+    import { Test, TestingModule } from '@nestjs/testing';
+    import { INestApplication, ValidationPipe } from '@nestjs/common';
+    import * as request from 'supertest';
+    import { AppModule } from '../../src/app.module';
+    import { PrismaService } from '../../src/database/prisma/prisma.service';
+    import Decimal from 'decimal.js';
+
+    describe('E2E: Billing Cycle Flow', () => {
+      let app: INestApplication;
+      let prisma: PrismaService;
+      let authToken: string;
+      let testTenantId: string;
+
+      beforeAll(async () => {
+        // Setup app and test data
+      });
+
+      afterAll(async () => {
+        // Cleanup in correct order (payments, invoices, enrollments, children, parents, tenant)
+      });
+
+      describe('Child Enrollment', () => {
+        it('enrolls children with different fee structures', async () => {
+          // POST /children with first_name, last_name, parent_id, fee_structure_id, start_date
+        });
+      });
+
+      describe('Invoice Generation', () => {
+        it('generates monthly invoices with correct amounts', async () => {
+          // POST /invoices/generate with billing_month: "2025-01"
+          // Verify response has invoices_created count
+        });
+
+        it('calculates pro-rata for mid-month enrollment', async () => {
+          // Child starting Jan 15 in 31-day month = 17/31 of monthly fee
+        });
+
+        it('applies sibling discount correctly', async () => {
+          // 2nd child: 10% off, 3rd+: 15% off
+        });
+
+        it('calculates VAT at 15%', async () => {
+          // Verify vatCents = subtotalCents * 0.15 (rounded using banker's rounding)
+        });
+
+        it('includes ad-hoc charges in invoice', async () => {
+          // Create ad-hoc charge, then generate invoice with include_adhoc: true
+        });
+      });
+
+      describe('Invoice Delivery', () => {
+        it('delivers invoices via email with PDF', async () => {
+          // POST /invoices/send with delivery_method: "EMAIL"
+        });
+
+        it('delivers invoices via WhatsApp', async () => {
+          // POST /invoices/send with delivery_method: "WHATSAPP"
+        });
+
+        it('handles failed deliveries gracefully', async () => {
+          // Invalid email returns failures array, doesn't block other deliveries
+        });
+      });
+
+      describe('Payment and Status', () => {
+        it('updates invoice status on payment receipt', async () => {
+          // Full payment -> PAID
+          // Partial payment -> PARTIALLY_PAID
+        });
+      });
+    });
+    ```
+  </file>
+
+  <file path="tests/helpers/email-mock.ts">
+    Email MCP mock server for testing delivery.
+  </file>
+
+  <file path="tests/helpers/whatsapp-mock.ts">
+    WhatsApp MCP mock server for testing delivery.
+  </file>
+
+  <file path="tests/helpers/billing-calculators.ts">
+    Helper functions for expected value calculation:
+    - calculateProRata(monthlyAmount, startDay, daysInMonth)
+    - calculateSiblingDiscount(baseAmount, siblingOrder)
+    - calculateVat(subtotal, vatRate)
+    - calculateTotal(subtotal, vat)
+  </file>
+
+  <file path="tests/fixtures/billing/test-scenarios.json">
+    Predefined billing scenarios with expected values.
+  </file>
 </files_to_create>
 
-<files_to_modify>
-  <!-- No existing files to modify -->
-</files_to_modify>
+<test_requirements>
+  <requirement>Use real database with actual Prisma operations</requirement>
+  <requirement>Use real calculation services (InvoiceGenerationService, ProRataService)</requirement>
+  <requirement>Mock only external services (email, WhatsApp, Xero)</requirement>
+  <requirement>Pro-rata calculations must be exact to the day</requirement>
+  <requirement>Sibling discounts: 10% for 2nd child, 15% for 3rd+ child</requirement>
+  <requirement>VAT calculations must be exact to 2 decimal places</requirement>
+  <requirement>Email delivery must include valid PDF attachment</requirement>
+  <requirement>WhatsApp delivery must include payment link</requirement>
+  <requirement>Failed deliveries must not block successful ones</requirement>
+  <requirement>Invoice status transitions must be atomic and correct</requirement>
+  <requirement>No rounding errors - use Decimal.js for all calculations</requirement>
+</test_requirements>
 
-<validation_criteria>
-  <criterion>All test cases pass without skips or failures</criterion>
-  <criterion>Pro-rata calculations exact to the day</criterion>
-  <criterion>Sibling discounts applied correctly (10% 2nd, 15% 3rd+)</criterion>
-  <criterion>VAT calculations exact to 2 decimal places</criterion>
-  <criterion>Email delivery includes valid PDF attachment</criterion>
-  <criterion>WhatsApp delivery includes payment link</criterion>
-  <criterion>Failed deliveries don't block successful ones</criterion>
-  <criterion>Invoice status transitions are atomic and correct</criterion>
-  <criterion>Xero receives correctly formatted invoice data</criterion>
-  <criterion>No rounding errors in any calculation</criterion>
-</validation_criteria>
+<endpoint_reference>
+  | Method | Path | DTO In | DTO Out | Description |
+  |--------|------|--------|---------|-------------|
+  | POST | /children | EnrollChildDto | EnrollChildResponseDto | Enroll child |
+  | GET | /children | ListChildrenQueryDto | ChildListResponseDto | List children |
+  | GET | /children/:id | - | ChildDetailResponseDto | Get child |
+  | PUT | /children/:id | ApiUpdateChildDto | ChildDetailResponseDto | Update child |
+  | GET | /invoices | ListInvoicesQueryDto | InvoiceListResponseDto | List invoices |
+  | POST | /invoices/generate | GenerateInvoicesDto | GenerateInvoicesResponseDto | Generate invoices |
+  | POST | /invoices/send | ApiSendInvoicesDto | SendInvoicesResponseDto | Send invoices |
+</endpoint_reference>
+
+<calculation_examples>
+  <example name="Pro-rata Calculation">
+    Child enrolled Jan 15, 2025 (31-day month):
+    Days enrolled: 17 (Jan 15-31)
+    Monthly fee: R3,000
+    Pro-rata fee: R3,000 × (17/31) = R1,645.16
+  </example>
+
+  <example name="Sibling Discount">
+    Family with 3 children:
+    - Child 1: Full fee = R3,000
+    - Child 2: R3,000 - 10% = R2,700
+    - Child 3: R3,000 - 15% = R2,550
+    Total before VAT: R8,250
+  </example>
+
+  <example name="VAT Calculation">
+    Subtotal: R3,250.00
+    VAT (15%): R487.50
+    Total: R3,737.50
+  </example>
+</calculation_examples>
+
+<verification_steps>
+  <step>npm run build - must compile without errors</step>
+  <step>npm run lint - must pass with no warnings</step>
+  <step>npm run test:e2e -- billing-cycle.e2e.spec.ts - all tests pass</step>
+  <step>Verify pro-rata calculations are exact</step>
+  <step>Verify sibling discounts applied correctly</step>
+  <step>Verify VAT is exactly 15%</step>
+  <step>Verify email mock receives PDF attachment</step>
+  <step>Verify WhatsApp mock receives payment link</step>
+</verification_steps>
 
 <test_commands>
   <command>npm run test:e2e -- billing-cycle.e2e.spec.ts</command>

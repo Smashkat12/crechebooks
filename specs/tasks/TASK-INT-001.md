@@ -1,4 +1,4 @@
-<task_spec id="TASK-INT-001" version="1.0">
+<task_spec id="TASK-INT-001" version="3.0">
 
 <metadata>
   <title>E2E Transaction Categorization Flow</title>
@@ -11,307 +11,266 @@
     <requirement_ref>REQ-TRANS-003</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-TRANS-033</task_ref>
+    <task_ref status="complete">TASK-TRANS-033</task_ref>
   </depends_on>
   <estimated_complexity>high</estimated_complexity>
+  <last_updated>2025-12-22</last_updated>
 </metadata>
 
-<context>
-This is a complete end-to-end integration test for the transaction categorization workflow.
-It tests the entire user journey from importing bank statements through AI-powered
-categorization, manual corrections, pattern learning, and final synchronization with Xero.
-This test MUST use real data and real system components - no mocks or stubs allowed except
-for external services (bank APIs, Xero). The test validates the 95% accuracy target and
-ensures all edge cases are properly handled.
-</context>
+<executive_summary>
+Complete E2E integration test for the transaction categorization workflow. Tests the entire
+journey from CSV/PDF import through AI-powered categorization, manual corrections, pattern
+learning, and final Xero synchronization. Uses real database, real services - mock only
+Xero MCP server. Validates 95% accuracy target on pattern-trained data.
+</executive_summary>
 
-<input_context_files>
-  <file purpose="api_contracts">specs/technical/api-contracts.md#transaction_endpoints</file>
-  <file purpose="test_data">specs/technical/test-data-requirements.md</file>
-  <file purpose="requirements">specs/requirements/REQ-TRANS.md</file>
-  <file purpose="service_contracts">specs/technical/api-contracts.md#component_contracts</file>
-</input_context_files>
+<critical_rules>
+  <rule>NO BACKWARDS COMPATIBILITY - fail fast or work correctly</rule>
+  <rule>NO MOCK DATA IN TESTS - use real services with actual database</rule>
+  <rule>NO WORKAROUNDS OR FALLBACKS - errors must propagate with clear messages</rule>
+  <rule>API uses snake_case (e.g., bank_account, transaction_ids)</rule>
+  <rule>Internal services use camelCase (e.g., bankAccount, transactionIds)</rule>
+  <rule>API amounts in decimal Rands, internal amounts in cents (multiply by 100)</rule>
+  <rule>Use `import type { IUser }` for decorator compatibility with isolatedModules</rule>
+</critical_rules>
 
-<prerequisites>
-  <check>All Phase 3 transaction tasks completed</check>
-  <check>Database seeded with test tenant and Chart of Accounts</check>
-  <check>Claude Code agent accessible for AI categorization</check>
-  <check>Xero MCP mock server running for sync operations</check>
-  <check>Test CSV files with diverse transaction scenarios</check>
-</prerequisites>
+<project_context>
+  <test_count>1536 tests currently passing</test_count>
+  <surface_layer_status>100% complete (all 16 Surface Layer tasks done)</surface_layer_status>
+  <agent_layer_status>100% complete (all 5 Agent tasks done)</agent_layer_status>
+  <pattern_reference>Use tests/api/transaction/*.spec.ts as reference for test patterns</pattern_reference>
+</project_context>
 
-<scope>
-  <in_scope>
-    - E2E test: CSV import → parsing → storage
-    - E2E test: AI categorization with confidence scoring
-    - E2E test: Manual corrections and pattern creation
-    - E2E test: Split transactions with VAT allocation
-    - E2E test: Xero synchronization of categorized transactions
-    - Edge case: Blank/minimal descriptions
-    - Edge case: Duplicate transaction detection
-    - Edge case: Split transaction validation
-    - Performance: Batch categorization of 100+ transactions
-    - Accuracy validation: 95% auto-categorization target
-  </in_scope>
-  <out_of_scope>
-    - Real Xero integration (use mock)
-    - Real bank API integration (use test files)
-    - Unit tests for individual components (covered in Phase 2/3)
-    - Performance optimization (future phase)
-  </out_of_scope>
-</scope>
+<existing_infrastructure>
+  <file path="src/api/transaction/transaction.controller.ts" purpose="Transaction API endpoints">
+    Key endpoints:
+    - GET /transactions - List with filters (status, date_from, date_to, is_reconciled, search)
+    - POST /transactions/import - Upload CSV/PDF file with bank_account
+    - PUT /transactions/:id/categorize - Manual categorization with create_pattern option
+    - POST /transactions/categorize/batch - Batch AI categorization
+    - GET /transactions/:id/suggestions - Get AI suggestions
 
-<definition_of_done>
-  <signatures>
-    <signature file="tests/e2e/transaction-flow.e2e.spec.ts">
-      describe('E2E: Transaction Categorization Flow', () => {
-        it('imports CSV with diverse transactions');
-        it('AI categorizes with 95%+ confidence on known patterns');
-        it('flags low-confidence for manual review');
-        it('learns from manual corrections');
-        it('handles blank descriptions gracefully');
-        it('detects and prevents duplicates');
-        it('validates split transaction amounts');
-        it('syncs categorized transactions to Xero');
-      });
-    </signature>
-  </signatures>
+    Query params use snake_case, service calls use camelCase.
+    Response wraps in { success: true, data: {...}, meta?: {...} }
+  </file>
 
-  <constraints>
-    - MUST use real database (not in-memory)
-    - MUST use real Claude Code agent (not mocked)
-    - MUST test with minimum 100 transactions
-    - MUST achieve 95% auto-categorization rate on second run (after learning)
-    - MUST complete full flow in under 5 minutes
-    - Split transaction amounts MUST equal parent transaction
-    - Duplicate detection MUST be 100% accurate
-    - NO mocks for internal services (TransactionService, AI agent)
-  </constraints>
+  <file path="src/api/transaction/dto/index.ts" purpose="Transaction DTOs">
+    Exports:
+    - ListTransactionsQueryDto (page, limit, status, date_from, date_to, is_reconciled, search)
+    - TransactionListResponseDto, TransactionResponseDto
+    - ImportTransactionsRequestDto (bank_account: string)
+    - ImportTransactionsResponseDto (import_batch_id, status, total_parsed, duplicates_skipped, etc.)
+    - UpdateCategorizationRequestDto (account_code, account_name, vat_type, is_split, splits, create_pattern)
+    - UpdateCategorizationResponseDto
+    - BatchCategorizeRequestDto (transaction_ids: string[], force_recategorize?: boolean)
+    - BatchCategorizeResponseDto
+    - SuggestionsResponseDto
+  </file>
 
-  <verification>
-    - npm run test:e2e -- transaction-flow.e2e.spec.ts passes
-    - Test creates real database records
-    - Test makes real AI categorization calls
-    - Test output shows categorization statistics
-    - 95% accuracy achieved on pattern-trained data
-    - All edge cases properly handled with clear error messages
-    - Xero mock receives correct sync payloads
-  </verification>
-</definition_of_done>
+  <file path="src/database/services/transaction-import.service.ts" purpose="Import service">
+    TransactionImportService.importFromFile(file, bankAccount, tenantId) -> ImportResult
+    Handles CSV and PDF (via LLMWhisperer) parsing.
+    Returns { importBatchId, status, fileName, totalParsed, duplicatesSkipped, transactionsCreated, errors }
+  </file>
 
-<pseudo_code>
-Test Setup:
-  beforeAll:
-    await app.init()
-    testTenant = await createTestTenant({ vat_registered: true })
-    testUser = await createTestUser(testTenant, 'OWNER')
-    authToken = await getAuthToken(testUser)
-    chartOfAccounts = await seedChartOfAccounts(testTenant)
-    xeroMock = await startXeroMockServer()
+  <file path="src/database/services/categorization.service.ts" purpose="AI categorization service">
+    CategorizationService.categorizeTransactions(transactionIds, tenantId) -> BatchResult
+    CategorizationService.updateCategorization(txId, dto, userId, tenantId) -> Transaction
+    CategorizationService.getSuggestions(txId, tenantId) -> Suggestion[]
 
-Test Flow 1: Basic Import and Categorization
-  # Step 1: Import CSV
-  testFile = loadTestData('transactions/diverse-100.csv')
-  response = POST /transactions/import
-    headers: { Authorization: `Bearer ${authToken}` }
-    body: { file: testFile, source: 'CSV_IMPORT', bank_account: 'TEST-BANK-001' }
+    Uses payee patterns for matching, Claude AI for unknown transactions.
+    Returns { totalProcessed, autoCategorized, reviewRequired, failed, results, statistics }
+  </file>
 
-  expect(response.status).toBe(202)
-  importId = response.data.import_id
+  <file path="src/database/services/pattern-learning.service.ts" purpose="Pattern learning">
+    PatternLearningService.createPattern(transactionId, accountCode, tenantId, userId)
+    PatternLearningService.findMatchingPatterns(payeeName, tenantId) -> Pattern[]
+    Stores payee patterns for future automatic categorization.
+  </file>
 
-  # Wait for import processing
-  await waitForImportComplete(importId, timeout: 30000)
+  <file path="src/database/services/xero-sync.service.ts" purpose="Xero synchronization">
+    XeroSyncService.syncTransaction(transaction, categorization) -> XeroResult
+    Syncs categorized transactions to Xero as bank transactions.
+  </file>
 
-  # Verify import
-  transactions = GET /transactions?page=1&limit=100
-  expect(transactions.data.length).toBe(100)
-  expect(transactions.data.every(t => t.status === 'PENDING')).toBe(true)
+  <file path="src/database/entities/transaction.entity.ts" purpose="Transaction entity">
+    TransactionStatus: PENDING, CATEGORIZED, REVIEW_REQUIRED, SYNCED, FAILED
+    Fields: tenantId, date, description, payeeName, reference, amountCents, isCredit, status, isReconciled
+  </file>
 
-  # Step 2: Trigger AI Categorization
-  categorizeResponse = POST /transactions/categorize/batch
-    body: { transaction_ids: [], force_recategorize: false }
+  <file path="src/database/entities/categorization.entity.ts" purpose="Categorization entity">
+    VatType: STANDARD, ZERO_RATED, EXEMPT
+    CategorizationSource: AI, PATTERN, USER_OVERRIDE, RULE
+    Fields: transactionId, accountCode, accountName, confidenceScore, source, isSplit
+  </file>
 
-  expect(categorizeResponse.status).toBe(202)
-  jobId = categorizeResponse.data.job_id
+  <file path="tests/api/transaction/transaction.controller.spec.ts" purpose="Controller unit tests">
+    Pattern for mocking: Use Test.createTestingModule with providers including repositories.
+    Use jest.spyOn() for service method verification.
+    Create mock IUser objects with real UserRole from @prisma/client.
+  </file>
 
-  # Wait for categorization
-  await waitForJobComplete(jobId, timeout: 120000)
+  <file path="src/api/auth/decorators/current-user.decorator.ts" purpose="User decorator">
+    @CurrentUser() extracts user from JWT payload.
+    User interface: { id, tenantId, email, role }
+  </file>
 
-  # Verify categorization results
-  categorized = GET /transactions?status=CATEGORIZED
-  reviewRequired = GET /transactions?status=REVIEW_REQUIRED
+  <file path="src/api/auth/guards/jwt-auth.guard.ts" purpose="JWT guard">
+    JwtAuthGuard validates JWT token in Authorization header.
+  </file>
 
-  expect(categorized.meta.total + reviewRequired.meta.total).toBe(100)
-
-  # Calculate accuracy (first run, no patterns)
-  autoRate = categorized.meta.total / 100
-  expect(autoRate).toBeGreaterThan(0.70) # At least 70% on first run
-
-Test Flow 2: Manual Correction and Pattern Learning
-  # Step 3: Manual correction of low-confidence transaction
-  reviewTx = reviewRequired.data[0]
-
-  correctionResponse = PUT /transactions/{reviewTx.id}/categorize
-    body: {
-      account_code: '6100', # Food and Provisions
-      create_pattern: true
-    }
-
-  expect(correctionResponse.status).toBe(200)
-  expect(correctionResponse.data.pattern_created).toBe(true)
-
-  # Verify pattern stored in database
-  pattern = await db.payeePattern.findOne({
-    payee_name: reviewTx.payee_name,
-    tenant_id: testTenant.id
-  })
-  expect(pattern).toBeDefined()
-  expect(pattern.account_code).toBe('6100')
-
-Test Flow 3: Split Transaction
-  # Step 4: Create split transaction
-  splitTx = transactions.data.find(t => t.amount < 0 && Math.abs(t.amount) > 1000)
-
-  splitResponse = PUT /transactions/{splitTx.id}/categorize
-    body: {
-      is_split: true,
-      splits: [
-        { account_code: '6100', amount: Math.abs(splitTx.amount) * 0.6, vat_type: 'STANDARD' },
-        { account_code: '6200', amount: Math.abs(splitTx.amount) * 0.4, vat_type: 'ZERO_RATED' }
-      ]
-    }
-
-  expect(splitResponse.status).toBe(200)
-
-  # Verify split stored correctly
-  splits = await db.transactionSplit.findMany({ transaction_id: splitTx.id })
-  expect(splits.length).toBe(2)
-  totalSplit = splits.reduce((sum, s) => sum + s.amount, 0)
-  expect(Math.abs(totalSplit - Math.abs(splitTx.amount))).toBeLessThan(0.01) # Rounding tolerance
-
-Test Flow 4: Edge Cases
-  # Edge Case 1: Blank description
-  blankTx = await db.transaction.create({
-    data: {
-      tenant_id: testTenant.id,
-      date: new Date(),
-      description: '',
-      payee_name: '',
-      amount: -50.00,
-      status: 'PENDING'
-    }
-  })
-
-  categorizeBlank = POST /transactions/categorize/batch
-    body: { transaction_ids: [blankTx.id] }
-
-  await waitForJobComplete(categorizeBlank.data.job_id)
-
-  blankResult = GET /transactions/{blankTx.id}
-  expect(blankResult.data.status).toBe('REVIEW_REQUIRED')
-  expect(blankResult.data.categorization.confidence_score).toBeLessThan(80)
-
-  # Edge Case 2: Duplicate detection
-  duplicate = POST /transactions/import
-    body: { file: testFile, source: 'CSV_IMPORT', bank_account: 'TEST-BANK-001' }
-
-  await waitForImportComplete(duplicate.data.import_id)
-
-  duplicateCount = GET /transactions?is_duplicate=true
-  expect(duplicateCount.meta.total).toBe(100)
-
-  # Edge Case 3: Invalid split (amounts don't match)
-  invalidSplit = PUT /transactions/{splitTx.id}/categorize
-    body: {
-      is_split: true,
-      splits: [
-        { account_code: '6100', amount: 100 },
-        { account_code: '6200', amount: 50 } # Total 150, but tx is different
-      ]
-    }
-
-  expect(invalidSplit.status).toBe(400)
-  expect(invalidSplit.error.code).toBe('VALIDATION_ERROR')
-  expect(invalidSplit.error.message).toContain('Split amounts')
-
-Test Flow 5: Xero Synchronization
-  # Step 5: Verify Xero sync
-  categorizedTx = categorized.data[0]
-
-  # Check Xero mock received sync request
-  xeroRequests = xeroMock.getRequests()
-  syncRequest = xeroRequests.find(r =>
-    r.path === '/BankTransactions' &&
-    r.body.some(t => t.Reference === categorizedTx.id)
-  )
-
-  expect(syncRequest).toBeDefined()
-  expect(syncRequest.body[0].LineItems[0].AccountCode).toBe(
-    categorizedTx.categorization.account_code
-  )
-
-Test Flow 6: Pattern Learning Validation (Re-run)
-  # Step 6: Import similar transactions to test pattern learning
-  similarFile = loadTestData('transactions/similar-patterns-50.csv')
-
-  rerunImport = POST /transactions/import
-    body: { file: similarFile, source: 'CSV_IMPORT', bank_account: 'TEST-BANK-002' }
-
-  await waitForImportComplete(rerunImport.data.import_id)
-
-  rerunCategorize = POST /transactions/categorize/batch
-  await waitForJobComplete(rerunCategorize.data.job_id)
-
-  # Verify improved accuracy with learned patterns
-  rerunCategorized = GET /transactions?status=CATEGORIZED&bank_account=TEST-BANK-002
-  rerunAccuracy = rerunCategorized.meta.total / 50
-
-  expect(rerunAccuracy).toBeGreaterThanOrEqual(0.95) # 95% target achieved
-
-Performance Test:
-  # Test batch categorization performance
-  startTime = Date.now()
-  batchCategorize = POST /transactions/categorize/batch
-    body: { transaction_ids: transactions.data.map(t => t.id) }
-
-  await waitForJobComplete(batchCategorize.data.job_id)
-  duration = Date.now() - startTime
-
-  expect(duration).toBeLessThan(300000) # 5 minutes for 100 transactions
-
-Test Teardown:
-  afterAll:
-    await xeroMock.stop()
-    await db.transaction.deleteMany({ tenant_id: testTenant.id })
-    await db.tenant.delete({ where: { id: testTenant.id } })
-    await app.close()
-</pseudo_code>
+  <file path="src/api/auth/guards/roles.guard.ts" purpose="Roles guard">
+    RolesGuard checks user.role against @Roles() decorator.
+  </file>
+</existing_infrastructure>
 
 <files_to_create>
-  <file path="tests/e2e/transaction-flow.e2e.spec.ts">Complete E2E test suite</file>
-  <file path="tests/fixtures/transactions/diverse-100.csv">Test CSV with 100 diverse transactions</file>
-  <file path="tests/fixtures/transactions/similar-patterns-50.csv">Test CSV for pattern validation</file>
-  <file path="tests/helpers/xero-mock.ts">Xero API mock server helper</file>
-  <file path="tests/helpers/wait-for-job.ts">Job completion polling utility</file>
-  <file path="tests/helpers/test-data-generators.ts">Test data creation helpers</file>
+  <file path="tests/e2e/transaction-flow.e2e.spec.ts">
+    Complete E2E test suite using supertest and real database.
+
+    Test structure:
+    ```typescript
+    import { Test, TestingModule } from '@nestjs/testing';
+    import { INestApplication, ValidationPipe } from '@nestjs/common';
+    import * as request from 'supertest';
+    import { AppModule } from '../../src/app.module';
+    import { PrismaService } from '../../src/database/prisma/prisma.service';
+
+    describe('E2E: Transaction Categorization Flow', () => {
+      let app: INestApplication;
+      let prisma: PrismaService;
+      let authToken: string;
+      let testTenantId: string;
+
+      beforeAll(async () => {
+        const moduleFixture: TestingModule = await Test.createTestingModule({
+          imports: [AppModule],
+        }).compile();
+
+        app = moduleFixture.createNestApplication();
+        app.useGlobalPipes(new ValidationPipe({ transform: true }));
+        await app.init();
+
+        prisma = app.get(PrismaService);
+
+        // Create test tenant and user
+        const tenant = await prisma.tenant.create({ data: { name: 'E2E Test Tenant' } });
+        testTenantId = tenant.id;
+
+        // Create user and get JWT token
+        // ...setup auth...
+      });
+
+      afterAll(async () => {
+        await prisma.transaction.deleteMany({ where: { tenantId: testTenantId } });
+        await prisma.tenant.delete({ where: { id: testTenantId } });
+        await app.close();
+      });
+
+      it('imports CSV with diverse transactions', async () => {
+        // Use multipart/form-data with file upload
+        const response = await request(app.getHttpServer())
+          .post('/transactions/import')
+          .set('Authorization', `Bearer ${authToken}`)
+          .attach('file', 'tests/fixtures/transactions/diverse-100.csv')
+          .field('bank_account', 'TEST-BANK-001');
+
+        expect(response.status).toBe(200);
+        expect(response.body.success).toBe(true);
+        expect(response.body.data.transactions_created).toBe(100);
+      });
+
+      it('AI categorizes with 95%+ confidence on known patterns', async () => { ... });
+      it('flags low-confidence for manual review', async () => { ... });
+      it('learns from manual corrections', async () => { ... });
+      it('handles blank descriptions gracefully', async () => { ... });
+      it('detects and prevents duplicates', async () => { ... });
+      it('validates split transaction amounts', async () => { ... });
+      it('syncs categorized transactions to Xero', async () => { ... });
+    });
+    ```
+  </file>
+
+  <file path="tests/fixtures/transactions/diverse-100.csv">
+    Test CSV with 100 diverse transactions:
+    - Various payee names (Shoprite, Woolworths, Eskom, etc.)
+    - Mix of credits and debits
+    - Various amounts (R50 to R50,000)
+    - Some blank descriptions for edge case testing
+    - Some duplicate entries for detection testing
+  </file>
+
+  <file path="tests/fixtures/transactions/similar-patterns-50.csv">
+    Test CSV for pattern validation - transactions similar to those corrected manually.
+  </file>
+
+  <file path="tests/helpers/xero-mock.ts">
+    Xero MCP mock server using express:
+    ```typescript
+    import express from 'express';
+    import { Server } from 'http';
+
+    export class XeroMockServer {
+      private app = express();
+      private server: Server | null = null;
+      private requests: Array<{ method: string; path: string; body: any }> = [];
+
+      start(port = 9999): Promise<void> {
+        this.app.use(express.json());
+        this.app.all('*', (req, res) => {
+          this.requests.push({ method: req.method, path: req.path, body: req.body });
+          res.json({ success: true });
+        });
+        return new Promise((resolve) => {
+          this.server = this.app.listen(port, resolve);
+        });
+      }
+
+      getRequests() { return this.requests; }
+      clearRequests() { this.requests = []; }
+      stop(): Promise<void> { ... }
+    }
+    ```
+  </file>
+
+  <file path="tests/helpers/test-data-generators.ts">
+    Helper functions:
+    - createTestTenant(opts) -> Tenant
+    - createTestUser(tenantId, role) -> User
+    - getAuthToken(user) -> string (JWT)
+    - seedChartOfAccounts(tenantId) -> Account[]
+  </file>
 </files_to_create>
 
-<files_to_modify>
-  <!-- No existing files to modify -->
-</files_to_modify>
+<test_requirements>
+  <requirement>Use real database with actual Prisma operations</requirement>
+  <requirement>Use real CategorizationService (not mocked)</requirement>
+  <requirement>Mock only external services (Xero MCP)</requirement>
+  <requirement>Test minimum 100 transactions in batch operations</requirement>
+  <requirement>Achieve 95% auto-categorization on second run (after pattern learning)</requirement>
+  <requirement>Validate duplicate detection catches 100% of re-imported transactions</requirement>
+  <requirement>Split transaction amounts must equal parent transaction</requirement>
+  <requirement>All edge cases must have clear error messages</requirement>
+  <requirement>Test completes in under 5 minutes</requirement>
+</test_requirements>
 
-<validation_criteria>
-  <criterion>All test cases pass without skips or failures</criterion>
-  <criterion>Test uses real database with actual data persistence</criterion>
-  <criterion>AI categorization makes real API calls (not mocked)</criterion>
-  <criterion>95% auto-categorization accuracy achieved on second run</criterion>
-  <criterion>Duplicate detection catches all 100 re-imported transactions</criterion>
-  <criterion>Split transaction validation prevents invalid amounts</criterion>
-  <criterion>Blank description handled gracefully without errors</criterion>
-  <criterion>Xero mock receives correctly formatted sync payloads</criterion>
-  <criterion>Test completes in under 5 minutes</criterion>
-  <criterion>Clear error messages for all failure scenarios</criterion>
-</validation_criteria>
+<endpoint_reference>
+  | Method | Path | DTO In | DTO Out | Description |
+  |--------|------|--------|---------|-------------|
+  | GET | /transactions | ListTransactionsQueryDto | TransactionListResponseDto | List with filters |
+  | POST | /transactions/import | multipart + bank_account | ImportTransactionsResponseDto | Upload file |
+  | PUT | /transactions/:id/categorize | UpdateCategorizationRequestDto | UpdateCategorizationResponseDto | Manual categorize |
+  | POST | /transactions/categorize/batch | BatchCategorizeRequestDto | BatchCategorizeResponseDto | AI batch categorize |
+  | GET | /transactions/:id/suggestions | - | SuggestionsResponseDto | Get AI suggestions |
+</endpoint_reference>
+
+<verification_steps>
+  <step>npm run build - must compile without errors</step>
+  <step>npm run lint - must pass with no warnings</step>
+  <step>npm run test:e2e -- transaction-flow.e2e.spec.ts - all tests pass</step>
+  <step>Verify 95% accuracy achieved on pattern-trained data</step>
+  <step>Verify Xero mock receives correct sync payloads</step>
+</verification_steps>
 
 <test_commands>
   <command>npm run test:e2e -- transaction-flow.e2e.spec.ts</command>

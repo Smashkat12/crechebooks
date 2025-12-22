@@ -58,3 +58,26 @@ memory/data/
 
 # Prompt scratch files
 prompt*.txt
+
+# Next.js build output
+.next/
+out/
+
+# Playwright test artifacts
+playwright-report/
+test-results/
+.playwright-mcp/
+
+# Claude Code / MCP local development artifacts
+**/.claude/
+**/.mcp.json
+**/claude-flow
+**/.swarm/
+**/memory/agents/
+**/memory/sessions/
+**/memory/*.json
+**/memory.db*
+
+# ESLint cache
+.eslintcache
+.cache/

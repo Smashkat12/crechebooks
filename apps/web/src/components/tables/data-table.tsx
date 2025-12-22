@@ -96,7 +96,7 @@ export function DataTable<TData, TValue>({
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
+                  data-state={enableRowSelection && row.getIsSelected() ? 'selected' : undefined}
                   onClick={() => onRowClick?.(row.original)}
                   className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : undefined}
                   tabIndex={onRowClick ? 0 : undefined}

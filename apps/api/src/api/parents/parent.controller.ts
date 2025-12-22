@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -34,21 +35,24 @@ import {
 import { Parent } from '@prisma/client';
 
 /**
- * Transform parent to snake_case response
+ * Transform parent to camelCase response matching IParent interface
  */
-function toSnakeCase(parent: Parent): Record<string, unknown> {
+function toResponse(parent: Parent & { children?: unknown[] }): Record<string, unknown> {
   return {
     id: parent.id,
-    tenant_id: parent.tenantId,
-    first_name: parent.firstName,
-    last_name: parent.lastName,
+    tenantId: parent.tenantId,
+    firstName: parent.firstName,
+    lastName: parent.lastName,
     email: parent.email,
     phone: parent.phone,
-    id_number: parent.idNumber,
+    whatsapp: parent.whatsapp,
+    idNumber: parent.idNumber,
     address: parent.address,
-    is_active: parent.isActive,
-    created_at: parent.createdAt,
-    updated_at: parent.updatedAt,
+    preferredCommunication: parent.preferredContact || 'EMAIL',
+    isActive: parent.isActive,
+    children: parent.children || [],
+    createdAt: parent.createdAt,
+    updatedAt: parent.updatedAt,
   };
 }
 
@@ -64,12 +68,21 @@ export class ParentController {
   @ApiOperation({ summary: 'Get all parents for tenant' })
   @ApiQuery({ name: 'search', required: false, description: 'Search by name' })
   @ApiQuery({ name: 'isActive', required: false, type: Boolean })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'List of parents' })
   async findAll(
     @CurrentUser() user: IUser,
     @Query('search') search?: string,
     @Query('isActive') isActive?: string,
-  ): Promise<Record<string, unknown>[]> {
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<{
+    parents: Record<string, unknown>[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const filter: ParentFilterDto = {};
     if (search) filter.search = search;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
@@ -78,7 +91,18 @@ export class ParentController {
       user.tenantId,
       filter,
     );
-    return parents.map(toSnakeCase);
+
+    const pageNum = parseInt(page || '1', 10);
+    const limitNum = parseInt(limit || '20', 10);
+    const startIndex = (pageNum - 1) * limitNum;
+    const paginatedParents = parents.slice(startIndex, startIndex + limitNum);
+
+    return {
+      parents: paginatedParents.map(toResponse),
+      total: parents.length,
+      page: pageNum,
+      limit: limitNum,
+    };
   }
 
   @Get(':id')
@@ -93,9 +117,40 @@ export class ParentController {
   ): Promise<Record<string, unknown>> {
     const parent = await this.parentRepository.findById(id);
     if (!parent || parent.tenantId !== user.tenantId) {
-      throw new Error('Parent not found');
+      throw new NotFoundException('Parent not found');
     }
-    return toSnakeCase(parent);
+    return toResponse(parent);
+  }
+
+  @Get(':id/children')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get children for a parent' })
+  @ApiParam({ name: 'id', description: 'Parent ID' })
+  @ApiResponse({ status: 200, description: 'List of children' })
+  @ApiResponse({ status: 404, description: 'Parent not found' })
+  async findChildren(
+    @CurrentUser() user: IUser,
+    @Param('id') id: string,
+  ): Promise<Record<string, unknown>[]> {
+    const parent = await this.parentRepository.findById(id);
+    if (!parent || parent.tenantId !== user.tenantId) {
+      throw new NotFoundException('Parent not found');
+    }
+    // Transform children to camelCase response
+    const children = (parent as Parent & { children?: Array<Record<string, unknown>> }).children || [];
+    return children.map((child) => ({
+      id: child.id,
+      parentId: child.parentId,
+      firstName: child.firstName,
+      lastName: child.lastName,
+      dateOfBirth: child.dateOfBirth,
+      gender: child.gender,
+      allergies: child.allergies,
+      medicalNotes: child.medicalNotes,
+      status: child.status || 'ACTIVE',
+      createdAt: child.createdAt,
+      updatedAt: child.updatedAt,
+    }));
   }
 
   @Post()
@@ -112,7 +167,7 @@ export class ParentController {
       ...dto,
       tenantId: user.tenantId,
     });
-    return toSnakeCase(parent);
+    return toResponse(parent);
   }
 
   @Put(':id')
@@ -129,10 +184,10 @@ export class ParentController {
     // Verify parent belongs to tenant
     const existing = await this.parentRepository.findById(id);
     if (!existing || existing.tenantId !== user.tenantId) {
-      throw new Error('Parent not found');
+      throw new NotFoundException('Parent not found');
     }
     const parent = await this.parentRepository.update(id, dto);
-    return toSnakeCase(parent);
+    return toResponse(parent);
   }
 
   @Delete(':id')
@@ -149,7 +204,7 @@ export class ParentController {
     // Verify parent belongs to tenant
     const existing = await this.parentRepository.findById(id);
     if (!existing || existing.tenantId !== user.tenantId) {
-      throw new Error('Parent not found');
+      throw new NotFoundException('Parent not found');
     }
     await this.parentRepository.delete(id);
   }

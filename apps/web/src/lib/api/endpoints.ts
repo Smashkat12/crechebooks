@@ -69,4 +69,9 @@ export const endpoints = {
     list: '/fee-structures',
     detail: (id: string) => `/fee-structures/${id}`,
   },
+  adhocCharges: {
+    list: (invoiceId: string) => `/invoices/${invoiceId}/charges`,
+    add: (invoiceId: string) => `/invoices/${invoiceId}/charges`,
+    remove: (invoiceId: string, lineId: string) => `/invoices/${invoiceId}/charges/${lineId}`,
+  },
 } as const;

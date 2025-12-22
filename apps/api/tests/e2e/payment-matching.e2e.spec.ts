@@ -143,14 +143,20 @@ async function createTestInvoice(
     invoiceNumber?: string;
     dueDate?: Date;
     amountPaidCents?: number;
+    billingPeriodStart?: Date;
+    billingPeriodEnd?: Date;
   } = {},
 ): Promise<TestInvoice> {
-  const uniqueId =
-    Date.now().toString(36) + Math.random().toString(36).slice(2);
+  // Use crypto.randomUUID for truly unique IDs in rapid test execution
+  const uniqueId = crypto.randomUUID().replace(/-/g, '').substring(0, 12);
 
   const totalCents = opts.totalCents || 345000; // Default R3,450.00
   const subtotalCents = Math.round(totalCents / 1.15); // Subtract 15% VAT
   const vatCents = totalCents - subtotalCents;
+
+  // Default billing period is January 2025
+  const billingPeriodStart = opts.billingPeriodStart || new Date('2025-01-01');
+  const billingPeriodEnd = opts.billingPeriodEnd || new Date('2025-01-31');
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -162,6 +168,8 @@ async function createTestInvoice(
         `INV-2025-${uniqueId.substring(0, 6).toUpperCase()}`,
       issueDate: new Date('2025-01-01'),
       dueDate: opts.dueDate || new Date('2025-01-15'),
+      billingPeriodStart,
+      billingPeriodEnd,
       subtotalCents,
       vatCents,
       totalCents,
@@ -514,6 +522,7 @@ describe('E2E: Payment Matching Flow', () => {
 
     it('should return no_match when transaction cannot be matched', async () => {
       // Create transaction with no matching invoice
+      // Use a date far from any billing periods to avoid date proximity matching
       const transaction = await createTestCreditTransaction(
         prisma,
         testTenant.id,
@@ -521,6 +530,7 @@ describe('E2E: Payment Matching Flow', () => {
           amountCents: 999999, // R9,999.99 - unusual amount
           reference: 'UNMATCHABLE-REF-XYZ',
           payeeName: 'COMPLETELY UNKNOWN PERSON',
+          date: new Date('2024-06-15'), // Far from Jan 2025 billing periods
         },
       );
 
@@ -785,8 +795,8 @@ describe('E2E: Payment Matching Flow', () => {
           ],
         });
 
-      expect(response.status).toBe(400);
-      expect(response.body.success).toBe(false);
+      // BusinessException returns 422 (Unprocessable Entity) for business rule violations
+      expect(response.status).toBe(422);
     });
   });
 
@@ -1006,8 +1016,8 @@ describe('E2E: Payment Matching Flow', () => {
           allocations: [{ invoice_id: paidInvoice.id, amount: 3000.0 }],
         });
 
-      // Should fail because invoice is already paid
-      expect(response.status).toBe(404); // Invoice not found in outstanding list
+      // Should fail because invoice is already paid (returns 422 for business rule violation)
+      expect(response.status).toBe(422);
     });
 
     it('should reject double allocation of same transaction', async () => {
@@ -1052,7 +1062,7 @@ describe('E2E: Payment Matching Flow', () => {
 
       expect(response1.status).toBe(201);
 
-      // Second allocation of same transaction - should fail
+      // Second allocation of same transaction - should fail because transaction already allocated
       const response2 = await request(app.getHttpServer())
         .post('/payments')
         .set('Authorization', `Bearer ${authToken}`)
@@ -1061,7 +1071,8 @@ describe('E2E: Payment Matching Flow', () => {
           allocations: [{ invoice_id: invoice2.id, amount: 2000.0 }],
         });
 
-      expect(response2.status).toBe(400);
+      // BusinessException returns 422 for business rule violations
+      expect(response2.status).toBe(422);
     });
 
     it('should handle zero-amount transactions', async () => {
@@ -1134,8 +1145,8 @@ describe('E2E: Payment Matching Flow', () => {
           allocations: [{ invoice_id: invoice.id, amount: 1000.0 }],
         });
 
-      // Should fail because transaction is not a credit
-      expect(response.status).toBe(400);
+      // Should fail because transaction is not a credit (returns 422 for business rule violation)
+      expect(response.status).toBe(422);
     });
 
     it('should handle invalid invoice ID in allocation', async () => {

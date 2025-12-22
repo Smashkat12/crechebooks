@@ -10,9 +10,10 @@ interface InvoicePreviewProps {
 }
 
 export function InvoicePreview({ invoice }: InvoicePreviewProps) {
-  const subtotal = invoice.lines.reduce((sum, line) => sum + line.amount, 0);
-  const vatAmount = subtotal * (invoice.vatRate / 100);
-  const total = subtotal + vatAmount;
+  // Use backend-calculated amounts if available, otherwise calculate from lines
+  const subtotal = invoice.subtotal ?? invoice.lines.reduce((sum, line) => sum + line.amount, 0);
+  const vatAmount = invoice.vatAmount ?? subtotal * (invoice.vatRate / 100);
+  const total = invoice.total ?? subtotal + vatAmount;
 
   return (
     <Card>
@@ -68,29 +69,30 @@ export function InvoicePreview({ invoice }: InvoicePreviewProps) {
 
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Subtotal</span>
-            <span>{formatCurrency(subtotal)}</span>
+            <span className="text-muted-foreground">Subtotal (excl. VAT)</span>
+            <span className="font-mono">{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">
               VAT ({invoice.vatRate}%)
             </span>
-            <span>{formatCurrency(vatAmount)}</span>
+            <span className="font-mono">{formatCurrency(vatAmount)}</span>
           </div>
           <Separator />
           <div className="flex justify-between font-medium text-lg">
-            <span>Total</span>
-            <span>{formatCurrency(total)}</span>
+            <span>Total (incl. VAT)</span>
+            <span className="font-mono">{formatCurrency(total)}</span>
           </div>
           {invoice.amountPaid > 0 && (
             <>
+              <Separator className="my-2" />
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Amount Paid</span>
-                <span>{formatCurrency(invoice.amountPaid)}</span>
+                <span className="font-mono">{formatCurrency(invoice.amountPaid)}</span>
               </div>
-              <div className="flex justify-between font-medium">
+              <div className="flex justify-between font-medium text-base">
                 <span>Balance Due</span>
-                <span>{formatCurrency(total - invoice.amountPaid)}</span>
+                <span className="font-mono">{formatCurrency(total - invoice.amountPaid)}</span>
               </div>
             </>
           )}

@@ -350,31 +350,237 @@ export class PaymentMatchingService {
     }
 
     // 3. NAME SIMILARITY (0-20 points)
-    if (transaction.payeeName) {
-      const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
-      const similarity = this.calculateStringSimilarity(
-        this.normalizeString(transaction.payeeName),
-        this.normalizeString(parentName),
-      );
+    // Check both payeeName and description for name matches
+    const nameScore = this.calculateNameMatchScore(transaction, invoice);
+    if (nameScore.score > 0) {
+      score += nameScore.score;
+      reasons.push(...nameScore.reasons);
+    }
 
-      if (similarity === 1) {
-        score += 20;
-        reasons.push('Exact name match');
-      } else if (similarity > 0.8) {
-        score += 15;
-        reasons.push(
-          `Strong name similarity (${Math.round(similarity * 100)}%)`,
-        );
-      } else if (similarity > 0.6) {
-        score += 10;
-        reasons.push(`Good name similarity (${Math.round(similarity * 100)}%)`);
-      } else if (similarity > 0.4) {
-        score += 5;
-        reasons.push(`Weak name similarity (${Math.round(similarity * 100)}%)`);
-      }
+    // 4. DATE PROXIMITY (0-20 points)
+    // Payments made close to billing period are more likely matches
+    const transactionDate = new Date(transaction.date);
+    const billingStart = new Date(invoice.billingPeriodStart);
+    const billingEnd = new Date(invoice.billingPeriodEnd);
+    const dueDate = new Date(invoice.dueDate);
+
+    // Days from billing period start
+    const daysDiff = Math.abs(
+      (transactionDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    // Check if payment is within or near billing period
+    const isWithinBillingPeriod =
+      transactionDate >= billingStart && transactionDate <= billingEnd;
+    const isNearDueDate =
+      Math.abs(
+        (transactionDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
+      ) <= 7;
+
+    if (isWithinBillingPeriod) {
+      // Payment within billing period is strong signal - 20 points
+      score += 20;
+      reasons.push('Payment within billing period');
+    } else if (isNearDueDate) {
+      score += 15;
+      reasons.push('Payment near due date');
+    } else if (daysDiff <= 30) {
+      score += 10;
+      reasons.push('Payment within 30 days of billing');
+    } else if (daysDiff <= 60) {
+      score += 5;
+      reasons.push('Payment within 60 days of billing');
     }
 
     return { score: Math.min(score, 100), reasons };
+  }
+
+  /**
+   * Calculate name match score from transaction against invoice parent/child names
+   * Searches both payeeName and description for matches
+   * @returns Score 0-20 with reasons
+   */
+  private calculateNameMatchScore(
+    transaction: Transaction,
+    invoice: InvoiceWithRelations,
+  ): { score: number; reasons: string[] } {
+    let bestScore = 0;
+    const reasons: string[] = [];
+
+    // Names to match against
+    const parentFirstName = invoice.parent.firstName.toLowerCase();
+    const parentLastName = invoice.parent.lastName.toLowerCase();
+    const parentFullName = `${parentFirstName} ${parentLastName}`;
+    const childFirstName = invoice.child.firstName.toLowerCase();
+    const childLastName = invoice.child.lastName.toLowerCase();
+    const childFullName = `${childFirstName} ${childLastName}`;
+
+    // Sources to search for names (payeeName and description)
+    const searchSources: string[] = [];
+    if (transaction.payeeName) {
+      searchSources.push(transaction.payeeName);
+    }
+    if (transaction.description) {
+      // Extract potential names from description by removing banking prefixes
+      const extractedNames = this.extractNamesFromDescription(
+        transaction.description,
+      );
+      searchSources.push(...extractedNames);
+    }
+
+    for (const source of searchSources) {
+      const normalizedSource = this.normalizeString(source);
+
+      // Check child name match (prioritize since real data shows child names in payments)
+      const childFullSimilarity = this.calculateStringSimilarity(
+        normalizedSource,
+        childFullName.replace(/[^a-z0-9]/g, ''),
+      );
+      const childFirstSimilarity = this.calculateStringSimilarity(
+        normalizedSource,
+        childFirstName.replace(/[^a-z0-9]/g, ''),
+      );
+      const containsChildFirst =
+        normalizedSource.includes(childFirstName.replace(/[^a-z0-9]/g, '')) &&
+        childFirstName.length >= 3;
+      const containsChildLast =
+        normalizedSource.includes(childLastName.replace(/[^a-z0-9]/g, '')) &&
+        childLastName.length >= 3;
+
+      // Child full name match (highest priority)
+      if (childFullSimilarity === 1) {
+        if (bestScore < 20) {
+          bestScore = 20;
+          reasons.length = 0;
+          reasons.push(`Exact child name match: ${invoice.child.firstName} ${invoice.child.lastName}`);
+        }
+      } else if (childFullSimilarity > 0.8 || (containsChildFirst && containsChildLast)) {
+        if (bestScore < 18) {
+          bestScore = 18;
+          reasons.length = 0;
+          reasons.push(`Strong child name match: ${invoice.child.firstName} ${invoice.child.lastName}`);
+        }
+      } else if (childFullSimilarity > 0.6 || containsChildFirst || containsChildLast) {
+        if (bestScore < 15) {
+          bestScore = 15;
+          reasons.length = 0;
+          const matched = containsChildFirst ? invoice.child.firstName : invoice.child.lastName;
+          reasons.push(`Child name found: ${matched}`);
+        }
+      }
+
+      // Check parent name match
+      const parentFullSimilarity = this.calculateStringSimilarity(
+        normalizedSource,
+        parentFullName.replace(/[^a-z0-9]/g, ''),
+      );
+      const containsParentFirst =
+        normalizedSource.includes(parentFirstName.replace(/[^a-z0-9]/g, '')) &&
+        parentFirstName.length >= 3;
+      const containsParentLast =
+        normalizedSource.includes(parentLastName.replace(/[^a-z0-9]/g, '')) &&
+        parentLastName.length >= 3;
+
+      if (parentFullSimilarity === 1) {
+        if (bestScore < 20) {
+          bestScore = 20;
+          reasons.length = 0;
+          reasons.push('Exact parent name match');
+        }
+      } else if (containsParentFirst && containsParentLast) {
+        // Both first and last name found (even if order is different, e.g., "SMITH JOHN" for "John Smith")
+        // This is as strong as an exact match since both names are present
+        if (bestScore < 20) {
+          bestScore = 20;
+          reasons.length = 0;
+          reasons.push('Parent first and last name both found');
+        }
+      } else if (parentFullSimilarity > 0.8) {
+        if (bestScore < 15) {
+          bestScore = 15;
+          reasons.length = 0;
+          reasons.push(
+            `Strong parent name similarity (${Math.round(parentFullSimilarity * 100)}%)`,
+          );
+        }
+      } else if (parentFullSimilarity > 0.6 || containsParentFirst || containsParentLast) {
+        if (bestScore < 10) {
+          bestScore = 10;
+          reasons.length = 0;
+          reasons.push(
+            `Good parent name similarity (${Math.round(parentFullSimilarity * 100)}%)`,
+          );
+        }
+      } else if (parentFullSimilarity > 0.4) {
+        if (bestScore < 5) {
+          bestScore = 5;
+          reasons.length = 0;
+          reasons.push(
+            `Weak name similarity (${Math.round(parentFullSimilarity * 100)}%)`,
+          );
+        }
+      }
+    }
+
+    return { score: bestScore, reasons };
+  }
+
+  /**
+   * Extract potential names from bank transaction description
+   * Removes common banking prefixes and returns potential name strings
+   */
+  private extractNamesFromDescription(description: string): string[] {
+    // Common South African banking prefixes to remove
+    const bankingPrefixes = [
+      /^FNB App Payment From\s*/i,
+      /^FNB App Transfer From\s*/i,
+      /^Magtape Credit Capitec\s*/i,
+      /^Magtape Credit\s*/i,
+      /^ADT Cash Deposit\s*/i,
+      /^Payshap Credit\s*/i,
+      /^Int-Banking Pmt Frm\s*/i,
+      /^Rtc Credit\s*/i,
+      /^Scheduled Pymt From\s*/i,
+      /^Debit Order\s*/i,
+      /^EFT Credit\s*/i,
+      /^Internet Transfer\s*/i,
+      /^Mobile Transfer\s*/i,
+      /^ABSA\s*/i,
+      /^NEDBANK\s*/i,
+      /^STANDARD BANK\s*/i,
+      /^CAPITEC\s*/i,
+    ];
+
+    let cleaned = description;
+
+    // Remove banking prefixes
+    for (const prefix of bankingPrefixes) {
+      cleaned = cleaned.replace(prefix, '');
+    }
+
+    // Remove account numbers (sequences of 8+ digits)
+    cleaned = cleaned.replace(/\d{8,}/g, '');
+
+    // Remove short number sequences but keep the rest
+    cleaned = cleaned.replace(/\b\d{1,4}\b/g, '');
+
+    // Clean up extra whitespace
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+    const results: string[] = [];
+
+    // Add the full cleaned string
+    if (cleaned.length > 2) {
+      results.push(cleaned);
+    }
+
+    // Also add individual words that could be names (3+ chars, no numbers)
+    const words = cleaned.split(/\s+/).filter(
+      (word) => word.length >= 3 && !/\d/.test(word),
+    );
+    results.push(...words);
+
+    return results;
   }
 
   /**

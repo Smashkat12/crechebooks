@@ -52,10 +52,12 @@ export function ParentDetailSheet({
     (inv) => inv.status !== "PAID" && inv.status !== "VOID"
   );
   const payments = paymentsData?.payments ?? [];
+  // totalCents is in cents, convert to Rands for display
+  // Use amountPaidCents to calculate balance due
   const totalOutstanding = invoices.reduce((sum, inv) => {
-    const lineTotal = inv.lines?.reduce((lineSum, line) => lineSum + line.lineAmount, 0) ?? 0;
-    return sum + lineTotal;
-  }, 0);
+    const balanceDue = (inv.totalCents ?? 0) - (inv.amountPaidCents ?? 0);
+    return sum + balanceDue;
+  }, 0) / 100; // Convert cents to Rands
 
   if (!parentId) return null;
 
@@ -143,9 +145,7 @@ export function ParentDetailSheet({
                             </div>
                           </TableCell>
                           <TableCell className="text-right font-semibold">
-                            {formatCurrency(
-                              invoice.lines?.reduce((sum, line) => sum + line.lineAmount, 0) ?? 0
-                            )}
+                            {formatCurrency((invoice.totalCents ?? 0) / 100)}
                           </TableCell>
                         </TableRow>
                       );

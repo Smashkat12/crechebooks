@@ -6,3 +6,5 @@ export * from './enroll-child.dto';
 export * from './child-response.dto';
 export * from './update-child.dto';
 export * from './list-children.dto';
+export * from './adhoc-charge-request.dto';
+export * from './adhoc-charge-response.dto';

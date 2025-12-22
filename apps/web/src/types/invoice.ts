@@ -13,6 +13,7 @@ export interface InvoiceLine {
   quantity: number;
   unitPrice: number;
   amount: number;
+  vatAmount?: number; // VAT amount for this line item
 }
 
 export interface Invoice {
@@ -27,6 +28,10 @@ export interface Invoice {
   periodEnd: string;
   lines: InvoiceLine[];
   vatRate: number;
+  // Backend-calculated amounts (use these instead of recalculating)
+  subtotal?: number;
+  vatAmount?: number;
+  total?: number;
   amountPaid: number;
   paidDate?: string;
   notes?: string;

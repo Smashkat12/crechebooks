@@ -104,7 +104,7 @@ export function CategorizationDialog({
                 <p className={`text-sm font-medium ${
                   transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {formatCurrency(Math.abs(transaction.amount))}
+                  {formatCurrency(Math.abs(transaction.amount / 100))}
                 </p>
               </div>
             </div>

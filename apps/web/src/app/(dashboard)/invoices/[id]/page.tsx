@@ -61,8 +61,13 @@ export default function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
       quantity: line.quantity,
       unitPrice: line.unitAmount / 100,
       amount: line.lineAmount / 100,
+      vatAmount: line.vatAmount / 100, // Add VAT amount per line
     })),
     vatRate: 15,
+    // Use backend-calculated amounts (convert from cents to Rand)
+    subtotal: invoiceData.subtotal / 100,
+    vatAmount: invoiceData.vatAmount / 100,
+    total: invoiceData.total / 100,
     amountPaid: invoiceData.amountPaid / 100,
     paidDate: invoiceData.paidAt instanceof Date
       ? invoiceData.paidAt.toISOString()

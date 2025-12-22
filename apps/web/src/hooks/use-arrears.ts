@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 
-// Types for API responses
+// Types for frontend (camelCase)
 interface ArrearsItem {
   id: string;
   parentId: string;
@@ -56,15 +56,62 @@ interface SendReminderParams {
   template?: string;
 }
 
+// API response types (snake_case from backend)
+interface ApiArrearsItem {
+  id: string;
+  parent_id: string;
+  parent_name: string;
+  child_id: string;
+  child_name: string;
+  total_outstanding: number;
+  oldest_invoice_date: string;
+  days_past_due: number;
+  invoice_count: number;
+  last_payment_date?: string;
+  contact_email?: string;
+  contact_phone?: string;
+}
+
+interface ApiArrearsListResponse {
+  success: boolean;
+  arrears: ApiArrearsItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// Transform API response to frontend format
+function transformArrearsItem(api: ApiArrearsItem): ArrearsItem {
+  return {
+    id: api.id,
+    parentId: api.parent_id,
+    parentName: api.parent_name,
+    childId: api.child_id,
+    childName: api.child_name,
+    totalOutstanding: api.total_outstanding,
+    oldestInvoiceDate: api.oldest_invoice_date,
+    daysPastDue: api.days_past_due,
+    invoiceCount: api.invoice_count,
+    lastPaymentDate: api.last_payment_date,
+    contactEmail: api.contact_email,
+    contactPhone: api.contact_phone,
+  };
+}
+
 // List arrears with pagination and filters
 export function useArrearsList(params?: ArrearsListParams) {
   return useQuery<ArrearsListResponse, AxiosError>({
     queryKey: queryKeys.arrears.list(params),
     queryFn: async () => {
-      const { data } = await apiClient.get<ArrearsListResponse>(endpoints.arrears.list, {
+      const { data } = await apiClient.get<ApiArrearsListResponse>(endpoints.arrears.list, {
         params,
       });
-      return data;
+      return {
+        arrears: data.arrears.map(transformArrearsItem),
+        total: data.total,
+        page: data.page,
+        limit: data.limit,
+      };
     },
   });
 }

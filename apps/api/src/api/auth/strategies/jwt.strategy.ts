@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy, StrategyOptionsWithRequest } from 'passport-jwt';
 import { passportJwtSecret } from 'jwks-rsa';
 import { ConfigService } from '@nestjs/config';
-import { IUser } from '../../../database/entities/user.entity';
+import { IUser, UserRole } from '../../../database/entities/user.entity';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 
 export interface JwtPayload {
@@ -139,10 +139,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       id: user.id,
       tenantId: user.tenantId,
-      auth0Id: user.auth0Id,
+      auth0Id: user.auth0Id ?? '',
       email: user.email,
-      name: user.name,
-      role: user.role,
+      name: user.name ?? '',
+      role: user.role as UserRole,
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,

@@ -171,7 +171,7 @@ graph TD
 | 47 | TASK-BILL-032 | Invoice Generation Endpoint | surface | TASK-BILL-031 | ✅ Complete |
 | 48 | TASK-BILL-033 | Invoice Delivery Endpoint | surface | TASK-BILL-031, TASK-BILL-013 | ✅ Complete |
 | 49 | TASK-BILL-034 | Enrollment Controller | surface | TASK-BILL-011 | ✅ Complete |
-| 50 | TASK-PAY-031 | Payment Controller and DTOs | surface | TASK-PAY-011, TASK-PAY-012 | Pending |
+| 50 | TASK-PAY-031 | Payment Controller and DTOs | surface | TASK-PAY-011, TASK-PAY-012 | ✅ Complete |
 | 51 | TASK-PAY-032 | Payment Matching Endpoint | surface | TASK-PAY-031, TASK-AGENT-003 | Pending |
 | 52 | TASK-PAY-033 | Arrears Dashboard Endpoint | surface | TASK-PAY-013 | Pending |
 | 53 | TASK-SARS-031 | SARS Controller and DTOs | surface | TASK-SARS-014, TASK-SARS-015 | Pending |
@@ -199,11 +199,11 @@ graph TD
 | Foundation | 15 | 15 | 100% |
 | Logic | 22 | 22 | 100% |
 | Agents | 5 | 5 | 100% |
-| Surface | 16 | 8 | 50% |
+| Surface | 16 | 9 | 56% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **63** | **50** | **79%** |
+| **Total** | **63** | **51** | **81%** |
 
-**Last Updated**: 2025-12-22 (TASK-BILL-033 and TASK-BILL-034 completed - Invoice Delivery Endpoint + Child Enrollment Controller - 47 billing tests, total 1443 tests)
+**Last Updated**: 2025-12-22 (TASK-PAY-031 completed - Payment Controller and DTOs - 15 tests, total 1458 tests)
 
 ---
 

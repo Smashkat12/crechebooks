@@ -1,5 +1,40 @@
 # Decision Log
 
+## 2025-12-22: TASK-PAY-031 Payment Controller
+
+### Decision: Prisma Enum Imports
+- Used `import { MatchType, MatchedBy } from '@prisma/client'` directly in DTOs
+- Prisma generates its own enum types that differ from entity definitions
+- Avoids TS2322 type mismatch errors
+
+### Decision: Prisma to Entity Enum Casting
+- Used `filter.matchType = query.match_type as any` with eslint-disable comment
+- Required because PaymentFilterDto expects entity enum types
+- Repository layer handles Prisma compatibility internally
+
+### Decision: Type-Only Import for Decorator Compatibility
+- Used `import type { IUser }` in controller
+- TypeScript `isolatedModules` + `emitDecoratorMetadata` requires type-only imports for decorator parameters
+- Prevents "cannot be named" compilation errors
+
+### Decision: Decimal/Cents Conversion Strategy
+- API receives decimal amounts (e.g., 3450.00 for R3450)
+- Service layer uses cents (integers) for precision
+- Conversion: `Math.round(amount * 100)` for API → service
+- Conversion: `amountCents / 100` for service → API
+
+### Decision: Role-Based Access Control
+- POST /payments: Restricted to OWNER, ADMIN (write operation)
+- GET /payments: Extended to OWNER, ADMIN, VIEWER, ACCOUNTANT (read operation)
+- Follows principle of least privilege
+
+### Decision: PaymentModule Dependencies
+- Imports PaymentRepository for listing
+- Imports InvoiceRepository for enriching payment list with invoice details
+- Imports PaymentAllocationService for allocation logic
+
+---
+
 ## 2025-12-22: TASK-TRANS-031 Transaction Controller
 
 ### Decision: Type Import for Decorator Compatibility

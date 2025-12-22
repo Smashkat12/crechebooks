@@ -3,7 +3,7 @@
 ## Current Status: Surface Layer In Progress
 
 **Last Updated**: 2025-12-22
-**Total Tests**: 1414 passing
+**Total Tests**: 1458 passing
 **Build Status**: PASS
 **Lint Status**: PASS
 
@@ -16,57 +16,56 @@
 | Foundation | 15 | 15 | 100% Complete |
 | Logic | 22 | 22 | 100% Complete |
 | Agents | 5 | 5 | 100% Complete |
-| Surface | 16 | 6 | 37.5% In Progress |
+| Surface | 16 | 9 | 56% In Progress |
 | Integration | 5 | 0 | Not Started |
 
-**Overall Progress**: 48/63 tasks (76%)
+**Overall Progress**: 51/63 tasks (81%)
 
 ---
 
 ## Latest Completions (2025-12-22)
 
-### TASK-BILL-031: Invoice Controller and DTOs
+### TASK-PAY-031: Payment Controller and DTOs
 - **Status**: Complete
-- **Tests**: 10 controller tests passing (total 1406)
+- **Tests**: 15 controller tests passing (total 1458)
 - **Key Features**:
-  - GET /api/v1/invoices endpoint with pagination
-  - Query filters: status, parent_id, child_id, date_from, date_to
-  - ListInvoicesQueryDto with class-validator decorators
-  - InvoiceResponseDto with embedded parent/child summary
+  - POST /payments endpoint for manual payment allocation
+  - GET /payments endpoint with pagination and filtering
+  - ApiAllocatePaymentDto with snake_case for external API
+  - PaymentDto, PaymentListItemDto, PaymentListResponseDto
   - Cents → Rands conversion (divide by 100)
-  - Dates as YYYY-MM-DD strings
+  - @Roles(OWNER, ADMIN) for POST, extended roles for GET
   - Tenant isolation via @CurrentUser().tenantId
+  - Prisma enum compatibility handling
   - Swagger documentation with @ApiProperty examples
 - **Files Created**:
-  - src/api/billing/dto/list-invoices.dto.ts
-  - src/api/billing/dto/invoice-response.dto.ts
-  - src/api/billing/dto/index.ts
-  - src/api/billing/invoice.controller.ts
-  - src/api/billing/billing.module.ts
-  - tests/api/billing/invoice.controller.spec.ts
+  - src/api/payment/dto/allocate-payment.dto.ts
+  - src/api/payment/dto/payment-response.dto.ts
+  - src/api/payment/dto/list-payments.dto.ts
+  - src/api/payment/dto/index.ts
+  - src/api/payment/payment.controller.ts
+  - src/api/payment/payment.module.ts
+  - tests/api/payment/payment.controller.spec.ts
 
-### TASK-BILL-032: Invoice Generation Endpoint
+### TASK-BILL-033: Invoice Delivery Endpoint
 - **Status**: Complete
-- **Tests**: 8 controller tests passing (total 1414)
-- **Key Features**:
-  - POST /api/v1/invoices/generate endpoint
-  - GenerateInvoicesDto with YYYY-MM format validation
-  - Future month rejection with 400 BadRequest
-  - @Roles(OWNER, ADMIN) restriction via RolesGuard
-  - InvoiceGenerationService integration
-  - Response: invoices_created, total_amount (Rands), invoice summaries, errors
-- **Files Created**:
-  - src/api/billing/dto/generate-invoices.dto.ts
-  - tests/api/billing/generate-invoices.controller.spec.ts
-- **Files Modified**:
-  - src/api/billing/invoice.controller.ts (added generateInvoices method)
-  - src/api/billing/billing.module.ts (added InvoiceGenerationService deps)
-  - src/api/billing/dto/index.ts (export new DTOs)
-  - src/api/api.module.ts (import BillingModule)
+- **Tests**: 11 controller tests passing (total 1425)
+
+### TASK-BILL-034: Enrollment Controller
+- **Status**: Complete
+- **Tests**: 18 controller tests passing (total 1443)
 
 ---
 
 ## Previous Completions (2025-12-22)
+
+### TASK-BILL-031: Invoice Controller and DTOs
+- **Status**: Complete
+- **Tests**: 10 controller tests passing
+
+### TASK-BILL-032: Invoice Generation Endpoint
+- **Status**: Complete
+- **Tests**: 8 controller tests passing
 
 ### TASK-TRANS-031: Transaction Controller and DTOs
 - **Status**: Complete

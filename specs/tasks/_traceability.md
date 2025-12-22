@@ -49,7 +49,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | POST /invoices/generate | endpoint | TASK-BILL-032 | ✅ Complete |
 | POST /invoices/send | endpoint | TASK-BILL-033 | ✅ Complete |
 | POST /payments/match | endpoint | TASK-PAY-032 | Pending |
-| POST /payments | endpoint | TASK-PAY-031 | Pending |
+| POST /payments | endpoint | TASK-PAY-031 | ✅ Complete |
 | GET /arrears | endpoint | TASK-PAY-033 | Pending |
 | POST /sars/vat201 | endpoint | TASK-SARS-032 | Pending |
 | POST /sars/emp201 | endpoint | TASK-SARS-033 | Pending |
@@ -274,3 +274,4 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-22 | TASK-BILL-032 marked complete (Invoice Generation Endpoint - 8 tests, total 1414) | AI Agent |
 | 2025-12-22 | TASK-BILL-033 marked complete (Invoice Delivery Endpoint - 11 tests, total 1425) | AI Agent |
 | 2025-12-22 | TASK-BILL-034 marked complete (Child Enrollment Controller - 18 tests, total 1443) | AI Agent |
+| 2025-12-22 | TASK-PAY-031 marked complete (Payment Controller and DTOs - 15 tests, total 1458) | AI Agent |

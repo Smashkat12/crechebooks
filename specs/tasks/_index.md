@@ -172,8 +172,8 @@ graph TD
 | 48 | TASK-BILL-033 | Invoice Delivery Endpoint | surface | TASK-BILL-031, TASK-BILL-013 | ✅ Complete |
 | 49 | TASK-BILL-034 | Enrollment Controller | surface | TASK-BILL-011 | ✅ Complete |
 | 50 | TASK-PAY-031 | Payment Controller and DTOs | surface | TASK-PAY-011, TASK-PAY-012 | ✅ Complete |
-| 51 | TASK-PAY-032 | Payment Matching Endpoint | surface | TASK-PAY-031, TASK-AGENT-003 | Pending |
-| 52 | TASK-PAY-033 | Arrears Dashboard Endpoint | surface | TASK-PAY-013 | Pending |
+| 51 | TASK-PAY-032 | Payment Matching Endpoint | surface | TASK-PAY-031, TASK-AGENT-003 | ✅ Complete |
+| 52 | TASK-PAY-033 | Arrears Dashboard Endpoint | surface | TASK-PAY-013 | ✅ Complete |
 | 53 | TASK-SARS-031 | SARS Controller and DTOs | surface | TASK-SARS-014, TASK-SARS-015 | Pending |
 | 54 | TASK-SARS-032 | VAT201 Endpoint | surface | TASK-SARS-031 | Pending |
 | 55 | TASK-SARS-033 | EMP201 Endpoint | surface | TASK-SARS-031 | Pending |
@@ -199,11 +199,11 @@ graph TD
 | Foundation | 15 | 15 | 100% |
 | Logic | 22 | 22 | 100% |
 | Agents | 5 | 5 | 100% |
-| Surface | 16 | 9 | 56% |
+| Surface | 16 | 11 | 69% |
 | Integration | 5 | 0 | 0% |
-| **Total** | **63** | **51** | **81%** |
+| **Total** | **63** | **53** | **84%** |
 
-**Last Updated**: 2025-12-22 (TASK-PAY-031 completed - Payment Controller and DTOs - 15 tests, total 1458 tests)
+**Last Updated**: 2025-12-22 (TASK-PAY-032 + TASK-PAY-033 completed - Payment Matching + Arrears Dashboard - 21 tests, total 1479 tests)
 
 ---
 

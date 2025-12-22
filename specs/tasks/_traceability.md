@@ -48,9 +48,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | GET /invoices | endpoint | TASK-BILL-031 | ✅ Complete |
 | POST /invoices/generate | endpoint | TASK-BILL-032 | ✅ Complete |
 | POST /invoices/send | endpoint | TASK-BILL-033 | ✅ Complete |
-| POST /payments/match | endpoint | TASK-PAY-032 | Pending |
+| POST /payments/match | endpoint | TASK-PAY-032 | ✅ Complete |
 | POST /payments | endpoint | TASK-PAY-031 | ✅ Complete |
-| GET /arrears | endpoint | TASK-PAY-033 | Pending |
+| GET /arrears | endpoint | TASK-PAY-033 | ✅ Complete |
 | POST /sars/vat201 | endpoint | TASK-SARS-032 | Pending |
 | POST /sars/emp201 | endpoint | TASK-SARS-033 | Pending |
 | POST /sars/{id}/submit | endpoint | TASK-SARS-031 | Pending |
@@ -153,12 +153,12 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Ambiguous match flagging | REQ-PAY-004 | TASK-PAY-011 | ✅ Complete |
 | Partial payments | REQ-PAY-005 | TASK-PAY-012 | ✅ Complete |
 | Combined payments | REQ-PAY-006 | TASK-PAY-012 | ✅ Complete |
-| Arrears dashboard | REQ-PAY-007 | TASK-PAY-013, TASK-PAY-033 | Partial (TASK-PAY-013 ✅, TASK-PAY-033 pending) |
+| Arrears dashboard | REQ-PAY-007 | TASK-PAY-013, TASK-PAY-033 | ✅ Complete |
 | Parent payment history | REQ-PAY-008 | TASK-PAY-013 | ✅ Complete |
 | Automated reminders | REQ-PAY-009 | TASK-PAY-014 | ✅ Complete |
 | Reminder templates | REQ-PAY-010 | TASK-PAY-014 | ✅ Complete |
 | Escalation after reminders | REQ-PAY-011 | TASK-PAY-014 | ✅ Complete |
-| Arrears report export | REQ-PAY-012 | TASK-PAY-033 | Pending |
+| Arrears report export | REQ-PAY-012 | TASK-PAY-033 | ✅ Complete |
 
 ---
 
@@ -275,3 +275,5 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-22 | TASK-BILL-033 marked complete (Invoice Delivery Endpoint - 11 tests, total 1425) | AI Agent |
 | 2025-12-22 | TASK-BILL-034 marked complete (Child Enrollment Controller - 18 tests, total 1443) | AI Agent |
 | 2025-12-22 | TASK-PAY-031 marked complete (Payment Controller and DTOs - 15 tests, total 1458) | AI Agent |
+| 2025-12-22 | TASK-PAY-032 marked complete (Payment Matching Endpoint - 10 tests, total 1468) | AI Agent |
+| 2025-12-22 | TASK-PAY-033 marked complete (Arrears Dashboard Endpoint - 11 tests, total 1479) | AI Agent |

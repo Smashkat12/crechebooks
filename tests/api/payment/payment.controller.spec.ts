@@ -9,6 +9,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentController } from '../../../src/api/payment/payment.controller';
 import { PaymentAllocationService } from '../../../src/database/services/payment-allocation.service';
+import { PaymentMatchingService } from '../../../src/database/services/payment-matching.service';
+import { ArrearsService } from '../../../src/database/services/arrears.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { UserRole } from '@prisma/client';
@@ -63,6 +65,18 @@ describe('PaymentController', () => {
           provide: PaymentAllocationService,
           useValue: {
             allocatePayment: jest.fn(),
+          },
+        },
+        {
+          provide: PaymentMatchingService,
+          useValue: {
+            matchPayments: jest.fn(),
+          },
+        },
+        {
+          provide: ArrearsService,
+          useValue: {
+            getArrearsReport: jest.fn(),
           },
         },
         {

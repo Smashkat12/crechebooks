@@ -51,9 +51,9 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | POST /payments/match | endpoint | TASK-PAY-032 | ✅ Complete |
 | POST /payments | endpoint | TASK-PAY-031 | ✅ Complete |
 | GET /arrears | endpoint | TASK-PAY-033 | ✅ Complete |
-| POST /sars/vat201 | endpoint | TASK-SARS-032 | Pending |
-| POST /sars/emp201 | endpoint | TASK-SARS-033 | Pending |
-| POST /sars/{id}/submit | endpoint | TASK-SARS-031 | Pending |
+| POST /sars/vat201 | endpoint | TASK-SARS-032 | ✅ Complete |
+| POST /sars/emp201 | endpoint | TASK-SARS-033 | ✅ Complete |
+| POST /sars/{id}/submit | endpoint | TASK-SARS-031 | ✅ Complete |
 | POST /reconciliation | endpoint | TASK-RECON-031 | Pending |
 | GET /reports/income-statement | endpoint | TASK-RECON-032 | Pending |
 | POST /children | endpoint | TASK-BILL-034 | ✅ Complete |
@@ -277,3 +277,6 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-22 | TASK-PAY-031 marked complete (Payment Controller and DTOs - 15 tests, total 1458) | AI Agent |
 | 2025-12-22 | TASK-PAY-032 marked complete (Payment Matching Endpoint - 10 tests, total 1468) | AI Agent |
 | 2025-12-22 | TASK-PAY-033 marked complete (Arrears Dashboard Endpoint - 11 tests, total 1479) | AI Agent |
+| 2025-12-22 | TASK-SARS-031 marked complete (SARS Controller/DTOs - 8 tests, total 1487) | AI Agent |
+| 2025-12-22 | TASK-SARS-032 marked complete (VAT201 Endpoint - 11 tests, total 1498) | AI Agent |
+| 2025-12-22 | TASK-SARS-033 marked complete (EMP201 Endpoint - 12 tests, total 1510) | AI Agent |

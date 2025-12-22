@@ -1,260 +1,360 @@
-<task_spec id="TASK-SARS-031" version="1.0">
+<task_spec id="TASK-SARS-031" version="3.0">
 
 <metadata>
   <title>SARS Controller and DTOs</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>53</sequence>
   <implements>
     <requirement_ref>REQ-SARS-012</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-SARS-014</task_ref>
-    <task_ref>TASK-SARS-015</task_ref>
+    <task_ref status="complete">TASK-SARS-014</task_ref>
+    <task_ref status="complete">TASK-SARS-015</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
+  <last_updated>2025-12-22</last_updated>
 </metadata>
 
-<context>
-This task implements the SARS Controller and associated DTOs for managing tax submissions.
-It provides the REST API endpoint for marking SARS submissions as submitted after the
-user has filed them through eFiling. This endpoint finalizes submissions and makes them
-immutable for audit purposes. The controller handles both VAT201 and EMP201 submissions.
-</context>
+<executive_summary>
+Create NestJS SARS API controller at src/api/sars/ with POST /sars/:id/submit endpoint.
+Uses SarsSubmissionRepository.submit() method. All three SARS endpoints (submit, vat201, emp201)
+will be in the same controller. This task creates the base controller and submit endpoint.
+TASK-SARS-032 and TASK-SARS-033 add vat201 and emp201 endpoints to this controller.
+</executive_summary>
 
-<input_context_files>
-  <file purpose="api_specification">specs/technical/api-contracts.md#sars_endpoints</file>
-  <file purpose="service_interface">src/core/sars/sars.service.ts</file>
-  <file purpose="entities">src/core/sars/entities/sars-submission.entity.ts</file>
-  <file purpose="response_format">specs/technical/api-contracts.md#standard_response_format</file>
-</input_context_files>
+<critical_rules>
+  <rule>NO BACKWARDS COMPATIBILITY - fail fast or work correctly</rule>
+  <rule>NO MOCK DATA IN TESTS - use jest.spyOn() with real service interface types</rule>
+  <rule>NO WORKAROUNDS OR FALLBACKS - errors must propagate with clear messages</rule>
+  <rule>API DTOs use snake_case (e.g., sars_reference, submitted_date)</rule>
+  <rule>Internal service DTOs use camelCase (e.g., sarsReference, submittedBy)</rule>
+  <rule>All monetary values: cents internally, divide by 100 for API responses</rule>
+  <rule>Use `import type { IUser }` for decorator compatibility with isolatedModules</rule>
+</critical_rules>
 
-<prerequisites>
-  <check>TASK-SARS-014 completed (SarsService)</check>
-  <check>TASK-SARS-015 completed (SarsAgent)</check>
-  <check>TASK-CORE-002 completed (SarsSubmission entity)</check>
-  <check>NestJS application running</check>
-</prerequisites>
+<project_context>
+  <test_count>1479 tests passing as of TASK-PAY-033 completion</test_count>
+  <completed_api_modules>
+    - src/api/auth/ (AuthModule)
+    - src/api/transaction/ (TransactionModule)
+    - src/api/billing/ (BillingModule)
+    - src/api/payment/ (PaymentModule)
+  </completed_api_modules>
+  <pattern_reference>Use src/api/payment/ as the reference implementation pattern</pattern_reference>
+</project_context>
 
-<scope>
-  <in_scope>
-    - SARS controller with POST /sars/{id}/submit endpoint
-    - MarkSubmittedDto with validation decorators
-    - SarsSubmissionResponseDto for structured responses
-    - Swagger/OpenAPI annotations
-    - Request validation using class-validator
-    - Error handling for already-submitted submissions
-    - Immutability enforcement
-  </in_scope>
-  <out_of_scope>
-    - VAT201 generation (TASK-SARS-032)
-    - EMP201 generation (TASK-SARS-033)
-    - Tax calculations (handled in SarsService)
-    - eFiling integration (manual submission by user)
-  </out_of_scope>
-</scope>
+<existing_infrastructure>
+  <file path="src/database/repositories/sars-submission.repository.ts" purpose="Repository with submit method">
+    Key method: submit(id: string, dto: SubmitSarsSubmissionDto): Promise<SarsSubmission>
+    - Validates submission exists
+    - Checks submission is not already finalized
+    - Requires status === READY to submit
+    - Sets submittedAt, submittedBy, sarsReference
+    - Throws NotFoundException if submission not found
+    - Throws BusinessException if wrong status
+  </file>
+  <file path="src/database/dto/sars-submission.dto.ts" purpose="Internal DTOs">
+    - SubmitSarsSubmissionDto: { submittedBy: string, sarsReference?: string }
+    - SarsSubmissionFilterDto for querying
+    - CreateSarsSubmissionDto, UpdateSarsSubmissionDto
+  </file>
+  <file path="src/database/entities/sars-submission.entity.ts" purpose="Entity with enums">
+    - SubmissionType: VAT201 | EMP201 | IRP5
+    - SubmissionStatus: DRAFT | READY | SUBMITTED | ACKNOWLEDGED
+  </file>
+  <file path="src/database/services/vat201.service.ts" purpose="VAT201 generation">
+    - generateVat201(dto: GenerateVat201Dto): Creates SARS submission with DRAFT status
+  </file>
+  <file path="src/database/services/emp201.service.ts" purpose="EMP201 generation">
+    - generateEmp201(dto: GenerateEmp201Dto): Creates SARS submission with DRAFT status
+  </file>
+  <file path="src/api/auth/decorators/current-user.decorator.ts" purpose="Get current user from JWT">
+    @CurrentUser() returns IUser from request
+  </file>
+  <file path="src/api/auth/guards/jwt-auth.guard.ts" purpose="JWT authentication guard">
+    @UseGuards(JwtAuthGuard)
+  </file>
+  <file path="src/api/auth/guards/roles.guard.ts" purpose="Role-based access control">
+    @UseGuards(JwtAuthGuard, RolesGuard) with @Roles(UserRole.OWNER, ...)
+  </file>
+  <file path="src/shared/exceptions/index.ts" purpose="Custom exception classes">
+    NotFoundException, ConflictException, BusinessException
+  </file>
+</existing_infrastructure>
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/api/sars/sars.controller.ts">
-      @Controller('sars')
-      @ApiTags('SARS')
-      @UseGuards(JwtAuthGuard)
-      export class SarsController {
-        constructor(private readonly sarsService: SarsService) {}
+<files_to_create>
+  <file path="src/api/sars/sars.controller.ts">
+    NestJS controller for SARS endpoints.
 
-        @Post(':id/submit')
-        @ApiOperation({ summary: 'Mark SARS submission as submitted' })
-        @ApiResponse({ status: 200, type: SarsSubmissionResponseDto })
-        @ApiResponse({ status: 409, description: 'Already submitted' })
-        async markSubmitted(
-          @Param('id') id: string,
-          @Body() dto: MarkSubmittedDto,
-          @CurrentUser() user: JwtPayload,
-        ): Promise&lt;ApiResponse&lt;SarsSubmissionResponseDto&gt;&gt;
-      }
-    </signature>
+    Structure:
+    ```typescript
+    /**
+     * SARS Controller
+     * TASK-SARS-031: SARS Controller and DTOs
+     *
+     * Handles SARS tax submission operations.
+     * Uses snake_case for external API, transforms to camelCase for internal services.
+     */
+    import {
+      Controller, Post, Body, Param, Logger, HttpCode, UseGuards,
+    } from '@nestjs/common';
+    import {
+      ApiTags, ApiOperation, ApiResponse, ApiBearerAuth,
+      ApiUnauthorizedResponse, ApiForbiddenResponse, ApiParam,
+    } from '@nestjs/swagger';
+    import { UserRole } from '@prisma/client';
+    import { SarsSubmissionRepository } from '../../database/repositories/sars-submission.repository';
+    import { CurrentUser } from '../auth/decorators/current-user.decorator';
+    import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+    import { RolesGuard } from '../auth/guards/roles.guard';
+    import { Roles } from '../auth/decorators/roles.decorator';
+    import type { IUser } from '../../database/entities/user.entity';
+    import { ApiMarkSubmittedDto, SarsSubmissionResponseDto } from './dto';
 
-    <signature file="src/api/sars/dto/mark-submitted.dto.ts">
-      export class MarkSubmittedDto {
-        @ApiPropertyOptional({ example: 'SARS-REF-123' })
-        @IsOptional()
-        @IsString()
-        @MaxLength(100)
-        sars_reference?: string;
+    @Controller('sars')
+    @ApiTags('SARS')
+    @ApiBearerAuth('JWT-auth')
+    export class SarsController {
+      private readonly logger = new Logger(SarsController.name);
 
-        @ApiProperty({ example: '2025-01-25' })
-        @IsDateString()
-        submitted_date: string;
-      }
-    </signature>
+      constructor(
+        private readonly sarsSubmissionRepo: SarsSubmissionRepository,
+        // Vat201Service and Emp201Service will be added in TASK-SARS-032/033
+      ) {}
 
-    <signature file="src/api/sars/dto/sars-submission-response.dto.ts">
-      export class SarsSubmissionResponseDto {
-        @ApiProperty()
-        id: string;
+      @Post(':id/submit')
+      @HttpCode(200)
+      @Roles(UserRole.OWNER, UserRole.ADMIN)
+      @UseGuards(JwtAuthGuard, RolesGuard)
+      @ApiOperation({ summary: 'Mark SARS submission as submitted to eFiling' })
+      @ApiParam({ name: 'id', description: 'SARS submission ID (UUID)' })
+      @ApiResponse({ status: 200, type: SarsSubmissionResponseDto })
+      @ApiResponse({ status: 400, description: 'Invalid submission ID or date format' })
+      @ApiResponse({ status: 404, description: 'Submission not found' })
+      @ApiResponse({ status: 409, description: 'Submission not in READY status' })
+      @ApiForbiddenResponse({ description: 'Requires OWNER or ADMIN role' })
+      @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+      async markSubmitted(
+        @Param('id') id: string,
+        @Body() dto: ApiMarkSubmittedDto,
+        @CurrentUser() user: IUser,
+      ): Promise<SarsSubmissionResponseDto> {
+        this.logger.log(`Mark submitted: tenant=${user.tenantId}, submission=${id}`);
 
-        @ApiProperty({ enum: ['DRAFT', 'READY', 'SUBMITTED'] })
-        status: string;
+        // Transform API snake_case to service camelCase
+        const submission = await this.sarsSubmissionRepo.submit(id, {
+          submittedBy: user.id,
+          sarsReference: dto.sars_reference, // snake_case -> camelCase
+        });
 
-        @ApiProperty()
-        submitted_at: string;
-
-        @ApiProperty()
-        is_finalized: boolean;
-      }
-    </signature>
-  </signatures>
-
-  <constraints>
-    - Must validate id is valid UUID
-    - Must validate submitted_date is valid date in YYYY-MM-DD format
-    - Must check submission is not already submitted (409 Conflict)
-    - Must verify submission belongs to user's tenant
-    - Must set is_finalized to true (immutable)
-    - Must update status to SUBMITTED
-    - Must store SARS reference if provided
-    - Must use class-validator decorators for all validations
-    - Must include Swagger/OpenAPI annotations
-    - Must return 200 OK on success
-    - Must return 404 Not Found if submission doesn't exist
-    - Must return 409 Conflict if already submitted
-  </constraints>
-
-  <verification>
-    - POST /sars/{id}/submit with valid payload returns 200
-    - POST /sars/{id}/submit with invalid UUID returns 400
-    - POST /sars/{id}/submit with invalid date format returns 400
-    - POST /sars/{id}/submit without auth token returns 401
-    - POST /sars/{id}/submit for non-existent submission returns 404
-    - POST /sars/{id}/submit for already-submitted submission returns 409
-    - Submission becomes immutable after marking as submitted
-    - is_finalized set to true
-    - Swagger UI displays endpoint correctly
-    - npm run lint passes
-    - npm run test passes (controller unit tests)
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-SarsController (src/api/sars/sars.controller.ts):
-  @Controller('sars')
-  @ApiTags('SARS')
-  @UseGuards(JwtAuthGuard)
-  export class SarsController:
-    constructor(sarsService: SarsService)
-
-    @Post(':id/submit')
-    @ApiOperation({ summary: 'Mark SARS submission as submitted' })
-    @ApiResponse({ status: 200, type: SarsSubmissionResponseDto })
-    @ApiResponse({ status: 404, description: 'Submission not found' })
-    @ApiResponse({ status: 409, description: 'Already submitted' })
-    async markSubmitted(id: string, dto: MarkSubmittedDto, user: JwtPayload):
-      try:
-        submission = await sarsService.markSubmitted(
-          id,
-          dto.sars_reference,
-          new Date(dto.submitted_date),
-          user.tenant_id,
-          user.user_id
-        )
+        this.logger.log(`Submission ${id} marked as submitted`);
 
         return {
           success: true,
           data: {
             id: submission.id,
+            submission_type: submission.submissionType,
+            period: submission.periodStart.toISOString().slice(0, 7), // YYYY-MM
             status: submission.status,
-            submitted_at: submission.submitted_at.toISOString(),
-            is_finalized: submission.is_finalized
-          }
-        }
-      catch error:
-        if error instanceof NotFoundException:
-          throw new NotFoundException('Submission not found')
-        if error instanceof ConflictException:
-          throw new ConflictException('Submission already marked as submitted')
-        throw error
+            submitted_at: submission.submittedAt?.toISOString() ?? null,
+            sars_reference: submission.sarsReference ?? null,
+            is_finalized: submission.isFinalized,
+          },
+        };
+      }
+    }
+    ```
+  </file>
 
-MarkSubmittedDto (src/api/sars/dto/mark-submitted.dto.ts):
-  export class MarkSubmittedDto:
-    @ApiPropertyOptional({
-      example: 'SARS-REF-123',
-      description: 'eFiling reference number from SARS'
+  <file path="src/api/sars/dto/mark-submitted.dto.ts">
+    API DTO for POST /sars/:id/submit request body.
+
+    ```typescript
+    /**
+     * Mark Submitted DTO
+     * TASK-SARS-031: SARS Controller and DTOs
+     *
+     * API DTO for marking a SARS submission as submitted.
+     * Uses snake_case for external API consistency.
+     */
+    import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+    import { IsOptional, IsString, MaxLength, IsDateString } from 'class-validator';
+
+    export class ApiMarkSubmittedDto {
+      @ApiPropertyOptional({
+        description: 'eFiling reference number from SARS (optional)',
+        example: 'SARS-REF-2025-001234',
+      })
+      @IsOptional()
+      @IsString()
+      @MaxLength(100)
+      sars_reference?: string;
+
+      @ApiProperty({
+        description: 'Date submission was filed with SARS (YYYY-MM-DD)',
+        example: '2025-01-25',
+      })
+      @IsDateString()
+      submitted_date!: string;
+    }
+    ```
+  </file>
+
+  <file path="src/api/sars/dto/sars-response.dto.ts">
+    Response DTOs for SARS endpoints.
+
+    ```typescript
+    /**
+     * SARS Response DTOs
+     * TASK-SARS-031: SARS Controller and DTOs
+     *
+     * Response DTOs for SARS submission operations.
+     * Uses snake_case for external API consistency.
+     */
+    import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+    export class SarsSubmissionDataDto {
+      @ApiProperty({ example: 'uuid-here' })
+      id!: string;
+
+      @ApiProperty({ example: 'VAT201', enum: ['VAT201', 'EMP201', 'IRP5'] })
+      submission_type!: string;
+
+      @ApiProperty({ example: '2025-01', description: 'Period in YYYY-MM format' })
+      period!: string;
+
+      @ApiProperty({ example: 'SUBMITTED', enum: ['DRAFT', 'READY', 'SUBMITTED', 'ACKNOWLEDGED'] })
+      status!: string;
+
+      @ApiPropertyOptional({ example: '2025-01-25T14:30:00.000Z' })
+      submitted_at!: string | null;
+
+      @ApiPropertyOptional({ example: 'SARS-REF-2025-001234' })
+      sars_reference!: string | null;
+
+      @ApiProperty({ example: false })
+      is_finalized!: boolean;
+    }
+
+    export class SarsSubmissionResponseDto {
+      @ApiProperty({ example: true })
+      success!: boolean;
+
+      @ApiProperty({ type: SarsSubmissionDataDto })
+      data!: SarsSubmissionDataDto;
+    }
+    ```
+  </file>
+
+  <file path="src/api/sars/dto/index.ts">
+    Barrel export for SARS DTOs.
+
+    ```typescript
+    /**
+     * SARS DTO Barrel Exports
+     * TASK-SARS-031: SARS Controller and DTOs
+     */
+    export * from './mark-submitted.dto';
+    export * from './sars-response.dto';
+    // TASK-SARS-032 will add: export * from './vat201.dto';
+    // TASK-SARS-033 will add: export * from './emp201.dto';
+    ```
+  </file>
+
+  <file path="src/api/sars/sars.module.ts">
+    NestJS module for SARS API.
+
+    ```typescript
+    /**
+     * SARS Module
+     * TASK-SARS-031: SARS Controller and DTOs
+     *
+     * Provides the SarsController with required dependencies.
+     */
+    import { Module } from '@nestjs/common';
+    import { SarsController } from './sars.controller';
+    import { SarsSubmissionRepository } from '../../database/repositories/sars-submission.repository';
+    import { PrismaModule } from '../../database/prisma';
+
+    @Module({
+      imports: [PrismaModule],
+      controllers: [SarsController],
+      providers: [
+        SarsSubmissionRepository,
+        // Vat201Service will be added in TASK-SARS-032
+        // Emp201Service will be added in TASK-SARS-033
+      ],
     })
-    @IsOptional()
-    @IsString()
-    @MaxLength(100)
-    sars_reference?: string
+    export class SarsModule {}
+    ```
+  </file>
 
-    @ApiProperty({
-      example: '2025-01-25',
-      description: 'Date submission was filed with SARS'
-    })
-    @IsDateString()
-    submitted_date: string
+  <file path="tests/api/sars/sars.controller.spec.ts">
+    Controller unit tests using jest.spyOn() - NO MOCK DATA.
 
-SarsSubmissionResponseDto (src/api/sars/dto/sars-submission-response.dto.ts):
-  export class SarsSubmissionResponseDto:
-    @ApiProperty()
-    id: string
+    Test coverage:
+    1. POST /sars/:id/submit with valid payload returns 200
+    2. Transforms API snake_case to service camelCase
+    3. Response uses snake_case field names
+    4. Period format is YYYY-MM from periodStart
+    5. Handles null submitted_at and sars_reference
+    6. Works for ADMIN users same as OWNER
+    7. Propagates NotFoundException from repository
+    8. Propagates BusinessException for wrong status
 
-    @ApiProperty({
-      enum: ['DRAFT', 'READY', 'SUBMITTED'],
-      example: 'SUBMITTED'
-    })
-    status: string
-
-    @ApiProperty({ example: '2025-01-25T14:30:00Z' })
-    submitted_at: string
-
-    @ApiProperty({
-      example: true,
-      description: 'Whether submission is finalized and immutable'
-    })
-    is_finalized: boolean
-
-SarsModule (src/api/sars/sars.module.ts):
-  @Module({
-    imports: [
-      CoreSarsModule,
-      AuthModule
-    ],
-    controllers: [SarsController],
-    providers: []
-  })
-  export class SarsApiModule {}
-</pseudo_code>
-
-<files_to_create>
-  <file path="src/api/sars/sars.controller.ts">SARS controller with submit endpoint</file>
-  <file path="src/api/sars/dto/mark-submitted.dto.ts">DTO for submission marking request</file>
-  <file path="src/api/sars/dto/sars-submission-response.dto.ts">DTO for submission response</file>
-  <file path="src/api/sars/sars.module.ts">SARS API module</file>
-  <file path="tests/api/sars/sars.controller.spec.ts">Controller unit tests</file>
+    Pattern: Use tests/api/payment/payment-matching.controller.spec.ts as reference.
+  </file>
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/app.module.ts">Import SarsApiModule</file>
+  <file path="src/api/api.module.ts">
+    Add SarsModule to imports and exports.
+
+    ```typescript
+    import { SarsModule } from './sars/sars.module';
+
+    @Module({
+      imports: [AuthModule, TransactionModule, BillingModule, PaymentModule, SarsModule],
+      exports: [AuthModule, TransactionModule, BillingModule, PaymentModule, SarsModule],
+    })
+    export class ApiModule {}
+    ```
+  </file>
 </files_to_modify>
 
-<validation_criteria>
-  <criterion>Controller compiles without TypeScript errors</criterion>
-  <criterion>All DTOs have complete class-validator decorators</criterion>
-  <criterion>All endpoints have Swagger annotations</criterion>
-  <criterion>POST /sars/{id}/submit returns 200 with correct response</criterion>
-  <criterion>Already-submitted submissions return 409 Conflict</criterion>
-  <criterion>is_finalized enforces immutability</criterion>
-  <criterion>Missing auth token returns 401</criterion>
-  <criterion>Unit tests achieve >80% coverage</criterion>
-  <criterion>ESLint passes with no warnings</criterion>
-</validation_criteria>
+<test_requirements>
+  <requirement>Use jest.spyOn() to verify service/repository calls</requirement>
+  <requirement>Create mock IUser objects with real UserRole from @prisma/client</requirement>
+  <requirement>Return typed service response objects (not mock data)</requirement>
+  <requirement>Verify DTO transformation (snake_case API to camelCase service)</requirement>
+  <requirement>Verify cents to decimal conversion where applicable</requirement>
+  <requirement>Test error propagation (NotFoundException, BusinessException)</requirement>
+  <requirement>Minimum 8 tests for this endpoint</requirement>
+</test_requirements>
 
-<test_commands>
-  <command>npm run build</command>
-  <command>npm run lint</command>
-  <command>npm run test sars.controller.spec</command>
-  <command>npm run start:dev</command>
-  <command>curl -X POST http://localhost:3000/sars/uuid/submit -H "Authorization: Bearer token" -H "Content-Type: application/json" -d '{"submitted_date":"2025-01-25","sars_reference":"SARS-REF-123"}'</command>
-</test_commands>
+<verification_steps>
+  <step>npm run build - must compile without errors</step>
+  <step>npm run lint - must pass with no warnings</step>
+  <step>npm run test tests/api/sars/sars.controller.spec.ts - all tests pass</step>
+  <step>npm run test - all 1487+ tests pass (1479 + ~8 new)</step>
+</verification_steps>
+
+<error_handling>
+  Repository throws NotFoundException if submission not found - let it propagate.
+  Repository throws BusinessException if submission not in READY status - let it propagate.
+  Repository throws BusinessException if submission already finalized - let it propagate.
+  DO NOT catch and wrap errors unless adding context. Fail fast with clear error messages.
+</error_handling>
+
+<implementation_notes>
+  1. The controller uses SarsSubmissionRepository.submit() which expects status === READY.
+     If the submission is in DRAFT status, generate endpoints (TASK-SARS-032/033) must call
+     markAsReady() first to transition to READY before submit() can be called.
+  2. The submitted_date from API DTO is informational - the actual submittedAt is set by the
+     repository to the current timestamp when submit() is called.
+  3. TenantId validation is implicit - the repository does not filter by tenantId on submit.
+     Consider adding tenant validation in controller if required for security.
+</implementation_notes>
 
 </task_spec>

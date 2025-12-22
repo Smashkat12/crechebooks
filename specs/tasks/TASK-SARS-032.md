@@ -1,8 +1,8 @@
-<task_spec id="TASK-SARS-032" version="1.0">
+<task_spec id="TASK-SARS-032" version="3.0">
 
 <metadata>
   <title>VAT201 Endpoint</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>54</sequence>
   <implements>
@@ -12,297 +12,337 @@
     <requirement_ref>REQ-SARS-004</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-SARS-031</task_ref>
+    <task_ref status="complete">TASK-SARS-031</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
+  <last_updated>2025-12-22</last_updated>
 </metadata>
 
-<context>
-This task implements the VAT201 return generation endpoint. It creates a VAT201 submission
-for a specified period, calculating output VAT from invoices and input VAT from expenses.
-The endpoint distinguishes between standard-rated, zero-rated, and exempt supplies, and
-flags any items requiring review (e.g., missing VAT numbers). Returns are created in DRAFT
-status for review before final submission.
-</context>
+<executive_summary>
+Add POST /sars/vat201 endpoint to SarsController (created in TASK-SARS-031).
+Uses Vat201Service.generateVat201() from src/database/services/vat201.service.ts.
+Creates VAT201 submission in DRAFT status. Calculates output VAT from invoices,
+input VAT from expenses, and flags items requiring review.
+</executive_summary>
 
-<input_context_files>
-  <file purpose="api_specification">specs/technical/api-contracts.md#sars_endpoints</file>
-  <file purpose="service_interface">src/core/sars/sars.service.ts</file>
-  <file purpose="vat_rules">specs/functional/sars-module.md#vat_calculations</file>
-  <file purpose="response_format">specs/technical/api-contracts.md#standard_response_format</file>
-</input_context_files>
+<critical_rules>
+  <rule>NO BACKWARDS COMPATIBILITY - fail fast or work correctly</rule>
+  <rule>NO MOCK DATA IN TESTS - use jest.spyOn() with real service interface types</rule>
+  <rule>NO WORKAROUNDS OR FALLBACKS - errors must propagate with clear messages</rule>
+  <rule>API DTOs use snake_case (e.g., period_start, output_vat)</rule>
+  <rule>Internal service DTOs use camelCase (e.g., periodStart, outputVatCents)</rule>
+  <rule>All monetary values: cents internally, divide by 100 for API responses</rule>
+  <rule>Use `import type { IUser }` for decorator compatibility with isolatedModules</rule>
+</critical_rules>
 
-<prerequisites>
-  <check>TASK-SARS-031 completed (SARS controller)</check>
-  <check>TASK-SARS-014 completed (SarsService)</check>
-  <check>TASK-SARS-015 completed (SarsAgent)</check>
-  <check>Invoice and transaction data exists</check>
-</prerequisites>
+<project_context>
+  <test_count>1479 tests passing + TASK-SARS-031 tests</test_count>
+  <prerequisite>TASK-SARS-031 must be completed first (creates SarsController)</prerequisite>
+  <pattern_reference>Use src/api/payment/payment.controller.ts matchPayments method as reference</pattern_reference>
+</project_context>
 
-<scope>
-  <in_scope>
-    - POST /sars/vat201 endpoint
-    - GenerateVat201Dto with period parameters
-    - Vat201ResponseDto with detailed VAT breakdown
-    - Output VAT from invoices
-    - Input VAT from categorized expenses
-    - Items requiring review flagging
-    - Document URL generation
-    - Swagger/OpenAPI annotations
-  </in_scope>
-  <out_of_scope>
-    - VAT calculation logic (in SarsService)
-    - EMP201 generation (TASK-SARS-033)
-    - Submission marking (TASK-SARS-031)
-    - eFiling integration
-    - PDF generation (can return URL to placeholder)
-  </out_of_scope>
-</scope>
+<existing_infrastructure>
+  <file path="src/database/services/vat201.service.ts" purpose="VAT201 generation service">
+    Key method signature:
+    ```typescript
+    async generateVat201(dto: GenerateVat201Dto): Promise<SarsSubmission>
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/api/sars/sars.controller.ts">
-      @Controller('sars')
-      @ApiTags('SARS')
-      @UseGuards(JwtAuthGuard)
-      export class SarsController {
-        @Post('vat201')
-        @ApiOperation({ summary: 'Generate VAT201 return for period' })
-        @ApiResponse({ status: 201, type: Vat201ResponseDto })
-        async generateVat201(
-          @Body() dto: GenerateVat201Dto,
-          @CurrentUser() user: JwtPayload,
-        ): Promise&lt;ApiResponse&lt;Vat201ResponseDto&gt;&gt;
+    // GenerateVat201Dto interface (from src/database/dto/vat201.dto.ts):
+    interface GenerateVat201Dto {
+      tenantId: string;
+      periodStart: Date;
+      periodEnd: Date;
+    }
+
+    // Returns Prisma SarsSubmission with:
+    // - id, tenantId, submissionType: 'VAT201'
+    // - periodStart, periodEnd, deadline
+    // - outputVatCents, inputVatCents, netVatCents (all integers in cents)
+    // - status: 'DRAFT'
+    // - documentData: JSON with flaggedItems array
+    ```
+    Throws Error if tenant not VAT registered (check taxStatus !== 'VAT_REGISTERED').
+    Throws Error if tenant has no vatNumber.
+  </file>
+  <file path="src/database/dto/vat201.dto.ts" purpose="VAT201 internal DTOs">
+    Contains GenerateVat201Dto, Vat201Document, Vat201Fields, VatFlaggedItem types.
+  </file>
+  <file path="src/api/sars/sars.controller.ts" purpose="Controller from TASK-SARS-031">
+    Will add generateVat201 method to this controller.
+  </file>
+  <file path="src/api/sars/sars.module.ts" purpose="Module from TASK-SARS-031">
+    Will add Vat201Service to providers.
+  </file>
+</existing_infrastructure>
+
+<files_to_create>
+  <file path="src/api/sars/dto/vat201.dto.ts">
+    API DTOs for VAT201 endpoint.
+
+    ```typescript
+    /**
+     * VAT201 DTOs
+     * TASK-SARS-032: VAT201 Endpoint
+     *
+     * API DTOs for VAT201 generation endpoint.
+     * Uses snake_case for external API consistency.
+     */
+    import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+    import { IsDateString } from 'class-validator';
+
+    export class ApiGenerateVat201Dto {
+      @ApiProperty({
+        description: 'Start date of VAT period (YYYY-MM-DD)',
+        example: '2025-01-01',
+      })
+      @IsDateString()
+      period_start!: string;
+
+      @ApiProperty({
+        description: 'End date of VAT period (YYYY-MM-DD)',
+        example: '2025-01-31',
+      })
+      @IsDateString()
+      period_end!: string;
+    }
+
+    export class ApiVat201ReviewItemDto {
+      @ApiProperty({ example: 'trans-uuid' })
+      transaction_id!: string;
+
+      @ApiProperty({ example: 'Missing VAT number on supplier invoice' })
+      issue!: string;
+
+      @ApiProperty({ example: 'WARNING', enum: ['ERROR', 'WARNING'] })
+      severity!: string;
+    }
+
+    export class ApiVat201DataDto {
+      @ApiProperty({ example: 'uuid-here' })
+      id!: string;
+
+      @ApiProperty({ example: 'VAT201' })
+      submission_type!: string;
+
+      @ApiProperty({ example: '2025-01', description: 'Period in YYYY-MM format' })
+      period!: string;
+
+      @ApiProperty({ example: 'DRAFT', enum: ['DRAFT', 'READY', 'SUBMITTED', 'ACKNOWLEDGED'] })
+      status!: string;
+
+      @ApiProperty({ example: 23175.00, description: 'Output VAT from sales (Rands)' })
+      output_vat!: number;
+
+      @ApiProperty({ example: 8450.00, description: 'Input VAT from purchases (Rands)' })
+      input_vat!: number;
+
+      @ApiProperty({ example: 14725.00, description: 'Net VAT payable (output - input, Rands)' })
+      net_vat!: number;
+
+      @ApiProperty({ example: true, description: 'True if net VAT is owed to SARS' })
+      is_payable!: boolean;
+
+      @ApiProperty({ type: [ApiVat201ReviewItemDto], description: 'Items requiring review' })
+      items_requiring_review!: ApiVat201ReviewItemDto[];
+
+      @ApiProperty({ example: '2025-02-25T00:00:00.000Z', description: 'Submission deadline' })
+      deadline!: string;
+
+      @ApiProperty({ example: '/sars/vat201/uuid/document' })
+      document_url!: string;
+    }
+
+    export class ApiVat201ResponseDto {
+      @ApiProperty({ example: true })
+      success!: boolean;
+
+      @ApiProperty({ type: ApiVat201DataDto })
+      data!: ApiVat201DataDto;
+    }
+    ```
+  </file>
+
+  <file path="tests/api/sars/vat201.controller.spec.ts">
+    Controller unit tests using jest.spyOn() - NO MOCK DATA.
+
+    Test coverage:
+    1. POST /sars/vat201 with valid period returns 201
+    2. Transforms API snake_case to service camelCase
+    3. Converts cents to Rands in response (divide by 100)
+    4. Response uses snake_case field names
+    5. Period format is YYYY-MM from periodStart
+    6. Calculates is_payable correctly (net_vat > 0)
+    7. Includes items_requiring_review from documentData
+    8. Works for ADMIN users same as OWNER
+    9. Works for ACCOUNTANT role (read-only but can generate drafts)
+    10. Propagates error when tenant not VAT registered
+    11. Propagates error when period_end before period_start
+
+    Pattern: Use tests/api/payment/payment-matching.controller.spec.ts as reference.
+  </file>
+</files_to_create>
+
+<files_to_modify>
+  <file path="src/api/sars/sars.controller.ts">
+    Add Vat201Service dependency and generateVat201 method.
+
+    ```typescript
+    // Add to imports:
+    import { Vat201Service } from '../../database/services/vat201.service';
+    import {
+      ApiMarkSubmittedDto, SarsSubmissionResponseDto,
+      ApiGenerateVat201Dto, ApiVat201ResponseDto,
+    } from './dto';
+
+    // Add to constructor:
+    constructor(
+      private readonly sarsSubmissionRepo: SarsSubmissionRepository,
+      private readonly vat201Service: Vat201Service,
+    ) {}
+
+    // Add method:
+    @Post('vat201')
+    @HttpCode(201)
+    @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @ApiOperation({ summary: 'Generate VAT201 return for period' })
+    @ApiResponse({ status: 201, type: ApiVat201ResponseDto })
+    @ApiResponse({ status: 400, description: 'Invalid date format or period' })
+    @ApiResponse({ status: 403, description: 'Tenant not VAT registered' })
+    @ApiForbiddenResponse({ description: 'Requires OWNER, ADMIN, or ACCOUNTANT role' })
+    @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+    async generateVat201(
+      @Body() dto: ApiGenerateVat201Dto,
+      @CurrentUser() user: IUser,
+    ): Promise<ApiVat201ResponseDto> {
+      this.logger.log(
+        `Generate VAT201: tenant=${user.tenantId}, period=${dto.period_start} to ${dto.period_end}`
+      );
+
+      // Validate period_end is after period_start
+      const periodStart = new Date(dto.period_start);
+      const periodEnd = new Date(dto.period_end);
+      if (periodEnd <= periodStart) {
+        throw new BadRequestException('period_end must be after period_start');
       }
-    </signature>
 
-    <signature file="src/api/sars/dto/generate-vat201.dto.ts">
-      export class GenerateVat201Dto {
-        @ApiProperty({ example: '2025-01-01' })
-        @IsDateString()
-        period_start: string;
+      // Transform API snake_case to service camelCase
+      const submission = await this.vat201Service.generateVat201({
+        tenantId: user.tenantId,
+        periodStart,
+        periodEnd,
+      });
 
-        @ApiProperty({ example: '2025-01-31' })
-        @IsDateString()
-        period_end: string;
-      }
-    </signature>
+      // Extract flagged items from documentData
+      const documentData = submission.documentData as {
+        flaggedItems?: Array<{ transactionId: string; issue: string; severity: string }>;
+      };
+      const flaggedItems = documentData?.flaggedItems ?? [];
 
-    <signature file="src/api/sars/dto/vat201-response.dto.ts">
-      export class ReviewItemDto {
-        @ApiProperty()
-        transaction_id: string;
+      this.logger.log(
+        `VAT201 generated: ${submission.id}, output=${submission.outputVatCents}, input=${submission.inputVatCents}`
+      );
 
-        @ApiProperty()
-        issue: string;
-      }
-
-      export class Vat201ResponseDto {
-        @ApiProperty()
-        id: string;
-
-        @ApiProperty({ example: 'VAT201' })
-        submission_type: string;
-
-        @ApiProperty({ example: '2025-01' })
-        period: string;
-
-        @ApiProperty({ enum: ['DRAFT', 'READY', 'SUBMITTED'] })
-        status: string;
-
-        @ApiProperty({ example: 23175.00 })
-        output_vat: number;
-
-        @ApiProperty({ example: 8450.00 })
-        input_vat: number;
-
-        @ApiProperty({ example: 14725.00 })
-        net_vat: number;
-
-        @ApiProperty({ type: [ReviewItemDto] })
-        items_requiring_review: ReviewItemDto[];
-
-        @ApiProperty()
-        document_url: string;
-      }
-    </signature>
-  </signatures>
-
-  <constraints>
-    - Must validate period_start and period_end are valid dates
-    - Must validate period_end is after period_start
-    - Must verify tenant is VAT registered
-    - Must calculate output VAT from invoices in period
-    - Must calculate input VAT from expense transactions in period
-    - Must distinguish standard-rated, zero-rated, exempt
-    - Must flag items without proper VAT documentation
-    - Net VAT = output_vat - input_vat
-    - Must return amounts in Rand (not cents)
-    - Must create submission with DRAFT status
-    - Must use Swagger/OpenAPI annotations
-    - Must return 201 Created on success
-    - Must return 400 Bad Request for validation errors
-    - Must return 403 Forbidden if tenant not VAT registered
-  </constraints>
-
-  <verification>
-    - POST /sars/vat201 with valid period returns 201
-    - POST /sars/vat201 with invalid dates returns 400
-    - POST /sars/vat201 with end before start returns 400
-    - POST /sars/vat201 without auth token returns 401
-    - POST /sars/vat201 for non-VAT tenant returns 403
-    - Output VAT calculated correctly from invoices
-    - Input VAT calculated correctly from expenses
-    - Net VAT equals output minus input
-    - Items missing VAT details flagged for review
-    - Document URL generated correctly
-    - Swagger UI displays endpoint correctly
-    - npm run lint passes
-    - npm run test passes (controller unit tests)
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-SarsController (src/api/sars/sars.controller.ts):
-  @Post('vat201')
-  @ApiOperation({ summary: 'Generate VAT201 return for period' })
-  @ApiResponse({ status: 201, type: Vat201ResponseDto })
-  @ApiResponse({ status: 403, description: 'Tenant not VAT registered' })
-  async generateVat201(dto: GenerateVat201Dto, user: JwtPayload):
-    try:
-      submission = await sarsService.generateVat201(
-        new Date(dto.period_start),
-        new Date(dto.period_end),
-        user.tenant_id
-      )
-
+      // Transform service camelCase to API snake_case, cents to Rands
       return {
         success: true,
         data: {
           id: submission.id,
-          submission_type: submission.submission_type,
-          period: submission.period_month,
+          submission_type: submission.submissionType,
+          period: submission.periodStart.toISOString().slice(0, 7), // YYYY-MM
           status: submission.status,
-          output_vat: Money.fromCents(submission.output_vat_cents).toNumber(),
-          input_vat: Money.fromCents(submission.input_vat_cents).toNumber(),
-          net_vat: Money.fromCents(submission.net_vat_cents).toNumber(),
-          items_requiring_review: submission.review_items.map(item => ({
-            transaction_id: item.transaction_id,
-            issue: item.issue
+          output_vat: (submission.outputVatCents ?? 0) / 100,
+          input_vat: (submission.inputVatCents ?? 0) / 100,
+          net_vat: (submission.netVatCents ?? 0) / 100,
+          is_payable: (submission.netVatCents ?? 0) > 0,
+          items_requiring_review: flaggedItems.map(item => ({
+            transaction_id: item.transactionId,
+            issue: item.issue,
+            severity: item.severity,
           })),
-          document_url: `/sars/vat201/${submission.id}/document`
-        }
-      }
-    catch error:
-      if error instanceof ForbiddenException:
-        throw new ForbiddenException('Tenant is not VAT registered')
-      if error instanceof ValidationException:
-        throw new BadRequestException(error.message)
-      throw error
+          deadline: submission.deadline.toISOString(),
+          document_url: `/sars/vat201/${submission.id}/document`,
+        },
+      };
+    }
+    ```
+  </file>
 
-GenerateVat201Dto (src/api/sars/dto/generate-vat201.dto.ts):
-  export class GenerateVat201Dto:
-    @ApiProperty({
-      example: '2025-01-01',
-      description: 'Start date of VAT period (YYYY-MM-DD)'
+  <file path="src/api/sars/sars.module.ts">
+    Add Vat201Service and its dependencies to providers.
+
+    ```typescript
+    import { Vat201Service } from '../../database/services/vat201.service';
+    import { VatService } from '../../database/services/vat.service';
+
+    @Module({
+      imports: [PrismaModule],
+      controllers: [SarsController],
+      providers: [
+        SarsSubmissionRepository,
+        Vat201Service,
+        VatService, // Required by Vat201Service
+        // Emp201Service will be added in TASK-SARS-033
+      ],
     })
-    @IsDateString()
-    period_start: string
+    export class SarsModule {}
+    ```
+  </file>
 
-    @ApiProperty({
-      example: '2025-01-31',
-      description: 'End date of VAT period (YYYY-MM-DD)'
-    })
-    @IsDateString()
-    period_end: string
+  <file path="src/api/sars/dto/index.ts">
+    Add VAT201 DTO exports.
 
-    @Validate(IsAfterDate, ['period_start'])
-    period_end: string
-
-Vat201ResponseDto (src/api/sars/dto/vat201-response.dto.ts):
-  export class ReviewItemDto:
-    @ApiProperty()
-    transaction_id: string
-
-    @ApiProperty({ example: 'Missing VAT number on supplier invoice' })
-    issue: string
-
-  export class Vat201ResponseDto:
-    @ApiProperty()
-    id: string
-
-    @ApiProperty({ example: 'VAT201' })
-    submission_type: string
-
-    @ApiProperty({
-      example: '2025-01',
-      description: 'Period in YYYY-MM format'
-    })
-    period: string
-
-    @ApiProperty({ enum: ['DRAFT', 'READY', 'SUBMITTED'] })
-    status: string
-
-    @ApiProperty({
-      example: 23175.00,
-      description: 'Total output VAT from sales'
-    })
-    output_vat: number
-
-    @ApiProperty({
-      example: 8450.00,
-      description: 'Total input VAT from purchases'
-    })
-    input_vat: number
-
-    @ApiProperty({
-      example: 14725.00,
-      description: 'Net VAT payable (output - input)'
-    })
-    net_vat: number
-
-    @ApiProperty({
-      type: [ReviewItemDto],
-      description: 'Transactions requiring manual review'
-    })
-    items_requiring_review: ReviewItemDto[]
-
-    @ApiProperty({
-      example: '/sars/vat201/uuid/document',
-      description: 'URL to download VAT201 document'
-    })
-    document_url: string
-</pseudo_code>
-
-<files_to_create>
-  <file path="src/api/sars/dto/generate-vat201.dto.ts">DTO for VAT201 generation request</file>
-  <file path="src/api/sars/dto/vat201-response.dto.ts">DTO for VAT201 response</file>
-  <file path="tests/api/sars/vat201.controller.spec.ts">VAT201 endpoint unit tests</file>
-</files_to_create>
-
-<files_to_modify>
-  <file path="src/api/sars/sars.controller.ts">Add generateVat201 method</file>
+    ```typescript
+    export * from './mark-submitted.dto';
+    export * from './sars-response.dto';
+    export * from './vat201.dto';
+    // TASK-SARS-033 will add: export * from './emp201.dto';
+    ```
+  </file>
 </files_to_modify>
 
-<validation_criteria>
-  <criterion>Endpoint compiles without TypeScript errors</criterion>
-  <criterion>All DTOs have complete class-validator decorators</criterion>
-  <criterion>All endpoints have Swagger annotations</criterion>
-  <criterion>POST /sars/vat201 returns 201 with correct structure</criterion>
-  <criterion>Output VAT calculated from invoices</criterion>
-  <criterion>Input VAT calculated from expenses</criterion>
-  <criterion>Net VAT equals output minus input</criterion>
-  <criterion>Review items flagged correctly</criterion>
-  <criterion>Unit tests achieve >80% coverage</criterion>
-  <criterion>ESLint passes with no warnings</criterion>
-</validation_criteria>
+<test_requirements>
+  <requirement>Use jest.spyOn() to verify Vat201Service.generateVat201() calls</requirement>
+  <requirement>Create mock IUser objects with real UserRole from @prisma/client</requirement>
+  <requirement>Return typed SarsSubmission objects (not mock data)</requirement>
+  <requirement>Verify DTO transformation (snake_case API to camelCase service)</requirement>
+  <requirement>Verify cents to Rands conversion (divide by 100)</requirement>
+  <requirement>Test error propagation (tenant not VAT registered)</requirement>
+  <requirement>Test period validation (end after start)</requirement>
+  <requirement>Minimum 10 tests for this endpoint</requirement>
+</test_requirements>
 
-<test_commands>
-  <command>npm run build</command>
-  <command>npm run lint</command>
-  <command>npm run test vat201.controller.spec</command>
-  <command>npm run start:dev</command>
-  <command>curl -X POST http://localhost:3000/sars/vat201 -H "Authorization: Bearer token" -H "Content-Type: application/json" -d '{"period_start":"2025-01-01","period_end":"2025-01-31"}'</command>
-</test_commands>
+<verification_steps>
+  <step>npm run build - must compile without errors</step>
+  <step>npm run lint - must pass with no warnings</step>
+  <step>npm run test tests/api/sars/vat201.controller.spec.ts - all tests pass</step>
+  <step>npm run test - all tests pass (previous + ~10 new)</step>
+</verification_steps>
+
+<error_handling>
+  Vat201Service throws Error with message "Tenant is not VAT registered" - catch and throw ForbiddenException.
+  Vat201Service throws Error with message "Tenant has no VAT number" - catch and throw ForbiddenException.
+  Period validation (end before start) - throw BadRequestException in controller.
+  All other errors should propagate with their original messages.
+</error_handling>
+
+<implementation_notes>
+  1. Vat201Service.generateVat201() creates submission in DRAFT status.
+     To submit to SARS, user must first call markAsReady() then /sars/:id/submit.
+  2. The documentData field contains the full VAT201 document with flaggedItems array.
+     Extract flaggedItems for the API response.
+  3. ACCOUNTANT role can generate drafts (helps with preparation) but only OWNER/ADMIN can submit.
+  4. The is_payable field indicates whether the business owes SARS (net_vat > 0) or is owed a refund.
+  5. South African VAT rate is 15%. The service handles all calculations.
+</implementation_notes>
+
+<south_african_context>
+  <vat_rate>15%</vat_rate>
+  <submission_deadline>25th of month following VAT period</submission_deadline>
+  <vat_registration_threshold>R1,000,000 annual turnover</vat_registration_threshold>
+  <output_vat>VAT collected on sales (invoices to parents)</output_vat>
+  <input_vat>VAT paid on purchases (expense transactions)</input_vat>
+  <net_vat>output_vat - input_vat (positive = owe SARS, negative = refund due)</net_vat>
+</south_african_context>
 
 </task_spec>

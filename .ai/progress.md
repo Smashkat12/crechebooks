@@ -3,7 +3,7 @@
 ## Current Status: Surface Layer In Progress
 
 **Last Updated**: 2025-12-22
-**Total Tests**: 1479 passing
+**Total Tests**: 1510 passing
 **Build Status**: PASS
 **Lint Status**: PASS
 
@@ -16,14 +16,60 @@
 | Foundation | 15 | 15 | 100% Complete |
 | Logic | 22 | 22 | 100% Complete |
 | Agents | 5 | 5 | 100% Complete |
-| Surface | 16 | 11 | 69% In Progress |
+| Surface | 16 | 14 | 88% In Progress |
 | Integration | 5 | 0 | Not Started |
 
-**Overall Progress**: 53/63 tasks (84%)
+**Overall Progress**: 56/63 tasks (89%)
 
 ---
 
 ## Latest Completions (2025-12-22)
+
+### TASK-SARS-031: SARS Controller and DTOs
+- **Status**: Complete
+- **Tests**: 8 controller tests passing (total 1487)
+- **Key Features**:
+  - POST /sars/:id/submit for marking submissions as filed
+  - ApiMarkSubmittedDto with snake_case sars_reference
+  - SarsSubmissionResponseDto with snake_case fields
+  - Error propagation without catching/wrapping
+  - @Roles(OWNER, ADMIN) access control
+- **Files Created**:
+  - src/api/sars/sars.controller.ts
+  - src/api/sars/sars.module.ts
+  - src/api/sars/dto/mark-submitted.dto.ts
+  - src/api/sars/dto/sars-response.dto.ts
+  - src/api/sars/dto/index.ts
+  - tests/api/sars/sars.controller.spec.ts
+
+### TASK-SARS-032: VAT201 Endpoint
+- **Status**: Complete
+- **Tests**: 11 controller tests passing (total 1498)
+- **Key Features**:
+  - POST /sars/vat201 for VAT201 return generation
+  - ApiGenerateVat201Dto with period_start, period_end
+  - Period validation (end must be after start)
+  - Cents → Rands conversion (divide by 100)
+  - Flagged items extraction from documentData
+  - @Roles(OWNER, ADMIN, ACCOUNTANT) access control
+- **Files Created**:
+  - src/api/sars/dto/vat201.dto.ts
+  - tests/api/sars/vat201.controller.spec.ts
+
+### TASK-SARS-033: EMP201 Endpoint
+- **Status**: Complete
+- **Tests**: 12 controller tests passing (total 1510)
+- **Key Features**:
+  - POST /sars/emp201 for EMP201 employer reconciliation
+  - ApiGenerateEmp201Dto with period_month (YYYY-MM)
+  - Summary extraction (employee_count, totals)
+  - Employees array with PAYE/UIF breakdown
+  - Validation issues extraction
+  - Cents → Rands conversion (divide by 100)
+  - @Roles(OWNER, ADMIN, ACCOUNTANT) access control
+- **Files Created**:
+  - src/api/sars/dto/emp201.dto.ts
+  - tests/api/sars/emp201.controller.spec.ts
 
 ### TASK-PAY-032: Payment Matching Endpoint
 - **Status**: Complete

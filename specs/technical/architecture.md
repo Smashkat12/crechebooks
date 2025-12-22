@@ -3,15 +3,90 @@
 <metadata>
   <title>CrecheBooks System Architecture</title>
   <status>approved</status>
-  <last_updated>2025-12-19</last_updated>
+  <last_updated>2025-12-22</last_updated>
   <implements>
     <spec_ref>SPEC-TRANS</spec_ref>
     <spec_ref>SPEC-BILL</spec_ref>
     <spec_ref>SPEC-PAY</spec_ref>
     <spec_ref>SPEC-SARS</spec_ref>
     <spec_ref>SPEC-RECON</spec_ref>
+    <spec_ref>SPEC-WEB</spec_ref>
   </implements>
 </metadata>
+
+<monorepo_structure>
+
+## Directory Structure
+
+```
+crechebooks/
+├── apps/
+│   ├── api/                          # NestJS Backend API
+│   │   ├── src/
+│   │   │   ├── modules/              # Feature modules
+│   │   │   │   ├── auth/
+│   │   │   │   ├── transactions/
+│   │   │   │   ├── billing/
+│   │   │   │   ├── payments/
+│   │   │   │   ├── sars/
+│   │   │   │   └── reconciliation/
+│   │   │   ├── mcp/                  # MCP Server implementations
+│   │   │   │   ├── xero-mcp/
+│   │   │   │   ├── postgres-mcp/
+│   │   │   │   └── email-mcp/
+│   │   │   └── common/               # Shared utilities
+│   │   ├── prisma/                   # Database schema
+│   │   └── test/                     # API tests
+│   │
+│   └── web/                          # Next.js Frontend
+│       ├── src/
+│       │   ├── app/                  # App Router pages
+│       │   │   ├── (auth)/           # Auth pages (login, register)
+│       │   │   ├── (dashboard)/      # Protected dashboard pages
+│       │   │   │   ├── dashboard/
+│       │   │   │   ├── transactions/
+│       │   │   │   ├── invoices/
+│       │   │   │   ├── payments/
+│       │   │   │   ├── sars/
+│       │   │   │   ├── reconciliation/
+│       │   │   │   ├── parents/
+│       │   │   │   ├── staff/
+│       │   │   │   ├── reports/
+│       │   │   │   └── settings/
+│       │   │   └── api/              # API routes
+│       │   ├── components/           # React components
+│       │   │   ├── ui/               # shadcn/ui base components
+│       │   │   ├── forms/            # Form components
+│       │   │   ├── layout/           # Layout components
+│       │   │   ├── data-table/       # Table components
+│       │   │   ├── charts/           # Chart components
+│       │   │   ├── transactions/     # Transaction components
+│       │   │   ├── invoices/         # Invoice components
+│       │   │   ├── payments/         # Payment components
+│       │   │   ├── sars/             # SARS components
+│       │   │   ├── reconciliation/   # Reconciliation components
+│       │   │   ├── parents/          # Parent/child components
+│       │   │   ├── staff/            # Staff/payroll components
+│       │   │   └── reports/          # Report components
+│       │   ├── hooks/                # Custom React hooks
+│       │   ├── lib/                  # Utilities and API client
+│       │   ├── stores/               # Zustand state stores
+│       │   └── styles/               # Global styles
+│       └── public/                   # Static assets
+│
+└── packages/
+    ├── types/                        # Shared TypeScript types
+    │   └── src/
+    │       ├── common.ts
+    │       ├── transactions.ts
+    │       ├── billing.ts
+    │       ├── payments.ts
+    │       ├── sars.ts
+    │       └── reconciliation.ts
+    └── shared/                       # Shared utilities (future)
+```
+
+</monorepo_structure>
 
 <architecture_diagram>
 ```mermaid
@@ -119,6 +194,97 @@ C4Component
 ```
 </component_diagram>
 
+<web_component_diagram>
+```mermaid
+C4Component
+    title Web Application Components (apps/web)
+
+    Container_Boundary(web, "Next.js Web Application") {
+        Component(pages, "App Router Pages", "React Server Components", "Dashboard, transactions, invoices, etc.")
+        Component(layout, "Layout Components", "React", "Dashboard layout, navigation, header")
+        Component(ui, "UI Components", "shadcn/ui", "Button, Card, Dialog, Form, Table")
+        Component(domain, "Domain Components", "React", "Transaction list, invoice forms, payment matcher")
+        Component(hooks, "Custom Hooks", "React Hooks", "useTransactions, useInvoices, useAuth")
+        Component(stores, "State Stores", "Zustand", "UI state, filters, selections")
+        Component(api_client, "API Client", "axios + React Query", "Type-safe API calls with caching")
+        Component(providers, "Providers", "React Context", "Auth, theme, query client")
+    }
+
+    Container(api, "API Server", "NestJS", "Backend API")
+    Container(auth, "NextAuth.js", "Auth.js v5", "Authentication")
+    System_Ext(xero_redirect, "Xero OAuth", "OAuth2 flow")
+
+    Rel(pages, layout, "Uses")
+    Rel(pages, domain, "Uses")
+    Rel(domain, ui, "Uses")
+    Rel(domain, hooks, "Uses")
+    Rel(hooks, api_client, "Uses")
+    Rel(hooks, stores, "Updates")
+    Rel(api_client, api, "HTTPS/REST")
+    Rel(providers, auth, "Session")
+    Rel(auth, xero_redirect, "OAuth2")
+```
+
+### Web Application Technology Stack
+
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| Framework | Next.js 15 | App Router, Server Components, API Routes |
+| UI Library | shadcn/ui | Accessible, customizable components |
+| Styling | Tailwind CSS 4 | Utility-first CSS |
+| State Management | Zustand | Client-side UI state |
+| Server State | TanStack Query | Caching, refetching, mutations |
+| Forms | React Hook Form + Zod | Validation, type-safe forms |
+| Tables | TanStack Table | Sorting, filtering, pagination |
+| Charts | Recharts | Financial visualizations |
+| Authentication | NextAuth.js v5 | OAuth, sessions |
+| API Client | axios | HTTP client with interceptors |
+
+### Key Frontend Patterns
+
+```typescript
+// apps/web/src/lib/api/client.ts - Type-safe API client
+import axios from 'axios';
+import type { ITransaction, IPaginatedResponse } from '@crechebooks/types';
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  withCredentials: true,
+});
+
+export const transactionsApi = {
+  list: (params: TransactionFilters) =>
+    api.get<IPaginatedResponse<ITransaction>>('/transactions', { params }),
+  categorize: (id: string, accountCode: string) =>
+    api.patch<ITransaction>(`/transactions/${id}/categorize`, { accountCode }),
+};
+```
+
+```typescript
+// apps/web/src/hooks/use-transactions.ts - React Query hook
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { transactionsApi } from '@/lib/api/client';
+
+export function useTransactions(filters: TransactionFilters) {
+  return useQuery({
+    queryKey: ['transactions', filters],
+    queryFn: () => transactionsApi.list(filters),
+    staleTime: 30_000, // 30 seconds
+  });
+}
+
+export function useCategorizeTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, accountCode }: { id: string; accountCode: string }) =>
+      transactionsApi.categorize(id, accountCode),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+  });
+}
+```
+
+</web_component_diagram>
+
 <claude_code_architecture>
 
 ## Claude Code Multi-Agent Design
@@ -215,7 +381,7 @@ SARS_Agent:
   "mcpServers": {
     "xero": {
       "command": "node",
-      "args": ["./src/mcp/xero-mcp/server.js"],
+      "args": ["./apps/api/src/mcp/xero-mcp/server.js"],
       "env": {
         "XERO_CLIENT_ID": "${XERO_CLIENT_ID}",
         "XERO_CLIENT_SECRET": "${XERO_CLIENT_SECRET}",
@@ -234,7 +400,7 @@ SARS_Agent:
     },
     "postgres": {
       "command": "node",
-      "args": ["./src/mcp/postgres-mcp/server.js"],
+      "args": ["./apps/api/src/mcp/postgres-mcp/server.js"],
       "env": {
         "DATABASE_URL": "${DATABASE_URL}"
       },
@@ -245,7 +411,7 @@ SARS_Agent:
     },
     "email": {
       "command": "node",
-      "args": ["./src/mcp/email-mcp/server.js"],
+      "args": ["./apps/api/src/mcp/email-mcp/server.js"],
       "env": {
         "SMTP_HOST": "${SMTP_HOST}",
         "SMTP_USER": "${SMTP_USER}",

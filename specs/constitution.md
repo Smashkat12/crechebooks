@@ -29,7 +29,7 @@
 </tech_stack>
 
 <directory_structure>
-<!-- CrecheBooks Application Structure -->
+<!-- CrecheBooks Monorepo Structure (pnpm workspaces) -->
 crechebooks/
 ├── .ai/                              # AI context and memory
 │   ├── activeContext.md              # Current session state
@@ -56,53 +56,93 @@ crechebooks/
 │   ├── functional/
 │   ├── technical/
 │   └── tasks/
-├── src/
-│   ├── api/                          # REST API layer
-│   │   ├── controllers/
-│   │   ├── dto/
-│   │   ├── guards/
-│   │   └── middleware/
-│   ├── agents/                       # Claude Code agent definitions
-│   │   ├── orchestrator/
-│   │   ├── transaction-categorizer/
-│   │   ├── billing-agent/
-│   │   ├── payment-matcher/
-│   │   └── sars-agent/
-│   ├── core/                         # Core business logic
-│   │   ├── transaction/
-│   │   ├── billing/
-│   │   ├── payment/
-│   │   ├── sars/
-│   │   └── reconciliation/
-│   ├── database/
-│   │   ├── entities/
-│   │   ├── migrations/
-│   │   ├── repositories/
-│   │   └── seeds/
-│   ├── integrations/
-│   │   ├── xero/
-│   │   ├── banking/
-│   │   └── email/
-│   ├── mcp/                          # MCP Server implementations
-│   │   ├── xero-mcp/
-│   │   ├── postgres-mcp/
-│   │   └── email-mcp/
-│   ├── shared/
-│   │   ├── constants/
-│   │   ├── decorators/
-│   │   ├── exceptions/
-│   │   ├── interfaces/
-│   │   ├── types/
-│   │   └── utils/
-│   └── config/
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   ├── e2e/
-│   └── fixtures/
+├── apps/                             # Application packages
+│   ├── api/                          # NestJS API Server
+│   │   ├── src/
+│   │   │   ├── api/                  # REST API layer
+│   │   │   │   ├── controllers/
+│   │   │   │   ├── dto/
+│   │   │   │   ├── guards/
+│   │   │   │   └── middleware/
+│   │   │   ├── agents/               # Claude Code agent definitions
+│   │   │   │   ├── orchestrator/
+│   │   │   │   ├── transaction-categorizer/
+│   │   │   │   ├── billing-agent/
+│   │   │   │   ├── payment-matcher/
+│   │   │   │   └── sars-agent/
+│   │   │   ├── database/
+│   │   │   │   ├── entities/
+│   │   │   │   ├── migrations/
+│   │   │   │   ├── repositories/
+│   │   │   │   └── seeds/
+│   │   │   ├── integrations/
+│   │   │   │   ├── xero/
+│   │   │   │   ├── banking/
+│   │   │   │   └── email/
+│   │   │   ├── mcp/                  # MCP Server implementations
+│   │   │   │   ├── xero-mcp/
+│   │   │   │   ├── postgres-mcp/
+│   │   │   │   └── email-mcp/
+│   │   │   ├── shared/
+│   │   │   │   ├── constants/
+│   │   │   │   ├── decorators/
+│   │   │   │   ├── exceptions/
+│   │   │   │   ├── interfaces/
+│   │   │   │   ├── types/
+│   │   │   │   └── utils/
+│   │   │   └── config/
+│   │   ├── tests/
+│   │   │   ├── unit/
+│   │   │   ├── integration/
+│   │   │   ├── e2e/
+│   │   │   └── fixtures/
+│   │   └── prisma/
+│   │       └── schema.prisma
+│   └── web/                          # Next.js Web Application
+│       ├── src/
+│       │   ├── app/                  # Next.js App Router
+│       │   │   ├── (auth)/           # Auth routes
+│       │   │   │   ├── login/
+│       │   │   │   └── register/
+│       │   │   ├── (dashboard)/      # Protected routes
+│       │   │   │   ├── dashboard/
+│       │   │   │   ├── transactions/
+│       │   │   │   ├── invoices/
+│       │   │   │   ├── payments/
+│       │   │   │   ├── sars/
+│       │   │   │   ├── reports/
+│       │   │   │   └── settings/
+│       │   │   ├── layout.tsx
+│       │   │   └── page.tsx
+│       │   ├── components/           # React components
+│       │   │   ├── ui/               # shadcn/ui components
+│       │   │   ├── forms/            # Form components
+│       │   │   ├── tables/           # Data tables
+│       │   │   ├── charts/           # Dashboard charts
+│       │   │   └── layout/           # Layout components
+│       │   ├── hooks/                # Custom React hooks
+│       │   ├── lib/                  # Utility functions
+│       │   │   ├── api/              # API client
+│       │   │   ├── auth/             # Auth utilities
+│       │   │   └── utils/            # General utilities
+│       │   ├── stores/               # Zustand stores
+│       │   ├── styles/               # Global styles
+│       │   └── types/                # TypeScript types
+│       └── public/                   # Static assets
+├── packages/                         # Shared packages
+│   ├── types/                        # Shared TypeScript types
+│   │   └── src/
+│   │       ├── common.ts
+│   │       ├── transactions.ts
+│   │       ├── billing.ts
+│   │       ├── payments.ts
+│   │       ├── sars.ts
+│   │       └── reconciliation.ts
+│   └── shared/                       # Shared utilities
 ├── docs/
 │   └── diagrams/
-└── scripts/
+├── pnpm-workspace.yaml               # pnpm workspace config
+└── package.json                      # Root package.json
 </directory_structure>
 
 <coding_standards>

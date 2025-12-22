@@ -4,6 +4,7 @@ import { TransactionModule } from './transaction/transaction.module';
 import { BillingModule } from './billing/billing.module';
 import { PaymentModule } from './payment/payment.module';
 import { SarsModule } from './sars/sars.module';
+import { ReconciliationModule } from './reconciliation/reconciliation.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { SarsModule } from './sars/sars.module';
     BillingModule,
     PaymentModule,
     SarsModule,
+    ReconciliationModule,
   ],
   exports: [
     AuthModule,
@@ -19,6 +21,7 @@ import { SarsModule } from './sars/sars.module';
     BillingModule,
     PaymentModule,
     SarsModule,
+    ReconciliationModule,
   ],
 })
 export class ApiModule {}

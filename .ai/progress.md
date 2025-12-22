@@ -1,9 +1,9 @@
 # CrecheBooks Development Progress
 
-## Current Status: Surface Layer In Progress
+## Current Status: Surface Layer COMPLETE - Integration Layer Ready
 
 **Last Updated**: 2025-12-22
-**Total Tests**: 1510 passing
+**Total Tests**: 1536 passing
 **Build Status**: PASS
 **Lint Status**: PASS
 
@@ -16,14 +16,46 @@
 | Foundation | 15 | 15 | 100% Complete |
 | Logic | 22 | 22 | 100% Complete |
 | Agents | 5 | 5 | 100% Complete |
-| Surface | 16 | 14 | 88% In Progress |
+| Surface | 16 | 16 | 100% Complete |
 | Integration | 5 | 0 | Not Started |
 
-**Overall Progress**: 56/63 tasks (89%)
+**Overall Progress**: 58/63 tasks (92%)
 
 ---
 
 ## Latest Completions (2025-12-22)
+
+### TASK-RECON-031: Reconciliation Controller
+- **Status**: Complete
+- **Tests**: 12 controller tests passing (total 1522)
+- **Key Features**:
+  - POST /reconciliation for bank reconciliation
+  - ApiReconcileDto with snake_case (bank_account, period_start, etc.)
+  - ApiReconciliationResponseDto with reconciliation results
+  - Rands ↔ cents conversion (multiply/divide by 100)
+  - Error propagation (BusinessException, ConflictException)
+  - @Roles(OWNER, ADMIN, ACCOUNTANT) access control
+- **Files Created**:
+  - src/api/reconciliation/reconciliation.controller.ts
+  - src/api/reconciliation/reconciliation.module.ts
+  - src/api/reconciliation/dto/reconcile.dto.ts
+  - src/api/reconciliation/dto/reconciliation-response.dto.ts
+  - src/api/reconciliation/dto/index.ts
+  - tests/api/reconciliation/reconciliation.controller.spec.ts
+
+### TASK-RECON-032: Financial Reports Endpoint
+- **Status**: Complete
+- **Tests**: 14 controller tests passing (total 1536)
+- **Key Features**:
+  - GET /reconciliation/income-statement for Income Statement (P&L)
+  - ApiIncomeStatementQueryDto with period_start, period_end, format
+  - ApiIncomeStatementResponseDto with snake_case fields
+  - Income/expense breakdown by account code
+  - Period dates formatted as YYYY-MM-DD
+  - @Roles(OWNER, ADMIN, ACCOUNTANT, VIEWER) access control
+- **Files Created**:
+  - src/api/reconciliation/dto/income-statement.dto.ts
+  - tests/api/reconciliation/reports.controller.spec.ts
 
 ### TASK-SARS-031: SARS Controller and DTOs
 - **Status**: Complete

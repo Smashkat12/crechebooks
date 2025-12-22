@@ -54,8 +54,8 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | POST /sars/vat201 | endpoint | TASK-SARS-032 | ✅ Complete |
 | POST /sars/emp201 | endpoint | TASK-SARS-033 | ✅ Complete |
 | POST /sars/{id}/submit | endpoint | TASK-SARS-031 | ✅ Complete |
-| POST /reconciliation | endpoint | TASK-RECON-031 | Pending |
-| GET /reports/income-statement | endpoint | TASK-RECON-032 | Pending |
+| POST /reconciliation | endpoint | TASK-RECON-031 | ✅ Complete |
+| GET /reconciliation/income-statement | endpoint | TASK-RECON-032 | ✅ Complete |
 | POST /children | endpoint | TASK-BILL-034 | ✅ Complete |
 
 ### Component Contracts
@@ -280,3 +280,5 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-22 | TASK-SARS-031 marked complete (SARS Controller/DTOs - 8 tests, total 1487) | AI Agent |
 | 2025-12-22 | TASK-SARS-032 marked complete (VAT201 Endpoint - 11 tests, total 1498) | AI Agent |
 | 2025-12-22 | TASK-SARS-033 marked complete (EMP201 Endpoint - 12 tests, total 1510) | AI Agent |
+| 2025-12-22 | TASK-RECON-031 marked complete (Reconciliation Controller - 12 tests, total 1522) | AI Agent |
+| 2025-12-22 | TASK-RECON-032 marked complete (Income Statement Endpoint - 14 tests, total 1536) | AI Agent |

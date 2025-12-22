@@ -47,3 +47,14 @@ output.txt
 
 # Claude agent logs (contain sensitive decision data)
 .claude/logs/*.jsonl
+
+# Claude Code local development artifacts
+.claude/agents/
+.claude-flow/metrics/
+
+# Memory and session data (local state)
+memory/backups/
+memory/data/
+
+# Prompt scratch files
+prompt*.txt

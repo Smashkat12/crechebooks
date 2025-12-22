@@ -8,6 +8,8 @@ import { ChildRepository } from '../../database/repositories/child.repository';
 import { TenantRepository } from '../../database/repositories/tenant.repository';
 import { EnrollmentRepository } from '../../database/repositories/enrollment.repository';
 import { FeeStructureRepository } from '../../database/repositories/fee-structure.repository';
+import { TransactionRepository } from '../../database/repositories/transaction.repository';
+import { CategorizationRepository } from '../../database/repositories/categorization.repository';
 import { InvoiceGenerationService } from '../../database/services/invoice-generation.service';
 import { InvoiceDeliveryService } from '../../database/services/invoice-delivery.service';
 import { EnrollmentService } from '../../database/services/enrollment.service';
@@ -28,6 +30,8 @@ import { PrismaModule } from '../../database/prisma';
     TenantRepository,
     EnrollmentRepository,
     FeeStructureRepository,
+    TransactionRepository,
+    CategorizationRepository,
     InvoiceGenerationService,
     InvoiceDeliveryService,
     EnrollmentService,

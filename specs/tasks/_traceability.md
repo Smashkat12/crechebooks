@@ -45,8 +45,8 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | POST /transactions/import | endpoint | TASK-TRANS-032 | ✅ Complete |
 | PUT /transactions/{id}/categorize | endpoint | TASK-TRANS-033 | ✅ Complete |
 | POST /transactions/categorize/batch | endpoint | TASK-TRANS-033 | ✅ Complete |
-| GET /invoices | endpoint | TASK-BILL-031 | Pending |
-| POST /invoices/generate | endpoint | TASK-BILL-032 | Pending |
+| GET /invoices | endpoint | TASK-BILL-031 | ✅ Complete |
+| POST /invoices/generate | endpoint | TASK-BILL-032 | ✅ Complete |
 | POST /invoices/send | endpoint | TASK-BILL-033 | Pending |
 | POST /payments/match | endpoint | TASK-PAY-032 | Pending |
 | POST /payments | endpoint | TASK-PAY-031 | Pending |
@@ -270,3 +270,5 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-22 | TASK-TRANS-031 marked complete (Transaction Controller/DTOs - 9 controller tests, total 1381) | AI Agent |
 | 2025-12-22 | TASK-TRANS-032 marked complete (Transaction Import Endpoint - 7 tests, total 1388) | AI Agent |
 | 2025-12-22 | TASK-TRANS-033 marked complete (Categorization Endpoints - 8 tests, total 1396) | AI Agent |
+| 2025-12-22 | TASK-BILL-031 marked complete (Invoice Controller - 10 tests, total 1406) | AI Agent |
+| 2025-12-22 | TASK-BILL-032 marked complete (Invoice Generation Endpoint - 8 tests, total 1414) | AI Agent |

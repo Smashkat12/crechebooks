@@ -26,11 +26,21 @@ interface LLMWhispererResponse {
   extracted_text?: string;
 }
 
+interface LLMWhispererStatusResponse {
+  status: string;
+  status_code?: number;
+  result_text?: string;
+  extracted_text?: string;
+  message?: string;
+}
+
 export class LLMWhispererParser {
   private readonly logger = new Logger(LLMWhispererParser.name);
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly pollIntervalMs = 2000; // Poll every 2 seconds
+  private readonly maxPollAttempts = 30; // Max 60 seconds of polling
 
   constructor() {
     const config = getLLMWhispererConfig();
@@ -97,21 +107,16 @@ export class LLMWhispererParser {
 
       const result = (await response.json()) as LLMWhispererResponse;
 
-      // Handle different API response formats
-      let extractedText = '';
-
-      if (result.extracted_text) {
-        // V2 API direct response
-        extractedText = result.extracted_text;
-      } else if (result.extraction?.result_text) {
-        // Nested extraction format
-        extractedText = result.extraction.result_text;
-      } else if (result.status === 'processed' || result.status === 'success') {
-        // Status indicates success but text might be elsewhere
-        this.logger.warn(
-          'LLMWhisperer returned success but no text found in expected locations',
+      // Handle async processing - API returns job hash for polling
+      if (result.status === 'processing' && result.whisper_hash) {
+        this.logger.log(
+          `LLMWhisperer job accepted, polling for results: ${result.whisper_hash}`,
         );
+        return await this.pollForResult(result.whisper_hash);
       }
+
+      // Handle immediate response formats
+      const extractedText = this.extractTextFromResponse(result);
 
       if (!extractedText.trim()) {
         this.logger.error(
@@ -159,6 +164,202 @@ export class LLMWhispererParser {
         },
       );
     }
+  }
+
+  /**
+   * Poll for extraction result using whisper_hash
+   * @throws BusinessException if polling times out or fails
+   * @throws ValidationException if no text extracted
+   */
+  private async pollForResult(whisperHash: string): Promise<string> {
+    for (let attempt = 0; attempt < this.maxPollAttempts; attempt++) {
+      // Wait before polling
+      await this.sleep(this.pollIntervalMs);
+
+      this.logger.debug(
+        `Polling attempt ${attempt + 1}/${this.maxPollAttempts} for hash: ${whisperHash}`,
+      );
+
+      try {
+        const response = await fetch(
+          `${this.baseUrl}/api/v2/whisper-status?whisper_hash=${whisperHash}`,
+          {
+            method: 'GET',
+            headers: {
+              'unstract-key': this.apiKey,
+            },
+          },
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          this.logger.error(
+            `LLMWhisperer status API error: HTTP ${response.status} - ${errorText}`,
+          );
+          throw new BusinessException(
+            `LLMWhisperer status request failed: HTTP ${response.status}`,
+            'LLMWHISPERER_API_ERROR',
+            { status: response.status, error: errorText },
+          );
+        }
+
+        const result = (await response.json()) as LLMWhispererStatusResponse;
+
+        // Check if still processing
+        if (result.status === 'processing') {
+          this.logger.debug('Still processing, continuing to poll...');
+          continue;
+        }
+
+        // Check for processed/success status
+        if (result.status === 'processed' || result.status === 'success') {
+          // Text may be directly in response or need to fetch via retrieve endpoint
+          let extractedText = result.result_text || result.extracted_text || '';
+
+          // If no text in status response, fetch via retrieve endpoint
+          if (!extractedText.trim()) {
+            this.logger.log(
+              'No text in status response, fetching via retrieve endpoint...',
+            );
+            extractedText = await this.retrieveResult(whisperHash);
+          }
+
+          if (!extractedText.trim()) {
+            this.logger.error(
+              `LLMWhisperer returned empty text after polling. Response: ${JSON.stringify(result).substring(0, 500)}`,
+            );
+            throw new ValidationException('LLMWhisperer returned empty text', [
+              {
+                field: 'extraction',
+                message: 'No text could be extracted from PDF via LLMWhisperer',
+                value: JSON.stringify(result).substring(0, 200),
+              },
+            ]);
+          }
+
+          this.logger.log(
+            `LLMWhisperer extracted ${extractedText.length} characters after ${attempt + 1} poll(s)`,
+          );
+          return extractedText;
+        }
+
+        // Handle error status
+        if (result.status === 'error' || result.status === 'failed') {
+          this.logger.error(`LLMWhisperer extraction failed: ${result.message}`);
+          throw new BusinessException(
+            `LLMWhisperer extraction failed: ${result.message || 'Unknown error'}`,
+            'LLMWHISPERER_EXTRACTION_FAILED',
+            { response: result },
+          );
+        }
+
+        // Unknown status - log and continue polling
+        this.logger.warn(`Unknown LLMWhisperer status: ${result.status}`);
+      } catch (error) {
+        if (
+          error instanceof BusinessException ||
+          error instanceof ValidationException
+        ) {
+          throw error;
+        }
+        this.logger.error(
+          `Polling error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // Continue polling on network errors
+      }
+    }
+
+    // Polling timed out
+    this.logger.error(
+      `LLMWhisperer polling timed out after ${this.maxPollAttempts} attempts`,
+    );
+    throw new BusinessException(
+      `LLMWhisperer extraction timed out after ${this.maxPollAttempts * this.pollIntervalMs / 1000} seconds`,
+      'LLMWHISPERER_POLL_TIMEOUT',
+      { whisperHash, attempts: this.maxPollAttempts },
+    );
+  }
+
+  /**
+   * Retrieve extracted text using whisper_hash
+   * @throws BusinessException if retrieve fails
+   */
+  private async retrieveResult(whisperHash: string): Promise<string> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/api/v2/whisper-retrieve?whisper_hash=${whisperHash}`,
+        {
+          method: 'GET',
+          headers: {
+            'unstract-key': this.apiKey,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.error(
+          `LLMWhisperer retrieve API error: HTTP ${response.status} - ${errorText}`,
+        );
+        throw new BusinessException(
+          `LLMWhisperer retrieve request failed: HTTP ${response.status}`,
+          'LLMWHISPERER_API_ERROR',
+          { status: response.status, error: errorText },
+        );
+      }
+
+      // The retrieve endpoint may return text directly or as JSON
+      const contentType = response.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        const result = (await response.json()) as LLMWhispererStatusResponse;
+        return result.result_text || result.extracted_text || '';
+      } else {
+        // Plain text response
+        return await response.text();
+      }
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        throw error;
+      }
+      this.logger.error(
+        `Retrieve error: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new BusinessException(
+        `LLMWhisperer retrieve failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'LLMWHISPERER_RETRIEVE_ERROR',
+        { originalError: error instanceof Error ? error.message : String(error) },
+      );
+    }
+  }
+
+  /**
+   * Extract text from response object
+   */
+  private extractTextFromResponse(
+    result: LLMWhispererResponse | LLMWhispererStatusResponse,
+  ): string {
+    if ('extracted_text' in result && result.extracted_text) {
+      return result.extracted_text;
+    }
+    if ('result_text' in result && result.result_text) {
+      return result.result_text;
+    }
+    if (
+      'extraction' in result &&
+      result.extraction &&
+      result.extraction.result_text
+    ) {
+      return result.extraction.result_text;
+    }
+    return '';
+  }
+
+  /**
+   * Sleep helper for polling
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

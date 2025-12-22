@@ -70,7 +70,7 @@ describe('HybridPdfParser', () => {
       }
 
       console.log(`Total transactions from 5 PDFs: ${totalTransactions}`);
-    });
+    }, 30000); // 30 second timeout for multiple PDFs
 
     it('should handle all available FNB statements', async () => {
       const pdfFiles = fs
@@ -102,7 +102,7 @@ describe('HybridPdfParser', () => {
 
       // At least 80% of PDFs should parse successfully
       expect(successCount / pdfFiles.length).toBeGreaterThanOrEqual(0.8);
-    });
+    }, 60000); // 60 second timeout for all PDFs
   });
 
   describe('parseWithConfidence()', () => {

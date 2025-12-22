@@ -15,6 +15,7 @@ import { XeroClient, Invoice as XeroInvoice } from 'xero-node';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
 import { AuditLogService } from './audit-log.service';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   SyncResult,
   CategorySyncResult,
@@ -46,8 +47,10 @@ export class XeroSyncService {
     private readonly transactionRepo: TransactionRepository,
     private readonly categorizationRepo: CategorizationRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly prisma: PrismaService,
   ) {
-    this.tokenManager = new TokenManager();
+    // Pass PrismaService (extends PrismaClient) to TokenManager
+    this.tokenManager = new TokenManager(this.prisma);
   }
 
   /**

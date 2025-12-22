@@ -1,0 +1,9 @@
+// Parent and Child Management Components
+export { ParentTable } from './parent-table';
+export { ParentForm } from './parent-form';
+export { ParentDetail } from './parent-detail';
+export { ChildrenList } from './children-list';
+export { ChildForm } from './child-form';
+export { FeeStructureSelect } from './fee-structure-select';
+export { EnrollmentStatus } from './enrollment-status';
+export { ProrataDisplay } from './prorata-display';

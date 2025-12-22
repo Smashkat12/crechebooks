@@ -1,0 +1,58 @@
+[
+  {
+    "id": "cmd-memory-1766390509624",
+    "type": "memory",
+    "success": true,
+    "duration": 285.72033,
+    "timestamp": 1766390509910,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1766390736566",
+    "type": "memory",
+    "success": true,
+    "duration": 206.274966,
+    "timestamp": 1766390736772,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1766390926141",
+    "type": "memory",
+    "success": true,
+    "duration": 194.164759,
+    "timestamp": 1766390926335,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1766390971256",
+    "type": "memory",
+    "success": true,
+    "duration": 208.55889499999998,
+    "timestamp": 1766390971465,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1766391112120",
+    "type": "memory",
+    "success": true,
+    "duration": 201.22563200000002,
+    "timestamp": 1766391112321,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1766391544922",
+    "type": "memory",
+    "success": true,
+    "duration": 221.1956,
+    "timestamp": 1766391545144,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1766391927361",
+    "type": "memory",
+    "success": true,
+    "duration": 194.31508200000002,
+    "timestamp": 1766391927556,
+    "metadata": {}
+  }
+]

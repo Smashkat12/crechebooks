@@ -17,6 +17,7 @@
 | SPEC-PAY | Payment Matching | Payment Matching & Arrears | MUST | Complete | [payment-matching.md](./payment-matching.md) |
 | SPEC-SARS | SARS Compliance | SARS Compliance Engine | MUST | Complete | [sars-compliance.md](./sars-compliance.md) |
 | SPEC-RECON | Reconciliation | Intelligent Reconciliation | MUST | Complete | [reconciliation.md](./reconciliation.md) |
+| SPEC-WEB | Web Application | CrecheBooks Web Application UI | MUST | Ready | [web-application.md](./web-application.md) |
 
 ---
 
@@ -38,6 +39,10 @@ graph TD
         RECON[SPEC-RECON<br/>Reconciliation]
     end
 
+    subgraph User Interface
+        WEB[SPEC-WEB<br/>Web Application]
+    end
+
     TRANS --> PAY
     TRANS --> SARS
     TRANS --> RECON
@@ -45,6 +50,11 @@ graph TD
     BILL --> SARS
     PAY --> RECON
     SARS --> RECON
+    TRANS --> WEB
+    BILL --> WEB
+    PAY --> WEB
+    SARS --> WEB
+    RECON --> WEB
 ```
 
 ---
@@ -91,6 +101,20 @@ graph TD
 - Financial statement generation
 - Audit trail maintenance
 
+### SPEC-WEB: Web Application
+**Purpose**: Responsive Next.js frontend for creche owners, admins, and accountants.
+**Key Capabilities**:
+- Financial dashboard with key metrics and charts
+- Transaction management with AI categorization UI
+- Invoice generation, preview, and delivery
+- Payment matching interface with AI suggestions
+- Arrears tracking and reminder sending
+- SARS submission preparation and export
+- Bank reconciliation view
+- Financial reporting with export options
+- Parent and child enrollment management
+- Staff and payroll management
+
 ---
 
 ## Cross-Domain Requirements
@@ -115,3 +139,4 @@ graph TD
 | SPEC-PAY | Complete | Pending | Pending |
 | SPEC-SARS | Complete | Pending | Pending |
 | SPEC-RECON | Complete | Pending | Pending |
+| SPEC-WEB | Complete | Pending | Pending |

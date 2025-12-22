@@ -15,7 +15,10 @@ import { PaymentRepository } from '../../../src/database/repositories/payment.re
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
-import { MatchType, MatchedBy } from '../../../src/database/entities/payment.entity';
+import {
+  MatchType,
+  MatchedBy,
+} from '../../../src/database/entities/payment.entity';
 import type { AllocationResult } from '../../../src/database/dto/payment-allocation.dto';
 import { XeroSyncStatus } from '../../../src/database/dto/payment-allocation.dto';
 
@@ -518,10 +521,7 @@ describe('PaymentController', () => {
         .spyOn(paymentRepo, 'findByTenantId')
         .mockResolvedValue([]);
 
-      await controller.listPayments(
-        { invoice_id: 'inv-001' },
-        mockViewerUser,
-      );
+      await controller.listPayments({ invoice_id: 'inv-001' }, mockViewerUser);
 
       expect(findByTenantSpy).toHaveBeenCalledWith(
         mockTenantId,

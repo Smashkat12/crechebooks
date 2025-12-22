@@ -97,8 +97,7 @@ describe('XeroSyncService', () => {
     }).compile();
 
     prisma = module.get<PrismaService>(PrismaService);
-    transactionRepo =
-      module.get<TransactionRepository>(TransactionRepository);
+    transactionRepo = module.get<TransactionRepository>(TransactionRepository);
     categorizationRepo = module.get<CategorizationRepository>(
       CategorizationRepository,
     );
@@ -365,7 +364,11 @@ describe('XeroSyncService', () => {
       const dateFrom = new Date('2024-01-01');
       const dateTo = new Date('2024-01-31');
 
-      const result = await service.pullFromXero(testTenant.id, dateFrom, dateTo);
+      const result = await service.pullFromXero(
+        testTenant.id,
+        dateFrom,
+        dateTo,
+      );
 
       expect(result.transactionsPulled).toBe(2);
       expect(result.duplicatesSkipped).toBe(0);
@@ -398,7 +401,11 @@ describe('XeroSyncService', () => {
       const dateFrom = new Date('2024-01-01');
       const dateTo = new Date('2024-01-31');
 
-      const result = await service.pullFromXero(testTenant.id, dateFrom, dateTo);
+      const result = await service.pullFromXero(
+        testTenant.id,
+        dateFrom,
+        dateTo,
+      );
 
       expect(result.transactionsPulled).toBe(1); // Only the second one
       expect(result.duplicatesSkipped).toBe(1);
@@ -458,7 +465,9 @@ describe('XeroSyncService', () => {
       // The service catches errors and returns false
       // We need to override the tokenManager on the service instance
       const mockTokenManagerInstance = {
-        hasValidConnection: jest.fn().mockRejectedValue(new Error('Connection error')),
+        hasValidConnection: jest
+          .fn()
+          .mockRejectedValue(new Error('Connection error')),
         getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
         getXeroTenantId: jest.fn().mockResolvedValue('mock-xero-tenant-id'),
       };
@@ -520,7 +529,10 @@ describe('XeroSyncService', () => {
       } as any);
 
       // Try to sync from wrong tenant
-      const result = await service.syncTransactions([otherTx.id], testTenant.id);
+      const result = await service.syncTransactions(
+        [otherTx.id],
+        testTenant.id,
+      );
 
       expect(result.failed).toBe(1);
       expect(result.errors[0].error).toContain('not found');
@@ -556,8 +568,8 @@ describe('XeroSyncService', () => {
       });
 
       expect(auditLogs.length).toBeGreaterThanOrEqual(1);
-      const syncLog = auditLogs.find(
-        (log) => log.changeSummary?.includes('Synced to Xero'),
+      const syncLog = auditLogs.find((log) =>
+        log.changeSummary?.includes('Synced to Xero'),
       );
       expect(syncLog).toBeDefined();
     });
@@ -631,9 +643,9 @@ describe('XeroSyncService', () => {
         vatAmountCents: 13043,
       });
 
-      await expect(testService.pushToXero(tx.id, testTenant.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        testService.pushToXero(tx.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
   });
 });

@@ -3,11 +3,20 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { XCircle } from 'lucide-react';
+import { XCircle, Link2 } from 'lucide-react';
 
 export default function IntegrationsSettingsPage() {
   return (
     <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <Link2 className="h-8 w-8" />
+          Integrations
+        </h1>
+        <p className="text-muted-foreground">
+          Connect external services and third-party applications
+        </p>
+      </div>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">

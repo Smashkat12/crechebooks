@@ -6,3 +6,4 @@
 export * from './reconcile.dto';
 export * from './reconciliation-response.dto';
 export * from './income-statement.dto';
+export * from './reconciliation-summary.dto';

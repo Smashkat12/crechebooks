@@ -42,7 +42,9 @@ describe('TransactionCategorizerAgent', () => {
 
     prisma = module.get<PrismaService>(PrismaService);
     contextLoader = module.get<ContextLoader>(ContextLoader);
-    agent = module.get<TransactionCategorizerAgent>(TransactionCategorizerAgent);
+    agent = module.get<TransactionCategorizerAgent>(
+      TransactionCategorizerAgent,
+    );
 
     // Initialize context
     await contextLoader.loadContext();
@@ -55,7 +57,9 @@ describe('TransactionCategorizerAgent', () => {
     await prisma.invoiceLine.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.transaction.deleteMany({});
-    await prisma.tenant.deleteMany({ where: { email: { contains: 'cat-test' } } });
+    await prisma.tenant.deleteMany({
+      where: { email: { contains: 'cat-test' } },
+    });
 
     // Create test tenant
     testTenant = await prisma.tenant.create({
@@ -76,7 +80,9 @@ describe('TransactionCategorizerAgent', () => {
     // Clean up
     await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});
-    await prisma.tenant.deleteMany({ where: { email: { contains: 'cat-test' } } });
+    await prisma.tenant.deleteMany({
+      where: { email: { contains: 'cat-test' } },
+    });
     await prisma.$disconnect();
   });
 
@@ -326,29 +332,53 @@ describe('PatternMatcher', () => {
   });
 
   it('should return empty array for no match', () => {
-    const matches = matcher.match('RANDOM XYZ', 'RANDOM PAYMENT ABC', undefined, false);
+    const matches = matcher.match(
+      'RANDOM XYZ',
+      'RANDOM PAYMENT ABC',
+      undefined,
+      false,
+    );
 
     expect(matches.length).toBe(0);
   });
 
   it('should match multiple patterns and sort by confidence', () => {
-    const matches = matcher.match('FNB', 'FNB SERVICE FEE CHEQUE', undefined, false);
+    const matches = matcher.match(
+      'FNB',
+      'FNB SERVICE FEE CHEQUE',
+      undefined,
+      false,
+    );
 
     // Should match both bank-fnb-fee and bank-fnb-cheque patterns
     // Sorted by confidence descending
     expect(matches.length).toBeGreaterThanOrEqual(1);
     for (let i = 1; i < matches.length; i++) {
-      expect(matches[i - 1].confidence).toBeGreaterThanOrEqual(matches[i].confidence);
+      expect(matches[i - 1].confidence).toBeGreaterThanOrEqual(
+        matches[i].confidence,
+      );
     }
   });
 
   it('should filter by credit flag', () => {
     // School fee deposit pattern has isCredit: true
-    const debitMatches = matcher.match('DEPOSIT', 'SCHOOL FEE DEPOSIT', undefined, false);
-    const creditMatches = matcher.match('DEPOSIT', 'SCHOOL FEE DEPOSIT', undefined, true);
+    const debitMatches = matcher.match(
+      'DEPOSIT',
+      'SCHOOL FEE DEPOSIT',
+      undefined,
+      false,
+    );
+    const creditMatches = matcher.match(
+      'DEPOSIT',
+      'SCHOOL FEE DEPOSIT',
+      undefined,
+      true,
+    );
 
     // Credit match should include school fee pattern
-    const hasFeeInCredit = creditMatches.some(m => m.pattern.accountCode === '4000');
+    const hasFeeInCredit = creditMatches.some(
+      (m) => m.pattern.accountCode === '4000',
+    );
     expect(hasFeeInCredit).toBe(true);
   });
 });

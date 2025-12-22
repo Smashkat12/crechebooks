@@ -15,12 +15,22 @@ import { PrismaModule } from '../../database/prisma/prisma.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('AUTH0_CLIENT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get<number>('JWT_EXPIRATION', 86400),
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        // For local dev, use JWT_SECRET. For production, use AUTH0_CLIENT_SECRET
+        const nodeEnv = configService.get<string>('NODE_ENV');
+        const jwtSecret = configService.get<string>('JWT_SECRET');
+        const auth0Secret = configService.get<string>('AUTH0_CLIENT_SECRET');
+
+        const secret =
+          nodeEnv === 'development' && jwtSecret ? jwtSecret : auth0Secret;
+
+        return {
+          secret,
+          signOptions: {
+            expiresIn: configService.get<number>('JWT_EXPIRATION', 86400),
+          },
+        };
+      },
     }),
     PrismaModule,
   ],

@@ -19,15 +19,14 @@ import {
   NotFoundException,
   BusinessException,
 } from '../../../src/shared/exceptions';
-import { DeliveryStatus, DeliveryMethod, InvoiceStatus } from '../../../src/database/entities/invoice.entity';
+import {
+  DeliveryStatus,
+  DeliveryMethod,
+  InvoiceStatus,
+} from '../../../src/database/entities/invoice.entity';
 import { PreferredContact } from '../../../src/database/entities/parent.entity';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
-import {
-  Tenant,
-  Parent,
-  Child,
-  Invoice,
-} from '@prisma/client';
+import { Tenant, Parent, Child, Invoice } from '@prisma/client';
 
 /**
  * Mock EmailService - external SMTP integration
@@ -35,7 +34,9 @@ import {
  * The SMTP server requires real credentials which are not available in tests.
  */
 const createMockEmailService = () => ({
-  sendEmail: jest.fn().mockResolvedValue({ messageId: 'test-msg-123', status: 'sent' }),
+  sendEmail: jest
+    .fn()
+    .mockResolvedValue({ messageId: 'test-msg-123', status: 'sent' }),
   isValidEmail: jest.fn().mockReturnValue(true),
 });
 
@@ -44,7 +45,9 @@ const createMockEmailService = () => ({
  * NOTE: This is a SERVICE mock for external API, not a DATA mock.
  */
 const createMockWhatsAppService = () => ({
-  sendMessage: jest.fn().mockResolvedValue({ messageId: 'wa-msg-123', status: 'sent' }),
+  sendMessage: jest
+    .fn()
+    .mockResolvedValue({ messageId: 'wa-msg-123', status: 'sent' }),
   sanitizePhoneNumber: jest.fn().mockImplementation((phone: string) => {
     let digits = phone.replace(/\D/g, '');
     if (digits.length === 10 && digits.startsWith('0')) {
@@ -109,8 +112,14 @@ describe('InvoiceDeliveryService', () => {
   beforeEach(async () => {
     // Reset mocks
     jest.clearAllMocks();
-    mockEmailService.sendEmail.mockResolvedValue({ messageId: 'test-msg-123', status: 'sent' });
-    mockWhatsAppService.sendMessage.mockResolvedValue({ messageId: 'wa-msg-123', status: 'sent' });
+    mockEmailService.sendEmail.mockResolvedValue({
+      messageId: 'test-msg-123',
+      status: 'sent',
+    });
+    mockWhatsAppService.sendMessage.mockResolvedValue({
+      messageId: 'wa-msg-123',
+      status: 'sent',
+    });
 
     // CRITICAL: Clean database in FK order - leaf tables first!
     await prisma.auditLog.deleteMany({});

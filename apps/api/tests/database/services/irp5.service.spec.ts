@@ -9,11 +9,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { PayeService } from '../../../src/database/services/paye.service';
 import { Irp5Service } from '../../../src/database/services/irp5.service';
-import {
-  PayrollStatus,
-  EmploymentType,
-  PayFrequency,
-} from '@prisma/client';
+import { PayrollStatus, EmploymentType, PayFrequency } from '@prisma/client';
 import { Tenant, Staff } from '@prisma/client';
 
 describe('Irp5Service', () => {
@@ -530,7 +526,9 @@ describe('Irp5Service', () => {
 
       const result = service.validateForSubmission(certificate);
       expect(result.isValid).toBe(false);
-      expect(result.errors.some((e) => e.includes('does not match'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('does not match'))).toBe(
+        true,
+      );
     });
   });
 
@@ -585,7 +583,10 @@ describe('Irp5Service', () => {
         ],
       });
 
-      const certificates = await service.generateBulkIrp5(testTenant.id, '2025');
+      const certificates = await service.generateBulkIrp5(
+        testTenant.id,
+        '2025',
+      );
 
       expect(certificates).toHaveLength(2);
       expect(certificates[0].staffId).toBeDefined();

@@ -10,7 +10,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { DiscrepancyService } from '../../../src/database/services/discrepancy.service';
 import { ReconciliationRepository } from '../../../src/database/repositories/reconciliation.repository';
-import { Tenant, ReconciliationStatus, TransactionStatus } from '@prisma/client';
+import {
+  Tenant,
+  ReconciliationStatus,
+  TransactionStatus,
+} from '@prisma/client';
 import { DiscrepancyType } from '../../../src/database/dto/discrepancy.dto';
 
 describe('DiscrepancyService', () => {
@@ -20,11 +24,7 @@ describe('DiscrepancyService', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PrismaService,
-        DiscrepancyService,
-        ReconciliationRepository,
-      ],
+      providers: [PrismaService, DiscrepancyService, ReconciliationRepository],
     }).compile();
 
     prisma = module.get<PrismaService>(PrismaService);
@@ -51,8 +51,12 @@ describe('DiscrepancyService', () => {
     // Cleanup test data in FK order - CRITICAL
     if (testTenant?.id) {
       await prisma.auditLog.deleteMany({ where: { tenantId: testTenant.id } });
-      await prisma.reconciliation.deleteMany({ where: { tenantId: testTenant.id } });
-      await prisma.transaction.deleteMany({ where: { tenantId: testTenant.id } });
+      await prisma.reconciliation.deleteMany({
+        where: { tenantId: testTenant.id },
+      });
+      await prisma.transaction.deleteMany({
+        where: { tenantId: testTenant.id },
+      });
       await prisma.user.deleteMany({ where: { tenantId: testTenant.id } });
       await prisma.tenant.delete({ where: { id: testTenant.id } });
     }

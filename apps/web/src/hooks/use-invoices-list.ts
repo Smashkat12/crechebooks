@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { Invoice, InvoicesListParams } from "@/types/invoice";
+import { apiClient, endpoints } from "@/lib/api";
 
 interface PaginationState {
   pageIndex: number;
@@ -35,28 +36,26 @@ export function useInvoicesList(
       setError(null);
 
       try {
-        const queryParams = new URLSearchParams();
+        const queryParams: Record<string, string> = {};
 
-        if (params.status) queryParams.append("status", params.status);
-        if (params.parentSearch) queryParams.append("parentSearch", params.parentSearch);
-        if (params.dateFrom) queryParams.append("dateFrom", params.dateFrom);
-        if (params.dateTo) queryParams.append("dateTo", params.dateTo);
-        queryParams.append("page", pagination.pageIndex.toString());
-        queryParams.append("pageSize", pagination.pageSize.toString());
+        if (params.status) queryParams.status = params.status;
+        if (params.parentSearch) queryParams.parentSearch = params.parentSearch;
+        if (params.dateFrom) queryParams.date_from = params.dateFrom;
+        if (params.dateTo) queryParams.date_to = params.dateTo;
+        queryParams.page = (pagination.pageIndex + 1).toString();
+        queryParams.limit = pagination.pageSize.toString();
 
-        const response = await fetch(`/api/invoices?${queryParams.toString()}`);
+        const { data } = await apiClient.get(endpoints.invoices.list, { params: queryParams });
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch invoices");
-        }
+        // API returns { success, data: [...], meta: { page, limit, total, totalPages }}
+        const invoiceData = data.data || data.invoices || [];
+        const meta = data.meta || data.pagination || {};
 
-        const data = await response.json();
-
-        setInvoices(data.invoices);
+        setInvoices(invoiceData);
         setPaginationState((prev) => ({
           ...prev,
-          totalPages: data.pagination.totalPages,
-          totalCount: data.pagination.totalCount,
+          totalPages: meta.totalPages || Math.ceil((meta.total || 0) / pagination.pageSize),
+          totalCount: meta.total || meta.totalCount || 0,
         }));
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Unknown error"));

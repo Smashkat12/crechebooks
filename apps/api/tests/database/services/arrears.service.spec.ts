@@ -14,7 +14,10 @@ import { PaymentRepository } from '../../../src/database/repositories/payment.re
 import { ParentRepository } from '../../../src/database/repositories/parent.repository';
 import { TenantRepository } from '../../../src/database/repositories/tenant.repository';
 import { ChildRepository } from '../../../src/database/repositories/child.repository';
-import { NotFoundException, DatabaseException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  DatabaseException,
+} from '../../../src/shared/exceptions';
 import { Tenant, Parent, Child, Invoice } from '@prisma/client';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 
@@ -439,8 +442,18 @@ describe('ArrearsService', () => {
     });
 
     it('should handle partially paid invoices in aging calculation', async () => {
-      const invoice1 = await createInvoice(5, InvoiceStatus.PARTIALLY_PAID, 100000, 30000);
-      const invoice2 = await createInvoice(20, InvoiceStatus.PARTIALLY_PAID, 50000, 10000);
+      const invoice1 = await createInvoice(
+        5,
+        InvoiceStatus.PARTIALLY_PAID,
+        100000,
+        30000,
+      );
+      const invoice2 = await createInvoice(
+        20,
+        InvoiceStatus.PARTIALLY_PAID,
+        50000,
+        10000,
+      );
 
       const invoices = await prisma.invoice.findMany({
         where: { id: { in: [invoice1.id, invoice2.id] } },
@@ -457,8 +470,18 @@ describe('ArrearsService', () => {
   describe('getParentHistory', () => {
     it('should return correct payment history', async () => {
       // Create mix of paid and unpaid invoices
-      const invoice1 = await createInvoice(5, InvoiceStatus.PAID, 100000, 100000);
-      const invoice2 = await createInvoice(10, InvoiceStatus.PARTIALLY_PAID, 50000, 25000);
+      const invoice1 = await createInvoice(
+        5,
+        InvoiceStatus.PAID,
+        100000,
+        100000,
+      );
+      const invoice2 = await createInvoice(
+        10,
+        InvoiceStatus.PARTIALLY_PAID,
+        50000,
+        25000,
+      );
       const invoice3 = await createInvoice(15, InvoiceStatus.SENT, 75000, 0);
 
       // Create payment for invoice1
@@ -467,7 +490,9 @@ describe('ArrearsService', () => {
           tenantId: testTenant.id,
           invoiceId: invoice1.id,
           transactionId: null,
-          paymentDate: new Date(invoice1.dueDate.getTime() - 2 * 24 * 60 * 60 * 1000), // 2 days before due
+          paymentDate: new Date(
+            invoice1.dueDate.getTime() - 2 * 24 * 60 * 60 * 1000,
+          ), // 2 days before due
           amountCents: 100000,
           reference: 'Payment 1',
           matchType: 'EXACT',
@@ -475,7 +500,10 @@ describe('ArrearsService', () => {
         },
       });
 
-      const history = await service.getParentHistory(testParent.id, testTenant.id);
+      const history = await service.getParentHistory(
+        testParent.id,
+        testTenant.id,
+      );
 
       expect(history.parentId).toBe(testParent.id);
       expect(history.parentName).toBe('John Smith');
@@ -487,9 +515,24 @@ describe('ArrearsService', () => {
 
     it('should calculate on-time vs late payments correctly', async () => {
       // Create invoices with payments
-      const invoice1 = await createInvoice(5, InvoiceStatus.PAID, 100000, 100000);
-      const invoice2 = await createInvoice(10, InvoiceStatus.PAID, 50000, 50000);
-      const invoice3 = await createInvoice(15, InvoiceStatus.PAID, 75000, 75000);
+      const invoice1 = await createInvoice(
+        5,
+        InvoiceStatus.PAID,
+        100000,
+        100000,
+      );
+      const invoice2 = await createInvoice(
+        10,
+        InvoiceStatus.PAID,
+        50000,
+        50000,
+      );
+      const invoice3 = await createInvoice(
+        15,
+        InvoiceStatus.PAID,
+        75000,
+        75000,
+      );
 
       // On-time payment (paid 2 days before due)
       await prisma.payment.create({
@@ -497,7 +540,9 @@ describe('ArrearsService', () => {
           tenantId: testTenant.id,
           invoiceId: invoice1.id,
           transactionId: null,
-          paymentDate: new Date(invoice1.dueDate.getTime() - 2 * 24 * 60 * 60 * 1000),
+          paymentDate: new Date(
+            invoice1.dueDate.getTime() - 2 * 24 * 60 * 60 * 1000,
+          ),
           amountCents: 100000,
           reference: 'Payment 1',
           matchType: 'EXACT',
@@ -511,7 +556,9 @@ describe('ArrearsService', () => {
           tenantId: testTenant.id,
           invoiceId: invoice2.id,
           transactionId: null,
-          paymentDate: new Date(invoice2.dueDate.getTime() + 5 * 24 * 60 * 60 * 1000),
+          paymentDate: new Date(
+            invoice2.dueDate.getTime() + 5 * 24 * 60 * 60 * 1000,
+          ),
           amountCents: 50000,
           reference: 'Payment 2',
           matchType: 'EXACT',
@@ -533,15 +580,28 @@ describe('ArrearsService', () => {
         },
       });
 
-      const history = await service.getParentHistory(testParent.id, testTenant.id);
+      const history = await service.getParentHistory(
+        testParent.id,
+        testTenant.id,
+      );
 
       expect(history.onTimePaymentCount).toBe(2); // Payments on or before due date
       expect(history.latePaymentCount).toBe(1);
     });
 
     it('should calculate average days to payment', async () => {
-      const invoice1 = await createInvoice(5, InvoiceStatus.PAID, 100000, 100000);
-      const invoice2 = await createInvoice(10, InvoiceStatus.PAID, 50000, 50000);
+      const invoice1 = await createInvoice(
+        5,
+        InvoiceStatus.PAID,
+        100000,
+        100000,
+      );
+      const invoice2 = await createInvoice(
+        10,
+        InvoiceStatus.PAID,
+        50000,
+        50000,
+      );
 
       // Payment 1: 2 days before due date (daysToPayment = -2)
       await prisma.payment.create({
@@ -549,7 +609,9 @@ describe('ArrearsService', () => {
           tenantId: testTenant.id,
           invoiceId: invoice1.id,
           transactionId: null,
-          paymentDate: new Date(invoice1.dueDate.getTime() - 2 * 24 * 60 * 60 * 1000),
+          paymentDate: new Date(
+            invoice1.dueDate.getTime() - 2 * 24 * 60 * 60 * 1000,
+          ),
           amountCents: 100000,
           reference: 'Payment 1',
           matchType: 'EXACT',
@@ -563,7 +625,9 @@ describe('ArrearsService', () => {
           tenantId: testTenant.id,
           invoiceId: invoice2.id,
           transactionId: null,
-          paymentDate: new Date(invoice2.dueDate.getTime() + 4 * 24 * 60 * 60 * 1000),
+          paymentDate: new Date(
+            invoice2.dueDate.getTime() + 4 * 24 * 60 * 60 * 1000,
+          ),
           amountCents: 50000,
           reference: 'Payment 2',
           matchType: 'EXACT',
@@ -571,7 +635,10 @@ describe('ArrearsService', () => {
         },
       });
 
-      const history = await service.getParentHistory(testParent.id, testTenant.id);
+      const history = await service.getParentHistory(
+        testParent.id,
+        testTenant.id,
+      );
 
       // Average: (-2 + 4) / 2 = 1
       expect(history.averageDaysToPayment).toBe(1);
@@ -631,7 +698,10 @@ describe('ArrearsService', () => {
         },
       });
 
-      const history = await service.getParentHistory(newParent.id, testTenant.id);
+      const history = await service.getParentHistory(
+        newParent.id,
+        testTenant.id,
+      );
 
       expect(history.totalInvoicedCents).toBe(0);
       expect(history.totalPaidCents).toBe(0);
@@ -643,8 +713,18 @@ describe('ArrearsService', () => {
     });
 
     it('should correctly categorize payment status', async () => {
-      const invoice1 = await createInvoice(5, InvoiceStatus.PAID, 100000, 100000);
-      const invoice2 = await createInvoice(10, InvoiceStatus.PARTIALLY_PAID, 50000, 25000);
+      const invoice1 = await createInvoice(
+        5,
+        InvoiceStatus.PAID,
+        100000,
+        100000,
+      );
+      const invoice2 = await createInvoice(
+        10,
+        InvoiceStatus.PARTIALLY_PAID,
+        50000,
+        25000,
+      );
       const invoice3 = await createInvoice(15, InvoiceStatus.SENT, 75000, 0);
 
       // Create payment for invoice1
@@ -661,11 +741,20 @@ describe('ArrearsService', () => {
         },
       });
 
-      const history = await service.getParentHistory(testParent.id, testTenant.id);
+      const history = await service.getParentHistory(
+        testParent.id,
+        testTenant.id,
+      );
 
-      const paidEntry = history.paymentHistory.find((e) => e.invoiceId === invoice1.id);
-      const partialEntry = history.paymentHistory.find((e) => e.invoiceId === invoice2.id);
-      const overdueEntry = history.paymentHistory.find((e) => e.invoiceId === invoice3.id);
+      const paidEntry = history.paymentHistory.find(
+        (e) => e.invoiceId === invoice1.id,
+      );
+      const partialEntry = history.paymentHistory.find(
+        (e) => e.invoiceId === invoice2.id,
+      );
+      const overdueEntry = history.paymentHistory.find(
+        (e) => e.invoiceId === invoice3.id,
+      );
 
       expect(paidEntry?.status).toBe('paid');
       expect(partialEntry?.status).toBe('partial');
@@ -1059,7 +1148,9 @@ describe('ArrearsService', () => {
       const report = await service.getArrearsReport(testTenant.id);
 
       // Should not be included in arrears report
-      expect(report.invoices.find((inv) => inv.outstandingCents === 0)).toBeUndefined();
+      expect(
+        report.invoices.find((inv) => inv.outstandingCents === 0),
+      ).toBeUndefined();
     });
 
     it('should handle very large outstanding amounts', async () => {
@@ -1089,7 +1180,12 @@ describe('ArrearsService', () => {
     });
 
     it('should handle multiple payments on same invoice for history', async () => {
-      const invoice = await createInvoice(10, InvoiceStatus.PAID, 100000, 100000);
+      const invoice = await createInvoice(
+        10,
+        InvoiceStatus.PAID,
+        100000,
+        100000,
+      );
 
       // First partial payment
       await prisma.payment.create({
@@ -1097,7 +1193,9 @@ describe('ArrearsService', () => {
           tenantId: testTenant.id,
           invoiceId: invoice.id,
           transactionId: null,
-          paymentDate: new Date(invoice.dueDate.getTime() - 5 * 24 * 60 * 60 * 1000),
+          paymentDate: new Date(
+            invoice.dueDate.getTime() - 5 * 24 * 60 * 60 * 1000,
+          ),
           amountCents: 60000,
           reference: 'Payment 1',
           matchType: 'PARTIAL',
@@ -1111,7 +1209,9 @@ describe('ArrearsService', () => {
           tenantId: testTenant.id,
           invoiceId: invoice.id,
           transactionId: null,
-          paymentDate: new Date(invoice.dueDate.getTime() + 2 * 24 * 60 * 60 * 1000),
+          paymentDate: new Date(
+            invoice.dueDate.getTime() + 2 * 24 * 60 * 60 * 1000,
+          ),
           amountCents: 40000,
           reference: 'Payment 2',
           matchType: 'EXACT',
@@ -1119,10 +1219,15 @@ describe('ArrearsService', () => {
         },
       });
 
-      const history = await service.getParentHistory(testParent.id, testTenant.id);
+      const history = await service.getParentHistory(
+        testParent.id,
+        testTenant.id,
+      );
 
       // Should use the LATEST payment date for calculating days to payment
-      const entry = history.paymentHistory.find((e) => e.invoiceId === invoice.id);
+      const entry = history.paymentHistory.find(
+        (e) => e.invoiceId === invoice.id,
+      );
       expect(entry?.status).toBe('paid');
       expect(entry?.paidDate).toBeTruthy();
       expect(entry?.daysToPayment).toBe(2); // Latest payment was 2 days late
@@ -1142,7 +1247,9 @@ describe('ArrearsService', () => {
 
       expect(report.summary.totalInvoices).toBe(1);
       expect(report.summary.totalOutstandingCents).toBe(100000);
-      expect(report.invoices.find((i) => i.invoiceId === invoice2.id)).toBeUndefined();
+      expect(
+        report.invoices.find((i) => i.invoiceId === invoice2.id),
+      ).toBeUndefined();
     });
   });
 });

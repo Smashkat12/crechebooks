@@ -55,7 +55,10 @@ describe('LLMWhispererParser', () => {
       }
 
       // Use one of the test PDFs
-      const pdfPath = path.join(bankStatementsDir, '63061274808 2025-11-03.pdf');
+      const pdfPath = path.join(
+        bankStatementsDir,
+        '63061274808 2025-11-03.pdf',
+      );
 
       if (!fs.existsSync(pdfPath)) {
         console.warn(`Test PDF not found at ${pdfPath}`);
@@ -72,8 +75,11 @@ describe('LLMWhispererParser', () => {
         expect(text.toUpperCase()).toMatch(/FNB|FIRST NATIONAL BANK/);
       } catch (error) {
         // Skip test if rate limited (HTTP 402) or API unavailable
-        if (error instanceof BusinessException &&
-            (error.message.includes('402') || error.message.includes('rate limit'))) {
+        if (
+          error instanceof BusinessException &&
+          (error.message.includes('402') ||
+            error.message.includes('rate limit'))
+        ) {
           console.warn('LLMWhisperer API rate limited - skipping test');
           return;
         }
@@ -87,7 +93,10 @@ describe('LLMWhispererParser', () => {
         return;
       }
 
-      const pdfPath = path.join(bankStatementsDir, '63061274808 2023-08-03.pdf');
+      const pdfPath = path.join(
+        bankStatementsDir,
+        '63061274808 2023-08-03.pdf',
+      );
 
       if (!fs.existsSync(pdfPath)) {
         console.warn(`Test PDF not found at ${pdfPath}`);
@@ -101,8 +110,11 @@ describe('LLMWhispererParser', () => {
         expect(text).toBeDefined();
         expect(text.length).toBeGreaterThan(100);
       } catch (error) {
-        if (error instanceof BusinessException &&
-            (error.message.includes('402') || error.message.includes('rate limit'))) {
+        if (
+          error instanceof BusinessException &&
+          (error.message.includes('402') ||
+            error.message.includes('rate limit'))
+        ) {
           console.warn('LLMWhisperer API rate limited - skipping test');
           return;
         }
@@ -118,7 +130,10 @@ describe('LLMWhispererParser', () => {
         return;
       }
 
-      const pdfPath = path.join(bankStatementsDir, '63061274808 2025-11-03.pdf');
+      const pdfPath = path.join(
+        bankStatementsDir,
+        '63061274808 2025-11-03.pdf',
+      );
 
       if (!fs.existsSync(pdfPath)) {
         console.warn(`Test PDF not found at ${pdfPath}`);
@@ -132,7 +147,9 @@ describe('LLMWhispererParser', () => {
 
         expect(Array.isArray(transactions)).toBe(true);
         // Real bank statements should have at least some transactions
-        console.log(`Parsed ${transactions.length} transactions from LLMWhisperer`);
+        console.log(
+          `Parsed ${transactions.length} transactions from LLMWhisperer`,
+        );
 
         // Verify transaction structure
         for (const tx of transactions) {
@@ -142,8 +159,11 @@ describe('LLMWhispererParser', () => {
           expect(typeof tx.isCredit).toBe('boolean');
         }
       } catch (error) {
-        if (error instanceof BusinessException &&
-            (error.message.includes('402') || error.message.includes('rate limit'))) {
+        if (
+          error instanceof BusinessException &&
+          (error.message.includes('402') ||
+            error.message.includes('rate limit'))
+        ) {
           console.warn('LLMWhisperer API rate limited - skipping test');
           return;
         }
@@ -171,9 +191,14 @@ describe('LLMWhispererParser', () => {
           console.log(`${pdfFile}: ${transactions.length} transactions`);
           expect(Array.isArray(transactions)).toBe(true);
         } catch (error) {
-          if (error instanceof BusinessException &&
-              (error.message.includes('402') || error.message.includes('rate limit'))) {
-            console.warn(`LLMWhisperer API rate limited for ${pdfFile} - skipping`);
+          if (
+            error instanceof BusinessException &&
+            (error.message.includes('402') ||
+              error.message.includes('rate limit'))
+          ) {
+            console.warn(
+              `LLMWhisperer API rate limited for ${pdfFile} - skipping`,
+            );
             continue;
           }
           throw error;

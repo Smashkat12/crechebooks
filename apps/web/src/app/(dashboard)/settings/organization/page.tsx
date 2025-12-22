@@ -34,6 +34,7 @@ export default function OrganizationSettingsPage() {
   };
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Organization Details</CardTitle>
@@ -78,5 +79,23 @@ export default function OrganizationSettingsPage() {
         </form>
       </CardContent>
     </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Closure Dates</CardTitle>
+        <CardDescription>
+          Configure public holidays and closure periods when fees may be adjusted
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground text-center py-4">
+          No closure dates configured. Add dates when the creche will be closed.
+        </p>
+        <Button variant="outline" className="w-full">
+          Add Closure Date
+        </Button>
+      </CardContent>
+    </Card>
+    </>
   );
 }

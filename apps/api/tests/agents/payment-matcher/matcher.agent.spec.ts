@@ -44,8 +44,12 @@ describe('PaymentMatcherAgent', () => {
     await prisma.transaction.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.child.deleteMany({});
-    await prisma.parent.deleteMany({ where: { email: { contains: 'matcher-test' } } });
-    await prisma.tenant.deleteMany({ where: { email: { contains: 'matcher-test' } } });
+    await prisma.parent.deleteMany({
+      where: { email: { contains: 'matcher-test' } },
+    });
+    await prisma.tenant.deleteMany({
+      where: { email: { contains: 'matcher-test' } },
+    });
 
     // Create test tenant
     testTenant = await prisma.tenant.create({
@@ -93,8 +97,12 @@ describe('PaymentMatcherAgent', () => {
     await prisma.transaction.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.child.deleteMany({});
-    await prisma.parent.deleteMany({ where: { email: { contains: 'matcher-test' } } });
-    await prisma.tenant.deleteMany({ where: { email: { contains: 'matcher-test' } } });
+    await prisma.parent.deleteMany({
+      where: { email: { contains: 'matcher-test' } },
+    });
+    await prisma.tenant.deleteMany({
+      where: { email: { contains: 'matcher-test' } },
+    });
     await prisma.$disconnect();
   });
 
@@ -178,7 +186,9 @@ describe('PaymentMatcherAgent', () => {
 
       expect(candidates.length).toBe(1);
       expect(candidates[0].invoice.id).toBe(invoice.id);
-      expect(candidates[0].matchReasons).toContain('Reference contains invoice number');
+      expect(candidates[0].matchReasons).toContain(
+        'Reference contains invoice number',
+      );
     });
 
     it('should find invoice with amount match only', async () => {
@@ -729,8 +739,8 @@ describe('PaymentMatcherAgent', () => {
 
       expect(candidates.length).toBe(1);
       // Should have some name similarity score
-      const hasNameSimilarity = candidates[0].matchReasons.some(
-        (r) => r.toLowerCase().includes('name'),
+      const hasNameSimilarity = candidates[0].matchReasons.some((r) =>
+        r.toLowerCase().includes('name'),
       );
       expect(hasNameSimilarity).toBe(true);
     });

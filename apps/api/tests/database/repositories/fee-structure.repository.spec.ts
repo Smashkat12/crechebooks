@@ -4,7 +4,10 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { FeeStructureRepository } from '../../../src/database/repositories/fee-structure.repository';
 import { CreateFeeStructureDto } from '../../../src/database/dto/fee-structure.dto';
 import { FeeType } from '../../../src/database/entities/fee-structure.entity';
-import { NotFoundException, DatabaseException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  DatabaseException,
+} from '../../../src/shared/exceptions';
 import { Tenant } from '@prisma/client';
 
 describe('FeeStructureRepository', () => {
@@ -129,7 +132,9 @@ describe('FeeStructureRepository', () => {
         tenantId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should handle different fee types', async () => {
@@ -166,7 +171,9 @@ describe('FeeStructureRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });
@@ -200,7 +207,9 @@ describe('FeeStructureRepository', () => {
         data: { isActive: false },
       });
 
-      const activeFeeStructures = await repository.findByTenant(testTenant.id, { isActive: true });
+      const activeFeeStructures = await repository.findByTenant(testTenant.id, {
+        isActive: true,
+      });
 
       expect(activeFeeStructures).toHaveLength(1);
       expect(activeFeeStructures[0].name).toBe('Half Day Care');
@@ -255,7 +264,9 @@ describe('FeeStructureRepository', () => {
         data: { isActive: false },
       });
 
-      const activeFeeStructures = await repository.findActiveByTenant(testTenant.id);
+      const activeFeeStructures = await repository.findActiveByTenant(
+        testTenant.id,
+      );
 
       expect(activeFeeStructures).toHaveLength(1);
       expect(activeFeeStructures[0].name).toBe('Half Day Care');
@@ -340,7 +351,9 @@ describe('FeeStructureRepository', () => {
 
     it('should throw NotFoundException for non-existent fee structure', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', { name: 'Test' }),
+        repository.update('00000000-0000-0000-0000-000000000000', {
+          name: 'Test',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -412,7 +425,9 @@ describe('FeeStructureRepository', () => {
       });
 
       // Now try to delete fee structure - should fail
-      await expect(repository.delete(feeStructure.id)).rejects.toThrow(DatabaseException);
+      await expect(repository.delete(feeStructure.id)).rejects.toThrow(
+        DatabaseException,
+      );
     });
   });
 

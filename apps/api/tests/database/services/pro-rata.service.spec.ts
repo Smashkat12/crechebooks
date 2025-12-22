@@ -30,11 +30,7 @@ describe('ProRataService', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ProRataService,
-        TenantRepository,
-        PrismaService,
-      ],
+      providers: [ProRataService, TenantRepository, PrismaService],
     }).compile();
 
     service = module.get<ProRataService>(ProRataService);
@@ -118,7 +114,10 @@ describe('ProRataService', () => {
 
   describe('isTenantClosure', () => {
     it('should return false when tenant has no closure dates', async () => {
-      const result = await service.isTenantClosure(new Date('2025-01-15'), tenantId);
+      const result = await service.isTenantClosure(
+        new Date('2025-01-15'),
+        tenantId,
+      );
       expect(result).toBe(false);
     });
 
@@ -131,7 +130,10 @@ describe('ProRataService', () => {
         },
       });
 
-      const result = await service.isTenantClosure(new Date('2025-01-15'), tenantId);
+      const result = await service.isTenantClosure(
+        new Date('2025-01-15'),
+        tenantId,
+      );
       expect(result).toBe(true);
     });
 
@@ -143,7 +145,10 @@ describe('ProRataService', () => {
         },
       });
 
-      const result = await service.isTenantClosure(new Date('2025-01-17'), tenantId);
+      const result = await service.isTenantClosure(
+        new Date('2025-01-17'),
+        tenantId,
+      );
       expect(result).toBe(false);
     });
   });
@@ -231,7 +236,11 @@ describe('ProRataService', () => {
       const monthlyFeeCents = 500000;
       const month = new Date('2025-01-15');
 
-      const dailyRate = await service.calculateDailyRate(monthlyFeeCents, month, tenantId);
+      const dailyRate = await service.calculateDailyRate(
+        monthlyFeeCents,
+        month,
+        tenantId,
+      );
       expect(dailyRate).toBe(22727);
     });
 
@@ -247,7 +256,11 @@ describe('ProRataService', () => {
         data: { closureDates: closures },
       });
 
-      const dailyRate = await service.calculateDailyRate(500000, new Date('2025-01-15'), tenantId);
+      const dailyRate = await service.calculateDailyRate(
+        500000,
+        new Date('2025-01-15'),
+        tenantId,
+      );
       expect(dailyRate).toBe(0);
     });
   });
@@ -258,7 +271,12 @@ describe('ProRataService', () => {
       const start = new Date('2025-01-01');
       const end = new Date('2025-01-31');
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, start, end, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        start,
+        end,
+        tenantId,
+      );
       expect(proRata).toBe(monthlyFeeCents);
     });
 
@@ -271,7 +289,12 @@ describe('ProRataService', () => {
       const start = new Date('2025-01-13');
       const end = new Date('2025-01-17');
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, start, end, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        start,
+        end,
+        tenantId,
+      );
       expect(proRata).toBe(113636);
     });
 
@@ -291,7 +314,12 @@ describe('ProRataService', () => {
       const start = new Date('2025-01-04'); // Saturday
       const end = new Date('2025-01-05'); // Sunday
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, start, end, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        start,
+        end,
+        tenantId,
+      );
       expect(proRata).toBe(0);
     });
 
@@ -303,7 +331,12 @@ describe('ProRataService', () => {
       const monthlyFeeCents = 500000;
       const singleDay = new Date('2025-01-06'); // Monday
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, singleDay, singleDay, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        singleDay,
+        singleDay,
+        tenantId,
+      );
       expect(proRata).toBe(22727);
     });
   });
@@ -343,7 +376,9 @@ describe('ProRataService', () => {
 
       expect(result.excludedDays.length).toBeGreaterThan(0);
 
-      const weekendDays = result.excludedDays.filter(d => d.reason === 'WEEKEND');
+      const weekendDays = result.excludedDays.filter(
+        (d) => d.reason === 'WEEKEND',
+      );
       expect(weekendDays.length).toBe(2); // Sat and Sun
     });
 
@@ -360,7 +395,9 @@ describe('ProRataService', () => {
         tenantId,
       );
 
-      const holidays = result.excludedDays.filter(d => d.reason === 'PUBLIC_HOLIDAY');
+      const holidays = result.excludedDays.filter(
+        (d) => d.reason === 'PUBLIC_HOLIDAY',
+      );
       expect(holidays.length).toBe(1); // New Year's Day
     });
 
@@ -381,7 +418,9 @@ describe('ProRataService', () => {
         tenantId,
       );
 
-      const closures = result.excludedDays.filter(d => d.reason === 'CLOSURE');
+      const closures = result.excludedDays.filter(
+        (d) => d.reason === 'CLOSURE',
+      );
       expect(closures.length).toBe(1);
       expect(result.billedDays).toBe(4); // 5 weekdays minus 1 closure
     });
@@ -404,10 +443,18 @@ describe('ProRataService', () => {
       );
 
       // Calculate expected: 15 school days / 22 total * 500000 = 340909
-      const schoolDays = await service.getSchoolDays(enrollmentDate, monthEnd, tenantId);
+      const schoolDays = await service.getSchoolDays(
+        enrollmentDate,
+        monthEnd,
+        tenantId,
+      );
       expect(schoolDays).toBe(15);
 
-      const expected = new Decimal(500000).div(22).mul(15).toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber();
+      const expected = new Decimal(500000)
+        .div(22)
+        .mul(15)
+        .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+        .toNumber();
       expect(proRata).toBe(expected);
     });
   });
@@ -427,24 +474,36 @@ describe('ProRataService', () => {
       );
 
       // Calculate expected school days in Jan 1-17
-      const schoolDays = await service.getSchoolDays(monthStart, withdrawalDate, tenantId);
+      const schoolDays = await service.getSchoolDays(
+        monthStart,
+        withdrawalDate,
+        tenantId,
+      );
       // Jan 1 (holiday), 2-3 (Thu-Fri), 6-10 (Mon-Fri), 13-17 (Mon-Fri) = 2+5+5 = 12 days
       expect(schoolDays).toBe(12);
 
-      const expected = new Decimal(500000).div(22).mul(12).toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber();
+      const expected = new Decimal(500000)
+        .div(22)
+        .mul(12)
+        .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+        .toNumber();
       expect(proRata).toBe(expected);
     });
   });
 
-  describe('Banker\'s Rounding', () => {
-    it('should use banker\'s rounding for .5 cases', async () => {
+  describe("Banker's Rounding", () => {
+    it("should use banker's rounding for .5 cases", async () => {
       // Create a scenario where rounding matters
       // Monthly fee where daily rate ends in .5
       // 100000 cents / 22 days = 4545.454545...
       const monthlyFeeCents = 100000;
       const month = new Date('2025-01-15');
 
-      const dailyRate = await service.calculateDailyRate(monthlyFeeCents, month, tenantId);
+      const dailyRate = await service.calculateDailyRate(
+        monthlyFeeCents,
+        month,
+        tenantId,
+      );
 
       // Banker's rounding: 4545.4545 should round to 4545
       expect(dailyRate).toBe(4545);
@@ -457,9 +516,15 @@ describe('ProRataService', () => {
       const value3 = new Decimal('4.5');
 
       // Banker's rounding: .5 rounds to nearest even
-      expect(value1.toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber()).toBe(2); // 2 is even
-      expect(value2.toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber()).toBe(4); // 4 is even
-      expect(value3.toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber()).toBe(4); // 4 is even
+      expect(
+        value1.toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber(),
+      ).toBe(2); // 2 is even
+      expect(
+        value2.toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber(),
+      ).toBe(4); // 4 is even
+      expect(
+        value3.toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN).toNumber(),
+      ).toBe(4); // 4 is even
     });
   });
 
@@ -480,7 +545,12 @@ describe('ProRataService', () => {
       const start = new Date('2025-01-01');
       const end = new Date('2025-01-31');
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, start, end, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        start,
+        end,
+        tenantId,
+      );
       expect(proRata).toBe(0);
     });
 
@@ -488,9 +558,18 @@ describe('ProRataService', () => {
       const monthlyFeeCents = 500000;
       const singleDay = new Date('2025-01-06'); // Monday
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, singleDay, singleDay, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        singleDay,
+        singleDay,
+        tenantId,
+      );
 
-      const dailyRate = await service.calculateDailyRate(monthlyFeeCents, singleDay, tenantId);
+      const dailyRate = await service.calculateDailyRate(
+        monthlyFeeCents,
+        singleDay,
+        tenantId,
+      );
       expect(proRata).toBe(dailyRate);
     });
 
@@ -499,7 +578,12 @@ describe('ProRataService', () => {
       const start = new Date('2025-01-06T10:30:00.000Z');
       const end = new Date('2025-01-10T23:59:59.999Z');
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, start, end, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        start,
+        end,
+        tenantId,
+      );
 
       // Should work the same as dates without time
       const startNormalized = new Date('2025-01-06');
@@ -541,7 +625,12 @@ describe('ProRataService', () => {
       const start = new Date('2025-01-06');
       const end = new Date('2025-01-10');
 
-      const proRata = await service.calculateProRata(monthlyFeeCents, start, end, tenantId);
+      const proRata = await service.calculateProRata(
+        monthlyFeeCents,
+        start,
+        end,
+        tenantId,
+      );
       expect(proRata).toBe(0);
     });
   });

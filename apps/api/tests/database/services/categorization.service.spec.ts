@@ -14,13 +14,19 @@ import { PayeePatternRepository } from '../../../src/database/repositories/payee
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { CategorizationService } from '../../../src/database/services/categorization.service';
 import { PatternLearningService } from '../../../src/database/services/pattern-learning.service';
-import { ImportSource, TransactionStatus } from '../../../src/database/entities/transaction.entity';
+import {
+  ImportSource,
+  TransactionStatus,
+} from '../../../src/database/entities/transaction.entity';
 import {
   VatType,
   CategorizationSource,
 } from '../../../src/database/entities/categorization.entity';
 import { Tenant, User, Transaction } from '@prisma/client';
-import { NotFoundException, BusinessException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  BusinessException,
+} from '../../../src/shared/exceptions';
 
 describe('CategorizationService', () => {
   let service: CategorizationService;
@@ -46,8 +52,12 @@ describe('CategorizationService', () => {
 
     prisma = module.get<PrismaService>(PrismaService);
     transactionRepo = module.get<TransactionRepository>(TransactionRepository);
-    categorizationRepo = module.get<CategorizationRepository>(CategorizationRepository);
-    payeePatternRepo = module.get<PayeePatternRepository>(PayeePatternRepository);
+    categorizationRepo = module.get<CategorizationRepository>(
+      CategorizationRepository,
+    );
+    payeePatternRepo = module.get<PayeePatternRepository>(
+      PayeePatternRepository,
+    );
     service = module.get<CategorizationService>(CategorizationService);
 
     await prisma.onModuleInit();
@@ -102,7 +112,9 @@ describe('CategorizationService', () => {
   });
 
   // Helper to create a test transaction
-  async function createTransaction(overrides: Partial<Transaction> = {}): Promise<Transaction> {
+  async function createTransaction(
+    overrides: Partial<Transaction> = {},
+  ): Promise<Transaction> {
     return transactionRepo.create({
       tenantId: testTenant.id,
       bankAccount: 'FNB Cheque',
@@ -152,7 +164,10 @@ describe('CategorizationService', () => {
       expect(result.confidenceScore).toBeGreaterThanOrEqual(80);
 
       // Verify transaction status updated
-      const updated = await transactionRepo.findById(testTenant.id, transaction.id);
+      const updated = await transactionRepo.findById(
+        testTenant.id,
+        transaction.id,
+      );
       expect(updated?.status).toBe(TransactionStatus.CATEGORIZED);
     });
 
@@ -213,7 +228,10 @@ describe('CategorizationService', () => {
       expect(result.confidenceScore).toBeLessThan(80);
 
       // Verify transaction status
-      const updated = await transactionRepo.findById(testTenant.id, transaction.id);
+      const updated = await transactionRepo.findById(
+        testTenant.id,
+        transaction.id,
+      );
       expect(updated?.status).toBe(TransactionStatus.REVIEW_REQUIRED);
     });
 
@@ -284,9 +302,10 @@ describe('CategorizationService', () => {
 
       expect(result.totalProcessed).toBe(2);
       expect(result.failed).toBe(1);
-      expect(result.results.find((r) => r.transactionId === 'non-existent-id')?.error).toBe(
-        'Transaction not found',
-      );
+      expect(
+        result.results.find((r) => r.transactionId === 'non-existent-id')
+          ?.error,
+      ).toBe('Transaction not found');
     });
   });
 

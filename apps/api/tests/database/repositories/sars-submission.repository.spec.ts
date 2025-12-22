@@ -31,9 +31,7 @@ describe('SarsSubmissionRepository', () => {
     inputVatCents: 180000, // R1,800.00 input VAT
     netVatCents: 270000, // R2,700.00 net VAT payable
     documentData: {
-      lineItems: [
-        { description: 'School fees', amount: 3000000, vat: 450000 },
-      ],
+      lineItems: [{ description: 'School fees', amount: 3000000, vat: 450000 }],
     },
     notes: 'Monthly VAT return for January 2025',
   };

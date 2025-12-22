@@ -61,7 +61,8 @@ describe('JwtAuthGuard', () => {
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
 
       // Mock parent class canActivate to throw UnauthorizedException
-      jest.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
+      jest
+        .spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
         .mockImplementation(() => {
           throw new UnauthorizedException('No authorization token was found');
         });
@@ -80,7 +81,8 @@ describe('JwtAuthGuard', () => {
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
 
       // Mock parent class canActivate to return true for valid token
-      jest.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
+      jest
+        .spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
         .mockResolvedValue(true);
 
       const result = await guard.canActivate(context);
@@ -92,7 +94,8 @@ describe('JwtAuthGuard', () => {
       const context = createMockExecutionContext(false);
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
 
-      jest.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
+      jest
+        .spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
         .mockImplementation(() => {
           throw new UnauthorizedException('No authorization token was found');
         });
@@ -110,7 +113,8 @@ describe('JwtAuthGuard', () => {
       const context = createMockExecutionContext(false);
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
 
-      jest.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
+      jest
+        .spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
         .mockImplementation(() => {
           throw new UnauthorizedException('Invalid token format');
         });
@@ -122,7 +126,8 @@ describe('JwtAuthGuard', () => {
       const context = createMockExecutionContext(false);
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
 
-      jest.spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
+      jest
+        .spyOn(Object.getPrototypeOf(JwtAuthGuard.prototype), 'canActivate')
         .mockImplementation(() => {
           throw new UnauthorizedException('Token has expired');
         });
@@ -134,7 +139,9 @@ describe('JwtAuthGuard', () => {
   describe('Reflector Integration', () => {
     it('should check both handler and class for @Public decorator', () => {
       const context = createMockExecutionContext(true);
-      const spy = jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(true);
+      const spy = jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue(true);
 
       guard.canActivate(context);
 

@@ -99,7 +99,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, mockUser);
 
@@ -115,7 +117,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      const spy = jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      const spy = jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       await controller.generateVat201(dto, mockUser);
 
@@ -132,7 +136,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, mockUser);
 
@@ -147,7 +153,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, mockUser);
 
@@ -166,7 +174,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, mockUser);
 
@@ -181,7 +191,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, mockUser);
 
@@ -195,7 +207,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, mockUser);
 
@@ -216,7 +230,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, adminUser);
 
@@ -231,7 +247,9 @@ describe('SarsController - POST /sars/vat201', () => {
         period_end: '2025-01-31',
       };
 
-      jest.spyOn(vat201Service, 'generateVat201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(vat201Service, 'generateVat201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateVat201(dto, accountantUser);
 

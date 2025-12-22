@@ -62,7 +62,9 @@ describe('EnrollmentService', () => {
     tenantRepo = module.get<TenantRepository>(TenantRepository);
     parentRepo = module.get<ParentRepository>(ParentRepository);
     childRepo = module.get<ChildRepository>(ChildRepository);
-    feeStructureRepo = module.get<FeeStructureRepository>(FeeStructureRepository);
+    feeStructureRepo = module.get<FeeStructureRepository>(
+      FeeStructureRepository,
+    );
     enrollmentRepo = module.get<EnrollmentRepository>(EnrollmentRepository);
 
     await prisma.onModuleInit();
@@ -613,9 +615,9 @@ describe('EnrollmentService', () => {
       const enrollments = await service.getActiveEnrollments(testTenant.id);
 
       expect(enrollments).toHaveLength(3);
-      expect(enrollments.every((e) => e.status === EnrollmentStatus.ACTIVE)).toBe(
-        true,
-      );
+      expect(
+        enrollments.every((e) => e.status === EnrollmentStatus.ACTIVE),
+      ).toBe(true);
     });
 
     it('should filter by parentId correctly', async () => {

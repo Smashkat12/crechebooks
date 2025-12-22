@@ -115,7 +115,11 @@ describe('TransactionController.importTransactions', () => {
         status: 'COMPLETED',
         errors: [
           { row: 5, message: 'Invalid date', code: 'INVALID_DATE' },
-          { field: 'amount', message: 'Negative value', code: 'INVALID_AMOUNT' },
+          {
+            field: 'amount',
+            message: 'Negative value',
+            code: 'INVALID_AMOUNT',
+          },
         ],
       };
       importService.importFromFile.mockResolvedValue(resultWithErrors);
@@ -185,11 +189,7 @@ describe('TransactionController.importTransactions', () => {
       } as Express.Multer.File;
 
       await expect(
-        controller.importTransactions(
-          file,
-          { bank_account: '' },
-          mockUser,
-        ),
+        controller.importTransactions(file, { bank_account: '' }, mockUser),
       ).rejects.toThrow(BadRequestException);
     });
   });

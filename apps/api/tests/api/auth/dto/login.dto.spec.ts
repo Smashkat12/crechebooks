@@ -9,7 +9,9 @@ describe('LoginRequestDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      const redirectUriError = errors.find((e) => e.property === 'redirect_uri');
+      const redirectUriError = errors.find(
+        (e) => e.property === 'redirect_uri',
+      );
       expect(redirectUriError).toBeDefined();
       expect(redirectUriError?.constraints).toHaveProperty('isNotEmpty');
       expect(redirectUriError?.constraints?.isNotEmpty).toBe(
@@ -35,7 +37,9 @@ describe('LoginRequestDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      const redirectUriError = errors.find((e) => e.property === 'redirect_uri');
+      const redirectUriError = errors.find(
+        (e) => e.property === 'redirect_uri',
+      );
       expect(redirectUriError).toBeDefined();
       expect(redirectUriError?.constraints).toHaveProperty('isUrl');
     });
@@ -92,7 +96,9 @@ describe('LoginRequestDto', () => {
       const errors = await validate(dto);
 
       // With require_tld: false, this might pass. Let's test actual behavior
-      const redirectUriError = errors.find((e) => e.property === 'redirect_uri');
+      const redirectUriError = errors.find(
+        (e) => e.property === 'redirect_uri',
+      );
       if (redirectUriError) {
         expect(redirectUriError.constraints).toHaveProperty('isUrl');
       }
@@ -103,7 +109,9 @@ describe('LoginRequestDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      const redirectUriError = errors.find((e) => e.property === 'redirect_uri');
+      const redirectUriError = errors.find(
+        (e) => e.property === 'redirect_uri',
+      );
       expect(redirectUriError).toBeDefined();
       expect(redirectUriError?.constraints).toHaveProperty('isNotEmpty');
     });

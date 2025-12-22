@@ -32,7 +32,7 @@ export const mainNavLinks: NavLink[] = [
 export const managementNavLinks: NavLink[] = [
   { title: 'Parents', href: '/parents', icon: UsersRound },
   { title: 'Staff', href: '/staff', icon: Users },
-  { title: 'Payroll', href: '/payroll', icon: FileSpreadsheet },
+  { title: 'Payroll', href: '/staff/payroll', icon: FileSpreadsheet },
 ];
 
 export const complianceNavLinks: NavLink[] = [

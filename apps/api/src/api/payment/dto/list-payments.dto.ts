@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsBoolean,
   IsInt,
+  IsString,
   Min,
   Max,
 } from 'class-validator';
@@ -16,6 +17,11 @@ import { MatchType, MatchedBy } from '@prisma/client';
  * Uses snake_case for external API consumers.
  */
 export class ListPaymentsQueryDto {
+  // tenantId is passed by frontend but ignored - we use JWT token instead
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
   @ApiPropertyOptional({
     description: 'Filter by invoice UUID',
     example: '550e8400-e29b-41d4-a716-446655440000',

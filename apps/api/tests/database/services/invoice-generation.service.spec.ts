@@ -28,10 +28,24 @@ import { XeroSyncService } from '../../../src/database/services/xero-sync.servic
  */
 const mockXeroSyncService = {
   createInvoiceDraft: async (): Promise<string | null> => null,
-  syncTransactions: async () => ({ totalProcessed: 0, synced: 0, failed: 0, skipped: 0, errors: [] }),
+  syncTransactions: async () => ({
+    totalProcessed: 0,
+    synced: 0,
+    failed: 0,
+    skipped: 0,
+    errors: [],
+  }),
   pushToXero: async () => false,
-  pullFromXero: async () => ({ transactionsPulled: 0, duplicatesSkipped: 0, errors: [] }),
-  syncChartOfAccounts: async () => ({ accountsFetched: 0, newAccounts: [], errors: [] }),
+  pullFromXero: async () => ({
+    transactionsPulled: 0,
+    duplicatesSkipped: 0,
+    errors: [],
+  }),
+  syncChartOfAccounts: async () => ({
+    accountsFetched: 0,
+    newAccounts: [],
+    errors: [],
+  }),
   hasValidConnection: async () => false,
   mapVatToXeroTax: () => 'NONE',
   mapXeroTaxToVat: () => 'NO_VAT',
@@ -314,7 +328,7 @@ describe('InvoiceGenerationService', () => {
       expect(service.calculateVAT(10000)).toBe(1500);
     });
 
-    it('should use banker\'s rounding (ROUND_HALF_EVEN) for VAT', () => {
+    it("should use banker's rounding (ROUND_HALF_EVEN) for VAT", () => {
       // R125.00 = 12500 cents -> VAT = 1875 cents (exact)
       expect(service.calculateVAT(12500)).toBe(1875);
 
@@ -442,7 +456,9 @@ describe('InvoiceGenerationService', () => {
 
     it('should return empty result when no active enrollments', async () => {
       // Delete all enrollments
-      await prisma.enrollment.deleteMany({ where: { tenantId: testTenant.id } });
+      await prisma.enrollment.deleteMany({
+        where: { tenantId: testTenant.id },
+      });
 
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
@@ -729,7 +745,9 @@ describe('InvoiceGenerationService', () => {
 
       expect(result.invoicesCreated).toBe(1);
 
-      const invoice = await invoiceRepo.findByIdWithLines(result.invoices[0].id);
+      const invoice = await invoiceRepo.findByIdWithLines(
+        result.invoices[0].id,
+      );
       expect(invoice).toBeDefined();
 
       // R5000 + 15% VAT = R5750
@@ -783,11 +801,15 @@ describe('InvoiceGenerationService', () => {
       expect(invoice!.lines).toHaveLength(2);
 
       // Fee line has VAT
-      const feeLine = invoice!.lines.find((l) => l.lineType === LineType.MONTHLY_FEE);
+      const feeLine = invoice!.lines.find(
+        (l) => l.lineType === LineType.MONTHLY_FEE,
+      );
       expect(feeLine!.vatCents).toBe(75000);
 
       // Discount line has NO VAT
-      const discountLine = invoice!.lines.find((l) => l.lineType === LineType.DISCOUNT);
+      const discountLine = invoice!.lines.find(
+        (l) => l.lineType === LineType.DISCOUNT,
+      );
       expect(discountLine!.vatCents).toBe(0);
     });
   });
@@ -814,7 +836,9 @@ describe('InvoiceGenerationService', () => {
 
       expect(result.invoicesCreated).toBe(1);
 
-      const invoice = await invoiceRepo.findByIdWithLines(result.invoices[0].id);
+      const invoice = await invoiceRepo.findByIdWithLines(
+        result.invoices[0].id,
+      );
       expect(invoice).toBeDefined();
 
       // Only one line (no discount)
@@ -842,7 +866,9 @@ describe('InvoiceGenerationService', () => {
 
       expect(result.invoicesCreated).toBe(1);
 
-      const invoice = await invoiceRepo.findByIdWithLines(result.invoices[0].id);
+      const invoice = await invoiceRepo.findByIdWithLines(
+        result.invoices[0].id,
+      );
       expect(invoice).toBeDefined();
       expect(invoice!.lines[0].unitPriceCents).toBe(450000);
       expect(invoice!.subtotalCents).toBe(450000);
@@ -889,7 +915,9 @@ describe('InvoiceGenerationService', () => {
       // All should be recorded as errors but method shouldn't throw
       expect(result.invoicesCreated).toBe(0);
       expect(result.errors.length).toBe(3);
-      expect(result.errors.every((e) => e.code === 'DUPLICATE_INVOICE')).toBe(true);
+      expect(result.errors.every((e) => e.code === 'DUPLICATE_INVOICE')).toBe(
+        true,
+      );
     });
 
     it('should aggregate total amount correctly across all invoices', async () => {
@@ -900,7 +928,10 @@ describe('InvoiceGenerationService', () => {
       );
 
       // Calculate expected total
-      const actualTotal = result.invoices.reduce((sum, inv) => sum + inv.totalCents, 0);
+      const actualTotal = result.invoices.reduce(
+        (sum, inv) => sum + inv.totalCents,
+        0,
+      );
       expect(result.totalAmountCents).toBe(actualTotal);
     });
   });

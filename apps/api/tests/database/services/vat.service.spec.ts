@@ -511,7 +511,11 @@ describe('VatService', () => {
 
   describe('classifyVatType', () => {
     it('should classify zero-rated by account code', () => {
-      const result = service.classifyVatType('1200', 'Some export item', '4123456789');
+      const result = service.classifyVatType(
+        '1200',
+        'Some export item',
+        '4123456789',
+      );
       expect(result).toBe(VatType.ZERO_RATED);
     });
 
@@ -526,17 +530,29 @@ describe('VatService', () => {
     });
 
     it('should classify as STANDARD with valid VAT number', () => {
-      const result = service.classifyVatType('6100', 'Office supplies', '4123456789');
+      const result = service.classifyVatType(
+        '6100',
+        'Office supplies',
+        '4123456789',
+      );
       expect(result).toBe(VatType.STANDARD);
     });
 
     it('should detect zero-rated by keyword', () => {
-      const result = service.classifyVatType('9999', 'Export to UK', '4123456789');
+      const result = service.classifyVatType(
+        '9999',
+        'Export to UK',
+        '4123456789',
+      );
       expect(result).toBe(VatType.ZERO_RATED);
     });
 
     it('should detect exempt by keyword', () => {
-      const result = service.classifyVatType('9999', 'Bank charge monthly', '4123456789');
+      const result = service.classifyVatType(
+        '9999',
+        'Bank charge monthly',
+        '4123456789',
+      );
       expect(result).toBe(VatType.EXEMPT);
     });
   });
@@ -674,7 +690,9 @@ describe('VatService', () => {
         new Date('2025-01-31'),
       );
 
-      expect(flagged.some((f) => f.issue.includes('total does not equal'))).toBe(true);
+      expect(
+        flagged.some((f) => f.issue.includes('total does not equal')),
+      ).toBe(true);
     });
 
     it('should warn about zero VAT invoices', async () => {
@@ -721,7 +739,11 @@ describe('VatService', () => {
         new Date('2025-01-31'),
       );
 
-      expect(flagged.some((f) => f.severity === 'WARNING' && f.issue.includes('no VAT'))).toBe(true);
+      expect(
+        flagged.some(
+          (f) => f.severity === 'WARNING' && f.issue.includes('no VAT'),
+        ),
+      ).toBe(true);
     });
   });
 
@@ -733,7 +755,7 @@ describe('VatService', () => {
       expect(vat.toNumber()).toBe(15000); // R150 in cents
     });
 
-    it('should apply banker\'s rounding correctly', () => {
+    it("should apply banker's rounding correctly", () => {
       // R100.125 should round to R100.12 (round to even)
       const amount1 = new Decimal(10012.5);
       const rounded1 = amount1.round();

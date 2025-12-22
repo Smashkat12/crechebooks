@@ -41,14 +41,17 @@ describe('AuthController', () => {
         redirect_uri: 'http://localhost:3000/callback',
       };
 
-      const expectedAuthUrl = 'https://auth0.com/authorize?client_id=test&redirect_uri=http://localhost:3000/callback&state=random-state';
+      const expectedAuthUrl =
+        'https://auth0.com/authorize?client_id=test&redirect_uri=http://localhost:3000/callback&state=random-state';
 
       mockAuthService.getAuthorizationUrl.mockReturnValue(expectedAuthUrl);
 
       const result = controller.login(loginDto);
 
       expect(result).toEqual({ auth_url: expectedAuthUrl });
-      expect(authService.getAuthorizationUrl).toHaveBeenCalledWith(loginDto.redirect_uri);
+      expect(authService.getAuthorizationUrl).toHaveBeenCalledWith(
+        loginDto.redirect_uri,
+      );
       expect(authService.getAuthorizationUrl).toHaveBeenCalledTimes(1);
     });
 
@@ -185,7 +188,9 @@ describe('AuthController', () => {
         expiresIn: 3600,
       };
 
-      mockAuthService.refreshAccessToken.mockResolvedValue(expectedRefreshResult);
+      mockAuthService.refreshAccessToken.mockResolvedValue(
+        expectedRefreshResult,
+      );
 
       const result = await controller.refresh(refreshDto);
 

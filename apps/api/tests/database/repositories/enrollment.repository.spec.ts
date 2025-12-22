@@ -199,7 +199,9 @@ describe('EnrollmentRepository', () => {
         childId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException for non-existent fee structure', async () => {
@@ -208,7 +210,9 @@ describe('EnrollmentRepository', () => {
         feeStructureId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException for non-existent tenant', async () => {
@@ -217,7 +221,9 @@ describe('EnrollmentRepository', () => {
         tenantId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -233,7 +239,9 @@ describe('EnrollmentRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });
@@ -330,13 +338,19 @@ describe('EnrollmentRepository', () => {
         status: EnrollmentStatus.GRADUATED,
       });
 
-      const enrollments = await repository.findByChild(testTenant.id, testChild.id);
+      const enrollments = await repository.findByChild(
+        testTenant.id,
+        testChild.id,
+      );
 
       expect(enrollments).toHaveLength(2);
     });
 
     it('should return empty array for child with no enrollments', async () => {
-      const enrollments = await repository.findByChild(testTenant.id, otherChild.id);
+      const enrollments = await repository.findByChild(
+        testTenant.id,
+        otherChild.id,
+      );
       expect(enrollments).toHaveLength(0);
     });
   });
@@ -345,7 +359,10 @@ describe('EnrollmentRepository', () => {
     it('should return active enrollment for child', async () => {
       await repository.create(testEnrollmentData);
 
-      const active = await repository.findActiveByChild(testTenant.id, testChild.id);
+      const active = await repository.findActiveByChild(
+        testTenant.id,
+        testChild.id,
+      );
 
       expect(active).not.toBeNull();
       expect(active?.status).toBe(EnrollmentStatus.ACTIVE);
@@ -358,7 +375,10 @@ describe('EnrollmentRepository', () => {
         status: EnrollmentStatus.WITHDRAWN,
       });
 
-      const active = await repository.findActiveByChild(testTenant.id, testChild.id);
+      const active = await repository.findActiveByChild(
+        testTenant.id,
+        testChild.id,
+      );
 
       expect(active).toBeNull();
     });
@@ -375,7 +395,10 @@ describe('EnrollmentRepository', () => {
         startDate: new Date('2025-01-15'),
       });
 
-      const active = await repository.findActiveByChild(testTenant.id, testChild.id);
+      const active = await repository.findActiveByChild(
+        testTenant.id,
+        testChild.id,
+      );
 
       expect(active).not.toBeNull();
       expect(active?.startDate.getMonth()).toBe(0); // January 2025 (most recent)
@@ -528,7 +551,10 @@ describe('EnrollmentRepository', () => {
       });
 
       // Verify both exist
-      const beforeDelete = await repository.findByChild(testTenant.id, testChild.id);
+      const beforeDelete = await repository.findByChild(
+        testTenant.id,
+        testChild.id,
+      );
       expect(beforeDelete).toHaveLength(2);
 
       // Delete child

@@ -65,4 +65,8 @@ export const endpoints = {
     metrics: '/dashboard/metrics',
     trends: '/dashboard/trends',
   },
+  feeStructures: {
+    list: '/fee-structures',
+    detail: (id: string) => `/fee-structures/${id}`,
+  },
 } as const;

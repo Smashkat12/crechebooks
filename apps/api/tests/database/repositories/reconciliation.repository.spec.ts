@@ -106,7 +106,9 @@ describe('ReconciliationRepository', () => {
 
       expect(reconciliation.id).toBeDefined();
       expect(reconciliation.tenantId).toBe(testTenant.id);
-      expect(reconciliation.bankAccount).toBe(testReconciliationData.bankAccount);
+      expect(reconciliation.bankAccount).toBe(
+        testReconciliationData.bankAccount,
+      );
       expect(reconciliation.openingBalanceCents).toBe(10000000);
       expect(reconciliation.closingBalanceCents).toBe(12500000);
       expect(reconciliation.calculatedBalanceCents).toBe(12450000);

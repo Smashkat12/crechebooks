@@ -2,9 +2,15 @@ import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { UserRepository } from '../../../src/database/repositories/user.repository';
-import { CreateUserDto, UpdateUserDto } from '../../../src/database/dto/user.dto';
+import {
+  CreateUserDto,
+  UpdateUserDto,
+} from '../../../src/database/dto/user.dto';
 import { UserRole } from '../../../src/database/entities/user.entity';
-import { NotFoundException, ConflictException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  ConflictException,
+} from '../../../src/shared/exceptions';
 import { Tenant } from '@prisma/client';
 
 describe('UserRepository', () => {
@@ -124,7 +130,9 @@ describe('UserRepository', () => {
         email: 'different@email.co.za', // different email
       };
 
-      await expect(repository.create(duplicateData)).rejects.toThrow(ConflictException);
+      await expect(repository.create(duplicateData)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should throw ConflictException for duplicate tenantId+email', async () => {
@@ -136,7 +144,9 @@ describe('UserRepository', () => {
         auth0Id: 'auth0|different123456', // different auth0Id
       };
 
-      await expect(repository.create(duplicateData)).rejects.toThrow(ConflictException);
+      await expect(repository.create(duplicateData)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should throw NotFoundException for non-existent tenant', async () => {
@@ -145,7 +155,9 @@ describe('UserRepository', () => {
         tenantId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -161,7 +173,9 @@ describe('UserRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });

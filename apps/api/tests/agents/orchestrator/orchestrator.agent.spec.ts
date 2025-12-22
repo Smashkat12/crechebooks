@@ -118,9 +118,15 @@ describe('OrchestratorAgent', () => {
     });
 
     it('should return L2 for all SARS workflows', () => {
-      expect(workflowRouter.getAutonomyLevel('CALCULATE_PAYE')).toBe('L2_DRAFT');
-      expect(workflowRouter.getAutonomyLevel('GENERATE_EMP201')).toBe('L2_DRAFT');
-      expect(workflowRouter.getAutonomyLevel('GENERATE_VAT201')).toBe('L2_DRAFT');
+      expect(workflowRouter.getAutonomyLevel('CALCULATE_PAYE')).toBe(
+        'L2_DRAFT',
+      );
+      expect(workflowRouter.getAutonomyLevel('GENERATE_EMP201')).toBe(
+        'L2_DRAFT',
+      );
+      expect(workflowRouter.getAutonomyLevel('GENERATE_VAT201')).toBe(
+        'L2_DRAFT',
+      );
     });
 
     it('should return L2 for MONTHLY_CLOSE', () => {
@@ -131,7 +137,9 @@ describe('OrchestratorAgent', () => {
     it('should identify SARS workflows', () => {
       expect(workflowRouter.isSarsWorkflow('CALCULATE_PAYE')).toBe(true);
       expect(workflowRouter.isSarsWorkflow('GENERATE_EMP201')).toBe(true);
-      expect(workflowRouter.isSarsWorkflow('CATEGORIZE_TRANSACTIONS')).toBe(false);
+      expect(workflowRouter.isSarsWorkflow('CATEGORIZE_TRANSACTIONS')).toBe(
+        false,
+      );
     });
 
     it('should list available workflows', () => {
@@ -178,7 +186,9 @@ describe('OrchestratorAgent', () => {
       });
 
       expect(result.autonomyLevel).toBe('L3_FULL_AUTO');
-      expect(result.results.some((r) => r.agent === 'transaction-categorizer')).toBe(true);
+      expect(
+        result.results.some((r) => r.agent === 'transaction-categorizer'),
+      ).toBe(true);
       expect(result.results[0].processed).toBe(2);
     });
   });
@@ -265,7 +275,9 @@ describe('OrchestratorAgent', () => {
       });
 
       expect(result.autonomyLevel).toBe('L3_FULL_AUTO');
-      expect(result.results.some((r) => r.agent === 'payment-matcher')).toBe(true);
+      expect(result.results.some((r) => r.agent === 'payment-matcher')).toBe(
+        true,
+      );
       expect(result.results[0].processed).toBe(1);
     });
   });
@@ -281,7 +293,9 @@ describe('OrchestratorAgent', () => {
       expect(result.autonomyLevel).toBe('L3_FULL_AUTO');
       // Should have results from both agents
       expect(result.results.length).toBe(2);
-      expect(result.results.map((r) => r.agent)).toContain('transaction-categorizer');
+      expect(result.results.map((r) => r.agent)).toContain(
+        'transaction-categorizer',
+      );
       expect(result.results.map((r) => r.agent)).toContain('payment-matcher');
     });
   });
@@ -331,7 +345,9 @@ describe('OrchestratorAgent', () => {
       expect(result.autonomyLevel).toBe('L2_DRAFT');
       expect(result.status).toBe('ESCALATED');
       expect(result.results.some((r) => r.agent === 'sars-agent')).toBe(true);
-      expect(result.escalations.some((e) => e.type === 'SARS_EMP201')).toBe(true);
+      expect(result.escalations.some((e) => e.type === 'SARS_EMP201')).toBe(
+        true,
+      );
     });
   });
 
@@ -366,7 +382,9 @@ describe('OrchestratorAgent', () => {
 
       expect(result.autonomyLevel).toBe('L2_DRAFT');
       expect(result.status).toBe('ESCALATED');
-      expect(result.escalations.some((e) => e.type === 'SARS_VAT201')).toBe(true);
+      expect(result.escalations.some((e) => e.type === 'SARS_VAT201')).toBe(
+        true,
+      );
     });
   });
 
@@ -422,7 +440,9 @@ describe('OrchestratorAgent', () => {
       expect(agents).toContain('sars-agent');
 
       // Should have monthly close escalation
-      expect(result.escalations.some((e) => e.type === 'MONTHLY_CLOSE')).toBe(true);
+      expect(result.escalations.some((e) => e.type === 'MONTHLY_CLOSE')).toBe(
+        true,
+      );
     });
   });
 

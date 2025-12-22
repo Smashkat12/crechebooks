@@ -24,7 +24,9 @@ describe('GetAccounts Tool', () => {
 
   describe('error handling', () => {
     it('should define XeroMCPError correctly', () => {
-      const error = new XeroMCPError('Test error', 'TEST_CODE', 400, { foo: 'bar' });
+      const error = new XeroMCPError('Test error', 'TEST_CODE', 400, {
+        foo: 'bar',
+      });
 
       expect(error.name).toBe('XeroMCPError');
       expect(error.message).toBe('Test error');

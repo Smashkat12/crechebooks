@@ -6,7 +6,11 @@ import { TransactionImportService } from '../../../src/database/services/transac
 import { CategorizationService } from '../../../src/database/services/categorization.service';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { Transaction } from '@prisma/client';
-import type { CategorizationBatchResult, CategorizationItemResult, CategorySuggestion } from '../../../src/database/dto/categorization-service.dto';
+import type {
+  CategorizationBatchResult,
+  CategorizationItemResult,
+  CategorySuggestion,
+} from '../../../src/database/dto/categorization-service.dto';
 import { CategorizationSource } from '../../../src/database/entities/categorization.entity';
 import { VatTypeApiEnum } from '../../../src/api/transaction/dto/update-categorization.dto';
 
@@ -76,7 +80,9 @@ describe('TransactionController Categorization Endpoints', () => {
 
   describe('PUT /:id/categorize', () => {
     it('should update categorization with manual override', async () => {
-      categorizationService.updateCategorization.mockResolvedValue(mockTransaction);
+      categorizationService.updateCategorization.mockResolvedValue(
+        mockTransaction,
+      );
 
       const result = await controller.updateCategorization(
         'tx-001',
@@ -105,7 +111,9 @@ describe('TransactionController Categorization Endpoints', () => {
     });
 
     it('should handle split transactions', async () => {
-      categorizationService.updateCategorization.mockResolvedValue(mockTransaction);
+      categorizationService.updateCategorization.mockResolvedValue(
+        mockTransaction,
+      );
 
       const result = await controller.updateCategorization(
         'tx-001',
@@ -114,8 +122,18 @@ describe('TransactionController Categorization Endpoints', () => {
           account_name: 'Mixed',
           is_split: true,
           splits: [
-            { account_code: '5100', account_name: 'Groceries', amount_cents: 10000, vat_type: VatTypeApiEnum.STANDARD },
-            { account_code: '5200', account_name: 'Cleaning', amount_cents: 5000, vat_type: VatTypeApiEnum.STANDARD },
+            {
+              account_code: '5100',
+              account_name: 'Groceries',
+              amount_cents: 10000,
+              vat_type: VatTypeApiEnum.STANDARD,
+            },
+            {
+              account_code: '5200',
+              account_name: 'Cleaning',
+              amount_cents: 5000,
+              vat_type: VatTypeApiEnum.STANDARD,
+            },
           ],
           vat_type: VatTypeApiEnum.STANDARD,
         },
@@ -127,7 +145,9 @@ describe('TransactionController Categorization Endpoints', () => {
     });
 
     it('should respect create_pattern flag', async () => {
-      categorizationService.updateCategorization.mockResolvedValue(mockTransaction);
+      categorizationService.updateCategorization.mockResolvedValue(
+        mockTransaction,
+      );
 
       const result = await controller.updateCategorization(
         'tx-001',
@@ -168,7 +188,9 @@ describe('TransactionController Categorization Endpoints', () => {
     };
 
     it('should batch categorize specific transactions', async () => {
-      categorizationService.categorizeTransactions.mockResolvedValue(mockBatchResult);
+      categorizationService.categorizeTransactions.mockResolvedValue(
+        mockBatchResult,
+      );
 
       const result = await controller.batchCategorize(
         { transaction_ids: ['tx-001', 'tx-002'] },
@@ -189,7 +211,9 @@ describe('TransactionController Categorization Endpoints', () => {
         total: 1,
         totalPages: 1,
       });
-      categorizationService.categorizeTransactions.mockResolvedValue(mockBatchResult);
+      categorizationService.categorizeTransactions.mockResolvedValue(
+        mockBatchResult,
+      );
 
       const result = await controller.batchCategorize({}, mockUser);
 
@@ -213,7 +237,9 @@ describe('TransactionController Categorization Endpoints', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.total_processed).toBe(0);
-      expect(categorizationService.categorizeTransactions).not.toHaveBeenCalled();
+      expect(
+        categorizationService.categorizeTransactions,
+      ).not.toHaveBeenCalled();
     });
   });
 
@@ -244,7 +270,10 @@ describe('TransactionController Categorization Endpoints', () => {
       expect(result.data).toHaveLength(2);
       expect(result.data[0].account_code).toBe('5100');
       expect(result.data[0].source).toBe('PATTERN');
-      expect(categorizationService.getSuggestions).toHaveBeenCalledWith('tx-001', 'tenant-001');
+      expect(categorizationService.getSuggestions).toHaveBeenCalledWith(
+        'tx-001',
+        'tenant-001',
+      );
     });
 
     it('should handle empty suggestions', async () => {

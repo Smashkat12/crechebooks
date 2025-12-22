@@ -7,11 +7,17 @@ import {
   IsEnum,
   IsISO8601,
   IsUUID,
+  IsString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { InvoiceStatus } from '../../../database/entities/invoice.entity';
 
 export class ListInvoicesQueryDto {
+  // tenantId is passed by frontend but ignored - we use JWT token instead
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
   @IsOptional()
   @IsInt()
   @Min(1)

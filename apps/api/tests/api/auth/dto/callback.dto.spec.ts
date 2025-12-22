@@ -15,7 +15,9 @@ describe('CallbackRequestDto', () => {
       const codeError = errors.find((e) => e.property === 'code');
       expect(codeError).toBeDefined();
       expect(codeError?.constraints).toHaveProperty('isNotEmpty');
-      expect(codeError?.constraints?.isNotEmpty).toBe('Authorization code is required');
+      expect(codeError?.constraints?.isNotEmpty).toBe(
+        'Authorization code is required',
+      );
     });
 
     it('should reject undefined code', async () => {
@@ -65,7 +67,9 @@ describe('CallbackRequestDto', () => {
       const stateError = errors.find((e) => e.property === 'state');
       expect(stateError).toBeDefined();
       expect(stateError?.constraints).toHaveProperty('isNotEmpty');
-      expect(stateError?.constraints?.isNotEmpty).toBe('State parameter is required');
+      expect(stateError?.constraints?.isNotEmpty).toBe(
+        'State parameter is required',
+      );
     });
 
     it('should reject undefined state', async () => {

@@ -7,7 +7,8 @@ import { UserRole } from '@prisma/client';
 import * as jwt from 'jsonwebtoken';
 
 // Use a test JWT secret - E2E tests should configure this
-const TEST_JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-e2e-testing';
+const TEST_JWT_SECRET =
+  process.env.JWT_SECRET || 'test-jwt-secret-for-e2e-testing';
 
 export interface TestTenant {
   id: string;
@@ -28,9 +29,10 @@ export interface TestUser {
  */
 export async function createTestTenant(
   prisma: PrismaService,
-  opts: { name?: string; email?: string } = {}
+  opts: { name?: string; email?: string } = {},
 ): Promise<TestTenant> {
-  const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const uniqueId =
+    Date.now().toString(36) + Math.random().toString(36).slice(2);
   const tenant = await prisma.tenant.create({
     data: {
       name: opts.name || `E2E Test Tenant ${uniqueId}`,
@@ -51,9 +53,10 @@ export async function createTestTenant(
 export async function createTestUser(
   prisma: PrismaService,
   tenantId: string,
-  opts: { role?: UserRole; email?: string } = {}
+  opts: { role?: UserRole; email?: string } = {},
 ): Promise<TestUser> {
-  const uniqueId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const uniqueId =
+    Date.now().toString(36) + Math.random().toString(36).slice(2);
   const user = await prisma.user.create({
     data: {
       tenantId,
@@ -93,21 +96,43 @@ export function getAuthToken(user: TestUser): string {
  */
 export async function seedChartOfAccounts(
   prisma: PrismaService,
-  tenantId: string
+  tenantId: string,
 ): Promise<void> {
   // Create payee patterns for common SA retailers
   const patterns = [
-    { payeePattern: 'WOOLWORTHS', accountCode: '5100', accountName: 'Groceries & Supplies' },
-    { payeePattern: 'CHECKERS', accountCode: '5100', accountName: 'Groceries & Supplies' },
-    { payeePattern: 'PICK N PAY', accountCode: '5100', accountName: 'Groceries & Supplies' },
-    { payeePattern: 'SPAR', accountCode: '5100', accountName: 'Groceries & Supplies' },
+    {
+      payeePattern: 'WOOLWORTHS',
+      accountCode: '5100',
+      accountName: 'Groceries & Supplies',
+    },
+    {
+      payeePattern: 'CHECKERS',
+      accountCode: '5100',
+      accountName: 'Groceries & Supplies',
+    },
+    {
+      payeePattern: 'PICK N PAY',
+      accountCode: '5100',
+      accountName: 'Groceries & Supplies',
+    },
+    {
+      payeePattern: 'SPAR',
+      accountCode: '5100',
+      accountName: 'Groceries & Supplies',
+    },
     { payeePattern: 'ESKOM', accountCode: '5200', accountName: 'Utilities' },
-    { payeePattern: 'CITY OF JOHANNESBURG', accountCode: '5200', accountName: 'Utilities' },
+    {
+      payeePattern: 'CITY OF JOHANNESBURG',
+      accountCode: '5200',
+      accountName: 'Utilities',
+    },
   ];
 
   for (const p of patterns) {
     await prisma.payeePattern.upsert({
-      where: { tenantId_payeePattern: { tenantId, payeePattern: p.payeePattern } },
+      where: {
+        tenantId_payeePattern: { tenantId, payeePattern: p.payeePattern },
+      },
       update: {},
       create: {
         tenantId,
@@ -125,11 +150,11 @@ export async function seedChartOfAccounts(
  */
 export async function cleanupTestData(
   prisma: PrismaService,
-  tenantId: string
+  tenantId: string,
 ): Promise<void> {
   // Delete in order respecting foreign keys
   await prisma.categorization.deleteMany({
-    where: { transaction: { tenantId } }
+    where: { transaction: { tenantId } },
   });
   await prisma.transaction.deleteMany({ where: { tenantId } });
   await prisma.payeePattern.deleteMany({ where: { tenantId } });

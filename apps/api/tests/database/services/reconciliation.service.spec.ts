@@ -65,8 +65,12 @@ describe('ReconciliationService', () => {
   afterEach(async () => {
     // Cleanup test data in FK order - CRITICAL
     if (testTenant?.id) {
-      await prisma.reconciliation.deleteMany({ where: { tenantId: testTenant.id } });
-      await prisma.transaction.deleteMany({ where: { tenantId: testTenant.id } });
+      await prisma.reconciliation.deleteMany({
+        where: { tenantId: testTenant.id },
+      });
+      await prisma.transaction.deleteMany({
+        where: { tenantId: testTenant.id },
+      });
       await prisma.user.deleteMany({ where: { tenantId: testTenant.id } });
       await prisma.tenant.delete({ where: { id: testTenant.id } });
     }
@@ -653,7 +657,11 @@ describe('ReconciliationService', () => {
         },
       });
 
-      const result = await service.matchTransactions(testTenant.id, recon.id, []);
+      const result = await service.matchTransactions(
+        testTenant.id,
+        recon.id,
+        [],
+      );
 
       expect(result.matchedCount).toBe(0);
       expect(result.unmatchedCount).toBe(0);

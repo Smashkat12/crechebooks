@@ -4,6 +4,7 @@ import { InvoiceRepository } from '../../../src/database/repositories/invoice.re
 import { ParentRepository } from '../../../src/database/repositories/parent.repository';
 import { ChildRepository } from '../../../src/database/repositories/child.repository';
 import { InvoiceGenerationService } from '../../../src/database/services/invoice-generation.service';
+import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
 import { IUser, UserRole } from '../../../src/database/entities/user.entity';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 
@@ -111,6 +112,12 @@ describe('InvoiceController', () => {
           provide: InvoiceGenerationService,
           useValue: {
             generateMonthlyInvoices: jest.fn(),
+          },
+        },
+        {
+          provide: InvoiceDeliveryService,
+          useValue: {
+            sendInvoices: jest.fn(),
           },
         },
       ],

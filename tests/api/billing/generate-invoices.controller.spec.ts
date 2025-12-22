@@ -14,6 +14,7 @@ import { InvoiceRepository } from '../../../src/database/repositories/invoice.re
 import { ParentRepository } from '../../../src/database/repositories/parent.repository';
 import { ChildRepository } from '../../../src/database/repositories/child.repository';
 import { InvoiceGenerationService } from '../../../src/database/services/invoice-generation.service';
+import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
@@ -113,6 +114,12 @@ describe('InvoiceController - Generate Invoices', () => {
           provide: InvoiceGenerationService,
           useValue: {
             generateMonthlyInvoices: jest.fn(),
+          },
+        },
+        {
+          provide: InvoiceDeliveryService,
+          useValue: {
+            sendInvoices: jest.fn(),
           },
         },
       ],

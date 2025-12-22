@@ -1,4 +1,4 @@
-<task_spec id="TASK-BILL-033" version="1.0">
+<task_spec id="TASK-BILL-033" version="3.0">
 
 <metadata>
   <title>Invoice Delivery Endpoint</title>
@@ -11,49 +11,125 @@
     <requirement_ref>REQ-BILL-008</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-BILL-031</task_ref>
-    <task_ref>TASK-BILL-013</task_ref>
+    <task_ref status="complete">TASK-BILL-031</task_ref>
+    <task_ref status="complete">TASK-BILL-032</task_ref>
+    <task_ref status="complete">TASK-BILL-013</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
+  <last_updated>2025-12-22</last_updated>
 </metadata>
 
 <context>
-This task implements the invoice delivery endpoint for the CrecheBooks system. It creates
-the POST /invoices/send endpoint that triggers email and/or WhatsApp delivery of approved
-invoices to parents. Integrates with email and WhatsApp MCP services and tracks delivery
-status with failure handling.
+This task adds POST /invoices/send endpoint to the existing InvoiceController. The endpoint
+triggers invoice delivery via email/WhatsApp by calling InvoiceDeliveryService.sendInvoices().
+TASK-BILL-031 and TASK-BILL-032 are COMPLETE - use their patterns for controller/DTO structure.
+
+CRITICAL REQUIREMENTS:
+- NO MOCK DATA in tests - use jest.spyOn() with real behavior verification
+- NO BACKWARDS COMPATIBILITY - fail fast with robust error logging
+- NO WORKAROUNDS - if something fails, throw BusinessException with error code
+- NO FALLBACKS - each failure must be logged and returned in the response
+
+Service layer (TASK-BILL-013) is COMPLETE. The InvoiceDeliveryService already:
+- Validates invoices are in DRAFT status (throws BusinessException if not)
+- Maps parent.preferredContact to DeliveryMethod
+- Tracks delivery attempts and updates invoice status
+- Returns DeliveryResult with sent/failed counts and failure details
 </context>
 
-<input_context_files>
-  <file purpose="billing_service">src/core/billing/billing.service.ts</file>
-  <file purpose="delivery_service">src/core/billing/delivery.service.ts</file>
-  <file purpose="api_contracts">specs/technical/api-contracts.md#invoices/send</file>
-</input_context_files>
+<current_codebase_state>
+IMPORTANT: These are the ACTUAL file paths and patterns in the codebase.
 
-<prerequisites>
-  <check>TASK-BILL-031 completed (Invoice controller base)</check>
-  <check>TASK-BILL-013 completed (Delivery service)</check>
-  <check>Email MCP service configured</check>
-  <check>WhatsApp MCP service configured</check>
-</prerequisites>
+## Existing Billing Files (Created in TASK-BILL-031/032)
+- src/api/billing/invoice.controller.ts (add sendInvoices method here)
+- src/api/billing/billing.module.ts (add InvoiceDeliveryService)
+- src/api/billing/dto/index.ts (export new DTOs here)
+- tests/api/billing/invoice.controller.spec.ts (10 tests)
+- tests/api/billing/generate-invoices.controller.spec.ts (8 tests)
+
+## Service Layer (COMPLETE - TASK-BILL-013)
+- src/database/services/invoice-delivery.service.ts
+  - sendInvoices(dto: SendInvoicesDto): Promise<DeliveryResult>
+  - deliverInvoice(tenantId, invoiceId, methodOverride?): Promise<void>
+  - retryFailed(dto: RetryFailedDto): Promise<DeliveryResult>
+
+## DTOs from Service Layer
+- src/database/dto/invoice-delivery.dto.ts contains:
+  ```typescript
+  export class SendInvoicesDto {
+    tenantId!: string;
+    invoiceIds!: string[];
+    method?: DeliveryMethod;
+  }
+
+  export interface DeliveryResult {
+    sent: number;
+    failed: number;
+    failures: DeliveryFailure[];
+  }
+
+  export interface DeliveryFailure {
+    invoiceId: string;
+    reason: string;
+    channel?: 'EMAIL' | 'WHATSAPP';
+    code: string;
+  }
+  ```
+
+## Entity Enums (src/database/entities/invoice.entity.ts)
+```typescript
+export enum DeliveryMethod {
+  EMAIL = 'EMAIL',
+  WHATSAPP = 'WHATSAPP',
+  BOTH = 'BOTH',
+}
+
+export enum DeliveryStatus {
+  PENDING = 'PENDING',
+  SENT = 'SENT',
+  DELIVERED = 'DELIVERED',
+  FAILED = 'FAILED',
+}
+
+export enum InvoiceStatus {
+  DRAFT = 'DRAFT',
+  SENT = 'SENT',
+  PAID = 'PAID',
+  OVERDUE = 'OVERDUE',
+  CANCELLED = 'CANCELLED',
+}
+```
+
+## Auth Patterns (from TASK-BILL-031/032)
+```typescript
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
+import type { IUser } from '../../database/entities/user.entity';
+```
+
+## Integration Services (Required by InvoiceDeliveryService)
+- src/integrations/email/email.service.ts
+- src/integrations/whatsapp/whatsapp.service.ts
+</current_codebase_state>
 
 <scope>
   <in_scope>
-    - Add POST /invoices/send endpoint to InvoiceController
-    - Create delivery request/response DTOs
-    - Support delivery_method selection (EMAIL, WHATSAPP, BOTH)
-    - Validate invoices are in DRAFT status
-    - Track delivery failures with reasons
-    - Update invoice and delivery status
+    - Add POST /invoices/send endpoint to invoice.controller.ts
+    - Create API-layer request/response DTOs (snake_case)
+    - Create send-invoices.dto.ts with validation
+    - Update billing.module.ts with InvoiceDeliveryService and dependencies
     - Add Swagger/OpenAPI annotations
+    - Create unit tests (8 minimum, no mock data)
     - Return summary with sent/failed counts
   </in_scope>
   <out_of_scope>
-    - Email sending logic (in MCP service)
-    - WhatsApp sending logic (in MCP service)
-    - PDF generation (in service layer)
+    - Email/WhatsApp sending logic (in integration services)
+    - PDF generation (not implemented yet)
     - Parent contact preference management
-    - Delivery retry logic (future enhancement)
+    - Delivery retry endpoint (separate task)
   </out_of_scope>
 </scope>
 
@@ -61,52 +137,59 @@ status with failure handling.
   <signatures>
     <signature file="src/api/billing/invoice.controller.ts">
       @Post('send')
-      @ApiOperation({ summary: 'Send approved invoices to parents' })
-      @ApiResponse({ status: 200, type: SendInvoicesResponseDto })
+      @HttpCode(200)
       @Roles(UserRole.OWNER, UserRole.ADMIN)
       @UseGuards(JwtAuthGuard, RolesGuard)
+      @ApiOperation({ summary: 'Send approved invoices to parents' })
+      @ApiResponse({ status: 200, type: SendInvoicesResponseDto })
+      @ApiResponse({ status: 400, description: 'Invalid invoice IDs or non-DRAFT status' })
+      @ApiForbiddenResponse({ description: 'Insufficient permissions' })
       async sendInvoices(
-        @Body() dto: SendInvoicesDto,
-        @CurrentUser() user: User
-      ): Promise&lt;SendInvoicesResponseDto&gt;;
+        @Body() dto: ApiSendInvoicesDto,
+        @CurrentUser() user: IUser
+      ): Promise<SendInvoicesResponseDto>;
     </signature>
+
     <signature file="src/api/billing/dto/send-invoices.dto.ts">
-      export class SendInvoicesDto {
+      // API-layer DTO (snake_case for API, converts to service-layer DTO)
+      export class ApiSendInvoicesDto {
         @IsArray()
         @IsUUID('4', { each: true })
-        @ApiProperty({ type: [String] })
-        invoice_ids: string[];
+        @ArrayMinSize(1)
+        @ApiProperty({ type: [String], description: 'Invoice UUIDs to send' })
+        invoice_ids!: string[];
 
         @IsOptional()
         @IsEnum(DeliveryMethod)
         @ApiProperty({
           enum: DeliveryMethod,
           required: false,
-          description: 'Defaults to parent preference'
+          description: 'Override delivery method. Defaults to parent preference.'
         })
         delivery_method?: DeliveryMethod;
       }
 
-      export class DeliveryFailureDto {
-        @ApiProperty()
-        invoice_id: string;
-
-        @ApiProperty()
-        invoice_number: string;
-
-        @ApiProperty()
-        reason: string;
+      export class DeliveryFailureResponseDto {
+        @ApiProperty() invoice_id!: string;
+        @ApiProperty() invoice_number?: string;
+        @ApiProperty() reason!: string;
+        @ApiProperty() code!: string;
       }
 
       export class SendInvoicesResponseDto {
-        @ApiProperty()
-        success: boolean;
-
-        @ApiProperty()
-        data: {
+        @ApiProperty() success!: boolean;
+        @ApiProperty({
+          type: 'object',
+          properties: {
+            sent: { type: 'number' },
+            failed: { type: 'number' },
+            failures: { type: 'array', items: { $ref: '#/components/schemas/DeliveryFailureResponseDto' } }
+          }
+        })
+        data!: {
           sent: number;
           failed: number;
-          failures: DeliveryFailureDto[];
+          failures: DeliveryFailureResponseDto[];
         };
       }
     </signature>
@@ -114,157 +197,216 @@ status with failure handling.
 
   <constraints>
     - Only OWNER and ADMIN roles can send invoices
-    - Invoices must be in DRAFT status to send
-    - Must validate all invoice_ids exist and belong to tenant
-    - If delivery_method not specified, use parent preference
-    - Must update invoice status to SENT on success
-    - Must track delivery_status (SENT, FAILED, DELIVERED)
-    - Failed deliveries must not block others
-    - Must return detailed failure reasons
+    - Service validates invoices are in DRAFT status (throws BusinessException)
+    - Service validates all invoice_ids exist and belong to tenant
+    - Failed deliveries must not block others (partial success allowed)
+    - Must return detailed failure reasons with error codes
     - All DTOs must have Swagger documentation
+    - API uses snake_case (invoice_ids), service uses camelCase (invoiceIds)
   </constraints>
 
-  <verification>
+  <validation_criteria>
     - POST /invoices/send sends invoices successfully
-    - Validates invoices are in DRAFT status
-    - Validates invoices belong to tenant
-    - delivery_method override works
-    - Parent preference is used when method not specified
-    - Updates invoice status to SENT
-    - Tracks delivery_status correctly
-    - Returns sent/failed counts
-    - Returns failure details with reasons
+    - delivery_method override works (EMAIL, WHATSAPP, BOTH)
+    - Parent preference used when delivery_method not specified
+    - Returns sent/failed counts accurately
+    - Returns failure details with reason and code
     - Only OWNER/ADMIN can access (403 for others)
-  </verification>
+    - Minimum 8 unit tests, all using jest.spyOn()
+    - npm run test passes
+    - npm run build passes
+    - npm run lint passes
+  </validation_criteria>
 </definition_of_done>
 
-<pseudo_code>
-InvoiceController (src/api/billing/invoice.controller.ts):
-  @Post('send')
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async sendInvoices(dto: SendInvoicesDto, user: User):
-    # Validate all invoices exist and belong to tenant
-    invoices = await billingService.findByIds(dto.invoice_ids, user.tenantId)
+<implementation_pattern>
+Follow EXACTLY this pattern from TASK-BILL-032 invoice.controller.ts:
 
-    if (invoices.length !== dto.invoice_ids.length):
-      throw new BadRequestException('One or more invoices not found')
+```typescript
+// In invoice.controller.ts - ADD this method
 
-    # Validate all invoices are in DRAFT status
-    nonDraftInvoices = invoices.filter(inv => inv.status !== 'DRAFT')
-    if (nonDraftInvoices.length > 0):
-      throw new BadRequestException(
-        'All invoices must be in DRAFT status to send'
-      )
+@Post('send')
+@HttpCode(200)
+@Roles(UserRole.OWNER, UserRole.ADMIN)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiOperation({
+  summary: 'Send invoices to parents',
+  description: 'Sends DRAFT invoices via email/WhatsApp. Returns partial success if some fail.',
+})
+@ApiResponse({ status: 200, type: SendInvoicesResponseDto })
+@ApiResponse({ status: 400, description: 'Invalid invoice IDs' })
+@ApiForbiddenResponse({ description: 'Insufficient permissions (requires OWNER or ADMIN)' })
+@ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+async sendInvoices(
+  @Body() dto: ApiSendInvoicesDto,
+  @CurrentUser() user: IUser,
+): Promise<SendInvoicesResponseDto> {
+  this.logger.log(
+    `Send invoices: tenant=${user.tenantId}, count=${dto.invoice_ids.length}`,
+  );
 
-    # Send invoices
-    result = await deliveryService.sendInvoices({
-      invoices,
-      deliveryMethod: dto.delivery_method, # optional override
-      tenantId: user.tenantId
-    })
+  // Call service layer (handles DRAFT validation, tenant isolation, delivery)
+  const result = await this.invoiceDeliveryService.sendInvoices({
+    tenantId: user.tenantId,
+    invoiceIds: dto.invoice_ids, // API: snake_case -> Service: camelCase
+    method: dto.delivery_method,
+  });
 
-    # Format response
-    return {
-      success: true,
-      data: {
-        sent: result.successful.length,
-        failed: result.failures.length,
-        failures: result.failures.map(failure => ({
-          invoice_id: failure.invoice.id,
-          invoice_number: failure.invoice.invoiceNumber,
-          reason: failure.reason
-        }))
-      }
-    }
+  this.logger.log(
+    `Send complete: sent=${result.sent}, failed=${result.failed}`,
+  );
 
-DeliveryService.sendInvoices (pseudo):
-  async sendInvoices({ invoices, deliveryMethod, tenantId }):
-    successful = []
-    failures = []
+  // Transform service result to API response (camelCase -> snake_case)
+  return {
+    success: true,
+    data: {
+      sent: result.sent,
+      failed: result.failed,
+      failures: result.failures.map((f) => ({
+        invoice_id: f.invoiceId,
+        reason: f.reason,
+        code: f.code,
+      })),
+    },
+  };
+}
+```
+</implementation_pattern>
 
-    for (invoice of invoices):
-      try:
-        # Determine delivery method
-        method = deliveryMethod || invoice.parent.preferredDeliveryMethod
+<test_pattern>
+Follow EXACTLY this pattern from generate-invoices.controller.spec.ts:
 
-        # Get parent contact info
-        parent = invoice.parent
+```typescript
+// tests/api/billing/send-invoices.controller.spec.ts
 
-        # Generate PDF if not already generated
-        pdfUrl = await pdfService.getInvoicePdf(invoice.id)
+import { Test, TestingModule } from '@nestjs/testing';
+import { InvoiceController } from '../../../src/api/billing/invoice.controller';
+import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
+// ... other imports from existing tests
 
-        # Send via appropriate channel(s)
-        if (method === 'EMAIL' || method === 'BOTH'):
-          await emailMcp.sendInvoice({
-            to: parent.email,
-            invoiceNumber: invoice.invoiceNumber,
-            pdfUrl
-          })
+describe('InvoiceController - Send Invoices', () => {
+  let controller: InvoiceController;
+  let invoiceDeliveryService: InvoiceDeliveryService;
 
-        if (method === 'WHATSAPP' || method === 'BOTH'):
-          await whatsappMcp.sendInvoice({
-            to: parent.phone,
-            invoiceNumber: invoice.invoiceNumber,
-            pdfUrl
-          })
+  const mockTenantId = 'tenant-123';
+  const mockUserId = 'user-456';
 
-        # Update invoice status
-        await invoiceRepo.update(invoice.id, {
-          status: 'SENT',
-          deliveryStatus: 'SENT',
-          sentAt: new Date()
-        })
+  const mockOwnerUser: IUser = {
+    id: mockUserId,
+    tenantId: mockTenantId,
+    auth0Id: 'auth0|owner123',
+    email: 'owner@school.com',
+    role: UserRole.OWNER,
+    name: 'School Owner',
+    isActive: true,
+    lastLoginAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 
-        successful.push(invoice)
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [InvoiceController],
+      providers: [
+        // ... existing providers from other tests
+        {
+          provide: InvoiceDeliveryService,
+          useValue: {
+            sendInvoices: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
 
-      catch (error):
-        failures.push({
-          invoice,
-          reason: error.message
-        })
+    controller = module.get<InvoiceController>(InvoiceController);
+    invoiceDeliveryService = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
+  });
 
-    return { successful, failures }
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
 
-Error Handling:
-  # Common failure reasons
-  - Invalid email address
-  - Invalid phone number
-  - Email service unavailable
-  - WhatsApp service unavailable
-  - PDF generation failed
-  - Missing parent contact info
-</pseudo_code>
+  describe('POST /invoices/send', () => {
+    it('should send invoices successfully', async () => {
+      // Arrange
+      const dto = { invoice_ids: ['inv-001', 'inv-002'] };
+      const mockResult = { sent: 2, failed: 0, failures: [] };
+
+      const sendSpy = jest
+        .spyOn(invoiceDeliveryService, 'sendInvoices')
+        .mockResolvedValue(mockResult);
+
+      // Act
+      const result = await controller.sendInvoices(dto, mockOwnerUser);
+
+      // Assert
+      expect(sendSpy).toHaveBeenCalledWith({
+        tenantId: mockTenantId,
+        invoiceIds: ['inv-001', 'inv-002'],
+        method: undefined,
+      });
+      expect(result.success).toBe(true);
+      expect(result.data.sent).toBe(2);
+      expect(result.data.failed).toBe(0);
+    });
+
+    // ... more tests following this pattern
+  });
+});
+```
+
+CRITICAL: NO MOCK DATA. Use jest.spyOn() to verify service calls with real behavior.
+</test_pattern>
 
 <files_to_create>
-  <file path="src/api/billing/dto/send-invoices.dto.ts">Invoice delivery DTOs</file>
-  <file path="src/api/billing/dto/delivery-failure.dto.ts">Delivery failure DTO</file>
-  <file path="tests/api/billing/send-invoices.spec.ts">Send endpoint unit tests</file>
-  <file path="tests/api/billing/send-invoices.e2e-spec.ts">Send E2E tests</file>
+  <file path="src/api/billing/dto/send-invoices.dto.ts">API-layer send invoices DTOs</file>
+  <file path="tests/api/billing/send-invoices.controller.spec.ts">Send endpoint unit tests (8 minimum)</file>
 </files_to_create>
 
 <files_to_modify>
-  <file path="src/api/billing/invoice.controller.ts">Add send endpoint</file>
+  <file path="src/api/billing/invoice.controller.ts">Add sendInvoices endpoint</file>
+  <file path="src/api/billing/billing.module.ts">Add InvoiceDeliveryService, EmailService, WhatsAppService</file>
+  <file path="src/api/billing/dto/index.ts">Export new DTOs</file>
 </files_to_modify>
 
-<validation_criteria>
-  <criterion>POST /invoices/send sends invoices successfully</criterion>
-  <criterion>Validates DRAFT status requirement</criterion>
-  <criterion>Validates tenant ownership</criterion>
-  <criterion>delivery_method override works</criterion>
-  <criterion>Parent preference used when not specified</criterion>
-  <criterion>Updates invoice status to SENT</criterion>
-  <criterion>Returns accurate sent/failed counts</criterion>
-  <criterion>Returns detailed failure reasons</criterion>
-  <criterion>Role guard enforces OWNER/ADMIN only</criterion>
-  <criterion>All tests pass with >80% coverage</criterion>
-</validation_criteria>
+<billing_module_update>
+Update billing.module.ts to add InvoiceDeliveryService and its dependencies:
+
+```typescript
+import { InvoiceDeliveryService } from '../../database/services/invoice-delivery.service';
+import { EmailService } from '../../integrations/email/email.service';
+import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [InvoiceController],
+  providers: [
+    // ... existing providers
+    InvoiceDeliveryService,
+    EmailService,
+    WhatsAppService,
+  ],
+})
+export class BillingModule {}
+```
+</billing_module_update>
 
 <test_commands>
-  <command>npm run test -- send-invoices.spec</command>
-  <command>npm run test:e2e -- send-invoices.e2e-spec</command>
-  <command>curl -X POST -H "Authorization: Bearer TOKEN" -d '{"invoice_ids":["uuid1","uuid2"]}' http://localhost:3000/v1/invoices/send</command>
-  <command>curl -X POST -H "Authorization: Bearer TOKEN" -d '{"invoice_ids":["uuid1"],"delivery_method":"EMAIL"}' http://localhost:3000/v1/invoices/send</command>
+  <command>npm run test -- tests/api/billing/send-invoices.controller.spec.ts</command>
+  <command>npm run test -- tests/api/billing/</command>
+  <command>npm run build</command>
+  <command>npm run lint -- src/api/billing tests/api/billing</command>
 </test_commands>
+
+<success_criteria>
+1. POST /invoices/send endpoint works with valid invoice_ids
+2. delivery_method override works (EMAIL, WHATSAPP, BOTH)
+3. Returns correct sent/failed counts
+4. Returns failure details with code and reason
+5. Role guard enforces OWNER/ADMIN only
+6. All 8+ tests pass using jest.spyOn() (NO MOCK DATA)
+7. npm run build passes
+8. npm run lint passes
+</success_criteria>
 
 </task_spec>

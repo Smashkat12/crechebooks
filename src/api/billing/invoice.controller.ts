@@ -22,6 +22,7 @@ import { InvoiceRepository } from '../../database/repositories/invoice.repositor
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { ChildRepository } from '../../database/repositories/child.repository';
 import { InvoiceGenerationService } from '../../database/services/invoice-generation.service';
+import { InvoiceDeliveryService } from '../../database/services/invoice-delivery.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -39,6 +40,8 @@ import {
   ChildSummaryDto,
   GenerateInvoicesDto,
   GenerateInvoicesResponseDto,
+  ApiSendInvoicesDto,
+  SendInvoicesResponseDto,
 } from './dto';
 
 @Controller('invoices')
@@ -52,6 +55,7 @@ export class InvoiceController {
     private readonly parentRepo: ParentRepository,
     private readonly childRepo: ChildRepository,
     private readonly invoiceGenerationService: InvoiceGenerationService,
+    private readonly invoiceDeliveryService: InvoiceDeliveryService,
   ) {}
 
   @Get()
@@ -263,6 +267,55 @@ export class InvoiceController {
           enrollment_id: err.enrollmentId,
           error: err.error,
           code: err.code,
+        })),
+      },
+    };
+  }
+
+  @Post('send')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Send invoices to parents',
+    description:
+      'Sends DRAFT invoices via email/WhatsApp. Returns partial success if some fail.',
+  })
+  @ApiResponse({ status: 200, type: SendInvoicesResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid invoice IDs' })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions (requires OWNER or ADMIN)',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async sendInvoices(
+    @Body() dto: ApiSendInvoicesDto,
+    @CurrentUser() user: IUser,
+  ): Promise<SendInvoicesResponseDto> {
+    this.logger.log(
+      `Send invoices: tenant=${user.tenantId}, count=${dto.invoice_ids.length}`,
+    );
+
+    // Call service layer (handles DRAFT validation, tenant isolation, delivery)
+    const result = await this.invoiceDeliveryService.sendInvoices({
+      tenantId: user.tenantId,
+      invoiceIds: dto.invoice_ids, // API: snake_case -> Service: camelCase
+      method: dto.delivery_method,
+    });
+
+    this.logger.log(
+      `Send complete: sent=${result.sent}, failed=${result.failed}`,
+    );
+
+    // Transform service result to API response (camelCase -> snake_case)
+    return {
+      success: true,
+      data: {
+        sent: result.sent,
+        failed: result.failed,
+        failures: result.failures.map((f) => ({
+          invoice_id: f.invoiceId,
+          reason: f.reason,
+          code: f.code,
         })),
       },
     };

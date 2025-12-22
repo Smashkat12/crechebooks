@@ -3,7 +3,7 @@
 ## Current Status: Surface Layer In Progress
 
 **Last Updated**: 2025-12-22
-**Total Tests**: 1381 passing
+**Total Tests**: 1414 passing
 **Build Status**: PASS
 **Lint Status**: PASS
 
@@ -16,80 +16,86 @@
 | Foundation | 15 | 15 | 100% Complete |
 | Logic | 22 | 22 | 100% Complete |
 | Agents | 5 | 5 | 100% Complete |
-| Surface | 16 | 2 | 12.5% In Progress |
+| Surface | 16 | 6 | 37.5% In Progress |
 | Integration | 5 | 0 | Not Started |
 
-**Overall Progress**: 44/63 tasks (69.8%)
+**Overall Progress**: 48/63 tasks (76%)
 
 ---
 
 ## Latest Completions (2025-12-22)
 
-### TASK-TRANS-031: Transaction Controller and DTOs
+### TASK-BILL-031: Invoice Controller and DTOs
 - **Status**: Complete
-- **Tests**: 9 controller tests passing (total 1381)
+- **Tests**: 10 controller tests passing (total 1406)
 - **Key Features**:
-  - GET /api/v1/transactions endpoint with pagination
-  - Query filters: status, date_from, date_to, is_reconciled, search
-  - PaginationMetaDto in src/shared/dto/ (reusable)
-  - TransactionResponseDto with nested CategorizationResponseDto
+  - GET /api/v1/invoices endpoint with pagination
+  - Query filters: status, parent_id, child_id, date_from, date_to
+  - ListInvoicesQueryDto with class-validator decorators
+  - InvoiceResponseDto with embedded parent/child summary
+  - Cents → Rands conversion (divide by 100)
+  - Dates as YYYY-MM-DD strings
   - Tenant isolation via @CurrentUser().tenantId
   - Swagger documentation with @ApiProperty examples
 - **Files Created**:
-  - src/shared/dto/pagination-meta.dto.ts
-  - src/api/transaction/dto/*.ts (4 files)
-  - src/api/transaction/transaction.controller.ts
-  - src/api/transaction/transaction.module.ts
-  - tests/api/transaction/transaction.controller.spec.ts
+  - src/api/billing/dto/list-invoices.dto.ts
+  - src/api/billing/dto/invoice-response.dto.ts
+  - src/api/billing/dto/index.ts
+  - src/api/billing/invoice.controller.ts
+  - src/api/billing/billing.module.ts
+  - tests/api/billing/invoice.controller.spec.ts
 
-### TASK-API-001: Authentication Controller and Guards
-- **Status**: Complete (2025-12-21)
-- **Tests**: 65 auth tests passing
+### TASK-BILL-032: Invoice Generation Endpoint
+- **Status**: Complete
+- **Tests**: 8 controller tests passing (total 1414)
+- **Key Features**:
+  - POST /api/v1/invoices/generate endpoint
+  - GenerateInvoicesDto with YYYY-MM format validation
+  - Future month rejection with 400 BadRequest
+  - @Roles(OWNER, ADMIN) restriction via RolesGuard
+  - InvoiceGenerationService integration
+  - Response: invoices_created, total_amount (Rands), invoice summaries, errors
+- **Files Created**:
+  - src/api/billing/dto/generate-invoices.dto.ts
+  - tests/api/billing/generate-invoices.controller.spec.ts
+- **Files Modified**:
+  - src/api/billing/invoice.controller.ts (added generateInvoices method)
+  - src/api/billing/billing.module.ts (added InvoiceGenerationService deps)
+  - src/api/billing/dto/index.ts (export new DTOs)
+  - src/api/api.module.ts (import BillingModule)
+
+---
+
+## Previous Completions (2025-12-22)
+
+### TASK-TRANS-031: Transaction Controller and DTOs
+- **Status**: Complete
+- **Tests**: 9 controller tests passing
+
+### TASK-TRANS-032: Transaction Import Endpoint
+- **Status**: Complete
+- **Tests**: 7 controller tests passing
+
+### TASK-TRANS-033: Categorization Endpoint
+- **Status**: Complete
+- **Tests**: 8 controller tests passing
 
 ---
 
 ## Previous Completions (2025-12-21)
 
+### TASK-API-001: Authentication Controller and Guards
+- **Status**: Complete
+- **Tests**: 65 auth tests passing
+
 ### TASK-AGENT-001 to TASK-AGENT-005: Claude Code Agents
 - **Status**: Complete
-- **Tests**: 71 agent tests passing
-- **Key Features**:
-  - TransactionCategorizerAgent: Pattern matching, confidence scoring, decision logging
-  - PaymentMatcherAgent: Invoice matching with auto-apply (>=80%) or escalation
-  - SarsAgent: PAYE/UIF/VAT calculations with mandatory review (L2 autonomy)
-  - OrchestratorAgent: Workflow routing, escalation aggregation
-  - Context files: chart_of_accounts.json, payee_patterns.json, sars_tables_2025.json
+- **Tests**: 56 agent tests passing
 
 ### TASK-TRANS-015: LLMWhisperer PDF Extraction
 - **Status**: Complete
 - **Tests**: 62 parser tests passing
-- **Key Features**:
-  - LLMWhisperer cloud API integration
-  - Confidence-based hybrid routing (local first, LLM fallback)
-  - Multi-line FNB bank statement parsing
-  - Bank charges handling (optional trailing line)
-  - Real PDF testing with 28 FNB statements
 
-### TASK-RECON-011: Bank Reconciliation Service
+### TASK-RECON-011/012/013: Reconciliation Services
 - **Status**: Complete
-- **Tests**: 16 passing
-- **Key Features**:
-  - Reconcile bank accounts for periods
-  - Formula: opening + credits - debits = calculated
-  - Status = RECONCILED if |discrepancy| <= 1 cent
-  - Mark transactions as reconciled (immutable)
-
-### TASK-RECON-012: Discrepancy Detection Service
-- **Status**: Complete
-- **Tests**: 17 passing
-- **Key Features**:
-  - Detect IN_BANK_NOT_XERO transactions
-  - Severity: LOW (<R10), MEDIUM (R10-R100), HIGH (>R100)
-  - Resolution suggestions
-
-### TASK-RECON-013: Financial Report Service
-- **Status**: Complete
-- **Tests**: 12 passing
-- **Key Features**:
-  - Income Statement, Balance Sheet, Trial Balance
-  - Chart of Accounts (SA IFRS for SMEs)
+- **Tests**: 45 tests passing

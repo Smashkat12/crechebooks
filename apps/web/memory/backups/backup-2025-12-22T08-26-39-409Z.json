@@ -1,0 +1,229 @@
+{
+  "timestamp": "2025-12-22T08:26:39.409Z",
+  "version": "1.0",
+  "entries": [
+    {
+      "id": "entry_mjgtz2oq_mwnzhdsb1",
+      "key": "web/task-001",
+      "value": {
+        "status": "complete",
+        "files": [
+          "apps/web/.env.example",
+          "apps/web/.env.local",
+          "apps/web/eslint.config.mjs"
+        ],
+        "verified": true
+      },
+      "type": "object",
+      "namespace": "crechebooks/progress",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-22T07:24:38.618Z",
+      "updatedAt": "2025-12-22T07:24:38.618Z",
+      "lastAccessedAt": "2025-12-22T07:24:38.618Z",
+      "version": 1,
+      "size": 151,
+      "compressed": false,
+      "checksum": "3f6c3b32ace0223e0c4e6fe6adf69e9d65d51229c699fa975afbf42ed3fe4063",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjguaga4_syzjfll8d",
+      "key": "web/task-002",
+      "value": "{\"status\":\"complete\",\"components\":[\"button\",\"input\",\"label\",\"card\",\"dialog\",\"alert-dialog\",\"select\",\"checkbox\",\"table\",\"tabs\",\"toast\",\"toaster\",\"use-toast\",\"separator\",\"badge\",\"dropdown-menu\",\"avatar\",\"tooltip\",\"popover\",\"skeleton\",\"sheet\",\"scroll-area\"],\"filesCreated\":[\"src/lib/utils.ts\",\"components.json\",\"src/components/ui/button.tsx\",\"src/components/ui/input.tsx\",\"src/components/ui/label.tsx\",\"src/components/ui/card.tsx\",\"src/components/ui/dialog.tsx\",\"src/components/ui/alert-dialog.tsx\",\"src/components/ui/select.tsx\",\"src/components/ui/checkbox.tsx\",\"src/components/ui/table.tsx\",\"src/components/ui/tabs.tsx\",\"src/components/ui/toast.tsx\",\"src/components/ui/toaster.tsx\",\"src/hooks/use-toast.ts\",\"src/components/ui/separator.tsx\",\"src/components/ui/badge.tsx\",\"src/components/ui/dropdown-menu.tsx\",\"src/components/ui/avatar.tsx\",\"src/components/ui/tooltip.tsx\",\"src/components/ui/popover.tsx\",\"src/components/ui/skeleton.tsx\",\"src/components/ui/sheet.tsx\",\"src/components/ui/scroll-area.tsx\"],\"dependenciesInstalled\":[\"@radix-ui/react-scroll-area\"],\"typeCheckPassed\":true}",
+      "type": "object",
+      "namespace": "crechebooks/progress",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-22T07:33:29.452Z",
+      "updatedAt": "2025-12-22T07:33:29.452Z",
+      "lastAccessedAt": "2025-12-22T07:33:29.452Z",
+      "version": 1,
+      "size": 1218,
+      "compressed": true,
+      "checksum": "9c48693a42901b211ce85c808f93f4de6258963efd7e86fab10e3e0118d0cc83",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgut57j_tsvvlqlsh",
+      "key": "web/task-003",
+      "value": {
+        "status": "complete",
+        "agent": "implementation",
+        "files": [
+          "lib/api/client.ts",
+          "lib/api/query-client.ts",
+          "lib/api/query-keys.ts",
+          "lib/api/endpoints.ts",
+          "lib/api/index.ts",
+          "hooks/use-transactions.ts",
+          "hooks/use-invoices.ts",
+          "hooks/use-payments.ts",
+          "hooks/use-arrears.ts",
+          "hooks/use-parents.ts",
+          "hooks/use-sars.ts",
+          "hooks/use-reconciliation.ts",
+          "hooks/use-staff.ts",
+          "hooks/use-dashboard.ts",
+          "hooks/index.ts"
+        ],
+        "linesOfCode": 1261,
+        "verification": "type-check passed",
+        "dependencies": "@crechebooks/types built and linked"
+      },
+      "type": "object",
+      "namespace": "crechebooks/progress",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-22T07:48:01.567Z",
+      "updatedAt": "2025-12-22T07:48:01.567Z",
+      "lastAccessedAt": "2025-12-22T07:48:01.567Z",
+      "version": 1,
+      "size": 539,
+      "compressed": false,
+      "checksum": "d5ebd5e99bc8a9df3169ec18e3484fdaa056711340aefd02ac3c385f830c4ec5",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgv4hmg_r9x7ix5hd",
+      "key": "web/task-005",
+      "value": {
+        "status": "complete",
+        "stores": [
+          "ui-store",
+          "filter-store",
+          "preferences-store"
+        ],
+        "timestamp": "2025-12-22T09:56:50+02:00"
+      },
+      "type": "object",
+      "namespace": "crechebooks/progress",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-22T07:56:50.872Z",
+      "updatedAt": "2025-12-22T07:56:50.872Z",
+      "lastAccessedAt": "2025-12-22T07:56:50.872Z",
+      "version": 1,
+      "size": 147,
+      "compressed": false,
+      "checksum": "f53b570509e93dbf6e510ec12519f14dc280b75a8c4b37def49ca5ef2bdece88",
+      "references": [],
+      "dependencies": []
+    },
+    {
+      "id": "entry_mjgw6tnz_w9hkm7ttd",
+      "key": "web/task-013",
+      "value": {
+        "status": "complete",
+        "components": [
+          "payment-columns.tsx",
+          "payment-table.tsx",
+          "payment-filters.tsx",
+          "match-payment-dialog.tsx",
+          "invoice-search.tsx",
+          "allocation-form.tsx",
+          "match-suggestions.tsx",
+          "index.ts"
+        ],
+        "hooks": [
+          "use-debounce.ts"
+        ],
+        "timestamp": "2025-12-22T10:30:00Z"
+      },
+      "type": "object",
+      "namespace": "crechebooks/progress",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-22T08:26:39.407Z",
+      "updatedAt": "2025-12-22T08:26:39.407Z",
+      "lastAccessedAt": "2025-12-22T08:26:39.407Z",
+      "version": 1,
+      "size": 297,
+      "compressed": false,
+      "checksum": "b50814ebde42c59f842a180ecf3579bdbfae8fa87a02f8bab8e33b1293e41d9a",
+      "references": [],
+      "dependencies": []
+    }
+  ],
+  "statistics": {
+    "overview": {
+      "totalEntries": 5,
+      "totalSize": 2352,
+      "compressedEntries": 1,
+      "compressionRatio": -0.07407407407407407,
+      "indexSize": 250,
+      "memoryUsage": 7729184,
+      "diskUsage": 0
+    },
+    "distribution": {
+      "byNamespace": {
+        "crechebooks/progress": {
+          "count": 5,
+          "size": 2352
+        }
+      },
+      "byType": {
+        "object": {
+          "count": 5,
+          "size": 2352
+        }
+      },
+      "byOwner": {
+        "system": {
+          "count": 5,
+          "size": 2352
+        }
+      },
+      "byAccessLevel": {
+        "shared": {
+          "count": 5,
+          "size": 2352
+        }
+      }
+    },
+    "temporal": {
+      "entriesCreatedLast24h": 5,
+      "entriesUpdatedLast24h": 5,
+      "entriesAccessedLast24h": 5,
+      "oldestEntry": "2025-12-22T07:24:38.618Z",
+      "newestEntry": "2025-12-22T08:26:39.407Z"
+    },
+    "performance": {
+      "averageQueryTime": 0,
+      "averageWriteTime": 1,
+      "cacheHitRatio": 0,
+      "indexEfficiency": 0.95
+    },
+    "health": {
+      "expiredEntries": 0,
+      "orphanedReferences": 0,
+      "duplicateKeys": 0,
+      "corruptedEntries": 0,
+      "recommendedCleanup": false
+    },
+    "optimization": {
+      "suggestions": [],
+      "potentialSavings": {
+        "compression": 0,
+        "cleanup": 0,
+        "deduplication": 0
+      },
+      "indexOptimization": [
+        "Consider periodic index rebuilding for optimal performance"
+      ]
+    }
+  }
+}

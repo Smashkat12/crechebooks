@@ -1,0 +1,102 @@
+{
+  "timestamp": "2025-12-22T07:24:38.619Z",
+  "version": "1.0",
+  "entries": [
+    {
+      "id": "entry_mjgtz2oq_mwnzhdsb1",
+      "key": "web/task-001",
+      "value": {
+        "status": "complete",
+        "files": [
+          "apps/web/.env.example",
+          "apps/web/.env.local",
+          "apps/web/eslint.config.mjs"
+        ],
+        "verified": true
+      },
+      "type": "object",
+      "namespace": "crechebooks/progress",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-22T07:24:38.618Z",
+      "updatedAt": "2025-12-22T07:24:38.618Z",
+      "lastAccessedAt": "2025-12-22T07:24:38.618Z",
+      "version": 1,
+      "size": 151,
+      "compressed": false,
+      "checksum": "3f6c3b32ace0223e0c4e6fe6adf69e9d65d51229c699fa975afbf42ed3fe4063",
+      "references": [],
+      "dependencies": []
+    }
+  ],
+  "statistics": {
+    "overview": {
+      "totalEntries": 1,
+      "totalSize": 151,
+      "compressedEntries": 0,
+      "compressionRatio": 1,
+      "indexSize": 50,
+      "memoryUsage": 7607400,
+      "diskUsage": 0
+    },
+    "distribution": {
+      "byNamespace": {
+        "crechebooks/progress": {
+          "count": 1,
+          "size": 151
+        }
+      },
+      "byType": {
+        "object": {
+          "count": 1,
+          "size": 151
+        }
+      },
+      "byOwner": {
+        "system": {
+          "count": 1,
+          "size": 151
+        }
+      },
+      "byAccessLevel": {
+        "shared": {
+          "count": 1,
+          "size": 151
+        }
+      }
+    },
+    "temporal": {
+      "entriesCreatedLast24h": 1,
+      "entriesUpdatedLast24h": 1,
+      "entriesAccessedLast24h": 1,
+      "oldestEntry": "2025-12-22T07:24:38.618Z",
+      "newestEntry": "2025-12-22T07:24:38.618Z"
+    },
+    "performance": {
+      "averageQueryTime": 0,
+      "averageWriteTime": 0,
+      "cacheHitRatio": 0,
+      "indexEfficiency": 0.95
+    },
+    "health": {
+      "expiredEntries": 0,
+      "orphanedReferences": 0,
+      "duplicateKeys": 0,
+      "corruptedEntries": 0,
+      "recommendedCleanup": false
+    },
+    "optimization": {
+      "suggestions": [],
+      "potentialSavings": {
+        "compression": 0,
+        "cleanup": 0,
+        "deduplication": 0
+      },
+      "indexOptimization": [
+        "Consider periodic index rebuilding for optimal performance"
+      ]
+    }
+  }
+}

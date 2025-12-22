@@ -1,8 +1,8 @@
-<task_spec id="TASK-SARS-033" version="1.0">
+<task_spec id="TASK-SARS-033" version="3.0">
 
 <metadata>
   <title>EMP201 Endpoint</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>55</sequence>
   <implements>
@@ -12,263 +12,338 @@
     <requirement_ref>REQ-SARS-009</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-SARS-031</task_ref>
+    <task_ref status="complete">TASK-SARS-031</task_ref>
+    <task_ref status="complete">TASK-SARS-032</task_ref>
   </depends_on>
   <estimated_complexity>medium</estimated_complexity>
+  <last_updated>2025-12-22</last_updated>
+  <completed_at>2025-12-22T03:37:00Z</completed_at>
 </metadata>
 
-<context>
-This task implements the EMP201 employer reconciliation endpoint. It generates an EMP201
-submission for a specified month, calculating PAYE, UIF, and SDL from payroll records.
-The endpoint applies current SARS tax tables and caps, handles employee count, and creates
-a submission in DRAFT status for review before final submission to SARS eFiling.
-</context>
+<executive_summary>
+Add POST /sars/emp201 endpoint to SarsController (created in TASK-SARS-031, extended in TASK-SARS-032).
+Uses Emp201Service.generateEmp201() from src/database/services/emp201.service.ts.
+Creates EMP201 employer reconciliation submission in DRAFT status. Calculates PAYE, UIF, and SDL
+from payroll records for a given month.
+</executive_summary>
 
-<input_context_files>
-  <file purpose="api_specification">specs/technical/api-contracts.md#sars_endpoints</file>
-  <file purpose="service_interface">src/core/sars/sars.service.ts</file>
-  <file purpose="payroll_rules">specs/functional/sars-module.md#emp201_calculations</file>
-  <file purpose="response_format">specs/technical/api-contracts.md#standard_response_format</file>
-</input_context_files>
+<critical_rules>
+  <rule>NO BACKWARDS COMPATIBILITY - fail fast or work correctly</rule>
+  <rule>NO MOCK DATA IN TESTS - use jest.spyOn() with real service interface types</rule>
+  <rule>NO WORKAROUNDS OR FALLBACKS - errors must propagate with clear messages</rule>
+  <rule>API DTOs use snake_case (e.g., period_month, total_paye)</rule>
+  <rule>Internal service DTOs use camelCase (e.g., periodMonth, totalPayeCents)</rule>
+  <rule>All monetary values: cents internally, divide by 100 for API responses</rule>
+  <rule>Use `import type { IUser }` for decorator compatibility with isolatedModules</rule>
+</critical_rules>
 
-<prerequisites>
-  <check>TASK-SARS-031 completed (SARS controller)</check>
-  <check>TASK-SARS-014 completed (SarsService)</check>
-  <check>TASK-SARS-015 completed (SarsAgent)</check>
-  <check>Payroll records exist in database</check>
-</prerequisites>
+<project_context>
+  <test_count>1479 tests + TASK-SARS-031 tests + TASK-SARS-032 tests</test_count>
+  <prerequisite>TASK-SARS-031 and TASK-SARS-032 must be completed first</prerequisite>
+  <pattern_reference>Use TASK-SARS-032 generateVat201 as reference pattern</pattern_reference>
+</project_context>
 
-<scope>
-  <in_scope>
-    - POST /sars/emp201 endpoint
-    - GenerateEmp201Dto with period parameter
-    - Emp201ResponseDto with PAYE/UIF/SDL breakdown
-    - PAYE calculation using SARS tax tables
-    - UIF calculation with statutory cap
-    - SDL calculation if applicable
-    - Employee count tracking
-    - Document URL generation
-    - Swagger/OpenAPI annotations
-  </in_scope>
-  <out_of_scope>
-    - EMP201 calculation logic (in SarsService)
-    - VAT201 generation (TASK-SARS-032)
-    - Submission marking (TASK-SARS-031)
-    - eFiling integration
-    - Payroll processing (separate module)
-  </out_of_scope>
-</scope>
+<existing_infrastructure>
+  <file path="src/database/services/emp201.service.ts" purpose="EMP201 generation service">
+    Key method signature:
+    ```typescript
+    async generateEmp201(dto: GenerateEmp201Dto): Promise<SarsSubmission>
 
-<definition_of_done>
-  <signatures>
-    <signature file="src/api/sars/sars.controller.ts">
-      @Controller('sars')
-      @ApiTags('SARS')
-      @UseGuards(JwtAuthGuard)
-      export class SarsController {
-        @Post('emp201')
-        @ApiOperation({ summary: 'Generate EMP201 employer reconciliation' })
-        @ApiResponse({ status: 201, type: Emp201ResponseDto })
-        async generateEmp201(
-          @Body() dto: GenerateEmp201Dto,
-          @CurrentUser() user: JwtPayload,
-        ): Promise&lt;ApiResponse&lt;Emp201ResponseDto&gt;&gt;
-      }
-    </signature>
+    // GenerateEmp201Dto interface (from src/database/dto/emp201.dto.ts):
+    interface GenerateEmp201Dto {
+      tenantId: string;
+      periodMonth: string; // Format: YYYY-MM
+    }
 
-    <signature file="src/api/sars/dto/generate-emp201.dto.ts">
-      export class GenerateEmp201Dto {
-        @ApiProperty({ example: '2025-01' })
-        @IsString()
-        @Matches(/^\d{4}-\d{2}$/)
-        period_month: string;
-      }
-    </signature>
+    // Returns Prisma SarsSubmission with:
+    // - id, tenantId, submissionType: 'EMP201'
+    // - periodStart, periodEnd (first/last day of month)
+    // - deadline (7th of following month)
+    // - totalPayeCents, totalUifCents, totalSdlCents (all integers in cents)
+    // - status: 'DRAFT'
+    // - documentData: JSON with summary and employees array
+    ```
+    Throws Error if period format is invalid (not YYYY-MM).
+    Throws Error if no approved payroll records for the period.
+  </file>
+  <file path="src/database/dto/emp201.dto.ts" purpose="EMP201 internal DTOs">
+    Contains GenerateEmp201Dto, Emp201Document, Emp201Summary, Emp201EmployeeRecord types.
+  </file>
+  <file path="src/api/sars/sars.controller.ts" purpose="Controller with markSubmitted and generateVat201">
+    Will add generateEmp201 method to this controller.
+  </file>
+  <file path="src/api/sars/sars.module.ts" purpose="Module with Vat201Service">
+    Will add Emp201Service and dependencies to providers.
+  </file>
+</existing_infrastructure>
 
-    <signature file="src/api/sars/dto/emp201-response.dto.ts">
-      export class Emp201ResponseDto {
-        @ApiProperty()
-        id: string;
+<files_to_create>
+  <file path="src/api/sars/dto/emp201.dto.ts">
+    API DTOs for EMP201 endpoint.
 
-        @ApiProperty({ example: 'EMP201' })
-        submission_type: string;
+    ```typescript
+    /**
+     * EMP201 DTOs
+     * TASK-SARS-033: EMP201 Endpoint
+     *
+     * API DTOs for EMP201 employer reconciliation endpoint.
+     * Uses snake_case for external API consistency.
+     */
+    import { ApiProperty } from '@nestjs/swagger';
+    import { IsString, Matches } from 'class-validator';
 
-        @ApiProperty({ example: '2025-01' })
-        period: string;
+    export class ApiGenerateEmp201Dto {
+      @ApiProperty({
+        description: 'Payroll period in YYYY-MM format',
+        example: '2025-01',
+      })
+      @IsString()
+      @Matches(/^\d{4}-\d{2}$/, { message: 'period_month must be in YYYY-MM format' })
+      period_month!: string;
+    }
 
-        @ApiProperty({ enum: ['DRAFT', 'READY', 'SUBMITTED'] })
-        status: string;
+    export class ApiEmp201DataDto {
+      @ApiProperty({ example: 'uuid-here' })
+      id!: string;
 
-        @ApiProperty({ example: 12450.00 })
-        total_paye: number;
+      @ApiProperty({ example: 'EMP201' })
+      submission_type!: string;
 
-        @ApiProperty({ example: 1770.00 })
-        total_uif: number;
+      @ApiProperty({ example: '2025-01', description: 'Period in YYYY-MM format' })
+      period!: string;
 
-        @ApiProperty({ example: 0.00 })
-        total_sdl: number;
+      @ApiProperty({ example: 'DRAFT', enum: ['DRAFT', 'READY', 'SUBMITTED', 'ACKNOWLEDGED'] })
+      status!: string;
 
-        @ApiProperty({ example: 5 })
-        employee_count: number;
+      @ApiProperty({ example: 12450.00, description: 'Total PAYE tax (Rands)' })
+      total_paye!: number;
 
-        @ApiProperty()
-        document_url: string;
-      }
-    </signature>
-  </signatures>
+      @ApiProperty({ example: 1770.00, description: 'Total UIF contributions (Rands)' })
+      total_uif!: number;
 
-  <constraints>
-    - Must validate period_month format is YYYY-MM
-    - Must validate period_month is not in future
-    - Must calculate PAYE using current SARS tax tables
-    - Must calculate UIF at 1% employee + 1% employer (2% total)
-    - UIF capped at maximum income threshold
-    - Must calculate SDL at 1% if payroll exceeds threshold
-    - Must count unique employees in period
-    - Must return amounts in Rand (not cents)
-    - Must create submission with DRAFT status
-    - Must use Swagger/OpenAPI annotations
-    - Must return 201 Created on success
-    - Must return 400 Bad Request for validation errors
-  </constraints>
+      @ApiProperty({ example: 885.00, description: 'Total SDL levy (Rands)' })
+      total_sdl!: number;
 
-  <verification>
-    - POST /sars/emp201 with valid period returns 201
-    - POST /sars/emp201 with invalid format returns 400
-    - POST /sars/emp201 with future date returns 400
-    - POST /sars/emp201 without auth token returns 401
-    - POST /sars/emp201 with no payroll data returns 201 with zeros
-    - PAYE calculated correctly using tax tables
-    - UIF calculated correctly with cap
-    - SDL calculated correctly if applicable
-    - Employee count accurate
-    - Document URL generated correctly
-    - Swagger UI displays endpoint correctly
-    - npm run lint passes
-    - npm run test passes (controller unit tests)
-  </verification>
-</definition_of_done>
+      @ApiProperty({ example: 15105.00, description: 'Total due to SARS (PAYE + UIF + SDL)' })
+      total_due!: number;
 
-<pseudo_code>
-SarsController (src/api/sars/sars.controller.ts):
-  @Post('emp201')
-  @ApiOperation({ summary: 'Generate EMP201 employer reconciliation' })
-  @ApiResponse({ status: 201, type: Emp201ResponseDto })
-  async generateEmp201(dto: GenerateEmp201Dto, user: JwtPayload):
-    try:
-      submission = await sarsService.generateEmp201(
-        dto.period_month,
-        user.tenant_id
-      )
+      @ApiProperty({ example: 5, description: 'Number of employees in period' })
+      employee_count!: number;
 
+      @ApiProperty({ example: '2025-02-07T00:00:00.000Z', description: 'Submission deadline' })
+      deadline!: string;
+
+      @ApiProperty({ example: '/sars/emp201/uuid/document' })
+      document_url!: string;
+    }
+
+    export class ApiEmp201ResponseDto {
+      @ApiProperty({ example: true })
+      success!: boolean;
+
+      @ApiProperty({ type: ApiEmp201DataDto })
+      data!: ApiEmp201DataDto;
+    }
+    ```
+  </file>
+
+  <file path="tests/api/sars/emp201.controller.spec.ts">
+    Controller unit tests using jest.spyOn() - NO MOCK DATA.
+
+    Test coverage:
+    1. POST /sars/emp201 with valid period returns 201
+    2. Transforms API snake_case to service camelCase
+    3. Converts cents to Rands in response (divide by 100)
+    4. Response uses snake_case field names
+    5. Period format matches input period_month
+    6. Calculates total_due correctly (paye + uif + sdl)
+    7. Employee count matches service result
+    8. Works for ADMIN users same as OWNER
+    9. Works for ACCOUNTANT role
+    10. Propagates error for invalid period format
+    11. Propagates error when no payroll records found
+
+    Pattern: Use tests/api/sars/vat201.controller.spec.ts as reference.
+  </file>
+</files_to_create>
+
+<files_to_modify>
+  <file path="src/api/sars/sars.controller.ts">
+    Add Emp201Service dependency and generateEmp201 method.
+
+    ```typescript
+    // Add to imports:
+    import { Emp201Service } from '../../database/services/emp201.service';
+    import {
+      ApiMarkSubmittedDto, SarsSubmissionResponseDto,
+      ApiGenerateVat201Dto, ApiVat201ResponseDto,
+      ApiGenerateEmp201Dto, ApiEmp201ResponseDto,
+    } from './dto';
+
+    // Update constructor:
+    constructor(
+      private readonly sarsSubmissionRepo: SarsSubmissionRepository,
+      private readonly vat201Service: Vat201Service,
+      private readonly emp201Service: Emp201Service,
+    ) {}
+
+    // Add method:
+    @Post('emp201')
+    @HttpCode(201)
+    @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @ApiOperation({ summary: 'Generate EMP201 employer reconciliation for month' })
+    @ApiResponse({ status: 201, type: ApiEmp201ResponseDto })
+    @ApiResponse({ status: 400, description: 'Invalid period format (must be YYYY-MM)' })
+    @ApiResponse({ status: 404, description: 'No payroll records for period' })
+    @ApiForbiddenResponse({ description: 'Requires OWNER, ADMIN, or ACCOUNTANT role' })
+    @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+    async generateEmp201(
+      @Body() dto: ApiGenerateEmp201Dto,
+      @CurrentUser() user: IUser,
+    ): Promise<ApiEmp201ResponseDto> {
+      this.logger.log(
+        `Generate EMP201: tenant=${user.tenantId}, period=${dto.period_month}`
+      );
+
+      // Transform API snake_case to service camelCase
+      const submission = await this.emp201Service.generateEmp201({
+        tenantId: user.tenantId,
+        periodMonth: dto.period_month, // snake_case -> camelCase
+      });
+
+      // Extract summary from documentData
+      const documentData = submission.documentData as {
+        summary?: { employeeCount?: number };
+      };
+      const employeeCount = documentData?.summary?.employeeCount ?? 0;
+
+      // Calculate total due
+      const totalPayeCents = submission.totalPayeCents ?? 0;
+      const totalUifCents = submission.totalUifCents ?? 0;
+      const totalSdlCents = submission.totalSdlCents ?? 0;
+      const totalDueCents = totalPayeCents + totalUifCents + totalSdlCents;
+
+      this.logger.log(
+        `EMP201 generated: ${submission.id}, paye=${totalPayeCents}, uif=${totalUifCents}, sdl=${totalSdlCents}`
+      );
+
+      // Transform service camelCase to API snake_case, cents to Rands
       return {
         success: true,
         data: {
           id: submission.id,
-          submission_type: submission.submission_type,
-          period: submission.period_month,
+          submission_type: submission.submissionType,
+          period: dto.period_month, // Use input format directly
           status: submission.status,
-          total_paye: Money.fromCents(submission.paye_cents).toNumber(),
-          total_uif: Money.fromCents(submission.uif_cents).toNumber(),
-          total_sdl: Money.fromCents(submission.sdl_cents).toNumber(),
-          employee_count: submission.employee_count,
-          document_url: `/sars/emp201/${submission.id}/document`
-        }
-      }
-    catch error:
-      if error instanceof ValidationException:
-        throw new BadRequestException(error.message)
-      throw error
+          total_paye: totalPayeCents / 100,
+          total_uif: totalUifCents / 100,
+          total_sdl: totalSdlCents / 100,
+          total_due: totalDueCents / 100,
+          employee_count: employeeCount,
+          deadline: submission.deadline.toISOString(),
+          document_url: `/sars/emp201/${submission.id}/document`,
+        },
+      };
+    }
+    ```
+  </file>
 
-GenerateEmp201Dto (src/api/sars/dto/generate-emp201.dto.ts):
-  export class GenerateEmp201Dto:
-    @ApiProperty({
-      example: '2025-01',
-      description: 'Payroll period in YYYY-MM format'
+  <file path="src/api/sars/sars.module.ts">
+    Add Emp201Service and its dependencies to providers.
+
+    ```typescript
+    import { Emp201Service } from '../../database/services/emp201.service';
+    import { PayeService } from '../../database/services/paye.service';
+    import { UifService } from '../../database/services/uif.service';
+
+    @Module({
+      imports: [PrismaModule],
+      controllers: [SarsController],
+      providers: [
+        SarsSubmissionRepository,
+        Vat201Service,
+        VatService,
+        Emp201Service,
+        PayeService, // Required by Emp201Service
+        UifService,  // Required by Emp201Service
+      ],
     })
-    @IsString()
-    @Matches(/^\d{4}-\d{2}$/, {
-      message: 'period_month must be in YYYY-MM format'
-    })
-    period_month: string
+    export class SarsModule {}
+    ```
+  </file>
 
-Emp201ResponseDto (src/api/sars/dto/emp201-response.dto.ts):
-  export class Emp201ResponseDto:
-    @ApiProperty()
-    id: string
+  <file path="src/api/sars/dto/index.ts">
+    Add EMP201 DTO exports.
 
-    @ApiProperty({ example: 'EMP201' })
-    submission_type: string
-
-    @ApiProperty({
-      example: '2025-01',
-      description: 'Period in YYYY-MM format'
-    })
-    period: string
-
-    @ApiProperty({ enum: ['DRAFT', 'READY', 'SUBMITTED'] })
-    status: string
-
-    @ApiProperty({
-      example: 12450.00,
-      description: 'Total PAYE (Pay As You Earn) tax'
-    })
-    total_paye: number
-
-    @ApiProperty({
-      example: 1770.00,
-      description: 'Total UIF (Unemployment Insurance Fund) contributions'
-    })
-    total_uif: number
-
-    @ApiProperty({
-      example: 0.00,
-      description: 'Total SDL (Skills Development Levy)'
-    })
-    total_sdl: number
-
-    @ApiProperty({
-      example: 5,
-      description: 'Number of employees in period'
-    })
-    employee_count: number
-
-    @ApiProperty({
-      example: '/sars/emp201/uuid/document',
-      description: 'URL to download EMP201 document'
-    })
-    document_url: string
-</pseudo_code>
-
-<files_to_create>
-  <file path="src/api/sars/dto/generate-emp201.dto.ts">DTO for EMP201 generation request</file>
-  <file path="src/api/sars/dto/emp201-response.dto.ts">DTO for EMP201 response</file>
-  <file path="tests/api/sars/emp201.controller.spec.ts">EMP201 endpoint unit tests</file>
-</files_to_create>
-
-<files_to_modify>
-  <file path="src/api/sars/sars.controller.ts">Add generateEmp201 method</file>
+    ```typescript
+    export * from './mark-submitted.dto';
+    export * from './sars-response.dto';
+    export * from './vat201.dto';
+    export * from './emp201.dto';
+    ```
+  </file>
 </files_to_modify>
 
-<validation_criteria>
-  <criterion>Endpoint compiles without TypeScript errors</criterion>
-  <criterion>All DTOs have complete class-validator decorators</criterion>
-  <criterion>All endpoints have Swagger annotations</criterion>
-  <criterion>POST /sars/emp201 returns 201 with correct structure</criterion>
-  <criterion>PAYE calculated correctly using tax tables</criterion>
-  <criterion>UIF calculated at 2% with cap applied</criterion>
-  <criterion>SDL calculated at 1% if applicable</criterion>
-  <criterion>Employee count accurate</criterion>
-  <criterion>Unit tests achieve >80% coverage</criterion>
-  <criterion>ESLint passes with no warnings</criterion>
-</validation_criteria>
+<test_requirements>
+  <requirement>Use jest.spyOn() to verify Emp201Service.generateEmp201() calls</requirement>
+  <requirement>Create mock IUser objects with real UserRole from @prisma/client</requirement>
+  <requirement>Return typed SarsSubmission objects (not mock data)</requirement>
+  <requirement>Verify DTO transformation (snake_case API to camelCase service)</requirement>
+  <requirement>Verify cents to Rands conversion (divide by 100)</requirement>
+  <requirement>Test error propagation (invalid format, no payroll records)</requirement>
+  <requirement>Verify total_due = total_paye + total_uif + total_sdl</requirement>
+  <requirement>Minimum 10 tests for this endpoint</requirement>
+</test_requirements>
 
-<test_commands>
-  <command>npm run build</command>
-  <command>npm run lint</command>
-  <command>npm run test emp201.controller.spec</command>
-  <command>npm run start:dev</command>
-  <command>curl -X POST http://localhost:3000/sars/emp201 -H "Authorization: Bearer token" -H "Content-Type: application/json" -d '{"period_month":"2025-01"}'</command>
-</test_commands>
+<verification_steps>
+  <step>npm run build - must compile without errors</step>
+  <step>npm run lint - must pass with no warnings</step>
+  <step>npm run test tests/api/sars/emp201.controller.spec.ts - all tests pass</step>
+  <step>npm run test - all tests pass (previous + ~10 new)</step>
+</verification_steps>
+
+<error_handling>
+  Emp201Service throws Error with message containing "Invalid period format" - let propagate as BadRequestException.
+  Emp201Service throws Error with message containing "No approved payroll records" - let propagate as NotFoundException.
+  Period format validation (@Matches decorator) - returns 400 automatically via class-validator.
+  All other errors should propagate with their original messages.
+</error_handling>
+
+<implementation_notes>
+  1. Emp201Service.generateEmp201() creates submission in DRAFT status.
+     To submit to SARS, user must first call markAsReady() then /sars/:id/submit.
+  2. The documentData field contains the full EMP201 document with summary and employees array.
+     Extract employeeCount from summary for the API response.
+  3. ACCOUNTANT role can generate drafts but only OWNER/ADMIN can submit.
+  4. EMP201 is due by the 7th of the month following the payroll period.
+  5. Total due is simply PAYE + UIF + SDL - no deductions in this simple case.
+</implementation_notes>
+
+<south_african_context>
+  <paye>Pay As You Earn - income tax deducted from employees based on SARS tax tables</paye>
+  <uif>Unemployment Insurance Fund - 1% employee + 1% employer (2% total), capped at earnings threshold</uif>
+  <sdl>Skills Development Levy - 1% of payroll if annual payroll exceeds R500,000</sdl>
+  <submission_deadline>7th of month following payroll period</submission_deadline>
+  <monthly_filing>EMP201 is filed monthly (unlike EMP501 which is bi-annual reconciliation)</monthly_filing>
+</south_african_context>
+
+<prisma_model_reference>
+  SarsSubmission model fields for EMP201:
+  - totalPayeCents: Int? (sum of all employee PAYE)
+  - totalUifCents: Int? (sum of employee + employer UIF)
+  - totalSdlCents: Int? (SDL if applicable)
+  - documentData: Json (contains summary and employees array)
+
+  Emp201Summary in documentData:
+  - employeeCount: number
+  - totalGrossRemunerationCents: number
+  - totalPayeCents: number
+  - totalUifEmployeeCents: number
+  - totalUifEmployerCents: number
+  - totalUifCents: number
+  - totalSdlCents: number
+  - totalDueCents: number
+</prisma_model_reference>
 
 </task_spec>

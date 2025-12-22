@@ -3,6 +3,30 @@
 ## Current Session: 2025-12-22
 
 ### Completed This Session
+- TASK-SARS-031: SARS Controller and DTOs (8 tests)
+  - POST /sars/:id/submit for marking submissions as filed
+  - ApiMarkSubmittedDto with snake_case sars_reference field
+  - SarsSubmissionResponseDto with snake_case fields
+  - snake_case API → camelCase service transformation
+  - Error propagation (NotFoundException, BusinessException)
+  - @Roles(OWNER, ADMIN) access control
+
+- TASK-SARS-032: VAT201 Endpoint (11 tests)
+  - POST /sars/vat201 for VAT201 return generation
+  - ApiGenerateVat201Dto with period_start, period_end
+  - Period validation (end > start)
+  - Cents → Rands conversion for output_vat, input_vat, net_vat
+  - Flagged items extraction from documentData
+  - @Roles(OWNER, ADMIN, ACCOUNTANT) access control
+
+- TASK-SARS-033: EMP201 Endpoint (12 tests)
+  - POST /sars/emp201 for EMP201 employer reconciliation
+  - ApiGenerateEmp201Dto with period_month (YYYY-MM)
+  - Summary and employees extraction from documentData
+  - Cents → Rands conversion for PAYE, UIF, SDL totals
+  - Validation issues extraction
+  - @Roles(OWNER, ADMIN, ACCOUNTANT) access control
+
 - TASK-PAY-032: Payment Matching Endpoint (10 tests)
   - POST /payments/match for AI-powered payment matching
   - ApiMatchPaymentsDto with snake_case transaction_ids field
@@ -64,8 +88,6 @@
 - TASK-RECON-011/012/013: Reconciliation Services (45 tests)
 
 ### Next Steps
-1. TASK-SARS-031: SARS Controller and DTOs
-2. TASK-SARS-032: VAT201 Endpoint
-3. TASK-SARS-033: EMP201 Endpoint
-4. TASK-RECON-031: Reconciliation Controller
-5. TASK-RECON-032: Financial Reports Endpoint
+1. TASK-RECON-031: Reconciliation Controller
+2. TASK-RECON-032: Financial Reports Endpoint
+3. TASK-INT-001 to TASK-INT-005: E2E Integration Tests

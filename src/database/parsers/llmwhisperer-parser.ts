@@ -245,7 +245,9 @@ export class LLMWhispererParser {
 
         // Handle error status
         if (result.status === 'error' || result.status === 'failed') {
-          this.logger.error(`LLMWhisperer extraction failed: ${result.message}`);
+          this.logger.error(
+            `LLMWhisperer extraction failed: ${result.message}`,
+          );
           throw new BusinessException(
             `LLMWhisperer extraction failed: ${result.message || 'Unknown error'}`,
             'LLMWHISPERER_EXTRACTION_FAILED',
@@ -274,7 +276,7 @@ export class LLMWhispererParser {
       `LLMWhisperer polling timed out after ${this.maxPollAttempts} attempts`,
     );
     throw new BusinessException(
-      `LLMWhisperer extraction timed out after ${this.maxPollAttempts * this.pollIntervalMs / 1000} seconds`,
+      `LLMWhisperer extraction timed out after ${(this.maxPollAttempts * this.pollIntervalMs) / 1000} seconds`,
       'LLMWHISPERER_POLL_TIMEOUT',
       { whisperHash, attempts: this.maxPollAttempts },
     );
@@ -328,7 +330,9 @@ export class LLMWhispererParser {
       throw new BusinessException(
         `LLMWhisperer retrieve failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'LLMWHISPERER_RETRIEVE_ERROR',
-        { originalError: error instanceof Error ? error.message : String(error) },
+        {
+          originalError: error instanceof Error ? error.message : String(error),
+        },
       );
     }
   }

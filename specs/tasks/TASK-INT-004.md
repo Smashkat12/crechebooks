@@ -1,4 +1,4 @@
-<task_spec id="TASK-INT-004" version="1.0">
+<task_spec id="TASK-INT-004" version="3.0">
 
 <metadata>
   <title>E2E SARS Submission Flow</title>
@@ -10,583 +10,265 @@
     <requirement_ref>REQ-SARS-009</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-SARS-033</task_ref>
+    <task_ref status="complete">TASK-SARS-033</task_ref>
   </depends_on>
   <estimated_complexity>high</estimated_complexity>
+  <last_updated>2025-12-22</last_updated>
 </metadata>
 
-<context>
-This is a complete end-to-end integration test for the SARS tax submission workflow.
-It tests the entire user journey from data collection through calculations, document
-generation, review, and final submission for both VAT201 and EMP201 forms. This test
-MUST use real data and real system components - no mocks except for the SARS eFiling
-service itself. The test validates complex tax calculations, immutability after
-submission, and proper handling of various VAT scenarios (standard, zero-rated, exempt).
-</context>
-
-<input_context_files>
-  <file purpose="api_contracts">specs/technical/api-contracts.md#sars_endpoints</file>
-  <file purpose="requirements">specs/requirements/REQ-SARS.md</file>
-  <file purpose="tax_rules">specs/business-rules/sars-tax-calculations.md</file>
-  <file purpose="test_data">specs/technical/test-data-requirements.md</file>
-</input_context_files>
-
-<prerequisites>
-  <check>All Phase 3 SARS tasks completed</check>
-  <check>Database seeded with test tenant (VAT registered)</check>
-  <check>Invoices and transactions with VAT data</check>
-  <check>Payroll records for EMP201 testing</check>
-  <check>SARS agent accessible for calculations</check>
-  <check>Current tax tables loaded (PAYE, UIF, SDL rates)</check>
-</prerequisites>
-
-<scope>
-  <in_scope>
-    - E2E test: VAT201 data collection (output and input VAT)
-    - E2E test: VAT201 calculations with distinctions (standard, zero-rated, exempt)
-    - E2E test: VAT201 document generation
-    - E2E test: VAT201 review and approval flow
-    - E2E test: VAT201 submission and immutability
-    - E2E test: EMP201 payroll data collection
-    - E2E test: EMP201 calculations (PAYE, UIF, SDL)
-    - E2E test: EMP201 document generation
-    - E2E test: EMP201 submission and immutability
-    - Edge case: Missing VAT details flagged for review
-    - Edge case: Attempt to edit submitted return (must fail)
-    - Edge case: Zero-rated vs exempt distinction
-  </in_scope>
-  <out_of_scope>
-    - Real SARS eFiling integration (use mock)
-    - IRP5/IT3 certificate generation
-    - Annual tax submissions
-    - Tax amendments (future phase)
-  </out_of_scope>
-</scope>
-
-<definition_of_done>
-  <signatures>
-    <signature file="tests/e2e/sars-submission.e2e.spec.ts">
-      describe('E2E: SARS Submission Flow', () => {
-        it('generates VAT201 with correct output VAT');
-        it('calculates input VAT from categorized expenses');
-        it('distinguishes zero-rated and exempt supplies');
-        it('flags transactions missing VAT details');
-        it('generates VAT201 PDF document');
-        it('prevents editing after submission');
-        it('generates EMP201 with PAYE calculations');
-        it('calculates UIF with proper capping');
-        it('generates EMP201 PDF document');
-        it('marks submission as finalized (immutable)');
-      });
-    </signature>
-  </signatures>
-
-  <constraints>
-    - MUST use real database (not in-memory)
-    - MUST use real SARS agent for calculations (not mocked)
-    - VAT calculations MUST be exact to 2 decimal places
-    - PAYE calculations MUST use current tax tables
-    - UIF MUST be capped at legislated maximum
-    - Submitted returns MUST be immutable (database constraint)
-    - Zero-rated vs exempt MUST be clearly distinguished
-    - NO mocks for internal services (SarsService, calculations)
-  </constraints>
-
-  <verification>
-    - npm run test:e2e -- sars-submission.e2e.spec.ts passes
-    - VAT calculations match manual verification
-    - PAYE calculations match SARS tax tables
-    - Generated PDFs contain all required information
-    - Immutability enforced at database level
-    - Attempt to edit submitted return throws error
-    - Zero-rated and exempt items correctly classified
-  </verification>
-</definition_of_done>
-
-<pseudo_code>
-Test Setup:
-  beforeAll:
-    await app.init()
-    testTenant = await createTestTenant({
-      vat_registered: true,
-      vat_number: 'VAT4123456789',
-      vat_rate: 0.15,
-      registration_date: '2024-01-01'
-    })
-    testUser = await createTestUser(testTenant, 'OWNER')
-    authToken = await getAuthToken(testUser)
-
-    # Seed tax tables
-    await seedTaxTables({
-      year: 2025,
-      paye_brackets: [...], # Current SARS tax brackets
-      uif_rate: 0.01, # 1% employee + 1% employer
-      uif_cap_monthly: 17712_00, # R177.12 max per month
-      sdl_rate: 0.01, # 1% of total payroll
-      sdl_threshold: 500000_00 # R500k annual payroll threshold
-    })
-
-Test Flow 1: VAT201 - Data Collection
-  # Create invoices (output VAT)
-  parent = await db.parent.create({
-    data: { tenant_id: testTenant.id, first_name: 'Test', last_name: 'Parent' }
-  })
-
-  child = await createChildWithEnrollment(parent.id, 3000_00)
-
-  # Generate invoices for January 2025
-  await POST /invoices/generate { billing_month: '2025-01' }
-
-  invoices = await db.invoice.findMany({
-    where: {
-      tenant_id: testTenant.id,
-      billing_month: '2025-01'
-    }
-  })
-
-  # Mark all as sent (output tax applicable)
-  await db.invoice.updateMany({
-    where: { id: { in: invoices.map(i => i.id) } },
-    data: { status: 'SENT' }
-  })
-
-  # Calculate expected output VAT
-  totalInvoiced = invoices.reduce((sum, inv) => sum + inv.subtotal_cents, 0)
-  expectedOutputVat = Math.round(totalInvoiced * 0.15) / 100
-
-Test Flow 2: VAT201 - Input VAT from Expenses
-  # Create categorized expense transactions with VAT
-
-  # Standard-rated expense
-  standardExpense = await db.transaction.create({
-    data: {
-      tenant_id: testTenant.id,
-      date: new Date('2025-01-10'),
-      description: 'Office supplies (VAT inclusive)',
-      amount: -1150.00, # R1000 + R150 VAT
-      is_credit: false,
-      status: 'CATEGORIZED',
-      categorization: {
-        account_code: '6300',
-        vat_type: 'STANDARD',
-        vat_amount_cents: 150_00
-      }
-    }
-  })
-
-  # Zero-rated expense (exports, basic foods)
-  zeroRatedExpense = await db.transaction.create({
-    data: {
-      tenant_id: testTenant.id,
-      date: new Date('2025-01-15'),
-      description: 'Brown bread and vegetables',
-      amount: -500.00,
-      is_credit: false,
-      status: 'CATEGORIZED',
-      categorization: {
-        account_code: '6100',
-        vat_type: 'ZERO_RATED',
-        vat_amount_cents: 0
-      }
-    }
-  })
-
-  # Exempt expense (financial services)
-  exemptExpense = await db.transaction.create({
-    data: {
-      tenant_id: testTenant.id,
-      date: new Date('2025-01-20'),
-      description: 'Bank charges',
-      amount: -100.00,
-      is_credit: false,
-      status: 'CATEGORIZED',
-      categorization: {
-        account_code: '6700',
-        vat_type: 'EXEMPT',
-        vat_amount_cents: 0
-      }
-    }
-  })
-
-  # Expense missing VAT details (should be flagged)
-  missingVatExpense = await db.transaction.create({
-    data: {
-      tenant_id: testTenant.id,
-      date: new Date('2025-01-25'),
-      description: 'Supplier payment - no VAT number',
-      amount: -2300.00,
-      is_credit: false,
-      status: 'CATEGORIZED',
-      categorization: {
-        account_code: '6200',
-        vat_type: 'STANDARD',
-        vat_amount_cents: null # Missing!
-      }
-    }
-  })
-
-  expectedInputVat = 150.00 # Only from standard-rated expense
-
-Test Flow 3: VAT201 Generation
-  # Generate VAT201 for January 2025
-  vat201Response = POST /sars/vat201
-    body: {
-      period_start: '2025-01-01',
-      period_end: '2025-01-31'
-    }
-
-  expect(vat201Response.status).toBe(201)
-
-  vat201 = vat201Response.data
-  expect(vat201.submission_type).toBe('VAT201')
-  expect(vat201.period).toBe('2025-01')
-  expect(vat201.status).toBe('DRAFT')
-
-  # Verify calculations
-  expect(vat201.output_vat).toBeCloseTo(expectedOutputVat, 2)
-  expect(vat201.input_vat).toBeCloseTo(expectedInputVat, 2)
-
-  netVat = expectedOutputVat - expectedInputVat
-  expect(vat201.net_vat).toBeCloseTo(netVat, 2)
-
-  # Verify items flagged for review
-  expect(vat201.items_requiring_review.length).toBe(1)
-  flaggedItem = vat201.items_requiring_review[0]
-  expect(flaggedItem.transaction_id).toBe(missingVatExpense.id)
-  expect(flaggedItem.issue).toContain('Missing VAT')
-
-Test Flow 4: VAT201 Document Verification
-  # Retrieve generated document
-  documentResponse = GET /sars/vat201/{vat201.id}/document
-
-  expect(documentResponse.status).toBe(200)
-  expect(documentResponse.headers['content-type']).toBe('application/pdf')
-
-  # Verify document stored in database
-  submission = await db.sarsSubmission.findUnique({
-    where: { id: vat201.id },
-    include: { line_items: true }
-  })
-
-  expect(submission.document_path).toBeDefined()
-  expect(submission.line_items.length).toBeGreaterThan(0)
-
-  # Verify line items breakdown
-  standardSupplies = submission.line_items.find(li =>
-    li.description === 'Standard-rated supplies'
-  )
-  expect(standardSupplies.amount_cents).toBe(totalInvoiced)
-  expect(standardSupplies.vat_cents).toBe(Math.round(expectedOutputVat * 100))
-
-  zeroRatedSupplies = submission.line_items.find(li =>
-    li.description === 'Zero-rated supplies'
-  )
-  expect(zeroRatedSupplies.amount_cents).toBe(0) # No zero-rated income
-
-  exemptSupplies = submission.line_items.find(li =>
-    li.description === 'Exempt supplies'
-  )
-  expect(exemptSupplies.amount_cents).toBe(0) # No exempt income
-
-Test Flow 5: VAT201 Submission and Immutability
-  # Mark as ready for submission
-  await db.sarsSubmission.update({
-    where: { id: vat201.id },
-    data: { status: 'READY' }
-  })
-
-  # Submit to SARS
-  submitResponse = POST /sars/{vat201.id}/submit
-    body: {
-      sars_reference: 'SARS-REF-12345',
-      submitted_date: '2025-02-07'
-    }
-
-  expect(submitResponse.status).toBe(200)
-  expect(submitResponse.data.status).toBe('SUBMITTED')
-  expect(submitResponse.data.is_finalized).toBe(true)
-
-  # Verify immutability - attempt to edit should fail
-  editAttempt = await db.sarsSubmission.update({
-    where: { id: vat201.id },
-    data: { net_vat_cents: 0 } # Try to change calculation
-  }).catch(error => error)
-
-  expect(editAttempt).toBeInstanceOf(Error)
-  expect(editAttempt.message).toContain('immutable')
-
-  # Verify cannot submit again
-  resubmitAttempt = POST /sars/{vat201.id}/submit
-    body: { submitted_date: '2025-02-08' }
-
-  expect(resubmitAttempt.status).toBe(409)
-  expect(resubmitAttempt.error.message).toContain('Already submitted')
-
-Test Flow 6: EMP201 - Payroll Data Setup
-  # Create employees
-  employee1 = await db.employee.create({
-    data: {
-      tenant_id: testTenant.id,
-      first_name: 'Jane',
-      last_name: 'Teacher',
-      id_number: '8505120123084',
-      tax_number: 'TAX1234567890',
-      monthly_salary_cents: 15000_00, # R15,000
-      uif_eligible: true,
-      start_date: '2024-06-01'
-    }
-  })
-
-  employee2 = await db.employee.create({
-    data: {
-      tenant_id: testTenant.id,
-      first_name: 'John',
-      last_name: 'Assistant',
-      id_number: '9203155678091',
-      tax_number: 'TAX9876543210',
-      monthly_salary_cents: 8000_00, # R8,000
-      uif_eligible: true,
-      start_date: '2024-09-01'
-    }
-  })
-
-  # Create payroll records for January 2025
-  payroll1 = await db.payroll.create({
-    data: {
-      tenant_id: testTenant.id,
-      employee_id: employee1.id,
-      pay_period: '2025-01',
-      gross_salary_cents: 15000_00,
-      paye_cents: null, # To be calculated
-      uif_employee_cents: null,
-      uif_employer_cents: null,
-      net_pay_cents: null
-    }
-  })
-
-  payroll2 = await db.payroll.create({
-    data: {
-      tenant_id: testTenant.id,
-      employee_id: employee2.id,
-      pay_period: '2025-01',
-      gross_salary_cents: 8000_00,
-      paye_cents: null,
-      uif_employee_cents: null,
-      uif_employer_cents: null,
-      net_pay_cents: null
-    }
-  })
-
-Test Flow 7: EMP201 Generation with Calculations
-  # Generate EMP201 for January 2025
-  emp201Response = POST /sars/emp201
-    body: {
-      period_month: '2025-01'
-    }
-
-  expect(emp201Response.status).toBe(201)
-
-  emp201 = emp201Response.data
-  expect(emp201.submission_type).toBe('EMP201')
-  expect(emp201.period).toBe('2025-01')
-  expect(emp201.status).toBe('DRAFT')
-  expect(emp201.employee_count).toBe(2)
-
-  # Verify PAYE calculations
-  # Employee 1: R15,000/month = R180,000/year
-  # Tax bracket (2025): R95,750 - R365,000 @ 31% - R14,975
-  # Monthly: (180000 * 0.31 - 14975) / 12 = R3,434.58
-  expectedPaye1 = 3434.58
-
-  # Employee 2: R8,000/month = R96,000/year
-  # Tax bracket: R95,750 - R365,000 @ 31% - R14,975
-  # Monthly: (96000 * 0.31 - 14975) / 12 = R1,230.83
-  expectedPaye2 = 1230.83
-
-  totalPaye = expectedPaye1 + expectedPaye2
-  expect(emp201.total_paye).toBeCloseTo(totalPaye, 2)
-
-  # Verify UIF calculations (1% employee + 1% employer, capped)
-  # Employee 1: R15,000 * 0.01 = R150 (employee) + R150 (employer) = R300
-  uif1 = 150.00 * 2
-
-  # Employee 2: R8,000 * 0.01 = R80 + R80 = R160
-  uif2 = 80.00 * 2
-
-  totalUif = uif1 + uif2
-  expect(emp201.total_uif).toBeCloseTo(totalUif, 2)
-
-  # Verify SDL (Skills Development Levy)
-  # Only applies if annual payroll > R500k
-  # Total monthly: R23,000, annual: R276,000 (below threshold)
-  expect(emp201.total_sdl).toBe(0)
-
-  # Verify payroll records updated
-  updatedPayroll1 = await db.payroll.findUnique({ where: { id: payroll1.id } })
-  expect(updatedPayroll1.paye_cents / 100).toBeCloseTo(expectedPaye1, 2)
-  expect(updatedPayroll1.uif_employee_cents / 100).toBe(150.00)
-  expect(updatedPayroll1.uif_employer_cents / 100).toBe(150.00)
-
-Test Flow 8: EMP201 with SDL Calculation
-  # Add high-earning employee to trigger SDL
-  employee3 = await db.employee.create({
-    data: {
-      tenant_id: testTenant.id,
-      first_name: 'Executive',
-      last_name: 'Director',
-      id_number: '7512105432198',
-      tax_number: 'TAX5555555555',
-      monthly_salary_cents: 30000_00, # R30,000
-      uif_eligible: false, # High earners often opt out
-      start_date: '2024-01-01'
-    }
-  })
-
-  await db.payroll.create({
-    data: {
-      tenant_id: testTenant.id,
-      employee_id: employee3.id,
-      pay_period: '2025-01',
-      gross_salary_cents: 30000_00
-    }
-  })
-
-  # Re-generate EMP201 with all employees
-  # Total monthly now: R53,000, annual: R636,000 (above R500k threshold)
-  emp201v2Response = POST /sars/emp201
-    body: {
-      period_month: '2025-01'
-    }
-
-  emp201v2 = emp201v2Response.data
-
-  # SDL: 1% of total payroll
-  expectedSdl = 53000 * 0.01
-  expect(emp201v2.total_sdl).toBeCloseTo(expectedSdl, 2)
-
-Test Flow 9: EMP201 Document and Submission
-  # Retrieve EMP201 document
-  emp201Doc = GET /sars/emp201/{emp201v2.id}/document
-
-  expect(emp201Doc.status).toBe(200)
-  expect(emp201Doc.headers['content-type']).toBe('application/pdf')
-
-  # Mark as ready and submit
-  await db.sarsSubmission.update({
-    where: { id: emp201v2.id },
-    data: { status: 'READY' }
-  })
-
-  submitEmp = POST /sars/{emp201v2.id}/submit
-    body: {
-      sars_reference: 'EMP-REF-67890',
-      submitted_date: '2025-02-07'
-    }
-
-  expect(submitEmp.status).toBe(200)
-  expect(submitEmp.data.is_finalized).toBe(true)
-
-  # Verify immutability
-  finalSubmission = await db.sarsSubmission.findUnique({
-    where: { id: emp201v2.id }
-  })
-
-  expect(finalSubmission.status).toBe('SUBMITTED')
-  expect(finalSubmission.is_finalized).toBe(true)
-  expect(finalSubmission.submitted_at).toBeDefined()
-
-Test Flow 10: Edge Case - UIF Capping
-  # Create employee with salary above UIF cap
-  # UIF calculated on first R17,712/month only
-  highEarner = await db.employee.create({
-    data: {
-      tenant_id: testTenant.id,
-      first_name: 'High',
-      last_name: 'Earner',
-      monthly_salary_cents: 50000_00, # R50,000
-      uif_eligible: true
-    }
-  })
-
-  await db.payroll.create({
-    data: {
-      tenant_id: testTenant.id,
-      employee_id: highEarner.id,
-      pay_period: '2025-02',
-      gross_salary_cents: 50000_00
-    }
-  })
-
-  # Generate EMP201 for February
-  febEmp201 = POST /sars/emp201
-    body: { period_month: '2025-02' }
-
-  # Verify UIF capped at R177.12 per month (R17,712 * 1%)
-  # Employee + Employer = R177.12 * 2 = R354.24
-  febPayroll = await db.payroll.findFirst({
-    where: { employee_id: highEarner.id, pay_period: '2025-02' }
-  })
-
-  expect(febPayroll.uif_employee_cents / 100).toBe(177.12)
-  expect(febPayroll.uif_employer_cents / 100).toBe(177.12)
-
-Test Flow 11: Audit Trail Verification
-  # Verify all submissions have audit trail
-  allSubmissions = await db.sarsSubmission.findMany({
-    where: { tenant_id: testTenant.id },
-    include: { audit_logs: true }
-  })
-
-  for (const submission of allSubmissions) {
-    # Created log
-    createLog = submission.audit_logs.find(log => log.action === 'CREATED')
-    expect(createLog).toBeDefined()
-
-    if (submission.status === 'SUBMITTED') {
-      # Submitted log
-      submitLog = submission.audit_logs.find(log => log.action === 'SUBMITTED')
-      expect(submitLog).toBeDefined()
-      expect(submitLog.user_id).toBe(testUser.id)
-      expect(submitLog.details).toContain('SARS reference')
-    }
-  }
-
-Test Teardown:
-  afterAll:
-    await db.payroll.deleteMany({ tenant_id: testTenant.id })
-    await db.employee.deleteMany({ tenant_id: testTenant.id })
-    await db.sarsSubmission.deleteMany({ tenant_id: testTenant.id })
-    await db.transaction.deleteMany({ tenant_id: testTenant.id })
-    await db.invoice.deleteMany({ tenant_id: testTenant.id })
-    await db.tenant.delete({ where: { id: testTenant.id } })
-    await app.close()
-</pseudo_code>
+<executive_summary>
+Complete E2E integration test for the SARS tax submission workflow. Tests VAT201 and EMP201
+generation, submission, and immutability. Validates complex tax calculations including PAYE
+(current tax tables), UIF (capped at R177.12/month), SDL (1% above R500k threshold), and
+VAT at 15%. Uses real database and services - mock only external SARS eFiling.
+</executive_summary>
+
+<critical_rules>
+  <rule>NO BACKWARDS COMPATIBILITY - fail fast or work correctly</rule>
+  <rule>NO MOCK DATA IN TESTS - use real services with actual database</rule>
+  <rule>NO WORKAROUNDS OR FALLBACKS - errors must propagate with clear messages</rule>
+  <rule>API uses snake_case (e.g., period_start, period_end, output_vat)</rule>
+  <rule>Internal services use camelCase (e.g., periodStart, periodEnd, outputVat)</rule>
+  <rule>API amounts in decimal Rands, internal amounts in cents</rule>
+  <rule>VAT rate is exactly 15%</rule>
+  <rule>UIF capped at R177.12 per month (R17,712 × 1%)</rule>
+  <rule>Submitted returns are immutable - no edits allowed</rule>
+</critical_rules>
+
+<project_context>
+  <test_count>1536 tests currently passing</test_count>
+  <surface_layer_status>100% complete (all 16 Surface Layer tasks done)</surface_layer_status>
+  <currency>ZAR (South African Rand)</currency>
+  <vat_rate>15%</vat_rate>
+  <uif_rate>1% employee + 1% employer</uif_rate>
+  <uif_monthly_cap>R177.12</uif_monthly_cap>
+  <sdl_rate>1% of total payroll</sdl_rate>
+  <sdl_threshold>R500,000 annual payroll</sdl_threshold>
+</project_context>
+
+<existing_infrastructure>
+  <file path="src/api/sars/sars.controller.ts" purpose="SARS API endpoints">
+    Key endpoints:
+    - POST /sars/vat201 - Generate VAT201 return
+    - POST /sars/emp201 - Generate EMP201 return
+    - POST /sars/:id/submit - Mark submission as submitted to SARS
+
+    POST /sars/vat201 body:
+    { period_start: "YYYY-MM-DD", period_end: "YYYY-MM-DD" }
+
+    POST /sars/emp201 body:
+    { period_month: "YYYY-MM" }
+
+    Response wraps in { success: true, data: {...} }
+  </file>
+
+  <file path="src/api/sars/dto/index.ts" purpose="SARS DTOs">
+    Exports:
+    - ApiGenerateVat201Dto (period_start, period_end)
+    - ApiVat201ResponseDto (output_vat, input_vat, net_vat, items_requiring_review[])
+    - ApiGenerateEmp201Dto (period_month)
+    - ApiEmp201ResponseDto (total_paye, total_uif, total_sdl, employee_count)
+    - ApiSubmitReturnDto (sars_reference, submitted_date)
+  </file>
+
+  <file path="src/database/services/vat-calculation.service.ts" purpose="VAT calculation">
+    VatCalculationService.calculateVat201(tenantId, periodStart, periodEnd)
+    Returns: { outputVatCents, inputVatCents, netVatCents, standardRated[], zeroRated[], exempt[] }
+  </file>
+
+  <file path="src/database/services/paye-calculation.service.ts" purpose="PAYE calculation">
+    PayeCalculationService.calculatePaye(grossSalaryCents, taxYear)
+    Returns: { payeCents, taxBracket, effectiveRate }
+
+    Uses SARS tax tables for 2025.
+  </file>
+
+  <file path="src/database/services/uif-calculation.service.ts" purpose="UIF calculation">
+    UifCalculationService.calculateUif(grossSalaryCents)
+    Returns: { employeeCents, employerCents, cappedAt }
+
+    Caps at R177.12/month per party.
+  </file>
+
+  <file path="src/database/services/vat201-generation.service.ts" purpose="VAT201 generation">
+    Vat201GenerationService.generate(tenantId, periodStart, periodEnd, userId)
+    Returns: SarsSubmission with line items, document path, and review items.
+  </file>
+
+  <file path="src/database/services/emp201-generation.service.ts" purpose="EMP201 generation">
+    Emp201GenerationService.generate(tenantId, periodMonth, userId)
+    Returns: SarsSubmission with payroll summaries, PAYE/UIF/SDL totals.
+  </file>
+
+  <file path="src/database/entities/sars-submission.entity.ts" purpose="SARS submission entity">
+    SarsSubmissionType: VAT201, EMP201
+    SarsSubmissionStatus: DRAFT, READY, SUBMITTED
+    Fields: tenantId, submissionType, period, status, outputVatCents, inputVatCents,
+            netVatCents, totalPayeCents, totalUifCents, totalSdlCents, isFinalized,
+            submittedAt, sarsReference
+  </file>
+
+  <file path="src/database/entities/staff.entity.ts" purpose="Staff/Employee entity">
+    Fields: tenantId, firstName, lastName, idNumber, taxNumber, grossSalaryCents,
+            uifEligible, startDate, terminationDate
+  </file>
+
+  <file path="tests/api/sars/sars.controller.spec.ts" purpose="Controller tests">
+    Pattern for testing: Use Test.createTestingModule with providers.
+    Use jest.spyOn() for service method verification.
+  </file>
+</existing_infrastructure>
 
 <files_to_create>
-  <file path="tests/e2e/sars-submission.e2e.spec.ts">Complete E2E test suite</file>
-  <file path="tests/fixtures/sars/tax-tables-2025.json">Current SARS tax tables</file>
-  <file path="tests/helpers/sars-calculators.ts">Expected calculation helpers</file>
-  <file path="tests/helpers/payroll-generators.ts">Test payroll data creation</file>
-  <file path="tests/fixtures/sars/vat-scenarios.json">Various VAT test scenarios</file>
+  <file path="tests/e2e/sars-submission.e2e.spec.ts">
+    Complete E2E test suite:
+
+    ```typescript
+    import { Test, TestingModule } from '@nestjs/testing';
+    import { INestApplication, ValidationPipe } from '@nestjs/common';
+    import * as request from 'supertest';
+    import { AppModule } from '../../src/app.module';
+    import { PrismaService } from '../../src/database/prisma/prisma.service';
+
+    describe('E2E: SARS Submission Flow', () => {
+      let app: INestApplication;
+      let prisma: PrismaService;
+      let authToken: string;
+      let testTenantId: string;
+
+      beforeAll(async () => {
+        // Setup app, VAT-registered tenant, user, token
+        // Seed tax tables for 2025
+      });
+
+      afterAll(async () => {
+        // Cleanup in order: sars_submissions, payroll, staff, transactions, invoices, tenant
+      });
+
+      describe('VAT201 Generation', () => {
+        it('calculates output VAT from invoices at 15%', async () => {
+          // Create invoices, verify vatCents = subtotalCents × 0.15
+        });
+
+        it('calculates input VAT from categorized expenses', async () => {
+          // Create expense transactions with VAT categorization
+        });
+
+        it('distinguishes standard, zero-rated, and exempt', async () => {
+          // Verify line items separated correctly
+        });
+
+        it('flags transactions missing VAT details', async () => {
+          // Expenses without VAT amount should appear in items_requiring_review
+        });
+
+        it('generates VAT201 document (PDF)', async () => {
+          // Verify document_path set, can download PDF
+        });
+      });
+
+      describe('EMP201 Generation', () => {
+        it('calculates PAYE using 2025 tax tables', async () => {
+          // R15,000/month → verify correct monthly PAYE
+        });
+
+        it('calculates UIF at 1% capped at R177.12', async () => {
+          // Employee earning R50,000 → UIF = R177.12 (capped)
+        });
+
+        it('calculates SDL when payroll exceeds R500k', async () => {
+          // Add employees to exceed threshold, verify SDL = 1%
+        });
+
+        it('excludes SDL when below threshold', async () => {
+          // Small payroll → total_sdl = 0
+        });
+      });
+
+      describe('Submission and Immutability', () => {
+        it('marks submission as finalized after submit', async () => {
+          // POST /sars/:id/submit with sars_reference
+          // Verify is_finalized = true
+        });
+
+        it('prevents editing after submission', async () => {
+          // Try to update submitted return → 409 error
+        });
+
+        it('prevents re-submission', async () => {
+          // POST /sars/:id/submit again → 409 Already submitted
+        });
+      });
+    });
+    ```
+  </file>
+
+  <file path="tests/fixtures/sars/tax-tables-2025.json">
+    Current SARS tax tables:
+    - PAYE brackets for 2025 tax year
+    - UIF cap: R17,712/month
+    - SDL threshold: R500,000/year
+  </file>
+
+  <file path="tests/helpers/sars-calculators.ts">
+    Helper functions:
+    - calculateExpectedPaye(grossAnnual) -> monthlyPaye
+    - calculateExpectedUif(grossMonthly) -> { employee, employer }
+    - calculateExpectedSdl(totalPayroll) -> sdlAmount
+    - calculateExpectedVat(subtotal, vatType) -> vatAmount
+  </file>
 </files_to_create>
 
-<files_to_modify>
-  <!-- No existing files to modify -->
-</files_to_modify>
+<test_requirements>
+  <requirement>Use real database with actual Prisma operations</requirement>
+  <requirement>Use real calculation services (not mocked)</requirement>
+  <requirement>Mock only external SARS eFiling service</requirement>
+  <requirement>VAT calculations exact to 2 decimal places</requirement>
+  <requirement>PAYE matches 2025 SARS tax tables</requirement>
+  <requirement>UIF capped at R177.12 per party per month</requirement>
+  <requirement>SDL = 0 when annual payroll under R500k</requirement>
+  <requirement>Submitted returns immutable at database level</requirement>
+  <requirement>Audit trail for all submissions</requirement>
+</test_requirements>
 
-<validation_criteria>
-  <criterion>All test cases pass without skips or failures</criterion>
-  <criterion>VAT calculations match manual verification to 2 decimals</criterion>
-  <criterion>PAYE calculations match SARS tax tables</criterion>
-  <criterion>UIF properly capped at R177.12 per month</criterion>
-  <criterion>SDL only applied when threshold exceeded</criterion>
-  <criterion>Zero-rated and exempt correctly distinguished</criterion>
-  <criterion>Missing VAT details flagged for review</criterion>
-  <criterion>Submitted returns are immutable (database enforced)</criterion>
-  <criterion>Generated PDFs contain all required information</criterion>
-  <criterion>Audit trail complete for all submissions</criterion>
-  <criterion>Cannot resubmit already submitted return</criterion>
-</validation_criteria>
+<endpoint_reference>
+  | Method | Path | DTO In | DTO Out | Description |
+  |--------|------|--------|---------|-------------|
+  | POST | /sars/vat201 | ApiGenerateVat201Dto | ApiVat201ResponseDto | Generate VAT201 |
+  | POST | /sars/emp201 | ApiGenerateEmp201Dto | ApiEmp201ResponseDto | Generate EMP201 |
+  | POST | /sars/:id/submit | ApiSubmitReturnDto | SarsSubmissionDto | Mark submitted |
+</endpoint_reference>
+
+<calculation_examples>
+  <example name="PAYE Calculation">
+    Employee: R15,000/month = R180,000/year
+    Tax bracket 2025: 18% on first R237,100
+    PAYE = (180000 × 0.18) / 12 = R2,700/month
+  </example>
+
+  <example name="UIF Capping">
+    Employee earning R50,000/month:
+    Uncapped UIF = R50,000 × 1% = R500
+    Capped UIF = R177.12 (max)
+    Total: R177.12 employee + R177.12 employer = R354.24
+  </example>
+
+  <example name="VAT201 Calculation">
+    Invoices issued: R50,000 (excl VAT)
+    Output VAT: R50,000 × 15% = R7,500
+    Expenses with VAT: R10,000 × 15% = R1,500 input VAT
+    Net VAT payable: R7,500 - R1,500 = R6,000
+  </example>
+</calculation_examples>
+
+<verification_steps>
+  <step>npm run build - must compile without errors</step>
+  <step>npm run lint - must pass with no warnings</step>
+  <step>npm run test:e2e -- sars-submission.e2e.spec.ts - all tests pass</step>
+  <step>Verify PAYE matches manual calculation using tax tables</step>
+  <step>Verify UIF capping at R177.12</step>
+  <step>Verify submitted returns cannot be edited</step>
+</verification_steps>
 
 <test_commands>
   <command>npm run test:e2e -- sars-submission.e2e.spec.ts</command>

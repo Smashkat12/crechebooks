@@ -133,6 +133,16 @@ export async function cleanupTestData(
   });
   await prisma.transaction.deleteMany({ where: { tenantId } });
   await prisma.payeePattern.deleteMany({ where: { tenantId } });
+
+  // Billing data cleanup
+  await prisma.payment.deleteMany({ where: { tenantId } });
+  await prisma.invoiceLine.deleteMany({ where: { invoice: { tenantId } } });
+  await prisma.invoice.deleteMany({ where: { tenantId } });
+  await prisma.enrollment.deleteMany({ where: { tenantId } });
+  await prisma.child.deleteMany({ where: { tenantId } });
+  await prisma.parent.deleteMany({ where: { tenantId } });
+  await prisma.feeStructure.deleteMany({ where: { tenantId } });
+
   await prisma.user.deleteMany({ where: { tenantId } });
   await prisma.tenant.delete({ where: { id: tenantId } });
 }

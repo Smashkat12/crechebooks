@@ -37,6 +37,7 @@ import {
   ApiReconciliationResponseDto,
   ApiIncomeStatementQueryDto,
   ApiIncomeStatementResponseDto,
+  ReconciliationSummaryResponseDto,
 } from './dto';
 
 @Controller('reconciliation')
@@ -114,6 +115,67 @@ export class ReconciliationController {
         discrepancy: result.discrepancyCents / 100,
         matched_count: result.matchedCount,
         unmatched_count: result.unmatchedCount,
+      },
+    };
+  }
+
+  @Get('summary')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get reconciliation summary' })
+  @ApiResponse({ status: 200, type: ReconciliationSummaryResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getSummary(
+    @CurrentUser() user: IUser,
+  ): Promise<ReconciliationSummaryResponseDto> {
+    this.logger.log(`Reconciliation summary: tenant=${user.tenantId}`);
+
+    // Query all reconciliations for this tenant
+    const reconciliations =
+      await this.reconciliationService.getReconciliationsByTenant(
+        user.tenantId,
+      );
+
+    // Calculate summary statistics from real data
+    let totalReconciledCents = 0;
+    let totalUnreconciledCents = 0;
+    let totalDiscrepancyCents = 0;
+    let lastReconciliationDate: Date | null = null;
+    let reconciledCount = 0;
+
+    for (const recon of reconciliations) {
+      if (recon.status === 'RECONCILED') {
+        totalReconciledCents += Math.abs(recon.closingBalanceCents);
+        reconciledCount++;
+        if (
+          recon.reconciledAt &&
+          (!lastReconciliationDate ||
+            recon.reconciledAt > lastReconciliationDate)
+        ) {
+          lastReconciliationDate = recon.reconciledAt;
+        }
+      } else {
+        totalUnreconciledCents += Math.abs(recon.closingBalanceCents);
+      }
+      totalDiscrepancyCents += Math.abs(recon.discrepancyCents);
+    }
+
+    const totalPeriods = reconciliations.length;
+    const reconciliationRate =
+      totalPeriods > 0 ? (reconciledCount / totalPeriods) * 100 : 0;
+
+    return {
+      success: true,
+      data: {
+        total_reconciled: totalReconciledCents / 100,
+        total_unreconciled: totalUnreconciledCents / 100,
+        last_reconciliation_date: lastReconciliationDate
+          ? lastReconciliationDate.toISOString().split('T')[0]
+          : null,
+        reconciliation_rate: Math.round(reconciliationRate * 100) / 100,
+        discrepancy_amount: totalDiscrepancyCents / 100,
+        period_count: totalPeriods,
       },
     };
   }

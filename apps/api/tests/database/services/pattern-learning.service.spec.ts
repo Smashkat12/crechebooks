@@ -40,7 +40,9 @@ describe('PatternLearningService', () => {
 
     prisma = module.get<PrismaService>(PrismaService);
     transactionRepo = module.get<TransactionRepository>(TransactionRepository);
-    payeePatternRepo = module.get<PayeePatternRepository>(PayeePatternRepository);
+    payeePatternRepo = module.get<PayeePatternRepository>(
+      PayeePatternRepository,
+    );
     service = module.get<PatternLearningService>(PatternLearningService);
 
     await prisma.onModuleInit();
@@ -491,7 +493,9 @@ describe('PatternLearningService', () => {
 
       expect(matches.length).toBe(2);
       // First match should have highest score
-      expect(matches[0].matchScore).toBeGreaterThanOrEqual(matches[1].matchScore);
+      expect(matches[0].matchScore).toBeGreaterThanOrEqual(
+        matches[1].matchScore,
+      );
     });
   });
 
@@ -516,7 +520,10 @@ describe('PatternLearningService', () => {
         });
       }
 
-      const result = await service.detectRecurring('INSURANCE CO', testTenant.id);
+      const result = await service.detectRecurring(
+        'INSURANCE CO',
+        testTenant.id,
+      );
 
       expect(result).not.toBeNull();
       expect(result?.isRecurring).toBe(true);
@@ -538,7 +545,10 @@ describe('PatternLearningService', () => {
         date: new Date('2024-02-15'),
       });
 
-      const result = await service.detectRecurring('RARE VENDOR', testTenant.id);
+      const result = await service.detectRecurring(
+        'RARE VENDOR',
+        testTenant.id,
+      );
 
       expect(result).toBeNull();
     });
@@ -562,7 +572,10 @@ describe('PatternLearningService', () => {
         });
       }
 
-      const result = await service.detectRecurring('IRREGULAR CO', testTenant.id);
+      const result = await service.detectRecurring(
+        'IRREGULAR CO',
+        testTenant.id,
+      );
 
       expect(result).not.toBeNull();
       expect(result?.isRecurring).toBe(false);
@@ -588,7 +601,10 @@ describe('PatternLearningService', () => {
         });
       }
 
-      const result = await service.detectRecurring('WEEKLY VENDOR', testTenant.id);
+      const result = await service.detectRecurring(
+        'WEEKLY VENDOR',
+        testTenant.id,
+      );
 
       expect(result).not.toBeNull();
       expect(result?.frequency).toBe('WEEKLY');
@@ -665,7 +681,9 @@ describe('PatternLearningService', () => {
       expect(service.extractPayeeName('PAYMENT INSURANCE CO')).toBe(
         'INSURANCE',
       );
-      expect(service.extractPayeeName('DEBIT ORDER MEDICAL AID')).toBe('MEDICAL AID');
+      expect(service.extractPayeeName('DEBIT ORDER MEDICAL AID')).toBe(
+        'MEDICAL AID',
+      );
     });
 
     it('should remove date prefixes', () => {

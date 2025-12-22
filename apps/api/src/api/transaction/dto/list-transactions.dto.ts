@@ -13,6 +13,11 @@ import { Type, Transform } from 'class-transformer';
 import { TransactionStatus } from '../../../database/entities/transaction.entity';
 
 export class ListTransactionsQueryDto {
+  // tenantId is passed by frontend but ignored - we use JWT token instead
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
   @IsOptional()
   @IsInt()
   @Min(1)

@@ -4,7 +4,10 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { PayrollRepository } from '../../../src/database/repositories/payroll.repository';
 import { CreatePayrollDto } from '../../../src/database/dto/payroll.dto';
 import { PayrollStatus } from '../../../src/database/entities/payroll.entity';
-import { EmploymentType, PayFrequency } from '../../../src/database/entities/staff.entity';
+import {
+  EmploymentType,
+  PayFrequency,
+} from '../../../src/database/entities/staff.entity';
 import {
   NotFoundException,
   ConflictException,
@@ -632,7 +635,10 @@ describe('PayrollRepository', () => {
       const approved = await repository.approve(created.id);
       expect(approved.status).toBe(PayrollStatus.APPROVED);
 
-      const paid = await repository.markAsPaid(created.id, new Date('2025-01-25'));
+      const paid = await repository.markAsPaid(
+        created.id,
+        new Date('2025-01-25'),
+      );
       expect(paid.status).toBe(PayrollStatus.PAID);
     });
   });
@@ -651,7 +657,10 @@ describe('PayrollRepository', () => {
       const payroll = await repository.create(testPayrollData);
       await repository.approve(payroll.id);
 
-      const paid = await repository.markAsPaid(payroll.id, new Date('2025-01-25'));
+      const paid = await repository.markAsPaid(
+        payroll.id,
+        new Date('2025-01-25'),
+      );
 
       expect(paid.paymentDate?.getDate()).toBe(25);
     });

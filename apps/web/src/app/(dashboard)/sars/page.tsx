@@ -104,9 +104,23 @@ export default function SarsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            No submissions yet. Use the buttons above to prepare your first submission.
-          </p>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="pb-2 font-medium">Type</th>
+                <th className="pb-2 font-medium">Period</th>
+                <th className="pb-2 font-medium">Submitted</th>
+                <th className="pb-2 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colSpan={4} className="text-muted-foreground text-center py-8">
+                  No submissions yet. Use the buttons above to prepare your first submission.
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </CardContent>
       </Card>
     </div>

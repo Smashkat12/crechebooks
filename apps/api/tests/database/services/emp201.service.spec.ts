@@ -232,7 +232,11 @@ describe('Emp201Service', () => {
 
       const documentData = submission.documentData as any;
       expect(documentData.validationIssues.length).toBeGreaterThan(0);
-      expect(documentData.validationIssues.some((i: string) => i.includes('Missing tax number'))).toBe(true);
+      expect(
+        documentData.validationIssues.some((i: string) =>
+          i.includes('Missing tax number'),
+        ),
+      ).toBe(true);
     });
 
     it('should throw error for invalid period format', async () => {
@@ -541,7 +545,9 @@ describe('Emp201Service', () => {
       };
 
       const result = service.validateSubmission(document);
-      expect(result.warnings.some((w) => w.includes('PAYE reference'))).toBe(true);
+      expect(result.warnings.some((w) => w.includes('PAYE reference'))).toBe(
+        true,
+      );
     });
   });
 });

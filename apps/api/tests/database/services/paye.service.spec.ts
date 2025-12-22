@@ -331,7 +331,9 @@ describe('PayeService', () => {
     });
 
     it('should return correct threshold for 65-74', () => {
-      expect(service.getTaxThreshold(67)).toBe(TAX_THRESHOLDS_2025.AGE_65_TO_74);
+      expect(service.getTaxThreshold(67)).toBe(
+        TAX_THRESHOLDS_2025.AGE_65_TO_74,
+      );
     });
 
     it('should return correct threshold for 75+', () => {
@@ -355,8 +357,8 @@ describe('PayeService', () => {
     });
   });
 
-  describe('Banker\'s Rounding', () => {
-    it('should apply banker\'s rounding correctly', () => {
+  describe("Banker's Rounding", () => {
+    it("should apply banker's rounding correctly", () => {
       // Test calculation that would produce a .5 case
       const result = service.annualizeEarnings(12345, PayFrequency.MONTHLY);
       expect(result).toBe(148140); // 12345 * 12

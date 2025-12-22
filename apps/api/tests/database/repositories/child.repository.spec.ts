@@ -154,7 +154,9 @@ describe('ChildRepository', () => {
         parentId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException for non-existent tenant', async () => {
@@ -163,7 +165,9 @@ describe('ChildRepository', () => {
         tenantId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -179,7 +183,9 @@ describe('ChildRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });
@@ -193,13 +199,19 @@ describe('ChildRepository', () => {
         gender: Gender.MALE,
       });
 
-      const children = await repository.findByParent(testTenant.id, testParent.id);
+      const children = await repository.findByParent(
+        testTenant.id,
+        testParent.id,
+      );
 
       expect(children).toHaveLength(2);
     });
 
     it('should return empty array for parent with no children', async () => {
-      const children = await repository.findByParent(testTenant.id, otherParent.id);
+      const children = await repository.findByParent(
+        testTenant.id,
+        otherParent.id,
+      );
       expect(children).toHaveLength(0);
     });
 
@@ -211,7 +223,10 @@ describe('ChildRepository', () => {
       });
       await repository.create(testChildData); // Lerato Mbeki
 
-      const children = await repository.findByParent(testTenant.id, testParent.id);
+      const children = await repository.findByParent(
+        testTenant.id,
+        testParent.id,
+      );
 
       expect(children[0].lastName).toBe('Mbeki');
       expect(children[1].lastName).toBe('Zulu');
@@ -264,7 +279,9 @@ describe('ChildRepository', () => {
         data: { isActive: false },
       });
 
-      const activeChildren = await repository.findByTenant(testTenant.id, { isActive: true });
+      const activeChildren = await repository.findByTenant(testTenant.id, {
+        isActive: true,
+      });
 
       expect(activeChildren).toHaveLength(1);
       expect(activeChildren[0].firstName).toBe('Active');
@@ -278,7 +295,9 @@ describe('ChildRepository', () => {
         lastName: 'Dlamini',
       });
 
-      const searchResult = await repository.findByTenant(testTenant.id, { search: 'lerato' });
+      const searchResult = await repository.findByTenant(testTenant.id, {
+        search: 'lerato',
+      });
 
       expect(searchResult).toHaveLength(1);
       expect(searchResult[0].firstName).toBe('Lerato');
@@ -303,7 +322,9 @@ describe('ChildRepository', () => {
 
     it('should throw NotFoundException for non-existent child', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', { firstName: 'Test' }),
+        repository.update('00000000-0000-0000-0000-000000000000', {
+          firstName: 'Test',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -350,7 +371,11 @@ describe('ChildRepository', () => {
     it('should calculate age in months correctly', async () => {
       // Create a child born 2 years and 3 months ago
       const now = new Date();
-      const dob = new Date(now.getFullYear() - 2, now.getMonth() - 3, now.getDate());
+      const dob = new Date(
+        now.getFullYear() - 2,
+        now.getMonth() - 3,
+        now.getDate(),
+      );
 
       const created = await repository.create({
         ...testChildData,
@@ -365,7 +390,11 @@ describe('ChildRepository', () => {
     it('should handle day-of-month adjustments', async () => {
       // Create a child where birthday this month hasn't happened yet
       const now = new Date();
-      const dob = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 15);
+      const dob = new Date(
+        now.getFullYear() - 1,
+        now.getMonth(),
+        now.getDate() + 15,
+      );
 
       // Only test if we're not near the end of the month
       if (now.getDate() <= 15) {
@@ -384,7 +413,11 @@ describe('ChildRepository', () => {
     it('should handle young children (< 12 months)', async () => {
       // Create a child born 6 months ago
       const now = new Date();
-      const dob = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+      const dob = new Date(
+        now.getFullYear(),
+        now.getMonth() - 6,
+        now.getDate(),
+      );
 
       const created = await repository.create({
         ...testChildData,

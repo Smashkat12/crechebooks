@@ -100,7 +100,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
     }).compile();
 
     controller = module.get<ReconciliationController>(ReconciliationController);
-    financialReportService = module.get<FinancialReportService>(FinancialReportService);
+    financialReportService = module.get<FinancialReportService>(
+      FinancialReportService,
+    );
   });
 
   afterEach(() => {
@@ -151,7 +153,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date('2025-01-31T14:30:00.000Z'),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       // Act
       const result = await controller.getIncomeStatement(
@@ -214,7 +218,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
         { period_start: '2025-03-01', period_end: '2025-03-31' },
@@ -234,14 +240,24 @@ describe('ReconciliationController - getIncomeStatement', () => {
           totalCents: 10000000,
           totalRands: 100000.0,
           breakdown: [
-            { accountCode: '4000', accountName: 'School Fees', amountCents: 10000000, amountRands: 100000.0 },
+            {
+              accountCode: '4000',
+              accountName: 'School Fees',
+              amountCents: 10000000,
+              amountRands: 100000.0,
+            },
           ],
         },
         expenses: {
           totalCents: 5000000,
           totalRands: 50000.0,
           breakdown: [
-            { accountCode: '5000', accountName: 'Salaries', amountCents: 5000000, amountRands: 50000.0 },
+            {
+              accountCode: '5000',
+              accountName: 'Salaries',
+              amountCents: 5000000,
+              amountRands: 50000.0,
+            },
           ],
         },
         netProfitCents: 5000000,
@@ -249,7 +265,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
         { period_start: '2025-04-01', period_end: '2025-04-30' },
@@ -277,7 +295,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
         { period_start: '2025-05-01', period_end: '2025-05-31' },
@@ -285,7 +305,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
       );
 
       expect(result.data.net_profit).toBe(75000.0);
-      expect(result.data.income.total - result.data.expenses.total).toBe(result.data.net_profit);
+      expect(result.data.income.total - result.data.expenses.total).toBe(
+        result.data.net_profit,
+      );
     });
 
     it('should return breakdown arrays with account_code and account_name', async () => {
@@ -296,15 +318,30 @@ describe('ReconciliationController - getIncomeStatement', () => {
           totalCents: 15000000,
           totalRands: 150000.0,
           breakdown: [
-            { accountCode: '4000', accountName: 'School Fees', amountCents: 15000000, amountRands: 150000.0 },
+            {
+              accountCode: '4000',
+              accountName: 'School Fees',
+              amountCents: 15000000,
+              amountRands: 150000.0,
+            },
           ],
         },
         expenses: {
           totalCents: 8000000,
           totalRands: 80000.0,
           breakdown: [
-            { accountCode: '5000', accountName: 'Salaries', amountCents: 6000000, amountRands: 60000.0 },
-            { accountCode: '5100', accountName: 'Food & Catering', amountCents: 2000000, amountRands: 20000.0 },
+            {
+              accountCode: '5000',
+              accountName: 'Salaries',
+              amountCents: 6000000,
+              amountRands: 60000.0,
+            },
+            {
+              accountCode: '5100',
+              accountName: 'Food & Catering',
+              amountCents: 2000000,
+              amountRands: 20000.0,
+            },
           ],
         },
         netProfitCents: 7000000,
@@ -312,7 +349,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
         { period_start: '2025-06-01', period_end: '2025-06-30' },
@@ -347,7 +386,11 @@ describe('ReconciliationController - getIncomeStatement', () => {
         mockAdminUser,
       );
 
-      expect(serviceSpy).toHaveBeenCalledWith(mockTenantId, expect.any(Date), expect.any(Date));
+      expect(serviceSpy).toHaveBeenCalledWith(
+        mockTenantId,
+        expect.any(Date),
+        expect.any(Date),
+      );
       expect(result.success).toBe(true);
     });
 
@@ -371,7 +414,11 @@ describe('ReconciliationController - getIncomeStatement', () => {
         mockAccountantUser,
       );
 
-      expect(serviceSpy).toHaveBeenCalledWith(mockTenantId, expect.any(Date), expect.any(Date));
+      expect(serviceSpy).toHaveBeenCalledWith(
+        mockTenantId,
+        expect.any(Date),
+        expect.any(Date),
+      );
       expect(result.success).toBe(true);
     });
 
@@ -395,7 +442,11 @@ describe('ReconciliationController - getIncomeStatement', () => {
         mockViewerUser,
       );
 
-      expect(serviceSpy).toHaveBeenCalledWith(mockTenantId, expect.any(Date), expect.any(Date));
+      expect(serviceSpy).toHaveBeenCalledWith(
+        mockTenantId,
+        expect.any(Date),
+        expect.any(Date),
+      );
       expect(result.success).toBe(true);
     });
 
@@ -405,7 +456,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
         'INVALID_PERIOD',
         { periodStart: '2025-12-31', periodEnd: '2025-01-01' },
       );
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockRejectedValue(businessError);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockRejectedValue(businessError);
 
       await expect(
         controller.getIncomeStatement(
@@ -434,7 +487,9 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt,
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
         { period_start: '2025-10-01', period_end: '2025-10-31' },
@@ -452,14 +507,24 @@ describe('ReconciliationController - getIncomeStatement', () => {
           totalCents: 10000000,
           totalRands: 100000.0,
           breakdown: [
-            { accountCode: '4000', accountName: 'School Fees', amountCents: 10000000, amountRands: 100000.0 },
+            {
+              accountCode: '4000',
+              accountName: 'School Fees',
+              amountCents: 10000000,
+              amountRands: 100000.0,
+            },
           ],
         },
         expenses: {
           totalCents: 6000000,
           totalRands: 60000.0,
           breakdown: [
-            { accountCode: '5000', accountName: 'Salaries', amountCents: 6000000, amountRands: 60000.0 },
+            {
+              accountCode: '5000',
+              accountName: 'Salaries',
+              amountCents: 6000000,
+              amountRands: 60000.0,
+            },
           ],
         },
         netProfitCents: 4000000,
@@ -467,10 +532,16 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
-        { period_start: '2025-11-01', period_end: '2025-11-30', format: 'json' },
+        {
+          period_start: '2025-11-01',
+          period_end: '2025-11-30',
+          format: 'json',
+        },
         mockOwnerUser,
       );
 
@@ -493,14 +564,18 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
         { period_start: '2025-12-01', period_end: '2025-12-31', format: 'pdf' },
         mockOwnerUser,
       );
 
-      expect(result.data.document_url).toBe('/reports/income-statement/download?format=pdf');
+      expect(result.data.document_url).toBe(
+        '/reports/income-statement/download?format=pdf',
+      );
     });
 
     it('should include document_url when format is excel', async () => {
@@ -514,14 +589,22 @@ describe('ReconciliationController - getIncomeStatement', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(financialReportService, 'generateIncomeStatement').mockResolvedValue(mockReport);
+      jest
+        .spyOn(financialReportService, 'generateIncomeStatement')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getIncomeStatement(
-        { period_start: '2025-12-01', period_end: '2025-12-31', format: 'excel' },
+        {
+          period_start: '2025-12-01',
+          period_end: '2025-12-31',
+          format: 'excel',
+        },
         mockOwnerUser,
       );
 
-      expect(result.data.document_url).toBe('/reports/income-statement/download?format=excel');
+      expect(result.data.document_url).toBe(
+        '/reports/income-statement/download?format=excel',
+      );
     });
   });
 });

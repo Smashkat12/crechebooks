@@ -12,11 +12,20 @@ import { PaymentMatchingService } from '../../../src/database/services/payment-m
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
-import { ImportSource, TransactionStatus } from '../../../src/database/entities/transaction.entity';
-import { InvoiceStatus, DeliveryMethod } from '../../../src/database/entities/invoice.entity';
+import {
+  ImportSource,
+  TransactionStatus,
+} from '../../../src/database/entities/transaction.entity';
+import {
+  InvoiceStatus,
+  DeliveryMethod,
+} from '../../../src/database/entities/invoice.entity';
 import { MatchConfidenceLevel } from '../../../src/database/dto/payment-matching.dto';
 import { Tenant, Parent, Child, Invoice, Transaction } from '@prisma/client';
-import { BusinessException, NotFoundException } from '../../../src/shared/exceptions';
+import {
+  BusinessException,
+  NotFoundException,
+} from '../../../src/shared/exceptions';
 
 describe('PaymentMatchingService', () => {
   let service: PaymentMatchingService;
@@ -204,7 +213,9 @@ describe('PaymentMatchingService', () => {
       expect(result.results[0].status).toBe('AUTO_APPLIED');
       expect(result.results[0].appliedMatch).toBeDefined();
       expect(result.results[0].appliedMatch?.confidenceScore).toBe(100);
-      expect(result.results[0].appliedMatch?.invoiceNumber).toBe('INV-2024-00001');
+      expect(result.results[0].appliedMatch?.invoiceNumber).toBe(
+        'INV-2024-00001',
+      );
 
       // Verify payment was created
       const payments = await paymentRepo.findByInvoiceId(invoice.id);
@@ -241,7 +252,9 @@ describe('PaymentMatchingService', () => {
 
       expect(result.autoApplied).toBe(1);
       // Case-insensitive matching through exact match should give 100
-      expect(result.results[0].appliedMatch?.confidenceScore).toBeGreaterThanOrEqual(80);
+      expect(
+        result.results[0].appliedMatch?.confidenceScore,
+      ).toBeGreaterThanOrEqual(80);
     });
   });
 
@@ -268,7 +281,9 @@ describe('PaymentMatchingService', () => {
 
       // 30 (reference contains) + 40 (exact amount) + 20 (name) = 90 - auto-apply
       expect(result.autoApplied).toBe(1);
-      expect(result.results[0].appliedMatch?.confidenceScore).toBeGreaterThanOrEqual(80);
+      expect(
+        result.results[0].appliedMatch?.confidenceScore,
+      ).toBeGreaterThanOrEqual(80);
     });
 
     it('should auto-apply high confidence match (amount + strong name similarity)', async () => {
@@ -293,7 +308,9 @@ describe('PaymentMatchingService', () => {
       expect(result.processed).toBe(1);
       if (result.reviewRequired === 1) {
         expect(result.results[0].candidates).toBeDefined();
-        expect(result.results[0].candidates![0].confidenceScore).toBeGreaterThanOrEqual(50);
+        expect(
+          result.results[0].candidates![0].confidenceScore,
+        ).toBeGreaterThanOrEqual(50);
       }
     });
   });

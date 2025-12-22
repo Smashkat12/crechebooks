@@ -42,6 +42,17 @@ export default function NewParentPage() {
           />
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Children</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-center py-4">
+            Save parent information first, then add children to their account.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

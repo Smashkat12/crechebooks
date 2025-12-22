@@ -6,7 +6,10 @@
 import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
-import { TokenManager, TokenSet } from '../../../src/mcp/xero-mcp/auth/token-manager';
+import {
+  TokenManager,
+  TokenSet,
+} from '../../../src/mcp/xero-mcp/auth/token-manager';
 import { Encryption } from '../../../src/mcp/xero-mcp/auth/encryption';
 import { TokenNotFoundError } from '../../../src/mcp/xero-mcp/utils/error-handler';
 
@@ -141,8 +144,9 @@ describe('TokenManager', () => {
     });
 
     it('should throw TokenNotFoundError when no connection exists', async () => {
-      await expect(tokenManager.getXeroTenantId('non-existent-id'))
-        .rejects.toThrow(TokenNotFoundError);
+      await expect(
+        tokenManager.getXeroTenantId('non-existent-id'),
+      ).rejects.toThrow(TokenNotFoundError);
     });
   });
 
@@ -180,7 +184,8 @@ describe('TokenManager', () => {
     });
 
     it('should return false when no token exists', async () => {
-      const hasConnection = await tokenManager.hasValidConnection('non-existent');
+      const hasConnection =
+        await tokenManager.hasValidConnection('non-existent');
       expect(hasConnection).toBe(false);
     });
   });

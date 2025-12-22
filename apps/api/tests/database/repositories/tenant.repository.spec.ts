@@ -3,8 +3,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { TenantRepository } from '../../../src/database/repositories/tenant.repository';
 import { CreateTenantDto } from '../../../src/database/dto/tenant.dto';
-import { TaxStatus, SubscriptionStatus } from '../../../src/database/entities/tenant.entity';
-import { NotFoundException, ConflictException } from '../../../src/shared/exceptions';
+import {
+  TaxStatus,
+  SubscriptionStatus,
+} from '../../../src/database/entities/tenant.entity';
+import {
+  NotFoundException,
+  ConflictException,
+} from '../../../src/shared/exceptions';
 
 describe('TenantRepository', () => {
   let repository: TenantRepository;
@@ -102,7 +108,9 @@ describe('TenantRepository', () => {
     it('should throw ConflictException for duplicate email', async () => {
       await repository.create(testTenantData);
 
-      await expect(repository.create(testTenantData)).rejects.toThrow(ConflictException);
+      await expect(repository.create(testTenantData)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -117,7 +125,9 @@ describe('TenantRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });
@@ -125,7 +135,7 @@ describe('TenantRepository', () => {
   describe('findByIdOrThrow', () => {
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.findByIdOrThrow('00000000-0000-0000-0000-000000000000')
+        repository.findByIdOrThrow('00000000-0000-0000-0000-000000000000'),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -178,7 +188,9 @@ describe('TenantRepository', () => {
 
     it('should throw NotFoundException for non-existent tenant', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', { name: 'Test' })
+        repository.update('00000000-0000-0000-0000-000000000000', {
+          name: 'Test',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -217,7 +229,7 @@ describe('TenantRepository', () => {
 
     it('should throw NotFoundException for non-existent tenant', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000')
+        repository.delete('00000000-0000-0000-0000-000000000000'),
       ).rejects.toThrow(NotFoundException);
     });
   });

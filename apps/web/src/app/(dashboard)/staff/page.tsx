@@ -19,11 +19,11 @@ export default function StaffPage() {
     throw new Error(`Failed to load staff: ${error.message}`);
   }
 
-  const filteredStaff = data?.staff.filter(
+  const filteredStaff = (data?.staff ?? []).filter(
     (s) =>
       s.firstName?.toLowerCase().includes(search.toLowerCase()) ||
       s.lastName?.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
+  );
 
   return (
     <div className="space-y-6">

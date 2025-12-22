@@ -106,8 +106,12 @@ describe('PayeePatternRepository', () => {
       expect(pattern.tenantId).toBe(testTenant.id);
       expect(pattern.payeePattern).toBe(testPatternData.payeePattern);
       expect(pattern.payeeAliases).toEqual(testPatternData.payeeAliases);
-      expect(pattern.defaultAccountCode).toBe(testPatternData.defaultAccountCode);
-      expect(pattern.defaultAccountName).toBe(testPatternData.defaultAccountName);
+      expect(pattern.defaultAccountCode).toBe(
+        testPatternData.defaultAccountCode,
+      );
+      expect(pattern.defaultAccountName).toBe(
+        testPatternData.defaultAccountName,
+      );
       expect(Number(pattern.confidenceBoost)).toBeCloseTo(15.5, 1);
       expect(pattern.matchCount).toBe(0);
       expect(pattern.isRecurring).toBe(false);
@@ -168,7 +172,9 @@ describe('PayeePatternRepository', () => {
         // expectedAmountCents is missing!
       };
 
-      await expect(repository.create(invalidRecurring)).rejects.toThrow(BusinessException);
+      await expect(repository.create(invalidRecurring)).rejects.toThrow(
+        BusinessException,
+      );
     });
 
     it('should throw ConflictException for duplicate pattern per tenant', async () => {
@@ -180,7 +186,9 @@ describe('PayeePatternRepository', () => {
         defaultAccountCode: '5000', // Different account, same pattern
       };
 
-      await expect(repository.create(duplicateData)).rejects.toThrow(ConflictException);
+      await expect(repository.create(duplicateData)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should allow same pattern for different tenants', async () => {
@@ -203,7 +211,9 @@ describe('PayeePatternRepository', () => {
         tenantId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -218,7 +228,9 @@ describe('PayeePatternRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });
@@ -246,7 +258,9 @@ describe('PayeePatternRepository', () => {
         expectedAmountCents: 50000,
       });
 
-      const recurring = await repository.findByTenant(testTenant.id, { isRecurring: true });
+      const recurring = await repository.findByTenant(testTenant.id, {
+        isRecurring: true,
+      });
 
       expect(recurring).toHaveLength(1);
       expect(recurring[0].isRecurring).toBe(true);
@@ -261,7 +275,9 @@ describe('PayeePatternRepository', () => {
         defaultAccountName: 'Expense',
       });
 
-      const result = await repository.findByTenant(testTenant.id, { accountCode: '5000' });
+      const result = await repository.findByTenant(testTenant.id, {
+        accountCode: '5000',
+      });
 
       expect(result).toHaveLength(1);
       expect(result[0].defaultAccountCode).toBe('5000');
@@ -275,7 +291,9 @@ describe('PayeePatternRepository', () => {
         defaultAccountName: 'Other Income',
       });
 
-      const searchResult = await repository.findByTenant(testTenant.id, { search: 'smith' });
+      const searchResult = await repository.findByTenant(testTenant.id, {
+        search: 'smith',
+      });
 
       expect(searchResult).toHaveLength(1);
       expect(searchResult[0].payeePattern).toBe('SMITH J');
@@ -324,7 +342,10 @@ describe('PayeePatternRepository', () => {
     it('should find pattern by alias match', async () => {
       await repository.create(testPatternData);
 
-      const found = await repository.findByPayeeName(testTenant.id, 'JOHN SMITH');
+      const found = await repository.findByPayeeName(
+        testTenant.id,
+        'JOHN SMITH',
+      );
 
       expect(found).not.toBeNull();
       expect(found?.payeePattern).toBe('SMITH J');
@@ -333,7 +354,10 @@ describe('PayeePatternRepository', () => {
     it('should find pattern by alias match (case-insensitive)', async () => {
       await repository.create(testPatternData);
 
-      const found = await repository.findByPayeeName(testTenant.id, 'john smith');
+      const found = await repository.findByPayeeName(
+        testTenant.id,
+        'john smith',
+      );
 
       expect(found).not.toBeNull();
       expect(found?.payeePattern).toBe('SMITH J');
@@ -342,7 +366,10 @@ describe('PayeePatternRepository', () => {
     it('should return null when no match found', async () => {
       await repository.create(testPatternData);
 
-      const found = await repository.findByPayeeName(testTenant.id, 'UNKNOWN PAYEE');
+      const found = await repository.findByPayeeName(
+        testTenant.id,
+        'UNKNOWN PAYEE',
+      );
 
       expect(found).toBeNull();
     });

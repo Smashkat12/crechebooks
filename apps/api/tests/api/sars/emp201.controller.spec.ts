@@ -260,7 +260,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         netVatCents: null,
       };
 
-      jest.spyOn(emp201Service, 'generateEmp201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(emp201Service, 'generateEmp201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateEmp201(dto, ownerUser);
 
@@ -309,7 +311,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         netVatCents: null,
       };
 
-      jest.spyOn(emp201Service, 'generateEmp201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(emp201Service, 'generateEmp201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateEmp201(dto, ownerUser);
 
@@ -379,7 +383,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         netVatCents: null,
       };
 
-      jest.spyOn(emp201Service, 'generateEmp201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(emp201Service, 'generateEmp201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateEmp201(dto, ownerUser);
 
@@ -440,7 +446,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         netVatCents: null,
       };
 
-      jest.spyOn(emp201Service, 'generateEmp201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(emp201Service, 'generateEmp201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateEmp201(dto, ownerUser);
 
@@ -495,7 +503,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         netVatCents: null,
       };
 
-      jest.spyOn(emp201Service, 'generateEmp201').mockResolvedValue(mockSubmission);
+      jest
+        .spyOn(emp201Service, 'generateEmp201')
+        .mockResolvedValue(mockSubmission);
 
       const result = await controller.generateEmp201(dto, ownerUser);
 
@@ -616,7 +626,9 @@ describe('SarsController - EMP201 Endpoint', () => {
       };
 
       // Service throws error - should propagate
-      const error = new BadRequestException('No approved payroll found for period 2025-10');
+      const error = new BadRequestException(
+        'No approved payroll found for period 2025-10',
+      );
       jest.spyOn(emp201Service, 'generateEmp201').mockRejectedValue(error);
 
       // Expect error to propagate (not caught and wrapped)

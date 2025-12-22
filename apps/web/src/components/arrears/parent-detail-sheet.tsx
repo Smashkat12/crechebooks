@@ -35,9 +35,10 @@ export function ParentDetailSheet({
   onOpenChange,
 }: ParentDetailSheetProps) {
   const { data: parent, isLoading: isLoadingParent } = useParent(parentId ?? "");
+  // Fetch all invoices for this parent (no status filter)
+  // and filter client-side for unpaid ones
   const { data: invoicesData, isLoading: isLoadingInvoices } = useInvoicesList({
     parentId: parentId ?? undefined,
-    status: "unpaid",
     limit: 50,
   });
   const { data: paymentsData, isLoading: isLoadingPayments } = usePaymentsList({
@@ -45,7 +46,11 @@ export function ParentDetailSheet({
     limit: 10,
   });
 
-  const invoices = invoicesData?.invoices ?? [];
+  // Filter client-side for unpaid invoices (exclude PAID and VOID)
+  const allInvoices = invoicesData?.invoices ?? [];
+  const invoices = allInvoices.filter(
+    (inv) => inv.status !== "PAID" && inv.status !== "VOID"
+  );
   const payments = paymentsData?.payments ?? [];
   const totalOutstanding = invoices.reduce((sum, inv) => {
     const lineTotal = inv.lines?.reduce((lineSum, line) => lineSum + line.lineAmount, 0) ?? 0;

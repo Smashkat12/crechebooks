@@ -34,8 +34,14 @@ describe('E2E: Transaction Categorization Flow', () => {
   let importedTransactionIds: string[] = [];
 
   // Fixture paths
-  const diverseCsvPath = path.join(__dirname, '../fixtures/transactions/diverse-100.csv');
-  const similarCsvPath = path.join(__dirname, '../fixtures/transactions/similar-patterns-50.csv');
+  const diverseCsvPath = path.join(
+    __dirname,
+    '../fixtures/transactions/diverse-100.csv',
+  );
+  const similarCsvPath = path.join(
+    __dirname,
+    '../fixtures/transactions/similar-patterns-50.csv',
+  );
 
   beforeAll(async () => {
     // Verify fixtures exist - fail fast if not
@@ -59,11 +65,13 @@ describe('E2E: Transaction Categorization Flow', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
 
     prisma = app.get(PrismaService);
@@ -97,7 +105,9 @@ describe('E2E: Transaction Categorization Flow', () => {
       // POST can return 200 or 201
       expect([200, 201]).toContain(response.status);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.transactions_created).toBeGreaterThanOrEqual(95);
+      expect(response.body.data.transactions_created).toBeGreaterThanOrEqual(
+        95,
+      );
       expect(response.body.data.status).toMatch(/PROCESSING|COMPLETED/);
 
       // Store import batch ID for later queries
@@ -118,7 +128,9 @@ describe('E2E: Transaction Categorization Flow', () => {
       expect(response.body.data.length).toBeGreaterThanOrEqual(95);
 
       // Store IDs for categorization tests
-      importedTransactionIds = response.body.data.map((tx: { id: string }) => tx.id);
+      importedTransactionIds = response.body.data.map(
+        (tx: { id: string }) => tx.id,
+      );
     });
 
     it('should detect duplicates on re-import', async () => {
@@ -164,13 +176,14 @@ describe('E2E: Transaction Categorization Flow', () => {
       const woolworthsTxs = response.body.data;
       const categorized = woolworthsTxs.filter(
         (tx: { categorization?: { account_code: string } }) =>
-          tx.categorization?.account_code === '5100'
+          tx.categorization?.account_code === '5100',
       );
 
       // Expect 80%+ match rate for known patterns
-      const matchRate = woolworthsTxs.length > 0
-        ? (categorized.length / woolworthsTxs.length) * 100
-        : 0;
+      const matchRate =
+        woolworthsTxs.length > 0
+          ? (categorized.length / woolworthsTxs.length) * 100
+          : 0;
       expect(matchRate).toBeGreaterThanOrEqual(80);
     });
   });
@@ -234,13 +247,16 @@ describe('E2E: Transaction Categorization Flow', () => {
 
       // Find transactions with blank payee names (from blank descriptions)
       const blankDescTxs = response.body.data.filter(
-        (tx: { payee_name: string | null }) => !tx.payee_name || tx.payee_name === ''
+        (tx: { payee_name: string | null }) =>
+          !tx.payee_name || tx.payee_name === '',
       );
 
       // They should still be in the system, just possibly as REVIEW_REQUIRED
       if (blankDescTxs.length > 0) {
         const blankTx = blankDescTxs[0];
-        expect(['PENDING', 'REVIEW_REQUIRED', 'CATEGORIZED']).toContain(blankTx.status);
+        expect(['PENDING', 'REVIEW_REQUIRED', 'CATEGORIZED']).toContain(
+          blankTx.status,
+        );
       }
     });
 
@@ -283,8 +299,18 @@ describe('E2E: Transaction Categorization Flow', () => {
           account_name: 'Groceries',
           is_split: true,
           splits: [
-            { account_code: '5100', account_name: 'Groceries', amount_cents: 1000, vat_type: 'STANDARD' },
-            { account_code: '5200', account_name: 'Utilities', amount_cents: 500, vat_type: 'STANDARD' },
+            {
+              account_code: '5100',
+              account_name: 'Groceries',
+              amount_cents: 1000,
+              vat_type: 'STANDARD',
+            },
+            {
+              account_code: '5200',
+              account_name: 'Utilities',
+              amount_cents: 500,
+              vat_type: 'STANDARD',
+            },
           ],
         });
 
@@ -304,7 +330,9 @@ describe('E2E: Transaction Categorization Flow', () => {
       // POST can return 200 or 201
       expect([200, 201]).toContain(response.status);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.transactions_created).toBeGreaterThanOrEqual(40);
+      expect(response.body.data.transactions_created).toBeGreaterThanOrEqual(
+        40,
+      );
     });
 
     it('should achieve reasonable auto-categorization on similar patterns', async () => {
@@ -317,7 +345,8 @@ describe('E2E: Transaction Categorization Flow', () => {
       // POST can return 200 or 201
       expect([200, 201]).toContain(response.status);
 
-      const { total_processed, auto_categorized, statistics } = response.body.data;
+      const { total_processed, auto_categorized, statistics } =
+        response.body.data;
 
       if (total_processed > 0) {
         const autoRate = (auto_categorized / total_processed) * 100;
@@ -332,8 +361,7 @@ describe('E2E: Transaction Categorization Flow', () => {
 
   describe('Authentication & Authorization', () => {
     it('should reject requests without auth token', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/transactions');
+      const response = await request(app.getHttpServer()).get('/transactions');
 
       expect(response.status).toBe(401);
     });

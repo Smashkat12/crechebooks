@@ -305,7 +305,10 @@ describe('SarsAgent', () => {
 
     it('should validate correct PAYE calculation', () => {
       // Income in bracket 1: R100,000/year, tax = 18% = R18,000
-      const result = contextValidator.validatePayeCalculation(10000000, 1800000);
+      const result = contextValidator.validatePayeCalculation(
+        10000000,
+        1800000,
+      );
       expect(result.isValid).toBe(true);
       expect(result.errors.length).toBe(0);
     });

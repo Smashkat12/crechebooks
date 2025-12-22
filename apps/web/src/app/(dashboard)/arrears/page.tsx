@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Download } from 'lucide-react';
+import { AlertTriangle, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrearsTable, SendReminderDialog } from '@/components/arrears';
@@ -12,6 +12,7 @@ import type { ArrearsRow } from '@/components/arrears';
 export default function ArrearsPage() {
   const [reminderOpen, setReminderOpen] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: arrearsData, isLoading } = useArrearsList();
   const { data: summary } = useArrearsSummary();
@@ -30,6 +31,39 @@ export default function ArrearsPage() {
     lastReminderDate: null,
   })) ?? [];
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      if (arrearsRows.length === 0) {
+        alert('No arrears data to export');
+        return;
+      }
+
+      const headers = ['Parent Name', 'Email', 'Children', 'Outstanding', 'Aging Band', 'Last Payment'];
+      const rows = arrearsRows.map(row => [
+        `"${row.parentName}"`,
+        row.parentEmail,
+        row.childrenCount,
+        (row.totalOutstanding / 100).toFixed(2),
+        row.agingBand,
+        row.lastPaymentDate || 'N/A',
+      ]);
+
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `arrears-report-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -39,8 +73,12 @@ export default function ArrearsPage() {
             Track and manage outstanding payments
           </p>
         </div>
-        <Button variant="outline">
-          <Download className="h-4 w-4 mr-2" />
+        <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+          {isExporting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
           Export Report
         </Button>
       </div>

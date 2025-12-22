@@ -14,11 +14,20 @@ import { PaymentRepository } from '../../../src/database/repositories/payment.re
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { TransactionRepository } from '../../../src/database/repositories/transaction.repository';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
-import { NotFoundException, BusinessException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  BusinessException,
+} from '../../../src/shared/exceptions';
 import { Tenant, Parent, Child, Invoice, Transaction } from '@prisma/client';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
-import { ImportSource, TransactionStatus } from '../../../src/database/entities/transaction.entity';
-import { MatchType, MatchedBy } from '../../../src/database/entities/payment.entity';
+import {
+  ImportSource,
+  TransactionStatus,
+} from '../../../src/database/entities/transaction.entity';
+import {
+  MatchType,
+  MatchedBy,
+} from '../../../src/database/entities/payment.entity';
 import { XeroSyncStatus } from '../../../src/database/dto/payment-allocation.dto';
 
 describe('PaymentAllocationService', () => {

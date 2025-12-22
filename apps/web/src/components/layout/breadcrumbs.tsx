@@ -51,7 +51,7 @@ export function Breadcrumbs() {
         const isLast = index === breadcrumbs.length - 1;
 
         return (
-          <Fragment key={breadcrumb.href}>
+          <Fragment key={`${index}-${breadcrumb.href}`}>
             {index === 0 ? (
               <Link
                 href={breadcrumb.href}

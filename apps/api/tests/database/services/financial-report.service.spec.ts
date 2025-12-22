@@ -23,7 +23,10 @@ import { PaymentRepository } from '../../../src/database/repositories/payment.re
 import { BusinessException } from '../../../src/shared/exceptions';
 import { DEFAULT_ACCOUNTS } from '../../../src/database/constants/chart-of-accounts.constants';
 import { ImportSource } from '../../../src/database/entities/transaction.entity';
-import { MatchType, MatchedBy } from '../../../src/database/entities/payment.entity';
+import {
+  MatchType,
+  MatchedBy,
+} from '../../../src/database/entities/payment.entity';
 import { CategorizationSource } from '../../../src/database/entities/categorization.entity';
 import { FeeType } from '../../../src/database/entities/fee-structure.entity';
 
@@ -72,7 +75,9 @@ describe('FinancialReportService (Integration)', () => {
     parentRepo = module.get<ParentRepository>(ParentRepository);
     childRepo = module.get<ChildRepository>(ChildRepository);
     enrollmentRepo = module.get<EnrollmentRepository>(EnrollmentRepository);
-    feeStructureRepo = module.get<FeeStructureRepository>(FeeStructureRepository);
+    feeStructureRepo = module.get<FeeStructureRepository>(
+      FeeStructureRepository,
+    );
     invoiceLineRepo = module.get<InvoiceLineRepository>(InvoiceLineRepository);
     paymentRepo = module.get<PaymentRepository>(PaymentRepository);
   });
@@ -98,7 +103,9 @@ describe('FinancialReportService (Integration)', () => {
         where: { transaction: { tenantId: testTenantId } },
       });
       await prisma.payment.deleteMany({ where: { tenantId: testTenantId } });
-      await prisma.transaction.deleteMany({ where: { tenantId: testTenantId } });
+      await prisma.transaction.deleteMany({
+        where: { tenantId: testTenantId },
+      });
       await prisma.invoiceLine.deleteMany({
         where: { invoice: { tenantId: testTenantId } },
       });
@@ -106,7 +113,9 @@ describe('FinancialReportService (Integration)', () => {
       await prisma.enrollment.deleteMany({ where: { tenantId: testTenantId } });
       await prisma.child.deleteMany({ where: { tenantId: testTenantId } });
       await prisma.parent.deleteMany({ where: { tenantId: testTenantId } });
-      await prisma.feeStructure.deleteMany({ where: { tenantId: testTenantId } });
+      await prisma.feeStructure.deleteMany({
+        where: { tenantId: testTenantId },
+      });
       await prisma.tenant.delete({ where: { id: testTenantId } });
     }
   });

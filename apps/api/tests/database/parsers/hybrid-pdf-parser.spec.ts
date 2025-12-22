@@ -38,7 +38,9 @@ describe('HybridPdfParser', () => {
       const transactions = await parser.parse(buffer);
 
       expect(Array.isArray(transactions)).toBe(true);
-      console.log(`Hybrid parser extracted ${transactions.length} transactions`);
+      console.log(
+        `Hybrid parser extracted ${transactions.length} transactions`,
+      );
 
       // Verify transaction structure
       for (const tx of transactions) {

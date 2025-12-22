@@ -84,7 +84,9 @@ describe('PaymentController - matchPayments', () => {
     }).compile();
 
     controller = module.get<PaymentController>(PaymentController);
-    matchingService = module.get<PaymentMatchingService>(PaymentMatchingService);
+    matchingService = module.get<PaymentMatchingService>(
+      PaymentMatchingService,
+    );
   });
 
   afterEach(() => {
@@ -171,13 +173,19 @@ describe('PaymentController - matchPayments', () => {
         ],
       };
 
-      jest.spyOn(matchingService, 'matchPayments').mockResolvedValue(expectedResult);
+      jest
+        .spyOn(matchingService, 'matchPayments')
+        .mockResolvedValue(expectedResult);
 
       const result = await controller.matchPayments({}, mockOwnerUser);
 
       expect(result.data.summary.requires_review).toBe(1);
-      expect(result.data.review_required[0].suggested_matches[0].invoice_id).toBe('inv-002');
-      expect(result.data.review_required[0].suggested_matches[0].outstanding_amount).toBe(3500.0);
+      expect(
+        result.data.review_required[0].suggested_matches[0].invoice_id,
+      ).toBe('inv-002');
+      expect(
+        result.data.review_required[0].suggested_matches[0].outstanding_amount,
+      ).toBe(3500.0);
     });
 
     it('should process all unallocated transactions when no IDs provided', async () => {
@@ -233,7 +241,9 @@ describe('PaymentController - matchPayments', () => {
         results: [],
       };
 
-      jest.spyOn(matchingService, 'matchPayments').mockResolvedValue(expectedResult);
+      jest
+        .spyOn(matchingService, 'matchPayments')
+        .mockResolvedValue(expectedResult);
 
       const result = await controller.matchPayments({}, mockOwnerUser);
 
@@ -282,13 +292,24 @@ describe('PaymentController - matchPayments', () => {
         results,
       };
 
-      jest.spyOn(matchingService, 'matchPayments').mockResolvedValue(expectedResult);
+      jest
+        .spyOn(matchingService, 'matchPayments')
+        .mockResolvedValue(expectedResult);
 
       const result = await controller.matchPayments({}, mockOwnerUser);
 
-      expect(result.data.auto_matched.find((m) => m.confidence_score === 100)?.confidence_level).toBe('EXACT');
-      expect(result.data.auto_matched.find((m) => m.confidence_score === 85)?.confidence_level).toBe('HIGH');
-      expect(result.data.auto_matched.find((m) => m.confidence_score === 60)?.confidence_level).toBe('MEDIUM');
+      expect(
+        result.data.auto_matched.find((m) => m.confidence_score === 100)
+          ?.confidence_level,
+      ).toBe('EXACT');
+      expect(
+        result.data.auto_matched.find((m) => m.confidence_score === 85)
+          ?.confidence_level,
+      ).toBe('HIGH');
+      expect(
+        result.data.auto_matched.find((m) => m.confidence_score === 60)
+          ?.confidence_level,
+      ).toBe('MEDIUM');
     });
 
     it('should handle multiple review-required candidates', async () => {
@@ -336,20 +357,30 @@ describe('PaymentController - matchPayments', () => {
         ],
       };
 
-      jest.spyOn(matchingService, 'matchPayments').mockResolvedValue(expectedResult);
+      jest
+        .spyOn(matchingService, 'matchPayments')
+        .mockResolvedValue(expectedResult);
 
       const result = await controller.matchPayments({}, mockOwnerUser);
 
       expect(result.data.review_required[0].suggested_matches).toHaveLength(2);
-      expect(result.data.review_required[0].suggested_matches[0].invoice_number).toBe('INV-003A');
-      expect(result.data.review_required[0].suggested_matches[1].invoice_number).toBe('INV-003B');
+      expect(
+        result.data.review_required[0].suggested_matches[0].invoice_number,
+      ).toBe('INV-003A');
+      expect(
+        result.data.review_required[0].suggested_matches[1].invoice_number,
+      ).toBe('INV-003B');
     });
 
     it('should propagate service errors without catching', async () => {
       const serviceError = new Error('Database connection failed');
-      jest.spyOn(matchingService, 'matchPayments').mockRejectedValue(serviceError);
+      jest
+        .spyOn(matchingService, 'matchPayments')
+        .mockRejectedValue(serviceError);
 
-      await expect(controller.matchPayments({}, mockOwnerUser)).rejects.toThrow('Database connection failed');
+      await expect(controller.matchPayments({}, mockOwnerUser)).rejects.toThrow(
+        'Database connection failed',
+      );
     });
 
     it('should work for ADMIN users same as OWNER', async () => {
@@ -399,7 +430,9 @@ describe('PaymentController - matchPayments', () => {
         ],
       };
 
-      jest.spyOn(matchingService, 'matchPayments').mockResolvedValue(expectedResult);
+      jest
+        .spyOn(matchingService, 'matchPayments')
+        .mockResolvedValue(expectedResult);
 
       const result = await controller.matchPayments({}, mockOwnerUser);
 

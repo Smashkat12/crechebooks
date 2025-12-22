@@ -121,8 +121,12 @@ describe('PdfParser - Confidence Scoring', () => {
       expect(results1.length).toBe(results2.length);
 
       for (let i = 0; i < results1.length; i++) {
-        expect(results1[i].parsingConfidence).toBe(results2[i].parsingConfidence);
-        expect(results1[i].confidenceReasons).toEqual(results2[i].confidenceReasons);
+        expect(results1[i].parsingConfidence).toBe(
+          results2[i].parsingConfidence,
+        );
+        expect(results1[i].confidenceReasons).toEqual(
+          results2[i].confidenceReasons,
+        );
       }
     });
   });

@@ -389,7 +389,9 @@ describe('Vat201Service', () => {
 
       const result = service.validateSubmission(document);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Invalid VAT number format (must be 10 digits)');
+      expect(result.errors).toContain(
+        'Invalid VAT number format (must be 10 digits)',
+      );
     });
 
     it('should fail validation for invalid period', () => {
@@ -409,7 +411,9 @@ describe('Vat201Service', () => {
 
       const result = service.validateSubmission(document);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Invalid period: start date must be before end date');
+      expect(result.errors).toContain(
+        'Invalid period: start date must be before end date',
+      );
     });
 
     it('should warn for large VAT amounts', () => {

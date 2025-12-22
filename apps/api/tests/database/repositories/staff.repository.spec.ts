@@ -3,7 +3,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { StaffRepository } from '../../../src/database/repositories/staff.repository';
 import { CreateStaffDto } from '../../../src/database/dto/staff.dto';
-import { EmploymentType, PayFrequency } from '../../../src/database/entities/staff.entity';
+import {
+  EmploymentType,
+  PayFrequency,
+} from '../../../src/database/entities/staff.entity';
 import {
   NotFoundException,
   ConflictException,
@@ -214,9 +217,7 @@ describe('StaffRepository', () => {
       const data = createTestStaffData();
       data.tenantId = '00000000-0000-0000-0000-000000000000';
 
-      await expect(repository.create(data)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(repository.create(data)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -247,10 +248,7 @@ describe('StaffRepository', () => {
       const data = createTestStaffData();
       const created = await repository.create(data);
 
-      const found = await repository.findByIdNumber(
-        tenant.id,
-        '8501015800084',
-      );
+      const found = await repository.findByIdNumber(tenant.id, '8501015800084');
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(created.id);

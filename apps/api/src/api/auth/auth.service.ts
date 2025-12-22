@@ -298,6 +298,122 @@ export class AuthService {
   }
 
   /**
+   * Dev login - for local development only
+   * Generates a JWT token for test users without Auth0
+   */
+  async devLogin(email: string, password: string): Promise<AuthResult> {
+    const nodeEnv = this.configService.get<string>('NODE_ENV');
+    const jwtSecret = this.configService.get<string>('JWT_SECRET');
+
+    if (nodeEnv !== 'development' || !jwtSecret) {
+      this.logger.error('Dev login attempted in non-development environment');
+      throw new UnauthorizedException(
+        'Dev login is only available in development mode',
+      );
+    }
+
+    // Validate test credentials
+    const validDevUsers: Record<
+      string,
+      { password: string; name: string; role: string }
+    > = {
+      'admin@crechebooks.co.za': {
+        password: 'admin123',
+        name: 'Admin User',
+        role: 'OWNER',
+      },
+      'viewer@crechebooks.co.za': {
+        password: 'viewer123',
+        name: 'Viewer User',
+        role: 'VIEWER',
+      },
+    };
+
+    const devUser = validDevUsers[email];
+    if (!devUser || devUser.password !== password) {
+      this.logger.warn(`Invalid dev login attempt for: ${email}`);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Find or create the dev user in database
+    let user = await this.prisma.user.findFirst({
+      where: { email },
+    });
+
+    if (!user) {
+      // Get or create dev tenant
+      let devTenant = await this.prisma.tenant.findFirst({
+        where: { email: 'dev@crechebooks.co.za' },
+      });
+
+      if (!devTenant) {
+        devTenant = await this.prisma.tenant.create({
+          data: {
+            name: 'Development Creche',
+            email: 'dev@crechebooks.co.za',
+            addressLine1: '123 Dev Street',
+            city: 'Cape Town',
+            province: 'Western Cape',
+            postalCode: '8001',
+            phone: '+27123456789',
+          },
+        });
+        this.logger.log(`Created dev tenant: ${devTenant.id}`);
+      }
+
+      user = await this.prisma.user.create({
+        data: {
+          tenantId: devTenant.id,
+          auth0Id: `dev-${email.replace('@', '-at-').replace('.', '-dot-')}`,
+          email,
+          name: devUser.name,
+          role: devUser.role as any,
+          isActive: true,
+        },
+      });
+      this.logger.log(`Created dev user: ${user.id}`);
+    }
+
+    // Generate JWT token
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+      role: user.role,
+    };
+
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.jwtExpiration,
+    });
+
+    // Update last login
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    this.logger.log(`Dev login successful for: ${email}`);
+
+    return {
+      accessToken,
+      refreshToken: '', // No refresh token for dev login
+      expiresIn: this.jwtExpiration,
+      user: {
+        id: user.id,
+        tenantId: user.tenantId,
+        auth0Id: user.auth0Id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isActive: user.isActive,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    };
+  }
+
+  /**
    * Clean up expired state tokens
    */
   private cleanupExpiredStates(): void {

@@ -79,4 +79,11 @@ export const queryKeys = {
     balanceSheet: (params?: Record<string, unknown>) => [...queryKeys.reports.all, 'balance-sheet', params] as const,
     agedReceivables: () => [...queryKeys.reports.all, 'aged-receivables'] as const,
   },
+  // Fee Structures
+  feeStructures: {
+    all: ['feeStructures'] as const,
+    lists: () => [...queryKeys.feeStructures.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.feeStructures.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.feeStructures.all, 'detail', id] as const,
+  },
 } as const;

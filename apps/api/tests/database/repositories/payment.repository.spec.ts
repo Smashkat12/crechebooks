@@ -3,7 +3,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { CreatePaymentDto } from '../../../src/database/dto/payment.dto';
-import { MatchType, MatchedBy } from '../../../src/database/entities/payment.entity';
+import {
+  MatchType,
+  MatchedBy,
+} from '../../../src/database/entities/payment.entity';
 import {
   NotFoundException,
   ConflictException,
@@ -700,7 +703,9 @@ describe('PaymentRepository', () => {
 
     it('should throw ConflictException for already reversed payment', async () => {
       const created = await repository.create(testPaymentData);
-      await repository.reverse(created.id, { reversalReason: 'First reversal' });
+      await repository.reverse(created.id, {
+        reversalReason: 'First reversal',
+      });
 
       await expect(
         repository.reverse(created.id, { reversalReason: 'Second reversal' }),
@@ -752,7 +757,9 @@ describe('PaymentRepository', () => {
         matchType: MatchType.PARTIAL,
       });
 
-      const total = await repository.calculateTotalPaidForInvoice(testInvoice.id);
+      const total = await repository.calculateTotalPaidForInvoice(
+        testInvoice.id,
+      );
 
       expect(total).toBe(450000); // 200000 + 250000
     });
@@ -786,13 +793,17 @@ describe('PaymentRepository', () => {
       // Reverse first payment
       await repository.reverse(payment1.id, { reversalReason: 'Test' });
 
-      const total = await repository.calculateTotalPaidForInvoice(testInvoice.id);
+      const total = await repository.calculateTotalPaidForInvoice(
+        testInvoice.id,
+      );
 
       expect(total).toBe(250000); // Only second payment counts
     });
 
     it('should return 0 for invoice with no payments', async () => {
-      const total = await repository.calculateTotalPaidForInvoice(testInvoice.id);
+      const total = await repository.calculateTotalPaidForInvoice(
+        testInvoice.id,
+      );
       expect(total).toBe(0);
     });
   });
@@ -828,7 +839,9 @@ describe('PaymentRepository', () => {
       // Reverse first payment
       await repository.reverse(payment1.id, { reversalReason: 'Test' });
 
-      const activePayments = await repository.findActiveByTenantId(testTenant.id);
+      const activePayments = await repository.findActiveByTenantId(
+        testTenant.id,
+      );
 
       expect(activePayments).toHaveLength(1);
       expect(activePayments[0].isReversed).toBe(false);

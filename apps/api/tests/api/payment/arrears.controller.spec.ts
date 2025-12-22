@@ -15,7 +15,11 @@ import { PaymentRepository } from '../../../src/database/repositories/payment.re
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
-import type { ArrearsReport, DebtorSummary, ArrearsInvoice } from '../../../src/database/dto/arrears.dto';
+import type {
+  ArrearsReport,
+  DebtorSummary,
+  ArrearsInvoice,
+} from '../../../src/database/dto/arrears.dto';
 
 describe('PaymentController - getArrearsReport', () => {
   let controller: PaymentController;
@@ -173,7 +177,16 @@ describe('PaymentController - getArrearsReport', () => {
 
     it('should transform query filters from snake_case to camelCase', async () => {
       const mockReport: ArrearsReport = {
-        summary: { totalOutstandingCents: 0, totalInvoices: 0, aging: { currentCents: 0, days30Cents: 0, days60Cents: 0, days90PlusCents: 0 } },
+        summary: {
+          totalOutstandingCents: 0,
+          totalInvoices: 0,
+          aging: {
+            currentCents: 0,
+            days30Cents: 0,
+            days60Cents: 0,
+            days90PlusCents: 0,
+          },
+        },
         topDebtors: [],
         invoices: [],
         generatedAt: new Date(),
@@ -186,12 +199,15 @@ describe('PaymentController - getArrearsReport', () => {
       const dateFrom = new Date('2025-01-01');
       const dateTo = new Date('2025-12-31');
 
-      await controller.getArrearsReport({
-        date_from: dateFrom,
-        date_to: dateTo,
-        parent_id: 'parent-001',
-        min_amount: 100.00, // decimal
-      }, mockOwnerUser);
+      await controller.getArrearsReport(
+        {
+          date_from: dateFrom,
+          date_to: dateTo,
+          parent_id: 'parent-001',
+          min_amount: 100.0, // decimal
+        },
+        mockOwnerUser,
+      );
 
       expect(reportSpy).toHaveBeenCalledWith(mockTenantId, {
         dateFrom,
@@ -203,7 +219,16 @@ describe('PaymentController - getArrearsReport', () => {
 
     it('should enforce tenant isolation via user context', async () => {
       const mockReport: ArrearsReport = {
-        summary: { totalOutstandingCents: 0, totalInvoices: 0, aging: { currentCents: 0, days30Cents: 0, days60Cents: 0, days90PlusCents: 0 } },
+        summary: {
+          totalOutstandingCents: 0,
+          totalInvoices: 0,
+          aging: {
+            currentCents: 0,
+            days30Cents: 0,
+            days60Cents: 0,
+            days90PlusCents: 0,
+          },
+        },
         topDebtors: [],
         invoices: [],
         generatedAt: new Date(),
@@ -213,11 +238,17 @@ describe('PaymentController - getArrearsReport', () => {
         .spyOn(arrearsService, 'getArrearsReport')
         .mockResolvedValue(mockReport);
 
-      const differentTenantUser = { ...mockOwnerUser, tenantId: 'different-tenant' };
+      const differentTenantUser = {
+        ...mockOwnerUser,
+        tenantId: 'different-tenant',
+      };
 
       await controller.getArrearsReport({}, differentTenantUser);
 
-      expect(reportSpy).toHaveBeenCalledWith('different-tenant', expect.any(Object));
+      expect(reportSpy).toHaveBeenCalledWith(
+        'different-tenant',
+        expect.any(Object),
+      );
     });
 
     it('should return empty arrays when no arrears exist', async () => {
@@ -237,7 +268,9 @@ describe('PaymentController - getArrearsReport', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(arrearsService, 'getArrearsReport').mockResolvedValue(mockReport);
+      jest
+        .spyOn(arrearsService, 'getArrearsReport')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getArrearsReport({}, mockOwnerUser);
 
@@ -249,7 +282,16 @@ describe('PaymentController - getArrearsReport', () => {
 
     it('should format dates as YYYY-MM-DD strings', async () => {
       const mockReport: ArrearsReport = {
-        summary: { totalOutstandingCents: 100000, totalInvoices: 1, aging: { currentCents: 100000, days30Cents: 0, days60Cents: 0, days90PlusCents: 0 } },
+        summary: {
+          totalOutstandingCents: 100000,
+          totalInvoices: 1,
+          aging: {
+            currentCents: 100000,
+            days30Cents: 0,
+            days60Cents: 0,
+            days90PlusCents: 0,
+          },
+        },
         topDebtors: [
           {
             parentId: 'parent-001',
@@ -282,7 +324,9 @@ describe('PaymentController - getArrearsReport', () => {
         generatedAt: new Date('2025-12-22T10:00:00.000Z'),
       };
 
-      jest.spyOn(arrearsService, 'getArrearsReport').mockResolvedValue(mockReport);
+      jest
+        .spyOn(arrearsService, 'getArrearsReport')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getArrearsReport({}, mockOwnerUser);
 
@@ -293,52 +337,83 @@ describe('PaymentController - getArrearsReport', () => {
     });
 
     it('should apply debtor_limit to top_debtors', async () => {
-      const mockDebtors: DebtorSummary[] = Array.from({ length: 20 }, (_, i) => ({
-        parentId: `parent-${i + 1}`,
-        parentName: `Parent ${i + 1}`,
-        parentEmail: `parent${i + 1}@example.com`,
-        parentPhone: null,
-        totalOutstandingCents: 100000 * (20 - i),
-        oldestInvoiceDate: new Date('2025-01-15'),
-        invoiceCount: 1,
-        maxDaysOverdue: 30,
-      }));
+      const mockDebtors: DebtorSummary[] = Array.from(
+        { length: 20 },
+        (_, i) => ({
+          parentId: `parent-${i + 1}`,
+          parentName: `Parent ${i + 1}`,
+          parentEmail: `parent${i + 1}@example.com`,
+          parentPhone: null,
+          totalOutstandingCents: 100000 * (20 - i),
+          oldestInvoiceDate: new Date('2025-01-15'),
+          invoiceCount: 1,
+          maxDaysOverdue: 30,
+        }),
+      );
 
       const mockReport: ArrearsReport = {
-        summary: { totalOutstandingCents: 2100000, totalInvoices: 20, aging: { currentCents: 0, days30Cents: 2100000, days60Cents: 0, days90PlusCents: 0 } },
+        summary: {
+          totalOutstandingCents: 2100000,
+          totalInvoices: 20,
+          aging: {
+            currentCents: 0,
+            days30Cents: 2100000,
+            days60Cents: 0,
+            days90PlusCents: 0,
+          },
+        },
         topDebtors: mockDebtors,
         invoices: [],
         generatedAt: new Date(),
       };
 
-      jest.spyOn(arrearsService, 'getArrearsReport').mockResolvedValue(mockReport);
+      jest
+        .spyOn(arrearsService, 'getArrearsReport')
+        .mockResolvedValue(mockReport);
 
-      const result = await controller.getArrearsReport({ debtor_limit: 5 }, mockOwnerUser);
+      const result = await controller.getArrearsReport(
+        { debtor_limit: 5 },
+        mockOwnerUser,
+      );
 
       expect(result.data.top_debtors).toHaveLength(5);
       expect(result.data.top_debtors[0].parent_id).toBe('parent-1');
     });
 
     it('should use default debtor_limit of 10 when not specified', async () => {
-      const mockDebtors: DebtorSummary[] = Array.from({ length: 15 }, (_, i) => ({
-        parentId: `parent-${i + 1}`,
-        parentName: `Parent ${i + 1}`,
-        parentEmail: null,
-        parentPhone: null,
-        totalOutstandingCents: 100000,
-        oldestInvoiceDate: new Date('2025-01-15'),
-        invoiceCount: 1,
-        maxDaysOverdue: 30,
-      }));
+      const mockDebtors: DebtorSummary[] = Array.from(
+        { length: 15 },
+        (_, i) => ({
+          parentId: `parent-${i + 1}`,
+          parentName: `Parent ${i + 1}`,
+          parentEmail: null,
+          parentPhone: null,
+          totalOutstandingCents: 100000,
+          oldestInvoiceDate: new Date('2025-01-15'),
+          invoiceCount: 1,
+          maxDaysOverdue: 30,
+        }),
+      );
 
       const mockReport: ArrearsReport = {
-        summary: { totalOutstandingCents: 1500000, totalInvoices: 15, aging: { currentCents: 0, days30Cents: 1500000, days60Cents: 0, days90PlusCents: 0 } },
+        summary: {
+          totalOutstandingCents: 1500000,
+          totalInvoices: 15,
+          aging: {
+            currentCents: 0,
+            days30Cents: 1500000,
+            days60Cents: 0,
+            days90PlusCents: 0,
+          },
+        },
         topDebtors: mockDebtors,
         invoices: [],
         generatedAt: new Date(),
       };
 
-      jest.spyOn(arrearsService, 'getArrearsReport').mockResolvedValue(mockReport);
+      jest
+        .spyOn(arrearsService, 'getArrearsReport')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getArrearsReport({}, mockOwnerUser);
 
@@ -347,14 +422,27 @@ describe('PaymentController - getArrearsReport', () => {
 
     it('should propagate service errors without catching', async () => {
       const serviceError = new Error('Database connection failed');
-      jest.spyOn(arrearsService, 'getArrearsReport').mockRejectedValue(serviceError);
+      jest
+        .spyOn(arrearsService, 'getArrearsReport')
+        .mockRejectedValue(serviceError);
 
-      await expect(controller.getArrearsReport({}, mockOwnerUser)).rejects.toThrow('Database connection failed');
+      await expect(
+        controller.getArrearsReport({}, mockOwnerUser),
+      ).rejects.toThrow('Database connection failed');
     });
 
     it('should work for ADMIN users same as OWNER', async () => {
       const mockReport: ArrearsReport = {
-        summary: { totalOutstandingCents: 100000, totalInvoices: 1, aging: { currentCents: 100000, days30Cents: 0, days60Cents: 0, days90PlusCents: 0 } },
+        summary: {
+          totalOutstandingCents: 100000,
+          totalInvoices: 1,
+          aging: {
+            currentCents: 100000,
+            days30Cents: 0,
+            days60Cents: 0,
+            days90PlusCents: 0,
+          },
+        },
         topDebtors: [],
         invoices: [],
         generatedAt: new Date(),
@@ -372,7 +460,16 @@ describe('PaymentController - getArrearsReport', () => {
 
     it('should work for ACCOUNTANT users', async () => {
       const mockReport: ArrearsReport = {
-        summary: { totalOutstandingCents: 100000, totalInvoices: 1, aging: { currentCents: 100000, days30Cents: 0, days60Cents: 0, days90PlusCents: 0 } },
+        summary: {
+          totalOutstandingCents: 100000,
+          totalInvoices: 1,
+          aging: {
+            currentCents: 100000,
+            days30Cents: 0,
+            days60Cents: 0,
+            days90PlusCents: 0,
+          },
+        },
         topDebtors: [],
         invoices: [],
         generatedAt: new Date(),
@@ -394,9 +491,9 @@ describe('PaymentController - getArrearsReport', () => {
           totalOutstandingCents: 1000000,
           totalInvoices: 4,
           aging: {
-            currentCents: 250000,  // R2,500
-            days30Cents: 300000,   // R3,000
-            days60Cents: 200000,   // R2,000
+            currentCents: 250000, // R2,500
+            days30Cents: 300000, // R3,000
+            days60Cents: 200000, // R2,000
             days90PlusCents: 250000, // R2,500
           },
         },
@@ -405,7 +502,9 @@ describe('PaymentController - getArrearsReport', () => {
         generatedAt: new Date(),
       };
 
-      jest.spyOn(arrearsService, 'getArrearsReport').mockResolvedValue(mockReport);
+      jest
+        .spyOn(arrearsService, 'getArrearsReport')
+        .mockResolvedValue(mockReport);
 
       const result = await controller.getArrearsReport({}, mockOwnerUser);
 

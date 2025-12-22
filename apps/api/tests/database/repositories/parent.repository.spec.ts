@@ -4,7 +4,10 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { ParentRepository } from '../../../src/database/repositories/parent.repository';
 import { CreateParentDto } from '../../../src/database/dto/parent.dto';
 import { PreferredContact } from '../../../src/database/entities/parent.entity';
-import { NotFoundException, ConflictException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  ConflictException,
+} from '../../../src/shared/exceptions';
 import { Tenant } from '@prisma/client';
 
 describe('ParentRepository', () => {
@@ -148,7 +151,9 @@ describe('ParentRepository', () => {
         lastName: 'Person',
       };
 
-      await expect(repository.create(duplicateData)).rejects.toThrow(ConflictException);
+      await expect(repository.create(duplicateData)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should allow same email for different tenants', async () => {
@@ -171,7 +176,9 @@ describe('ParentRepository', () => {
         tenantId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -187,7 +194,9 @@ describe('ParentRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });
@@ -222,7 +231,9 @@ describe('ParentRepository', () => {
         data: { isActive: false },
       });
 
-      const activeParents = await repository.findByTenant(testTenant.id, { isActive: true });
+      const activeParents = await repository.findByTenant(testTenant.id, {
+        isActive: true,
+      });
 
       expect(activeParents).toHaveLength(1);
       expect(activeParents[0].firstName).toBe('Inactive');
@@ -237,7 +248,9 @@ describe('ParentRepository', () => {
         email: 'zanele@family.co.za',
       });
 
-      const searchResult = await repository.findByTenant(testTenant.id, { search: 'thabo' });
+      const searchResult = await repository.findByTenant(testTenant.id, {
+        search: 'thabo',
+      });
 
       expect(searchResult).toHaveLength(1);
       expect(searchResult[0].firstName).toBe('Thabo');
@@ -263,14 +276,20 @@ describe('ParentRepository', () => {
     it('should find parent by email within tenant', async () => {
       await repository.create(testParentData);
 
-      const found = await repository.findByEmail(testTenant.id, testParentData.email!);
+      const found = await repository.findByEmail(
+        testTenant.id,
+        testParentData.email!,
+      );
 
       expect(found).not.toBeNull();
       expect(found?.email).toBe(testParentData.email);
     });
 
     it('should return null for non-existent email', async () => {
-      const found = await repository.findByEmail(testTenant.id, 'nonexistent@test.co.za');
+      const found = await repository.findByEmail(
+        testTenant.id,
+        'nonexistent@test.co.za',
+      );
       expect(found).toBeNull();
     });
 
@@ -278,7 +297,10 @@ describe('ParentRepository', () => {
       await repository.create(testParentData);
 
       // Same email but different tenant
-      const found = await repository.findByEmail(otherTenant.id, testParentData.email!);
+      const found = await repository.findByEmail(
+        otherTenant.id,
+        testParentData.email!,
+      );
 
       expect(found).toBeNull();
     });
@@ -324,7 +346,9 @@ describe('ParentRepository', () => {
 
     it('should throw NotFoundException for non-existent parent', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', { firstName: 'Test' }),
+        repository.update('00000000-0000-0000-0000-000000000000', {
+          firstName: 'Test',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -338,9 +362,9 @@ describe('ParentRepository', () => {
       });
 
       // Try to update p2's email to p1's email
-      await expect(repository.update(p2.id, { email: p1.email! })).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        repository.update(p2.id, { email: p1.email! }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -375,14 +399,18 @@ describe('ParentRepository', () => {
       });
 
       // Verify child exists
-      const childBefore = await prisma.child.findUnique({ where: { id: child.id } });
+      const childBefore = await prisma.child.findUnique({
+        where: { id: child.id },
+      });
       expect(childBefore).not.toBeNull();
 
       // Delete parent
       await repository.delete(parent.id);
 
       // Verify child is also deleted (cascade)
-      const childAfter = await prisma.child.findUnique({ where: { id: child.id } });
+      const childAfter = await prisma.child.findUnique({
+        where: { id: child.id },
+      });
       expect(childAfter).toBeNull();
     });
   });

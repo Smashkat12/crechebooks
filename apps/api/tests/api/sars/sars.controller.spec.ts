@@ -13,7 +13,10 @@ import { Vat201Service } from '../../../src/database/services/vat201.service';
 import { Emp201Service } from '../../../src/database/services/emp201.service';
 import { UserRole, SubmissionStatus, SarsSubmission } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
-import { NotFoundException, BusinessException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  BusinessException,
+} from '../../../src/shared/exceptions';
 
 describe('SarsController - markSubmitted', () => {
   let controller: SarsController;
@@ -343,7 +346,10 @@ describe('SarsController - markSubmitted', () => {
     });
 
     it('should propagate NotFoundException from repository', async () => {
-      const notFoundError = new NotFoundException('SarsSubmission', mockSubmissionId);
+      const notFoundError = new NotFoundException(
+        'SarsSubmission',
+        mockSubmissionId,
+      );
       jest.spyOn(repository, 'submit').mockRejectedValue(notFoundError);
 
       await expect(
@@ -360,7 +366,9 @@ describe('SarsController - markSubmitted', () => {
           { submitted_date: '2025-01-25' },
           mockOwnerUser,
         ),
-      ).rejects.toThrow(`SarsSubmission with identifier '${mockSubmissionId}' not found`);
+      ).rejects.toThrow(
+        `SarsSubmission with identifier '${mockSubmissionId}' not found`,
+      );
     });
 
     it('should propagate BusinessException for wrong status', async () => {

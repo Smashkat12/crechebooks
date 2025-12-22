@@ -1,14 +1,14 @@
 import { Money, Decimal } from '../../../src/shared/utils/decimal.util';
 
 describe('Money Utility', () => {
-  describe('Banker\'s Rounding (ROUND_HALF_EVEN)', () => {
+  describe("Banker's Rounding (ROUND_HALF_EVEN)", () => {
     // This is CRITICAL for financial compliance
     // Money.round() always rounds to 2 decimal places for currency
     // Banker's rounding: when the digit to round is exactly 5, round to nearest even
 
     it('should round 2.005 to 2.00 (down to even - 0 is even)', () => {
       const result = Money.round(new Decimal('2.005'));
-      expect(result.toNumber()).toBe(2.00);
+      expect(result.toNumber()).toBe(2.0);
     });
 
     it('should round 2.015 to 2.02 (up to even - 2 is even)', () => {
@@ -37,7 +37,7 @@ describe('Money Utility', () => {
     });
 
     // Additional edge cases
-    it('should round 0.005 to 0.00 (banker\'s rounding)', () => {
+    it("should round 0.005 to 0.00 (banker's rounding)", () => {
       const result = Money.round(new Decimal('0.005'));
       expect(result.toNumber()).toBe(0);
     });
@@ -58,17 +58,17 @@ describe('Money Utility', () => {
     });
 
     // Negative numbers with banker's rounding to 2 decimal places
-    it('should round -2.005 to -2.00 (banker\'s rounding with negatives)', () => {
+    it("should round -2.005 to -2.00 (banker's rounding with negatives)", () => {
       const result = Money.round(new Decimal('-2.005'));
-      expect(result.toNumber()).toBe(-2.00);
+      expect(result.toNumber()).toBe(-2.0);
     });
 
-    it('should round -2.015 to -2.02 (banker\'s rounding with negatives)', () => {
+    it("should round -2.015 to -2.02 (banker's rounding with negatives)", () => {
       const result = Money.round(new Decimal('-2.015'));
       expect(result.toNumber()).toBe(-2.02);
     });
 
-    it('should round -2.025 to -2.02 (banker\'s rounding with negatives)', () => {
+    it("should round -2.025 to -2.02 (banker's rounding with negatives)", () => {
       const result = Money.round(new Decimal('-2.025'));
       expect(result.toNumber()).toBe(-2.02);
     });
@@ -106,14 +106,14 @@ describe('Money Utility', () => {
       expect(result.toNumber()).toBe(-50);
     });
 
-    it('should apply banker\'s rounding when converting to cents', () => {
+    it("should apply banker's rounding when converting to cents", () => {
       // 2.125 should round to 2.12 (212 cents), not 2.13 (213 cents)
       const amount = new Decimal('2.125');
       const cents = Money.toCents(amount);
       expect(cents).toBe(212);
     });
 
-    it('should apply banker\'s rounding to 2.135', () => {
+    it("should apply banker's rounding to 2.135", () => {
       // 2.135 should round to 2.14 (214 cents)
       const amount = new Decimal('2.135');
       const cents = Money.toCents(amount);
@@ -228,7 +228,9 @@ describe('Money Utility', () => {
       const extractedVat = Money.extractVAT(gross, VAT_RATE);
       const calculatedNet = Money.subtract(gross, extractedVat);
 
-      expect(Money.round(calculatedNet).toNumber()).toBe(originalNet.toNumber());
+      expect(Money.round(calculatedNet).toNumber()).toBe(
+        originalNet.toNumber(),
+      );
     });
   });
 
@@ -365,7 +367,10 @@ describe('Money Utility', () => {
       // 2547.50 * 0.075 = 191.0625
       expect(Money.round(discountAmount).toNumber()).toBe(191.06);
 
-      const discountedFee = Money.subtract(baseFee, Money.round(discountAmount));
+      const discountedFee = Money.subtract(
+        baseFee,
+        Money.round(discountAmount),
+      );
       expect(discountedFee.toNumber()).toBe(2356.44);
 
       const vat = Money.calculateVAT(discountedFee, 0.15);
@@ -389,19 +394,25 @@ describe('Money Utility', () => {
       let remaining = payment;
 
       // Pay invoice 1
-      const pay1 = Money.isGreaterThan(remaining, invoice1) ? invoice1 : remaining;
+      const pay1 = Money.isGreaterThan(remaining, invoice1)
+        ? invoice1
+        : remaining;
       remaining = Money.subtract(remaining, pay1);
       expect(pay1.toNumber()).toBe(2000);
       expect(remaining.toNumber()).toBe(3000);
 
       // Pay invoice 2
-      const pay2 = Money.isGreaterThan(remaining, invoice2) ? invoice2 : remaining;
+      const pay2 = Money.isGreaterThan(remaining, invoice2)
+        ? invoice2
+        : remaining;
       remaining = Money.subtract(remaining, pay2);
       expect(pay2.toNumber()).toBe(1500);
       expect(remaining.toNumber()).toBe(1500);
 
       // Partial pay invoice 3
-      const pay3 = Money.isGreaterThan(remaining, invoice3) ? invoice3 : remaining;
+      const pay3 = Money.isGreaterThan(remaining, invoice3)
+        ? invoice3
+        : remaining;
       remaining = Money.subtract(remaining, pay3);
       expect(pay3.toNumber()).toBe(1500);
       expect(remaining.toNumber()).toBe(0);
@@ -432,7 +443,7 @@ describe('Money Utility', () => {
       expect(total.toNumber()).toBe(2300);
     });
 
-    it('should handle edge case: proration with banker\'s rounding', () => {
+    it("should handle edge case: proration with banker's rounding", () => {
       // Monthly fee: R3000
       // Days in month: 30
       // Days attended: 17

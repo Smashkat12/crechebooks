@@ -101,7 +101,7 @@ describe('UifService', () => {
       expect(result.isAboveCap).toBe(true);
     });
 
-    it('should apply banker\'s rounding correctly', async () => {
+    it("should apply banker's rounding correctly", async () => {
       // R10,005 * 1% = R100.05
       const result = await service.calculateUif(1000500);
 
@@ -154,21 +154,26 @@ describe('UifService', () => {
 
   describe('applyMaxCap', () => {
     it('should not cap amounts below threshold', () => {
-      const { cappedRemunerationCents, isAboveCap } = service.applyMaxCap(1000000);
+      const { cappedRemunerationCents, isAboveCap } =
+        service.applyMaxCap(1000000);
 
       expect(cappedRemunerationCents).toBe(1000000);
       expect(isAboveCap).toBe(false);
     });
 
     it('should cap amounts above threshold', () => {
-      const { cappedRemunerationCents, isAboveCap } = service.applyMaxCap(2000000);
+      const { cappedRemunerationCents, isAboveCap } =
+        service.applyMaxCap(2000000);
 
-      expect(cappedRemunerationCents).toBe(UIF_CONSTANTS.MAX_REMUNERATION_CENTS);
+      expect(cappedRemunerationCents).toBe(
+        UIF_CONSTANTS.MAX_REMUNERATION_CENTS,
+      );
       expect(isAboveCap).toBe(true);
     });
 
     it('should handle exact threshold amount', () => {
-      const { cappedRemunerationCents, isAboveCap } = service.applyMaxCap(1771200);
+      const { cappedRemunerationCents, isAboveCap } =
+        service.applyMaxCap(1771200);
 
       expect(cappedRemunerationCents).toBe(1771200);
       expect(isAboveCap).toBe(false);

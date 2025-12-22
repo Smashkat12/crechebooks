@@ -101,7 +101,7 @@ describe('RateLimiter', () => {
       expect(quickLimiter.canProceed()).toBe(false);
 
       // Wait for window to expire
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
 
       expect(quickLimiter.canProceed()).toBe(true);
       expect(quickLimiter.getCurrentCount()).toBe(0);

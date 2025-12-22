@@ -3,8 +3,14 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { TransactionRepository } from '../../../src/database/repositories/transaction.repository';
 import { CreateTransactionDto } from '../../../src/database/dto/transaction.dto';
-import { ImportSource, TransactionStatus } from '../../../src/database/entities/transaction.entity';
-import { NotFoundException, ConflictException } from '../../../src/shared/exceptions';
+import {
+  ImportSource,
+  TransactionStatus,
+} from '../../../src/database/entities/transaction.entity';
+import {
+  NotFoundException,
+  ConflictException,
+} from '../../../src/shared/exceptions';
 import { Tenant } from '@prisma/client';
 
 describe('TransactionRepository', () => {
@@ -143,7 +149,9 @@ describe('TransactionRepository', () => {
         tenantId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw ConflictException for duplicate xeroTransactionId', async () => {
@@ -161,7 +169,9 @@ describe('TransactionRepository', () => {
         description: 'Different transaction',
       };
 
-      await expect(repository.create(duplicateData)).rejects.toThrow(ConflictException);
+      await expect(repository.create(duplicateData)).rejects.toThrow(
+        ConflictException,
+      );
     });
   });
 
@@ -211,7 +221,10 @@ describe('TransactionRepository', () => {
         });
       }
 
-      const result = await repository.findByTenant(testTenant.id, { page: 1, limit: 3 });
+      const result = await repository.findByTenant(testTenant.id, {
+        page: 1,
+        limit: 3,
+      });
 
       expect(result.data).toHaveLength(3);
       expect(result.total).toBe(5);
@@ -357,9 +370,13 @@ describe('TransactionRepository', () => {
 
     it('should throw NotFoundException for non-existent transaction', async () => {
       await expect(
-        repository.update(testTenant.id, '00000000-0000-0000-0000-000000000000', {
-          status: TransactionStatus.CATEGORIZED,
-        }),
+        repository.update(
+          testTenant.id,
+          '00000000-0000-0000-0000-000000000000',
+          {
+            status: TransactionStatus.CATEGORIZED,
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -391,7 +408,10 @@ describe('TransactionRepository', () => {
 
     it('should throw NotFoundException for non-existent transaction', async () => {
       await expect(
-        repository.softDelete(testTenant.id, '00000000-0000-0000-0000-000000000000'),
+        repository.softDelete(
+          testTenant.id,
+          '00000000-0000-0000-0000-000000000000',
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -411,16 +431,24 @@ describe('TransactionRepository', () => {
       expect(created.reconciledAt).toBeNull();
 
       const beforeMark = new Date();
-      const updated = await repository.markReconciled(testTenant.id, created.id);
+      const updated = await repository.markReconciled(
+        testTenant.id,
+        created.id,
+      );
 
       expect(updated.isReconciled).toBe(true);
       expect(updated.reconciledAt).toBeInstanceOf(Date);
-      expect(updated.reconciledAt!.getTime()).toBeGreaterThanOrEqual(beforeMark.getTime());
+      expect(updated.reconciledAt!.getTime()).toBeGreaterThanOrEqual(
+        beforeMark.getTime(),
+      );
     });
 
     it('should throw NotFoundException for non-existent transaction', async () => {
       await expect(
-        repository.markReconciled(testTenant.id, '00000000-0000-0000-0000-000000000000'),
+        repository.markReconciled(
+          testTenant.id,
+          '00000000-0000-0000-0000-000000000000',
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 

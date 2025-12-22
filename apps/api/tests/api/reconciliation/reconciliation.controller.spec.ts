@@ -15,7 +15,10 @@ import { InvoiceRepository } from '../../../src/database/repositories/invoice.re
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { ReconcileResult } from '../../../src/database/dto/reconciliation-service.dto';
-import { BusinessException, ConflictException } from '../../../src/shared/exceptions';
+import {
+  BusinessException,
+  ConflictException,
+} from '../../../src/shared/exceptions';
 
 describe('ReconciliationController - reconcile', () => {
   let controller: ReconciliationController;
@@ -118,8 +121,8 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB Business Current',
           period_start: '2025-01-01',
           period_end: '2025-01-31',
-          opening_balance: 50000.00,
-          closing_balance: 62500.00,
+          opening_balance: 50000.0,
+          closing_balance: 62500.0,
         },
         mockOwnerUser,
       );
@@ -142,8 +145,8 @@ describe('ReconciliationController - reconcile', () => {
       expect(result.data.id).toBe('recon-123');
       expect(result.data.status).toBe('RECONCILED');
       expect(result.data.bank_account).toBe('FNB Business Current');
-      expect(result.data.opening_balance).toBe(50000.00);
-      expect(result.data.closing_balance).toBe(62500.00);
+      expect(result.data.opening_balance).toBe(50000.0);
+      expect(result.data.closing_balance).toBe(62500.0);
       expect(result.data.matched_count).toBe(45);
     });
 
@@ -168,8 +171,8 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'Standard Bank Business', // snake_case input
           period_start: '2025-02-01',
           period_end: '2025-02-28',
-          opening_balance: 10000.00,
-          closing_balance: 15000.00,
+          opening_balance: 10000.0,
+          closing_balance: 15000.0,
         },
         mockOwnerUser,
       );
@@ -204,8 +207,8 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB',
           period_start: '2025-03-01',
           period_end: '2025-03-31',
-          opening_balance: 123456.00, // Rands
-          closing_balance: 156789.00, // Rands
+          opening_balance: 123456.0, // Rands
+          closing_balance: 156789.0, // Rands
         },
         mockOwnerUser,
       );
@@ -239,14 +242,14 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB',
           period_start: '2025-04-01',
           period_end: '2025-04-30',
-          opening_balance: 50000.50,
+          opening_balance: 50000.5,
           closing_balance: 62500.75,
         },
         mockOwnerUser,
       );
 
       // Verify cents to Rands conversion (/ 100)
-      expect(result.data.opening_balance).toBe(50000.50);
+      expect(result.data.opening_balance).toBe(50000.5);
       expect(result.data.closing_balance).toBe(62500.75);
       expect(result.data.calculated_balance).toBe(62500.75);
       expect(result.data.discrepancy).toBe(0);
@@ -271,8 +274,8 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB',
           period_start: '2025-05-01',
           period_end: '2025-05-31',
-          opening_balance: 10000.00,
-          closing_balance: 12000.00,
+          opening_balance: 10000.0,
+          closing_balance: 12000.0,
         },
         mockOwnerUser,
       );
@@ -311,8 +314,8 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB',
           period_start: '2025-06-01',
           period_end: '2025-06-30',
-          opening_balance: 50000.00,
-          closing_balance: 60000.00,
+          opening_balance: 50000.0,
+          closing_balance: 60000.0,
         },
         mockOwnerUser,
       );
@@ -340,14 +343,14 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB',
           period_start: '2025-07-01',
           period_end: '2025-07-31',
-          opening_balance: 50000.00,
-          closing_balance: 60000.00,
+          opening_balance: 50000.0,
+          closing_balance: 60000.0,
         },
         mockOwnerUser,
       );
 
       expect(result.data.status).toBe('DISCREPANCY');
-      expect(result.data.discrepancy).toBe(50.00); // R50
+      expect(result.data.discrepancy).toBe(50.0); // R50
       expect(result.data.unmatched_count).toBe(2);
     });
 
@@ -372,8 +375,8 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB',
           period_start: '2025-08-01',
           period_end: '2025-08-31',
-          opening_balance: 20000.00,
-          closing_balance: 25000.00,
+          opening_balance: 20000.0,
+          closing_balance: 25000.0,
         },
         mockAdminUser,
       );
@@ -408,8 +411,8 @@ describe('ReconciliationController - reconcile', () => {
           bank_account: 'FNB',
           period_start: '2025-09-01',
           period_end: '2025-09-30',
-          opening_balance: 30000.00,
-          closing_balance: 35000.00,
+          opening_balance: 30000.0,
+          closing_balance: 35000.0,
         },
         mockAccountantUser,
       );
@@ -437,8 +440,8 @@ describe('ReconciliationController - reconcile', () => {
             bank_account: 'FNB',
             period_start: '2025-12-31',
             period_end: '2025-01-01', // End before start
-            opening_balance: 10000.00,
-            closing_balance: 15000.00,
+            opening_balance: 10000.0,
+            closing_balance: 15000.0,
           },
           mockOwnerUser,
         ),
@@ -450,8 +453,8 @@ describe('ReconciliationController - reconcile', () => {
             bank_account: 'FNB',
             period_start: '2025-12-31',
             period_end: '2025-01-01',
-            opening_balance: 10000.00,
-            closing_balance: 15000.00,
+            opening_balance: 10000.0,
+            closing_balance: 15000.0,
           },
           mockOwnerUser,
         ),
@@ -471,8 +474,8 @@ describe('ReconciliationController - reconcile', () => {
             bank_account: 'FNB Business Current',
             period_start: '2025-01-01',
             period_end: '2025-01-31',
-            opening_balance: 50000.00,
-            closing_balance: 62500.00,
+            opening_balance: 50000.0,
+            closing_balance: 62500.0,
           },
           mockOwnerUser,
         ),
@@ -484,8 +487,8 @@ describe('ReconciliationController - reconcile', () => {
             bank_account: 'FNB Business Current',
             period_start: '2025-01-01',
             period_end: '2025-01-31',
-            opening_balance: 50000.00,
-            closing_balance: 62500.00,
+            opening_balance: 50000.0,
+            closing_balance: 62500.0,
           },
           mockOwnerUser,
         ),

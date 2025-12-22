@@ -125,8 +125,12 @@ describe('CategorizationRepository', () => {
 
       expect(categorization.id).toBeDefined();
       expect(categorization.transactionId).toBe(testTransaction.id);
-      expect(categorization.accountCode).toBe(testCategorizationData.accountCode);
-      expect(categorization.accountName).toBe(testCategorizationData.accountName);
+      expect(categorization.accountCode).toBe(
+        testCategorizationData.accountCode,
+      );
+      expect(categorization.accountName).toBe(
+        testCategorizationData.accountName,
+      );
       expect(Number(categorization.confidenceScore)).toBeCloseTo(95.5, 1);
       expect(categorization.reasoning).toBe(testCategorizationData.reasoning);
       expect(categorization.source).toBe(CategorizationSource.AI_AUTO);
@@ -201,7 +205,9 @@ describe('CategorizationRepository', () => {
         transactionId: '00000000-0000-0000-0000-000000000000',
       };
 
-      await expect(repository.create(invalidData)).rejects.toThrow(NotFoundException);
+      await expect(repository.create(invalidData)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessException when isSplit=true but splitAmountCents missing', async () => {
@@ -216,7 +222,9 @@ describe('CategorizationRepository', () => {
         // splitAmountCents is missing!
       };
 
-      await expect(repository.create(invalidSplit)).rejects.toThrow(BusinessException);
+      await expect(repository.create(invalidSplit)).rejects.toThrow(
+        BusinessException,
+      );
     });
 
     it('should throw BusinessException when vatType=STANDARD but vatAmountCents missing', async () => {
@@ -231,7 +239,9 @@ describe('CategorizationRepository', () => {
         // vatAmountCents is missing!
       };
 
-      await expect(repository.create(invalidVat)).rejects.toThrow(BusinessException);
+      await expect(repository.create(invalidVat)).rejects.toThrow(
+        BusinessException,
+      );
     });
   });
 
@@ -246,7 +256,9 @@ describe('CategorizationRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('00000000-0000-0000-0000-000000000000');
+      const found = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
       expect(found).toBeNull();
     });
   });
@@ -262,7 +274,9 @@ describe('CategorizationRepository', () => {
         confidenceScore: 85,
       });
 
-      const categorizations = await repository.findByTransaction(testTransaction.id);
+      const categorizations = await repository.findByTransaction(
+        testTransaction.id,
+      );
 
       expect(categorizations).toHaveLength(2);
       expect(categorizations[0].createdAt.getTime()).toBeGreaterThanOrEqual(
@@ -271,7 +285,9 @@ describe('CategorizationRepository', () => {
     });
 
     it('should return empty array for transaction with no categorizations', async () => {
-      const categorizations = await repository.findByTransaction(testTransaction.id);
+      const categorizations = await repository.findByTransaction(
+        testTransaction.id,
+      );
       expect(categorizations).toHaveLength(0);
     });
   });
@@ -408,7 +424,9 @@ describe('CategorizationRepository', () => {
 
       expect(reviewed.reviewedBy).toBe(testUser.id);
       expect(reviewed.reviewedAt).toBeInstanceOf(Date);
-      expect(reviewed.reviewedAt!.getTime()).toBeGreaterThanOrEqual(beforeReview.getTime());
+      expect(reviewed.reviewedAt!.getTime()).toBeGreaterThanOrEqual(
+        beforeReview.getTime(),
+      );
       expect(reviewed.source).toBe(CategorizationSource.USER_OVERRIDE);
     });
 

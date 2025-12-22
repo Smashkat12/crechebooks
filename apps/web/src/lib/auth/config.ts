@@ -15,22 +15,44 @@ export const authConfig: NextAuthConfig = {
           return null;
         }
 
-        // Development mode - accept test credentials
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+        // Development mode - use dev-login endpoint
         if (process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true') {
-          if (credentials.email === 'admin@crechebooks.co.za' && credentials.password === 'admin123') {
+          try {
+            const response = await fetch(`${apiUrl}/api/v1/auth/dev-login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: credentials.email,
+                password: credentials.password,
+              }),
+            });
+
+            if (!response.ok) {
+              const error = await response.json().catch(() => ({}));
+              console.error('Dev login failed:', error);
+              return null;
+            }
+
+            const data = await response.json();
             return {
-              id: 'dev-user-1',
-              email: 'admin@crechebooks.co.za',
-              name: 'Admin User',
-              role: 'admin',
-              tenantId: 'dev-tenant-1',
+              id: data.user.id,
+              email: data.user.email,
+              name: data.user.name,
+              role: data.user.role,
+              tenantId: data.user.tenant_id,
+              accessToken: data.access_token,
             };
+          } catch (error) {
+            console.error('Dev login error:', error);
+            return null;
           }
         }
 
         // Production mode - call API
         try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
+          const response = await fetch(`${apiUrl}/api/v1/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -81,31 +103,6 @@ export const authConfig: NextAuthConfig = {
         session.accessToken = token.accessToken as string;
       }
       return session;
-    },
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard') ||
-        nextUrl.pathname.startsWith('/transactions') ||
-        nextUrl.pathname.startsWith('/invoices') ||
-        nextUrl.pathname.startsWith('/payments') ||
-        nextUrl.pathname.startsWith('/arrears') ||
-        nextUrl.pathname.startsWith('/sars') ||
-        nextUrl.pathname.startsWith('/reconciliation') ||
-        nextUrl.pathname.startsWith('/parents') ||
-        nextUrl.pathname.startsWith('/staff') ||
-        nextUrl.pathname.startsWith('/reports') ||
-        nextUrl.pathname.startsWith('/settings');
-
-      if (isOnDashboard) {
-        if (isLoggedIn) return true;
-        return false; // Redirect to login
-      }
-
-      if (isLoggedIn && nextUrl.pathname === '/login') {
-        return Response.redirect(new URL('/dashboard', nextUrl));
-      }
-
-      return true;
     },
   },
   session: {

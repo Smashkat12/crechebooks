@@ -23,7 +23,8 @@ export class TestJwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   private readonly logger = new Logger(TestJwtStrategy.name);
 
   constructor(private readonly prisma: PrismaService) {
-    const jwtSecret = process.env.JWT_SECRET || 'test-jwt-secret-for-e2e-testing';
+    const jwtSecret =
+      process.env.JWT_SECRET || 'test-jwt-secret-for-e2e-testing';
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

@@ -20,6 +20,7 @@ import {
   AuthCallbackResponseDto,
 } from './dto/callback.dto';
 import { RefreshRequestDto, RefreshResponseDto } from './dto/refresh.dto';
+import { DevLoginRequestDto, DevLoginResponseDto } from './dto/dev-login.dto';
 import { Public } from './decorators/public.decorator';
 
 @Controller('auth')
@@ -107,6 +108,41 @@ export class AuthController {
     return {
       access_token: result.accessToken,
       expires_in: result.expiresIn,
+    };
+  }
+
+  @Post('dev-login')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Dev login (development only)',
+    description:
+      'Login with test credentials in development mode. Returns JWT token.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    type: DevLoginResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Invalid credentials or not in development mode',
+  })
+  async devLogin(
+    @Body() dto: DevLoginRequestDto,
+  ): Promise<DevLoginResponseDto> {
+    this.logger.debug(`Dev login attempt for: ${dto.email}`);
+    const result = await this.authService.devLogin(dto.email, dto.password);
+
+    return {
+      access_token: result.accessToken,
+      expires_in: result.expiresIn,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        role: result.user.role,
+        tenant_id: result.user.tenantId,
+      },
     };
   }
 }

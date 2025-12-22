@@ -5,6 +5,11 @@ import { BillingModule } from './billing/billing.module';
 import { PaymentModule } from './payment/payment.module';
 import { SarsModule } from './sars/sars.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { ParentsModule } from './parents/parents.module';
+import { StaffModule } from './staff/staff.module';
+import { ArrearsModule } from './arrears/arrears.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -14,6 +19,11 @@ import { ReconciliationModule } from './reconciliation/reconciliation.module';
     PaymentModule,
     SarsModule,
     ReconciliationModule,
+    DashboardModule,
+    ParentsModule,
+    StaffModule,
+    ArrearsModule,
+    SettingsModule,
   ],
   exports: [
     AuthModule,
@@ -22,6 +32,11 @@ import { ReconciliationModule } from './reconciliation/reconciliation.module';
     PaymentModule,
     SarsModule,
     ReconciliationModule,
+    DashboardModule,
+    ParentsModule,
+    StaffModule,
+    ArrearsModule,
+    SettingsModule,
   ],
 })
 export class ApiModule {}

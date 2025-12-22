@@ -41,8 +41,18 @@ export function useInvoicesList(params?: InvoiceListParams) {
   return useQuery<InvoicesListResponse, AxiosError>({
     queryKey: queryKeys.invoices.list(params),
     queryFn: async () => {
+      // Transform camelCase params to snake_case for API
+      const apiParams: Record<string, string | number | undefined> = {};
+      if (params?.page) apiParams.page = params.page;
+      if (params?.limit) apiParams.limit = params.limit;
+      if (params?.status) apiParams.status = params.status;
+      if (params?.parentId) apiParams.parent_id = params.parentId;
+      if (params?.childId) apiParams.child_id = params.childId;
+      if (params?.startDate) apiParams.date_from = params.startDate;
+      if (params?.endDate) apiParams.date_to = params.endDate;
+
       const { data } = await apiClient.get<InvoicesListResponse>(endpoints.invoices.list, {
-        params,
+        params: apiParams,
       });
       return data;
     },

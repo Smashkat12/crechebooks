@@ -56,8 +56,13 @@ describe('RolesGuard', () => {
 
   describe('Role-Based Access Control', () => {
     it('should block requests with wrong role', () => {
-      const context = createMockExecutionContext([UserRole.ADMIN], UserRole.VIEWER);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
+      const context = createMockExecutionContext(
+        [UserRole.ADMIN],
+        UserRole.VIEWER,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.ADMIN]);
 
       try {
         guard.canActivate(context);
@@ -69,8 +74,13 @@ describe('RolesGuard', () => {
     });
 
     it('should allow requests with correct role', () => {
-      const context = createMockExecutionContext([UserRole.ADMIN], UserRole.ADMIN);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
+      const context = createMockExecutionContext(
+        [UserRole.ADMIN],
+        UserRole.ADMIN,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.ADMIN]);
 
       const result = guard.canActivate(context);
 
@@ -82,10 +92,9 @@ describe('RolesGuard', () => {
         [UserRole.ADMIN, UserRole.EDITOR],
         UserRole.EDITOR,
       );
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
-        UserRole.ADMIN,
-        UserRole.EDITOR,
-      ]);
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.ADMIN, UserRole.EDITOR]);
 
       const result = guard.canActivate(context);
 
@@ -97,10 +106,9 @@ describe('RolesGuard', () => {
         [UserRole.ADMIN, UserRole.EDITOR],
         UserRole.VIEWER,
       );
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([
-        UserRole.ADMIN,
-        UserRole.EDITOR,
-      ]);
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.ADMIN, UserRole.EDITOR]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
@@ -108,21 +116,33 @@ describe('RolesGuard', () => {
 
   describe('Error Messages', () => {
     it('should include required role in error message', () => {
-      const context = createMockExecutionContext([UserRole.ADMIN], UserRole.VIEWER);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
+      const context = createMockExecutionContext(
+        [UserRole.ADMIN],
+        UserRole.VIEWER,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.ADMIN]);
 
       try {
         guard.canActivate(context);
         fail('Should have thrown ForbiddenException');
       } catch (error) {
         expect(error).toBeInstanceOf(ForbiddenException);
-        expect(error.message).toBe('Insufficient permissions: required role ADMIN');
+        expect(error.message).toBe(
+          'Insufficient permissions: required role ADMIN',
+        );
       }
     });
 
     it('should throw ForbiddenException with proper status code', () => {
-      const context = createMockExecutionContext([UserRole.EDITOR], UserRole.VIEWER);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.EDITOR]);
+      const context = createMockExecutionContext(
+        [UserRole.EDITOR],
+        UserRole.VIEWER,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.EDITOR]);
 
       try {
         guard.canActivate(context);
@@ -136,29 +156,49 @@ describe('RolesGuard', () => {
 
   describe('Role-Based Access (No Hierarchy)', () => {
     it('should block ADMIN from accessing EDITOR-only routes', () => {
-      const context = createMockExecutionContext([UserRole.EDITOR], UserRole.ADMIN);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.EDITOR]);
+      const context = createMockExecutionContext(
+        [UserRole.EDITOR],
+        UserRole.ADMIN,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.EDITOR]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
 
     it('should block EDITOR from accessing VIEWER-only routes', () => {
-      const context = createMockExecutionContext([UserRole.VIEWER], UserRole.EDITOR);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.VIEWER]);
+      const context = createMockExecutionContext(
+        [UserRole.VIEWER],
+        UserRole.EDITOR,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.VIEWER]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
 
     it('should block VIEWER from accessing EDITOR routes', () => {
-      const context = createMockExecutionContext([UserRole.EDITOR], UserRole.VIEWER);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.EDITOR]);
+      const context = createMockExecutionContext(
+        [UserRole.EDITOR],
+        UserRole.VIEWER,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.EDITOR]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
 
     it('should block EDITOR from accessing ADMIN routes', () => {
-      const context = createMockExecutionContext([UserRole.ADMIN], UserRole.EDITOR);
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
+      const context = createMockExecutionContext(
+        [UserRole.ADMIN],
+        UserRole.EDITOR,
+      );
+      jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.ADMIN]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
@@ -166,8 +206,13 @@ describe('RolesGuard', () => {
 
   describe('Reflector Integration', () => {
     it('should check both handler and class for @Roles decorator', () => {
-      const context = createMockExecutionContext([UserRole.ADMIN], UserRole.ADMIN);
-      const spy = jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue([UserRole.ADMIN]);
+      const context = createMockExecutionContext(
+        [UserRole.ADMIN],
+        UserRole.ADMIN,
+      );
+      const spy = jest
+        .spyOn(reflector, 'getAllAndOverride')
+        .mockReturnValue([UserRole.ADMIN]);
 
       guard.canActivate(context);
 

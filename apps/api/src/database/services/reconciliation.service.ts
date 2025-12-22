@@ -228,6 +228,18 @@ export class ReconciliationService {
   }
 
   /**
+   * Get all reconciliations for a tenant
+   *
+   * @param tenantId - Tenant ID for isolation
+   * @returns Array of reconciliations
+   */
+  async getReconciliationsByTenant(
+    tenantId: string,
+  ): Promise<Reconciliation[]> {
+    return await this.reconciliationRepo.findByTenantId(tenantId);
+  }
+
+  /**
    * Get unreconciled transactions for a period
    *
    * @param tenantId - Tenant ID for isolation

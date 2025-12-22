@@ -16,13 +16,33 @@ interface DataTablePaginationProps<TData> {
 }
 
 export function DataTablePagination<TData>({ table }: DataTablePaginationProps<TData>) {
+  // Safely get row counts - these methods can throw when row selection isn't enabled
+  let selectedRowCount = 0;
+  let filteredRowCount = 0;
+
+  try {
+    selectedRowCount = table.getFilteredSelectedRowModel()?.rows?.length ?? 0;
+  } catch {
+    // Row selection not enabled
+  }
+
+  try {
+    filteredRowCount = table.getFilteredRowModel()?.rows?.length ?? 0;
+  } catch {
+    // Filtering not enabled, fall back to core row model
+    filteredRowCount = table.getCoreRowModel()?.rows?.length ?? 0;
+  }
+
+  const pageCount = table.getPageCount() || 1;
+  const currentPage = (table.getState().pagination?.pageIndex ?? 0) + 1;
+  const pageSize = table.getState().pagination?.pageSize ?? 20;
+
   return (
     <div className="flex items-center justify-between px-2">
       <div className="flex-1 text-sm text-muted-foreground">
-        {table.getFilteredSelectedRowModel().rows.length > 0 && (
+        {selectedRowCount > 0 && (
           <span>
-            {table.getFilteredSelectedRowModel().rows.length} of{' '}
-            {table.getFilteredRowModel().rows.length} row(s) selected.
+            {selectedRowCount} of {filteredRowCount} row(s) selected.
           </span>
         )}
       </div>
@@ -30,25 +50,25 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
         <div className="flex items-center space-x-2">
           <p className="text-sm font-medium">Rows per page</p>
           <Select
-            value={`${table.getState().pagination.pageSize}`}
+            value={`${pageSize}`}
             onValueChange={(value) => {
               table.setPageSize(Number(value));
             }}
           >
             <SelectTrigger className="h-8 w-[70px]">
-              <SelectValue placeholder={table.getState().pagination.pageSize} />
+              <SelectValue placeholder={pageSize} />
             </SelectTrigger>
             <SelectContent side="top">
-              {[10, 20, 30, 40, 50].map((pageSize) => (
-                <SelectItem key={pageSize} value={`${pageSize}`}>
-                  {pageSize}
+              {[10, 20, 30, 40, 50].map((size) => (
+                <SelectItem key={size} value={`${size}`}>
+                  {size}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-          Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+          Page {currentPage} of {pageCount}
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -81,7 +101,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
           <Button
             variant="outline"
             className="hidden h-8 w-8 p-0 lg:flex"
-            onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+            onClick={() => table.setPageIndex(pageCount - 1)}
             disabled={!table.getCanNextPage()}
             aria-label="Go to last page"
           >

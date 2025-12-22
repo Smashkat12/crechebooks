@@ -83,6 +83,9 @@ export class ParentRepository {
     try {
       return await this.prisma.parent.findUnique({
         where: { id },
+        include: {
+          children: true, // Include children for the parent
+        },
       });
     } catch (error) {
       this.logger.error(
@@ -125,6 +128,9 @@ export class ParentRepository {
 
       return await this.prisma.parent.findMany({
         where,
+        include: {
+          children: true, // Include children for each parent
+        },
         orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       });
     } catch (error) {

@@ -13,6 +13,7 @@ export const queryKeys = {
     lists: () => [...queryKeys.invoices.all, 'list'] as const,
     list: (params?: Record<string, unknown>) => [...queryKeys.invoices.lists(), params] as const,
     detail: (id: string) => [...queryKeys.invoices.all, 'detail', id] as const,
+    adhocCharges: (invoiceId: string) => [...queryKeys.invoices.all, 'adhoc-charges', invoiceId] as const,
   },
   // Payments
   payments: {
@@ -40,6 +41,13 @@ export const queryKeys = {
   children: {
     all: ['children'] as const,
     detail: (id: string) => [...queryKeys.children.all, 'detail', id] as const,
+  },
+  // Enrollments (uses children API)
+  enrollments: {
+    all: ['enrollments'] as const,
+    lists: () => [...queryKeys.enrollments.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.enrollments.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.enrollments.all, 'detail', id] as const,
   },
   // SARS
   sars: {

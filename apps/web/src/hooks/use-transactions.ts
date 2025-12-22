@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
-import type { ITransaction, ICategorizationResult } from '@crechebooks/types';
+import type { ITransaction, ICategorizationResult, TransactionStatus, TransactionType } from '@crechebooks/types';
 
-// Types for API responses
+// Types for frontend (camelCase)
 interface TransactionWithCategorization extends ITransaction {
   categorization?: ICategorizationResult;
 }
@@ -41,15 +41,80 @@ interface BatchCategorizeParams {
   categoryId: string;
 }
 
+// API response types (snake_case from backend)
+interface ApiCategorization {
+  account_code: string;
+  account_name: string;
+  confidence_score: number;
+  source: string;
+  reviewed_at?: string;
+}
+
+interface ApiTransaction {
+  id: string;
+  date: string;
+  description: string;
+  payee_name?: string;
+  reference?: string;
+  amount_cents: number;
+  is_credit: boolean;
+  status: string;
+  is_reconciled: boolean;
+  categorization?: ApiCategorization;
+  created_at: string;
+}
+
+interface ApiTransactionsListResponse {
+  success: boolean;
+  data: ApiTransaction[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// Transform API response to frontend format
+function transformTransaction(api: ApiTransaction): TransactionWithCategorization {
+  return {
+    id: api.id,
+    tenantId: '', // Not returned by list API
+    date: new Date(api.date),
+    description: api.description,
+    reference: api.reference,
+    amount: api.amount_cents, // Amount stored in cents
+    type: api.is_credit ? 'CREDIT' as TransactionType : 'DEBIT' as TransactionType,
+    status: api.status as TransactionStatus,
+    accountCode: api.categorization?.account_code,
+    reconciled: api.is_reconciled,
+    confidence: api.categorization?.confidence_score,
+    needsReview: api.status === 'NEEDS_REVIEW',
+    categorization: api.categorization ? {
+      transactionId: api.id,
+      categoryId: api.categorization.account_code, // Use account_code as ID
+      accountCode: api.categorization.account_code,
+      confidence: api.categorization.confidence_score,
+      reasoning: api.categorization.source,
+      needsReview: api.status === 'NEEDS_REVIEW',
+    } : undefined,
+  };
+}
+
 // List transactions with pagination and filters
 export function useTransactionsList(params?: TransactionListParams) {
   return useQuery<TransactionsListResponse, AxiosError>({
     queryKey: queryKeys.transactions.list(params),
     queryFn: async () => {
-      const { data } = await apiClient.get<TransactionsListResponse>(endpoints.transactions.list, {
+      const { data } = await apiClient.get<ApiTransactionsListResponse>(endpoints.transactions.list, {
         params,
       });
-      return data;
+      return {
+        transactions: data.data.map(transformTransaction),
+        total: data.meta.total,
+        page: data.meta.page,
+        limit: data.meta.limit,
+      };
     },
   });
 }

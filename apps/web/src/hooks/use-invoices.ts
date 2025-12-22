@@ -36,6 +36,63 @@ interface SendInvoicesParams {
   method: 'email' | 'whatsapp' | 'both';
 }
 
+// API response format from the backend
+interface ApiInvoiceResponse {
+  id: string;
+  invoice_number: string;
+  parent: { id: string; name: string; email: string };
+  child: { id: string; name: string };
+  billing_period_start: string;
+  billing_period_end: string;
+  issue_date: string;
+  due_date: string;
+  subtotal: number;
+  vat: number;
+  total: number;
+  amount_paid: number;
+  balance_due: number;
+  status: string;
+  delivery_status: string | null;
+  created_at: string;
+}
+
+interface ApiListResponse {
+  success: boolean;
+  data: ApiInvoiceResponse[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// Transform API response to frontend format
+function transformInvoice(apiInvoice: ApiInvoiceResponse): InvoiceWithLines {
+  return {
+    id: apiInvoice.id,
+    tenantId: '',
+    invoiceNumber: apiInvoice.invoice_number,
+    parentId: apiInvoice.parent.id,
+    parentName: apiInvoice.parent.name,
+    childId: apiInvoice.child.id,
+    childName: apiInvoice.child.name,
+    billingPeriodStart: new Date(apiInvoice.billing_period_start),
+    billingPeriodEnd: new Date(apiInvoice.billing_period_end),
+    issueDate: new Date(apiInvoice.issue_date),
+    dueDate: new Date(apiInvoice.due_date),
+    subtotalCents: Math.round(apiInvoice.subtotal * 100),
+    vatCents: Math.round(apiInvoice.vat * 100),
+    totalCents: Math.round(apiInvoice.total * 100),
+    amountPaidCents: Math.round(apiInvoice.amount_paid * 100),
+    status: apiInvoice.status as 'DRAFT' | 'SENT' | 'PAID' | 'PARTIALLY_PAID' | 'OVERDUE' | 'CANCELLED',
+    deliveryStatus: apiInvoice.delivery_status as 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null,
+    createdAt: new Date(apiInvoice.created_at),
+    updatedAt: new Date(apiInvoice.created_at),
+    lines: [], // Lines not included in list view
+  };
+}
+
 // List invoices with pagination and filters
 export function useInvoicesList(params?: InvoiceListParams) {
   return useQuery<InvoicesListResponse, AxiosError>({
@@ -51,10 +108,17 @@ export function useInvoicesList(params?: InvoiceListParams) {
       if (params?.startDate) apiParams.date_from = params.startDate;
       if (params?.endDate) apiParams.date_to = params.endDate;
 
-      const { data } = await apiClient.get<InvoicesListResponse>(endpoints.invoices.list, {
+      const { data } = await apiClient.get<ApiListResponse>(endpoints.invoices.list, {
         params: apiParams,
       });
-      return data;
+
+      // Transform API response to frontend format
+      return {
+        invoices: data.data.map(transformInvoice),
+        total: data.meta.total,
+        page: data.meta.page,
+        limit: data.meta.limit,
+      };
     },
   });
 }

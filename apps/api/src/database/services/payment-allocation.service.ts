@@ -9,7 +9,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Payment } from '@prisma/client';
+import { Payment, InvoiceStatus } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentRepository } from '../repositories/payment.repository';
@@ -73,6 +73,27 @@ export class PaymentAllocationService {
       );
     }
 
+    // 2a. Check if transaction has already been fully allocated
+    const existingPayments = await this.paymentRepo.findByTenantId(
+      dto.tenantId,
+      { transactionId: dto.transactionId },
+    );
+    const totalAlreadyAllocated = existingPayments.reduce(
+      (sum, p) => sum + p.amountCents,
+      0,
+    );
+    if (totalAlreadyAllocated >= transaction.amountCents) {
+      throw new BusinessException(
+        'Transaction has already been fully allocated',
+        'TRANSACTION_ALREADY_ALLOCATED',
+        {
+          transactionId: dto.transactionId,
+          transactionAmount: transaction.amountCents,
+          alreadyAllocated: totalAlreadyAllocated,
+        },
+      );
+    }
+
     // 3. Validate total allocations <= transaction amount
     this.validateAllocations(transaction.amountCents, dto.allocations);
 
@@ -99,7 +120,20 @@ export class PaymentAllocationService {
       );
     }
 
+    // Check if invoice is already fully paid
     const outstandingCents = invoice.totalCents - invoice.amountPaidCents;
+    if (outstandingCents <= 0 || invoice.status === 'PAID') {
+      throw new BusinessException(
+        'Invoice is already fully paid',
+        'INVOICE_ALREADY_PAID',
+        {
+          invoiceId: allocation.invoiceId,
+          status: invoice.status,
+          amountPaid: invoice.amountPaidCents,
+          total: invoice.totalCents,
+        },
+      );
+    }
     const allocationAmount = new Decimal(allocation.amountCents);
     const outstanding = new Decimal(outstandingCents);
 
@@ -240,7 +274,25 @@ export class PaymentAllocationService {
             );
           }
 
+          // Check if invoice is already fully paid
           const outstandingCents = invoice.totalCents - invoice.amountPaidCents;
+          if (outstandingCents <= 0 || invoice.status === 'PAID') {
+            errors.push({
+              invoiceId: allocation.invoiceId,
+              reason: 'Invoice is already fully paid',
+              code: 'INVOICE_ALREADY_PAID',
+            });
+            throw new BusinessException(
+              'Invoice is already fully paid',
+              'INVOICE_ALREADY_PAID',
+              {
+                invoiceId: allocation.invoiceId,
+                status: invoice.status,
+                amountPaid: invoice.amountPaidCents,
+                total: invoice.totalCents,
+              },
+            );
+          }
           const allocationAmount = new Decimal(allocation.amountCents);
           const outstanding = new Decimal(outstandingCents);
 
@@ -273,12 +325,12 @@ export class PaymentAllocationService {
           // Update invoice via recordPayment logic within transaction
           const newAmountPaid =
             invoice.amountPaidCents + allocation.amountCents;
-          let newStatus = invoice.status;
+          let newStatus: InvoiceStatus = invoice.status;
 
           if (newAmountPaid >= invoice.totalCents) {
-            newStatus = 'PAID';
+            newStatus = InvoiceStatus.PAID;
           } else if (newAmountPaid > 0) {
-            newStatus = 'PARTIALLY_PAID';
+            newStatus = InvoiceStatus.PARTIALLY_PAID;
           }
 
           await tx.invoice.update({

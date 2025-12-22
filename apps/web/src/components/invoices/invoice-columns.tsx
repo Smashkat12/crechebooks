@@ -92,7 +92,10 @@ export function createInvoiceColumns(
       accessorKey: "childName",
       header: "Child",
       cell: ({ row }) => {
-        const lines = row.original.lines;
+        const lines = row.original.lines || [];
+        if (lines.length === 0) {
+          return row.original.childName || '-';
+        }
         const childCount = new Set(lines.map((l) => l.childName)).size;
         return childCount > 1 ? `${childCount} children` : lines[0]?.childName;
       },
@@ -101,11 +104,19 @@ export function createInvoiceColumns(
       accessorKey: "totalAmount",
       header: "Amount",
       cell: ({ row }) => {
-        const subtotal = row.original.lines.reduce(
+        // Use totalCents from invoice if available
+        if (row.original.totalCents !== undefined) {
+          return formatCurrency(row.original.totalCents / 100);
+        }
+        const lines = row.original.lines || [];
+        if (lines.length === 0) {
+          return formatCurrency(0);
+        }
+        const subtotal = lines.reduce(
           (sum, line) => sum + line.amount,
           0
         );
-        const vat = subtotal * (row.original.vatRate / 100);
+        const vat = subtotal * ((row.original.vatRate || 0) / 100);
         return formatCurrency(subtotal + vat);
       },
     },

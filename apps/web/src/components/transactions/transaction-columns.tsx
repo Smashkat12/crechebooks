@@ -6,7 +6,7 @@
  */
 
 import { ColumnDef } from '@tanstack/react-table';
-import { ITransaction, TransactionStatus } from '@crechebooks/types';
+import { ITransaction, TransactionStatus, TransactionType } from '@crechebooks/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,15 +74,22 @@ function TransactionActions({
   );
 }
 
-function StatusBadge({ status }: { status: TransactionStatus }) {
-  const statusConfig: Record<TransactionStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
-    [TransactionStatus.CATEGORIZED]: { label: 'Categorized', variant: 'default' },
-    [TransactionStatus.PENDING]: { label: 'Pending', variant: 'secondary' },
-    [TransactionStatus.RECONCILED]: { label: 'Reconciled', variant: 'default' },
-    [TransactionStatus.NEEDS_REVIEW]: { label: 'Needs Review', variant: 'destructive' },
+function StatusBadge({ status }: { status: TransactionStatus | string }) {
+  const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' }> = {
+    // Uppercase (from API/enum)
+    CATEGORIZED: { label: 'Categorized', variant: 'default' },
+    PENDING: { label: 'Pending', variant: 'secondary' },
+    RECONCILED: { label: 'Reconciled', variant: 'default' },
+    NEEDS_REVIEW: { label: 'Needs Review', variant: 'destructive' },
+    // Lowercase fallback
+    categorized: { label: 'Categorized', variant: 'default' },
+    pending: { label: 'Pending', variant: 'secondary' },
+    reconciled: { label: 'Reconciled', variant: 'default' },
+    needs_review: { label: 'Needs Review', variant: 'destructive' },
   };
 
-  const config = statusConfig[status];
+  const statusStr = typeof status === 'string' ? status : String(status);
+  const config = statusConfig[statusStr] || { label: statusStr, variant: 'secondary' as const };
 
   return (
     <Badge variant={config.variant}>
@@ -122,10 +129,14 @@ export function getTransactionColumns(
       accessorKey: 'amount',
       header: 'Amount',
       cell: ({ row }) => {
-        const amount = row.getValue('amount') as number;
+        const amountCents = row.getValue('amount') as number;
+        const type = row.original.type;
+        const isCredit = type === 'CREDIT' || type === TransactionType.CREDIT;
+        // Amount is stored in cents, convert to rand for display
+        const amountRand = amountCents / 100;
         return (
-          <div className={amount >= 0 ? 'text-green-600' : 'text-red-600'}>
-            {formatCurrency(Math.abs(amount))}
+          <div className={isCredit ? 'text-green-600' : 'text-red-600'}>
+            {isCredit ? '+' : '-'}{formatCurrency(Math.abs(amountRand))}
           </div>
         );
       },

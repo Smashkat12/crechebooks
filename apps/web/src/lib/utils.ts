@@ -19,15 +19,19 @@ export function formatCurrency(amount: number): string {
 /**
  * Format date to readable string
  */
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return '-';
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(dateObj.getTime())) return '-';
   return format(dateObj, 'dd MMM yyyy');
 }
 
 /**
  * Format datetime to readable string
  */
-export function formatDateTime(date: Date | string): string {
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '-';
   const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(dateObj.getTime())) return '-';
   return format(dateObj, 'dd MMM yyyy HH:mm');
 }

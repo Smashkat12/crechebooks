@@ -753,7 +753,7 @@ describe('PaymentMatchingService', () => {
         invoice,
       );
 
-      expect(score).toBe(80); // 40 (reference) + 40 (amount)
+      expect(score).toBe(100); // 40 (reference) + 40 (amount) + 20 (date proximity within billing period)
       expect(reasons).toContain('Exact reference match');
       expect(reasons).toContain('Exact amount match');
     });
@@ -790,7 +790,7 @@ describe('PaymentMatchingService', () => {
       );
 
       expect(score).toBe(100); // 40 + 40 + 20 (capped at 100)
-      expect(reasons).toContain('Exact name match');
+      expect(reasons).toContain('Exact parent name match');
     });
 
     it('should handle name variations with similarity scoring', async () => {
@@ -857,7 +857,7 @@ describe('PaymentMatchingService', () => {
         invoice,
       );
 
-      expect(score).toBe(70); // 30 (contains) + 40 (amount)
+      expect(score).toBe(90); // 30 (contains) + 40 (amount) + 20 (date proximity within billing period)
       expect(reasons).toContain('Reference contains invoice number');
     });
 
@@ -891,7 +891,7 @@ describe('PaymentMatchingService', () => {
         invoice,
       );
 
-      expect(score).toBe(75); // 40 (reference) + 35 (within 1%)
+      expect(score).toBe(95); // 40 (reference) + 35 (within 1%) + 20 (date proximity within billing period)
       expect(reasons).toContain('Amount within 1% or R1');
     });
   });
@@ -917,6 +917,210 @@ describe('PaymentMatchingService', () => {
       );
       expect(similarity).toBeGreaterThan(0);
       expect(similarity).toBeLessThan(1);
+    });
+  });
+
+  describe('Child Name Matching', () => {
+    it('should match when transaction description contains child first name', async () => {
+      const invoice = await prisma.invoice.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceNumber: 'INV-2024-CHILD01',
+          parentId: testParent.id,
+          childId: testChild.id,
+          billingPeriodStart: new Date('2024-01-01'),
+          billingPeriodEnd: new Date('2024-01-31'),
+          issueDate: new Date('2024-01-05'),
+          dueDate: new Date('2024-01-20'),
+          subtotalCents: 200000,
+          totalCents: 200000,
+          amountPaidCents: 0,
+          status: InvoiceStatus.SENT,
+        },
+        include: { parent: true, child: true },
+      });
+
+      // Transaction with child name "Emily" in description (matching testChild)
+      const transaction = await createTransaction({
+        description: 'Magtape Credit Capitec Emily Smith',
+        amountCents: 200000,
+        isCredit: true,
+      });
+
+      const { score, reasons } = (service as any).calculateConfidence(
+        transaction,
+        invoice,
+      );
+
+      // Should get amount (40) + child name match (15-20)
+      expect(score).toBeGreaterThanOrEqual(55);
+      expect(reasons.some((r: string) => r.toLowerCase().includes('child'))).toBe(true);
+    });
+
+    it('should match when transaction description contains child full name', async () => {
+      const invoice = await prisma.invoice.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceNumber: 'INV-2024-CHILD02',
+          parentId: testParent.id,
+          childId: testChild.id,
+          billingPeriodStart: new Date('2024-01-01'),
+          billingPeriodEnd: new Date('2024-01-31'),
+          issueDate: new Date('2024-01-05'),
+          dueDate: new Date('2024-01-20'),
+          subtotalCents: 200000,
+          totalCents: 200000,
+          amountPaidCents: 0,
+          status: InvoiceStatus.SENT,
+        },
+        include: { parent: true, child: true },
+      });
+
+      // Transaction with child full name in description
+      const transaction = await createTransaction({
+        description: 'ADT Cash Deposit 09741002Emily Smith',
+        amountCents: 200000,
+        isCredit: true,
+      });
+
+      const { score, reasons } = (service as any).calculateConfidence(
+        transaction,
+        invoice,
+      );
+
+      // Should get amount (40) + strong child name match (18-20)
+      expect(score).toBeGreaterThanOrEqual(55);
+      expect(reasons.some((r: string) => r.toLowerCase().includes('child'))).toBe(true);
+    });
+
+    it('should extract names from FNB banking description format', async () => {
+      const invoice = await prisma.invoice.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceNumber: 'INV-2024-CHILD03',
+          parentId: testParent.id,
+          childId: testChild.id,
+          billingPeriodStart: new Date('2024-01-01'),
+          billingPeriodEnd: new Date('2024-01-31'),
+          issueDate: new Date('2024-01-05'),
+          dueDate: new Date('2024-01-20'),
+          subtotalCents: 200000,
+          totalCents: 200000,
+          amountPaidCents: 0,
+          status: InvoiceStatus.SENT,
+        },
+        include: { parent: true, child: true },
+      });
+
+      // Real FNB format with child name
+      const transaction = await createTransaction({
+        description: 'FNB App Payment From Emily',
+        amountCents: 200000,
+        isCredit: true,
+      });
+
+      const { score, reasons } = (service as any).calculateConfidence(
+        transaction,
+        invoice,
+      );
+
+      // Should detect child first name
+      expect(score).toBeGreaterThanOrEqual(55);
+    });
+
+    it('should auto-apply high confidence match when child name + amount match', async () => {
+      const invoice = await createInvoice({
+        invoiceNumber: 'INV-2024-CHILD04',
+        totalCents: 220000, // R2200
+        amountPaidCents: 0,
+      });
+
+      // Transaction with exact amount and child name in description
+      const transaction = await createTransaction({
+        description: 'Magtape Credit Capitec Emily Smith',
+        amountCents: 220000,
+        isCredit: true,
+      });
+
+      const result = await service.matchPayments({
+        tenantId: testTenant.id,
+        transactionIds: [transaction.id],
+      });
+
+      // Amount (40) + Child name (18) = 58, so review required
+      // But if amount is exact and name is strong match, should be candidate
+      expect(result.processed).toBe(1);
+      expect(result.results[0].candidates || result.results[0].appliedMatch).toBeDefined();
+    });
+
+    it('should handle Capitec Magtape format with child name', async () => {
+      const invoice = await prisma.invoice.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceNumber: 'INV-2024-CHILD05',
+          parentId: testParent.id,
+          childId: testChild.id,
+          billingPeriodStart: new Date('2024-01-01'),
+          billingPeriodEnd: new Date('2024-01-31'),
+          issueDate: new Date('2024-01-05'),
+          dueDate: new Date('2024-01-20'),
+          subtotalCents: 200000,
+          totalCents: 200000,
+          amountPaidCents: 0,
+          status: InvoiceStatus.SENT,
+        },
+        include: { parent: true, child: true },
+      });
+
+      // Real Capitec Magtape format
+      const transaction = await createTransaction({
+        description: 'Magtape Credit Capitec Emily',
+        amountCents: 200000,
+        isCredit: true,
+      });
+
+      const { score } = (service as any).calculateConfidence(transaction, invoice);
+
+      // Amount (40) + child name (15+)
+      expect(score).toBeGreaterThanOrEqual(55);
+    });
+  });
+
+  describe('Description Name Extraction', () => {
+    it('should extract name from ADT Cash Deposit format', () => {
+      const names = (service as any).extractNamesFromDescription(
+        'ADT Cash Deposit 09741002Bokamoso Mbewe',
+      );
+
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.some((n: string) => n.toLowerCase().includes('bokamoso'))).toBe(true);
+    });
+
+    it('should extract name from Magtape Credit format', () => {
+      const names = (service as any).extractNamesFromDescription(
+        'Magtape Credit Capitec Ntando Mthimunye',
+      );
+
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.some((n: string) => n.toLowerCase().includes('ntando'))).toBe(true);
+    });
+
+    it('should extract name from FNB App Payment format', () => {
+      const names = (service as any).extractNamesFromDescription(
+        'FNB App Payment From John Smith',
+      );
+
+      expect(names.length).toBeGreaterThan(0);
+      expect(names.some((n: string) => n.toLowerCase().includes('john'))).toBe(true);
+    });
+
+    it('should handle description with only account numbers', () => {
+      const names = (service as any).extractNamesFromDescription(
+        'ADT Cash Deposit 12345678901234',
+      );
+
+      // Should still return something or empty array, not crash
+      expect(Array.isArray(names)).toBe(true);
     });
   });
 

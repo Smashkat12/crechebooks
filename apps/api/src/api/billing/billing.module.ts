@@ -15,6 +15,8 @@ import { InvoiceDeliveryService } from '../../database/services/invoice-delivery
 import { EnrollmentService } from '../../database/services/enrollment.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { XeroSyncService } from '../../database/services/xero-sync.service';
+import { AdhocChargeService } from '../../database/services/adhoc-charge.service';
+import { VatService } from '../../database/services/vat.service';
 import { EmailService } from '../../integrations/email/email.service';
 import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
 import { PrismaModule } from '../../database/prisma';
@@ -37,6 +39,8 @@ import { PrismaModule } from '../../database/prisma';
     EnrollmentService,
     AuditLogService,
     XeroSyncService,
+    AdhocChargeService,
+    VatService,
     EmailService,
     WhatsAppService,
   ],

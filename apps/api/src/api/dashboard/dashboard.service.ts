@@ -17,11 +17,51 @@ export class DashboardService {
       `Getting dashboard metrics for tenant ${tenantId}, period: ${period || 'current_month'}`,
     );
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    // Find the most recent transaction date to determine which month to show
+    const latestTransaction = await this.prisma.transaction.findFirst({
+      where: { tenantId, isDeleted: false },
+      orderBy: { date: 'desc' },
+      select: { date: true },
+    });
 
-    // Get invoice metrics
+    // Use the latest transaction's month, or current month if no transactions
+    const referenceDate = latestTransaction?.date || new Date();
+    // Use UTC dates to avoid timezone issues
+    const year = referenceDate.getUTCFullYear();
+    const month = referenceDate.getUTCMonth();
+    const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+    const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+
+    this.logger.debug(
+      `Using date range: ${startOfMonth.toISOString()} to ${endOfMonth.toISOString()} (based on latest transaction)`,
+    );
+
+    // Current date for arrears calculations (what's overdue NOW)
+    const now = new Date();
+
+    // Get income from bank transactions (credits)
+    const incomeTransactions = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        isDeleted: false,
+        isCredit: true,
+        date: {
+          gte: startOfMonth,
+          lte: endOfMonth,
+        },
+      },
+      select: {
+        amountCents: true,
+        status: true,
+      },
+    });
+
+    const totalIncome = incomeTransactions.reduce(
+      (sum, txn) => sum + txn.amountCents,
+      0,
+    );
+
+    // Get invoice metrics for outstanding/invoiced amounts
     const invoices = await this.prisma.invoice.findMany({
       where: {
         tenantId,
@@ -154,25 +194,29 @@ export class DashboardService {
       },
     });
 
+    // Format the actual period being shown (e.g., "2025-10")
+    const actualPeriod = `${referenceDate.getFullYear()}-${String(referenceDate.getMonth() + 1).padStart(2, '0')}`;
+
+    // Convert all monetary values from cents to rands for frontend display
     return {
-      period: period || 'current_month',
+      period: period || actualPeriod,
       revenue: {
-        total: totalCollected,
-        invoiced: totalInvoiced,
-        collected: totalCollected,
-        outstanding,
+        total: totalIncome / 100, // Bank income (credits) in rands
+        invoiced: totalInvoiced / 100,
+        collected: totalCollected / 100,
+        outstanding: outstanding / 100,
       },
       expenses: {
-        total: totalExpenses,
-        categorized: categorizedExpenses,
-        uncategorized: uncategorizedExpenses,
+        total: totalExpenses / 100,
+        categorized: categorizedExpenses / 100,
+        uncategorized: uncategorizedExpenses / 100,
       },
       arrears: {
-        total: totalArrears,
+        total: totalArrears / 100,
         count: uniqueParentsInArrears.size,
-        overdueBy30,
-        overdueBy60,
-        overdueBy90,
+        overdueBy30: overdueBy30 / 100,
+        overdueBy60: overdueBy60 / 100,
+        overdueBy90: overdueBy90 / 100,
       },
       enrollment: {
         total: enrollments + inactiveEnrollments,
@@ -195,27 +239,41 @@ export class DashboardService {
       `Getting dashboard trends for tenant ${tenantId}, period: ${period || 'last_6_months'}`,
     );
 
-    const now = new Date();
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    // Find the most recent transaction date to determine the reference point
+    const latestTransaction = await this.prisma.transaction.findFirst({
+      where: { tenantId, isDeleted: false },
+      orderBy: { date: 'desc' },
+      select: { date: true },
+    });
+
+    // Use the latest transaction's month as reference, or current date if no transactions
+    const referenceDate = latestTransaction?.date || new Date();
+    const refYear = referenceDate.getUTCFullYear();
+    const refMonth = referenceDate.getUTCMonth();
+    this.logger.debug(
+      `Trends reference date: ${referenceDate.toISOString()} (latest transaction)`,
+    );
 
     const data: DashboardTrendsResponseDto['data'] = [];
 
     for (let i = 0; i < 6; i++) {
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() - 4 + i, 0);
+      // Use UTC dates to avoid timezone issues
+      const monthStart = new Date(Date.UTC(refYear, refMonth - 5 + i, 1, 0, 0, 0, 0));
+      const monthEnd = new Date(Date.UTC(refYear, refMonth - 4 + i, 0, 23, 59, 59, 999));
 
-      // Get revenue for this month
-      const invoiceTotal = await this.prisma.invoice.aggregate({
+      // Get income from bank transactions (credits) for this month
+      const incomeTotal = await this.prisma.transaction.aggregate({
         where: {
           tenantId,
           isDeleted: false,
-          issueDate: {
+          isCredit: true,
+          date: {
             gte: monthStart,
             lte: monthEnd,
           },
         },
         _sum: {
-          amountPaidCents: true,
+          amountCents: true,
         },
       });
 
@@ -253,18 +311,19 @@ export class DashboardService {
         },
       });
 
-      const revenue = invoiceTotal._sum.amountPaidCents || 0;
-      const expenses = Math.abs(expenseTotal._sum.amountCents || 0);
-      const arrears =
+      // Convert cents to rands for frontend display
+      const incomeCents = incomeTotal._sum.amountCents || 0;
+      const expensesCents = Math.abs(expenseTotal._sum.amountCents || 0);
+      const arrearsCents =
         (arrearsTotal._sum.totalCents || 0) -
         (arrearsTotal._sum.amountPaidCents || 0);
 
       data.push({
         date: monthStart.toISOString().slice(0, 7), // YYYY-MM format
-        revenue,
-        expenses,
-        profit: revenue - expenses,
-        arrears: Math.max(0, arrears),
+        revenue: incomeCents / 100, // Bank income in rands
+        expenses: expensesCents / 100,
+        profit: (incomeCents - expensesCents) / 100,
+        arrears: Math.max(0, arrearsCents) / 100,
       });
     }
 

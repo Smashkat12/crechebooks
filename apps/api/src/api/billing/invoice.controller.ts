@@ -2,8 +2,10 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Query,
   Body,
+  Param,
   Logger,
   HttpCode,
   UseGuards,
@@ -23,6 +25,7 @@ import { ParentRepository } from '../../database/repositories/parent.repository'
 import { ChildRepository } from '../../database/repositories/child.repository';
 import { InvoiceGenerationService } from '../../database/services/invoice-generation.service';
 import { InvoiceDeliveryService } from '../../database/services/invoice-delivery.service';
+import { AdhocChargeService } from '../../database/services/adhoc-charge.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -42,6 +45,10 @@ import {
   GenerateInvoicesResponseDto,
   ApiSendInvoicesDto,
   SendInvoicesResponseDto,
+  AddAdhocChargeRequestDto,
+  AddAdhocChargeResponseDto,
+  ListAdhocChargesResponseDto,
+  RemoveAdhocChargeResponseDto,
 } from './dto';
 
 @Controller('invoices')
@@ -56,6 +63,7 @@ export class InvoiceController {
     private readonly childRepo: ChildRepository,
     private readonly invoiceGenerationService: InvoiceGenerationService,
     private readonly invoiceDeliveryService: InvoiceDeliveryService,
+    private readonly adhocChargeService: AdhocChargeService,
   ) {}
 
   @Get()
@@ -318,6 +326,150 @@ export class InvoiceController {
           code: f.code,
         })),
       },
+    };
+  }
+
+  @Post(':id/charges')
+  @HttpCode(201)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Add an ad-hoc charge to an invoice',
+    description:
+      'Adds a manual charge to a DRAFT invoice. VAT is calculated automatically based on tenant settings.',
+  })
+  @ApiResponse({ status: 201, type: AddAdhocChargeResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid input or invoice is not in DRAFT status',
+  })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions or invoice belongs to another tenant',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async addAdhocCharge(
+    @Param('id') invoiceId: string,
+    @Body() dto: AddAdhocChargeRequestDto,
+    @CurrentUser() user: IUser,
+  ): Promise<AddAdhocChargeResponseDto> {
+    this.logger.log(
+      `Adding ad-hoc charge to invoice ${invoiceId} for tenant ${user.tenantId}`,
+    );
+
+    // Map snake_case request to camelCase for service
+    const result = await this.adhocChargeService.addCharge(
+      user.tenantId,
+      invoiceId,
+      {
+        description: dto.description,
+        amountCents: dto.amount_cents,
+        quantity: dto.quantity,
+        accountCode: dto.account_code,
+      },
+    );
+
+    // Map camelCase response to snake_case for API
+    return {
+      success: true,
+      data: {
+        line_id: result.lineId,
+        invoice_id: result.invoiceId,
+        description: result.description,
+        amount_cents: result.amountCents,
+        quantity: result.quantity,
+        vat_cents: result.vatCents,
+        total_cents: result.totalCents,
+        invoice_subtotal_cents: result.invoiceSubtotalCents,
+        invoice_vat_cents: result.invoiceVatCents,
+        invoice_total_cents: result.invoiceTotalCents,
+      },
+    };
+  }
+
+  @Get(':id/charges')
+  @ApiOperation({
+    summary: 'List ad-hoc charges for an invoice',
+    description: 'Returns all manual charges added to the invoice.',
+  })
+  @ApiResponse({ status: 200, type: ListAdhocChargesResponseDto })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  @ApiForbiddenResponse({
+    description: 'Invoice belongs to another tenant',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async listAdhocCharges(
+    @Param('id') invoiceId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<ListAdhocChargesResponseDto> {
+    this.logger.log(
+      `Listing ad-hoc charges for invoice ${invoiceId} for tenant ${user.tenantId}`,
+    );
+
+    const result = await this.adhocChargeService.getCharges(
+      user.tenantId,
+      invoiceId,
+    );
+
+    // Map camelCase response to snake_case for API
+    return {
+      success: true,
+      data: {
+        invoice_id: result.invoiceId,
+        charges: result.charges.map((charge) => ({
+          line_id: charge.lineId,
+          description: charge.description,
+          quantity: charge.quantity,
+          unit_price_cents: charge.unitPriceCents,
+          subtotal_cents: charge.subtotalCents,
+          vat_cents: charge.vatCents,
+          total_cents: charge.totalCents,
+          account_code: charge.accountCode,
+        })),
+        total_charges: result.totalCharges,
+        total_amount_cents: result.totalAmountCents,
+      },
+    };
+  }
+
+  @Delete(':id/charges/:lineId')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Remove an ad-hoc charge from an invoice',
+    description:
+      'Removes a manual charge from a DRAFT invoice. Invoice totals are recalculated automatically.',
+  })
+  @ApiResponse({ status: 200, type: RemoveAdhocChargeResponseDto })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Invalid input, invoice is not in DRAFT status, or line is not an ad-hoc charge',
+  })
+  @ApiResponse({ status: 404, description: 'Invoice or line not found' })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions or invoice belongs to another tenant',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async removeAdhocCharge(
+    @Param('id') invoiceId: string,
+    @Param('lineId') lineId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<RemoveAdhocChargeResponseDto> {
+    this.logger.log(
+      `Removing ad-hoc charge ${lineId} from invoice ${invoiceId} for tenant ${user.tenantId}`,
+    );
+
+    await this.adhocChargeService.removeCharge(
+      user.tenantId,
+      invoiceId,
+      lineId,
+    );
+
+    return {
+      success: true,
+      message: 'Ad-hoc charge removed successfully',
     };
   }
 }

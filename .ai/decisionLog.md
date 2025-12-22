@@ -1,5 +1,40 @@
 # Decision Log
 
+## 2025-12-22: TASK-PAY-032 and TASK-PAY-033 Payment Endpoints
+
+### Decision: Confidence Level Mapping
+- Mapped confidence scores to human-readable levels:
+  - 100 = EXACT (perfect match)
+  - 80-99 = HIGH (strong confidence)
+  - 50-79 = MEDIUM (needs review)
+  - <50 = LOW (unlikely match)
+- Used in both auto_matched results and suggested_matches
+
+### Decision: Aging Bucket Structure
+- Implemented South African standard aging buckets:
+  - current: 0-30 days
+  - days_30: 31-60 days
+  - days_60: 61-90 days
+  - days_90: 91-120 days
+  - days_120_plus: >120 days
+- Each bucket shows count and total_amount
+
+### Decision: debtor_limit Query Parameter
+- Added debtor_limit param to control response size
+- Default: 20 debtors for dashboard performance
+- Prevents API from returning thousands of records
+
+### Decision: Date Formatting for API
+- Used ISO date string format (YYYY-MM-DD) for oldest_invoice_date
+- Consistent with other API date fields
+
+### Decision: No Mock Data in Tests
+- Used jest.spyOn() to verify service calls
+- Service returns pre-defined result objects
+- Tests verify DTO transformation, not business logic
+
+---
+
 ## 2025-12-22: TASK-PAY-031 Payment Controller
 
 ### Decision: Prisma Enum Imports

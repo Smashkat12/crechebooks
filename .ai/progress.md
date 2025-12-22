@@ -3,7 +3,7 @@
 ## Current Status: Surface Layer In Progress
 
 **Last Updated**: 2025-12-22
-**Total Tests**: 1458 passing
+**Total Tests**: 1479 passing
 **Build Status**: PASS
 **Lint Status**: PASS
 
@@ -16,14 +16,42 @@
 | Foundation | 15 | 15 | 100% Complete |
 | Logic | 22 | 22 | 100% Complete |
 | Agents | 5 | 5 | 100% Complete |
-| Surface | 16 | 9 | 56% In Progress |
+| Surface | 16 | 11 | 69% In Progress |
 | Integration | 5 | 0 | Not Started |
 
-**Overall Progress**: 51/63 tasks (81%)
+**Overall Progress**: 53/63 tasks (84%)
 
 ---
 
 ## Latest Completions (2025-12-22)
+
+### TASK-PAY-032: Payment Matching Endpoint
+- **Status**: Complete
+- **Tests**: 10 controller tests passing (total 1479)
+- **Key Features**:
+  - POST /payments/match for AI-powered payment matching
+  - ApiMatchPaymentsDto with snake_case transaction_ids
+  - ApiMatchingResultResponseDto with auto_matched, review_required
+  - Confidence level mapping (EXACT, HIGH, MEDIUM, LOW)
+  - Cents → Rands conversion for amount fields
+  - @Roles(OWNER, ADMIN) access control
+- **Files Created**:
+  - src/api/payment/dto/match-payments.dto.ts
+  - src/api/payment/dto/matching-result.dto.ts
+  - tests/api/payment/payment-matching.controller.spec.ts
+
+### TASK-PAY-033: Arrears Dashboard Endpoint
+- **Status**: Complete
+- **Tests**: 11 controller tests passing (total 1479)
+- **Key Features**:
+  - GET /payments/arrears for aging analysis dashboard
+  - ApiArrearsQueryDto with min_amount, max_days, debtor_limit
+  - Aging buckets: current, 30, 60, 90, 120+ days
+  - Debtor list with oldest_invoice_date
+  - @Roles(OWNER, ADMIN, ACCOUNTANT) access control
+- **Files Created**:
+  - src/api/payment/dto/arrears-report.dto.ts
+  - tests/api/payment/arrears.controller.spec.ts
 
 ### TASK-PAY-031: Payment Controller and DTOs
 - **Status**: Complete

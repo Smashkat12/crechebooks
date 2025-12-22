@@ -3,6 +3,24 @@
 ## Current Session: 2025-12-22
 
 ### Completed This Session
+- TASK-PAY-032: Payment Matching Endpoint (10 tests)
+  - POST /payments/match for AI-powered payment matching
+  - ApiMatchPaymentsDto with snake_case transaction_ids field
+  - ApiMatchingResultResponseDto with auto_matched, review_required arrays
+  - snake_case API → camelCase service transformation
+  - Cents → Rands decimal conversion for API responses
+  - Confidence level mapping (EXACT, HIGH, MEDIUM, LOW)
+  - 10 unit tests covering matching, review-required, no-match, auth
+
+- TASK-PAY-033: Arrears Dashboard Endpoint (11 tests)
+  - GET /payments/arrears for aging analysis dashboard
+  - ApiArrearsQueryDto with min_amount, max_days, debtor_limit filters
+  - ApiArrearsReportResponseDto with aging buckets and debtor list
+  - Aging buckets: current, 30, 60, 90, 120+ days
+  - Date formatting for oldest_invoice_date
+  - debtor_limit query param controls response size
+  - 11 unit tests covering filters, limits, role access
+
 - TASK-PAY-031: Payment Controller and DTOs (15 tests)
   - POST /payments for manual payment allocation to invoices
   - GET /payments with pagination and filtering
@@ -46,7 +64,8 @@
 - TASK-RECON-011/012/013: Reconciliation Services (45 tests)
 
 ### Next Steps
-1. TASK-PAY-032: Payment Matching Endpoint (POST /payments/match)
-2. TASK-PAY-033: Arrears Dashboard Endpoint (GET /arrears)
-3. TASK-SARS-031: SARS Controller and DTOs
-4. Continue Surface Layer implementation
+1. TASK-SARS-031: SARS Controller and DTOs
+2. TASK-SARS-032: VAT201 Endpoint
+3. TASK-SARS-033: EMP201 Endpoint
+4. TASK-RECON-031: Reconciliation Controller
+5. TASK-RECON-032: Financial Reports Endpoint

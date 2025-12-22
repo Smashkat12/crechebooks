@@ -27,6 +27,8 @@ import {
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { PaymentAllocationService } from '../../database/services/payment-allocation.service';
+import { PaymentMatchingService } from '../../database/services/payment-matching.service';
+import { ArrearsService } from '../../database/services/arrears.service';
 import { PaymentRepository } from '../../database/repositories/payment.repository';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -42,6 +44,12 @@ import {
   PaymentListResponseDto,
   PaymentListItemDto,
   PaymentDto,
+  ApiMatchPaymentsDto,
+  ApiMatchingResultResponseDto,
+  ApiMatchedPaymentDto,
+  ApiReviewRequiredDto,
+  ApiArrearsQueryDto,
+  ApiArrearsReportResponseDto,
 } from './dto';
 
 @Controller('payments')
@@ -52,6 +60,8 @@ export class PaymentController {
 
   constructor(
     private readonly paymentAllocationService: PaymentAllocationService,
+    private readonly paymentMatchingService: PaymentMatchingService,
+    private readonly arrearsService: ArrearsService,
     private readonly paymentRepo: PaymentRepository,
     private readonly invoiceRepo: InvoiceRepository,
   ) {}
@@ -236,6 +246,180 @@ export class PaymentController {
         limit,
         total,
         totalPages,
+      },
+    };
+  }
+
+  /**
+   * Trigger AI payment matching for unallocated transactions.
+   * Auto-applies matches with confidence >= 80%, flags others for review.
+   */
+  @Post('match')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Trigger AI payment matching',
+    description:
+      'Matches unallocated credit transactions to outstanding invoices. ' +
+      'Auto-applies matches with >= 80% confidence, flags others for manual review.',
+  })
+  @ApiResponse({ status: 200, type: ApiMatchingResultResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid transaction ID' })
+  @ApiForbiddenResponse({ description: 'Requires OWNER or ADMIN role' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async matchPayments(
+    @Body() dto: ApiMatchPaymentsDto,
+    @CurrentUser() user: IUser,
+  ): Promise<ApiMatchingResultResponseDto> {
+    this.logger.log(
+      `Match payments: tenant=${user.tenantId}, transactions=${dto.transaction_ids?.length ?? 'all'}`,
+    );
+
+    // Transform API snake_case to service camelCase
+    const result = await this.paymentMatchingService.matchPayments({
+      tenantId: user.tenantId,
+      transactionIds: dto.transaction_ids, // snake_case -> camelCase
+    });
+
+    this.logger.log(
+      `Matching complete: ${result.autoApplied} auto-applied, ${result.reviewRequired} review, ${result.noMatch} no match`,
+    );
+
+    // Transform service camelCase to API snake_case, cents to decimal
+    const autoMatched: ApiMatchedPaymentDto[] = result.results
+      .filter((r) => r.status === 'AUTO_APPLIED' && r.appliedMatch)
+      .map((r) => ({
+        id: r.appliedMatch!.paymentId,
+        transaction_id: r.appliedMatch!.transactionId,
+        invoice_id: r.appliedMatch!.invoiceId,
+        invoice_number: r.appliedMatch!.invoiceNumber,
+        amount: r.appliedMatch!.amountCents / 100, // cents -> decimal
+        confidence_level:
+          r.appliedMatch!.confidenceScore === 100
+            ? 'EXACT'
+            : r.appliedMatch!.confidenceScore >= 80
+              ? 'HIGH'
+              : r.appliedMatch!.confidenceScore >= 50
+                ? 'MEDIUM'
+                : 'LOW',
+        confidence_score: r.appliedMatch!.confidenceScore,
+        match_reasons: ['Auto-matched: ' + r.reason],
+      }));
+
+    const reviewRequired: ApiReviewRequiredDto[] = result.results
+      .filter((r) => r.status === 'REVIEW_REQUIRED' && r.candidates)
+      .map((r) => ({
+        transaction_id: r.transactionId,
+        amount: r.candidates![0]?.transactionAmountCents
+          ? r.candidates![0].transactionAmountCents / 100
+          : 0,
+        reason: r.reason,
+        suggested_matches: r.candidates!.map((c) => ({
+          invoice_id: c.invoiceId,
+          invoice_number: c.invoiceNumber,
+          parent_name: c.parentName,
+          confidence_score: c.confidenceScore,
+          match_reasons: c.matchReasons,
+          outstanding_amount: c.invoiceOutstandingCents / 100, // cents -> decimal
+        })),
+      }));
+
+    return {
+      success: true,
+      data: {
+        summary: {
+          processed: result.processed,
+          auto_applied: result.autoApplied,
+          requires_review: result.reviewRequired,
+          no_match: result.noMatch,
+        },
+        auto_matched: autoMatched,
+        review_required: reviewRequired,
+      },
+    };
+  }
+
+  /**
+   * Get arrears dashboard report with aging analysis.
+   * Returns summary, top debtors, and all overdue invoices.
+   */
+  @Get('arrears')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Get arrears dashboard report',
+    description:
+      'Returns comprehensive arrears report with aging analysis, top debtors, and overdue invoices. ' +
+      'Supports filtering by date range, parent ID, and minimum amount.',
+  })
+  @ApiResponse({ status: 200, type: ApiArrearsReportResponseDto })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getArrearsReport(
+    @Query() query: ApiArrearsQueryDto,
+    @CurrentUser() user: IUser,
+  ): Promise<ApiArrearsReportResponseDto> {
+    this.logger.log(
+      `Get arrears report: tenant=${user.tenantId}, filters=${JSON.stringify(query)}`,
+    );
+
+    // Transform API snake_case to service camelCase, decimal to cents
+    const report = await this.arrearsService.getArrearsReport(user.tenantId, {
+      dateFrom: query.date_from,
+      dateTo: query.date_to,
+      parentId: query.parent_id,
+      minAmountCents: query.min_amount
+        ? Math.round(query.min_amount * 100)
+        : undefined,
+    });
+
+    // Transform service camelCase to API snake_case, cents to decimal
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+
+    return {
+      success: true,
+      data: {
+        summary: {
+          total_outstanding: report.summary.totalOutstandingCents / 100,
+          total_invoices: report.summary.totalInvoices,
+          aging: {
+            current: report.summary.aging.currentCents / 100,
+            days_30: report.summary.aging.days30Cents / 100,
+            days_60: report.summary.aging.days60Cents / 100,
+            days_90_plus: report.summary.aging.days90PlusCents / 100,
+          },
+        },
+        top_debtors: report.topDebtors
+          .slice(0, query.debtor_limit ?? 10)
+          .map((d) => ({
+            parent_id: d.parentId,
+            parent_name: d.parentName,
+            email: d.parentEmail,
+            phone: d.parentPhone,
+            total_outstanding: d.totalOutstandingCents / 100,
+            oldest_invoice_date: formatDate(d.oldestInvoiceDate),
+            invoice_count: d.invoiceCount,
+            max_days_overdue: d.maxDaysOverdue,
+          })),
+        invoices: report.invoices.map((inv) => ({
+          invoice_id: inv.invoiceId,
+          invoice_number: inv.invoiceNumber,
+          parent_id: inv.parentId,
+          parent_name: inv.parentName,
+          child_id: inv.childId,
+          child_name: inv.childName,
+          issue_date: formatDate(inv.issueDate),
+          due_date: formatDate(inv.dueDate),
+          total: inv.totalCents / 100,
+          amount_paid: inv.amountPaidCents / 100,
+          outstanding: inv.outstandingCents / 100,
+          days_overdue: inv.daysOverdue,
+          aging_bucket: inv.agingBucket,
+        })),
+        generated_at: report.generatedAt.toISOString(),
       },
     };
   }

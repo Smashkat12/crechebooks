@@ -6,10 +6,14 @@ import { FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { InvoiceTable } from '@/components/invoices';
+import { useDownloadInvoicePdf } from '@/hooks/use-invoices';
+import { useToast } from '@/hooks/use-toast';
 import type { Invoice } from '@/types/invoice';
 
 export default function InvoicesPage() {
   const router = useRouter();
+  const { downloadPdf } = useDownloadInvoicePdf();
+  const { toast } = useToast();
 
   const handleView = (invoice: Invoice) => {
     router.push(`/invoices/${invoice.id}`);
@@ -20,9 +24,21 @@ export default function InvoicesPage() {
     console.log('Send invoice:', invoice.id);
   };
 
-  const handleDownload = (invoice: Invoice) => {
-    // TODO: Download PDF
-    console.log('Download invoice:', invoice.id);
+  const handleDownload = async (invoice: Invoice) => {
+    try {
+      await downloadPdf(invoice.id, invoice.invoiceNumber);
+      toast({
+        title: 'Download started',
+        description: `Downloading ${invoice.invoiceNumber}.pdf`,
+      });
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast({
+        title: 'Download failed',
+        description: error instanceof Error ? error.message : 'Failed to download invoice',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDelete = (invoice: Invoice) => {

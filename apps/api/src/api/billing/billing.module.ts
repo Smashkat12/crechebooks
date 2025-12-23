@@ -12,6 +12,7 @@ import { TransactionRepository } from '../../database/repositories/transaction.r
 import { CategorizationRepository } from '../../database/repositories/categorization.repository';
 import { InvoiceGenerationService } from '../../database/services/invoice-generation.service';
 import { InvoiceDeliveryService } from '../../database/services/invoice-delivery.service';
+import { InvoicePdfService } from '../../database/services/invoice-pdf.service';
 import { EnrollmentService } from '../../database/services/enrollment.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { XeroSyncService } from '../../database/services/xero-sync.service';
@@ -36,6 +37,7 @@ import { PrismaModule } from '../../database/prisma';
     CategorizationRepository,
     InvoiceGenerationService,
     InvoiceDeliveryService,
+    InvoicePdfService,
     EnrollmentService,
     AuditLogService,
     XeroSyncService,

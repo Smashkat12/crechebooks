@@ -69,7 +69,7 @@ export default function TransactionsPage() {
         ((tx.amount_cents as number) / 100).toFixed(2),
         tx.is_credit ? 'Credit' : 'Debit',
         tx.status,
-        tx.categorization?.account_name || 'Uncategorized',
+        (tx.categorization as { account_name?: string } | null)?.account_name || 'Uncategorized',
       ]);
 
       const csv = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');

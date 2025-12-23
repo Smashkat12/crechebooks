@@ -4,7 +4,14 @@ export type InvoiceStatus =
   | "sent"
   | "paid"
   | "overdue"
-  | "cancelled";
+  | "cancelled"
+  // Uppercase variants from API
+  | "DRAFT"
+  | "SENT"
+  | "PAID"
+  | "PARTIALLY_PAID"
+  | "OVERDUE"
+  | "CANCELLED";
 
 export interface InvoiceLine {
   id: string;
@@ -21,22 +28,37 @@ export interface Invoice {
   invoiceNumber: string;
   parentId: string;
   parentName: string;
+  // Optional child fields (for single-child invoices)
+  childId?: string;
+  childName?: string;
   status: InvoiceStatus;
-  invoiceDate: string;
+  // Date fields (various formats used across the app)
+  invoiceDate?: string;
+  issueDate?: string;
   dueDate: string;
-  periodStart: string;
-  periodEnd: string;
+  periodStart?: string;
+  periodEnd?: string;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
   lines: InvoiceLine[];
-  vatRate: number;
+  vatRate?: number;
   // Backend-calculated amounts (use these instead of recalculating)
   subtotal?: number;
   vatAmount?: number;
+  vat?: number;
   total?: number;
+  balanceDue?: number;
+  // Amount fields in cents (transformed from API)
+  subtotalCents?: number;
+  vatCents?: number;
+  totalCents?: number;
+  amountPaidCents?: number;
   amountPaid: number;
   paidDate?: string;
   notes?: string;
+  deliveryStatus?: string | null;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface InvoiceWithLines extends Invoice {

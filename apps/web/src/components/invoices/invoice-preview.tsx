@@ -12,7 +12,7 @@ interface InvoicePreviewProps {
 export function InvoicePreview({ invoice }: InvoicePreviewProps) {
   // Use backend-calculated amounts if available, otherwise calculate from lines
   const subtotal = invoice.subtotal ?? invoice.lines.reduce((sum, line) => sum + line.amount, 0);
-  const vatAmount = invoice.vatAmount ?? subtotal * (invoice.vatRate / 100);
+  const vatAmount = invoice.vatAmount ?? subtotal * ((invoice.vatRate ?? 15) / 100);
   const total = invoice.total ?? subtotal + vatAmount;
 
   return (

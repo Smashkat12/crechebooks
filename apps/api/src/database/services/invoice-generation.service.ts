@@ -24,7 +24,7 @@ import { EnrollmentService } from './enrollment.service';
 import { AuditLogService } from './audit-log.service';
 import { XeroSyncService } from './xero-sync.service';
 import { InvoiceStatus } from '../entities/invoice.entity';
-import { LineType } from '../entities/invoice-line.entity';
+import { LineType, isVatApplicable } from '../entities/invoice-line.entity';
 import {
   InvoiceGenerationResult,
   LineItemInput,
@@ -419,11 +419,15 @@ export class InvoiceGenerationService {
       // Note: unitPriceCents can be negative for discounts
       const lineSubtotal = new Decimal(item.unitPriceCents).mul(item.quantity);
 
-      // Calculate VAT only for positive amounts and non-discount lines
+      // Calculate VAT based on line type and tenant VAT registration
+      // Uses isVatApplicable() which handles:
+      // - MONTHLY_FEE, REGISTRATION: VAT exempt (educational services)
+      // - BOOKS, STATIONERY, UNIFORM, SCHOOL_TRIP, EXTRA: VAT applicable (goods/services)
+      // - DISCOUNT, CREDIT: No VAT (adjustments)
       let lineVatCents = 0;
       if (
         isVatRegistered &&
-        item.lineType !== LineType.DISCOUNT &&
+        isVatApplicable(item.lineType) &&
         item.unitPriceCents > 0
       ) {
         lineVatCents = this.calculateVAT(

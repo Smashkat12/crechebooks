@@ -37,7 +37,9 @@ import { Parent } from '@prisma/client';
 /**
  * Transform parent to camelCase response matching IParent interface
  */
-function toResponse(parent: Parent & { children?: unknown[] }): Record<string, unknown> {
+function toResponse(
+  parent: Parent & { children?: unknown[] },
+): Record<string, unknown> {
   return {
     id: parent.id,
     tenantId: parent.tenantId,
@@ -137,7 +139,9 @@ export class ParentController {
       throw new NotFoundException('Parent not found');
     }
     // Transform children to camelCase response
-    const children = (parent as Parent & { children?: Array<Record<string, unknown>> }).children || [];
+    const children =
+      (parent as Parent & { children?: Array<Record<string, unknown>> })
+        .children || [];
     return children.map((child) => ({
       id: child.id,
       parentId: child.parentId,

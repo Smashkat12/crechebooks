@@ -239,6 +239,42 @@ export class ChildController {
       }
     }
 
+    // 4b. Fetch current enrollment with fee structure for all paginated children
+    const enrollmentDetailsMap = new Map<
+      string,
+      {
+        id: string;
+        fee_structure: { id: string; name: string; amount: number };
+        status: EnrollmentStatus;
+      } | null
+    >();
+    for (const child of paginatedChildren) {
+      const activeEnrollment = await this.enrollmentRepo.findActiveByChild(
+        tenantId,
+        child.id,
+      );
+      if (activeEnrollment) {
+        const feeStructure = await this.feeStructureRepo.findById(
+          activeEnrollment.feeStructureId,
+        );
+        if (feeStructure) {
+          enrollmentDetailsMap.set(child.id, {
+            id: activeEnrollment.id,
+            fee_structure: {
+              id: feeStructure.id,
+              name: feeStructure.name,
+              amount: feeStructure.amountCents / 100,
+            },
+            status: activeEnrollment.status as EnrollmentStatus,
+          });
+        } else {
+          enrollmentDetailsMap.set(child.id, null);
+        }
+      } else {
+        enrollmentDetailsMap.set(child.id, null);
+      }
+    }
+
     // 5. Transform to response
     const data = paginatedChildren.map((child) => {
       const parent = parentMap.get(child.parentId);
@@ -256,6 +292,7 @@ export class ChildController {
         enrollment_status: childEnrollmentMap.get(
           child.id,
         ) as EnrollmentStatus | null,
+        current_enrollment: enrollmentDetailsMap.get(child.id) || null,
       };
     });
 

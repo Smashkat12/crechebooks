@@ -155,9 +155,9 @@ export class AdhocChargeService {
 
     // Calculate VAT if tenant is VAT registered
     const lineVatCents = isVatRegistered
-      ? this.vatService.calculateVatFromExclusive(
-          new Decimal(lineSubtotalCents),
-        ).toNumber()
+      ? this.vatService
+          .calculateVatFromExclusive(new Decimal(lineSubtotalCents))
+          .toNumber()
       : 0;
 
     // Calculate line total
@@ -425,7 +425,9 @@ export class AdhocChargeService {
     const allLines = await this.invoiceLineRepo.findByInvoice(invoiceId);
 
     // Filter for EXTRA type lines (ad-hoc charges)
-    const extraLines = allLines.filter((line) => line.lineType === LineType.EXTRA);
+    const extraLines = allLines.filter(
+      (line) => line.lineType === LineType.EXTRA,
+    );
 
     // Calculate total amount (excluding VAT)
     const totalAmountCents = extraLines.reduce(

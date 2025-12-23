@@ -18,6 +18,7 @@ export const endpoints = {
     detail: (id: string) => `/invoices/${id}`,
     generate: '/invoices/generate',
     send: '/invoices/send',
+    pdf: (id: string) => `/invoices/${id}/pdf`,
   },
   payments: {
     list: '/payments',

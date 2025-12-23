@@ -954,7 +954,9 @@ describe('PaymentMatchingService', () => {
 
       // Should get amount (40) + child name match (15-20)
       expect(score).toBeGreaterThanOrEqual(55);
-      expect(reasons.some((r: string) => r.toLowerCase().includes('child'))).toBe(true);
+      expect(
+        reasons.some((r: string) => r.toLowerCase().includes('child')),
+      ).toBe(true);
     });
 
     it('should match when transaction description contains child full name', async () => {
@@ -990,7 +992,9 @@ describe('PaymentMatchingService', () => {
 
       // Should get amount (40) + strong child name match (18-20)
       expect(score).toBeGreaterThanOrEqual(55);
-      expect(reasons.some((r: string) => r.toLowerCase().includes('child'))).toBe(true);
+      expect(
+        reasons.some((r: string) => r.toLowerCase().includes('child')),
+      ).toBe(true);
     });
 
     it('should extract names from FNB banking description format', async () => {
@@ -1050,7 +1054,9 @@ describe('PaymentMatchingService', () => {
       // Amount (40) + Child name (18) = 58, so review required
       // But if amount is exact and name is strong match, should be candidate
       expect(result.processed).toBe(1);
-      expect(result.results[0].candidates || result.results[0].appliedMatch).toBeDefined();
+      expect(
+        result.results[0].candidates || result.results[0].appliedMatch,
+      ).toBeDefined();
     });
 
     it('should handle Capitec Magtape format with child name', async () => {
@@ -1079,7 +1085,10 @@ describe('PaymentMatchingService', () => {
         isCredit: true,
       });
 
-      const { score } = (service as any).calculateConfidence(transaction, invoice);
+      const { score } = (service as any).calculateConfidence(
+        transaction,
+        invoice,
+      );
 
       // Amount (40) + child name (15+)
       expect(score).toBeGreaterThanOrEqual(55);
@@ -1093,7 +1102,9 @@ describe('PaymentMatchingService', () => {
       );
 
       expect(names.length).toBeGreaterThan(0);
-      expect(names.some((n: string) => n.toLowerCase().includes('bokamoso'))).toBe(true);
+      expect(
+        names.some((n: string) => n.toLowerCase().includes('bokamoso')),
+      ).toBe(true);
     });
 
     it('should extract name from Magtape Credit format', () => {
@@ -1102,7 +1113,9 @@ describe('PaymentMatchingService', () => {
       );
 
       expect(names.length).toBeGreaterThan(0);
-      expect(names.some((n: string) => n.toLowerCase().includes('ntando'))).toBe(true);
+      expect(
+        names.some((n: string) => n.toLowerCase().includes('ntando')),
+      ).toBe(true);
     });
 
     it('should extract name from FNB App Payment format', () => {
@@ -1111,7 +1124,9 @@ describe('PaymentMatchingService', () => {
       );
 
       expect(names.length).toBeGreaterThan(0);
-      expect(names.some((n: string) => n.toLowerCase().includes('john'))).toBe(true);
+      expect(names.some((n: string) => n.toLowerCase().includes('john'))).toBe(
+        true,
+      );
     });
 
     it('should handle description with only account numbers', () => {

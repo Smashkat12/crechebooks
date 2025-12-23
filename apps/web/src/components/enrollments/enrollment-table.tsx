@@ -13,7 +13,7 @@ import * as React from 'react';
 import { DataTable } from '@/components/tables/data-table';
 import { getEnrollmentColumns, EnrollmentColumnOptions } from './enrollment-columns';
 import { EnrollmentFilters, EnrollmentFiltersState } from './enrollment-filters';
-import { useEnrollmentsList, EnrollmentChild } from '@/hooks/use-enrollments';
+import { useEnrollmentsList, EnrollmentChild, ChildWithEnrollment } from '@/hooks/use-enrollments';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
@@ -37,17 +37,17 @@ export function EnrollmentTable({ className }: EnrollmentTableProps) {
 
   const { data, isLoading, isError, error, refetch } = useEnrollmentsList(queryParams);
 
-  const handleView = (child: EnrollmentChild) => {
+  const handleView = (child: EnrollmentChild | ChildWithEnrollment) => {
     // TODO: Navigate to child detail page or open modal
     console.log('View child enrollment:', child);
   };
 
-  const handleEdit = (child: EnrollmentChild) => {
+  const handleEdit = (child: EnrollmentChild | ChildWithEnrollment) => {
     // TODO: Open edit enrollment dialog
     console.log('Edit child enrollment:', child);
   };
 
-  const handleWithdraw = async (child: EnrollmentChild) => {
+  const handleWithdraw = async (child: EnrollmentChild | ChildWithEnrollment) => {
     // TODO: Implement withdraw confirmation and mutation
     console.log('Withdraw child:', child);
   };

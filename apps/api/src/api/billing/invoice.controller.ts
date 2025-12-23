@@ -10,6 +10,7 @@ import {
   HttpCode,
   UseGuards,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,7 +19,9 @@ import {
   ApiBearerAuth,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
+  ApiParam,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import { ParentRepository } from '../../database/repositories/parent.repository';
@@ -26,6 +29,7 @@ import { ChildRepository } from '../../database/repositories/child.repository';
 import { InvoiceGenerationService } from '../../database/services/invoice-generation.service';
 import { InvoiceDeliveryService } from '../../database/services/invoice-delivery.service';
 import { AdhocChargeService } from '../../database/services/adhoc-charge.service';
+import { InvoicePdfService } from '../../database/services/invoice-pdf.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -39,6 +43,7 @@ import {
   ListInvoicesQueryDto,
   InvoiceListResponseDto,
   InvoiceResponseDto,
+  InvoiceDetailResponseDto,
   ParentSummaryDto,
   ChildSummaryDto,
   GenerateInvoicesDto,
@@ -64,6 +69,7 @@ export class InvoiceController {
     private readonly invoiceGenerationService: InvoiceGenerationService,
     private readonly invoiceDeliveryService: InvoiceDeliveryService,
     private readonly adhocChargeService: AdhocChargeService,
+    private readonly invoicePdfService: InvoicePdfService,
   ) {}
 
   @Get()
@@ -200,6 +206,106 @@ export class InvoiceController {
         limit,
         total,
         totalPages,
+      },
+    };
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get invoice details by ID',
+    description: 'Returns a single invoice with line items and related data',
+  })
+  @ApiParam({ name: 'id', description: 'Invoice ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Invoice retrieved successfully',
+    type: InvoiceDetailResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  @ApiForbiddenResponse({
+    description: 'Invoice belongs to another tenant',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getInvoice(
+    @Param('id') invoiceId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<InvoiceDetailResponseDto> {
+    this.logger.debug(
+      `Getting invoice ${invoiceId} for tenant ${user.tenantId}`,
+    );
+
+    // Fetch invoice with lines
+    const invoice = await this.invoiceRepo.findByIdWithLines(invoiceId);
+
+    if (!invoice) {
+      this.logger.error(`Invoice ${invoiceId} not found`);
+      throw new BadRequestException('Invoice not found');
+    }
+
+    // Verify tenant isolation
+    if (invoice.tenantId !== user.tenantId) {
+      this.logger.error(
+        `Invoice ${invoiceId} belongs to tenant ${invoice.tenantId}, not ${user.tenantId}`,
+      );
+      throw new BadRequestException('Invoice not found');
+    }
+
+    // Fetch parent and child data
+    const parent = await this.parentRepo.findById(invoice.parentId);
+    const child = await this.childRepo.findById(invoice.childId);
+
+    if (!parent || !child) {
+      this.logger.error(
+        `Missing parent or child data for invoice ${invoiceId}`,
+      );
+      throw new BadRequestException('Failed to load invoice relationships');
+    }
+
+    // Transform to response DTO
+    return {
+      success: true,
+      data: {
+        id: invoice.id,
+        invoice_number: invoice.invoiceNumber,
+        parent: {
+          id: parent.id,
+          name: `${parent.firstName} ${parent.lastName}`,
+          email: parent.email,
+        },
+        child: {
+          id: child.id,
+          name: `${child.firstName} ${child.lastName}`,
+        },
+        billing_period_start: invoice.billingPeriodStart
+          .toISOString()
+          .split('T')[0],
+        billing_period_end: invoice.billingPeriodEnd
+          .toISOString()
+          .split('T')[0],
+        issue_date: invoice.issueDate.toISOString().split('T')[0],
+        due_date: invoice.dueDate.toISOString().split('T')[0],
+        subtotal: invoice.subtotalCents / 100,
+        vat: invoice.vatCents / 100,
+        total: invoice.totalCents / 100,
+        amount_paid: invoice.amountPaidCents / 100,
+        balance_due: (invoice.totalCents - invoice.amountPaidCents) / 100,
+        status: invoice.status as unknown as InvoiceStatus,
+        delivery_status:
+          invoice.deliveryStatus as unknown as DeliveryStatus | null,
+        lines: invoice.lines.map((line) => ({
+          id: line.id,
+          description: line.description,
+          quantity: Number(line.quantity),
+          unit_price: line.unitPriceCents / 100,
+          subtotal: line.subtotalCents / 100,
+          vat: line.vatCents / 100,
+          total: line.totalCents / 100,
+          line_type: line.lineType,
+          account_code: line.accountCode,
+        })),
+        notes: invoice.notes,
+        created_at: invoice.createdAt,
+        updated_at: invoice.updatedAt,
       },
     };
   }
@@ -345,7 +451,8 @@ export class InvoiceController {
   })
   @ApiResponse({ status: 404, description: 'Invoice not found' })
   @ApiForbiddenResponse({
-    description: 'Insufficient permissions or invoice belongs to another tenant',
+    description:
+      'Insufficient permissions or invoice belongs to another tenant',
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async addAdhocCharge(
@@ -449,7 +556,8 @@ export class InvoiceController {
   })
   @ApiResponse({ status: 404, description: 'Invoice or line not found' })
   @ApiForbiddenResponse({
-    description: 'Insufficient permissions or invoice belongs to another tenant',
+    description:
+      'Insufficient permissions or invoice belongs to another tenant',
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async removeAdhocCharge(
@@ -471,5 +579,88 @@ export class InvoiceController {
       success: true,
       message: 'Ad-hoc charge removed successfully',
     };
+  }
+
+  @Get(':id/pdf')
+  @ApiOperation({ summary: 'Download invoice as PDF' })
+  @ApiParam({ name: 'id', description: 'Invoice ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF file',
+    content: {
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Invoice not found' })
+  @ApiForbiddenResponse({
+    description: 'Invoice belongs to another tenant',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async downloadPdf(
+    @Param('id') invoiceId: string,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(
+      `Downloading PDF for invoice ${invoiceId} for tenant ${user.tenantId}`,
+    );
+
+    try {
+      // Get invoice to retrieve invoice number for filename
+      const invoice = await this.invoiceRepo.findById(invoiceId);
+
+      if (!invoice) {
+        this.logger.error(`Invoice ${invoiceId} not found`);
+        res.status(404).json({
+          success: false,
+          error: 'Invoice not found',
+        });
+        return;
+      }
+
+      // Verify tenant isolation
+      if (invoice.tenantId !== user.tenantId) {
+        this.logger.error(
+          `Invoice ${invoiceId} belongs to tenant ${invoice.tenantId}, not ${user.tenantId}`,
+        );
+        res.status(404).json({
+          success: false,
+          error: 'Invoice not found',
+        });
+        return;
+      }
+
+      // Generate PDF buffer
+      const pdfBuffer = await this.invoicePdfService.generatePdf(
+        user.tenantId,
+        invoiceId,
+      );
+
+      // Set response headers
+      const filename = `${invoice.invoiceNumber}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      // Send PDF buffer
+      res.send(pdfBuffer);
+
+      this.logger.log(
+        `PDF downloaded successfully for invoice ${invoice.invoiceNumber}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to download PDF for invoice ${invoiceId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate PDF',
+      });
+    }
   }
 }

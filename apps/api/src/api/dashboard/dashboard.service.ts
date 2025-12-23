@@ -258,8 +258,12 @@ export class DashboardService {
 
     for (let i = 0; i < 6; i++) {
       // Use UTC dates to avoid timezone issues
-      const monthStart = new Date(Date.UTC(refYear, refMonth - 5 + i, 1, 0, 0, 0, 0));
-      const monthEnd = new Date(Date.UTC(refYear, refMonth - 4 + i, 0, 23, 59, 59, 999));
+      const monthStart = new Date(
+        Date.UTC(refYear, refMonth - 5 + i, 1, 0, 0, 0, 0),
+      );
+      const monthEnd = new Date(
+        Date.UTC(refYear, refMonth - 4 + i, 0, 23, 59, 59, 999),
+      );
 
       // Get income from bank transactions (credits) for this month
       const incomeTotal = await this.prisma.transaction.aggregate({

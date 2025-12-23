@@ -125,6 +125,11 @@ enum LineType {
   EXTRA
   DISCOUNT
   CREDIT
+  // Creche-specific line types (VAT applicable)
+  BOOKS
+  SCHOOL_TRIP
+  STATIONERY
+  UNIFORM
 }
 
 enum MatchType {

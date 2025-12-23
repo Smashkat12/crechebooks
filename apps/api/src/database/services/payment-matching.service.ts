@@ -366,7 +366,8 @@ export class PaymentMatchingService {
 
     // Days from billing period start
     const daysDiff = Math.abs(
-      (transactionDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24),
+      (transactionDate.getTime() - billingStart.getTime()) /
+        (1000 * 60 * 60 * 24),
     );
 
     // Check if payment is within or near billing period
@@ -452,19 +453,32 @@ export class PaymentMatchingService {
         if (bestScore < 20) {
           bestScore = 20;
           reasons.length = 0;
-          reasons.push(`Exact child name match: ${invoice.child.firstName} ${invoice.child.lastName}`);
+          reasons.push(
+            `Exact child name match: ${invoice.child.firstName} ${invoice.child.lastName}`,
+          );
         }
-      } else if (childFullSimilarity > 0.8 || (containsChildFirst && containsChildLast)) {
+      } else if (
+        childFullSimilarity > 0.8 ||
+        (containsChildFirst && containsChildLast)
+      ) {
         if (bestScore < 18) {
           bestScore = 18;
           reasons.length = 0;
-          reasons.push(`Strong child name match: ${invoice.child.firstName} ${invoice.child.lastName}`);
+          reasons.push(
+            `Strong child name match: ${invoice.child.firstName} ${invoice.child.lastName}`,
+          );
         }
-      } else if (childFullSimilarity > 0.6 || containsChildFirst || containsChildLast) {
+      } else if (
+        childFullSimilarity > 0.6 ||
+        containsChildFirst ||
+        containsChildLast
+      ) {
         if (bestScore < 15) {
           bestScore = 15;
           reasons.length = 0;
-          const matched = containsChildFirst ? invoice.child.firstName : invoice.child.lastName;
+          const matched = containsChildFirst
+            ? invoice.child.firstName
+            : invoice.child.lastName;
           reasons.push(`Child name found: ${matched}`);
         }
       }
@@ -503,7 +517,11 @@ export class PaymentMatchingService {
             `Strong parent name similarity (${Math.round(parentFullSimilarity * 100)}%)`,
           );
         }
-      } else if (parentFullSimilarity > 0.6 || containsParentFirst || containsParentLast) {
+      } else if (
+        parentFullSimilarity > 0.6 ||
+        containsParentFirst ||
+        containsParentLast
+      ) {
         if (bestScore < 10) {
           bestScore = 10;
           reasons.length = 0;
@@ -575,9 +593,9 @@ export class PaymentMatchingService {
     }
 
     // Also add individual words that could be names (3+ chars, no numbers)
-    const words = cleaned.split(/\s+/).filter(
-      (word) => word.length >= 3 && !/\d/.test(word),
-    );
+    const words = cleaned
+      .split(/\s+/)
+      .filter((word) => word.length >= 3 && !/\d/.test(word));
     results.push(...words);
 
     return results;

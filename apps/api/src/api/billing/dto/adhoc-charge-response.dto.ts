@@ -44,7 +44,9 @@ export class AddAdhocChargeResponseDto {
   @ApiProperty({ description: 'Success flag' })
   success!: boolean;
 
-  @ApiProperty({ description: 'Created charge details and updated invoice totals' })
+  @ApiProperty({
+    description: 'Created charge details and updated invoice totals',
+  })
   data!: {
     /** Created invoice line ID */
     line_id: string;

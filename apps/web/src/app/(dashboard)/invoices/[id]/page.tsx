@@ -40,7 +40,7 @@ export default function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
     id: invoiceData.id,
     invoiceNumber: invoiceData.invoiceNumber,
     parentId: invoiceData.parentId,
-    parentName: 'Parent', // Would need to join with parent data
+    parentName: invoiceData.parentName ?? 'Unknown Parent',
     status: invoiceData.status.toLowerCase() as Invoice['status'],
     invoiceDate: invoiceData.issueDate instanceof Date
       ? invoiceData.issueDate.toISOString()

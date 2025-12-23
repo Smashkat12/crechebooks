@@ -130,8 +130,8 @@ export function getTransactionColumns(
       header: 'Amount',
       cell: ({ row }) => {
         const amountCents = row.getValue('amount') as number;
-        const type = row.original.type;
-        const isCredit = type === 'CREDIT' || type === TransactionType.CREDIT;
+        const type = row.original.type as string;
+        const isCredit = type === 'CREDIT';
         // Amount is stored in cents, convert to rand for display
         const amountRand = amountCents / 100;
         return (

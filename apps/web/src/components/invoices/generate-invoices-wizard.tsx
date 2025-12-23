@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CalendarIcon, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { CalendarIcon, Check, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -22,6 +22,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn, formatCurrency } from "@/lib/utils";
+import { apiClient } from "@/lib/api";
 
 interface EnrollmentPreview {
   id: string;
@@ -55,41 +56,64 @@ export function GenerateInvoicesWizard({
   const [selectedMonth, setSelectedMonth] = useState<Date>();
   const [enrollments, setEnrollments] = useState<EnrollmentPreview[]>([]);
   const [selectedEnrollments, setSelectedEnrollments] = useState<string[]>([]);
+  const [isLoadingEnrollments, setIsLoadingEnrollments] = useState(false);
+  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
 
-  // Mock data - replace with actual API call
-  const mockEnrollments: EnrollmentPreview[] = [
-    {
-      id: "1",
-      childName: "Alice Johnson",
-      parentName: "Bob Johnson",
-      feeStructure: "Standard Monthly",
-      monthlyFee: 2500,
-      selected: true,
-    },
-    {
-      id: "2",
-      childName: "Charlie Smith",
-      parentName: "Diana Smith",
-      feeStructure: "Standard Monthly",
-      monthlyFee: 2500,
-      selected: true,
-    },
-    {
-      id: "3",
-      childName: "Eve Williams",
-      parentName: "Frank Williams",
-      feeStructure: "Premium Monthly",
-      monthlyFee: 3500,
-      selected: true,
-    },
-  ];
+  // Fetch real enrollment data from API using children endpoint
+  const fetchEnrollments = async () => {
+    setIsLoadingEnrollments(true);
+    setEnrollmentError(null);
+    try {
+      // Fetch children with active enrollments via children endpoint
+      const response = await apiClient.get<{
+        success: boolean;
+        data: Array<{
+          id: string;
+          first_name: string;
+          last_name: string;
+          parent: { id: string; name: string; email: string };
+          enrollment_status: string | null;
+          current_enrollment?: {
+            id: string;
+            fee_structure: { id: string; name: string; amount: number };
+            status: string;
+          };
+        }>;
+        meta: { total: number };
+      }>('/children', {
+        params: { enrollment_status: 'ACTIVE', limit: 100 },
+      });
+
+      if (response.data.success && response.data.data) {
+        // Filter to only children with active enrollments
+        const activeChildren = response.data.data.filter(
+          (c) => c.enrollment_status === 'ACTIVE' && c.current_enrollment
+        );
+
+        const enrollmentData: EnrollmentPreview[] = activeChildren.map((c) => ({
+          id: c.id, // Use child ID, not enrollment ID - API expects childIds
+          childName: `${c.first_name} ${c.last_name}`,
+          parentName: c.parent.name,
+          feeStructure: c.current_enrollment?.fee_structure.name || 'Standard',
+          monthlyFee: c.current_enrollment?.fee_structure.amount || 950, // Default to R950 if not set
+          selected: true,
+        }));
+        setEnrollments(enrollmentData);
+        setSelectedEnrollments(enrollmentData.map((e) => e.id));
+      }
+    } catch (error) {
+      console.error('Failed to fetch enrollments:', error);
+      setEnrollmentError('Failed to load enrollments. Please try again.');
+    } finally {
+      setIsLoadingEnrollments(false);
+    }
+  };
 
   const handleMonthSelect = (date: Date | undefined) => {
     setSelectedMonth(date);
     if (date) {
-      // Fetch enrollments for selected month
-      setEnrollments(mockEnrollments);
-      setSelectedEnrollments(mockEnrollments.map((e) => e.id));
+      // Fetch real enrollments when month is selected
+      fetchEnrollments();
     }
   };
 
@@ -150,7 +174,7 @@ export function GenerateInvoicesWizard({
     setSelectedEnrollments([]);
   };
 
-  const invoicePreviews = step === 3 ? generateInvoicePreviews() : [];
+  const invoicePreviews = (step === 3 || step === 4) ? generateInvoicePreviews() : [];
   const totalAmount = invoicePreviews.reduce((sum, inv) => sum + inv.total, 0);
 
   return (
@@ -207,7 +231,7 @@ export function GenerateInvoicesWizard({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label>Active Enrollments for {selectedMonth && format(selectedMonth, "MMMM yyyy")}</Label>
-                <Button variant="outline" size="sm" onClick={handleToggleAll}>
+                <Button variant="outline" size="sm" onClick={handleToggleAll} disabled={isLoadingEnrollments}>
                   {selectedEnrollments.length === enrollments.length
                     ? "Deselect All"
                     : "Select All"}
@@ -215,30 +239,48 @@ export function GenerateInvoicesWizard({
               </div>
               <ScrollArea className="h-[400px] rounded-md border">
                 <div className="p-4 space-y-2">
-                  {enrollments.map((enrollment) => (
-                    <div
-                      key={enrollment.id}
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted"
-                    >
-                      <Checkbox
-                        checked={selectedEnrollments.includes(enrollment.id)}
-                        onCheckedChange={() =>
-                          handleToggleEnrollment(enrollment.id)
-                        }
-                      />
-                      <div className="flex-1 space-y-1">
-                        <p className="font-medium">{enrollment.childName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Parent: {enrollment.parentName} • {enrollment.feeStructure}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">
-                          {formatCurrency(enrollment.monthlyFee)}
-                        </p>
-                      </div>
+                  {isLoadingEnrollments ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                      <span>Loading enrollments...</span>
                     </div>
-                  ))}
+                  ) : enrollmentError ? (
+                    <div className="text-center py-8 text-destructive">
+                      <p>{enrollmentError}</p>
+                      <Button variant="outline" size="sm" onClick={fetchEnrollments} className="mt-2">
+                        Retry
+                      </Button>
+                    </div>
+                  ) : enrollments.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No active enrollments found
+                    </div>
+                  ) : (
+                    enrollments.map((enrollment) => (
+                      <div
+                        key={enrollment.id}
+                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-muted"
+                      >
+                        <Checkbox
+                          checked={selectedEnrollments.includes(enrollment.id)}
+                          onCheckedChange={() =>
+                            handleToggleEnrollment(enrollment.id)
+                          }
+                        />
+                        <div className="flex-1 space-y-1">
+                          <p className="font-medium">{enrollment.childName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Parent: {enrollment.parentName} • {enrollment.feeStructure}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">
+                            {formatCurrency(enrollment.monthlyFee)}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </ScrollArea>
               <p className="text-sm text-muted-foreground">

@@ -1,11 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
-import type { IInvoice, IInvoiceLine } from '@crechebooks/types';
+import type { IInvoice, IInvoiceLine, InvoiceStatus } from '@crechebooks/types';
 
-// Types for API responses
+// Types for API responses - extends IInvoice with transformed cents fields
 interface InvoiceWithLines extends IInvoice {
   lines: IInvoiceLine[];
+  // Transformed fields from API (converted to cents for consistency)
+  parentName?: string;
+  childId?: string;
+  childName?: string;
+  billingPeriodStart?: Date;
+  billingPeriodEnd?: Date;
+  subtotalCents?: number;
+  vatCents?: number;
+  totalCents?: number;
+  amountPaidCents?: number;
+  deliveryStatus?: 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 interface InvoicesListResponse {
@@ -67,6 +80,91 @@ interface ApiListResponse {
   };
 }
 
+// API response for single invoice detail
+interface ApiInvoiceLineResponse {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  subtotal: number;
+  vat: number;
+  total: number;
+  line_type: string;
+  account_code: string | null;
+}
+
+interface ApiInvoiceDetailResponse {
+  id: string;
+  invoice_number: string;
+  parent: { id: string; name: string; email?: string | null };
+  child: { id: string; name: string };
+  billing_period_start: string;
+  billing_period_end: string;
+  issue_date: string;
+  due_date: string;
+  subtotal: number;
+  vat: number;
+  total: number;
+  amount_paid: number;
+  balance_due: number;
+  status: string;
+  delivery_status: string | null;
+  lines: ApiInvoiceLineResponse[];
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ApiDetailResponse {
+  success: boolean;
+  data: ApiInvoiceDetailResponse;
+}
+
+// Transform API detail response to frontend format
+function transformInvoiceDetail(apiInvoice: ApiInvoiceDetailResponse): InvoiceWithLines {
+  return {
+    id: apiInvoice.id,
+    tenantId: '',
+    invoiceNumber: apiInvoice.invoice_number,
+    parentId: apiInvoice.parent.id,
+    parentName: apiInvoice.parent.name,
+    childId: apiInvoice.child.id,
+    childName: apiInvoice.child.name,
+    billingPeriodStart: new Date(apiInvoice.billing_period_start),
+    billingPeriodEnd: new Date(apiInvoice.billing_period_end),
+    issueDate: new Date(apiInvoice.issue_date),
+    dueDate: new Date(apiInvoice.due_date),
+    // All monetary values stored in cents for consistency
+    // API returns Rands, convert to cents by multiplying by 100
+    subtotal: Math.round(apiInvoice.subtotal * 100),
+    vatAmount: Math.round(apiInvoice.vat * 100),
+    total: Math.round(apiInvoice.total * 100),
+    amountPaid: Math.round(apiInvoice.amount_paid * 100),
+    amountDue: Math.round(apiInvoice.balance_due * 100),
+    // Cents fields (same values for backwards compatibility)
+    subtotalCents: Math.round(apiInvoice.subtotal * 100),
+    vatCents: Math.round(apiInvoice.vat * 100),
+    totalCents: Math.round(apiInvoice.total * 100),
+    amountPaidCents: Math.round(apiInvoice.amount_paid * 100),
+    status: apiInvoice.status as InvoiceStatus,
+    deliveryStatus: apiInvoice.delivery_status as 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null,
+    createdAt: new Date(apiInvoice.created_at),
+    updatedAt: new Date(apiInvoice.updated_at),
+    // Transform lines - use child ID from invoice (each invoice is for a single child)
+    lines: apiInvoice.lines.map((line) => ({
+      id: line.id,
+      invoiceId: apiInvoice.id,
+      childId: apiInvoice.child.id, // Required by IInvoiceLine
+      description: line.description,
+      quantity: line.quantity,
+      unitAmount: Math.round(line.unit_price * 100), // Convert to cents
+      lineAmount: Math.round(line.subtotal * 100),
+      vatAmount: Math.round(line.vat * 100),
+      accountCode: line.account_code ?? '', // Required string field
+    })),
+  };
+}
+
 // Transform API response to frontend format
 function transformInvoice(apiInvoice: ApiInvoiceResponse): InvoiceWithLines {
   return {
@@ -81,11 +179,18 @@ function transformInvoice(apiInvoice: ApiInvoiceResponse): InvoiceWithLines {
     billingPeriodEnd: new Date(apiInvoice.billing_period_end),
     issueDate: new Date(apiInvoice.issue_date),
     dueDate: new Date(apiInvoice.due_date),
+    // Required IInvoice fields (in Rands)
+    subtotal: apiInvoice.subtotal,
+    vatAmount: apiInvoice.vat,
+    total: apiInvoice.total,
+    amountPaid: apiInvoice.amount_paid,
+    amountDue: apiInvoice.balance_due,
+    // Additional cents fields for display
     subtotalCents: Math.round(apiInvoice.subtotal * 100),
     vatCents: Math.round(apiInvoice.vat * 100),
     totalCents: Math.round(apiInvoice.total * 100),
     amountPaidCents: Math.round(apiInvoice.amount_paid * 100),
-    status: apiInvoice.status as 'DRAFT' | 'SENT' | 'PAID' | 'PARTIALLY_PAID' | 'OVERDUE' | 'CANCELLED',
+    status: apiInvoice.status as InvoiceStatus,
     deliveryStatus: apiInvoice.delivery_status as 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null,
     createdAt: new Date(apiInvoice.created_at),
     updatedAt: new Date(apiInvoice.created_at),
@@ -128,8 +233,14 @@ export function useInvoice(id: string, enabled = true) {
   return useQuery<InvoiceWithLines, AxiosError>({
     queryKey: queryKeys.invoices.detail(id),
     queryFn: async () => {
-      const { data } = await apiClient.get<InvoiceWithLines>(endpoints.invoices.detail(id));
-      return data;
+      const { data } = await apiClient.get<ApiDetailResponse>(endpoints.invoices.detail(id));
+
+      if (!data.success) {
+        throw new Error('Failed to load invoice');
+      }
+
+      // Transform API response to frontend format
+      return transformInvoiceDetail(data.data);
     },
     enabled: enabled && !!id,
   });
@@ -141,12 +252,13 @@ export function useGenerateInvoices() {
 
   return useMutation<{ success: boolean; count: number }, AxiosError, GenerateInvoicesParams>({
     mutationFn: async ({ month, year, childIds }) => {
+      // API expects billing_month in YYYY-MM format and child_ids (snake_case)
+      const billingMonth = `${year}-${String(month).padStart(2, '0')}`;
       const { data } = await apiClient.post<{ success: boolean; count: number }>(
         endpoints.invoices.generate,
         {
-          month,
-          year,
-          childIds,
+          billing_month: billingMonth,
+          child_ids: childIds,
         }
       );
       return data;
@@ -185,4 +297,49 @@ export function useSendInvoices() {
       queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() });
     },
   });
+}
+
+// Download invoice PDF
+export function useDownloadInvoicePdf() {
+  const downloadPdf = async (invoiceId: string, invoiceNumber: string): Promise<void> => {
+    // Get auth token from localStorage (same pattern as apiClient interceptor)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    if (!token) {
+      throw new Error('Authentication required. Please log in.');
+    }
+
+    const response = await fetch(
+      `${apiClient.defaults.baseURL}${endpoints.invoices.pdf(invoiceId)}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      let errorMessage = `Failed to download PDF: ${response.status}`;
+      try {
+        const error = await response.json();
+        errorMessage = error.error || error.message || errorMessage;
+      } catch {
+        // If response is not JSON, use default error message
+      }
+      throw new Error(errorMessage);
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${invoiceNumber}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
+
+  return { downloadPdf };
 }

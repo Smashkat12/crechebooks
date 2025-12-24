@@ -4,11 +4,18 @@ import { ConfigModule } from './config/config.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './database/prisma';
 import { ApiModule } from './api/api.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, HealthModule, ApiModule],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    HealthModule,
+    ApiModule,
+    SchedulerModule,
+  ],
   controllers: [],
   providers: [
     // Apply JwtAuthGuard globally - use @Public() to skip

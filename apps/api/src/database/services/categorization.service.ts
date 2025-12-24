@@ -38,6 +38,7 @@ import { TransactionStatus } from '../entities/transaction.entity';
 import { CreateCategorizationDto } from '../dto/categorization.dto';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import { TransactionCategorizerAgent } from '../../agents/transaction-categorizer/categorizer.agent';
+import { AccuracyMetricsService } from './accuracy-metrics.service';
 
 @Injectable()
 export class CategorizationService {
@@ -52,6 +53,8 @@ export class CategorizationService {
     private readonly patternLearningService: PatternLearningService,
     @Optional()
     private readonly categorizerAgent?: TransactionCategorizerAgent,
+    @Optional()
+    private readonly accuracyMetricsService?: AccuracyMetricsService,
   ) {}
 
   /**
@@ -237,6 +240,24 @@ export class CategorizationService {
       afterValue: JSON.parse(JSON.stringify(categorization)),
     });
 
+    // TASK-TRANS-017: Record categorization for accuracy tracking
+    if (this.accuracyMetricsService) {
+      try {
+        await this.accuracyMetricsService.recordCategorization(tenantId, {
+          transactionId,
+          confidence: finalConfidence,
+          isAutoApplied: isAutoApply,
+          accountCode: aiResult.accountCode,
+        });
+      } catch (error) {
+        // Log but don't fail - metrics tracking is non-critical
+        this.logger.warn(
+          `Failed to record accuracy metric for transaction ${transactionId}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
     return {
       transactionId,
       status,
@@ -375,6 +396,24 @@ export class CategorizationService {
         // Log but don't fail - pattern learning is non-critical
         this.logger.warn(
           `Failed to learn pattern from correction: ${transactionId}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
+    // TASK-TRANS-017: Record correction for accuracy tracking
+    // Only record if there was a previous categorization that's being overridden
+    if (this.accuracyMetricsService && beforeValue) {
+      try {
+        await this.accuracyMetricsService.recordCorrection(tenantId, {
+          transactionId,
+          originalAccountCode: beforeValue.accountCode,
+          correctedAccountCode: dto.accountCode,
+        });
+      } catch (error) {
+        // Log but don't fail - metrics tracking is non-critical
+        this.logger.warn(
+          `Failed to record correction metric for transaction ${transactionId}`,
           error instanceof Error ? error.stack : String(error),
         );
       }

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { TransactionModule } from './transaction/transaction.module';
-import { BillingModule } from './billing/billing.module';
+import { BillingApiModule } from './billing/billing.module';
 import { PaymentModule } from './payment/payment.module';
-import { SarsModule } from './sars/sars.module';
+import { SarsApiModule } from './sars/sars.module';
 import { ReconciliationModule } from './reconciliation/reconciliation.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ParentsModule } from './parents/parents.module';
@@ -15,9 +15,9 @@ import { SettingsModule } from './settings/settings.module';
   imports: [
     AuthModule,
     TransactionModule,
-    BillingModule,
+    BillingApiModule,
     PaymentModule,
-    SarsModule,
+    SarsApiModule,
     ReconciliationModule,
     DashboardModule,
     ParentsModule,
@@ -28,9 +28,9 @@ import { SettingsModule } from './settings/settings.module';
   exports: [
     AuthModule,
     TransactionModule,
-    BillingModule,
+    BillingApiModule,
     PaymentModule,
-    SarsModule,
+    SarsApiModule,
     ReconciliationModule,
     DashboardModule,
     ParentsModule,

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SchedulerService } from './scheduler.service';
@@ -9,71 +9,92 @@ import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
 
+const logger = new Logger('SchedulerModule');
+
+// Check if Redis is configured before registering Bull modules
+const isRedisConfigured = (): boolean => {
+  return !!(process.env.REDIS_HOST && process.env.REDIS_PORT);
+};
+
+// Conditionally create Bull imports
+const bullImports = isRedisConfigured()
+  ? [
+      BullModule.forRootAsync({
+        imports: [ConfigModule],
+        useFactory: async (configService: ConfigService) => {
+          const redisHost = configService.get<string>('REDIS_HOST');
+          const redisPort = configService.get<number>('REDIS_PORT');
+          const redisPassword = configService.get<string>('REDIS_PASSWORD');
+
+          logger.log(`Connecting to Redis at ${redisHost}:${redisPort}`);
+
+          return {
+            redis: {
+              host: redisHost,
+              port: redisPort,
+              password: redisPassword,
+              retryStrategy: (times: number) => {
+                if (times > 3) {
+                  logger.error(
+                    `Failed to connect to Redis after ${times} attempts`,
+                  );
+                  return null; // Stop retrying
+                }
+                return Math.min(times * 1000, 3000);
+              },
+            },
+            defaultJobOptions: {
+              attempts: 3,
+              backoff: {
+                type: 'exponential',
+                delay: 1000,
+              },
+              removeOnComplete: 100,
+              removeOnFail: false,
+            },
+          };
+        },
+        inject: [ConfigService],
+      }),
+      BullModule.registerQueue(
+        {
+          name: QUEUE_NAMES.INVOICE_GENERATION,
+        },
+        {
+          name: QUEUE_NAMES.PAYMENT_REMINDER,
+        },
+        {
+          name: QUEUE_NAMES.SARS_DEADLINE,
+        },
+        {
+          name: QUEUE_NAMES.BANK_SYNC,
+        },
+      ),
+    ]
+  : [];
+
+// Log Redis status at module load time
+if (!isRedisConfigured()) {
+  logger.warn(
+    'Redis not configured (REDIS_HOST/REDIS_PORT missing). Scheduler queues disabled. Set REDIS_HOST and REDIS_PORT to enable.',
+  );
+}
+
+// Conditionally create providers - only register scheduler services when Redis is available
+const schedulerProviders = isRedisConfigured()
+  ? [
+      SchedulerService,
+      SarsDeadlineProcessor,
+      InvoiceSchedulerProcessor,
+      PaymentReminderProcessor,
+    ]
+  : [];
+
 @Module({
-  imports: [
-    SarsSchedulerModule,
-    DatabaseModule,
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => {
-        const redisHost = configService.get<string>('REDIS_HOST');
-        const redisPort = configService.get<number>('REDIS_PORT');
-        const redisPassword = configService.get<string>('REDIS_PASSWORD');
-
-        if (!redisHost || !redisPort) {
-          throw new Error(
-            'Redis configuration missing: REDIS_HOST and REDIS_PORT must be set in environment variables',
-          );
-        }
-
-        return {
-          redis: {
-            host: redisHost,
-            port: redisPort,
-            password: redisPassword,
-            retryStrategy: (times: number) => {
-              if (times > 3) {
-                throw new Error(
-                  `Failed to connect to Redis after ${times} attempts. Check REDIS_HOST=${redisHost} and REDIS_PORT=${redisPort}`,
-                );
-              }
-              return Math.min(times * 1000, 3000);
-            },
-          },
-          defaultJobOptions: {
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 1000,
-            },
-            removeOnComplete: 100,
-            removeOnFail: false,
-          },
-        };
-      },
-      inject: [ConfigService],
-    }),
-    BullModule.registerQueue(
-      {
-        name: QUEUE_NAMES.INVOICE_GENERATION,
-      },
-      {
-        name: QUEUE_NAMES.PAYMENT_REMINDER,
-      },
-      {
-        name: QUEUE_NAMES.SARS_DEADLINE,
-      },
-      {
-        name: QUEUE_NAMES.BANK_SYNC,
-      },
-    ),
+  imports: [SarsSchedulerModule, DatabaseModule, ...bullImports],
+  providers: schedulerProviders,
+  exports: [
+    ...(isRedisConfigured() ? [SchedulerService, BullModule] : []),
   ],
-  providers: [
-    SchedulerService,
-    SarsDeadlineProcessor,
-    InvoiceSchedulerProcessor,
-    PaymentReminderProcessor,
-  ],
-  exports: [SchedulerService, BullModule],
 })
 export class SchedulerModule {}

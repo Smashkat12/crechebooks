@@ -1,0 +1,109 @@
+{
+  "version": "2024-2025",
+  "effectiveFrom": "2024-03-01",
+  "effectiveTo": "2025-02-28",
+  "source": "SARS Tax Tables 2024/2025",
+  "paye": {
+    "taxYear": "2024/2025",
+    "description": "SARS PAYE Tax Brackets for tax year ending February 2025",
+    "taxBrackets": [
+      {
+        "bracketNumber": 1,
+        "fromCents": 0,
+        "toCents": 23780000,
+        "rate": 0.18,
+        "baseTaxCents": 0
+      },
+      {
+        "bracketNumber": 2,
+        "fromCents": 23780001,
+        "toCents": 37060000,
+        "rate": 0.26,
+        "baseTaxCents": 4280400
+      },
+      {
+        "bracketNumber": 3,
+        "fromCents": 37060001,
+        "toCents": 51460000,
+        "rate": 0.31,
+        "baseTaxCents": 7733200
+      },
+      {
+        "bracketNumber": 4,
+        "fromCents": 51460001,
+        "toCents": 67320000,
+        "rate": 0.36,
+        "baseTaxCents": 12197200
+      },
+      {
+        "bracketNumber": 5,
+        "fromCents": 67320001,
+        "toCents": 85780000,
+        "rate": 0.39,
+        "baseTaxCents": 17906800
+      },
+      {
+        "bracketNumber": 6,
+        "fromCents": 85780001,
+        "toCents": 185700000,
+        "rate": 0.41,
+        "baseTaxCents": 25106200
+      },
+      {
+        "bracketNumber": 7,
+        "fromCents": 185700001,
+        "toCents": 999999999999,
+        "rate": 0.45,
+        "baseTaxCents": 66083200
+      }
+    ],
+    "rebates": {
+      "description": "Tax rebates for individuals by age group",
+      "primary": {
+        "amountCents": 1771400,
+        "ageRequirement": null
+      },
+      "secondary": {
+        "amountCents": 973200,
+        "ageRequirement": 65
+      },
+      "tertiary": {
+        "amountCents": 324100,
+        "ageRequirement": 75
+      }
+    },
+    "taxThresholds": {
+      "description": "Annual income thresholds below which no tax is payable",
+      "under65": 9561900,
+      "age65to74": 14873900,
+      "age75plus": 16611100
+    }
+  },
+  "uif": {
+    "description": "Unemployment Insurance Fund contributions",
+    "employeeRate": 0.01,
+    "employerRate": 0.01,
+    "maxMonthlyEarningsCents": 1789589,
+    "maxMonthlyContributionCents": 17896
+  },
+  "vat": {
+    "description": "Value Added Tax rates and thresholds",
+    "standardRate": 0.15,
+    "zeroRatedItems": [
+      "Basic foodstuffs (brown bread, maize meal, samp, mealie rice, dried mealies, dried beans, lentils, pilchards/sardines in tins, milk powder, dairy powder blend, rice, vegetables, fruit, vegetable oil, milk, cultured milk, brown wheaten meal, eggs)",
+      "Petrol and diesel",
+      "Illuminating paraffin",
+      "Exported goods",
+      "International transport services"
+    ],
+    "exemptItems": [
+      "Educational services by registered institutions",
+      "Public transport",
+      "Residential accommodation rental",
+      "Financial services",
+      "Medical services by registered practitioners",
+      "Childcare services by registered facilities"
+    ],
+    "registrationThresholdCents": 100000000
+  }
+}

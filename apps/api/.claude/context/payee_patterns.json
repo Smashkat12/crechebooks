@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "description": "Payee patterns for automatic transaction categorization",
+  "autoApplyConfidenceThreshold": 0.85,
+  "patterns": [
+    {
+      "payeePattern": "^WOOLWORTHS",
+      "category": "GROCERIES",
+      "accountCode": "5100",
+      "accountName": "Cost of Sales - Groceries",
+      "confidence": 0.95
+    },
+    {
+      "payeePattern": "^PICK N PAY",
+      "category": "GROCERIES",
+      "accountCode": "5100",
+      "accountName": "Cost of Sales - Groceries",
+      "confidence": 0.95
+    },
+    {
+      "payeePattern": "^CHECKERS",
+      "category": "GROCERIES",
+      "accountCode": "5100",
+      "accountName": "Cost of Sales - Groceries",
+      "confidence": 0.95
+    },
+    {
+      "payeePattern": "^ESKOM|^CITY POWER|^ELECTRICITY",
+      "category": "UTILITIES",
+      "accountCode": "6100",
+      "accountName": "Utilities - Electricity",
+      "confidence": 0.92
+    },
+    {
+      "payeePattern": "^WATER|^MUNICIPALITY.*WATER",
+      "category": "UTILITIES",
+      "accountCode": "6110",
+      "accountName": "Utilities - Water",
+      "confidence": 0.90
+    },
+    {
+      "payeePattern": "^TELKOM|^MTN|^VODACOM|^CELL C",
+      "category": "TELECOMMUNICATIONS",
+      "accountCode": "6200",
+      "accountName": "Telecommunications",
+      "confidence": 0.90
+    },
+    {
+      "payeePattern": "SALARY|^PAYROLL|WAGES",
+      "category": "PAYROLL",
+      "accountCode": "4100",
+      "accountName": "Tuition Fee Income",
+      "confidence": 0.88
+    },
+    {
+      "payeePattern": "^SARS|TAX",
+      "category": "TAX",
+      "accountCode": "2100",
+      "accountName": "SARS Liabilities",
+      "confidence": 0.92
+    },
+    {
+      "payeePattern": "^RENT|^LEASE",
+      "category": "RENT",
+      "accountCode": "6300",
+      "accountName": "Rent Expense",
+      "confidence": 0.88
+    },
+    {
+      "payeePattern": "^INSURANCE|^OLD MUTUAL|^SANLAM|^DISCOVERY",
+      "category": "INSURANCE",
+      "accountCode": "6400",
+      "accountName": "Insurance",
+      "confidence": 0.88
+    }
+  ]
+}

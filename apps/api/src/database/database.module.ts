@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 import { TenantRepository } from './repositories/tenant.repository';
 import { UserRepository } from './repositories/user.repository';
@@ -49,10 +49,10 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
 @Module({
   imports: [
     EmailModule,
-    WhatsAppModule,
+    forwardRef(() => WhatsAppModule),
     TransactionCategorizerModule,
     PaymentMatcherModule,
-    SarsAgentModule,
+    forwardRef(() => SarsAgentModule),
   ],
   providers: [
     PrismaService,

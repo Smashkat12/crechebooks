@@ -7,14 +7,14 @@
  * Provides PAYE, UIF, EMP201, and VAT201 calculation agents.
  */
 
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SarsAgent } from './sars.agent';
 import { SarsDecisionLogger } from './decision-logger';
 import { SarsContextValidator } from './context-validator';
 import { DatabaseModule } from '../../database/database.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [forwardRef(() => DatabaseModule)],
   providers: [SarsAgent, SarsDecisionLogger, SarsContextValidator],
   exports: [SarsAgent, SarsContextValidator],
 })

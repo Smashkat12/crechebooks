@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "description": "Chart of Accounts for CrecheBooks - South African Creche/Daycare",
+  "accounts": [
+    {"code": "1000", "name": "Cash on Hand", "type": "ASSET", "subType": "Current Asset"},
+    {"code": "1100", "name": "Bank Account - Current", "type": "ASSET", "subType": "Current Asset"},
+    {"code": "1110", "name": "Bank Account - Savings", "type": "ASSET", "subType": "Current Asset"},
+    {"code": "1200", "name": "Accounts Receivable", "type": "ASSET", "subType": "Current Asset"},
+    {"code": "1210", "name": "Parent Fees Receivable", "type": "ASSET", "subType": "Current Asset"},
+    {"code": "1300", "name": "Prepaid Expenses", "type": "ASSET", "subType": "Current Asset"},
+    {"code": "1400", "name": "Inventory - Food & Supplies", "type": "ASSET", "subType": "Current Asset"},
+    {"code": "1500", "name": "Fixed Assets - Equipment", "type": "ASSET", "subType": "Non-Current Asset"},
+    {"code": "1510", "name": "Fixed Assets - Furniture", "type": "ASSET", "subType": "Non-Current Asset"},
+    {"code": "1520", "name": "Fixed Assets - Vehicles", "type": "ASSET", "subType": "Non-Current Asset"},
+    {"code": "1600", "name": "Accumulated Depreciation", "type": "ASSET", "subType": "Non-Current Asset"},
+
+    {"code": "2000", "name": "Accounts Payable", "type": "LIABILITY", "subType": "Current Liability"},
+    {"code": "2100", "name": "SARS - PAYE Payable", "type": "LIABILITY", "subType": "Current Liability"},
+    {"code": "2110", "name": "SARS - UIF Payable", "type": "LIABILITY", "subType": "Current Liability"},
+    {"code": "2120", "name": "SARS - VAT Payable", "type": "LIABILITY", "subType": "Current Liability"},
+    {"code": "2200", "name": "Accrued Expenses", "type": "LIABILITY", "subType": "Current Liability"},
+    {"code": "2300", "name": "Deferred Revenue - Prepaid Fees", "type": "LIABILITY", "subType": "Current Liability"},
+    {"code": "2400", "name": "Long-term Loans", "type": "LIABILITY", "subType": "Non-Current Liability"},
+
+    {"code": "3000", "name": "Owner's Equity", "type": "EQUITY", "subType": "Equity"},
+    {"code": "3100", "name": "Retained Earnings", "type": "EQUITY", "subType": "Equity"},
+    {"code": "3200", "name": "Current Year Earnings", "type": "EQUITY", "subType": "Equity"},
+
+    {"code": "4000", "name": "Revenue", "type": "INCOME", "subType": "Operating Income"},
+    {"code": "4100", "name": "Tuition Fee Income", "type": "INCOME", "subType": "Operating Income"},
+    {"code": "4110", "name": "Registration Fee Income", "type": "INCOME", "subType": "Operating Income"},
+    {"code": "4120", "name": "After-care Fee Income", "type": "INCOME", "subType": "Operating Income"},
+    {"code": "4130", "name": "Transport Fee Income", "type": "INCOME", "subType": "Operating Income"},
+    {"code": "4200", "name": "Late Payment Fees", "type": "INCOME", "subType": "Operating Income"},
+    {"code": "4300", "name": "Donations & Grants", "type": "INCOME", "subType": "Other Income"},
+    {"code": "4400", "name": "Interest Income", "type": "INCOME", "subType": "Other Income"},
+
+    {"code": "5000", "name": "Cost of Services", "type": "EXPENSE", "subType": "Cost of Sales"},
+    {"code": "5100", "name": "Food & Catering", "type": "EXPENSE", "subType": "Cost of Sales"},
+    {"code": "5200", "name": "Educational Materials", "type": "EXPENSE", "subType": "Cost of Sales"},
+    {"code": "5300", "name": "Cleaning Supplies", "type": "EXPENSE", "subType": "Cost of Sales"},
+
+    {"code": "6000", "name": "Operating Expenses", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6100", "name": "Utilities - Electricity", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6110", "name": "Utilities - Water", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6120", "name": "Utilities - Gas", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6200", "name": "Telecommunications", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6300", "name": "Rent Expense", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6400", "name": "Insurance", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6500", "name": "Repairs & Maintenance", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6600", "name": "Security", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6700", "name": "Advertising & Marketing", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6800", "name": "Professional Fees", "type": "EXPENSE", "subType": "Operating Expense"},
+    {"code": "6900", "name": "Bank Charges", "type": "EXPENSE", "subType": "Operating Expense"},
+
+    {"code": "7000", "name": "Payroll Expenses", "type": "EXPENSE", "subType": "Payroll"},
+    {"code": "7100", "name": "Salaries - Teachers", "type": "EXPENSE", "subType": "Payroll"},
+    {"code": "7110", "name": "Salaries - Support Staff", "type": "EXPENSE", "subType": "Payroll"},
+    {"code": "7120", "name": "Salaries - Admin", "type": "EXPENSE", "subType": "Payroll"},
+    {"code": "7200", "name": "Employer Contributions - UIF", "type": "EXPENSE", "subType": "Payroll"},
+    {"code": "7210", "name": "Employer Contributions - Pension", "type": "EXPENSE", "subType": "Payroll"},
+    {"code": "7300", "name": "Training & Development", "type": "EXPENSE", "subType": "Payroll"},
+
+    {"code": "8000", "name": "Depreciation Expense", "type": "EXPENSE", "subType": "Non-Cash Expense"},
+    {"code": "8100", "name": "Interest Expense", "type": "EXPENSE", "subType": "Finance Cost"}
+  ],
+  "accountRanges": {
+    "assets": {"start": 1000, "end": 1999},
+    "liabilities": {"start": 2000, "end": 2999},
+    "equity": {"start": 3000, "end": 3999},
+    "income": {"start": 4000, "end": 4999},
+    "costOfSales": {"start": 5000, "end": 5999},
+    "operatingExpenses": {"start": 6000, "end": 6999},
+    "payroll": {"start": 7000, "end": 7999},
+    "otherExpenses": {"start": 8000, "end": 8999}
+  }
+}

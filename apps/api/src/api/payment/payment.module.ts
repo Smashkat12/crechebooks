@@ -10,28 +10,10 @@
 
 import { Module } from '@nestjs/common';
 import { PaymentController } from './payment.controller';
-import { PaymentRepository } from '../../database/repositories/payment.repository';
-import { TransactionRepository } from '../../database/repositories/transaction.repository';
-import { InvoiceRepository } from '../../database/repositories/invoice.repository';
-import { ParentRepository } from '../../database/repositories/parent.repository';
-import { PaymentAllocationService } from '../../database/services/payment-allocation.service';
-import { PaymentMatchingService } from '../../database/services/payment-matching.service';
-import { ArrearsService } from '../../database/services/arrears.service';
-import { AuditLogService } from '../../database/services/audit-log.service';
-import { PrismaModule } from '../../database/prisma';
+import { DatabaseModule } from '../../database/database.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [DatabaseModule],
   controllers: [PaymentController],
-  providers: [
-    PaymentRepository,
-    TransactionRepository,
-    InvoiceRepository,
-    ParentRepository,
-    PaymentAllocationService,
-    PaymentMatchingService,
-    ArrearsService,
-    AuditLogService,
-  ],
 })
 export class PaymentModule {}

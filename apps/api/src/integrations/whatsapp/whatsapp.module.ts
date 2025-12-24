@@ -6,12 +6,12 @@
  * and reminders via Meta Cloud API.
  */
 
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { WhatsAppService } from './whatsapp.service';
 import { DatabaseModule } from '../../database/database.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [forwardRef(() => DatabaseModule)],
   providers: [WhatsAppService],
   exports: [WhatsAppService],
 })

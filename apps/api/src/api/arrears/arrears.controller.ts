@@ -7,7 +7,10 @@ import {
   Logger,
   HttpCode,
   UseGuards,
+  Res,
+  Header,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -15,11 +18,13 @@ import {
   ApiBearerAuth,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
+  ApiProduces,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { ChildRepository } from '../../database/repositories/child.repository';
+import { ArrearsReportPdfService, ArrearsReportOptions } from '../../database/services/arrears-report-pdf.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -45,6 +50,7 @@ export class ArrearsController {
     private readonly invoiceRepo: InvoiceRepository,
     private readonly parentRepo: ParentRepository,
     private readonly childRepo: ChildRepository,
+    private readonly arrearsPdfService: ArrearsReportPdfService,
   ) {}
 
   @Get()
@@ -302,5 +308,52 @@ export class ArrearsController {
       sent,
       failed,
     };
+  }
+
+  /**
+   * TASK-PAY-017: Export arrears report as PDF
+   */
+  @Get('export/pdf')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @Header('Content-Type', 'application/pdf')
+  @ApiOperation({
+    summary: 'Export arrears report as PDF',
+    description: 'Generates a professional PDF report of arrears with aging analysis, summary statistics, and detailed invoice breakdown.',
+  })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'PDF file generated successfully',
+    content: {
+      'application/pdf': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async exportPdf(
+    @Query() query: ListArrearsQueryDto,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    const tenantId = user.tenantId;
+
+    this.logger.log(`Generating arrears PDF for tenant=${tenantId}`);
+
+    const options: ArrearsReportOptions = {
+      parentId: query.parentId,
+      minAmountCents: query.minAmount ? Math.round(query.minAmount * 100) : undefined,
+      includeTopDebtors: true,
+      topDebtorsLimit: 10,
+      includeDetailedInvoices: true,
+    };
+
+    const pdfBuffer = await this.arrearsPdfService.generatePdf(tenantId, options);
+
+    const filename = `arrears-report-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   }
 }

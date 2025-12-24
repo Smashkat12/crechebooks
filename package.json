@@ -36,5 +36,9 @@
   "devDependencies": {
     "prettier": "^3.4.2",
     "turbo": "^2.3.3"
+  },
+  "dependencies": {
+    "@types/node": "^22.10.7",
+    "exceljs": "^4.4.0"
   }
 }

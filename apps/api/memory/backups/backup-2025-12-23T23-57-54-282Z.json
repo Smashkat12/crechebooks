@@ -1,0 +1,94 @@
+{
+  "timestamp": "2025-12-23T23:57:54.282Z",
+  "version": "1.0",
+  "entries": [
+    {
+      "id": "entry_mjj8w9nt_d87dszsrc",
+      "key": "crechebooks/remediation/task-infra-011/output",
+      "value": "{\"taskId\":\"TASK-INFRA-011\",\"status\":\"COMPLETE\",\"filesCreated\":[\"apps/api/src/scheduler/types/scheduler.types.ts\",\"apps/api/src/scheduler/processors/base.processor.ts\",\"apps/api/src/scheduler/processors/index.ts\",\"apps/api/src/scheduler/scheduler.service.ts\",\"apps/api/src/scheduler/scheduler.module.ts\",\"apps/api/src/scheduler/index.ts\",\"apps/api/src/scheduler/__tests__/scheduler.service.spec.ts\"],\"filesModified\":[\"apps/api/src/app.module.ts\"],\"buildResult\":\"SUCCESS\",\"testResult\":\"12/12 PASSING\",\"exports\":{\"SchedulerModule\":\"apps/api/src/scheduler/scheduler.module.ts\",\"SchedulerService\":\"apps/api/src/scheduler/scheduler.service.ts\",\"BaseProcessor\":\"apps/api/src/scheduler/processors/base.processor.ts\",\"QUEUE_NAMES\":\"apps/api/src/scheduler/types/scheduler.types.ts\"},\"queueNames\":[\"invoice-generation\",\"payment-reminder\",\"sars-deadline\",\"bank-sync\"],\"nextAgentNotes\":\"Import SchedulerService from apps/api/src/scheduler. Extend BaseProcessor for queue-specific processors. Use QUEUE_NAMES.SARS_DEADLINE for SARS deadline alerts.\",\"completedAt\":\"2025-12-24T00:00:00.000Z\"}",
+      "type": "object",
+      "namespace": "crechebooks",
+      "tags": [],
+      "metadata": {},
+      "owner": "system",
+      "accessLevel": "shared",
+      "createdAt": "2025-12-23T23:57:54.281Z",
+      "updatedAt": "2025-12-23T23:57:54.281Z",
+      "lastAccessedAt": "2025-12-23T23:57:54.281Z",
+      "version": 1,
+      "size": 1179,
+      "compressed": true,
+      "checksum": "4be1b4edab1e8f35f90ff17d644318384dfcf8001e66359fe4543b19da097d71",
+      "references": [],
+      "dependencies": []
+    }
+  ],
+  "statistics": {
+    "overview": {
+      "totalEntries": 1,
+      "totalSize": 1179,
+      "compressedEntries": 1,
+      "compressionRatio": 0,
+      "indexSize": 50,
+      "memoryUsage": 7656112,
+      "diskUsage": 0
+    },
+    "distribution": {
+      "byNamespace": {
+        "crechebooks": {
+          "count": 1,
+          "size": 1179
+        }
+      },
+      "byType": {
+        "object": {
+          "count": 1,
+          "size": 1179
+        }
+      },
+      "byOwner": {
+        "system": {
+          "count": 1,
+          "size": 1179
+        }
+      },
+      "byAccessLevel": {
+        "shared": {
+          "count": 1,
+          "size": 1179
+        }
+      }
+    },
+    "temporal": {
+      "entriesCreatedLast24h": 1,
+      "entriesUpdatedLast24h": 1,
+      "entriesAccessedLast24h": 1,
+      "oldestEntry": "2025-12-23T23:57:54.281Z",
+      "newestEntry": "2025-12-23T23:57:54.281Z"
+    },
+    "performance": {
+      "averageQueryTime": 0,
+      "averageWriteTime": 0,
+      "cacheHitRatio": 0,
+      "indexEfficiency": 0.95
+    },
+    "health": {
+      "expiredEntries": 0,
+      "orphanedReferences": 0,
+      "duplicateKeys": 0,
+      "corruptedEntries": 0,
+      "recommendedCleanup": false
+    },
+    "optimization": {
+      "suggestions": [],
+      "potentialSavings": {
+        "compression": 0,
+        "cleanup": 0,
+        "deduplication": 0
+      },
+      "indexOptimization": [
+        "Consider periodic index rebuilding for optimal performance"
+      ]
+    }
+  }
+}

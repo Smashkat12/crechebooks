@@ -13,7 +13,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Invoice, InvoiceLine } from '@prisma/client';
+import { Invoice, InvoiceLine, AdHocCharge } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { InvoiceRepository } from '../repositories/invoice.repository';
@@ -223,6 +223,25 @@ export class InvoiceGenerationService {
             accountCode: this.SCHOOL_FEES_ACCOUNT,
           });
 
+          // TASK-BILL-017: Get and include pending ad-hoc charges for this child
+          const adHocCharges = await this.getAdHocCharges(
+            tenantId,
+            enrollment.childId,
+            billingMonth,
+          );
+
+          for (const charge of adHocCharges) {
+            lineItems.push({
+              description: charge.description,
+              quantity: new Decimal(1),
+              unitPriceCents: charge.amountCents,
+              discountCents: 0,
+              lineType: LineType.AD_HOC,
+              accountCode: this.SCHOOL_FEES_ACCOUNT,
+              adHocChargeId: charge.id, // Track which charge this came from
+            });
+          }
+
           // Apply sibling discount if applicable
           const discountPercentage =
             siblingDiscounts.get(enrollment.childId) ?? new Decimal(0);
@@ -251,6 +270,15 @@ export class InvoiceGenerationService {
 
           // Add line items and calculate totals
           await this.addLineItems(invoice.id, lineItems, isVatRegistered);
+
+          // TASK-BILL-017: Mark ad-hoc charges as invoiced
+          if (adHocCharges.length > 0) {
+            const chargeIds = adHocCharges.map((c) => c.id);
+            await this.markChargesInvoiced(chargeIds, invoice.id);
+            this.logger.log(
+              `Marked ${chargeIds.length} ad-hoc charges as invoiced for child ${enrollment.childId}`,
+            );
+          }
 
           // Refresh invoice to get updated totals
           const updatedInvoice = await this.invoiceRepo.findById(invoice.id);
@@ -655,5 +683,67 @@ export class InvoiceGenerationService {
     });
 
     return enrollments as EnrollmentWithRelations[];
+  }
+
+  /**
+   * TASK-BILL-017: Get pending ad-hoc charges for a child within a billing period
+   *
+   * @param tenantId - Tenant ID for isolation
+   * @param childId - Child ID to get charges for
+   * @param billingMonth - Format: YYYY-MM
+   * @returns Array of uninvoiced ad-hoc charges
+   */
+  private async getAdHocCharges(
+    tenantId: string,
+    childId: string,
+    billingMonth: string,
+  ): Promise<AdHocCharge[]> {
+    // Parse billing month to get date range
+    const [year, month] = billingMonth.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1); // First day of month
+    const endDate = new Date(year, month, 0); // Last day of month
+
+    // Query for uninvoiced charges within the billing period
+    const charges = await this.prisma.adHocCharge.findMany({
+      where: {
+        tenantId,
+        childId,
+        invoicedAt: null, // Not yet invoiced
+        chargeDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      orderBy: { chargeDate: 'asc' },
+    });
+
+    this.logger.debug(
+      `Found ${charges.length} pending ad-hoc charges for child ${childId} in ${billingMonth}`,
+    );
+
+    return charges;
+  }
+
+  /**
+   * TASK-BILL-017: Mark ad-hoc charges as invoiced
+   *
+   * @param chargeIds - Array of charge IDs to mark
+   * @param invoiceId - Invoice ID to link charges to
+   */
+  private async markChargesInvoiced(
+    chargeIds: string[],
+    invoiceId: string,
+  ): Promise<void> {
+    const now = new Date();
+
+    await this.prisma.adHocCharge.updateMany({
+      where: {
+        id: { in: chargeIds },
+      },
+      data: {
+        invoicedAt: now,
+        invoiceId,
+      },
+    });
   }
 }

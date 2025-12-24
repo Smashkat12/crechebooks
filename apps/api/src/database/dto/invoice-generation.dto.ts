@@ -69,6 +69,8 @@ export interface LineItemInput {
   discountCents: number;
   lineType: LineType;
   accountCode?: string;
+  /** TASK-BILL-017: Reference to ad-hoc charge if applicable */
+  adHocChargeId?: string;
 }
 
 /**

@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './database/prisma';
 import { ApiModule } from './api/api.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { WebhookModule } from './webhooks/webhook.module';
 import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';
 
@@ -15,6 +16,7 @@ import { RolesGuard } from './api/auth/guards/roles.guard';
     HealthModule,
     ApiModule,
     SchedulerModule,
+    WebhookModule,
   ],
   controllers: [],
   providers: [

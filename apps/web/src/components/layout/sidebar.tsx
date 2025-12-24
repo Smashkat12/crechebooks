@@ -97,6 +97,7 @@ export function Sidebar() {
     <aside
       className={cn(
         'fixed left-0 top-0 z-40 h-screen border-r bg-background transition-all duration-300',
+        'hidden lg:block', // Hide on mobile, show on desktop
         sidebarCollapsed ? 'w-16' : 'w-64'
       )}
     >

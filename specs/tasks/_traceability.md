@@ -210,6 +210,72 @@ This document ensures 100% coverage of all requirements in the specifications. E
 
 ---
 
+## Phase 7: Critical Issue Remediation Coverage
+
+### P0 Blockers (8 Issues)
+
+| Critical Issue | Description | Covered by Task ID | Status |
+|----------------|-------------|-------------------|--------|
+| CRIT-001 | Reconciled Transaction Delete Protection | TASK-RECON-014 | ✅ Complete |
+| CRIT-002 | Replace SARS VAT201 Mock Data | TASK-WEB-041 | ⏳ Pending |
+| CRIT-003 | Bank Feed Integration | TASK-TRANS-016 | ⏳ Pending |
+| CRIT-004 | Fix PAYE Tax Bracket Discrepancy | TASK-SARS-004 | ⏳ Pending |
+| CRIT-005 | SARS Deadline Reminder System | TASK-SARS-017 | ✅ Complete |
+| CRIT-006 | Connect Invoice Send to API | TASK-WEB-042 | ⏳ Pending |
+| CRIT-007 | Balance Sheet API Endpoint | TASK-RECON-033 | ⏳ Pending |
+| CRIT-008 | Accuracy Tracking Service | TASK-TRANS-017 | ✅ Complete |
+
+### P1 Critical (8 Issues)
+
+| Critical Issue | Description | Covered by Task ID | Status |
+|----------------|-------------|-------------------|--------|
+| CRIT-009 | Invoice Scheduling Cron Job | TASK-BILL-016 | ✅ Complete |
+| CRIT-010 | WhatsApp Business API Integration | TASK-BILL-015 | ✅ Complete |
+| CRIT-011 | Payment Reminder Scheduler | TASK-PAY-015 | ✅ Complete |
+| CRIT-012 | Invoke PaymentMatcherAgent | TASK-PAY-016 | ⏳ Pending |
+| CRIT-013 | Reports PDF/CSV Export | TASK-WEB-043 | ⏳ Pending |
+| CRIT-014 | Enable Payee Alias Matching | TASK-TRANS-018 | ⏳ Pending |
+| CRIT-015 | Reconciliation Duplicate Detection | TASK-RECON-015 | ⏳ Pending |
+| CRIT-016 | 3-Day Timing Window for Matching | TASK-RECON-016 | ⏳ Pending |
+
+### P2 High (10 Issues)
+
+| Critical Issue | Description | Covered by Task ID | Status |
+|----------------|-------------|-------------------|--------|
+| HIGH-001 | Recurring Detection Integration | TASK-TRANS-019 | ⏳ Pending |
+| HIGH-002 | Xero Sync REST Endpoints | TASK-TRANS-034 | ⏳ Pending |
+| HIGH-003 | Delivery Status Webhooks | TASK-BILL-035 | ⏳ Pending |
+| HIGH-004 | Ad-Hoc Charges in Monthly Invoice | TASK-BILL-017 | ⏳ Pending |
+| HIGH-005 | PDF Export for Arrears | TASK-PAY-017 | ⏳ Pending |
+| HIGH-006 | Template Customization UI | TASK-WEB-045 | ⏳ Pending |
+| HIGH-007 | SARS eFiling Error Handling | TASK-SARS-018 | ⏳ Pending |
+| HIGH-008 | Audit Log Pagination | TASK-RECON-034 | ⏳ Pending |
+| HIGH-009 | ProRataDisplay Component | TASK-WEB-044 | ⏳ Pending |
+| HIGH-010 | Mobile Responsive Expansion | TASK-WEB-046 | ⏳ Pending |
+
+### Infrastructure (2 Issues)
+
+| Critical Issue | Description | Covered by Task ID | Status |
+|----------------|-------------|-------------------|--------|
+| INFRA-001 | Centralized Scheduling Service | TASK-INFRA-011 | ✅ Complete |
+| INFRA-002 | Notification Service Enhancement | TASK-INFRA-012 | ⏳ Pending |
+
+---
+
+## Remediation Validation Summary
+
+- [x] All P0 blockers have corresponding tasks (8/8)
+- [x] All P1 critical issues have corresponding tasks (8/8)
+- [x] All P2 high issues have corresponding tasks (10/10)
+- [x] All infrastructure issues have corresponding tasks (2/2)
+- [x] Task dependencies form valid DAG (no cycles)
+- [x] Layer ordering is correct (foundation → infrastructure → logic → surface)
+- [x] Each task is atomic (single conceptual change)
+
+**Remediation Coverage**: ✅ COMPLETE (28/28 issues covered)
+
+---
+
 ## Validation Summary
 
 - [x] All data models have corresponding tasks
@@ -288,3 +354,14 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2025-12-22 | TASK-INT-004 marked complete (E2E SARS Submission Flow - 30 tests, 915 lines) | AI Agent |
 | 2025-12-22 | TASK-INT-005 marked complete (E2E Reconciliation Flow - 24 tests, 1139 lines) | AI Agent |
 | 2025-12-22 | **ALL 63 TASKS COMPLETE** - Project ready for production | AI Agent |
+| 2025-12-24 | Phase 7: Remediation tasks created (28 tasks) - Addresses all critical issues from VALIDATION_ANALYSIS.md | AI Agent |
+| 2025-12-24 | TASK-SARS-004 created - Fix PAYE Tax Bracket 1 Maximum (P0-BLOCKER) | AI Agent |
+| 2025-12-24 | TASK-INFRA-011, TASK-INFRA-012 created - Scheduling & Notification infrastructure | AI Agent |
+| 2025-12-24 | TASK-RECON-014 through TASK-RECON-016 created - Reconciliation logic fixes | AI Agent |
+| 2025-12-24 | TASK-TRANS-016 through TASK-TRANS-019 created - Transaction logic fixes | AI Agent |
+| 2025-12-24 | TASK-BILL-015 through TASK-BILL-017 created - Billing logic fixes | AI Agent |
+| 2025-12-24 | TASK-PAY-015 through TASK-PAY-017 created - Payment logic fixes | AI Agent |
+| 2025-12-24 | TASK-SARS-017, TASK-SARS-018 created - SARS logic fixes | AI Agent |
+| 2025-12-24 | TASK-RECON-033, TASK-RECON-034, TASK-TRANS-034, TASK-BILL-035 created - API surface fixes | AI Agent |
+| 2025-12-24 | TASK-WEB-041 through TASK-WEB-046 created - Web frontend fixes | AI Agent |
+| 2025-12-24 | **121 TOTAL TASKS** - 93 complete + 28 remediation pending | AI Agent |

@@ -26,4 +26,4 @@ import { PrismaModule } from '../../database/prisma';
     UifService,
   ],
 })
-export class SarsModule {}
+export class SarsApiModule {}

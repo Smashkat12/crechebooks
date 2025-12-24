@@ -47,4 +47,4 @@ import { PrismaModule } from '../../database/prisma';
     WhatsAppService,
   ],
 })
-export class BillingModule {}
+export class BillingApiModule {}

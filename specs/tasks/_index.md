@@ -251,11 +251,90 @@ graph TD
 | Web Foundation | 10 | 10 | 100% |
 | Web Logic | 10 | 10 | 100% |
 | Web Surface | 10 | 10 | 100% |
-| **Total** | **93** | **93** | **100%** |
+| **Subtotal (Phases 1-6)** | **93** | **93** | **100%** |
+| Remediation - Foundation | 1 | 0 | 0% |
+| Remediation - Infrastructure | 2 | 1 | 50% |
+| Remediation - Logic P0 | 4 | 3 | 75% |
+| Remediation - Logic P1 | 7 | 3 | 43% |
+| Remediation - Logic P2 | 4 | 0 | 0% |
+| Remediation - Surface API | 4 | 0 | 0% |
+| Remediation - Surface WEB | 6 | 0 | 0% |
+| **Subtotal (Phase 7)** | **28** | **7** | **25%** |
+| **Grand Total** | **121** | **100** | **83%** |
 
-**Last Updated**: 2025-12-22
+**Last Updated**: 2025-12-24
 - API Backend: 63/63 tasks complete (100%)
 - Web Frontend: 30/30 tasks complete (100%) ✅
+- Remediation: 7/28 tasks complete (25%) 🔄
+
+---
+
+## Phase 7: Remediation Tasks
+
+These tasks address critical issues identified in the validation analysis (`/docs/VALIDATION_ANALYSIS.md`).
+
+### 7.1 Foundation Layer (Remediation)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 93 | TASK-SARS-004 | Fix PAYE Tax Bracket 1 Maximum Value | foundation | TASK-SARS-001 | P0-BLOCKER | ⏳ Pending |
+
+### 7.2 Infrastructure Layer (Remediation)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 94 | TASK-INFRA-011 | Centralized Scheduling Service with BullMQ | logic | TASK-CORE-001 | P0-BLOCKER | ✅ Complete |
+| 95 | TASK-INFRA-012 | Multi-Channel Notification Service Enhancement | logic | TASK-BILL-015 | P2-HIGH | ⏳ Pending |
+
+### 7.3 Logic Layer - P0 Blockers (Remediation)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 96 | TASK-RECON-014 | Reconciled Transaction Delete Protection | logic | TASK-RECON-001, TASK-TRANS-001 | P0-BLOCKER | ✅ Complete |
+| 97 | TASK-TRANS-016 | Bank Feed Integration Service via Xero API | logic | TASK-TRANS-001, TASK-MCP-001 | P0-BLOCKER | ⏳ Pending |
+| 98 | TASK-TRANS-017 | Transaction Categorization Accuracy Tracking | logic | TASK-TRANS-012 | P0-BLOCKER | ✅ Complete |
+| 99 | TASK-SARS-017 | SARS Deadline Reminder System | logic | TASK-INFRA-011 | P0-BLOCKER | ✅ Complete |
+
+### 7.4 Logic Layer - P1 Critical (Remediation)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 100 | TASK-BILL-015 | WhatsApp Business API Integration | logic | TASK-BILL-013 | P1-CRITICAL | ✅ Complete |
+| 101 | TASK-BILL-016 | Invoice Generation Scheduling Cron Job | logic | TASK-BILL-012, TASK-INFRA-011 | P1-CRITICAL | ✅ Complete |
+| 102 | TASK-PAY-015 | Payment Reminder Scheduler Service | logic | TASK-INFRA-011, TASK-PAY-014 | P1-CRITICAL | ✅ Complete |
+| 103 | TASK-PAY-016 | Invoke PaymentMatcherAgent in PaymentMatchingService | logic | TASK-PAY-011, TASK-AGENT-003 | P1-CRITICAL | ⏳ Pending |
+| 104 | TASK-TRANS-018 | Enable Payee Alias Matching in Categorization | logic | TASK-TRANS-013 | P1-CRITICAL | ⏳ Pending |
+| 105 | TASK-RECON-015 | Reconciliation Duplicate Detection Service | logic | TASK-TRANS-001, TASK-RECON-001 | P1-CRITICAL | ⏳ Pending |
+| 106 | TASK-RECON-016 | 3-Day Business Day Timing Window for Reconciliation | logic | TASK-RECON-011 | P1-CRITICAL | ⏳ Pending |
+
+### 7.5 Logic Layer - P2 High (Remediation)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 107 | TASK-TRANS-019 | Recurring Transaction Detection Integration | logic | TASK-TRANS-013 | P2-HIGH | ⏳ Pending |
+| 108 | TASK-BILL-017 | Ad-Hoc Charges in Monthly Invoice Generation | logic | TASK-BILL-012 | P2-HIGH | ⏳ Pending |
+| 109 | TASK-PAY-017 | Arrears Report PDF Export | logic | TASK-PAY-013 | P2-HIGH | ⏳ Pending |
+| 114 | TASK-SARS-018 | SARS eFiling Submission Error Handling and Retry | logic | TASK-SARS-014, TASK-SARS-015 | P2-HIGH | ⏳ Pending |
+
+### 7.6 Surface Layer - API (Remediation)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 110 | TASK-RECON-033 | Balance Sheet API Endpoint | surface | TASK-RECON-013 | P0-BLOCKER | ⏳ Pending |
+| 111 | TASK-TRANS-034 | Xero Sync REST API Endpoints | surface | TASK-TRANS-014, TASK-TRANS-016 | P2-HIGH | ⏳ Pending |
+| 112 | TASK-BILL-035 | Delivery Status Webhook Handlers | surface | TASK-BILL-013, TASK-BILL-015 | P2-HIGH | ⏳ Pending |
+| 113 | TASK-RECON-034 | Audit Log Pagination and Filtering | surface | TASK-CORE-004 | P2-HIGH | ⏳ Pending |
+
+### 7.7 Surface Layer - WEB (Remediation)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 120 | TASK-WEB-041 | SARS VAT201 Real Data Hook | surface | TASK-SARS-014, TASK-WEB-003 | P0-BLOCKER | ⏳ Pending |
+| 121 | TASK-WEB-042 | Invoice Send Button API Integration | surface | TASK-BILL-013, TASK-BILL-015 | P0-BLOCKER | ⏳ Pending |
+| 122 | TASK-WEB-043 | Reports PDF/CSV Export Implementation | surface | TASK-RECON-013, TASK-RECON-033 | P1-CRITICAL | ⏳ Pending |
+| 123 | TASK-WEB-044 | Pro-Rata Fee Display Component | surface | TASK-BILL-014 | P2-HIGH | ⏳ Pending |
+| 124 | TASK-WEB-045 | Payment Reminder Template Editor | surface | TASK-PAY-015 | P2-HIGH | ⏳ Pending |
+| 125 | TASK-WEB-046 | Mobile Responsive Improvements | surface | TASK-WEB-006 | P2-HIGH | ⏳ Pending |
 
 ---
 

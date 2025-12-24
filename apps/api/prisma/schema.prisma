@@ -35,6 +35,7 @@ enum AuditAction {
   CREATE
   UPDATE
   DELETE
+  DELETE_BLOCKED
   CATEGORIZE
   MATCH
   RECONCILE
@@ -236,7 +237,9 @@ model Tenant {
   sarsSubmissions  SarsSubmission[]
   reconciliations  Reconciliation[]
   xeroToken        XeroToken?
-  reminders        Reminder[]
+  bankConnections         BankConnection[]
+  reminders               Reminder[]
+  categorizationMetrics   CategorizationMetric[]
 
   @@map("tenants")
 }
@@ -309,9 +312,10 @@ model Transaction {
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  categorizations Categorization[]
-  payments        Payment[]
+  tenant                Tenant                  @relation(fields: [tenantId], references: [id])
+  categorizations       Categorization[]
+  payments              Payment[]
+  categorizationMetrics CategorizationMetric[]
 
   @@index([tenantId, date])
   @@index([tenantId, status])
@@ -423,6 +427,7 @@ model Parent {
   phone            String?          @db.VarChar(20)
   whatsapp         String?          @db.VarChar(20)
   preferredContact PreferredContact @default(EMAIL) @map("preferred_contact")
+  whatsappOptIn    Boolean          @default(false) @map("whatsapp_opt_in")
   idNumber         String?          @map("id_number") @db.VarChar(20)
   address          String?
   notes            String?
@@ -487,6 +492,7 @@ model Invoice {
   deliveryStatus     DeliveryStatus? @map("delivery_status")
   deliveredAt        DateTime?       @map("delivered_at")
   deliveryRetryCount Int             @default(0) @map("delivery_retry_count")
+  pdfUrl             String?         @map("pdf_url") @db.VarChar(500)
   notes              String?
   isDeleted          Boolean         @default(false) @map("is_deleted")
   createdAt          DateTime        @default(now()) @map("created_at")
@@ -689,6 +695,61 @@ model XeroToken {
 
   @@index([tenantId])
   @@map("xero_tokens")
+}
+
+// TASK-TRANS-016: Bank Feed Integration via Xero API
+enum BankConnectionStatus {
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
+model BankConnection {
+  id               String               @id @default(uuid())
+  tenantId         String               @map("tenant_id")
+  xeroAccountId    String               @map("xero_account_id")
+  accountName      String               @map("account_name")
+  accountNumber    String               @map("account_number")
+  bankName         String               @map("bank_name")
+  status           BankConnectionStatus @default(ACTIVE)
+  errorMessage     String?              @map("error_message")
+  connectedAt      DateTime             @default(now()) @map("connected_at")
+  lastSyncAt       DateTime?            @map("last_sync_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  tenant           Tenant               @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, xeroAccountId])
+  @@index([tenantId, status])
+  @@map("bank_connections")
+}
+
+// TASK-TRANS-017: Transaction Categorization Accuracy Tracking
+enum MetricEventType {
+  CATEGORIZED
+  CORRECTED
+}
+
+model CategorizationMetric {
+  id                  String           @id @default(uuid())
+  tenantId            String           @map("tenant_id")
+  transactionId       String           @map("transaction_id")
+  date                DateTime         @default(now())
+  eventType           MetricEventType  @map("event_type")
+  confidence          Decimal          @db.Decimal(5, 2)
+  isAutoApplied       Boolean          @default(false) @map("is_auto_applied")
+  originalAccountCode String?          @map("original_account_code")
+  correctedAccountCode String?         @map("corrected_account_code")
+  createdAt           DateTime         @default(now()) @map("created_at")
+
+  tenant              Tenant           @relation(fields: [tenantId], references: [id])
+  transaction         Transaction      @relation(fields: [transactionId], references: [id])
+
+  @@index([tenantId, date])
+  @@index([tenantId, eventType])
+  @@index([transactionId])
+  @@map("categorization_metrics")
 }
 
 model Reminder {

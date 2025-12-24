@@ -84,8 +84,12 @@ export class UnauthorizedException extends AppException {
  * Forbidden error - thrown when user doesn't have permission
  */
 export class ForbiddenException extends AppException {
-  constructor(message: string = 'Access denied') {
-    super(message, 'FORBIDDEN', 403);
+  constructor(
+    message: string = 'Access denied',
+    code: string = 'FORBIDDEN',
+    details?: Record<string, unknown>,
+  ) {
+    super(message, code, 403, details);
     this.name = 'ForbiddenException';
   }
 }

@@ -10,7 +10,10 @@ import {
   NotFoundException,
   ConflictException,
   DatabaseException,
+  ForbiddenException,
 } from '../../shared/exceptions';
+import { AuditLogService } from '../services/audit-log.service';
+import { AuditAction } from '../entities/audit-log.entity';
 
 export interface PaginatedResult<T> {
   data: T[];
@@ -24,7 +27,10 @@ export interface PaginatedResult<T> {
 export class TransactionRepository {
   private readonly logger = new Logger(TransactionRepository.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   /**
    * Create a new transaction
@@ -301,14 +307,50 @@ export class TransactionRepository {
   /**
    * Soft delete transaction (sets isDeleted and deletedAt)
    * @throws NotFoundException if transaction doesn't exist or belongs to different tenant
+   * @throws ForbiddenException if transaction is reconciled (CRIT-001)
    * @throws DatabaseException for database errors
    */
-  async softDelete(tenantId: string, id: string): Promise<void> {
+  async softDelete(
+    tenantId: string,
+    id: string,
+    userId?: string,
+  ): Promise<void> {
     try {
       // First verify transaction exists and belongs to tenant
       const existing = await this.findById(tenantId, id);
       if (!existing) {
         throw new NotFoundException('Transaction', id);
+      }
+
+      // CRIT-001: Prevent deletion of reconciled transactions
+      // REQ-RECON-010: Reconciled transactions cannot be modified or deleted
+      if (existing.isReconciled) {
+        this.logger.warn(`Blocked deletion of reconciled transaction ${id}`, {
+          transactionId: id,
+          tenantId,
+          userId,
+          reconciledAt: existing.reconciledAt,
+        });
+
+        // Log to audit trail for compliance
+        await this.auditLogService.logAction({
+          tenantId,
+          entityType: 'Transaction',
+          entityId: id,
+          action: AuditAction.DELETE_BLOCKED,
+          userId: userId || undefined,
+          beforeValue: {
+            isReconciled: existing.isReconciled,
+            reconciledAt: existing.reconciledAt?.toISOString(),
+          },
+          changeSummary: `Blocked deletion attempt on reconciled transaction by user ${userId || 'SYSTEM'}`,
+        });
+
+        throw new ForbiddenException(
+          'Cannot delete reconciled transaction. Reconciled transactions are locked for audit compliance.',
+          'RECONCILED_TRANSACTION_UNDELETABLE',
+          { transactionId: id, reconciledAt: existing.reconciledAt },
+        );
       }
 
       await this.prisma.transaction.update({
@@ -318,8 +360,13 @@ export class TransactionRepository {
           deletedAt: new Date(),
         },
       });
+
+      this.logger.log(`Soft deleted transaction ${id}`);
     } catch (error) {
-      if (error instanceof NotFoundException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
       this.logger.error(

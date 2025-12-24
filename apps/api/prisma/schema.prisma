@@ -117,6 +117,9 @@ enum DeliveryStatus {
   SENT
   DELIVERED
   OPENED
+  CLICKED
+  BOUNCED
+  COMPLAINED
   FAILED
 }
 
@@ -131,6 +134,7 @@ enum LineType {
   SCHOOL_TRIP
   STATIONERY
   UNIFORM
+  AD_HOC
 }
 
 enum MatchType {
@@ -220,6 +224,8 @@ model Tenant {
   invoiceDayOfMonth  Int                @default(1) @map("invoice_day_of_month")
   invoiceDueDays     Int                @default(7) @map("invoice_due_days")
   closureDates       Json               @default("[]") @map("closure_dates")
+  xeroConnectedAt    DateTime?          @map("xero_connected_at")
+  xeroTenantName     String?            @map("xero_tenant_name") @db.VarChar(200)
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
@@ -240,6 +246,8 @@ model Tenant {
   bankConnections         BankConnection[]
   reminders               Reminder[]
   categorizationMetrics   CategorizationMetric[]
+  xeroOAuthState          XeroOAuthState?
+  invoiceDeliveryLogs     InvoiceDeliveryLog[]
 
   @@map("tenants")
 }
@@ -291,6 +299,12 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+enum DuplicateStatus {
+  NONE
+  FLAGGED
+  RESOLVED
+}
+
 model Transaction {
   id                String            @id @default(uuid())
   tenantId          String            @map("tenant_id")
@@ -309,10 +323,15 @@ model Transaction {
   reconciledAt      DateTime?         @map("reconciled_at")
   isDeleted         Boolean           @default(false) @map("is_deleted")
   deletedAt         DateTime?         @map("deleted_at")
+  transactionHash   String?           @map("transaction_hash") @db.VarChar(64)
+  duplicateOfId     String?           @map("duplicate_of_id")
+  duplicateStatus   DuplicateStatus   @default(NONE) @map("duplicate_status")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
   tenant                Tenant                  @relation(fields: [tenantId], references: [id])
+  duplicateOf           Transaction?            @relation("TransactionDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates            Transaction[]           @relation("TransactionDuplicates")
   categorizations       Categorization[]
   payments              Payment[]
   categorizationMetrics CategorizationMetric[]
@@ -321,6 +340,8 @@ model Transaction {
   @@index([tenantId, status])
   @@index([tenantId, payeeName])
   @@index([tenantId, isReconciled])
+  @@index([tenantId, transactionHash])
+  @@index([tenantId, duplicateStatus])
   @@map("transactions")
 }
 
@@ -498,12 +519,14 @@ model Invoice {
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")
 
-  tenant    Tenant        @relation(fields: [tenantId], references: [id])
-  parent    Parent        @relation(fields: [parentId], references: [id])
-  child     Child         @relation(fields: [childId], references: [id])
-  lines     InvoiceLine[]
-  payments  Payment[]
-  reminders Reminder[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  parent        Parent         @relation(fields: [parentId], references: [id])
+  child         Child          @relation(fields: [childId], references: [id])
+  lines         InvoiceLine[]
+  payments      Payment[]
+  reminders     Reminder[]
+  adHocCharges  AdHocCharge[]
+  deliveryLogs  InvoiceDeliveryLog[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, parentId])
@@ -526,12 +549,37 @@ model InvoiceLine {
   lineType       LineType @map("line_type")
   accountCode    String?  @map("account_code") @db.VarChar(20)
   sortOrder      Int      @default(0) @map("sort_order")
+  adHocChargeId  String?  @map("ad_hoc_charge_id")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice     Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  adHocCharge AdHocCharge? @relation(fields: [adHocChargeId], references: [id])
 
   @@index([invoiceId, sortOrder])
+  @@index([adHocChargeId])
   @@map("invoice_lines")
+}
+
+// TASK-BILL-035: Invoice Delivery Log for webhook tracking
+model InvoiceDeliveryLog {
+  id                String   @id @default(uuid())
+  invoiceId         String   @map("invoice_id")
+  tenantId          String   @map("tenant_id")
+  channel           String   @db.VarChar(20)  // EMAIL, WHATSAPP
+  status            String   @db.VarChar(20)  // DeliveryStatus
+  eventType         String   @map("event_type") @db.VarChar(50)
+  externalMessageId String?  @map("external_message_id") @db.VarChar(255)
+  metadata          Json     @default("{}")
+  occurredAt        DateTime @map("occurred_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@index([invoiceId, occurredAt])
+  @@index([externalMessageId])
+  @@index([tenantId, channel])
+  @@map("invoice_delivery_logs")
 }
 
 model Payment {
@@ -752,6 +800,27 @@ model CategorizationMetric {
   @@map("categorization_metrics")
 }
 
+model AdHocCharge {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  childId     String    @map("child_id")
+  description String    @db.VarChar(500)
+  amountCents Int       @map("amount_cents")
+  chargeDate  DateTime  @map("charge_date") @db.Date
+  invoicedAt  DateTime? @map("invoiced_at")
+  invoiceId   String?   @map("invoice_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  invoice      Invoice?       @relation(fields: [invoiceId], references: [id])
+  invoiceLines InvoiceLine[]
+
+  @@index([tenantId, childId])
+  @@index([tenantId, invoicedAt])
+  @@index([tenantId, chargeDate])
+  @@map("ad_hoc_charges")
+}
+
 model Reminder {
   id               String           @id @default(uuid())
   tenantId         String           @map("tenant_id")
@@ -778,4 +847,19 @@ model Reminder {
   @@index([tenantId, parentId])
   @@index([tenantId, scheduledFor])
   @@map("reminders")
+}
+
+// TASK-TRANS-034: Xero Sync REST API Endpoints
+model XeroOAuthState {
+  id           String   @id @default(uuid())
+  tenantId     String   @unique @map("tenant_id")
+  codeVerifier String   @map("code_verifier") @db.Text
+  state        String   @db.Text
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("xero_oauth_states")
 }

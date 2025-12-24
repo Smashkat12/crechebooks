@@ -39,6 +39,8 @@ import { CreateCategorizationDto } from '../dto/categorization.dto';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import { TransactionCategorizerAgent } from '../../agents/transaction-categorizer/categorizer.agent';
 import { AccuracyMetricsService } from './accuracy-metrics.service';
+import { PayeeAliasService } from './payee-alias.service';
+import { RecurringDetectionService } from './recurring-detection.service';
 
 @Injectable()
 export class CategorizationService {
@@ -51,6 +53,9 @@ export class CategorizationService {
     private readonly auditLogService: AuditLogService,
     @Inject(forwardRef(() => PatternLearningService))
     private readonly patternLearningService: PatternLearningService,
+    private readonly payeeAliasService: PayeeAliasService,
+    @Optional()
+    private readonly recurringDetectionService?: RecurringDetectionService,
     @Optional()
     private readonly categorizerAgent?: TransactionCategorizerAgent,
     @Optional()
@@ -157,6 +162,8 @@ export class CategorizationService {
 
   /**
    * Categorize a single transaction
+   * TASK-TRANS-019: Integrated recurring detection before AI categorization
+   *
    * @param transactionId - Transaction ID to categorize
    * @param tenantId - Tenant ID for isolation
    * @returns Categorization result
@@ -174,7 +181,28 @@ export class CategorizationService {
       throw new NotFoundException('Transaction', transactionId);
     }
 
-    // Try pattern match first
+    // TASK-TRANS-019: Try recurring detection first (before pattern match)
+    if (this.recurringDetectionService) {
+      const recurringMatch = await this.recurringDetectionService.detectRecurring(
+        tenantId,
+        transaction,
+      );
+
+      if (recurringMatch && recurringMatch.confidence >= 80) {
+        this.logger.log(
+          `Recurring pattern detected for transaction ${transactionId}: ${recurringMatch.payeeName} (${recurringMatch.confidence}% confidence)`,
+        );
+
+        // Apply recurring categorization immediately
+        return await this.applyRecurringCategorization(
+          transaction,
+          recurringMatch,
+          tenantId,
+        );
+      }
+    }
+
+    // Try pattern match
     const patternMatch = await this.tryPatternMatch(transaction, tenantId);
 
     // Get AI categorization
@@ -505,7 +533,102 @@ export class CategorizationService {
   }
 
   /**
+   * Apply categorization from recurring pattern match
+   * TASK-TRANS-019: Auto-categorizes based on recurring pattern
+   *
+   * @param transaction - Transaction to categorize
+   * @param recurringMatch - Recurring pattern match
+   * @param tenantId - Tenant ID for isolation
+   * @returns Categorization result
+   */
+  private async applyRecurringCategorization(
+    transaction: Transaction,
+    recurringMatch: any,
+    tenantId: string,
+  ): Promise<CategorizationItemResult> {
+    const categorizationDto: CreateCategorizationDto = {
+      transactionId: transaction.id,
+      accountCode: recurringMatch.suggestedAccountCode,
+      accountName: recurringMatch.suggestedAccountName,
+      confidenceScore: recurringMatch.confidence,
+      reasoning: `Recurring ${recurringMatch.frequency} payment to ${recurringMatch.payeeName} (${recurringMatch.confidence}% confidence)`,
+      source: CategorizationSource.RULE_BASED,
+      isSplit: false,
+      vatAmountCents: this.calculateVatAmount(
+        transaction.amountCents,
+        VatType.STANDARD,
+      ),
+      vatType: VatType.STANDARD,
+    };
+
+    const categorization =
+      await this.categorizationRepo.create(categorizationDto);
+
+    // Update transaction status
+    await this.transactionRepo.updateStatus(
+      tenantId,
+      transaction.id,
+      TransactionStatus.CATEGORIZED,
+    );
+
+    // Create audit trail
+    await this.auditLogService.logCreate({
+      tenantId,
+      agentId: 'recurring-detection-service',
+      entityType: 'Categorization',
+      entityId: categorization.id,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      afterValue: JSON.parse(JSON.stringify(categorization)),
+    });
+
+    // TASK-TRANS-017: Record categorization for accuracy tracking
+    if (this.accuracyMetricsService) {
+      try {
+        await this.accuracyMetricsService.recordCategorization(tenantId, {
+          transactionId: transaction.id,
+          confidence: recurringMatch.confidence,
+          isAutoApplied: true,
+          accountCode: recurringMatch.suggestedAccountCode,
+        });
+      } catch (error) {
+        // Log but don't fail - metrics tracking is non-critical
+        this.logger.warn(
+          `Failed to record accuracy metric for transaction ${transaction.id}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
+    // Apply recurring category (increments match count)
+    if (this.recurringDetectionService) {
+      try {
+        await this.recurringDetectionService.applyRecurringCategory(
+          tenantId,
+          transaction.id,
+        );
+      } catch (error) {
+        // Log but don't fail
+        this.logger.warn(
+          `Failed to apply recurring category for transaction ${transaction.id}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
+    return {
+      transactionId: transaction.id,
+      status: 'AUTO_APPLIED',
+      accountCode: recurringMatch.suggestedAccountCode,
+      accountName: recurringMatch.suggestedAccountName,
+      confidenceScore: recurringMatch.confidence,
+      source: CategorizationSource.RULE_BASED,
+    };
+  }
+
+  /**
    * Try to match transaction against payee patterns
+   * TASK-TRANS-018: Uses alias resolution before pattern matching
+   *
    * @param transaction - Transaction to match
    * @param tenantId - Tenant ID for isolation
    * @returns Pattern match result or null
@@ -519,9 +642,19 @@ export class CategorizationService {
     }
 
     try {
-      const pattern = await this.payeePatternRepo.findByPayeeName(
+      // TASK-TRANS-018: Resolve alias to canonical name first
+      const canonicalName = await this.payeeAliasService.resolveAlias(
         tenantId,
         transaction.payeeName,
+      );
+
+      this.logger.debug(
+        `Resolved "${transaction.payeeName}" to "${canonicalName}"`,
+      );
+
+      const pattern = await this.payeePatternRepo.findByPayeeName(
+        tenantId,
+        canonicalName,
       );
 
       if (pattern) {

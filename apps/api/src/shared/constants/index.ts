@@ -2,6 +2,9 @@
  * Shared constants for CrecheBooks
  */
 
+// South African public holidays
+export * from './sa-holidays.constants';
+
 // South African VAT rate (15%)
 export const VAT_RATE = 0.15;
 

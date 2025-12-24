@@ -1,113 +1,97 @@
-import { useState } from "react";
-import { Mail, MessageSquare } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+'use client';
+
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import type { Invoice } from "@/types/invoice";
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Mail, MessageCircle, Loader2 } from 'lucide-react';
+import type { Invoice } from '@/types/invoice';
 
 interface SendInvoiceDialogProps {
-  invoice: Invoice;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSend: (options: { email: boolean; whatsapp: boolean; message?: string }) => void;
+  invoice: Invoice | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSend: (channel: 'email' | 'whatsapp') => void;
+  isLoading: boolean;
 }
 
 export function SendInvoiceDialog({
   invoice,
-  open,
-  onOpenChange,
+  isOpen,
+  onClose,
   onSend,
+  isLoading,
 }: SendInvoiceDialogProps) {
-  const [sendEmail, setSendEmail] = useState(true);
-  const [sendWhatsApp, setSendWhatsApp] = useState(false);
-  const [message, setMessage] = useState("");
+  const [channel, setChannel] = useState<'email' | 'whatsapp'>('email');
+
+  if (!invoice) return null;
 
   const handleSend = () => {
-    onSend({
-      email: sendEmail,
-      whatsapp: sendWhatsApp,
-      message: message.trim() || undefined,
-    });
-    onOpenChange(false);
-    setMessage("");
+    onSend(channel);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Send Invoice</DialogTitle>
           <DialogDescription>
             Send invoice {invoice.invoiceNumber} to {invoice.parentName}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
+
+        <div className="py-4 space-y-4">
           <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="email"
-                checked={sendEmail}
-                onCheckedChange={(checked) => setSendEmail(checked === true)}
-              />
-              <Label
-                htmlFor="email"
-                className="flex items-center gap-2 cursor-pointer"
+            <Label className="text-sm font-medium">Delivery Method</Label>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setChannel('email')}
+                className={`w-full flex items-center gap-3 p-3 rounded-md border-2 transition-colors ${
+                  channel === 'email'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-primary/50'
+                }`}
               >
                 <Mail className="h-4 w-4" />
-                Send via Email
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="whatsapp"
-                checked={sendWhatsApp}
-                onCheckedChange={(checked) => setSendWhatsApp(checked === true)}
-              />
-              <Label
-                htmlFor="whatsapp"
-                className="flex items-center gap-2 cursor-pointer"
+                <span className="font-medium">Email</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChannel('whatsapp')}
+                className={`w-full flex items-center gap-3 p-3 rounded-md border-2 transition-colors ${
+                  channel === 'whatsapp'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-primary/50'
+                }`}
               >
-                <MessageSquare className="h-4 w-4" />
-                Send via WhatsApp
-              </Label>
+                <MessageCircle className="h-4 w-4" />
+                <span className="font-medium">WhatsApp</span>
+              </button>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="message">Additional Message (Optional)</Label>
-            <Textarea
-              id="message"
-              placeholder="Add a personal message to include with the invoice..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={4}
-            />
-          </div>
-
-          {!sendEmail && !sendWhatsApp && (
-            <p className="text-sm text-destructive">
-              Please select at least one delivery method
-            </p>
-          )}
         </div>
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSend}
-            disabled={!sendEmail && !sendWhatsApp}
-          >
-            Send Invoice
+          <Button onClick={handleSend} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              'Send Invoice'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

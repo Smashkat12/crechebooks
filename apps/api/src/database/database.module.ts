@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PrismaService } from './prisma/prisma.service';
 import { TenantRepository } from './repositories/tenant.repository';
 import { UserRepository } from './repositories/user.repository';
 import { TransactionRepository } from './repositories/transaction.repository';
@@ -35,6 +36,10 @@ import { ReconciliationRepository } from './repositories/reconciliation.reposito
 import { ReconciliationService } from './services/reconciliation.service';
 import { DiscrepancyService } from './services/discrepancy.service';
 import { FinancialReportService } from './services/financial-report.service';
+import { PayeeAliasService } from './services/payee-alias.service';
+import { AccuracyMetricsService } from './services/accuracy-metrics.service';
+import { DuplicateDetectionService } from './services/duplicate-detection.service';
+import { RecurringDetectionService } from './services/recurring-detection.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
@@ -50,6 +55,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     SarsAgentModule,
   ],
   providers: [
+    PrismaService,
     TenantRepository,
     UserRepository,
     TransactionRepository,
@@ -86,8 +92,13 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     ReconciliationService,
     DiscrepancyService,
     FinancialReportService,
+    PayeeAliasService,
+    AccuracyMetricsService,
+    DuplicateDetectionService,
+    RecurringDetectionService,
   ],
   exports: [
+    PrismaService,
     TenantRepository,
     UserRepository,
     TransactionRepository,
@@ -124,6 +135,10 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     ReconciliationService,
     DiscrepancyService,
     FinancialReportService,
+    PayeeAliasService,
+    AccuracyMetricsService,
+    DuplicateDetectionService,
+    RecurringDetectionService,
   ],
 })
 export class DatabaseModule {}

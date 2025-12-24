@@ -37,15 +37,29 @@ import { MatchType, MatchedBy } from '../entities/payment.entity';
 import { InvoiceStatus } from '../entities/invoice.entity';
 import { AuditAction } from '../entities/audit-log.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
+import { PaymentMatcherAgent } from '../../agents/payment-matcher/matcher.agent';
+import {
+  MatchDecision,
+  InvoiceCandidate,
+} from '../../agents/payment-matcher/interfaces/matcher.interface';
 
 /** Confidence threshold for auto-apply (single high-confidence match) */
 const AUTO_APPLY_THRESHOLD = 80;
+
+/** Confidence threshold for agent decision (ambiguous matches) */
+const AGENT_CONFIDENCE_HIGH = 85;
+
+/** Confidence threshold for review required */
+const AGENT_CONFIDENCE_MEDIUM = 60;
 
 /** Minimum confidence to include as a candidate for review */
 const CANDIDATE_THRESHOLD = 20;
 
 /** Maximum candidates to return for review */
 const MAX_CANDIDATES = 5;
+
+/** Maximum retries for agent calls */
+const MAX_AGENT_RETRIES = 3;
 
 /** Invoice with parent and child relations */
 type InvoiceWithRelations = Invoice & { parent: Parent; child: Child };
@@ -59,6 +73,7 @@ export class PaymentMatchingService {
     private readonly paymentRepo: PaymentRepository,
     private readonly invoiceRepo: InvoiceRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly paymentAgent: PaymentMatcherAgent,
   ) {}
 
   /**
@@ -178,16 +193,28 @@ export class PaymentMatchingService {
           reason: `High confidence match (${highConfidence[0].confidenceScore}%)`,
         });
         autoApplied++;
+      } else if (highConfidence.length > 1) {
+        // Multiple high-confidence matches - AMBIGUOUS, invoke agent
+        const agentResult = await this.resolveAmbiguousMatch(
+          transaction,
+          partialMatches,
+          dto.tenantId,
+        );
+
+        if (agentResult.status === 'AUTO_APPLIED') {
+          results.push(agentResult);
+          autoApplied++;
+        } else {
+          results.push(agentResult);
+          reviewRequired++;
+        }
       } else {
-        // Multiple matches or low confidence - require review
+        // No high-confidence match - require review
         results.push({
           transactionId: transaction.id,
           status: 'REVIEW_REQUIRED',
           candidates: partialMatches.slice(0, MAX_CANDIDATES),
-          reason:
-            highConfidence.length > 1
-              ? 'Multiple high-confidence matches - manual selection required'
-              : 'No high-confidence match found',
+          reason: 'No high-confidence match found',
         });
         reviewRequired++;
       }
@@ -905,5 +932,170 @@ export class PaymentMatchingService {
       },
     });
     return existingPayment !== null;
+  }
+
+  /**
+   * Resolve ambiguous match using PaymentMatcherAgent
+   * Called when multiple high-confidence candidates exist
+   *
+   * @param transaction - The transaction to match
+   * @param candidates - Match candidates sorted by confidence
+   * @param tenantId - Tenant ID for audit logging
+   * @returns Transaction match result with agent decision
+   */
+  private async resolveAmbiguousMatch(
+    transaction: Transaction,
+    candidates: MatchCandidate[],
+    tenantId: string,
+  ): Promise<TransactionMatchResult> {
+    this.logger.log(
+      `Resolving ambiguous match for transaction ${transaction.id} with ${candidates.length} candidates`,
+    );
+
+    // Convert MatchCandidate[] to InvoiceCandidate[] format agent expects
+    const invoiceCandidates: InvoiceCandidate[] = candidates.map((c) => ({
+      invoice: {
+        id: c.invoiceId,
+        invoiceNumber: c.invoiceNumber,
+        totalCents: c.invoiceOutstandingCents, // Using outstanding as total for candidate
+        amountPaidCents: 0, // Not needed for agent decision
+        parentId: c.parentId,
+        parent: {
+          firstName: c.parentName.split(' ')[0] ?? '',
+          lastName: c.parentName.split(' ').slice(1).join(' ') || '',
+        },
+        child: {
+          firstName: c.childName,
+        },
+      },
+      confidence: c.confidenceScore,
+      matchReasons: c.matchReasons,
+    }));
+
+    let agentDecision: MatchDecision | null = null;
+    let lastError: Error | null = null;
+
+    // Retry logic with max 3 attempts
+    for (let attempt = 1; attempt <= MAX_AGENT_RETRIES; attempt++) {
+      try {
+        agentDecision = await this.paymentAgent.makeMatchDecision(
+          transaction,
+          invoiceCandidates,
+          tenantId,
+          AGENT_CONFIDENCE_HIGH,
+        );
+        break; // Success - exit retry loop
+      } catch (error) {
+        lastError = error as Error;
+        this.logger.warn(
+          `Agent decision failed (attempt ${attempt}/${MAX_AGENT_RETRIES}): ${lastError.message}`,
+        );
+
+        // Wait before retry (exponential backoff)
+        if (attempt < MAX_AGENT_RETRIES) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, attempt) * 100),
+          );
+        }
+      }
+    }
+
+    // If agent failed after retries, fall back to rule-based
+    if (!agentDecision) {
+      this.logger.error(
+        `Agent decision failed after ${MAX_AGENT_RETRIES} retries, falling back to rule-based: ${lastError?.message}`,
+      );
+
+      // Log agent failure to audit
+      await this.auditLogService.logAction({
+        tenantId,
+        entityType: 'Payment',
+        entityId: transaction.id,
+        action: AuditAction.UPDATE,
+        afterValue: {
+          agentFailure: true,
+          errorMessage: lastError?.message,
+          fallbackUsed: 'rule-based',
+          candidateCount: candidates.length,
+        },
+        changeSummary: `Agent failed to resolve ambiguous match, falling back to manual review`,
+      });
+
+      // Return first candidate as best match for review
+      return {
+        transactionId: transaction.id,
+        status: 'REVIEW_REQUIRED',
+        candidates: candidates.slice(0, MAX_CANDIDATES),
+        reason: `Agent resolution failed - ${candidates.length} high-confidence matches require manual selection`,
+      };
+    }
+
+    // Log agent decision to audit
+    await this.auditLogService.logAction({
+      tenantId,
+      entityType: 'Payment',
+      entityId: transaction.id,
+      action: AuditAction.UPDATE,
+      afterValue: {
+        agentDecision: agentDecision.action,
+        agentConfidence: agentDecision.confidence,
+        agentReasoning: agentDecision.reasoning,
+        selectedInvoice: agentDecision.invoiceId,
+        alternativesCount: agentDecision.alternatives.length,
+      },
+      changeSummary: `Agent resolved ambiguous match: ${agentDecision.action} (${agentDecision.confidence}% confidence)`,
+    });
+
+    // Apply confidence thresholds to agent decision
+    if (
+      agentDecision.action === 'AUTO_APPLY' &&
+      agentDecision.confidence >= AGENT_CONFIDENCE_HIGH &&
+      agentDecision.invoiceId
+    ) {
+      // Agent confident - auto-apply
+      const selectedCandidate = candidates.find(
+        (c) => c.invoiceId === agentDecision.invoiceId,
+      );
+
+      if (!selectedCandidate) {
+        this.logger.error(
+          `Agent selected invoice ${agentDecision.invoiceId} not found in candidates`,
+        );
+        return {
+          transactionId: transaction.id,
+          status: 'REVIEW_REQUIRED',
+          candidates: candidates.slice(0, MAX_CANDIDATES),
+          reason: 'Agent selected invalid invoice - requires manual review',
+        };
+      }
+
+      const applied = await this.autoApplyMatch(selectedCandidate, tenantId);
+
+      return {
+        transactionId: transaction.id,
+        status: 'AUTO_APPLIED',
+        appliedMatch: applied,
+        reason: `Agent auto-applied (${agentDecision.confidence}%): ${agentDecision.reasoning}`,
+      };
+    } else if (
+      agentDecision.confidence >= AGENT_CONFIDENCE_MEDIUM &&
+      agentDecision.confidence < AGENT_CONFIDENCE_HIGH
+    ) {
+      // Medium confidence - suggest to user for review
+      return {
+        transactionId: transaction.id,
+        status: 'REVIEW_REQUIRED',
+        candidates: candidates.slice(0, MAX_CANDIDATES),
+        reason: `Agent suggests review (${agentDecision.confidence}%): ${agentDecision.reasoning}`,
+      };
+    } else {
+      // Low confidence or NO_MATCH - flag for manual review
+      return {
+        transactionId: transaction.id,
+        status: 'REVIEW_REQUIRED',
+        candidates: candidates.slice(0, MAX_CANDIDATES),
+        reason: `Agent flagged for manual review (${agentDecision.confidence}%): ${agentDecision.reasoning}`,
+      };
+    }
   }
 }

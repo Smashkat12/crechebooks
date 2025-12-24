@@ -7,7 +7,7 @@
  * auto-categorization accuracy. Creates and updates PayeePattern records.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PayeePattern, Transaction } from '@prisma/client';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
@@ -20,6 +20,7 @@ import {
 } from '../dto/pattern-learning.dto';
 import { NotFoundException } from '../../shared/exceptions';
 import { PayeePatternFilterDto } from '../dto/payee-pattern.dto';
+import { PayeeAliasService } from './payee-alias.service';
 
 @Injectable()
 export class PatternLearningService {
@@ -29,11 +30,14 @@ export class PatternLearningService {
     private readonly patternRepo: PayeePatternRepository,
     private readonly transactionRepo: TransactionRepository,
     private readonly categorizationRepo: CategorizationRepository,
+    @Inject(forwardRef(() => PayeeAliasService))
+    private readonly payeeAliasService: PayeeAliasService,
   ) {}
 
   /**
    * Learn from user categorization correction
    * Creates new pattern or updates existing one
+   * TASK-TRANS-018: Creates alias if payee name variation detected
    *
    * @param transactionId - Transaction that was corrected
    * @param accountCode - Account code user selected
@@ -66,10 +70,41 @@ export class PatternLearningService {
     );
     const keywords = this.extractKeywords(transaction.description);
 
-    // 3. Check if pattern exists for this payee
-    const existing = await this.patternRepo.findByPayeeName(
+    // TASK-TRANS-018: Check if this is a similar payee (potential alias)
+    const similarPayees = await this.payeeAliasService.findSimilar(
       tenantId,
       payeeName,
+    );
+
+    let canonicalName = payeeName;
+    if (similarPayees.length > 0) {
+      // Use the first similar payee as canonical
+      canonicalName = similarPayees[0];
+
+      // Create alias if payee name differs from canonical
+      if (this.normalizePayeeName(payeeName) !== this.normalizePayeeName(canonicalName)) {
+        try {
+          await this.payeeAliasService.createAlias(
+            tenantId,
+            payeeName,
+            canonicalName,
+          );
+          this.logger.log(
+            `Created alias "${payeeName}" for canonical name "${canonicalName}"`,
+          );
+        } catch (error) {
+          // Log but don't fail - alias might already exist
+          this.logger.warn(
+            `Could not create alias: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+
+    // 3. Check if pattern exists for this payee (using canonical name)
+    const existing = await this.patternRepo.findByPayeeName(
+      tenantId,
+      canonicalName,
     );
 
     if (existing) {
@@ -99,11 +134,11 @@ export class PatternLearningService {
     } else {
       // 4b. Create new pattern
       this.logger.log(
-        `Creating new pattern for payee: ${payeeName} with account ${accountCode}`,
+        `Creating new pattern for payee: ${canonicalName} with account ${accountCode}`,
       );
       return await this.patternRepo.create({
         tenantId,
-        payeePattern: this.normalizePayeeName(payeeName),
+        payeePattern: this.normalizePayeeName(canonicalName),
         payeeAliases: keywords.slice(0, 5), // Store top 5 keywords as aliases
         defaultAccountCode: accountCode,
         defaultAccountName: accountName,

@@ -14,6 +14,8 @@ export enum LineType {
   SCHOOL_TRIP = 'SCHOOL_TRIP',
   STATIONERY = 'STATIONERY',
   UNIFORM = 'UNIFORM',
+  // TASK-BILL-017: Ad-hoc charges (field trips, late fees, materials)
+  AD_HOC = 'AD_HOC',
 }
 
 /**
@@ -41,6 +43,7 @@ export function isVatApplicable(lineType: LineType): boolean {
     case LineType.STATIONERY:
     case LineType.UNIFORM:
     case LineType.EXTRA:
+    case LineType.AD_HOC: // TASK-BILL-017: Ad-hoc charges (typically goods/services)
       return true;
 
     // NO VAT - Adjustments (discounts/credits don't attract VAT themselves)

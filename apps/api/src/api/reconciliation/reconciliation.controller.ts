@@ -2,6 +2,8 @@
  * Reconciliation Controller
  * TASK-RECON-031: Reconciliation Controller
  * TASK-RECON-032: Financial Reports Endpoint
+ * TASK-RECON-033: Balance Sheet API Endpoint
+ * TASK-RECON-034: Audit Log Pagination and Filtering
  *
  * Handles bank reconciliation and financial reporting operations.
  * Uses snake_case for external API, transforms to camelCase for internal services.
@@ -10,11 +12,13 @@ import {
   Controller,
   Post,
   Get,
+  Param,
   Body,
   Query,
   Logger,
   HttpCode,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,10 +27,14 @@ import {
   ApiBearerAuth,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
+  ApiParam,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { ReconciliationService } from '../../database/services/reconciliation.service';
 import { FinancialReportService } from '../../database/services/financial-report.service';
+import { BalanceSheetService } from '../../database/services/balance-sheet.service';
+import { AuditLogService } from '../../database/services/audit-log.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -39,6 +47,13 @@ import {
   ApiIncomeStatementResponseDto,
   ReconciliationSummaryResponseDto,
 } from './dto';
+import { BalanceSheetResponse } from '../../database/dto/balance-sheet.dto';
+import {
+  AuditLogQueryDto,
+  AuditLogExportDto,
+  PaginatedAuditLogResponseDto,
+  AuditLogResponseDto,
+} from '../../database/dto/audit-log.dto';
 
 @Controller('reconciliation')
 @ApiTags('Reconciliation')
@@ -49,6 +64,8 @@ export class ReconciliationController {
   constructor(
     private readonly reconciliationService: ReconciliationService,
     private readonly financialReportService: FinancialReportService,
+    private readonly balanceSheetService: BalanceSheetService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Post()
@@ -252,5 +269,282 @@ export class ReconciliationController {
     }
 
     return response;
+  }
+
+  @Get('balance-sheet')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Generate Balance Sheet (IFRS for SMEs)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Balance sheet generated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getBalanceSheet(
+    @Query('as_at_date') asAtDate: string,
+    @CurrentUser() user: IUser,
+  ): Promise<BalanceSheetResponse> {
+    this.logger.log(
+      `Balance Sheet: tenant=${user.tenantId}, as_at_date=${asAtDate}`,
+    );
+
+    // Parse and validate date
+    const date = new Date(asAtDate);
+    if (isNaN(date.getTime())) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    const balanceSheet = await this.balanceSheetService.generate(
+      user.tenantId,
+      date,
+    );
+
+    this.logger.log(
+      `Balance Sheet generated: assets=${balanceSheet.totalAssetsCents}c, balanced=${balanceSheet.isBalanced}`,
+    );
+
+    return {
+      success: true,
+      data: balanceSheet,
+    };
+  }
+
+  @Get('balance-sheet/export')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Export Balance Sheet as PDF or Excel' })
+  @ApiResponse({
+    status: 200,
+    description: 'Balance sheet exported successfully',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format or unsupported format',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async exportBalanceSheet(
+    @Query('as_at_date') asAtDate: string,
+    @Query('format') format: 'pdf' | 'xlsx',
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(
+      `Balance Sheet Export: tenant=${user.tenantId}, as_at_date=${asAtDate}, format=${format}`,
+    );
+
+    // Validate format
+    if (!['pdf', 'xlsx'].includes(format)) {
+      throw new Error('Invalid format. Use "pdf" or "xlsx"');
+    }
+
+    // Parse and validate date
+    const date = new Date(asAtDate);
+    if (isNaN(date.getTime())) {
+      throw new Error('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    // Generate balance sheet
+    const balanceSheet = await this.balanceSheetService.generate(
+      user.tenantId,
+      date,
+    );
+
+    // Export to requested format
+    let buffer: Buffer;
+    let mimeType: string;
+    let filename: string;
+
+    if (format === 'pdf') {
+      buffer = await this.balanceSheetService.exportToPdf(balanceSheet);
+      mimeType = 'application/pdf';
+      filename = `balance-sheet-${asAtDate}.pdf`;
+    } else {
+      buffer = await this.balanceSheetService.exportToExcel(balanceSheet);
+      mimeType =
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      filename = `balance-sheet-${asAtDate}.xlsx`;
+    }
+
+    this.logger.log(
+      `Balance Sheet exported: format=${format}, size=${buffer.length} bytes`,
+    );
+
+    // Set response headers
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+
+    // Send buffer
+    res.send(buffer);
+  }
+
+  // ============================================
+  // TASK-RECON-034: Audit Log Endpoints
+  // ============================================
+
+  @Get('audit-logs')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get paginated audit logs with filtering' })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated audit logs returned',
+    type: PaginatedAuditLogResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAuditLogs(
+    @Query() query: AuditLogQueryDto,
+    @CurrentUser() user: IUser,
+  ): Promise<PaginatedAuditLogResponseDto> {
+    this.logger.log(
+      `Audit logs: tenant=${user.tenantId}, offset=${query.offset}, limit=${query.limit}`,
+    );
+
+    const result = await this.auditLogService.findAll(user.tenantId, {
+      offset: query.offset,
+      limit: query.limit,
+      startDate: query.startDate ? new Date(query.startDate) : undefined,
+      endDate: query.endDate ? new Date(query.endDate) : undefined,
+      entityType: query.entityType,
+      action: query.action,
+      userId: query.userId,
+      entityId: query.entityId,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+    });
+
+    return {
+      data: result.data as AuditLogResponseDto[],
+      total: result.total,
+      offset: result.offset,
+      limit: result.limit,
+      hasMore: result.hasMore,
+    };
+  }
+
+  @Get('audit-logs/export')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Export audit logs as CSV or JSON' })
+  @ApiResponse({
+    status: 200,
+    description: 'Audit logs exported successfully',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async exportAuditLogs(
+    @Query() query: AuditLogExportDto,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(
+      `Audit logs export: tenant=${user.tenantId}, format=${query.format}`,
+    );
+
+    const format = query.format || 'csv';
+    const buffer = await this.auditLogService.export(
+      user.tenantId,
+      {
+        startDate: query.startDate ? new Date(query.startDate) : undefined,
+        endDate: query.endDate ? new Date(query.endDate) : undefined,
+        entityType: query.entityType,
+        action: query.action,
+        userId: query.userId,
+        entityId: query.entityId,
+      },
+      format,
+    );
+
+    const mimeType = format === 'json' ? 'application/json' : 'text/csv';
+    const filename = `audit-logs-${new Date().toISOString().split('T')[0]}.${format}`;
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+
+    res.send(buffer);
+  }
+
+  @Get('audit-logs/:id')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get a single audit log by ID' })
+  @ApiParam({ name: 'id', description: 'Audit log ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Audit log returned',
+    type: AuditLogResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Audit log not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAuditLogById(
+    @Param('id') id: string,
+    @CurrentUser() user: IUser,
+  ): Promise<AuditLogResponseDto> {
+    this.logger.log(`Audit log by ID: tenant=${user.tenantId}, id=${id}`);
+
+    const log = await this.auditLogService.getById(user.tenantId, id);
+    return log as AuditLogResponseDto;
+  }
+
+  @Get('audit-logs/entity/:entityId')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get all audit logs for a specific entity' })
+  @ApiParam({ name: 'entityId', description: 'Entity ID to filter by' })
+  @ApiResponse({
+    status: 200,
+    description: 'Audit logs returned',
+    type: [AuditLogResponseDto],
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAuditLogsByEntityId(
+    @Param('entityId') entityId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<AuditLogResponseDto[]> {
+    this.logger.log(
+      `Audit logs by entity: tenant=${user.tenantId}, entityId=${entityId}`,
+    );
+
+    const logs = await this.auditLogService.getByEntityId(
+      user.tenantId,
+      entityId,
+    );
+    return logs as AuditLogResponseDto[];
   }
 }

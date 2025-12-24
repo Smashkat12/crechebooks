@@ -1,27 +1,67 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { InvoiceTable } from '@/components/invoices';
+import { SendInvoiceDialog } from '@/components/invoices/send-invoice-dialog';
 import { useDownloadInvoicePdf } from '@/hooks/use-invoices';
+import { useSendInvoice } from '@/hooks/useSendInvoice';
 import { useToast } from '@/hooks/use-toast';
 import type { Invoice } from '@/types/invoice';
 
 export default function InvoicesPage() {
   const router = useRouter();
   const { downloadPdf } = useDownloadInvoicePdf();
+  const sendInvoice = useSendInvoice();
   const { toast } = useToast();
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   const handleView = (invoice: Invoice) => {
     router.push(`/invoices/${invoice.id}`);
   };
 
   const handleSend = (invoice: Invoice) => {
-    // TODO: Open send dialog
-    console.log('Send invoice:', invoice.id);
+    setSelectedInvoice(invoice);
+    setSendDialogOpen(true);
+  };
+
+  const handleConfirmSend = (channel: 'email' | 'whatsapp') => {
+    if (!selectedInvoice) return;
+
+    sendInvoice.mutate(
+      { invoiceId: selectedInvoice.id, channel },
+      {
+        onSuccess: (data) => {
+          if (data.data.sent > 0) {
+            toast({
+              title: 'Invoice sent',
+              description: `Invoice sent successfully via ${channel}`,
+            });
+          }
+          if (data.data.failed > 0 && data.data.failures.length > 0) {
+            toast({
+              title: 'Failed to send',
+              description: data.data.failures[0].reason,
+              variant: 'destructive',
+            });
+          }
+          setSendDialogOpen(false);
+          setSelectedInvoice(null);
+        },
+        onError: (error) => {
+          toast({
+            title: 'Failed to send',
+            description: error.message || 'An error occurred while sending the invoice',
+            variant: 'destructive',
+          });
+        },
+      }
+    );
   };
 
   const handleDownload = async (invoice: Invoice) => {
@@ -73,6 +113,14 @@ export default function InvoicesPage() {
           />
         </CardContent>
       </Card>
+
+      <SendInvoiceDialog
+        invoice={selectedInvoice}
+        isOpen={sendDialogOpen}
+        onClose={() => setSendDialogOpen(false)}
+        onSend={handleConfirmSend}
+        isLoading={sendInvoice.isPending}
+      />
     </div>
   );
 }

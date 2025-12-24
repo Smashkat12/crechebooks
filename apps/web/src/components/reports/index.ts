@@ -8,3 +8,4 @@ export { DateRangePicker } from './date-range-picker';
 export type { DateRange } from './date-range-picker';
 export { ExportButtons } from './export-buttons';
 export type { ExportFormat } from './export-buttons';
+export { ExportDialog } from './ExportDialog';

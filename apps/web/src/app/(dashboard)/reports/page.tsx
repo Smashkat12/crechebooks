@@ -10,6 +10,7 @@ import {
 } from '@/components/reports';
 import type { DateRange, ExportFormat } from '@/components/reports';
 import { ReportType } from '@crechebooks/types';
+import { useExportReport } from '@/hooks/useExportReport';
 
 export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<ReportType>(ReportType.INCOME_STATEMENT);
@@ -18,9 +19,22 @@ export default function ReportsPage() {
     to: new Date(),
   });
 
+  const exportReport = useExportReport();
+
   const handleExport = async (format: ExportFormat): Promise<void> => {
-    console.log('Export:', selectedReport, format, dateRange);
-    // TODO: Implement actual export logic
+    // Only support PDF and CSV formats (filter out xlsx)
+    if (format !== 'pdf' && format !== 'csv') {
+      return;
+    }
+
+    exportReport.mutate({
+      reportType: selectedReport,
+      format,
+      dateRange: {
+        start: dateRange.from.toISOString().split('T')[0],
+        end: dateRange.to.toISOString().split('T')[0],
+      },
+    });
   };
 
   const getReportTitle = () => {

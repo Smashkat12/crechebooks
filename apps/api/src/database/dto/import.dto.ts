@@ -38,6 +38,17 @@ export interface ParsedTransactionWithConfidence extends ParsedTransaction {
 }
 
 /**
+ * Categorization statistics from auto-categorization.
+ */
+export interface CategorizationStats {
+  /** Number of transactions auto-categorized with high confidence */
+  autoCategorized: number;
+
+  /** Number of transactions requiring manual review */
+  reviewRequired: number;
+}
+
+/**
  * Result of a transaction import operation.
  * Provides comprehensive feedback about the import process.
  */
@@ -62,6 +73,9 @@ export interface ImportResult {
 
   /** Collection of errors encountered during import */
   errors: ImportError[];
+
+  /** Auto-categorization statistics (optional, only present if categorization ran) */
+  categorization?: CategorizationStats;
 }
 
 /**

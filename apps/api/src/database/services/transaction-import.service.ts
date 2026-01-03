@@ -13,6 +13,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { subDays, format } from 'date-fns';
 import { TransactionRepository } from '../repositories/transaction.repository';
+import { CategorizationService } from './categorization.service';
 import { CsvParser } from '../parsers/csv-parser';
 import { HybridPdfParser } from '../parsers/hybrid-pdf-parser';
 import {
@@ -45,7 +46,10 @@ export class TransactionImportService {
   private readonly csvParser = new CsvParser();
   private readonly pdfParser = new HybridPdfParser();
 
-  constructor(private readonly transactionRepo: TransactionRepository) {}
+  constructor(
+    private readonly transactionRepo: TransactionRepository,
+    private readonly categorizationService: CategorizationService,
+  ) {}
 
   /**
    * Import transactions from a file (CSV or PDF)
@@ -133,20 +137,40 @@ export class TransactionImportService {
       importBatchId,
     );
 
-    // 5. Queue categorization (TODO: Implement in TASK-TRANS-012)
+    // 5. Auto-categorize imported transactions
     const transactionIds = created.map((t) => t.id);
     this.logger.log(
-      `Would queue ${transactionIds.length} transactions for categorization`,
+      `Auto-categorizing ${transactionIds.length} imported transactions`,
     );
+
+    let categorizationResult;
+    try {
+      categorizationResult = await this.categorizationService.categorizeTransactions(
+        transactionIds,
+        tenantId,
+      );
+      this.logger.log(
+        `Categorization complete: ${categorizationResult.autoCategorized} auto-categorized, ${categorizationResult.reviewRequired} need review`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Categorization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+      // Don't fail import if categorization fails - transactions are still saved
+    }
 
     return {
       importBatchId,
-      status: 'PROCESSING',
+      status: 'COMPLETED',
       fileName: file.originalname,
       totalParsed: parsedTransactions.length,
       duplicatesSkipped: duplicates.length,
       transactionsCreated: created.length,
       errors,
+      categorization: categorizationResult ? {
+        autoCategorized: categorizationResult.autoCategorized,
+        reviewRequired: categorizationResult.reviewRequired,
+      } : undefined,
     };
   }
 

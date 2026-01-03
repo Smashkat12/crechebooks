@@ -31,10 +31,28 @@ interface TransactionListParams extends Record<string, unknown> {
 
 interface CategorizeTransactionParams {
   transactionId: string;
-  categoryId: string;
-  confidence: number;
-  notes?: string;
+  categoryId: string; // Actually account_code from Chart of Accounts
+  confidence?: number; // Optional, for UI display purposes
+  notes?: string; // Optional notes
 }
+
+// Map account codes to names (must match CategorySelect)
+const ACCOUNT_CODE_TO_NAME: Record<string, string> = {
+  '4000': 'Fee Income',
+  '4100': 'Enrollment Fees',
+  '4200': 'Activity Fees',
+  '4900': 'Other Income',
+  '5000': 'Salaries and Wages',
+  '5100': 'Staff Benefits',
+  '5200': 'Facility Costs',
+  '5300': 'Learning Materials',
+  '5400': 'Food and Nutrition',
+  '5500': 'Utilities',
+  '5600': 'Administrative',
+  '5700': 'Professional Services',
+  '5800': 'Taxes and Licenses',
+  '5900': 'Other Expenses',
+};
 
 interface BatchCategorizeParams {
   transactionIds: string[];
@@ -147,21 +165,53 @@ export function useTransactionSuggestions(id: string, enabled = true) {
   });
 }
 
+// API response type for categorization update
+interface UpdateCategorizationResponse {
+  success: boolean;
+  data: {
+    id: string;
+    status: string;
+    account_code: string;
+    account_name: string;
+    source: string;
+    pattern_created: boolean;
+  };
+}
+
 // Categorize a single transaction
 export function useCategorizeTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation<TransactionWithCategorization, AxiosError, CategorizeTransactionParams>({
-    mutationFn: async ({ transactionId, categoryId, confidence, notes }) => {
-      const { data } = await apiClient.post<TransactionWithCategorization>(
+    mutationFn: async ({ transactionId, categoryId }) => {
+      // categoryId is actually an account_code (e.g., '5100')
+      const accountName = ACCOUNT_CODE_TO_NAME[categoryId] || 'Unknown Category';
+
+      // API expects PUT with account_code, account_name, is_split, vat_type
+      const { data } = await apiClient.put<UpdateCategorizationResponse>(
         endpoints.transactions.categorize(transactionId),
         {
-          categoryId,
-          confidence,
-          notes,
+          account_code: categoryId,
+          account_name: accountName,
+          is_split: false,
+          vat_type: 'STANDARD',
+          create_pattern: true, // Learn from user corrections
         }
       );
-      return data;
+
+      // Transform response to match expected type
+      return {
+        id: data.data.id,
+        tenantId: '',
+        date: new Date(),
+        description: '',
+        amount: 0,
+        type: 'DEBIT' as TransactionType,
+        status: data.data.status as TransactionStatus,
+        accountCode: data.data.account_code,
+        reconciled: false,
+        needsReview: false,
+      };
     },
     onSuccess: (data) => {
       // Invalidate and refetch

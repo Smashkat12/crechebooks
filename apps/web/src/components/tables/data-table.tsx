@@ -27,6 +27,8 @@ interface DataTableProps<TData, TValue> {
   enableRowSelection?: boolean;
   enableColumnFilters?: boolean;
   enableSorting?: boolean;
+  /** Hide built-in pagination when using server-side pagination */
+  manualPagination?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -39,6 +41,7 @@ export function DataTable<TData, TValue>({
   enableRowSelection = false,
   enableColumnFilters = true,
   enableSorting = true,
+  manualPagination = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -124,7 +127,7 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <DataTablePagination table={table} />
+      {!manualPagination && <DataTablePagination table={table} />}
     </div>
   );
 }

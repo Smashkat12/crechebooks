@@ -249,6 +249,12 @@ export class TransactionController {
           message: e.message,
           code: e.code,
         })),
+        categorization: result.categorization
+          ? {
+              auto_categorized: result.categorization.autoCategorized,
+              review_required: result.categorization.reviewRequired,
+            }
+          : undefined,
       },
     };
   }

@@ -45,6 +45,23 @@ export class ImportErrorDto {
 }
 
 /**
+ * Auto-categorization statistics
+ */
+export class CategorizationStatsDto {
+  @ApiProperty({
+    example: 38,
+    description: 'Transactions auto-categorized with high confidence',
+  })
+  auto_categorized: number;
+
+  @ApiProperty({
+    example: 4,
+    description: 'Transactions requiring manual review',
+  })
+  review_required: number;
+}
+
+/**
  * Import result data
  */
 export class ImportResultDataDto {
@@ -77,6 +94,12 @@ export class ImportResultDataDto {
     description: 'Any errors encountered',
   })
   errors: ImportErrorDto[];
+
+  @ApiPropertyOptional({
+    type: CategorizationStatsDto,
+    description: 'Auto-categorization statistics (only present if categorization ran)',
+  })
+  categorization?: CategorizationStatsDto;
 }
 
 /**

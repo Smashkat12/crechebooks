@@ -23,22 +23,32 @@ interface TransactionTableProps {
   className?: string;
 }
 
+const PAGE_SIZE = 20;
+
 export function TransactionTable({ tenantId, className }: TransactionTableProps) {
   const [filters, setFilters] = React.useState<TransactionFiltersState>({
     status: 'all',
   });
+  const [page, setPage] = React.useState(1);
   const [selectedTransaction, setSelectedTransaction] = React.useState<ITransaction | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+
+  // Reset page when filters change
+  React.useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   // Build query parameters from filters
   const queryParams = React.useMemo(() => ({
     tenantId,
+    page,
+    limit: PAGE_SIZE,
     startDate: filters.dateRange?.from?.toISOString(),
     endDate: filters.dateRange?.to?.toISOString(),
     status: filters.status !== 'all' ? filters.status : undefined,
     categoryCode: filters.categoryCode,
     search: filters.search,
-  }), [tenantId, filters]);
+  }), [tenantId, page, filters]);
 
   const { data, isLoading, isError, error, refetch } = useTransactionsList(queryParams);
 
@@ -106,9 +116,38 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
       <DataTable
         columns={columns}
         data={data?.transactions || []}
-        pageSize={data?.limit || 10}
+        pageSize={PAGE_SIZE}
         isLoading={isLoading}
+        manualPagination={true}
       />
+
+      {/* Server-side Pagination */}
+      {data && data.total > PAGE_SIZE && (
+        <div className="flex items-center justify-between py-4">
+          <div className="text-sm text-muted-foreground">
+            Showing {((page - 1) * PAGE_SIZE) + 1} to {Math.min(page * PAGE_SIZE, data.total)} of {data.total} transactions
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded border px-3 py-1 text-sm disabled:opacity-50 hover:bg-muted"
+            >
+              Previous
+            </button>
+            <span className="text-sm">
+              Page {page} of {Math.ceil(data.total / PAGE_SIZE)}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(Math.ceil(data.total / PAGE_SIZE), p + 1))}
+              disabled={page >= Math.ceil(data.total / PAGE_SIZE)}
+              className="rounded border px-3 py-1 text-sm disabled:opacity-50 hover:bg-muted"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Categorization Dialog */}
       <CategorizationDialog

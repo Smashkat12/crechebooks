@@ -27,6 +27,30 @@ export class PdfParser {
   private readonly logger = new Logger(PdfParser.name);
 
   /**
+   * Maximum allowed transaction amount in cents.
+   * R1,000,000 = 100,000,000 cents
+   * Amounts larger than this are likely balance values incorrectly parsed.
+   */
+  private readonly MAX_TRANSACTION_AMOUNT_CENTS = 100_000_000;
+
+  /**
+   * Validate transaction amount is within reasonable bounds.
+   * Filters out balance values that were incorrectly parsed as transactions.
+   */
+  private isValidTransactionAmount(amountCents: number): boolean {
+    if (amountCents <= 0) {
+      return false;
+    }
+    if (amountCents > this.MAX_TRANSACTION_AMOUNT_CENTS) {
+      this.logger.warn(
+        `Skipping transaction with excessive amount: R${(amountCents / 100).toLocaleString()} - likely a balance value`,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Parse PDF bank statement buffer into standardized transactions.
    *
    * @param buffer - PDF file buffer
@@ -143,6 +167,11 @@ export class PdfParser {
         // Parse amount
         const amountCents = Math.abs(parseCurrency(amountStr));
 
+        // Validate amount is reasonable (not a balance)
+        if (!this.isValidTransactionAmount(amountCents)) {
+          continue;
+        }
+
         // Determine if credit or debit based on sign
         const isCredit = !amountStr.trim().startsWith('-');
 
@@ -255,6 +284,11 @@ export class PdfParser {
         const cleanAmount = amountStr.replace(/,/g, '');
         const amountCents = Math.round(parseFloat(cleanAmount) * 100);
 
+        // Validate amount is reasonable (not a balance)
+        if (!this.isValidTransactionAmount(amountCents)) {
+          continue;
+        }
+
         // Determine if credit or debit:
         // - If typeOrBalance is "Cr", it's a credit
         // - If typeOrBalance is "Dr", it's a debit
@@ -321,6 +355,11 @@ export class PdfParser {
 
         // Parse amount (parseCurrency handles R prefix)
         const amountCents = Math.abs(parseCurrency(amountStr));
+
+        // Validate amount is reasonable (not a balance)
+        if (!this.isValidTransactionAmount(amountCents)) {
+          continue;
+        }
 
         // Determine if credit or debit based on sign
         const isCredit = !amountStr.trim().startsWith('-');

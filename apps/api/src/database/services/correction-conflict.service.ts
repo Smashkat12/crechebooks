@@ -190,8 +190,10 @@ export class CorrectionConflictService {
     const transactionIds = categorizations.map((c) => c.transactionId);
 
     // Load transactions and filter by payee
-    const transactions =
-      await this.transactionRepo.findByIds(tenantId, transactionIds);
+    const transactions = await this.transactionRepo.findByIds(
+      tenantId,
+      transactionIds,
+    );
 
     // Normalize payee for comparison
     const normalizedPayee = this.normalizePayeeName(payee);
@@ -223,9 +225,8 @@ export class CorrectionConflictService {
     for (const transactionId of conflict.affectedTransactionIds) {
       try {
         // Find existing categorization
-        const existing = await this.categorizationRepo.findByTransaction(
-          transactionId,
-        );
+        const existing =
+          await this.categorizationRepo.findByTransaction(transactionId);
 
         if (existing.length > 0) {
           // Update most recent categorization
@@ -274,9 +275,8 @@ export class CorrectionConflictService {
     );
 
     // Pattern stays unchanged - just update this single transaction
-    const existing = await this.categorizationRepo.findByTransaction(
-      transactionId,
-    );
+    const existing =
+      await this.categorizationRepo.findByTransaction(transactionId);
 
     if (existing.length > 0) {
       const mostRecent = existing[0];
@@ -337,9 +337,7 @@ export class CorrectionConflictService {
     conflict: CorrectionConflict,
     pattern: string,
   ): Promise<void> {
-    this.logger.log(
-      `Creating split rule by description pattern: ${pattern}`,
-    );
+    this.logger.log(`Creating split rule by description pattern: ${pattern}`);
 
     // Future enhancement: Create conditional pattern
     // For now, default to "just this one" behavior

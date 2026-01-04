@@ -93,8 +93,6 @@ const schedulerProviders = isRedisConfigured()
 @Module({
   imports: [SarsSchedulerModule, DatabaseModule, ...bullImports],
   providers: schedulerProviders,
-  exports: [
-    ...(isRedisConfigured() ? [SchedulerService, BullModule] : []),
-  ],
+  exports: [...(isRedisConfigured() ? [SchedulerService, BullModule] : [])],
 })
 export class SchedulerModule {}

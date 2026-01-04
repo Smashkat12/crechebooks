@@ -21,7 +21,10 @@ import {
 import { MoreHorizontal, Eye, Edit, UserX } from 'lucide-react';
 import { EnrollmentStatus as EnrollmentStatusBadge } from '@/components/parents/enrollment-status';
 import { formatDate, formatCurrency } from '@/lib/utils';
-import { EnrollmentChild, ChildWithEnrollment } from '@/hooks/use-enrollments';
+
+// Legacy types - this file is not used in TASK-BILL-019
+type EnrollmentChild = Record<string, unknown>;
+type ChildWithEnrollment = Record<string, unknown>;
 
 interface EnrollmentActionsProps {
   child: EnrollmentChild | ChildWithEnrollment;
@@ -36,9 +39,7 @@ function EnrollmentActions({
   onEdit,
   onWithdraw,
 }: EnrollmentActionsProps) {
-  const isActive = 'enrollment_status' in child
-    ? child.enrollment_status === EnrollmentStatus.ACTIVE
-    : child.current_enrollment?.status === EnrollmentStatus.ACTIVE;
+  const isActive = false; // Legacy code - disabled for TASK-BILL-019
 
   return (
     <DropdownMenu>

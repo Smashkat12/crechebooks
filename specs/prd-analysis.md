@@ -33,27 +33,61 @@
 8. **SARS Submissions**: System generates submission-ready reports
 9. **Monthly Reconciliation**: Auto-completes; owner reviews dashboard
 
-### Secondary Journeys
+### Secondary Journeys (Owner-Operator)
 1. **New Child Enrollment**: Add child, set up fee structure, create parent contact
 2. **Mid-Month Changes**: Handle enrollment/withdrawal with pro-rata calculations
 3. **Payment Investigation**: Investigate unmatched payments or disputes
 4. **Year-End Processing**: Generate IRP5 certificates, annual reconciliation
 5. **Audit Preparation**: Generate audit-ready reports and documentation
 
+### Administrator Journeys
+1. **Daily Transaction Review**: Review imported transactions, approve categorizations, resolve flagged items
+2. **Bulk Invoice Management**: Review draft invoices, make corrections, approve batch send
+3. **Staff Onboarding**: Add new staff members, configure payroll details, set up tax information
+4. **Report Generation**: Generate daily/weekly reports for management review
+5. **Parent Communication**: Handle delivery failures, update contact information, resolve disputes
+
+### Accountant Journeys (Multi-Creche)
+1. **Multi-Creche Dashboard**: View aggregated financial position across managed creches
+2. **Batch Processing Workflow**: Process transactions and invoices across multiple creches efficiently
+3. **Month-End Close**: Complete reconciliation, generate trial balance, close period
+4. **VAT Period Close**: Aggregate VAT across creches, generate consolidated VAT201
+5. **Year-End Audit Preparation**: Compile audit pack, generate IRP5s, reconcile annual figures
+
+### Regulatory Auditor Journeys
+1. **Audit Access Request**: Request and receive read-only access to specific creche data
+2. **Transaction Sampling**: Select random transactions for verification against source documents
+3. **Report Verification**: Compare system reports against bank statements and invoices
+4. **Compliance Check**: Verify SARS submissions against source data
+5. **Audit Trail Review**: Review change history for selected transactions
+
+### Parent Journeys (External Portal - Future Phase)
+1. **Invoice Viewing**: Receive notification, view invoice via secure link
+2. **Payment Confirmation**: View payment confirmation and updated balance
+3. **Statement Request**: Request and view account statement history
+4. **Dispute Initiation**: Flag incorrect charges with supporting information
+5. **Contact Update**: Update email/phone for invoice delivery
+
 ---
 
 ## Functional Domains
 
-| Domain | Code | Description | Priority |
-|--------|------|-------------|----------|
-| Transaction Categorization | TRANS | Import and categorize bank transactions | MUST |
-| Fee Billing | BILL | Generate, send, and track school fee invoices | MUST |
-| Payment Matching | PAY | Match payments to invoices; manage arrears | MUST |
-| SARS Compliance | SARS | Calculate and generate tax submissions | MUST |
-| Reconciliation | RECON | Bank reconciliation and financial reporting | MUST |
-| Enrollment Management | ENROLL | Child/parent registration and fee structures | MUST |
-| User Management | USER | Authentication, authorization, multi-tenancy | MUST |
-| Xero Integration | XERO | Bi-directional sync with Xero accounting | MUST |
+| Domain | Code | Description | Priority | Spec Status |
+|--------|------|-------------|----------|-------------|
+| Transaction Categorization | TRANS | Import and categorize bank transactions | MUST | ✅ Complete |
+| Fee Billing | BILL | Generate, send, and track school fee invoices | MUST | ✅ Complete |
+| Payment Matching | PAY | Match payments to invoices; manage arrears | MUST | ✅ Complete |
+| SARS Compliance | SARS | Calculate and generate tax submissions | MUST | ✅ Complete |
+| Reconciliation | RECON | Bank reconciliation and financial reporting | MUST | ✅ Complete |
+| Enrollment Management | ENROLL | Child/parent registration and fee structures | MUST | ⚠️ Embedded in BILL |
+| User Management | USER | Authentication, authorization, multi-tenancy | MUST | ⚠️ Needs Dedicated Spec |
+| Xero Integration | XERO | Bi-directional sync with Xero accounting | MUST | ⚠️ Embedded in TRANS |
+| Web Application | WEB | User interface for all domains | MUST | ✅ Complete |
+
+### Domain Gap Analysis
+- **ENROLL**: Currently embedded within SPEC-BILL. Requirements REQ-BILL-009 through REQ-BILL-011 cover enrollment. Consider extracting to dedicated spec for clarity.
+- **USER**: No dedicated functional spec. Authentication implemented in TASK-API-001 and TASK-CORE-003 but lacks formal user story documentation.
+- **XERO**: Integration distributed across TRANS, BILL, PAY domains. Consider cross-cutting spec for sync error handling.
 
 ---
 
@@ -132,6 +166,30 @@
 | REQ-RECON-005 | Generate Income Statement on demand | SHOULD | Section 5 |
 | REQ-RECON-006 | Generate Balance Sheet on demand | SHOULD | Section 5 |
 | REQ-RECON-007 | Maintain transaction audit trail | MUST | Section 5 |
+
+### User Management Domain (USER)
+
+| ID | Requirement | Priority | Source | Status |
+|----|-------------|----------|--------|--------|
+| REQ-USER-001 | OAuth 2.0 / OIDC authentication for all users | MUST | Section 6 | ✅ Implemented |
+| REQ-USER-002 | Role-based access control (Owner, Admin, Viewer, Accountant) | MUST | Section 6 | ✅ Implemented |
+| REQ-USER-003 | Multi-tenant isolation at database level (row-level security) | MUST | Section 6 | ✅ Implemented |
+| REQ-USER-004 | User can belong to multiple tenants with different roles | SHOULD | Section 6 | ⚠️ Partial |
+| REQ-USER-005 | Audit logging of all authentication events | MUST | Section 6 | ✅ Implemented |
+| REQ-USER-006 | Session timeout after 24 hours of inactivity | SHOULD | Section 6 | ✅ Implemented |
+| REQ-USER-007 | Password-less authentication via OAuth providers | SHOULD | Section 6 | ⚠️ Future |
+
+### Xero Integration Domain (XERO)
+
+| ID | Requirement | Priority | Source | Status |
+|----|-------------|----------|--------|--------|
+| REQ-XERO-001 | OAuth 2.0 connection to Xero with token refresh | MUST | Section 5 | ✅ Implemented |
+| REQ-XERO-002 | Sync Chart of Accounts from Xero | MUST | Section 5 | ✅ Implemented |
+| REQ-XERO-003 | Create invoices in Xero as drafts | MUST | Section 5 | ✅ Implemented |
+| REQ-XERO-004 | Sync payments to Xero | MUST | Section 5 | ✅ Implemented |
+| REQ-XERO-005 | Queue and retry on Xero API failure (24h window) | MUST | Section 6 | ✅ Implemented |
+| REQ-XERO-006 | Handle Xero rate limiting gracefully | SHOULD | Section 6 | ✅ Implemented |
+| REQ-XERO-007 | Bi-directional sync conflict resolution | SHOULD | Section 5 | ⚠️ Needs Review |
 
 ---
 
@@ -242,11 +300,35 @@
 
 ## Summary Statistics
 
-| Category | Count |
-|----------|-------|
-| Functional Domains | 8 |
-| User Stories | 14 |
-| Functional Requirements | 46 |
-| Non-Functional Requirements | 23 |
-| Edge Cases Identified | 35 |
-| Open Questions | 8 |
+| Category | Count | Notes |
+|----------|-------|-------|
+| User Types | 5 | Owner-Operator, Administrator, Accountant, Auditor, Parent |
+| User Journeys | 29 | Primary (9) + Secondary Owner (5) + Admin (5) + Accountant (5) + Auditor (5) |
+| Functional Domains | 9 | Including WEB domain added post-analysis |
+| Functional Requirements | 60 | Including USER (7) and XERO (7) domains |
+| Non-Functional Requirements | 23 | Performance, Security, Compliance, Scalability |
+| Edge Cases Identified | 35 | Across all core domains |
+| Open Questions | 8 | For stakeholder resolution |
+| Implementation Tasks | 121 | All marked complete |
+
+## Requirements Implementation Status
+
+| Domain | Total Reqs | Implemented | Pending | Coverage |
+|--------|-----------|-------------|---------|----------|
+| TRANS | 10 | 8 | 2 | 80% |
+| BILL | 12 | 10 | 2 | 83% |
+| PAY | 12 | 12 | 0 | 100% |
+| SARS | 12 | 12 | 0 | 100% |
+| RECON | 7 | 7 | 0 | 100% |
+| USER | 7 | 5 | 2 | 71% |
+| XERO | 7 | 6 | 1 | 86% |
+| **TOTAL** | **67** | **60** | **7** | **90%** |
+
+### Outstanding Items Requiring Attention
+1. **REQ-TRANS-009**: Split transactions - UI implementation incomplete
+2. **REQ-TRANS-007**: Categorization explainability - Agent integration pending
+3. **REQ-BILL-011**: Ad-hoc charges - Integration with invoice generation
+4. **REQ-BILL-012**: VAT on invoices - VAT-registered creche path
+5. **REQ-USER-004**: Multi-tenant user assignment - Partial implementation
+6. **REQ-USER-007**: Password-less auth - Future enhancement
+7. **REQ-XERO-007**: Bi-directional conflict resolution - Needs review

@@ -178,7 +178,9 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
         invoiceDueDays: 7,
       } as any);
 
-      (prisma.enrollment.findMany as jest.Mock).mockResolvedValue([mockEnrollment]);
+      (prisma.enrollment.findMany as jest.Mock).mockResolvedValue([
+        mockEnrollment,
+      ]);
 
       invoiceRepo.findByBillingPeriod.mockResolvedValue(null);
       invoiceRepo.findLastInvoiceForYear.mockResolvedValue(null);
@@ -217,8 +219,12 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
 
     it('should include ad-hoc charges in invoice generation', async () => {
       // Arrange
-      (prisma.adHocCharge.findMany as jest.Mock).mockResolvedValue(mockAdHocCharges);
-      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
+      (prisma.adHocCharge.findMany as jest.Mock).mockResolvedValue(
+        mockAdHocCharges,
+      );
+      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({
+        count: 2,
+      });
 
       invoiceRepo.findById.mockResolvedValue({
         id: 'invoice-001',
@@ -276,8 +282,12 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
 
     it('should mark ad-hoc charges as invoiced after creation', async () => {
       // Arrange
-      (prisma.adHocCharge.findMany as jest.Mock).mockResolvedValue(mockAdHocCharges);
-      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
+      (prisma.adHocCharge.findMany as jest.Mock).mockResolvedValue(
+        mockAdHocCharges,
+      );
+      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({
+        count: 2,
+      });
 
       invoiceRepo.findById.mockResolvedValue({
         id: 'invoice-001',
@@ -395,7 +405,9 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
         .mockResolvedValueOnce(mockAdHocCharges)
         .mockResolvedValueOnce([]);
 
-      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({ count: 2 });
+      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({
+        count: 2,
+      });
 
       invoiceRepo.findById.mockResolvedValue({
         id: 'invoice-001',
@@ -463,7 +475,9 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
         },
       };
 
-      (prisma.enrollment.findMany as jest.Mock).mockResolvedValue([mockEnrollment]);
+      (prisma.enrollment.findMany as jest.Mock).mockResolvedValue([
+        mockEnrollment,
+      ]);
 
       const adHocCharge = {
         id: 'adhoc-001',
@@ -476,8 +490,12 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
         invoiceId: null,
       };
 
-      (prisma.adHocCharge.findMany as jest.Mock).mockResolvedValue([adHocCharge]);
-      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+      (prisma.adHocCharge.findMany as jest.Mock).mockResolvedValue([
+        adHocCharge,
+      ]);
+      (prisma.adHocCharge.updateMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
 
       invoiceRepo.findByBillingPeriod.mockResolvedValue(null);
       invoiceRepo.findLastInvoiceForYear.mockResolvedValue(null);

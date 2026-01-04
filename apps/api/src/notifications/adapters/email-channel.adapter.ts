@@ -121,9 +121,7 @@ export class EmailChannelAdapter implements INotificationChannel {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       const errorCode =
-        error instanceof BusinessException
-          ? error.code
-          : 'EMAIL_SEND_FAILED';
+        error instanceof BusinessException ? error.code : 'EMAIL_SEND_FAILED';
 
       this.logger.error({
         error: {

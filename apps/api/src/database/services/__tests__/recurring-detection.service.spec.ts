@@ -11,7 +11,10 @@ import { RecurringDetectionService } from '../recurring-detection.service';
 import { TransactionRepository } from '../../repositories/transaction.repository';
 import { PayeePatternRepository } from '../../repositories/payee-pattern.repository';
 import { Transaction, PayeePattern } from '@prisma/client';
-import { ImportSource, TransactionStatus } from '../../entities/transaction.entity';
+import {
+  ImportSource,
+  TransactionStatus,
+} from '../../entities/transaction.entity';
 import { NotFoundException } from '../../../shared/exceptions';
 import { VatType } from '../../entities/categorization.entity';
 
@@ -109,8 +112,18 @@ describe('RecurringDetectionService', () => {
       const transactions: Partial<Transaction>[] = [
         createTransaction('tx-1', baseDate, 'GYM MEMBERSHIP', 5000),
         createTransaction('tx-2', addDays(baseDate, 7), 'GYM MEMBERSHIP', 5000),
-        createTransaction('tx-3', addDays(baseDate, 14), 'GYM MEMBERSHIP', 5000),
-        createTransaction('tx-4', addDays(baseDate, 21), 'GYM MEMBERSHIP', 5000),
+        createTransaction(
+          'tx-3',
+          addDays(baseDate, 14),
+          'GYM MEMBERSHIP',
+          5000,
+        ),
+        createTransaction(
+          'tx-4',
+          addDays(baseDate, 21),
+          'GYM MEMBERSHIP',
+          5000,
+        ),
       ];
 
       transactionRepo.findByTenant.mockResolvedValue({
@@ -378,9 +391,7 @@ describe('RecurringDetectionService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      payeePatternRepo.create.mockResolvedValue(
-        createdPattern as PayeePattern,
-      );
+      payeePatternRepo.create.mockResolvedValue(createdPattern as PayeePattern);
 
       // Act
       const result = await service.createPattern(TENANT_ID, dto);
@@ -426,9 +437,7 @@ describe('RecurringDetectionService', () => {
         defaultAccountCode: '5500',
         defaultAccountName: 'Updated Account',
       };
-      payeePatternRepo.update.mockResolvedValue(
-        updatedPattern as PayeePattern,
-      );
+      payeePatternRepo.update.mockResolvedValue(updatedPattern as PayeePattern);
 
       // Act
       const result = await service.createPattern(TENANT_ID, dto);

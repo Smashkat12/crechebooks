@@ -6,7 +6,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PayeeAliasService } from '../payee-alias.service';
 import { PayeePatternRepository } from '../../repositories/payee-pattern.repository';
-import { BusinessException, NotFoundException } from '../../../shared/exceptions';
+import {
+  BusinessException,
+  NotFoundException,
+} from '../../../shared/exceptions';
 import { PayeePattern } from '@prisma/client';
 
 describe('PayeeAliasService', () => {
@@ -227,10 +230,7 @@ describe('PayeeAliasService', () => {
         payeeAliases: ['WOOLWORTHS SANDTON'],
       });
 
-      await service.deleteAlias(
-        mockTenantId,
-        'pattern-1:W/WORTHS',
-      );
+      await service.deleteAlias(mockTenantId, 'pattern-1:W/WORTHS');
 
       expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', {
         payeeAliases: ['WOOLWORTHS SANDTON'],
@@ -244,10 +244,7 @@ describe('PayeeAliasService', () => {
         payeeAliases: ['WOOLWORTHS SANDTON'],
       });
 
-      await service.deleteAlias(
-        mockTenantId,
-        'pattern-1:w/worths',
-      );
+      await service.deleteAlias(mockTenantId, 'pattern-1:w/worths');
 
       expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', {
         payeeAliases: ['WOOLWORTHS SANDTON'],
@@ -265,10 +262,7 @@ describe('PayeeAliasService', () => {
         payeeAliases: [],
       });
 
-      await service.deleteAlias(
-        mockTenantId,
-        'pattern-1:STORE:BRANCH1',
-      );
+      await service.deleteAlias(mockTenantId, 'pattern-1:STORE:BRANCH1');
 
       expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', {
         payeeAliases: [],

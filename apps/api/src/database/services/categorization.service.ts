@@ -183,10 +183,11 @@ export class CategorizationService {
 
     // TASK-TRANS-019: Try recurring detection first (before pattern match)
     if (this.recurringDetectionService) {
-      const recurringMatch = await this.recurringDetectionService.detectRecurring(
-        tenantId,
-        transaction,
-      );
+      const recurringMatch =
+        await this.recurringDetectionService.detectRecurring(
+          tenantId,
+          transaction,
+        );
 
       if (recurringMatch && recurringMatch.confidence >= 80) {
         this.logger.log(

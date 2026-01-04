@@ -116,9 +116,7 @@ describe('SarsSubmissionRetryService', () => {
       mockPrisma.sarsSubmission.findUnique.mockResolvedValue(
         submissionWithRetries,
       );
-      mockPrisma.sarsSubmission.update.mockResolvedValue(
-        submissionWithRetries,
-      );
+      mockPrisma.sarsSubmission.update.mockResolvedValue(submissionWithRetries);
 
       const result = await service.submitWithRetry(submissionId);
 
@@ -485,9 +483,7 @@ describe('SarsSubmissionRetryService', () => {
     });
 
     it('should map SUBMITTED to SUBMITTED', () => {
-      const status = service['mapSubmissionStatus'](
-        SubmissionStatus.SUBMITTED,
-      );
+      const status = service['mapSubmissionStatus'](SubmissionStatus.SUBMITTED);
       expect(status).toBe('SUBMITTED');
     });
 
@@ -511,15 +507,13 @@ describe('SarsSubmissionRetryService', () => {
       mockPrisma.sarsSubmission.update.mockResolvedValue(failedSubmission);
 
       // First attempt fails
-      jest
-        .spyOn(service as any, 'callSarsApi')
-        .mockImplementation(() => {
-          attemptCount++;
-          if (attemptCount === 1) {
-            throw { statusCode: 503, message: 'Service unavailable' };
-          }
-          return Promise.resolve({ reference: 'SARS12345' });
-        });
+      jest.spyOn(service as any, 'callSarsApi').mockImplementation(() => {
+        attemptCount++;
+        if (attemptCount === 1) {
+          throw { statusCode: 503, message: 'Service unavailable' };
+        }
+        return Promise.resolve({ reference: 'SARS12345' });
+      });
 
       // First attempt
       const result1 = await service.submitWithRetry(submissionId);

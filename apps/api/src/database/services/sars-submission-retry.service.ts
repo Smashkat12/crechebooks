@@ -302,11 +302,8 @@ export class SarsSubmissionRetryService {
    * @param error - The error that occurred
    * @returns Promise<void>
    */
-  async notifyAdmin(
-    submission: any,
-    error: SarsApiError,
-  ): Promise<void> {
-    const metadata = (submission.documentData as any)?.retryMetadata || {};
+  async notifyAdmin(submission: any, error: SarsApiError): Promise<void> {
+    const metadata = submission.documentData?.retryMetadata || {};
     const errorType = await this.classifyError(error);
 
     const notification: AdminNotification = {

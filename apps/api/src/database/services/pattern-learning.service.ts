@@ -82,7 +82,10 @@ export class PatternLearningService {
       canonicalName = similarPayees[0];
 
       // Create alias if payee name differs from canonical
-      if (this.normalizePayeeName(payeeName) !== this.normalizePayeeName(canonicalName)) {
+      if (
+        this.normalizePayeeName(payeeName) !==
+        this.normalizePayeeName(canonicalName)
+      ) {
         try {
           await this.payeeAliasService.createAlias(
             tenantId,

@@ -94,4 +94,10 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => [...queryKeys.feeStructures.lists(), params] as const,
     detail: (id: string) => [...queryKeys.feeStructures.all, 'detail', id] as const,
   },
+  // Users & Tenants
+  users: {
+    all: ['users'] as const,
+    tenantUsers: (tenantId: string) => [...queryKeys.users.all, 'tenant', tenantId] as const,
+    invitations: (tenantId: string) => [...queryKeys.users.all, 'invitations', tenantId] as const,
+  },
 } as const;

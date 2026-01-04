@@ -260,12 +260,19 @@ graph TD
 | Remediation - Surface API | 4 | 4 | 100% |
 | Remediation - Surface WEB | 6 | 6 | 100% |
 | **Subtotal (Phase 7)** | **28** | **28** | **100%** |
-| **Grand Total** | **121** | **121** | **100%** |
+| Gap Remediation - Trans | 4 | 0 | 0% |
+| Gap Remediation - Bill | 2 | 0 | 0% |
+| Gap Remediation - User | 2 | 0 | 0% |
+| Gap Remediation - Xero | 2 | 0 | 0% |
+| Gap Remediation - Edge Cases | 3 | 0 | 0% |
+| **Subtotal (Phase 8)** | **13** | **0** | **0%** |
+| **Grand Total** | **134** | **121** | **90%** |
 
-**Last Updated**: 2025-12-24
-- API Backend: 63/63 tasks complete (100%) ✅
-- Web Frontend: 30/30 tasks complete (100%) ✅
-- Remediation: 28/28 tasks complete (100%) ✅
+**Last Updated**: 2026-01-04
+- Phases 1-6 (Core): 93/93 tasks complete (100%) ✅
+- Phase 7 (Remediation): 28/28 tasks complete (100%) ✅
+- Phase 8 (Gap Remediation): 0/13 tasks complete (0%) ⭕
+- Overall Progress: 121/134 tasks (90%)
 
 ---
 
@@ -335,6 +342,61 @@ These tasks address critical issues identified in the validation analysis (`/doc
 | 123 | TASK-WEB-044 | Pro-Rata Fee Display Component | surface | TASK-BILL-014 | P2-HIGH | ✅ Complete |
 | 124 | TASK-WEB-045 | Payment Reminder Template Editor | surface | TASK-PAY-015 | P2-HIGH | ✅ Complete |
 | 125 | TASK-WEB-046 | Mobile Responsive Improvements | surface | TASK-WEB-006 | P2-HIGH | ✅ Complete |
+
+---
+
+## Phase 8: Gap Remediation (Outstanding Requirements)
+
+Based on PRD analysis review against AI-Agent-SpecTaskCreator methodology, the following requirements need additional work:
+
+### 8.1 Transaction Domain Gaps
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 126 | TASK-TRANS-020 | Split Transaction UI Implementation | surface | TASK-WEB-011, TASK-TRANS-002 | P2-HIGH | ⭕ Pending |
+| 127 | TASK-TRANS-021 | Categorization Explainability Display | surface | TASK-AGENT-002, TASK-WEB-011 | P2-HIGH | ⭕ Pending |
+| 128 | TASK-TRANS-022 | Reversal Transaction Detection | logic | TASK-TRANS-012 | P3-MEDIUM | ⭕ Pending |
+| 129 | TASK-TRANS-023 | Learning Mode Indicator for New Tenants | surface | TASK-TRANS-017, TASK-WEB-017 | P3-MEDIUM | ⭕ Pending |
+
+### 8.2 Billing Domain Gaps
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 130 | TASK-BILL-018 | VAT Calculation for VAT-Registered Creches | logic | TASK-BILL-012, TASK-SARS-011 | P1-CRITICAL | ⭕ Pending |
+| 131 | TASK-BILL-019 | Enrollment Register Dedicated View | surface | TASK-WEB-037, TASK-BILL-011 | P2-HIGH | ⭕ Pending |
+
+### 8.3 User Management Domain (New)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 132 | TASK-USER-001 | Multi-Tenant User Role Assignment | logic | TASK-CORE-003 | P2-HIGH | ⭕ Pending |
+| 133 | TASK-USER-002 | User Management Admin Page | surface | TASK-WEB-040, TASK-API-001 | P2-HIGH | ⭕ Pending |
+
+### 8.4 Xero Integration Gaps
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 134 | TASK-XERO-001 | Bi-directional Sync Conflict Resolution | logic | TASK-TRANS-014 | P2-HIGH | ⭕ Pending |
+| 135 | TASK-XERO-002 | Xero Connection Status Dashboard Widget | surface | TASK-WEB-017, TASK-MCP-001 | P3-MEDIUM | ⭕ Pending |
+
+### 8.5 Edge Case Implementations
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 136 | TASK-EC-001 | Payee Name Variation Detection Algorithm | logic | TASK-TRANS-013 | P2-HIGH | ⭕ Pending |
+| 137 | TASK-EC-002 | Conflicting Correction Resolution UI | surface | TASK-TRANS-013, TASK-WEB-011 | P3-MEDIUM | ⭕ Pending |
+| 138 | TASK-EC-003 | Recurring Amount Variation Threshold Config | logic | TASK-TRANS-019 | P3-MEDIUM | ⭕ Pending |
+
+---
+
+## Phase 8 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 1 | 0 | 1 | 0% |
+| P2-HIGH | 8 | 0 | 8 | 0% |
+| P3-MEDIUM | 4 | 0 | 4 | 0% |
+| **Total Phase 8** | **13** | **0** | **13** | **0%** |
 
 ---
 

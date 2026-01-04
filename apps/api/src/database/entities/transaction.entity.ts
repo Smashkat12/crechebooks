@@ -35,6 +35,8 @@ export interface ITransaction {
   reconciledAt: Date | null;
   isDeleted: boolean;
   deletedAt: Date | null;
+  reversesTransactionId?: string | null;
+  isReversal: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -27,7 +27,7 @@ describe('ArrearsReportPdfService', () => {
   let testTenantId: string;
   let testParentId: string;
   let testChildId: string;
-  let testInvoiceIds: string[] = [];
+  const testInvoiceIds: string[] = [];
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -193,13 +193,19 @@ describe('ArrearsReportPdfService', () => {
         });
       }
       if (testChildId) {
-        await prisma.child.delete({ where: { id: testChildId } }).catch(() => {});
+        await prisma.child
+          .delete({ where: { id: testChildId } })
+          .catch(() => {});
       }
       if (testParentId) {
-        await prisma.parent.delete({ where: { id: testParentId } }).catch(() => {});
+        await prisma.parent
+          .delete({ where: { id: testParentId } })
+          .catch(() => {});
       }
       if (testTenantId) {
-        await prisma.tenant.delete({ where: { id: testTenantId } }).catch(() => {});
+        await prisma.tenant
+          .delete({ where: { id: testTenantId } })
+          .catch(() => {});
       }
     } catch (error) {
       // Ignore cleanup errors
@@ -267,9 +273,9 @@ describe('ArrearsReportPdfService', () => {
     });
 
     it('should throw NotFoundException for invalid tenant', async () => {
-      await expect(
-        service.generatePdf('invalid-tenant-id'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.generatePdf('invalid-tenant-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

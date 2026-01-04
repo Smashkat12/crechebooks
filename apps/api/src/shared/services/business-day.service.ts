@@ -162,7 +162,9 @@ export class BusinessDayService {
    */
   private stripTime(date: Date): Date {
     // Use Date.UTC to ensure we get midnight in UTC, not local time
-    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    return new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
+    );
   }
 
   /**

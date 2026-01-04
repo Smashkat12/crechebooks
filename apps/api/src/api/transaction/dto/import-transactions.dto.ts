@@ -97,7 +97,8 @@ export class ImportResultDataDto {
 
   @ApiPropertyOptional({
     type: CategorizationStatsDto,
-    description: 'Auto-categorization statistics (only present if categorization ran)',
+    description:
+      'Auto-categorization statistics (only present if categorization ran)',
   })
   categorization?: CategorizationStatsDto;
 }

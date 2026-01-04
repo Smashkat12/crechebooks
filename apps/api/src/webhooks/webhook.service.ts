@@ -40,9 +40,15 @@ export class WebhookService {
     private readonly configService: ConfigService,
     private readonly auditLogService: AuditLogService,
   ) {
-    this.sendgridWebhookKey = this.configService.get<string>('SENDGRID_WEBHOOK_KEY');
-    this.whatsappAppSecret = this.configService.get<string>('WHATSAPP_APP_SECRET');
-    this.whatsappVerifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN');
+    this.sendgridWebhookKey = this.configService.get<string>(
+      'SENDGRID_WEBHOOK_KEY',
+    );
+    this.whatsappAppSecret = this.configService.get<string>(
+      'WHATSAPP_APP_SECRET',
+    );
+    this.whatsappVerifyToken = this.configService.get<string>(
+      'WHATSAPP_VERIFY_TOKEN',
+    );
   }
 
   /**
@@ -54,9 +60,15 @@ export class WebhookService {
    * @param timestamp - x-twilio-email-event-webhook-timestamp header
    * @returns true if signature is valid
    */
-  verifyEmailSignature(payload: string, signature: string, timestamp: string): boolean {
+  verifyEmailSignature(
+    payload: string,
+    signature: string,
+    timestamp: string,
+  ): boolean {
     if (!this.sendgridWebhookKey) {
-      this.logger.warn('SendGrid webhook key not configured, skipping verification');
+      this.logger.warn(
+        'SendGrid webhook key not configured, skipping verification',
+      );
       return true; // Allow in development
     }
 
@@ -94,7 +106,9 @@ export class WebhookService {
    */
   verifyWhatsAppSignature(payload: string, signature: string): boolean {
     if (!this.whatsappAppSecret) {
-      this.logger.warn('WhatsApp app secret not configured, skipping verification');
+      this.logger.warn(
+        'WhatsApp app secret not configured, skipping verification',
+      );
       return true; // Allow in development
     }
 
@@ -131,18 +145,31 @@ export class WebhookService {
    * @param challenge - hub.challenge query param
    * @returns challenge string if valid, throws otherwise
    */
-  verifyWhatsAppSubscription(mode: string, token: string, challenge: string): string {
+  verifyWhatsAppSubscription(
+    mode: string,
+    token: string,
+    challenge: string,
+  ): string {
     if (mode !== 'subscribe') {
-      throw new BusinessException('Invalid webhook mode', 'INVALID_WEBHOOK_MODE');
+      throw new BusinessException(
+        'Invalid webhook mode',
+        'INVALID_WEBHOOK_MODE',
+      );
     }
 
     if (!this.whatsappVerifyToken) {
       this.logger.warn('WhatsApp verify token not configured');
-      throw new BusinessException('Webhook not configured', 'WEBHOOK_NOT_CONFIGURED');
+      throw new BusinessException(
+        'Webhook not configured',
+        'WEBHOOK_NOT_CONFIGURED',
+      );
     }
 
     if (token !== this.whatsappVerifyToken) {
-      throw new BusinessException('Invalid verify token', 'INVALID_VERIFY_TOKEN');
+      throw new BusinessException(
+        'Invalid verify token',
+        'INVALID_VERIFY_TOKEN',
+      );
     }
 
     this.logger.log('WhatsApp webhook subscription verified');
@@ -155,7 +182,9 @@ export class WebhookService {
    * @param events - Array of SendGrid events
    * @returns Processing result with counts and errors
    */
-  async processEmailEvent(events: EmailEvent[]): Promise<WebhookProcessingResult> {
+  async processEmailEvent(
+    events: EmailEvent[],
+  ): Promise<WebhookProcessingResult> {
     const result: WebhookProcessingResult = {
       processed: 0,
       skipped: 0,
@@ -204,7 +233,8 @@ export class WebhookService {
 
         result.processed++;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         result.errors.push({
           eventId: event.sg_message_id || 'unknown',
           error: errorMessage,
@@ -226,7 +256,9 @@ export class WebhookService {
    * @param payload - WhatsApp webhook payload
    * @returns Processing result with counts and errors
    */
-  async processWhatsAppEvent(payload: WhatsAppWebhookPayload): Promise<WebhookProcessingResult> {
+  async processWhatsAppEvent(
+    payload: WhatsAppWebhookPayload,
+  ): Promise<WebhookProcessingResult> {
     const result: WebhookProcessingResult = {
       processed: 0,
       skipped: 0,
@@ -240,16 +272,17 @@ export class WebhookService {
         for (const status of statuses) {
           try {
             // Look up invoice by WhatsApp message ID
-            const messageRecord = await this.prisma.invoiceDeliveryLog.findFirst({
-              where: {
-                externalMessageId: status.id,
-                channel: 'WHATSAPP',
-              },
-              select: {
-                invoiceId: true,
-                tenantId: true,
-              },
-            });
+            const messageRecord =
+              await this.prisma.invoiceDeliveryLog.findFirst({
+                where: {
+                  externalMessageId: status.id,
+                  channel: 'WHATSAPP',
+                },
+                select: {
+                  invoiceId: true,
+                  tenantId: true,
+                },
+              });
 
             if (!messageRecord) {
               this.logger.debug(
@@ -286,12 +319,15 @@ export class WebhookService {
 
             result.processed++;
           } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
             result.errors.push({
               eventId: status.id || 'unknown',
               error: errorMessage,
             });
-            this.logger.error(`Error processing WhatsApp event: ${errorMessage}`);
+            this.logger.error(
+              `Error processing WhatsApp event: ${errorMessage}`,
+            );
           }
         }
       }
@@ -357,7 +393,9 @@ export class WebhookService {
       where: { id: invoiceId },
       data: {
         deliveryStatus: status,
-        ...(status === 'DELIVERED' || status === 'OPENED' || status === 'CLICKED'
+        ...(status === 'DELIVERED' ||
+        status === 'OPENED' ||
+        status === 'CLICKED'
           ? { deliveredAt: new Date() }
           : {}),
       },
@@ -464,7 +502,8 @@ export class WebhookService {
       bounced,
       complained,
       failed,
-      deliveryRate: totalSent > 0 ? ((delivered + opened + clicked) / totalSent) * 100 : 0,
+      deliveryRate:
+        totalSent > 0 ? ((delivered + opened + clicked) / totalSent) * 100 : 0,
       openRate: delivered > 0 ? ((opened + clicked) / delivered) * 100 : 0,
       clickRate: opened > 0 ? (clicked / opened) * 100 : 0,
     };

@@ -174,7 +174,9 @@ describe('DuplicateDetectionService', () => {
       expect(result.clean).toHaveLength(0);
       expect(result.potentialDuplicates).toHaveLength(1);
       expect(result.potentialDuplicates[0].confidence).toBe(100);
-      expect(result.potentialDuplicates[0].existingMatch.id).toBe(existingTx.id);
+      expect(result.potentialDuplicates[0].existingMatch.id).toBe(
+        existingTx.id,
+      );
 
       // Clean up
       await prisma.transaction.delete({ where: { id: existingTx.id } });
@@ -290,12 +292,17 @@ describe('DuplicateDetectionService', () => {
         },
       ];
 
-      const result = await service.checkForDuplicates(testTenantId, transactions);
+      const result = await service.checkForDuplicates(
+        testTenantId,
+        transactions,
+      );
 
       expect(result.clean).toHaveLength(1);
       expect(result.potentialDuplicates).toHaveLength(1);
       expect(result.clean[0].reference).toBe('CLEAN-001');
-      expect(result.potentialDuplicates[0].transaction.reference).toBe('BATCH-001');
+      expect(result.potentialDuplicates[0].transaction.reference).toBe(
+        'BATCH-001',
+      );
 
       // Clean up
       await prisma.transaction.delete({ where: { id: existingTx.id } });

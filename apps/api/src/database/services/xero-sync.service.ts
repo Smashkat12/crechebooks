@@ -15,6 +15,8 @@ import { XeroClient, Invoice as XeroInvoice } from 'xero-node';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
 import { AuditLogService } from './audit-log.service';
+import { ConflictDetectionService } from './conflict-detection.service';
+import { ConflictResolutionService } from './conflict-resolution.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   SyncResult,
@@ -28,6 +30,7 @@ import {
   TransactionStatus,
 } from '../entities/transaction.entity';
 import { AuditAction } from '../entities/audit-log.entity';
+import { ConflictType } from '../entities/sync-conflict.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 
 // Import Xero MCP tools
@@ -47,6 +50,8 @@ export class XeroSyncService {
     private readonly transactionRepo: TransactionRepository,
     private readonly categorizationRepo: CategorizationRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly conflictDetection: ConflictDetectionService,
+    private readonly conflictResolution: ConflictResolutionService,
     private readonly prisma: PrismaService,
   ) {
     // Pass PrismaService (extends PrismaClient) to TokenManager
@@ -171,6 +176,85 @@ export class XeroSyncService {
 
     // Use the most recent categorization
     const categorization = categorizations[0];
+
+    // TASK-XERO-001: Check for conflicts before syncing
+    // Fetch current Xero version to detect conflicts
+    // Note: We'll need to fetch all transactions and filter by ID
+    // since getTransactions doesn't support transactionIds filter
+    const allXeroTransactions = await getTransactions(client, xeroTenantId, {
+      fromDate: format(transaction.date, 'yyyy-MM-dd'),
+      toDate: format(transaction.date, 'yyyy-MM-dd'),
+    });
+
+    const xeroTransactions = allXeroTransactions.filter(
+      (tx) => tx.transactionId === transaction.xeroTransactionId,
+    );
+
+    if (xeroTransactions.length > 0) {
+      const xeroTransaction = xeroTransactions[0];
+      const lastSyncedAt = transaction.reconciledAt; // Use reconciliation date as last sync
+
+      // Detect conflicts
+      const conflictCheck = await this.conflictDetection.detectConflicts(
+        tenantId,
+        'Transaction',
+        transactionId,
+        {
+          updatedAt: transaction.updatedAt,
+          accountCode: categorization.accountCode,
+          amountCents: transaction.amountCents,
+          description: transaction.description,
+        },
+        {
+          UpdatedDateUTC: xeroTransaction.date,
+          AccountCode: xeroTransaction.accountCode,
+          Total: xeroTransaction.amountCents / 100, // Convert cents to dollars
+          Description: xeroTransaction.description,
+        },
+        lastSyncedAt ?? undefined,
+      );
+
+      if (conflictCheck.hasConflict) {
+        this.logger.warn(
+          `Conflict detected for transaction ${transactionId}: ${conflictCheck.message}`,
+        );
+
+        // Create conflict record
+        const conflictId = await this.conflictDetection.createConflictRecord(
+          tenantId,
+          'Transaction',
+          transactionId,
+          conflictCheck.conflictType || ConflictType.UPDATE_UPDATE,
+          {
+            updatedAt: transaction.updatedAt,
+            accountCode: categorization.accountCode,
+            amountCents: transaction.amountCents,
+          },
+          {
+            UpdatedDateUTC: xeroTransaction.date,
+            AccountCode: xeroTransaction.accountCode,
+            Total: xeroTransaction.amountCents / 100,
+          },
+          transaction.updatedAt,
+          new Date(xeroTransaction.date),
+        );
+
+        // Try auto-resolution with last_modified_wins strategy
+        const autoResolved = await this.conflictResolution.autoResolve(
+          conflictId,
+          'last_modified_wins',
+        );
+
+        if (!autoResolved) {
+          throw new BusinessException(
+            `Sync conflict detected for transaction ${transactionId}. Manual resolution required.`,
+            'SYNC_CONFLICT',
+          );
+        }
+
+        this.logger.log(`Auto-resolved conflict ${conflictId} for transaction ${transactionId}`);
+      }
+    }
 
     // Update transaction in Xero
     await updateTransaction(

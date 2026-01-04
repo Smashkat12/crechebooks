@@ -75,4 +75,13 @@ export const endpoints = {
     add: (invoiceId: string) => `/invoices/${invoiceId}/charges`,
     remove: (invoiceId: string, lineId: string) => `/invoices/${invoiceId}/charges/${lineId}`,
   },
+  users: {
+    tenantUsers: (tenantId: string) => `/tenants/${tenantId}/users`,
+    updateRole: (tenantId: string, userId: string) => `/tenants/${tenantId}/users/${userId}/role`,
+    removeUser: (tenantId: string, userId: string) => `/tenants/${tenantId}/users/${userId}`,
+    invite: (tenantId: string) => `/tenants/${tenantId}/invitations`,
+    invitations: (tenantId: string) => `/tenants/${tenantId}/invitations`,
+    resendInvitation: (tenantId: string, invitationId: string) => `/tenants/${tenantId}/invitations/${invitationId}/resend`,
+    revokeInvitation: (tenantId: string, invitationId: string) => `/tenants/${tenantId}/invitations/${invitationId}`,
+  },
 } as const;

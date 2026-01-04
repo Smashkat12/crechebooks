@@ -26,10 +26,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { WebhookService } from './webhook.service';
 import { Public } from '../api/auth/decorators/public.decorator';
-import type {
-  EmailEvent,
-  WhatsAppWebhookPayload,
-} from './types/webhook.types';
+import type { EmailEvent, WhatsAppWebhookPayload } from './types/webhook.types';
 import type { WebhookProcessingResult } from './types/webhook.types';
 import { BusinessException } from '../shared/exceptions';
 
@@ -72,7 +69,9 @@ export class WebhookController {
     const rawBody = req.rawBody?.toString() || JSON.stringify(body);
 
     // Verify signature
-    if (!this.webhookService.verifyEmailSignature(rawBody, signature, timestamp)) {
+    if (
+      !this.webhookService.verifyEmailSignature(rawBody, signature, timestamp)
+    ) {
       this.logger.warn('Invalid email webhook signature');
       throw new BusinessException(
         'Invalid webhook signature',
@@ -153,6 +152,10 @@ export class WebhookController {
   ): string {
     this.logger.log(`WhatsApp webhook verification: mode=${mode}`);
 
-    return this.webhookService.verifyWhatsAppSubscription(mode, token, challenge);
+    return this.webhookService.verifyWhatsAppSubscription(
+      mode,
+      token,
+      challenge,
+    );
   }
 }

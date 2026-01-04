@@ -209,46 +209,42 @@ describe('XeroController', () => {
   });
 
   describe('initiateConnection', () => {
-    it(
-      'should store OAuth state and generate authorization URL',
-      async () => {
-        const mockUser = createMockUser();
+    it('should store OAuth state and generate authorization URL', async () => {
+      const mockUser = createMockUser();
 
-        // Set environment variables for test
-        const originalClientId = process.env.XERO_CLIENT_ID;
-        const originalRedirectUri = process.env.XERO_REDIRECT_URI;
-        process.env.XERO_CLIENT_ID = 'test-client-id';
-        process.env.XERO_REDIRECT_URI = 'http://localhost:3000/api/xero/callback';
+      // Set environment variables for test
+      const originalClientId = process.env.XERO_CLIENT_ID;
+      const originalRedirectUri = process.env.XERO_REDIRECT_URI;
+      process.env.XERO_CLIENT_ID = 'test-client-id';
+      process.env.XERO_REDIRECT_URI = 'http://localhost:3000/api/xero/callback';
 
-        try {
-          const result = await controller.initiateConnection(mockUser);
+      try {
+        const result = await controller.initiateConnection(mockUser);
 
-          expect(result).toBeDefined();
-          expect(result.authUrl).toBeDefined();
-          // The auth URL should be a string and contain state parameter
-          expect(typeof result.authUrl).toBe('string');
-          expect(result.authUrl).toContain('state=');
+        expect(result).toBeDefined();
+        expect(result.authUrl).toBeDefined();
+        // The auth URL should be a string and contain state parameter
+        expect(typeof result.authUrl).toBe('string');
+        expect(result.authUrl).toContain('state=');
 
-          // Verify OAuth state was stored
-          const oauthState = await prisma.xeroOAuthState.findUnique({
-            where: { tenantId: testTenantId },
-          });
-          expect(oauthState).toBeDefined();
-          expect(oauthState?.codeVerifier).toBeDefined();
-          expect(oauthState?.state).toBeDefined();
-        } finally {
-          // Restore environment
-          process.env.XERO_CLIENT_ID = originalClientId;
-          process.env.XERO_REDIRECT_URI = originalRedirectUri;
+        // Verify OAuth state was stored
+        const oauthState = await prisma.xeroOAuthState.findUnique({
+          where: { tenantId: testTenantId },
+        });
+        expect(oauthState).toBeDefined();
+        expect(oauthState?.codeVerifier).toBeDefined();
+        expect(oauthState?.state).toBeDefined();
+      } finally {
+        // Restore environment
+        process.env.XERO_CLIENT_ID = originalClientId;
+        process.env.XERO_REDIRECT_URI = originalRedirectUri;
 
-          // Cleanup
-          await prisma.xeroOAuthState
-            .delete({ where: { tenantId: testTenantId } })
-            .catch(() => {});
-        }
-      },
-      15000, // 15 second timeout for OAuth URL generation
-    );
+        // Cleanup
+        await prisma.xeroOAuthState
+          .delete({ where: { tenantId: testTenantId } })
+          .catch(() => {});
+      }
+    }, 15000); // 15 second timeout for OAuth URL generation
   });
 });
 

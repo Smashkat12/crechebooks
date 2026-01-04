@@ -184,7 +184,9 @@ describe('BalanceSheetService', () => {
         },
       ];
 
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue(mockTransactions as any);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue(mockTransactions as any);
 
       // Act
       const result = await service.generate(mockTenantId, testDate);
@@ -239,7 +241,9 @@ describe('BalanceSheetService', () => {
         },
       ];
 
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue(mockTransactions as any);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue(mockTransactions as any);
 
       const result = await service.generate(mockTenantId, testDate);
 
@@ -284,9 +288,9 @@ describe('BalanceSheetService', () => {
         },
       ];
 
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue(
-        mockTransactions.filter(t => !t.isDeleted) as any
-      );
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue(mockTransactions.filter((t) => !t.isDeleted) as any);
 
       const result = await service.generate(mockTenantId, testDate);
 
@@ -330,7 +334,9 @@ describe('BalanceSheetService', () => {
         },
       ];
 
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue(mockTransactions as any);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue(mockTransactions as any);
 
       const result = await service.generate(mockTenantId, testDate);
 
@@ -359,7 +365,9 @@ describe('BalanceSheetService', () => {
       ];
 
       // Prisma filter should only return transactions <= asAtDate
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue(mockTransactions as any);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue(mockTransactions as any);
 
       await service.generate(mockTenantId, testDate);
 
@@ -559,7 +567,7 @@ describe('BalanceSheetService', () => {
   });
 
   describe('Decimal.js configuration', () => {
-    it('should use banker\'s rounding (ROUND_HALF_EVEN)', () => {
+    it("should use banker's rounding (ROUND_HALF_EVEN)", () => {
       // Test banker's rounding: .5 rounds to nearest even
       const value1 = new Decimal(2.5);
       const value2 = new Decimal(3.5);

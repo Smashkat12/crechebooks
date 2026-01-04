@@ -62,7 +62,7 @@ export function SplitTransactionModal({
     validationError,
     saveSplits,
     isLoading,
-  } = useSplitTransaction(transaction.id);
+  } = useSplitTransaction(transaction.id, transaction.amount);
 
   // Reset when dialog closes
   React.useEffect(() => {

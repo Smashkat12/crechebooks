@@ -5,3 +5,4 @@ export * from './import-transactions.dto';
 export * from './update-categorization.dto';
 export * from './batch-categorize.dto';
 export * from './suggestions.dto';
+export * from './split-transaction.dto';

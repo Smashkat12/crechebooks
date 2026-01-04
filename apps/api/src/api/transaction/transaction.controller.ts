@@ -43,6 +43,8 @@ import {
   CategorizationResponseDto,
   ImportTransactionsRequestDto,
   ImportTransactionsResponseDto,
+  CreateSplitTransactionDto,
+  CreateSplitTransactionResponseDto,
 } from './dto';
 import {
   UpdateCategorizationRequestDto,
@@ -432,6 +434,96 @@ export class TransactionController {
         reason: s.reason,
         source: s.source,
       })),
+    };
+  }
+
+  @Post(':id/splits')
+  @ApiOperation({
+    summary: 'Create split transaction',
+    description:
+      'Split a transaction across multiple categories. The sum of split amounts must equal the transaction amount.',
+  })
+  @ApiParam({ name: 'id', description: 'Transaction UUID', type: String })
+  @ApiResponse({
+    status: 201,
+    description: 'Split transaction created successfully',
+    type: CreateSplitTransactionResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request (split amounts do not match transaction)',
+  })
+  @ApiResponse({ status: 404, description: 'Transaction not found' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async createSplitTransaction(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreateSplitTransactionDto,
+    @CurrentUser() user: IUser,
+  ): Promise<CreateSplitTransactionResponseDto> {
+    this.logger.log(
+      `Create split transaction: tx=${id}, splits=${dto.splits.length}, tenant=${user.tenantId}`,
+    );
+
+    // Validate that we have at least 2 splits
+    if (dto.splits.length < 2) {
+      throw new BadRequestException(
+        'A split transaction requires at least 2 allocations',
+      );
+    }
+
+    // Get the transaction to verify it exists and get the amount
+    const transaction = await this.transactionRepo.findById(user.tenantId, id);
+    if (!transaction) {
+      throw new BadRequestException('Transaction not found');
+    }
+
+    // Verify split amounts equal transaction amount
+    const totalSplitAmount = dto.splits.reduce(
+      (sum, split) => sum + split.amount,
+      0,
+    );
+    const transactionAmount = Math.abs(transaction.amountCents);
+
+    if (totalSplitAmount !== transactionAmount) {
+      throw new BadRequestException(
+        `Split amounts (${totalSplitAmount}) do not equal transaction amount (${transactionAmount})`,
+      );
+    }
+
+    // Use the categorization service to create the split
+    const serviceDto = {
+      accountCode: dto.splits[0].categoryId,
+      accountName: dto.splits[0].categoryName,
+      isSplit: true,
+      splits: dto.splits.map((s) => ({
+        accountCode: s.categoryId,
+        accountName: s.categoryName,
+        amountCents: s.amount,
+        vatType: VatType.STANDARD,
+        description: s.description,
+      })),
+      vatType: VatType.STANDARD,
+      createPattern: false,
+    };
+
+    await this.categorizationService.updateCategorization(
+      id,
+      serviceDto,
+      user.id,
+      user.tenantId,
+    );
+
+    // Return success with split details
+    return {
+      success: true,
+      data: {
+        transactionId: id,
+        splits: dto.splits.map((s, index) => ({
+          id: `split-${index}`,
+          categoryId: s.categoryId,
+          amount: s.amount,
+        })),
+      },
     };
   }
 }

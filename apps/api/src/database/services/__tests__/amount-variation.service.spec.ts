@@ -10,7 +10,12 @@ import { Decimal } from 'decimal.js';
 import { AmountVariationService } from '../amount-variation.service';
 import { TransactionRepository } from '../../repositories/transaction.repository';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Transaction, ImportSource, TransactionStatus, DuplicateStatus } from '@prisma/client';
+import {
+  Transaction,
+  ImportSource,
+  TransactionStatus,
+  DuplicateStatus,
+} from '@prisma/client';
 
 describe('AmountVariationService', () => {
   let service: AmountVariationService;
@@ -417,10 +422,14 @@ describe('AmountVariationService', () => {
         thresholdType: 'percentage',
         percentageThreshold: 50,
       });
-      await service.setThresholdConfig(TENANT_ID, {
-        thresholdType: 'percentage',
-        percentageThreshold: 25,
-      }, PAYEE_NAME);
+      await service.setThresholdConfig(
+        TENANT_ID,
+        {
+          thresholdType: 'percentage',
+          percentageThreshold: 25,
+        },
+        PAYEE_NAME,
+      );
 
       // Clear cache
       service.clearCache();
@@ -434,7 +443,10 @@ describe('AmountVariationService', () => {
   /**
    * Helper: Create mock transactions with given amounts
    */
-  function createTransactions(amounts: number[], payeeName = PAYEE_NAME): Transaction[] {
+  function createTransactions(
+    amounts: number[],
+    payeeName = PAYEE_NAME,
+  ): Transaction[] {
     return amounts.map((amountCents, idx) => ({
       id: `txn-${idx}`,
       tenantId: TENANT_ID,

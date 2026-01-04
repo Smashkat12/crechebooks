@@ -7,7 +7,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ReversalDetectionService } from '../reversal-detection.service';
 import { TransactionRepository } from '../../repositories/transaction.repository';
 import { AuditLogService } from '../audit-log.service';
-import { TransactionStatus, ImportSource } from '../../entities/transaction.entity';
+import {
+  TransactionStatus,
+  ImportSource,
+} from '../../entities/transaction.entity';
 
 describe('ReversalDetectionService', () => {
   let service: ReversalDetectionService;
@@ -58,7 +61,10 @@ describe('ReversalDetectionService', () => {
         reference: 'INV-123',
       };
 
-      const result = await service.detectReversal(TENANT_ID, transaction as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        transaction as any,
+      );
 
       expect(result).toBeNull();
       expect(transactionRepository.findByTenant).not.toHaveBeenCalled();
@@ -94,7 +100,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       expect(result).toBeDefined();
       expect(result?.originalTransactionId).toBe('txn-original');
@@ -141,7 +150,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       expect(result).toBeDefined();
       expect(result?.confidence).toBeGreaterThanOrEqual(70);
@@ -178,7 +190,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       expect(result).toBeDefined();
       expect(result?.confidence).toBeGreaterThanOrEqual(55);
@@ -215,7 +230,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       // Should still search in range, but date scoring will reduce confidence
       expect(transactionRepository.findByTenant).toHaveBeenCalled();
@@ -251,7 +269,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       // Note: The mock doesn't actually filter, so we get a result
       // In production, findByTenant with isReconciled: false would not return this
@@ -301,7 +322,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       expect(result?.originalTransactionId).toBe('txn-2'); // Highest confidence
       expect(result?.confidence).toBeGreaterThanOrEqual(90);
@@ -336,7 +360,9 @@ describe('ReversalDetectionService', () => {
 
       await service.linkReversalWithTenant(TENANT_ID, reversalId, originalId);
 
-      expect((transactionRepository as any).prisma.transaction.update).toHaveBeenCalledWith({
+      expect(
+        (transactionRepository as any).prisma.transaction.update,
+      ).toHaveBeenCalledWith({
         where: { id: reversalId },
         data: {
           reversesTransactionId: originalId,
@@ -545,7 +571,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       expect(result).toBeDefined();
       // Should still detect based on amount and date
@@ -584,7 +613,10 @@ describe('ReversalDetectionService', () => {
           totalPages: 1,
         } as any);
 
-        const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+        const result = await service.detectReversal(
+          TENANT_ID,
+          reversalTxn as any,
+        );
 
         expect(result).toBeDefined();
         expect(result?.matchReason).toContain('reversal keywords');
@@ -622,14 +654,17 @@ describe('ReversalDetectionService', () => {
         };
 
         transactionRepository.findByTenant.mockResolvedValue({
-        data: [originalTxn],
-        total: 1,
-        page: 1,
-        limit: 100,
-        totalPages: 1,
-      } as any);
+          data: [originalTxn],
+          total: 1,
+          page: 1,
+          limit: 100,
+          totalPages: 1,
+        } as any);
 
-        const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+        const result = await service.detectReversal(
+          TENANT_ID,
+          reversalTxn as any,
+        );
 
         if (testCase.expectedSimilarity >= 80) {
           expect(result).toBeDefined();
@@ -669,7 +704,10 @@ describe('ReversalDetectionService', () => {
         totalPages: 1,
       } as any);
 
-      const result = await service.detectReversal(TENANT_ID, reversalTxn as any);
+      const result = await service.detectReversal(
+        TENANT_ID,
+        reversalTxn as any,
+      );
 
       expect(result).toBeDefined();
       expect(result?.confidence).toBeGreaterThanOrEqual(90); // High confidence for same-day exact match

@@ -70,7 +70,10 @@ export class ConflictDetectionService {
     const xeroModifiedSinceSync = xeroModifiedAt > lastSyncedAt;
 
     if (localModifiedSinceSync && xeroModifiedSinceSync) {
-      const conflictingFields = await this.getConflictingFields(localData, xeroData);
+      const conflictingFields = await this.getConflictingFields(
+        localData,
+        xeroData,
+      );
 
       return {
         hasConflict: true,
@@ -127,7 +130,9 @@ export class ConflictDetectionService {
     );
 
     if (!modifiedAt) {
-      this.logger.warn('Cannot determine modification status - missing timestamp');
+      this.logger.warn(
+        'Cannot determine modification status - missing timestamp',
+      );
       return false;
     }
 

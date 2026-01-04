@@ -47,6 +47,7 @@ import { AmountVariationService } from './services/amount-variation.service';
 import { ConflictDetectionService } from './services/conflict-detection.service';
 import { ConflictResolutionService } from './services/conflict-resolution.service';
 import { ReversalDetectionService } from './services/reversal-detection.service';
+import { CorrectionConflictService } from './services/correction-conflict.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
@@ -110,6 +111,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     PayeeNormalizerService,
     PayeeVariationDetectorService,
     ReversalDetectionService,
+    CorrectionConflictService,
   ],
   exports: [
     PrismaService,
@@ -160,6 +162,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     ConflictDetectionService,
     ConflictResolutionService,
     ReversalDetectionService,
+    CorrectionConflictService,
   ],
 })
 export class DatabaseModule {}

@@ -7,7 +7,13 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { UserTenantRole, Invitation, UserRole, InvitationStatus as PrismaInvitationStatus, Prisma } from '@prisma/client';
+import {
+  UserTenantRole,
+  Invitation,
+  UserRole,
+  InvitationStatus as PrismaInvitationStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from './audit-log.service';
 import { TenantWithRole } from '../entities/user-tenant-role.entity';
@@ -83,7 +89,10 @@ export class UserTenantService {
    * @returns User role or null if not a member
    * @throws DatabaseException on database errors
    */
-  async getTenantRole(userId: string, tenantId: string): Promise<UserRole | null> {
+  async getTenantRole(
+    userId: string,
+    tenantId: string,
+  ): Promise<UserRole | null> {
     try {
       const userTenantRole = await this.prisma.userTenantRole.findUnique({
         where: {
@@ -155,10 +164,7 @@ export class UserTenantService {
       });
 
       if (existing && existing.isActive) {
-        throw new ConflictException(
-          'UserTenantRole',
-          { userId, tenantId },
-        );
+        throw new ConflictException('UserTenantRole', { userId, tenantId });
       }
 
       // Create or reactivate membership
@@ -263,9 +269,7 @@ export class UserTenantService {
         changeSummary: `User ${userId} removed from tenant ${tenantId}`,
       });
 
-      this.logger.log(
-        `User ${userId} removed from tenant ${tenantId}`,
-      );
+      this.logger.log(`User ${userId} removed from tenant ${tenantId}`);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -502,16 +506,23 @@ export class UserTenantService {
       }
 
       if (user.email.toLowerCase() !== invitation.email.toLowerCase()) {
-        throw new ValidationException('User email does not match invitation email', [
-          { field: 'email', message: 'Email mismatch', value: user.email },
-        ]);
+        throw new ValidationException(
+          'User email does not match invitation email',
+          [{ field: 'email', message: 'Email mismatch', value: user.email }],
+        );
       }
 
       // Check invitation status
       if (invitation.status !== 'PENDING') {
         throw new ValidationException(
           `Invitation is ${invitation.status.toLowerCase()}, cannot accept`,
-          [{ field: 'status', message: 'Invitation not pending', value: invitation.status }],
+          [
+            {
+              field: 'status',
+              message: 'Invitation not pending',
+              value: invitation.status,
+            },
+          ],
         );
       }
 
@@ -524,7 +535,11 @@ export class UserTenantService {
         });
 
         throw new ValidationException('Invitation has expired', [
-          { field: 'expiresAt', message: 'Invitation expired', value: invitation.expiresAt },
+          {
+            field: 'expiresAt',
+            message: 'Invitation expired',
+            value: invitation.expiresAt,
+          },
         ]);
       }
 
@@ -604,7 +619,10 @@ export class UserTenantService {
    * @throws ValidationException if invitation already accepted or revoked
    * @throws DatabaseException on database errors
    */
-  async revokeInvitation(invitationId: string, revokedBy?: string): Promise<void> {
+  async revokeInvitation(
+    invitationId: string,
+    revokedBy?: string,
+  ): Promise<void> {
     try {
       const invitation = await this.prisma.invitation.findUnique({
         where: { id: invitationId },
@@ -615,9 +633,16 @@ export class UserTenantService {
       }
 
       if (invitation.status !== 'PENDING') {
-        throw new ValidationException(`Cannot revoke invitation with status: ${invitation.status}`, [
-          { field: 'status', message: 'Cannot revoke non-pending invitation', value: invitation.status },
-        ]);
+        throw new ValidationException(
+          `Cannot revoke invitation with status: ${invitation.status}`,
+          [
+            {
+              field: 'status',
+              message: 'Cannot revoke non-pending invitation',
+              value: invitation.status,
+            },
+          ],
+        );
       }
 
       await this.prisma.invitation.update({

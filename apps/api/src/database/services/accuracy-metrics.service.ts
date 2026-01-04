@@ -16,6 +16,7 @@ import {
   ThresholdCheckResult,
   RecordCategorizationInput,
   RecordCorrectionInput,
+  LearningModeProgress,
   ACCURACY_CONSTANTS,
 } from '../dto/accuracy.dto';
 
@@ -349,5 +350,117 @@ export class AccuracyMetricsService {
       ((d.getTime() - week1.getTime()) / 86400000 + week1.getDay() + 1) / 7,
     );
     return `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Get learning mode progress for a tenant
+   * TASK-TRANS-023: Learning Mode Indicator
+   *
+   * Learning mode: first 90 days OR <100 corrections
+   * Exit when BOTH: 90+ days AND 100+ corrections
+   *
+   * @param tenantId - Tenant ID
+   * @returns Learning mode progress data
+   */
+  async getLearningModeProgress(
+    tenantId: string,
+  ): Promise<LearningModeProgress> {
+    this.logger.debug(`Getting learning mode progress for tenant ${tenantId}`);
+
+    // Get first transaction date
+    const firstTransaction = await this.prisma.categorizationMetric.findFirst({
+      where: {
+        tenantId,
+        eventType: MetricEventType.CATEGORIZED,
+      },
+      orderBy: { date: 'asc' },
+      select: { date: true },
+    });
+
+    const firstTransactionDate = firstTransaction?.date ?? null;
+
+    // If no transactions yet, return default learning mode state
+    if (!firstTransactionDate) {
+      return {
+        isLearningMode: true,
+        daysRemaining: ACCURACY_CONSTANTS.LEARNING_MODE_DAYS,
+        correctionsCount: 0,
+        correctionsTarget: ACCURACY_CONSTANTS.LEARNING_MODE_CORRECTIONS,
+        progressPercent: 0,
+        currentAccuracy: 0,
+        excludeFromMetrics: true,
+        daysSinceStart: 0,
+        firstTransactionDate: null,
+      };
+    }
+
+    // Calculate days since first transaction
+    const now = new Date();
+    const daysSinceStart = Math.floor(
+      (now.getTime() - firstTransactionDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    // Count total corrections
+    const correctionsCount = await this.prisma.categorizationMetric.count({
+      where: {
+        tenantId,
+        eventType: MetricEventType.CORRECTED,
+      },
+    });
+
+    // Learning mode conditions
+    const isWithinDayThreshold =
+      daysSinceStart < ACCURACY_CONSTANTS.LEARNING_MODE_DAYS;
+    const isWithinCorrectionThreshold =
+      correctionsCount < ACCURACY_CONSTANTS.LEARNING_MODE_CORRECTIONS;
+
+    // In learning mode if EITHER condition is true
+    const isLearningMode = isWithinDayThreshold || isWithinCorrectionThreshold;
+
+    // Calculate progress percentages
+    const daysProgress = Math.min(
+      (daysSinceStart / ACCURACY_CONSTANTS.LEARNING_MODE_DAYS) * 100,
+      100,
+    );
+    const correctionsProgress = Math.min(
+      (correctionsCount / ACCURACY_CONSTANTS.LEARNING_MODE_CORRECTIONS) * 100,
+      100,
+    );
+
+    // Overall progress is the minimum (slowest) of the two
+    const progressPercent = Math.min(daysProgress, correctionsProgress);
+
+    // Days remaining (0 if past threshold)
+    const daysRemaining = Math.max(
+      0,
+      ACCURACY_CONSTANTS.LEARNING_MODE_DAYS - daysSinceStart,
+    );
+
+    // Get current accuracy
+    const accuracyReport = await this.getAccuracy(tenantId);
+
+    return {
+      isLearningMode,
+      daysRemaining,
+      correctionsCount,
+      correctionsTarget: ACCURACY_CONSTANTS.LEARNING_MODE_CORRECTIONS,
+      progressPercent: Math.round(progressPercent * 100) / 100,
+      currentAccuracy: accuracyReport.accuracyPercentage,
+      excludeFromMetrics: isLearningMode,
+      daysSinceStart,
+      firstTransactionDate,
+    };
+  }
+
+  /**
+   * Check if tenant is in learning mode
+   * TASK-TRANS-023: Learning Mode Indicator
+   *
+   * @param tenantId - Tenant ID
+   * @returns Whether tenant is in learning mode
+   */
+  async isInLearningMode(tenantId: string): Promise<boolean> {
+    const progress = await this.getLearningModeProgress(tenantId);
+    return progress.isLearningMode;
   }
 }

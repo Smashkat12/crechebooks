@@ -36,7 +36,9 @@ export class ConflictResolutionService {
     strategy: ResolutionStrategy,
     resolvedBy: string,
   ): Promise<ConflictResolutionResult> {
-    this.logger.log(`Resolving conflict ${conflictId} with strategy: ${strategy}`);
+    this.logger.log(
+      `Resolving conflict ${conflictId} with strategy: ${strategy}`,
+    );
 
     // Load conflict
     const conflict = await this.prisma.syncConflict.findUnique({

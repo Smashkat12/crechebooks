@@ -114,7 +114,11 @@ export class PayeeVariationDetectorService {
       }
 
       const match = this.calculateSimilarity(payeeName, otherPayee);
-      if (match.score >= LEVENSHTEIN_THRESHOLD || match.method === 'abbreviation' || match.method === 'phonetic') {
+      if (
+        match.score >= LEVENSHTEIN_THRESHOLD ||
+        match.method === 'abbreviation' ||
+        match.method === 'phonetic'
+      ) {
         const normalizedOther = this.normalize(otherPayee);
 
         matches.push({
@@ -170,10 +174,16 @@ export class PayeeVariationDetectorService {
         if (processed.has(payeeB)) continue;
 
         const match = this.calculateSimilarity(payeeA, payeeB);
-        if (match.score >= LEVENSHTEIN_THRESHOLD || match.method === 'abbreviation') {
+        if (
+          match.score >= LEVENSHTEIN_THRESHOLD ||
+          match.method === 'abbreviation'
+        ) {
           variants.push(payeeB);
           matchTypes.add(match.method as PayeeMatchType);
-          totalConfidence += this.calculateConfidence(match.score, match.method);
+          totalConfidence += this.calculateConfidence(
+            match.score,
+            match.method,
+          );
           matchCount++;
           processed.add(payeeB);
         }
@@ -364,11 +374,7 @@ export class PayeeVariationDetectorService {
     const maxPrefixLength = 4;
 
     let prefixLength = 0;
-    for (
-      let i = 0;
-      i < Math.min(s1.length, s2.length, maxPrefixLength);
-      i++
-    ) {
+    for (let i = 0; i < Math.min(s1.length, s2.length, maxPrefixLength); i++) {
       if (s1[i] === s2[i]) {
         prefixLength++;
       } else {

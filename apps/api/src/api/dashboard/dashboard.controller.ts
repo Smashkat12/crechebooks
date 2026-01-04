@@ -12,6 +12,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import { DashboardMetricsResponseDto } from './dto/dashboard-metrics.dto';
 import { DashboardTrendsResponseDto } from './dto/dashboard-trends.dto';
+import { AccuracyMetricsService } from '../../database/services/accuracy-metrics.service';
+import type { LearningModeProgress } from '../../database/dto/accuracy.dto';
 
 @Controller('dashboard')
 @ApiTags('Dashboard')
@@ -19,7 +21,10 @@ import { DashboardTrendsResponseDto } from './dto/dashboard-trends.dto';
 export class DashboardController {
   private readonly logger = new Logger(DashboardController.name);
 
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(
+    private readonly dashboardService: DashboardService,
+    private readonly accuracyMetricsService: AccuracyMetricsService,
+  ) {}
 
   @Get('metrics')
   @ApiOperation({
@@ -73,5 +78,27 @@ export class DashboardController {
   ): Promise<DashboardTrendsResponseDto> {
     this.logger.debug(`Getting trends for tenant ${user.tenantId}`);
     return this.dashboardService.getTrends(user.tenantId, period);
+  }
+
+  @Get('learning-mode')
+  @ApiOperation({
+    summary: 'Get learning mode progress',
+    description:
+      'Returns learning mode status and progress for the tenant. Learning mode is active during first 90 days OR with <100 corrections.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Learning mode progress retrieved successfully',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  async getLearningMode(
+    @CurrentUser() user: IUser,
+  ): Promise<LearningModeProgress> {
+    this.logger.debug(
+      `Getting learning mode progress for tenant ${user.tenantId}`,
+    );
+    return this.accuracyMetricsService.getLearningModeProgress(user.tenantId);
   }
 }

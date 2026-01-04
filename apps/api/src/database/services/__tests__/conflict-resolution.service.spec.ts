@@ -8,7 +8,10 @@ import { ConflictResolutionService } from '../conflict-resolution.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../audit-log.service';
 import { ConflictStatus } from '../../entities/sync-conflict.entity';
-import { BusinessException, NotFoundException } from '../../../shared/exceptions';
+import {
+  BusinessException,
+  NotFoundException,
+} from '../../../shared/exceptions';
 
 describe('ConflictResolutionService', () => {
   let service: ConflictResolutionService;
@@ -388,9 +391,9 @@ describe('ConflictResolutionService', () => {
     it('should throw NotFoundException when conflict not found', async () => {
       mockPrismaService.syncConflict.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.applyResolution('conflict-123', {}),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.applyResolution('conflict-123', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessException when conflict not resolved', async () => {
@@ -403,9 +406,9 @@ describe('ConflictResolutionService', () => {
         pendingConflict,
       );
 
-      await expect(
-        service.applyResolution('conflict-123', {}),
-      ).rejects.toThrow(BusinessException);
+      await expect(service.applyResolution('conflict-123', {})).rejects.toThrow(
+        BusinessException,
+      );
     });
   });
 });

@@ -93,12 +93,17 @@ describe('PayeeVariationDetectorService', () => {
 
     it('should use Jaro-Winkler for name matching', () => {
       const result = service.calculateSimilarity('CHECKERS', 'CHECKER');
-      expect(['jaro-winkler', 'levenshtein', 'suffix']).toContain(result.method);
+      expect(['jaro-winkler', 'levenshtein', 'suffix']).toContain(
+        result.method,
+      );
       expect(result.score).toBeGreaterThan(0.8);
     });
 
     it('should use Levenshtein for fuzzy matching', () => {
-      const result = service.calculateSimilarity('ACME CORP', 'ACME CORPORATION');
+      const result = service.calculateSimilarity(
+        'ACME CORP',
+        'ACME CORPORATION',
+      );
       expect(result.score).toBeGreaterThan(0.7);
     });
 

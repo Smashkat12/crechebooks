@@ -1,13 +1,21 @@
 'use client';
 
 import { DollarSign, Receipt, AlertTriangle, Users } from 'lucide-react';
-import { MetricCard, IncomeExpenseChart, TopArrearsWidget } from '@/components/dashboard';
+import {
+  MetricCard,
+  IncomeExpenseChart,
+  TopArrearsWidget,
+  XeroStatusWidget,
+  LearningModeIndicator
+} from '@/components/dashboard';
 import { useDashboardMetrics, useDashboardTrends } from '@/hooks/use-dashboard';
+import { useLearningMode } from '@/hooks/useLearningMode';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = useDashboardMetrics();
   const { data: trends, isLoading: trendsLoading } = useDashboardTrends();
+  const { progress, isLoading: learningModeLoading, isDismissed, dismissIndicator } = useLearningMode();
 
   if (metricsError) {
     throw new Error(`Failed to load dashboard: ${metricsError.message}`);
@@ -77,8 +85,22 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Learning Mode Indicator - Show if in learning mode and not dismissed */}
+      {progress && progress.isLearningMode && !isDismissed && !learningModeLoading && (
+        <LearningModeIndicator
+          progress={progress}
+          onDismiss={dismissIndicator}
+        />
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="md:col-span-2">
+          <IncomeExpenseChart data={chartData} isLoading={trendsLoading} />
+        </div>
+        <XeroStatusWidget />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
-        <IncomeExpenseChart data={chartData} isLoading={trendsLoading} />
         <TopArrearsWidget arrears={arrearsData} />
       </div>
     </div>

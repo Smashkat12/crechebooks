@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   BarChart3,
   Settings,
+  GraduationCap,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -30,6 +31,7 @@ export const mainNavLinks: NavLink[] = [
 ];
 
 export const managementNavLinks: NavLink[] = [
+  { title: 'Enrollments', href: '/enrollments', icon: GraduationCap },
   { title: 'Parents', href: '/parents', icon: UsersRound },
   { title: 'Staff', href: '/staff', icon: Users },
   { title: 'Payroll', href: '/staff/payroll', icon: FileSpreadsheet },

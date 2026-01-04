@@ -73,11 +73,7 @@ export interface EmailWebhookPayload {
  * WhatsApp message status
  * @see https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples
  */
-export type WhatsAppStatusType =
-  | 'sent'
-  | 'delivered'
-  | 'read'
-  | 'failed';
+export type WhatsAppStatusType = 'sent' | 'delivered' | 'read' | 'failed';
 
 /**
  * WhatsApp status update structure
@@ -204,7 +200,9 @@ export interface RawWebhookEvent {
 /**
  * Map email event types to delivery status
  */
-export function mapEmailEventToStatus(event: EmailEventType): DeliveryStatus | null {
+export function mapEmailEventToStatus(
+  event: EmailEventType,
+): DeliveryStatus | null {
   switch (event) {
     case 'delivered':
       return 'DELIVERED';
@@ -230,7 +228,9 @@ export function mapEmailEventToStatus(event: EmailEventType): DeliveryStatus | n
 /**
  * Map WhatsApp status to delivery status
  */
-export function mapWhatsAppStatusToDeliveryStatus(status: WhatsAppStatusType): DeliveryStatus | null {
+export function mapWhatsAppStatusToDeliveryStatus(
+  status: WhatsAppStatusType,
+): DeliveryStatus | null {
   switch (status) {
     case 'sent':
       return 'SENT';

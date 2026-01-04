@@ -145,10 +145,11 @@ export class TransactionImportService {
 
     let categorizationResult;
     try {
-      categorizationResult = await this.categorizationService.categorizeTransactions(
-        transactionIds,
-        tenantId,
-      );
+      categorizationResult =
+        await this.categorizationService.categorizeTransactions(
+          transactionIds,
+          tenantId,
+        );
       this.logger.log(
         `Categorization complete: ${categorizationResult.autoCategorized} auto-categorized, ${categorizationResult.reviewRequired} need review`,
       );
@@ -167,10 +168,12 @@ export class TransactionImportService {
       duplicatesSkipped: duplicates.length,
       transactionsCreated: created.length,
       errors,
-      categorization: categorizationResult ? {
-        autoCategorized: categorizationResult.autoCategorized,
-        reviewRequired: categorizationResult.reviewRequired,
-      } : undefined,
+      categorization: categorizationResult
+        ? {
+            autoCategorized: categorizationResult.autoCategorized,
+            reviewRequired: categorizationResult.reviewRequired,
+          }
+        : undefined,
     };
   }
 

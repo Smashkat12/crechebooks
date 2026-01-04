@@ -16,11 +16,7 @@ import { AuditLogService } from '../database/services/audit-log.service';
 @Module({
   imports: [ConfigModule],
   controllers: [WebhookController],
-  providers: [
-    WebhookService,
-    PrismaService,
-    AuditLogService,
-  ],
+  providers: [WebhookService, PrismaService, AuditLogService],
   exports: [WebhookService],
 })
 export class WebhookModule {}

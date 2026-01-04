@@ -201,35 +201,46 @@ enum ReminderStatus {
   FAILED
 }
 
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 // ============================================
 // MODELS
 // ============================================
 
 model Tenant {
-  id                 String             @id @default(uuid())
-  name               String             @db.VarChar(200)
-  tradingName        String?            @map("trading_name") @db.VarChar(200)
-  registrationNumber String?            @map("registration_number") @db.VarChar(50)
-  vatNumber          String?            @map("vat_number") @db.VarChar(20)
-  taxStatus          TaxStatus          @default(NOT_REGISTERED) @map("tax_status")
-  addressLine1       String             @map("address_line1") @db.VarChar(200)
-  addressLine2       String?            @map("address_line2") @db.VarChar(200)
-  city               String             @db.VarChar(100)
-  province           String             @db.VarChar(50)
-  postalCode         String             @map("postal_code") @db.VarChar(10)
-  phone              String             @db.VarChar(20)
-  email              String             @unique @db.VarChar(255)
-  xeroTenantId       String?            @unique @map("xero_tenant_id") @db.VarChar(50)
-  subscriptionStatus SubscriptionStatus @default(TRIAL) @map("subscription_status")
-  invoiceDayOfMonth  Int                @default(1) @map("invoice_day_of_month")
-  invoiceDueDays     Int                @default(7) @map("invoice_due_days")
-  closureDates       Json               @default("[]") @map("closure_dates")
-  xeroConnectedAt    DateTime?          @map("xero_connected_at")
-  xeroTenantName     String?            @map("xero_tenant_name") @db.VarChar(200)
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
+  id                    String             @id @default(uuid())
+  name                  String             @db.VarChar(200)
+  tradingName           String?            @map("trading_name") @db.VarChar(200)
+  registrationNumber    String?            @map("registration_number") @db.VarChar(50)
+  vatNumber             String?            @map("vat_number") @db.VarChar(20)
+  taxStatus             TaxStatus          @default(NOT_REGISTERED) @map("tax_status")
+  vatRegistrationDate   DateTime?          @map("vat_registration_date") @db.Date
+  cumulativeTurnoverCents BigInt           @default(0) @map("cumulative_turnover_cents")
+  addressLine1          String             @map("address_line1") @db.VarChar(200)
+  addressLine2          String?            @map("address_line2") @db.VarChar(200)
+  city                  String             @db.VarChar(100)
+  province              String             @db.VarChar(50)
+  postalCode            String             @map("postal_code") @db.VarChar(10)
+  phone                 String             @db.VarChar(20)
+  email                 String             @unique @db.VarChar(255)
+  xeroTenantId          String?            @unique @map("xero_tenant_id") @db.VarChar(50)
+  subscriptionStatus    SubscriptionStatus @default(TRIAL) @map("subscription_status")
+  invoiceDayOfMonth     Int                @default(1) @map("invoice_day_of_month")
+  invoiceDueDays        Int                @default(7) @map("invoice_due_days")
+  closureDates          Json               @default("[]") @map("closure_dates")
+  xeroConnectedAt       DateTime?          @map("xero_connected_at")
+  xeroTenantName        String?            @map("xero_tenant_name") @db.VarChar(200)
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
 
   users            User[]
+  userTenantRoles  UserTenantRole[]
+  invitations      Invitation[]
   transactions     Transaction[]
   payeePatterns    PayeePattern[]
   feeStructures    FeeStructure[]
@@ -253,18 +264,21 @@ model Tenant {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  tenantId    String    @map("tenant_id")
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
-  auth0Id     String    @unique @map("auth0_id")
-  email       String
-  name        String
-  role        UserRole
-  isActive    Boolean   @default(true) @map("is_active")
-  lastLoginAt DateTime? @map("last_login_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  auth0Id           String    @unique @map("auth0_id")
+  email             String
+  name              String
+  role              UserRole  // Kept for backward compatibility - primary tenant role
+  isActive          Boolean   @default(true) @map("is_active")
+  lastLoginAt       DateTime? @map("last_login_at")
+  currentTenantId   String?   @map("current_tenant_id")  // Active tenant in current session
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
+  tenantRoles             UserTenantRole[] @relation("UserTenantRoles")
+  receivedInvitations     Invitation[]
   reviewedCategorizations Categorization[] @relation("ReviewedCategorizations")
   sarsSubmissions         SarsSubmission[]
   reconciliations         Reconciliation[] @relation("ReconciliationReconciler")
@@ -272,6 +286,7 @@ model User {
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([auth0Id])
+  @@index([currentTenantId])
   @@map("users")
 }
 
@@ -306,32 +321,36 @@ enum DuplicateStatus {
 }
 
 model Transaction {
-  id                String            @id @default(uuid())
-  tenantId          String            @map("tenant_id")
-  xeroTransactionId String?           @unique @map("xero_transaction_id")
-  bankAccount       String            @map("bank_account") @db.VarChar(50)
-  date              DateTime          @db.Date
-  description       String
-  payeeName         String?           @map("payee_name") @db.VarChar(200)
-  reference         String?           @db.VarChar(100)
-  amountCents       Int               @map("amount_cents")
-  isCredit          Boolean           @map("is_credit")
-  source            ImportSource
-  importBatchId     String?           @map("import_batch_id")
-  status            TransactionStatus @default(PENDING)
-  isReconciled      Boolean           @default(false) @map("is_reconciled")
-  reconciledAt      DateTime?         @map("reconciled_at")
-  isDeleted         Boolean           @default(false) @map("is_deleted")
-  deletedAt         DateTime?         @map("deleted_at")
-  transactionHash   String?           @map("transaction_hash") @db.VarChar(64)
-  duplicateOfId     String?           @map("duplicate_of_id")
-  duplicateStatus   DuplicateStatus   @default(NONE) @map("duplicate_status")
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  id                    String            @id @default(uuid())
+  tenantId              String            @map("tenant_id")
+  xeroTransactionId     String?           @unique @map("xero_transaction_id")
+  bankAccount           String            @map("bank_account") @db.VarChar(50)
+  date                  DateTime          @db.Date
+  description           String
+  payeeName             String?           @map("payee_name") @db.VarChar(200)
+  reference             String?           @db.VarChar(100)
+  amountCents           Int               @map("amount_cents")
+  isCredit              Boolean           @map("is_credit")
+  source                ImportSource
+  importBatchId         String?           @map("import_batch_id")
+  status                TransactionStatus @default(PENDING)
+  isReconciled          Boolean           @default(false) @map("is_reconciled")
+  reconciledAt          DateTime?         @map("reconciled_at")
+  isDeleted             Boolean           @default(false) @map("is_deleted")
+  deletedAt             DateTime?         @map("deleted_at")
+  transactionHash       String?           @map("transaction_hash") @db.VarChar(64)
+  duplicateOfId         String?           @map("duplicate_of_id")
+  duplicateStatus       DuplicateStatus   @default(NONE) @map("duplicate_status")
+  reversesTransactionId String?           @map("reverses_transaction_id")
+  isReversal            Boolean           @default(false) @map("is_reversal")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
 
   tenant                Tenant                  @relation(fields: [tenantId], references: [id])
   duplicateOf           Transaction?            @relation("TransactionDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
   duplicates            Transaction[]           @relation("TransactionDuplicates")
+  reversesTransaction   Transaction?            @relation("TransactionReversals", fields: [reversesTransactionId], references: [id], onDelete: SetNull)
+  reversals             Transaction[]           @relation("TransactionReversals")
   categorizations       Categorization[]
   payments              Payment[]
   categorizationMetrics CategorizationMetric[]
@@ -342,6 +361,8 @@ model Transaction {
   @@index([tenantId, isReconciled])
   @@index([tenantId, transactionHash])
   @@index([tenantId, duplicateStatus])
+  @@index([tenantId, isReversal])
+  @@index([reversesTransactionId])
   @@map("transactions")
 }
 
@@ -506,6 +527,7 @@ model Invoice {
   dueDate            DateTime        @map("due_date") @db.Date
   subtotalCents      Int             @map("subtotal_cents")
   vatCents           Int             @default(0) @map("vat_cents")
+  vatRate            Decimal         @default(0) @map("vat_rate") @db.Decimal(5, 2)
   totalCents         Int             @map("total_cents")
   amountPaidCents    Int             @default(0) @map("amount_paid_cents")
   status             InvoiceStatus   @default(DRAFT)
@@ -862,4 +884,88 @@ model XeroOAuthState {
 
   @@index([tenantId])
   @@map("xero_oauth_states")
+}
+
+// TASK-USER-001: Multi-Tenant User Role Assignment
+model UserTenantRole {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tenantId  String   @map("tenant_id")
+  role      UserRole
+  isActive  Boolean  @default(true) @map("is_active")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user   User   @relation("UserTenantRoles", fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([userId])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("user_tenant_roles")
+}
+
+// TASK-USER-001: Invitation System for Multi-Tenant Users
+model Invitation {
+  id          String           @id @default(uuid())
+  email       String           @db.VarChar(255)
+  tenantId    String           @map("tenant_id")
+  role        UserRole
+  status      InvitationStatus @default(PENDING)
+  invitedBy   String?          @map("invited_by")
+  acceptedBy  String?          @map("accepted_by")
+  expiresAt   DateTime         @map("expires_at")
+  acceptedAt  DateTime?        @map("accepted_at")
+  revokedAt   DateTime?        @map("revoked_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  acceptedUser User?  @relation(fields: [acceptedBy], references: [id])
+
+  @@unique([email, tenantId, status])
+  @@index([tenantId])
+  @@index([email])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+// TASK-XERO-001: Bi-directional Sync Conflict Resolution
+enum ConflictType {
+  UPDATE_UPDATE
+  DELETE_UPDATE
+  CREATE_CREATE
+}
+
+enum ConflictStatus {
+  PENDING
+  AUTO_RESOLVED
+  MANUALLY_RESOLVED
+  IGNORED
+}
+
+model SyncConflict {
+  id                String         @id @default(uuid())
+  tenantId          String         @map("tenant_id")
+  entityType        String         @map("entity_type") @db.VarChar(50)
+  entityId          String         @map("entity_id")
+  conflictType      ConflictType   @map("conflict_type")
+  localData         Json           @map("local_data")
+  xeroData          Json           @map("xero_data")
+  localModifiedAt   DateTime       @map("local_modified_at")
+  xeroModifiedAt    DateTime       @map("xero_modified_at")
+  status            ConflictStatus @default(PENDING)
+  resolvedBy        String?        @map("resolved_by")
+  resolution        String?        @db.VarChar(50)
+  resolvedAt        DateTime?      @map("resolved_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  @@index([tenantId, status])
+  @@index([tenantId, entityType, entityId])
+  @@index([createdAt])
+  @@map("sync_conflicts")
 }

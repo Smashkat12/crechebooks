@@ -11,6 +11,7 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PayeePattern } from '@prisma/client';
 import { PayeePatternRepository } from '../repositories/payee-pattern.repository';
 import { BusinessException, NotFoundException } from '../../shared/exceptions';
+import { PayeeVariationDetectorService } from './payee-variation-detector.service';
 
 /**
  * Represents a payee alias mapping
@@ -33,7 +34,11 @@ const SIMILARITY_THRESHOLD = 0.8;
 export class PayeeAliasService {
   private readonly logger = new Logger(PayeeAliasService.name);
 
-  constructor(private readonly payeePatternRepo: PayeePatternRepository) {}
+  constructor(
+    private readonly payeePatternRepo: PayeePatternRepository,
+    @Inject(forwardRef(() => PayeeVariationDetectorService))
+    private readonly variationDetector: PayeeVariationDetectorService,
+  ) {}
 
   /**
    * Resolve a payee name to its canonical form
@@ -141,7 +146,9 @@ export class PayeeAliasService {
         confidenceBoost: 0,
         isRecurring: false,
       });
-      this.logger.log(`Created new pattern for canonical name: ${canonicalName}`);
+      this.logger.log(
+        `Created new pattern for canonical name: ${canonicalName}`,
+      );
     }
 
     // Add alias to pattern
@@ -207,7 +214,10 @@ export class PayeeAliasService {
     // Parse aliasId (format: "patternId:alias")
     const parts = aliasId.split(':');
     if (parts.length < 2) {
-      throw new BusinessException('Invalid alias ID format', 'INVALID_ALIAS_ID');
+      throw new BusinessException(
+        'Invalid alias ID format',
+        'INVALID_ALIAS_ID',
+      );
     }
 
     const patternId = parts[0];
@@ -234,12 +244,15 @@ export class PayeeAliasService {
       payeeAliases: updatedAliases,
     });
 
-    this.logger.log(`Deleted alias "${aliasToDelete}" from pattern ${patternId}`);
+    this.logger.log(
+      `Deleted alias "${aliasToDelete}" from pattern ${patternId}`,
+    );
   }
 
   /**
-   * Find similar payee names using Levenshtein distance
+   * Find similar payee names using advanced variation detection
    * Returns canonical names that are similar to the input
+   * Uses PayeeVariationDetectorService for improved matching
    *
    * @param tenantId - Tenant ID for isolation
    * @param payeeName - Payee name to match
@@ -250,48 +263,29 @@ export class PayeeAliasService {
       return [];
     }
 
-    const normalized = this.normalizePayeeName(payeeName);
-    const patterns = await this.payeePatternRepo.findByTenant(tenantId, {});
+    // Use the variation detector service for better matching
+    const variations = await this.variationDetector.detectVariations(
+      tenantId,
+      payeeName,
+    );
 
-    const similar: Array<{ name: string; similarity: number }> = [];
+    // Return unique canonical names sorted by confidence
+    const uniqueNames = new Set<string>();
+    const results: Array<{ name: string; confidence: number }> = [];
 
-    for (const pattern of patterns) {
-      // Check canonical name
-      const canonicalSimilarity = this.calculateSimilarity(
-        normalized,
-        this.normalizePayeeName(pattern.payeePattern),
-      );
-
-      if (canonicalSimilarity >= SIMILARITY_THRESHOLD) {
-        similar.push({
-          name: pattern.payeePattern,
-          similarity: canonicalSimilarity,
-        });
-        continue; // Skip aliases if canonical matches
-      }
-
-      // Check aliases
-      const aliases = pattern.payeeAliases as string[];
-      for (const alias of aliases) {
-        const aliasSimilarity = this.calculateSimilarity(
-          normalized,
-          this.normalizePayeeName(alias),
-        );
-
-        if (aliasSimilarity >= SIMILARITY_THRESHOLD) {
-          similar.push({
-            name: pattern.payeePattern,
-            similarity: aliasSimilarity,
-          });
-          break; // One match per pattern is enough
-        }
+    for (const variation of variations) {
+      // Resolve the variation to its canonical form
+      const canonical = await this.resolveAlias(tenantId, variation.payeeB);
+      if (!uniqueNames.has(canonical)) {
+        uniqueNames.add(canonical);
+        results.push({ name: canonical, confidence: variation.confidence });
       }
     }
 
-    // Sort by similarity descending and return names
-    return similar
-      .sort((a, b) => b.similarity - a.similarity)
-      .map((s) => s.name);
+    // Sort by confidence descending
+    return results
+      .sort((a, b) => b.confidence - a.confidence)
+      .map((r) => r.name);
   }
 
   /**

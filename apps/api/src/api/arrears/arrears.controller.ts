@@ -24,7 +24,10 @@ import { UserRole } from '@prisma/client';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { ChildRepository } from '../../database/repositories/child.repository';
-import { ArrearsReportPdfService, ArrearsReportOptions } from '../../database/services/arrears-report-pdf.service';
+import {
+  ArrearsReportPdfService,
+  ArrearsReportOptions,
+} from '../../database/services/arrears-report-pdf.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -318,7 +321,8 @@ export class ArrearsController {
   @Header('Content-Type', 'application/pdf')
   @ApiOperation({
     summary: 'Export arrears report as PDF',
-    description: 'Generates a professional PDF report of arrears with aging analysis, summary statistics, and detailed invoice breakdown.',
+    description:
+      'Generates a professional PDF report of arrears with aging analysis, summary statistics, and detailed invoice breakdown.',
   })
   @ApiProduces('application/pdf')
   @ApiResponse({
@@ -342,13 +346,18 @@ export class ArrearsController {
 
     const options: ArrearsReportOptions = {
       parentId: query.parentId,
-      minAmountCents: query.minAmount ? Math.round(query.minAmount * 100) : undefined,
+      minAmountCents: query.minAmount
+        ? Math.round(query.minAmount * 100)
+        : undefined,
       includeTopDebtors: true,
       topDebtorsLimit: 10,
       includeDetailedInvoices: true,
     };
 
-    const pdfBuffer = await this.arrearsPdfService.generatePdf(tenantId, options);
+    const pdfBuffer = await this.arrearsPdfService.generatePdf(
+      tenantId,
+      options,
+    );
 
     const filename = `arrears-report-${new Date().toISOString().split('T')[0]}.pdf`;
 

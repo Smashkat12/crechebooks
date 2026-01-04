@@ -31,7 +31,12 @@ import {
   ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { randomBytes, createHash, createCipheriv, createDecipheriv } from 'crypto';
+import {
+  randomBytes,
+  createHash,
+  createCipheriv,
+  createDecipheriv,
+} from 'crypto';
 import { XeroClient } from 'xero-node';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { TokenManager, TokenSet } from '../../mcp/xero-mcp/auth/token-manager';
@@ -85,7 +90,8 @@ export class XeroController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Initiate Xero OAuth connection',
-    description: 'Returns an authorization URL to redirect the user to Xero for OAuth consent.',
+    description:
+      'Returns an authorization URL to redirect the user to Xero for OAuth consent.',
   })
   @ApiResponse({
     status: 200,
@@ -168,7 +174,8 @@ export class XeroController {
   @Get('callback')
   @ApiOperation({
     summary: 'Handle Xero OAuth callback',
-    description: 'Receives the authorization code from Xero and exchanges it for tokens.',
+    description:
+      'Receives the authorization code from Xero and exchanges it for tokens.',
   })
   @ApiResponse({
     status: 302,
@@ -303,14 +310,17 @@ export class XeroController {
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Trigger Xero sync',
-    description: 'Initiates a sync operation with Xero. Returns job ID for tracking progress.',
+    description:
+      'Initiates a sync operation with Xero. Returns job ID for tracking progress.',
   })
   @ApiResponse({
     status: 202,
     description: 'Sync job queued',
     type: SyncJobResponseDto,
   })
-  @ApiForbiddenResponse({ description: 'Requires OWNER, ADMIN, or ACCOUNTANT role' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async triggerSync(
     @Body() body: SyncRequestDto,
@@ -364,7 +374,8 @@ export class XeroController {
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
   @ApiOperation({
     summary: 'Get Xero connection status',
-    description: 'Returns current Xero connection status and last sync information.',
+    description:
+      'Returns current Xero connection status and last sync information.',
   })
   @ApiResponse({
     status: 200,
@@ -372,7 +383,9 @@ export class XeroController {
     type: XeroConnectionStatusDto,
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
-  async getStatus(@CurrentUser() user: IUser): Promise<XeroConnectionStatusDto> {
+  async getStatus(
+    @CurrentUser() user: IUser,
+  ): Promise<XeroConnectionStatusDto> {
     const tenantId = user.tenantId;
     this.logger.debug(`Getting Xero status for tenant ${tenantId}`);
 
@@ -502,7 +515,10 @@ export class XeroController {
       });
 
       // Sync bank transactions (if pulling)
-      if (options.direction === 'pull' || options.direction === 'bidirectional') {
+      if (
+        options.direction === 'pull' ||
+        options.direction === 'bidirectional'
+      ) {
         this.syncGateway.emitProgress(tenantId, {
           entity: 'transactions',
           total: 100,
@@ -510,14 +526,18 @@ export class XeroController {
           percentage: 25,
         });
 
-        const syncResult = await this.bankFeedService.syncTransactions(tenantId, {
-          fromDate: options.fromDate ? new Date(options.fromDate) : undefined,
-        });
+        const syncResult = await this.bankFeedService.syncTransactions(
+          tenantId,
+          {
+            fromDate: options.fromDate ? new Date(options.fromDate) : undefined,
+          },
+        );
 
         this.syncGateway.emitProgress(tenantId, {
           entity: 'transactions',
           total: syncResult.transactionsFound,
-          processed: syncResult.transactionsCreated + syncResult.duplicatesSkipped,
+          processed:
+            syncResult.transactionsCreated + syncResult.duplicatesSkipped,
           percentage: 100,
         });
       }
@@ -579,10 +599,7 @@ export class XeroController {
 
       return JSON.parse(decrypted) as OAuthStatePayload;
     } catch (error) {
-      throw new BusinessException(
-        'Invalid OAuth state',
-        'OAUTH_STATE_INVALID',
-      );
+      throw new BusinessException('Invalid OAuth state', 'OAUTH_STATE_INVALID');
     }
   }
 }

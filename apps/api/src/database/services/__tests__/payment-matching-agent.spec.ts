@@ -172,11 +172,15 @@ describe('PaymentMatchingService - Agent Integration', () => {
   describe('Agent Integration - Ambiguous Matches', () => {
     it('should invoke agent when multiple high-confidence matches exist', async () => {
       // Arrange: Setup 2 invoices with both having high confidence (>80%)
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([mockTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-        mockInvoiceWithRelations2 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([
+          mockInvoiceWithRelations1 as any,
+          mockInvoiceWithRelations2 as any,
+        ]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 
@@ -197,10 +201,16 @@ describe('PaymentMatchingService - Agent Integration', () => {
         ],
       };
 
-      jest.spyOn(paymentAgent, 'makeMatchDecision').mockResolvedValue(mockAgentDecision);
+      jest
+        .spyOn(paymentAgent, 'makeMatchDecision')
+        .mockResolvedValue(mockAgentDecision);
 
-      jest.spyOn(service['paymentRepo'], 'create').mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
-      jest.spyOn(service['invoiceRepo'], 'recordPayment').mockResolvedValue(undefined);
+      jest
+        .spyOn(service['paymentRepo'], 'create')
+        .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
+      jest
+        .spyOn(service['invoiceRepo'], 'recordPayment')
+        .mockResolvedValue(undefined);
 
       // Act
       const result = await service.matchPayments({
@@ -230,11 +240,15 @@ describe('PaymentMatchingService - Agent Integration', () => {
 
     it('should apply confidence thresholds correctly', async () => {
       // Arrange: Agent returns medium confidence (60-85%)
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([mockTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-        mockInvoiceWithRelations2 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([
+          mockInvoiceWithRelations1 as any,
+          mockInvoiceWithRelations2 as any,
+        ]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 
@@ -248,7 +262,9 @@ describe('PaymentMatchingService - Agent Integration', () => {
         alternatives: [],
       };
 
-      jest.spyOn(paymentAgent, 'makeMatchDecision').mockResolvedValue(mockAgentDecision);
+      jest
+        .spyOn(paymentAgent, 'makeMatchDecision')
+        .mockResolvedValue(mockAgentDecision);
 
       // Act
       const result = await service.matchPayments({
@@ -264,11 +280,15 @@ describe('PaymentMatchingService - Agent Integration', () => {
 
     it('should flag low confidence matches for manual review', async () => {
       // Arrange: Agent returns low confidence (<60%)
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([mockTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-        mockInvoiceWithRelations2 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([
+          mockInvoiceWithRelations1 as any,
+          mockInvoiceWithRelations2 as any,
+        ]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 
@@ -282,7 +302,9 @@ describe('PaymentMatchingService - Agent Integration', () => {
         alternatives: [],
       };
 
-      jest.spyOn(paymentAgent, 'makeMatchDecision').mockResolvedValue(mockAgentDecision);
+      jest
+        .spyOn(paymentAgent, 'makeMatchDecision')
+        .mockResolvedValue(mockAgentDecision);
 
       // Act
       const result = await service.matchPayments({
@@ -293,18 +315,24 @@ describe('PaymentMatchingService - Agent Integration', () => {
       expect(result.reviewRequired).toBe(1);
       expect(result.autoApplied).toBe(0);
       expect(result.results[0].status).toBe('REVIEW_REQUIRED');
-      expect(result.results[0].reason).toContain('Agent flagged for manual review');
+      expect(result.results[0].reason).toContain(
+        'Agent flagged for manual review',
+      );
     });
   });
 
   describe('Agent Retry and Fallback', () => {
     it('should retry agent call up to 3 times on failure', async () => {
       // Arrange
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([mockTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-        mockInvoiceWithRelations2 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([
+          mockInvoiceWithRelations1 as any,
+          mockInvoiceWithRelations2 as any,
+        ]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 
@@ -323,8 +351,12 @@ describe('PaymentMatchingService - Agent Integration', () => {
           alternatives: [],
         });
 
-      jest.spyOn(service['paymentRepo'], 'create').mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
-      jest.spyOn(service['invoiceRepo'], 'recordPayment').mockResolvedValue(undefined);
+      jest
+        .spyOn(service['paymentRepo'], 'create')
+        .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
+      jest
+        .spyOn(service['invoiceRepo'], 'recordPayment')
+        .mockResolvedValue(undefined);
 
       // Act
       const result = await service.matchPayments({
@@ -339,11 +371,15 @@ describe('PaymentMatchingService - Agent Integration', () => {
 
     it('should fallback to manual review after 3 failed retries', async () => {
       // Arrange
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([mockTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-        mockInvoiceWithRelations2 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([
+          mockInvoiceWithRelations1 as any,
+          mockInvoiceWithRelations2 as any,
+        ]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 
@@ -379,11 +415,15 @@ describe('PaymentMatchingService - Agent Integration', () => {
   describe('Agent Decision Logging', () => {
     it('should log all agent decisions to audit log', async () => {
       // Arrange
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([mockTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-        mockInvoiceWithRelations2 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([
+          mockInvoiceWithRelations1 as any,
+          mockInvoiceWithRelations2 as any,
+        ]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 
@@ -403,10 +443,16 @@ describe('PaymentMatchingService - Agent Integration', () => {
         ],
       };
 
-      jest.spyOn(paymentAgent, 'makeMatchDecision').mockResolvedValue(mockAgentDecision);
+      jest
+        .spyOn(paymentAgent, 'makeMatchDecision')
+        .mockResolvedValue(mockAgentDecision);
 
-      jest.spyOn(service['paymentRepo'], 'create').mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
-      jest.spyOn(service['invoiceRepo'], 'recordPayment').mockResolvedValue(undefined);
+      jest
+        .spyOn(service['paymentRepo'], 'create')
+        .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
+      jest
+        .spyOn(service['invoiceRepo'], 'recordPayment')
+        .mockResolvedValue(undefined);
 
       // Act
       await service.matchPayments({
@@ -423,7 +469,9 @@ describe('PaymentMatchingService - Agent Integration', () => {
             selectedInvoice: mockInvoiceId1,
             alternativesCount: 1,
           }),
-          changeSummary: expect.stringContaining('Agent resolved ambiguous match'),
+          changeSummary: expect.stringContaining(
+            'Agent resolved ambiguous match',
+          ),
         }),
       );
 
@@ -440,15 +488,21 @@ describe('PaymentMatchingService - Agent Integration', () => {
   describe('Agent NOT Invoked Scenarios', () => {
     it('should NOT invoke agent for single high-confidence match', async () => {
       // Arrange: Only one invoice matches with high confidence
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([mockTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([mockInvoiceWithRelations1 as any]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 
-      jest.spyOn(service['paymentRepo'], 'create').mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
-      jest.spyOn(service['invoiceRepo'], 'recordPayment').mockResolvedValue(undefined);
+      jest
+        .spyOn(service['paymentRepo'], 'create')
+        .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
+      jest
+        .spyOn(service['invoiceRepo'], 'recordPayment')
+        .mockResolvedValue(undefined);
 
       // Act
       const result = await service.matchPayments({
@@ -469,10 +523,12 @@ describe('PaymentMatchingService - Agent Integration', () => {
         amountCents: 50000, // Different amount
       };
 
-      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([poorMatchTransaction]);
-      jest.spyOn(prisma.invoice, 'findMany').mockResolvedValue([
-        mockInvoiceWithRelations1 as any,
-      ]);
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([poorMatchTransaction]);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([mockInvoiceWithRelations1 as any]);
       jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
 

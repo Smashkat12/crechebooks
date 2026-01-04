@@ -1,0 +1,34 @@
+[
+  {
+    "id": "cmd-memory-1767491120822",
+    "type": "memory",
+    "success": true,
+    "duration": 2.471709000000004,
+    "timestamp": 1767491120825,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1767491623888",
+    "type": "memory",
+    "success": true,
+    "duration": 206.69445399999998,
+    "timestamp": 1767491624095,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1767491709686",
+    "type": "memory",
+    "success": true,
+    "duration": 194.44606299999998,
+    "timestamp": 1767491709880,
+    "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1767492512988",
+    "type": "memory",
+    "success": true,
+    "duration": 197.23092499999998,
+    "timestamp": 1767492513185,
+    "metadata": {}
+  }
+]

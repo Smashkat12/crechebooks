@@ -88,6 +88,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: string;
       isActive: boolean;
       lastLoginAt: Date | null;
+      currentTenantId: string | null;
       createdAt: Date;
       updatedAt: Date;
     } | null = null;
@@ -145,6 +146,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role as UserRole,
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt,
+      currentTenantId: user.currentTenantId,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

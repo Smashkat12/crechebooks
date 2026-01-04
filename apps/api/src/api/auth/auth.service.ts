@@ -221,6 +221,7 @@ export class AuthService {
         role: user.role,
         isActive: user.isActive,
         lastLoginAt: user.lastLoginAt,
+        currentTenantId: user.currentTenantId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -292,6 +293,7 @@ export class AuthService {
       role: user.role,
       isActive: user.isActive,
       lastLoginAt: user.lastLoginAt,
+      currentTenantId: user.currentTenantId,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -416,6 +418,7 @@ export class AuthService {
         role: user.role,
         isActive: user.isActive,
         lastLoginAt: user.lastLoginAt,
+        currentTenantId: user.currentTenantId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },

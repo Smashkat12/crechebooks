@@ -19,7 +19,10 @@ import { TransactionRepository } from '../../repositories/transaction.repository
 import { CategorizationRepository } from '../../repositories/categorization.repository';
 import { AuditLogService } from '../audit-log.service';
 import { Transaction, PayeePattern } from '@prisma/client';
-import { ImportSource, TransactionStatus } from '../../entities/transaction.entity';
+import {
+  ImportSource,
+  TransactionStatus,
+} from '../../entities/transaction.entity';
 
 describe('PayeeAlias Integration', () => {
   let payeeAliasService: PayeeAliasService;
@@ -145,13 +148,15 @@ describe('PayeeAlias Integration', () => {
       transactionRepo.findById.mockResolvedValue(mockTransaction);
       patternRepo.findByTenant.mockResolvedValue([mockPattern]);
       patternRepo.findByPayeeName.mockResolvedValue(mockPattern);
-      patternRepo.update.mockResolvedValueOnce({
-        ...mockPattern,
-        payeeAliases: [aliasPayee],
-      }).mockResolvedValueOnce({
-        ...mockPattern,
-        confidenceBoost: 15,
-      });
+      patternRepo.update
+        .mockResolvedValueOnce({
+          ...mockPattern,
+          payeeAliases: [aliasPayee],
+        })
+        .mockResolvedValueOnce({
+          ...mockPattern,
+          confidenceBoost: 15,
+        });
 
       // Act: User corrects transaction with alias payee
       await patternLearningService.learnFromCorrection(

@@ -208,7 +208,9 @@ describe('BusinessDayService', () => {
       const afterChristmas = new Date('2024-12-27'); // Friday
       // Dec 25 (Wed) is Christmas, Dec 26 (Thu) is Day of Goodwill
       // Only Friday (Dec 27) counts
-      expect(service.getBusinessDaysBetween(beforeChristmas, afterChristmas)).toBe(1);
+      expect(
+        service.getBusinessDaysBetween(beforeChristmas, afterChristmas),
+      ).toBe(1);
     });
 
     it('should handle observed holidays', () => {
@@ -216,7 +218,9 @@ describe('BusinessDayService', () => {
       const afterHoliday = new Date('2024-04-30'); // Tuesday after observed Monday
       // Saturday (27th actual), Sunday (28th), Monday (29th observed) excluded
       // Only Tuesday (30th) counts
-      expect(service.getBusinessDaysBetween(beforeHoliday, afterHoliday)).toBe(1);
+      expect(service.getBusinessDaysBetween(beforeHoliday, afterHoliday)).toBe(
+        1,
+      );
     });
 
     it('should handle year boundaries', () => {

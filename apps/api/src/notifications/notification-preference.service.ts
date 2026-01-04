@@ -42,13 +42,11 @@ export class NotificationPreferenceService {
 
     // Build preferred channels from parent.preferredContact
     const preferredChannels = this.mapPreferredContactToChannels(
-      parent.preferredContact as PreferredContact,
+      parent.preferredContact,
     );
 
     // Build fallback order based on preferences
-    const fallbackOrder = this.buildFallbackOrder(
-      parent.preferredContact as PreferredContact,
-    );
+    const fallbackOrder = this.buildFallbackOrder(parent.preferredContact);
 
     return {
       parentId,

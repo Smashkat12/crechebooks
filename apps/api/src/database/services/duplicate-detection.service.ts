@@ -101,13 +101,25 @@ export class DuplicateDetectionService {
         let confidence = 60; // Base confidence for date + amount match
 
         // Increase confidence based on additional field matches
-        if (match.reference && transaction.reference && match.reference === transaction.reference) {
+        if (
+          match.reference &&
+          transaction.reference &&
+          match.reference === transaction.reference
+        ) {
           confidence += 20;
         }
-        if (match.payeeName && transaction.payeeName && match.payeeName === transaction.payeeName) {
+        if (
+          match.payeeName &&
+          transaction.payeeName &&
+          match.payeeName === transaction.payeeName
+        ) {
           confidence += 10;
         }
-        if (match.description && transaction.description && match.description === transaction.description) {
+        if (
+          match.description &&
+          transaction.description &&
+          match.description === transaction.description
+        ) {
           confidence += 10;
         }
 
@@ -289,9 +301,7 @@ export class DuplicateDetectionService {
    * Get all pending duplicates for a tenant
    * Returns transactions flagged but not yet resolved
    */
-  async getPendingDuplicates(
-    tenantId: string,
-  ): Promise<PotentialDuplicate[]> {
+  async getPendingDuplicates(tenantId: string): Promise<PotentialDuplicate[]> {
     const flaggedTransactions = await this.prisma.transaction.findMany({
       where: {
         tenantId,

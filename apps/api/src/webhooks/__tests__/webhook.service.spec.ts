@@ -140,13 +140,19 @@ describe('WebhookService', () => {
           .catch(() => {});
       }
       if (testChildId) {
-        await prisma.child.delete({ where: { id: testChildId } }).catch(() => {});
+        await prisma.child
+          .delete({ where: { id: testChildId } })
+          .catch(() => {});
       }
       if (testParentId) {
-        await prisma.parent.delete({ where: { id: testParentId } }).catch(() => {});
+        await prisma.parent
+          .delete({ where: { id: testParentId } })
+          .catch(() => {});
       }
       if (testTenantId) {
-        await prisma.tenant.delete({ where: { id: testTenantId } }).catch(() => {});
+        await prisma.tenant
+          .delete({ where: { id: testTenantId } })
+          .catch(() => {});
       }
     } catch {
       // Ignore cleanup errors
@@ -205,7 +211,11 @@ describe('WebhookService', () => {
   describe('Signature Verification', () => {
     it('should allow processing when webhook keys are not configured', () => {
       // In development, signatures are not verified if keys are not set
-      const result = service.verifyEmailSignature('test payload', 'test-sig', '12345');
+      const result = service.verifyEmailSignature(
+        'test payload',
+        'test-sig',
+        '12345',
+      );
       expect(result).toBe(true); // No key configured, should allow
     });
 
@@ -219,7 +229,10 @@ describe('WebhookService', () => {
     });
 
     it('should allow WhatsApp processing when app secret is not configured', () => {
-      const result = service.verifyWhatsAppSignature('test payload', 'test-sig');
+      const result = service.verifyWhatsAppSignature(
+        'test payload',
+        'test-sig',
+      );
       expect(result).toBe(true); // No key configured, should allow
     });
 
@@ -258,7 +271,11 @@ describe('WebhookService', () => {
     it('should throw when token does not match', () => {
       (service as any).whatsappVerifyToken = 'correct-token';
       expect(() =>
-        service.verifyWhatsAppSubscription('subscribe', 'wrong-token', 'challenge'),
+        service.verifyWhatsAppSubscription(
+          'subscribe',
+          'wrong-token',
+          'challenge',
+        ),
       ).toThrow('Invalid verify token');
       (service as any).whatsappVerifyToken = undefined;
     });

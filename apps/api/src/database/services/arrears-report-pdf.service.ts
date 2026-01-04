@@ -175,10 +175,9 @@ export class ArrearsReportPdfService {
         doc
           .fontSize(10)
           .font('Helvetica')
-          .text(
-            `Generated: ${this.formatDateTime(report.generatedAt)}`,
-            { align: 'center' },
-          );
+          .text(`Generated: ${this.formatDateTime(report.generatedAt)}`, {
+            align: 'center',
+          });
 
         // Summary Section
         doc.moveDown(2);
@@ -298,10 +297,7 @@ export class ArrearsReportPdfService {
     doc: typeof PDFDocument.prototype,
     summary: ArrearsReportSummary,
   ): void {
-    doc
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text('Summary Statistics', 50);
+    doc.fontSize(14).font('Helvetica-Bold').text('Summary Statistics', 50);
 
     doc.moveDown(0.5);
     doc.fontSize(11).font('Helvetica');
@@ -342,10 +338,7 @@ export class ArrearsReportPdfService {
     doc: typeof PDFDocument.prototype,
     aging: AgingBuckets,
   ): void {
-    doc
-      .fontSize(14)
-      .font('Helvetica-Bold')
-      .text('Aging Analysis', 50);
+    doc.fontSize(14).font('Helvetica-Bold').text('Aging Analysis', 50);
 
     doc.moveDown(1);
 
@@ -440,12 +433,9 @@ export class ArrearsReportPdfService {
 
       doc.text(`${index + 1}`, 50, rowY, { width: 20 });
       doc.text(debtor.parentName, 75, rowY, { width: 150 });
-      doc.text(
-        debtor.parentEmail || debtor.parentPhone || 'N/A',
-        230,
-        rowY,
-        { width: 120 },
-      );
+      doc.text(debtor.parentEmail || debtor.parentPhone || 'N/A', 230, rowY, {
+        width: 120,
+      });
       doc.text(`${debtor.invoiceCount}`, 355, rowY, {
         width: 50,
         align: 'right',
@@ -454,10 +444,15 @@ export class ArrearsReportPdfService {
         width: 40,
         align: 'right',
       });
-      doc.text(`R ${this.formatCurrency(debtor.totalOutstandingCents)}`, 455, rowY, {
-        width: 90,
-        align: 'right',
-      });
+      doc.text(
+        `R ${this.formatCurrency(debtor.totalOutstandingCents)}`,
+        455,
+        rowY,
+        {
+          width: 90,
+          align: 'right',
+        },
+      );
 
       doc.moveDown(0.8);
 

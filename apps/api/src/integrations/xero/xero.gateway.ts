@@ -35,7 +35,9 @@ import { SyncProgress, SyncResult, SyncError } from './dto/xero.dto';
     credentials: true,
   },
 })
-export class XeroSyncGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class XeroSyncGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server!: Server;
 
@@ -70,7 +72,9 @@ export class XeroSyncGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() tenantId: string,
   ): void {
     if (!tenantId) {
-      this.logger.warn(`Client ${client.id} tried to subscribe without tenantId`);
+      this.logger.warn(
+        `Client ${client.id} tried to subscribe without tenantId`,
+      );
       return;
     }
 
@@ -99,7 +103,9 @@ export class XeroSyncGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (tenantId) {
       client.leave(`tenant:${tenantId}`);
       this.clientTenants.delete(client.id);
-      this.logger.debug(`Client ${client.id} unsubscribed from tenant ${tenantId}`);
+      this.logger.debug(
+        `Client ${client.id} unsubscribed from tenant ${tenantId}`,
+      );
     }
   }
 
@@ -140,8 +146,6 @@ export class XeroSyncGateway implements OnGatewayConnection, OnGatewayDisconnect
       return;
     }
     this.server.to(`tenant:${tenantId}`).emit('sync:error', error);
-    this.logger.warn(
-      `Emitted error to tenant ${tenantId}: ${error.message}`,
-    );
+    this.logger.warn(`Emitted error to tenant ${tenantId}: ${error.message}`);
   }
 }

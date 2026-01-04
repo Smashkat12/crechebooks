@@ -9,6 +9,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Transaction, PayeePattern } from '@prisma/client';
+import { Decimal } from 'decimal.js';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { PayeePatternRepository } from '../repositories/payee-pattern.repository';
 import {
@@ -20,6 +21,7 @@ import {
 } from '../dto/recurring-pattern.dto';
 import { VatType } from '../entities/categorization.entity';
 import { NotFoundException } from '../../shared/exceptions';
+import { AmountVariationService } from './amount-variation.service';
 
 @Injectable()
 export class RecurringDetectionService {
@@ -28,6 +30,7 @@ export class RecurringDetectionService {
   constructor(
     private readonly transactionRepo: TransactionRepository,
     private readonly payeePatternRepo: PayeePatternRepository,
+    private readonly amountVariationService: AmountVariationService,
   ) {}
 
   /**
@@ -52,8 +55,7 @@ export class RecurringDetectionService {
     );
 
     // Find all transactions for this payee in last 12 months
-    const windowMonths =
-      RECURRING_DETECTION_CONSTANTS.DETECTION_WINDOW_MONTHS;
+    const windowMonths = RECURRING_DETECTION_CONSTANTS.DETECTION_WINDOW_MONTHS;
     const dateFrom = new Date();
     dateFrom.setMonth(dateFrom.getMonth() - windowMonths);
 
@@ -121,14 +123,48 @@ export class RecurringDetectionService {
       return null;
     }
 
-    // Calculate amount variance
+    // Calculate amount variance using AmountVariationService
     const amounts = sorted.map((t) => t.amountCents);
-    const avgAmount = amounts.reduce((sum, val) => sum + val, 0) / amounts.length;
-    const amountStdDev = Math.sqrt(
-      amounts.reduce((sum, val) => sum + Math.pow(val - avgAmount, 2), 0) /
-        amounts.length,
-    );
-    const amountVariancePercent = (amountStdDev / avgAmount) * 100;
+    const avgAmount =
+      amounts.reduce((sum, val) => sum + val, 0) / amounts.length;
+
+    // Use AmountVariationService to analyze amount variation
+    let amountVariancePercent = 0;
+    let exceedsThreshold = false;
+
+    if (transaction.payeeName) {
+      const variationAnalysis = await this.amountVariationService.analyzeVariation(
+        tenantId,
+        transaction.payeeName,
+        new Decimal(transaction.amountCents),
+      );
+
+      if (variationAnalysis) {
+        amountVariancePercent = variationAnalysis.percentageVariation;
+        exceedsThreshold = variationAnalysis.exceedsThreshold;
+
+        // If amount variation exceeds threshold significantly, log warning
+        if (variationAnalysis.recommendedAction === 'block') {
+          this.logger.warn(
+            `Recurring transaction for ${transaction.payeeName} has excessive amount variation ` +
+            `(${amountVariancePercent.toFixed(1)}%, z-score: ${variationAnalysis.zScore.toFixed(2)}). ` +
+            `Recommended action: ${variationAnalysis.recommendedAction}`,
+          );
+        } else if (variationAnalysis.recommendedAction === 'flag_review') {
+          this.logger.log(
+            `Recurring transaction for ${transaction.payeeName} flagged for review ` +
+            `(${amountVariancePercent.toFixed(1)}% variation)`,
+          );
+        }
+      } else {
+        // Fallback to simple calculation if insufficient data for AmountVariationService
+        const amountStdDev = Math.sqrt(
+          amounts.reduce((sum, val) => sum + Math.pow(val - avgAmount, 2), 0) /
+            amounts.length,
+        );
+        amountVariancePercent = (amountStdDev / avgAmount) * 100;
+      }
+    }
 
     // Calculate confidence score
     const confidence = this.calculateConfidence(
@@ -285,9 +321,8 @@ export class RecurringDetectionService {
   } {
     // Weekly: 7 days ± 1 day
     if (
-      Math.abs(
-        avgInterval - RECURRING_DETECTION_CONSTANTS.WEEKLY_INTERVAL,
-      ) <= RECURRING_DETECTION_CONSTANTS.WEEKLY_TOLERANCE_DAYS
+      Math.abs(avgInterval - RECURRING_DETECTION_CONSTANTS.WEEKLY_INTERVAL) <=
+      RECURRING_DETECTION_CONSTANTS.WEEKLY_TOLERANCE_DAYS
     ) {
       return {
         frequency: 'WEEKLY',
@@ -311,9 +346,8 @@ export class RecurringDetectionService {
 
     // Monthly: 30 days ± 3 days
     if (
-      Math.abs(
-        avgInterval - RECURRING_DETECTION_CONSTANTS.MONTHLY_INTERVAL,
-      ) <= RECURRING_DETECTION_CONSTANTS.MONTHLY_TOLERANCE_DAYS
+      Math.abs(avgInterval - RECURRING_DETECTION_CONSTANTS.MONTHLY_INTERVAL) <=
+      RECURRING_DETECTION_CONSTANTS.MONTHLY_TOLERANCE_DAYS
     ) {
       return {
         frequency: 'MONTHLY',
@@ -389,7 +423,7 @@ export class RecurringDetectionService {
    */
   private mapToRecurringPattern(pattern: PayeePattern): RecurringPattern {
     // Determine frequency from expected interval
-    let frequency: RecurringFrequency = 'MONTHLY'; // Default
+    const frequency: RecurringFrequency = 'MONTHLY'; // Default
     const intervalDays = 30; // Default
 
     return {

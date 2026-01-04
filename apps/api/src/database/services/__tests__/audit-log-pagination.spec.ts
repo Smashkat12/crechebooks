@@ -9,7 +9,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuditLogService } from '../audit-log.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditAction } from '../../entities/audit-log.entity';
-import { DatabaseException, NotFoundException } from '../../../shared/exceptions';
+import {
+  DatabaseException,
+  NotFoundException,
+} from '../../../shared/exceptions';
 
 describe('AuditLogService - Pagination and Filtering', () => {
   let service: AuditLogService;
@@ -305,9 +308,9 @@ describe('AuditLogService - Pagination and Filtering', () => {
     it('should throw NotFoundException when not found', async () => {
       mockPrisma.auditLog.findFirst.mockResolvedValue(null);
 
-      await expect(service.getById(testTenantId, 'non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.getById(testTenantId, 'non-existent'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should enforce tenant isolation', async () => {
@@ -321,7 +324,9 @@ describe('AuditLogService - Pagination and Filtering', () => {
 
   describe('getByEntityId', () => {
     it('should return all logs for an entity', async () => {
-      const entityLogs = mockAuditLogs.filter((l) => l.entityId === testEntityId);
+      const entityLogs = mockAuditLogs.filter(
+        (l) => l.entityId === testEntityId,
+      );
       mockPrisma.auditLog.findMany.mockResolvedValue(entityLogs);
 
       const result = await service.getByEntityId(testTenantId, testEntityId);

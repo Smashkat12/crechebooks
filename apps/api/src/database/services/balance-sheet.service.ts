@@ -44,7 +44,8 @@ export class BalanceSheetService {
     ]);
 
     const totalAssetsCents = assets.totalCents;
-    const totalLiabilitiesAndEquityCents = liabilities.totalCents + equity.totalCents;
+    const totalLiabilitiesAndEquityCents =
+      liabilities.totalCents + equity.totalCents;
 
     // Verify accounting equation: Assets = Liabilities + Equity
     const isBalanced = totalAssetsCents === totalLiabilitiesAndEquityCents;
@@ -94,10 +95,10 @@ export class BalanceSheetService {
       balanceSheet.assets.current.forEach((item) => {
         doc
           .fontSize(10)
-          .text(
-            `${item.account} - ${item.description}`,
-            { continued: true, width: 350 },
-          )
+          .text(`${item.account} - ${item.description}`, {
+            continued: true,
+            width: 350,
+          })
           .text(`R ${this.formatCents(item.amountCents)}`, { align: 'right' });
       });
       doc
@@ -112,18 +113,21 @@ export class BalanceSheetService {
       balanceSheet.assets.nonCurrent.forEach((item) => {
         doc
           .fontSize(10)
-          .text(
-            `${item.account} - ${item.description}`,
-            { continued: true, width: 350 },
-          )
+          .text(`${item.account} - ${item.description}`, {
+            continued: true,
+            width: 350,
+          })
           .text(`R ${this.formatCents(item.amountCents)}`, { align: 'right' });
       });
       doc
         .fontSize(11)
         .text('Total Non-Current Assets', { continued: true, width: 350 })
-        .text(`R ${this.formatCents(balanceSheet.assets.totalNonCurrentCents)}`, {
-          align: 'right',
-        });
+        .text(
+          `R ${this.formatCents(balanceSheet.assets.totalNonCurrentCents)}`,
+          {
+            align: 'right',
+          },
+        );
       doc.moveDown(0.5);
 
       doc
@@ -143,28 +147,31 @@ export class BalanceSheetService {
       balanceSheet.liabilities.current.forEach((item) => {
         doc
           .fontSize(10)
-          .text(
-            `${item.account} - ${item.description}`,
-            { continued: true, width: 350 },
-          )
+          .text(`${item.account} - ${item.description}`, {
+            continued: true,
+            width: 350,
+          })
           .text(`R ${this.formatCents(item.amountCents)}`, { align: 'right' });
       });
       doc
         .fontSize(11)
         .text('Total Current Liabilities', { continued: true, width: 350 })
-        .text(`R ${this.formatCents(balanceSheet.liabilities.totalCurrentCents)}`, {
-          align: 'right',
-        });
+        .text(
+          `R ${this.formatCents(balanceSheet.liabilities.totalCurrentCents)}`,
+          {
+            align: 'right',
+          },
+        );
       doc.moveDown(0.5);
 
       doc.fontSize(12).text('Non-Current Liabilities:', { underline: true });
       balanceSheet.liabilities.nonCurrent.forEach((item) => {
         doc
           .fontSize(10)
-          .text(
-            `${item.account} - ${item.description}`,
-            { continued: true, width: 350 },
-          )
+          .text(`${item.account} - ${item.description}`, {
+            continued: true,
+            width: 350,
+          })
           .text(`R ${this.formatCents(item.amountCents)}`, { align: 'right' });
       });
       doc
@@ -183,18 +190,21 @@ export class BalanceSheetService {
       balanceSheet.equity.items.forEach((item) => {
         doc
           .fontSize(10)
-          .text(
-            `${item.account} - ${item.description}`,
-            { continued: true, width: 350 },
-          )
+          .text(`${item.account} - ${item.description}`, {
+            continued: true,
+            width: 350,
+          })
           .text(`R ${this.formatCents(item.amountCents)}`, { align: 'right' });
       });
       doc
         .fontSize(11)
         .text('Retained Earnings', { continued: true, width: 350 })
-        .text(`R ${this.formatCents(balanceSheet.equity.retainedEarningsCents)}`, {
-          align: 'right',
-        });
+        .text(
+          `R ${this.formatCents(balanceSheet.equity.retainedEarningsCents)}`,
+          {
+            align: 'right',
+          },
+        );
       doc.moveDown(0.5);
 
       doc
@@ -225,7 +235,9 @@ export class BalanceSheetService {
         doc
           .fontSize(10)
           .fillColor('red')
-          .text('WARNING: Balance sheet does not balance!', { align: 'center' });
+          .text('WARNING: Balance sheet does not balance!', {
+            align: 'center',
+          });
       }
 
       doc.end();
@@ -264,7 +276,8 @@ export class BalanceSheetService {
     currentRow++;
 
     worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
-    worksheet.getCell(`A${currentRow}`).value = `As at ${balanceSheet.asAtDate.toLocaleDateString('en-ZA')}`;
+    worksheet.getCell(`A${currentRow}`).value =
+      `As at ${balanceSheet.asAtDate.toLocaleDateString('en-ZA')}`;
     worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center' };
     currentRow += 2;
 
@@ -281,7 +294,9 @@ export class BalanceSheetService {
     balanceSheet.assets.current.forEach((item) => {
       worksheet.getCell(`A${currentRow}`).value = item.account;
       worksheet.getCell(`B${currentRow}`).value = item.description;
-      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(item.amountCents).toNumber();
+      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+        item.amountCents,
+      ).toNumber();
       worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
       currentRow++;
     });
@@ -303,7 +318,9 @@ export class BalanceSheetService {
     balanceSheet.assets.nonCurrent.forEach((item) => {
       worksheet.getCell(`A${currentRow}`).value = item.account;
       worksheet.getCell(`B${currentRow}`).value = item.description;
-      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(item.amountCents).toNumber();
+      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+        item.amountCents,
+      ).toNumber();
       worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
       currentRow++;
     });
@@ -320,7 +337,9 @@ export class BalanceSheetService {
     const totalAssetsRow = currentRow;
     worksheet.getCell(`B${currentRow}`).value = 'TOTAL ASSETS';
     worksheet.getCell(`B${currentRow}`).font = { bold: true };
-    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(balanceSheet.totalAssetsCents).toNumber();
+    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+      balanceSheet.totalAssetsCents,
+    ).toNumber();
     worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
     worksheet.getCell(`C${currentRow}`).font = { bold: true };
     currentRow += 2;
@@ -338,7 +357,9 @@ export class BalanceSheetService {
     balanceSheet.liabilities.current.forEach((item) => {
       worksheet.getCell(`A${currentRow}`).value = item.account;
       worksheet.getCell(`B${currentRow}`).value = item.description;
-      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(item.amountCents).toNumber();
+      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+        item.amountCents,
+      ).toNumber();
       worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
       currentRow++;
     });
@@ -360,7 +381,9 @@ export class BalanceSheetService {
     balanceSheet.liabilities.nonCurrent.forEach((item) => {
       worksheet.getCell(`A${currentRow}`).value = item.account;
       worksheet.getCell(`B${currentRow}`).value = item.description;
-      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(item.amountCents).toNumber();
+      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+        item.amountCents,
+      ).toNumber();
       worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
       currentRow++;
     });
@@ -382,19 +405,25 @@ export class BalanceSheetService {
     balanceSheet.equity.items.forEach((item) => {
       worksheet.getCell(`A${currentRow}`).value = item.account;
       worksheet.getCell(`B${currentRow}`).value = item.description;
-      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(item.amountCents).toNumber();
+      worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+        item.amountCents,
+      ).toNumber();
       worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
       currentRow++;
     });
 
     worksheet.getCell(`B${currentRow}`).value = 'Retained Earnings';
-    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(balanceSheet.equity.retainedEarningsCents).toNumber();
+    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+      balanceSheet.equity.retainedEarningsCents,
+    ).toNumber();
     worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
     currentRow++;
 
     worksheet.getCell(`B${currentRow}`).value = 'TOTAL EQUITY';
     worksheet.getCell(`B${currentRow}`).font = { bold: true };
-    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(balanceSheet.equity.totalCents).toNumber();
+    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+      balanceSheet.equity.totalCents,
+    ).toNumber();
     worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
     worksheet.getCell(`C${currentRow}`).font = { bold: true };
     currentRow += 2;
@@ -402,7 +431,9 @@ export class BalanceSheetService {
     // TOTAL LIABILITIES AND EQUITY
     worksheet.getCell(`B${currentRow}`).value = 'TOTAL LIABILITIES AND EQUITY';
     worksheet.getCell(`B${currentRow}`).font = { bold: true };
-    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(balanceSheet.totalLiabilitiesAndEquityCents).toNumber();
+    worksheet.getCell(`C${currentRow}`).value = this.centsToDecimal(
+      balanceSheet.totalLiabilitiesAndEquityCents,
+    ).toNumber();
     worksheet.getCell(`C${currentRow}`).numFmt = 'R #,##0.00';
     worksheet.getCell(`C${currentRow}`).font = { bold: true };
 
@@ -427,7 +458,10 @@ export class BalanceSheetService {
       },
     });
 
-    const assetBalances = new Map<string, { amountCents: number; name: string }>();
+    const assetBalances = new Map<
+      string,
+      { amountCents: number; name: string }
+    >();
 
     // Aggregate asset balances
     for (const txn of transactions) {
@@ -499,7 +533,10 @@ export class BalanceSheetService {
       },
     });
 
-    const liabilityBalances = new Map<string, { amountCents: number; name: string }>();
+    const liabilityBalances = new Map<
+      string,
+      { amountCents: number; name: string }
+    >();
 
     // Aggregate liability balances
     for (const txn of transactions) {
@@ -571,7 +608,10 @@ export class BalanceSheetService {
       },
     });
 
-    const equityBalances = new Map<string, { amountCents: number; name: string }>();
+    const equityBalances = new Map<
+      string,
+      { amountCents: number; name: string }
+    >();
     let totalIncomeCents = 0;
     let totalExpensesCents = 0;
 

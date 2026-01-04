@@ -40,6 +40,8 @@ export interface IInvoice {
   dueDate: Date;
   subtotalCents: number;
   vatCents: number;
+  /** VAT rate applied (e.g., 15 for 15%). 0 if not VAT registered. */
+  vatRate: number;
   totalCents: number;
   amountPaidCents: number;
   status: InvoiceStatus;

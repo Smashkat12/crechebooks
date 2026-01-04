@@ -20,6 +20,7 @@ import { XeroSyncService } from './services/xero-sync.service';
 import { EnrollmentService } from './services/enrollment.service';
 import { InvoiceGenerationService } from './services/invoice-generation.service';
 import { InvoiceDeliveryService } from './services/invoice-delivery.service';
+import { InvoiceVatService } from './services/invoice-vat.service';
 import { ProRataService } from './services/pro-rata.service';
 import { PaymentMatchingService } from './services/payment-matching.service';
 import { PaymentAllocationService } from './services/payment-allocation.service';
@@ -37,9 +38,15 @@ import { ReconciliationService } from './services/reconciliation.service';
 import { DiscrepancyService } from './services/discrepancy.service';
 import { FinancialReportService } from './services/financial-report.service';
 import { PayeeAliasService } from './services/payee-alias.service';
+import { PayeeNormalizerService } from './services/payee-normalizer.service';
+import { PayeeVariationDetectorService } from './services/payee-variation-detector.service';
 import { AccuracyMetricsService } from './services/accuracy-metrics.service';
 import { DuplicateDetectionService } from './services/duplicate-detection.service';
 import { RecurringDetectionService } from './services/recurring-detection.service';
+import { AmountVariationService } from './services/amount-variation.service';
+import { ConflictDetectionService } from './services/conflict-detection.service';
+import { ConflictResolutionService } from './services/conflict-resolution.service';
+import { ReversalDetectionService } from './services/reversal-detection.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
@@ -76,6 +83,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     EnrollmentService,
     InvoiceGenerationService,
     InvoiceDeliveryService,
+    InvoiceVatService,
     ProRataService,
     PaymentMatchingService,
     PaymentAllocationService,
@@ -96,6 +104,12 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     AccuracyMetricsService,
     DuplicateDetectionService,
     RecurringDetectionService,
+    AmountVariationService,
+    ConflictDetectionService,
+    ConflictResolutionService,
+    PayeeNormalizerService,
+    PayeeVariationDetectorService,
+    ReversalDetectionService,
   ],
   exports: [
     PrismaService,
@@ -119,6 +133,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     EnrollmentService,
     InvoiceGenerationService,
     InvoiceDeliveryService,
+    InvoiceVatService,
     ProRataService,
     PaymentMatchingService,
     PaymentAllocationService,
@@ -136,9 +151,15 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     DiscrepancyService,
     FinancialReportService,
     PayeeAliasService,
+    PayeeNormalizerService,
+    PayeeVariationDetectorService,
     AccuracyMetricsService,
     DuplicateDetectionService,
     RecurringDetectionService,
+    AmountVariationService,
+    ConflictDetectionService,
+    ConflictResolutionService,
+    ReversalDetectionService,
   ],
 })
 export class DatabaseModule {}

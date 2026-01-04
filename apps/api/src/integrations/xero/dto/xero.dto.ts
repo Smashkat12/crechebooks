@@ -54,6 +54,21 @@ export class SyncRequestDto {
   @IsOptional()
   @IsDateString()
   fromDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'If true, syncs all historical transactions (last 2 years)',
+    default: false,
+  })
+  @IsOptional()
+  fullSync?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'If true, includes unreconciled bank statement lines from bank feeds (uses Finance API)',
+    default: false,
+  })
+  @IsOptional()
+  includeUnreconciled?: boolean;
 }
 
 /**
@@ -163,6 +178,16 @@ export class CallbackQueryDto {
   @ApiProperty({ description: 'State parameter for CSRF protection' })
   @IsString()
   state!: string;
+
+  @ApiPropertyOptional({ description: 'Scopes granted by user' })
+  @IsString()
+  @IsOptional()
+  scope?: string;
+
+  @ApiPropertyOptional({ description: 'Session state from Xero' })
+  @IsString()
+  @IsOptional()
+  session_state?: string;
 }
 
 /**

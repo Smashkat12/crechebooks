@@ -119,6 +119,26 @@ export interface BankSyncOptions {
   toDate?: Date;
   connectionId?: string;
   forceFullSync?: boolean;
+  /** If true, also fetches unreconciled bank statement lines from Finance API */
+  includeUnreconciled?: boolean;
+}
+
+/**
+ * Unreconciled bank statement line from Xero Finance API
+ */
+export interface XeroStatementLine {
+  statementLineId: string;
+  postedDate: string;
+  transactionDate?: string;
+  payee?: string;
+  reference?: string;
+  notes?: string;
+  chequeNo?: string;
+  amount: number;
+  type?: string;
+  isReconciled: boolean;
+  isDuplicate?: boolean;
+  isDeleted?: boolean;
 }
 
 /**

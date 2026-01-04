@@ -94,9 +94,80 @@ async function disconnect(): Promise<{ success: boolean; message?: string }> {
   return response.data;
 }
 
+/**
+ * Bank account from Xero
+ */
+export interface XeroBankAccount {
+  accountId: string;
+  name: string;
+  accountNumber: string;
+  bankAccountType: string;
+  isConnected: boolean;
+  connectionId?: string;
+}
+
+/**
+ * Connected bank account
+ */
+export interface BankConnection {
+  id: string;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+  status: string;
+  lastSyncAt: string | null;
+  errorMessage: string | null;
+}
+
+/**
+ * Get available bank accounts from Xero
+ */
+async function getBankAccounts(): Promise<{ accounts: XeroBankAccount[] }> {
+  const response = await apiClient.get<{ accounts: XeroBankAccount[] }>(
+    endpoints.xero.bankAccounts
+  );
+  return response.data;
+}
+
+/**
+ * Get connected bank accounts
+ */
+async function getBankConnections(): Promise<{ connections: BankConnection[] }> {
+  const response = await apiClient.get<{ connections: BankConnection[] }>(
+    endpoints.xero.bankConnections
+  );
+  return response.data;
+}
+
+/**
+ * Connect a bank account for syncing
+ */
+async function connectBankAccount(accountId: string): Promise<{ success: boolean; connectionId: string; message: string }> {
+  const response = await apiClient.post<{ success: boolean; connectionId: string; message: string }>(
+    endpoints.xero.connectBankAccount,
+    { accountId }
+  );
+  return response.data;
+}
+
+/**
+ * Disconnect a bank account
+ */
+async function disconnectBankAccount(connectionId: string): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    endpoints.xero.disconnectBankAccount,
+    { connectionId }
+  );
+  return response.data;
+}
+
 export const xeroApi = {
   getStatus,
   syncNow,
   connect,
   disconnect,
+  getBankAccounts,
+  getBankConnections,
+  connectBankAccount,
+  disconnectBankAccount,
 };

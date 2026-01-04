@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Reports PDF/CSV Export Implementation</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>122</sequence>
   <priority>P1-CRITICAL</priority>

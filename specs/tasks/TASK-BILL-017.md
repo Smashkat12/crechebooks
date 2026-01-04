@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Ad-Hoc Charges in Monthly Invoice Generation</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>108</sequence>
   <priority>P2-HIGH</priority>

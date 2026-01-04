@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Invoke PaymentMatcherAgent in PaymentMatchingService</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>103</sequence>
   <priority>P1-CRITICAL</priority>

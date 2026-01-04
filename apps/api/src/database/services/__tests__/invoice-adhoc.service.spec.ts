@@ -16,6 +16,7 @@ import { ParentRepository } from '../../repositories/parent.repository';
 import { EnrollmentService } from '../enrollment.service';
 import { AuditLogService } from '../audit-log.service';
 import { XeroSyncService } from '../xero-sync.service';
+import { ProRataService } from '../pro-rata.service';
 import { LineType } from '../../entities/invoice-line.entity';
 
 describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
@@ -95,6 +96,12 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
           provide: XeroSyncService,
           useValue: {
             createInvoiceDraft: jest.fn(),
+          },
+        },
+        {
+          provide: ProRataService,
+          useValue: {
+            calculateProRata: jest.fn(),
           },
         },
       ],

@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Conflicting Correction Resolution UI</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>surface</layer>
   <sequence>137</sequence>

@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Multi-Tenant User Role Assignment</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>logic</layer>
   <sequence>132</sequence>

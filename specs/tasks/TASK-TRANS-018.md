@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Enable Payee Alias Matching in Categorization</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>99</sequence>
   <priority>P1-CRITICAL</priority>

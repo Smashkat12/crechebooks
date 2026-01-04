@@ -2,7 +2,7 @@
 
 <metadata>
   <title>SARS eFiling Submission Error Handling and Retry</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>114</sequence>
   <priority>P2-HIGH</priority>

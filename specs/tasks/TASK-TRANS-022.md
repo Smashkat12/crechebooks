@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Reversal Transaction Detection</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>logic</layer>
   <sequence>128</sequence>

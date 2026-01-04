@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Recurring Transaction Detection Integration</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>107</sequence>
   <priority>P2-HIGH</priority>

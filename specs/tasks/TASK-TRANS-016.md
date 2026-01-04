@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Bank Feed Integration Service via Xero API</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>97</sequence>
   <priority>P0-BLOCKER</priority>

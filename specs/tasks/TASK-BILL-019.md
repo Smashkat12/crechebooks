@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Enrollment Register Dedicated View</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>surface</layer>
   <sequence>131</sequence>

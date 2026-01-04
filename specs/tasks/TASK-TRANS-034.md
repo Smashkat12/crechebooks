@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Xero Sync REST API Endpoints</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>111</sequence>
   <priority>P2-HIGH</priority>

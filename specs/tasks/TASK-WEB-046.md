@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Mobile Responsive Improvements</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>125</sequence>
   <priority>P2-HIGH</priority>

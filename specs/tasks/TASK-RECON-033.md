@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Balance Sheet API Endpoint</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>110</sequence>
   <priority>P0-BLOCKER</priority>

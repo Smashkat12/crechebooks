@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Pro-Rata Fee Display Component</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>123</sequence>
   <priority>P2-HIGH</priority>

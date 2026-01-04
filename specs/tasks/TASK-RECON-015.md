@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Reconciliation Duplicate Detection Service</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>105</sequence>
   <priority>P1-CRITICAL</priority>

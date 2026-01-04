@@ -2,7 +2,7 @@
 
 <metadata>
   <title>VAT Calculation for VAT-Registered Creches</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>logic</layer>
   <sequence>130</sequence>

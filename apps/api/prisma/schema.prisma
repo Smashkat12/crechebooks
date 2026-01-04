@@ -259,6 +259,7 @@ model Tenant {
   categorizationMetrics   CategorizationMetric[]
   xeroOAuthState          XeroOAuthState?
   invoiceDeliveryLogs     InvoiceDeliveryLog[]
+  reminderTemplates       ReminderTemplate[]
 
   @@map("tenants")
 }
@@ -884,6 +885,27 @@ model XeroOAuthState {
 
   @@index([tenantId])
   @@map("xero_oauth_states")
+}
+
+// TASK-PAY-017: Tenant-Customizable Reminder Templates
+model ReminderTemplate {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  stage        String   @db.VarChar(20) // FIRST, SECOND, FINAL, ESCALATED
+  daysOverdue  Int      @map("days_overdue")
+  channels     String[] // email, whatsapp
+  emailSubject String?  @map("email_subject") @db.VarChar(500)
+  emailBody    String?  @map("email_body") @db.Text
+  whatsappBody String?  @map("whatsapp_body") @db.Text
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, stage])
+  @@index([tenantId])
+  @@map("reminder_templates")
 }
 
 // TASK-USER-001: Multi-Tenant User Role Assignment

@@ -107,8 +107,7 @@ export class AmountVariationService {
     const transactions = result.data.filter(
       (t) =>
         t.payeeName &&
-        this.normalizePayeeName(t.payeeName) ===
-          this.normalizePayeeName(payee),
+        this.normalizePayeeName(t.payeeName) === this.normalizePayeeName(payee),
     );
 
     if (transactions.length < MIN_TRANSACTIONS_FOR_STATS) {
@@ -120,25 +119,33 @@ export class AmountVariationService {
 
     // Calculate statistics
     const amounts = transactions.map((t) => t.amountCents);
-    const meanAmountCents = amounts.reduce((sum, val) => sum + val, 0) / amounts.length;
+    const meanAmountCents =
+      amounts.reduce((sum, val) => sum + val, 0) / amounts.length;
     const variance =
-      amounts.reduce((sum, val) => sum + Math.pow(val - meanAmountCents, 2), 0) /
-      amounts.length;
+      amounts.reduce(
+        (sum, val) => sum + Math.pow(val - meanAmountCents, 2),
+        0,
+      ) / amounts.length;
     const stdDevAmountCents = Math.sqrt(variance);
 
     // Convert amount to number for calculations
-    const currentAmountCents = typeof amount === 'object' && 'toNumber' in amount
-      ? amount.toNumber()
-      : Number(amount);
+    const currentAmountCents =
+      typeof amount === 'object' && 'toNumber' in amount
+        ? amount.toNumber()
+        : Number(amount);
 
     // Calculate variations
-    const absoluteVariationCents = Math.abs(currentAmountCents - meanAmountCents);
-    const percentageVariation = meanAmountCents !== 0
-      ? (absoluteVariationCents / Math.abs(meanAmountCents)) * 100
-      : 0;
-    const zScore = stdDevAmountCents !== 0
-      ? (currentAmountCents - meanAmountCents) / stdDevAmountCents
-      : 0;
+    const absoluteVariationCents = Math.abs(
+      currentAmountCents - meanAmountCents,
+    );
+    const percentageVariation =
+      meanAmountCents !== 0
+        ? (absoluteVariationCents / Math.abs(meanAmountCents)) * 100
+        : 0;
+    const zScore =
+      stdDevAmountCents !== 0
+        ? (currentAmountCents - meanAmountCents) / stdDevAmountCents
+        : 0;
 
     // Get threshold configuration (per-payee or tenant default)
     const config = await this.getThresholdConfig(tenantId, payee);
@@ -149,7 +156,8 @@ export class AmountVariationService {
 
     switch (config.thresholdType) {
       case 'percentage':
-        thresholdValue = config.percentageThreshold || DEFAULT_PERCENTAGE_THRESHOLD;
+        thresholdValue =
+          config.percentageThreshold || DEFAULT_PERCENTAGE_THRESHOLD;
         exceedsThreshold = percentageVariation > thresholdValue;
         break;
       case 'absolute':
@@ -189,7 +197,7 @@ export class AmountVariationService {
 
     this.logger.log(
       `Amount variation analysis: ${payee} - ${percentageVariation.toFixed(1)}% variation, ` +
-      `z-score: ${zScore.toFixed(2)}, action: ${recommendedAction}`,
+        `z-score: ${zScore.toFixed(2)}, action: ${recommendedAction}`,
     );
 
     return analysis;
@@ -264,19 +272,29 @@ export class AmountVariationService {
       : `${tenantId}:default`;
 
     // Validate configuration BEFORE merging with defaults
-    if (config.thresholdType === 'percentage' &&
-        config.percentageThreshold === undefined &&
-        !this.thresholdCache.has(cacheKey)) {
-      throw new Error('percentageThreshold required for percentage threshold type');
+    if (
+      config.thresholdType === 'percentage' &&
+      config.percentageThreshold === undefined &&
+      !this.thresholdCache.has(cacheKey)
+    ) {
+      throw new Error(
+        'percentageThreshold required for percentage threshold type',
+      );
     }
-    if (config.thresholdType === 'absolute' &&
-        config.absoluteThresholdCents === undefined &&
-        !this.thresholdCache.has(cacheKey)) {
-      throw new Error('absoluteThresholdCents required for absolute threshold type');
+    if (
+      config.thresholdType === 'absolute' &&
+      config.absoluteThresholdCents === undefined &&
+      !this.thresholdCache.has(cacheKey)
+    ) {
+      throw new Error(
+        'absoluteThresholdCents required for absolute threshold type',
+      );
     }
-    if (config.thresholdType === 'z_score' &&
-        config.zScoreThreshold === undefined &&
-        !this.thresholdCache.has(cacheKey)) {
+    if (
+      config.thresholdType === 'z_score' &&
+      config.zScoreThreshold === undefined &&
+      !this.thresholdCache.has(cacheKey)
+    ) {
       throw new Error('zScoreThreshold required for z_score threshold type');
     }
 
@@ -313,7 +331,7 @@ export class AmountVariationService {
 
     this.logger.log(
       `Threshold config updated for ${payee || 'tenant default'}: ` +
-      `${updated.thresholdType} = ${updated.percentageThreshold || updated.absoluteThresholdCents || updated.zScoreThreshold}`,
+        `${updated.thresholdType} = ${updated.percentageThreshold || updated.absoluteThresholdCents || updated.zScoreThreshold}`,
     );
 
     return updated;
@@ -345,8 +363,7 @@ export class AmountVariationService {
     const transactions = result.data.filter(
       (t) =>
         t.payeeName &&
-        this.normalizePayeeName(t.payeeName) ===
-          this.normalizePayeeName(payee),
+        this.normalizePayeeName(t.payeeName) === this.normalizePayeeName(payee),
     );
 
     if (transactions.length < MIN_TRANSACTIONS_FOR_STATS) {
@@ -358,10 +375,13 @@ export class AmountVariationService {
 
     // Calculate statistics
     const amounts = transactions.map((t) => t.amountCents);
-    const meanAmountCents = amounts.reduce((sum, val) => sum + val, 0) / amounts.length;
+    const meanAmountCents =
+      amounts.reduce((sum, val) => sum + val, 0) / amounts.length;
     const variance =
-      amounts.reduce((sum, val) => sum + Math.pow(val - meanAmountCents, 2), 0) /
-      amounts.length;
+      amounts.reduce(
+        (sum, val) => sum + Math.pow(val - meanAmountCents, 2),
+        0,
+      ) / amounts.length;
     const stdDevAmountCents = Math.sqrt(variance);
     const minAmountCents = Math.min(...amounts);
     const maxAmountCents = Math.max(...amounts);

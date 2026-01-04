@@ -87,6 +87,31 @@ export interface RecordCorrectionInput {
 }
 
 /**
+ * Learning mode progress data
+ * TASK-TRANS-023: Learning Mode Indicator
+ */
+export interface LearningModeProgress {
+  /** Whether tenant is in learning mode */
+  isLearningMode: boolean;
+  /** Days remaining until 90-day threshold */
+  daysRemaining: number;
+  /** Current number of corrections made */
+  correctionsCount: number;
+  /** Target corrections count (100) */
+  correctionsTarget: number;
+  /** Overall progress percentage (0-100) */
+  progressPercent: number;
+  /** Current accuracy percentage */
+  currentAccuracy: number;
+  /** Whether to exclude from metrics */
+  excludeFromMetrics: boolean;
+  /** Days since first transaction */
+  daysSinceStart: number;
+  /** First transaction date */
+  firstTransactionDate: Date | null;
+}
+
+/**
  * Constants for accuracy metrics
  */
 export const ACCURACY_CONSTANTS = {
@@ -98,4 +123,8 @@ export const ACCURACY_CONSTANTS = {
   CRITICAL_THRESHOLD: 85,
   /** Target accuracy percentage (from REQ-TRANS-003) */
   TARGET_ACCURACY: 95,
+  /** Learning mode duration in days */
+  LEARNING_MODE_DAYS: 90,
+  /** Learning mode corrections target */
+  LEARNING_MODE_CORRECTIONS: 100,
 } as const;

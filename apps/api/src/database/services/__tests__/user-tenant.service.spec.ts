@@ -9,7 +9,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UserTenantService } from '../user-tenant.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogService } from '../audit-log.service';
-import { UserRole, InvitationStatus as PrismaInvitationStatus } from '@prisma/client';
+import {
+  UserRole,
+  InvitationStatus as PrismaInvitationStatus,
+} from '@prisma/client';
 import {
   NotFoundException,
   ConflictException,
@@ -101,7 +104,9 @@ describe('UserTenantService', () => {
         },
       ];
 
-      mockPrismaService.userTenantRole.findMany.mockResolvedValue(mockUserTenantRoles);
+      mockPrismaService.userTenantRole.findMany.mockResolvedValue(
+        mockUserTenantRoles,
+      );
 
       const result = await service.getUserTenants(userId);
 
@@ -143,7 +148,9 @@ describe('UserTenantService', () => {
         role: UserRole.ADMIN,
       };
 
-      mockPrismaService.userTenantRole.findUnique.mockResolvedValue(mockUserTenantRole);
+      mockPrismaService.userTenantRole.findUnique.mockResolvedValue(
+        mockUserTenantRole,
+      );
 
       const result = await service.getTenantRole('user-123', 'tenant-123');
 
@@ -176,7 +183,12 @@ describe('UserTenantService', () => {
         isActive: true,
       });
 
-      const result = await service.addUserToTenant(userId, tenantId, role, 'inviter-123');
+      const result = await service.addUserToTenant(
+        userId,
+        tenantId,
+        role,
+        'inviter-123',
+      );
 
       expect(result.userId).toBe(userId);
       expect(result.tenantId).toBe(tenantId);
@@ -203,7 +215,9 @@ describe('UserTenantService', () => {
 
     it('should throw ConflictException if user already belongs to tenant', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user-123' });
-      mockPrismaService.tenant.findUnique.mockResolvedValue({ id: 'tenant-123' });
+      mockPrismaService.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-123',
+      });
       mockPrismaService.userTenantRole.findUnique.mockResolvedValue({
         id: 'utr-123',
         isActive: true,
@@ -247,13 +261,19 @@ describe('UserTenantService', () => {
         role: UserRole.VIEWER,
       };
 
-      mockPrismaService.userTenantRole.findUnique.mockResolvedValue(mockUserTenantRole);
+      mockPrismaService.userTenantRole.findUnique.mockResolvedValue(
+        mockUserTenantRole,
+      );
       mockPrismaService.userTenantRole.update.mockResolvedValue({
         ...mockUserTenantRole,
         isActive: false,
       });
 
-      await service.removeUserFromTenant('user-123', 'tenant-123', 'remover-123');
+      await service.removeUserFromTenant(
+        'user-123',
+        'tenant-123',
+        'remover-123',
+      );
 
       expect(mockPrismaService.userTenantRole.update).toHaveBeenCalledWith({
         where: { id: 'utr-123' },
@@ -278,7 +298,9 @@ describe('UserTenantService', () => {
         role: UserRole.VIEWER,
       };
 
-      mockPrismaService.userTenantRole.findUnique.mockResolvedValue(mockUserTenantRole);
+      mockPrismaService.userTenantRole.findUnique.mockResolvedValue(
+        mockUserTenantRole,
+      );
       mockPrismaService.userTenantRole.update.mockResolvedValue({
         ...mockUserTenantRole,
         role: UserRole.ADMIN,
@@ -338,12 +360,18 @@ describe('UserTenantService', () => {
 
     it('should throw ValidationException for invalid email', async () => {
       await expect(
-        service.inviteUserToTenant('invalid-email', 'tenant-123', UserRole.VIEWER),
+        service.inviteUserToTenant(
+          'invalid-email',
+          'tenant-123',
+          UserRole.VIEWER,
+        ),
       ).rejects.toThrow(ValidationException);
     });
 
     it('should throw ForbiddenException if inviter is not OWNER or ADMIN', async () => {
-      mockPrismaService.tenant.findUnique.mockResolvedValue({ id: 'tenant-123' });
+      mockPrismaService.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-123',
+      });
       mockPrismaService.userTenantRole.findUnique.mockResolvedValue({
         role: UserRole.VIEWER,
       });
@@ -359,7 +387,9 @@ describe('UserTenantService', () => {
     });
 
     it('should throw ConflictException if active invitation exists', async () => {
-      mockPrismaService.tenant.findUnique.mockResolvedValue({ id: 'tenant-123' });
+      mockPrismaService.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-123',
+      });
       mockPrismaService.userTenantRole.findUnique.mockResolvedValue({
         role: UserRole.OWNER,
       });

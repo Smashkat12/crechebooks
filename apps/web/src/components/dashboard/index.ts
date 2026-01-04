@@ -4,3 +4,7 @@ export { IncomeExpenseChart } from './income-expense-chart';
 export { TopArrearsWidget } from './top-arrears-widget';
 export { RecentTransactions } from './recent-transactions';
 export { QuickActions } from './quick-actions';
+export { XeroStatusWidget } from './XeroStatusWidget';
+export { XeroStatusIndicator } from './XeroStatusIndicator';
+export { LearningModeIndicator } from './LearningModeIndicator';
+export { AccuracyMilestone } from './AccuracyMilestone';

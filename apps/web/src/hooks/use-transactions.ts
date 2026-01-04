@@ -264,3 +264,26 @@ export function useImportTransactions() {
     },
   });
 }
+
+// Get multiple transactions by IDs (for conflict impact preview)
+export function useTransactionsByIds(ids: string[]) {
+  return useQuery<TransactionWithCategorization[], AxiosError>({
+    queryKey: queryKeys.transactions.byIds(ids),
+    queryFn: async () => {
+      if (ids.length === 0) {
+        return [];
+      }
+
+      // Fetch transactions by IDs using the list endpoint with ID filter
+      const { data } = await apiClient.get<ApiTransactionsListResponse>(endpoints.transactions.list, {
+        params: {
+          ids: ids.join(','),
+          limit: ids.length,
+        },
+      });
+
+      return data.data.map(transformTransaction);
+    },
+    enabled: ids.length > 0,
+  });
+}

@@ -14,6 +14,7 @@ import { DataTable } from '@/components/tables/data-table';
 import { getTransactionColumns, TransactionColumnOptions } from './transaction-columns';
 import { TransactionFilters, TransactionFiltersState } from './transaction-filters';
 import { CategorizationDialog } from './categorization-dialog';
+import { SplitTransactionModal, SplitRow } from './SplitTransactionModal';
 import { useTransactionsList } from '@/hooks/use-transactions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
@@ -32,6 +33,8 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
   const [page, setPage] = React.useState(1);
   const [selectedTransaction, setSelectedTransaction] = React.useState<ITransaction | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [splitModalOpen, setSplitModalOpen] = React.useState(false);
+  const [splitTransaction, setSplitTransaction] = React.useState<ITransaction | null>(null);
 
   // Reset page when filters change
   React.useEffect(() => {
@@ -67,6 +70,17 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
     console.log('Delete transaction:', transaction);
   };
 
+  const handleSplit = (transaction: ITransaction) => {
+    setSplitTransaction(transaction);
+    setSplitModalOpen(true);
+  };
+
+  const handleSplitSave = async (splits: SplitRow[]) => {
+    // Split save is handled by the modal's hook
+    console.log('Split saved:', splits);
+    await refetch();
+  };
+
   const handleCategorizationSuccess = () => {
     refetch();
   };
@@ -75,10 +89,11 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
     () => getTransactionColumns({
       onView: handleView,
       onEdit: handleEdit,
+      onSplit: handleSplit,
       onDelete: handleDelete,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handleView, handleEdit, handleDelete]
+    [handleView, handleEdit, handleSplit, handleDelete]
   );
 
   if (isLoading) {
@@ -156,6 +171,19 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
         onOpenChange={setDialogOpen}
         onSuccess={handleCategorizationSuccess}
       />
+
+      {/* Split Transaction Modal */}
+      {splitTransaction && (
+        <SplitTransactionModal
+          transaction={splitTransaction}
+          isOpen={splitModalOpen}
+          onClose={() => {
+            setSplitModalOpen(false);
+            setSplitTransaction(null);
+          }}
+          onSave={handleSplitSave}
+        />
+      )}
     </div>
   );
 }

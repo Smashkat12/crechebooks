@@ -17,14 +17,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, Split } from 'lucide-react';
 import { ConfidenceBadge } from './confidence-badge';
+import { CategorizationReasoning } from './CategorizationReasoning';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface TransactionActionsProps {
   transaction: ITransaction;
   onView?: (transaction: ITransaction) => void;
   onEdit?: (transaction: ITransaction) => void;
+  onSplit?: (transaction: ITransaction) => void;
   onDelete?: (transaction: ITransaction) => void;
 }
 
@@ -32,6 +34,7 @@ function TransactionActions({
   transaction,
   onView,
   onEdit,
+  onSplit,
   onDelete
 }: TransactionActionsProps) {
   return (
@@ -55,6 +58,12 @@ function TransactionActions({
           <DropdownMenuItem onClick={() => onEdit(transaction)}>
             <Edit className="mr-2 h-4 w-4" />
             Edit Category
+          </DropdownMenuItem>
+        )}
+        {onSplit && (
+          <DropdownMenuItem onClick={() => onSplit(transaction)}>
+            <Split className="mr-2 h-4 w-4" />
+            Split Transaction
           </DropdownMenuItem>
         )}
         {onDelete && (
@@ -101,6 +110,7 @@ function StatusBadge({ status }: { status: TransactionStatus | string }) {
 export interface TransactionColumnOptions {
   onView?: (transaction: ITransaction) => void;
   onEdit?: (transaction: ITransaction) => void;
+  onSplit?: (transaction: ITransaction) => void;
   onDelete?: (transaction: ITransaction) => void;
 }
 
@@ -147,14 +157,29 @@ export function getTransactionColumns(
       cell: ({ row }) => {
         const code = row.getValue('accountCode') as string | null;
         const categoryId = row.original.categoryId;
+        const reasoning = (row.original as any).categorizationReasoning as string | undefined;
+        const confidence = row.getValue('confidence') as number | undefined;
+        const alternatives = (row.original as any).categorizationAlternatives as Array<{ category: string; confidence: number }> | undefined;
+        const matchedPatterns = (row.original as any).matchedPatterns as string[] | undefined;
 
         if (!code && !categoryId) {
           return <span className="text-muted-foreground">Uncategorized</span>;
         }
 
         return (
-          <div className="max-w-[200px] truncate" title={code || categoryId || ''}>
-            {code || categoryId}
+          <div className="flex items-center gap-2 max-w-[250px]">
+            <div className="flex-1 truncate" title={code || categoryId || ''}>
+              {code || categoryId}
+            </div>
+            {reasoning && confidence !== undefined && (
+              <CategorizationReasoning
+                reasoning={reasoning}
+                confidence={confidence}
+                alternatives={alternatives}
+                matchedPatterns={matchedPatterns}
+                mode="compact"
+              />
+            )}
           </div>
         );
       },
@@ -186,6 +211,7 @@ export function getTransactionColumns(
           transaction={row.original}
           onView={options.onView}
           onEdit={options.onEdit}
+          onSplit={options.onSplit}
           onDelete={options.onDelete}
         />
       ),

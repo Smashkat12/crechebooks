@@ -252,7 +252,9 @@ export class XeroSyncService {
           );
         }
 
-        this.logger.log(`Auto-resolved conflict ${conflictId} for transaction ${transactionId}`);
+        this.logger.log(
+          `Auto-resolved conflict ${conflictId} for transaction ${transactionId}`,
+        );
       }
     }
 

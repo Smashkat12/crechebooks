@@ -6,6 +6,7 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => [...queryKeys.transactions.lists(), params] as const,
     detail: (id: string) => [...queryKeys.transactions.all, 'detail', id] as const,
     suggestions: (id: string) => [...queryKeys.transactions.all, 'suggestions', id] as const,
+    byIds: (ids: string[]) => [...queryKeys.transactions.all, 'byIds', ids.sort().join(',')] as const,
   },
   // Invoices
   invoices: {
@@ -79,6 +80,7 @@ export const queryKeys = {
     all: ['dashboard'] as const,
     metrics: (period?: string) => [...queryKeys.dashboard.all, 'metrics', period] as const,
     trends: (period?: string) => [...queryKeys.dashboard.all, 'trends', period] as const,
+    learningMode: () => [...queryKeys.dashboard.all, 'learning-mode'] as const,
   },
   // Reports
   reports: {
@@ -99,5 +101,11 @@ export const queryKeys = {
     all: ['users'] as const,
     tenantUsers: (tenantId: string) => [...queryKeys.users.all, 'tenant', tenantId] as const,
     invitations: (tenantId: string) => [...queryKeys.users.all, 'invitations', tenantId] as const,
+  },
+  // Xero Integration
+  xero: {
+    all: ['xero'] as const,
+    status: () => [...queryKeys.xero.all, 'status'] as const,
+    syncJobs: () => [...queryKeys.xero.all, 'sync-jobs'] as const,
   },
 } as const;

@@ -133,11 +133,12 @@ export class RecurringDetectionService {
     let exceedsThreshold = false;
 
     if (transaction.payeeName) {
-      const variationAnalysis = await this.amountVariationService.analyzeVariation(
-        tenantId,
-        transaction.payeeName,
-        new Decimal(transaction.amountCents),
-      );
+      const variationAnalysis =
+        await this.amountVariationService.analyzeVariation(
+          tenantId,
+          transaction.payeeName,
+          new Decimal(transaction.amountCents),
+        );
 
       if (variationAnalysis) {
         amountVariancePercent = variationAnalysis.percentageVariation;
@@ -147,13 +148,13 @@ export class RecurringDetectionService {
         if (variationAnalysis.recommendedAction === 'block') {
           this.logger.warn(
             `Recurring transaction for ${transaction.payeeName} has excessive amount variation ` +
-            `(${amountVariancePercent.toFixed(1)}%, z-score: ${variationAnalysis.zScore.toFixed(2)}). ` +
-            `Recommended action: ${variationAnalysis.recommendedAction}`,
+              `(${amountVariancePercent.toFixed(1)}%, z-score: ${variationAnalysis.zScore.toFixed(2)}). ` +
+              `Recommended action: ${variationAnalysis.recommendedAction}`,
           );
         } else if (variationAnalysis.recommendedAction === 'flag_review') {
           this.logger.log(
             `Recurring transaction for ${transaction.payeeName} flagged for review ` +
-            `(${amountVariancePercent.toFixed(1)}% variation)`,
+              `(${amountVariancePercent.toFixed(1)}% variation)`,
           );
         }
       } else {

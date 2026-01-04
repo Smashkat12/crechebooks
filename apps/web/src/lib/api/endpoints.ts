@@ -12,6 +12,7 @@ export const endpoints = {
     categorize: (id: string) => `/transactions/${id}/categorize`,
     batchCategorize: '/transactions/categorize/batch',
     suggestions: (id: string) => `/transactions/${id}/suggestions`,
+    split: (id: string) => `/transactions/${id}/splits`,
   },
   invoices: {
     list: '/invoices',
@@ -65,6 +66,7 @@ export const endpoints = {
   dashboard: {
     metrics: '/dashboard/metrics',
     trends: '/dashboard/trends',
+    learningMode: '/dashboard/learning-mode',
   },
   feeStructures: {
     list: '/fee-structures',
@@ -83,5 +85,11 @@ export const endpoints = {
     invitations: (tenantId: string) => `/tenants/${tenantId}/invitations`,
     resendInvitation: (tenantId: string, invitationId: string) => `/tenants/${tenantId}/invitations/${invitationId}/resend`,
     revokeInvitation: (tenantId: string, invitationId: string) => `/tenants/${tenantId}/invitations/${invitationId}`,
+  },
+  xero: {
+    status: '/xero/status',
+    sync: '/xero/sync',
+    connect: '/xero/connect',
+    disconnect: '/xero/disconnect',
   },
 } as const;

@@ -21,6 +21,7 @@ import {
 import { NotFoundException } from '../../shared/exceptions';
 import { PayeePatternFilterDto } from '../dto/payee-pattern.dto';
 import { PayeeAliasService } from './payee-alias.service';
+import { CorrectionConflictService } from './correction-conflict.service';
 
 @Injectable()
 export class PatternLearningService {
@@ -32,18 +33,22 @@ export class PatternLearningService {
     private readonly categorizationRepo: CategorizationRepository,
     @Inject(forwardRef(() => PayeeAliasService))
     private readonly payeeAliasService: PayeeAliasService,
+    @Inject(forwardRef(() => CorrectionConflictService))
+    private readonly conflictService: CorrectionConflictService,
   ) {}
 
   /**
    * Learn from user categorization correction
    * Creates new pattern or updates existing one
    * TASK-TRANS-018: Creates alias if payee name variation detected
+   * TASK-EC-002: Detects conflicts and throws error with conflict data
    *
    * @param transactionId - Transaction that was corrected
    * @param accountCode - Account code user selected
    * @param accountName - Account name for the code
    * @param tenantId - Tenant ID for isolation
    * @returns Created or updated PayeePattern
+   * @throws Error with conflict data if categorization conflicts with existing pattern
    */
   async learnFromCorrection(
     transactionId: string,
@@ -69,6 +74,21 @@ export class PatternLearningService {
       transaction.payeeName || transaction.description,
     );
     const keywords = this.extractKeywords(transaction.description);
+
+    // 2a. TASK-EC-002: Check for conflicting categorization
+    const conflict = await this.conflictService.detectConflict(
+      tenantId,
+      payeeName,
+      accountCode,
+      accountName,
+    );
+
+    if (conflict) {
+      // Throw error with conflict data - caller should handle this
+      const error = new Error('CATEGORIZATION_CONFLICT');
+      (error as any).conflict = conflict;
+      throw error;
+    }
 
     // TASK-TRANS-018: Check if this is a similar payee (potential alias)
     const similarPayees = await this.payeeAliasService.findSimilar(

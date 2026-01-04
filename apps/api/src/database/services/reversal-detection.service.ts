@@ -58,7 +58,11 @@ export class ReversalDetectionService {
     // Score each potential original
     const matches = potentialOriginals.map((original) => {
       const confidence = this.calculateConfidence(transaction, original);
-      const matchReason = this.buildMatchReason(transaction, original, confidence);
+      const matchReason = this.buildMatchReason(
+        transaction,
+        original,
+        confidence,
+      );
 
       return {
         originalTransactionId: original.id,
@@ -102,7 +106,9 @@ export class ReversalDetectionService {
     });
 
     // Filter for exact amount matches
-    return result.data.filter((txn) => txn.amountCents === positiveAmount) as ITransaction[];
+    return result.data.filter(
+      (txn) => txn.amountCents === positiveAmount,
+    ) as ITransaction[];
   }
 
   /**
@@ -134,7 +140,10 @@ export class ReversalDetectionService {
   /**
    * Calculate payee similarity score (0-50 points)
    */
-  private calculatePayeeScore(reversalPayee: string, originalPayee: string): number {
+  private calculatePayeeScore(
+    reversalPayee: string,
+    originalPayee: string,
+  ): number {
     if (!reversalPayee || !originalPayee) {
       return 0;
     }
@@ -153,14 +162,19 @@ export class ReversalDetectionService {
     );
 
     // Calculate similarity using Levenshtein distance
-    const similarity = this.calculateSimilarity(reversalPayeeUpper, originalPayeeUpper);
+    const similarity = this.calculateSimilarity(
+      reversalPayeeUpper,
+      originalPayeeUpper,
+    );
 
     // Strip reversal keywords for comparison if present
     let strippedReversalPayee = reversalPayeeUpper;
     for (const keyword of REVERSAL_KEYWORDS) {
       strippedReversalPayee = strippedReversalPayee.replace(keyword, '').trim();
     }
-    strippedReversalPayee = strippedReversalPayee.replace(/^[\s-]+|[\s-]+$/g, '').trim();
+    strippedReversalPayee = strippedReversalPayee
+      .replace(/^[\s-]+|[\s-]+$/g, '')
+      .trim();
     const strippedSimilarity = strippedReversalPayee
       ? this.calculateSimilarity(strippedReversalPayee, originalPayeeUpper)
       : 0;
@@ -191,7 +205,10 @@ export class ReversalDetectionService {
    */
   private calculateDateScore(reversalDate: Date, originalDate: Date): number {
     const daysDiff = Math.abs(
-      Math.floor((reversalDate.getTime() - originalDate.getTime()) / (1000 * 60 * 60 * 24)),
+      Math.floor(
+        (reversalDate.getTime() - originalDate.getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
     );
 
     if (daysDiff === 0) return 10; // Same day
@@ -275,7 +292,10 @@ export class ReversalDetectionService {
     }
 
     const daysDiff = Math.abs(
-      Math.floor((reversal.date!.getTime() - original.date.getTime()) / (1000 * 60 * 60 * 24)),
+      Math.floor(
+        (reversal.date!.getTime() - original.date.getTime()) /
+          (1000 * 60 * 60 * 24),
+      ),
     );
 
     if (daysDiff === 0) {
@@ -284,7 +304,10 @@ export class ReversalDetectionService {
       reasons.push(`${daysDiff} days apart`);
     }
 
-    const prefix = reasons.length > 0 ? 'Exact negative amount with ' : 'Exact negative amount';
+    const prefix =
+      reasons.length > 0
+        ? 'Exact negative amount with '
+        : 'Exact negative amount';
     return `${prefix}${reasons.join(', ')}`;
   }
 
@@ -307,12 +330,18 @@ export class ReversalDetectionService {
     originalId: string,
   ): Promise<void> {
     // Validate both transactions exist
-    const reversal = await this.transactionRepository.findById(tenantId, reversalId);
+    const reversal = await this.transactionRepository.findById(
+      tenantId,
+      reversalId,
+    );
     if (!reversal) {
       throw new Error('Reversal transaction not found');
     }
 
-    const original = await this.transactionRepository.findById(tenantId, originalId);
+    const original = await this.transactionRepository.findById(
+      tenantId,
+      originalId,
+    );
     if (!original) {
       throw new Error('Original transaction not found');
     }
@@ -344,8 +373,14 @@ export class ReversalDetectionService {
   /**
    * Get all reversals for a transaction
    */
-  async getReversalsFor(tenantId: string, transactionId: string): Promise<ITransaction[]> {
-    const original = await this.transactionRepository.findById(tenantId, transactionId);
+  async getReversalsFor(
+    tenantId: string,
+    transactionId: string,
+  ): Promise<ITransaction[]> {
+    const original = await this.transactionRepository.findById(
+      tenantId,
+      transactionId,
+    );
     if (!original) {
       return [];
     }
@@ -363,6 +398,8 @@ export class ReversalDetectionService {
     });
 
     // Filter for reversals that link to this transaction
-    return result.data.filter((txn) => txn.reversesTransactionId === transactionId) as ITransaction[];
+    return result.data.filter(
+      (txn) => txn.reversesTransactionId === transactionId,
+    ) as ITransaction[];
   }
 }

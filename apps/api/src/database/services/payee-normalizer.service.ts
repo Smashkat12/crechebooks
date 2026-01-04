@@ -72,7 +72,10 @@ export class PayeeNormalizerService {
           abbrData.abbreviations || {},
         )) {
           if (Array.isArray(variants)) {
-            this.abbreviations.set(canonical.toUpperCase(), variants as string[]);
+            this.abbreviations.set(
+              canonical.toUpperCase(),
+              variants as string[],
+            );
           }
         }
 
@@ -96,7 +99,9 @@ export class PayeeNormalizerService {
       if (fs.existsSync(locPath)) {
         const locData = JSON.parse(fs.readFileSync(locPath, 'utf-8'));
         const combined = locData.combined || [];
-        combined.forEach((loc: string) => this.locations.add(loc.toUpperCase()));
+        combined.forEach((loc: string) =>
+          this.locations.add(loc.toUpperCase()),
+        );
         this.logger.log(`Loaded ${this.locations.size} SA locations`);
       }
     } catch (error) {
@@ -189,7 +194,10 @@ export class PayeeNormalizerService {
 
         // Remove suffix with parentheses (if not already in suffix pattern)
         if (!suffix.includes('(')) {
-          const parenPattern = new RegExp(`\\s*\\(${escapedSuffix}\\)\\s*`, 'gi');
+          const parenPattern = new RegExp(
+            `\\s*\\(${escapedSuffix}\\)\\s*`,
+            'gi',
+          );
           const newResult2 = result.replace(parenPattern, ' ');
           if (newResult2 !== result) {
             result = newResult2;

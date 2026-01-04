@@ -107,11 +107,11 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Spec Item | ID | Covered by Task ID | Status |
 |-----------|----|--------------------|--------|
 | Blank/gibberish description | EC-TRANS-001 | TASK-TRANS-012 | ✅ Complete |
-| Payee name variations | EC-TRANS-002 | TASK-TRANS-013, TASK-TRANS-018 | ⭕ TASK-EC-001 (Phase 8) |
-| Recurring amount variation | EC-TRANS-003 | TASK-TRANS-013 | ⭕ TASK-EC-003 (Phase 8) |
+| Payee name variations | EC-TRANS-002 | TASK-TRANS-013, TASK-TRANS-018, TASK-EC-001 | ✅ Complete |
+| Recurring amount variation | EC-TRANS-003 | TASK-TRANS-013, TASK-EC-003 | ✅ Complete |
 | Xero API unavailable | EC-TRANS-004 | TASK-TRANS-014 | ✅ Complete (retry logic) |
 | Split validation | EC-TRANS-005 | TASK-TRANS-012 | ✅ Complete |
-| Reversal detection | EC-TRANS-006 | TASK-TRANS-012 | ⭕ TASK-TRANS-022 (Phase 8) |
+| Reversal detection | EC-TRANS-006 | TASK-TRANS-012, TASK-TRANS-022 | ✅ Complete |
 | Learning mode indicator | EC-TRANS-007 | TASK-TRANS-017 | ⭕ TASK-TRANS-023 (Phase 8) |
 | Duplicate detection | EC-TRANS-008 | TASK-TRANS-011, TASK-RECON-015 | ✅ Complete |
 | Conflicting corrections | EC-TRANS-009 | TASK-TRANS-013 | ⭕ TASK-EC-002 (Phase 8) |
@@ -134,10 +134,10 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Email invoice delivery | REQ-BILL-006 | TASK-BILL-013, TASK-WEB-042 | ✅ Complete |
 | WhatsApp delivery | REQ-BILL-007 | TASK-BILL-015 | ✅ Complete |
 | Delivery status tracking | REQ-BILL-008 | TASK-BILL-003, TASK-BILL-013, TASK-BILL-035 | ✅ Complete |
-| Enrollment register | REQ-BILL-009 | TASK-BILL-001, TASK-BILL-002, TASK-BILL-011 | ⭕ TASK-BILL-019 (Phase 8) |
+| Enrollment register | REQ-BILL-009 | TASK-BILL-001, TASK-BILL-002, TASK-BILL-011, TASK-BILL-019 | ✅ Complete |
 | Pro-rata calculation | REQ-BILL-010 | TASK-BILL-014, TASK-WEB-044 | ✅ Complete |
 | Ad-hoc charges | REQ-BILL-011 | TASK-BILL-003, TASK-BILL-017 | ✅ Complete |
-| VAT calculation | REQ-BILL-012 | TASK-BILL-012 | ⭕ TASK-BILL-018 (Phase 8) |
+| VAT calculation | REQ-BILL-012 | TASK-BILL-012, TASK-BILL-018 | ✅ Complete |
 
 ---
 
@@ -287,7 +287,7 @@ This document ensures 100% coverage of all requirements in the specifications. E
 - [x] Layer ordering is correct (foundation → logic → surface)
 - [x] Each task is atomic (single conceptual change)
 
-**Traceability Status**: ⚠️ 90% COMPLETE (Phase 8 Outstanding)
+**Traceability Status**: 🔄 96% COMPLETE (129/134 tasks, 5 Phase 8 remaining)
 
 ---
 
@@ -300,10 +300,10 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | OAuth 2.0 / OIDC authentication | REQ-USER-001 | TASK-API-001 | ✅ Complete |
 | Role-based access control | REQ-USER-002 | TASK-CORE-003, TASK-API-001 | ✅ Complete |
 | Multi-tenant isolation | REQ-USER-003 | TASK-CORE-002 | ✅ Complete |
-| Multi-tenant user assignment | REQ-USER-004 | TASK-CORE-003 | ⭕ TASK-USER-001 (Phase 8) |
+| Multi-tenant user assignment | REQ-USER-004 | TASK-CORE-003, TASK-USER-001 | ✅ Complete |
 | Auth audit logging | REQ-USER-005 | TASK-CORE-004, TASK-API-001 | ✅ Complete |
 | Session timeout | REQ-USER-006 | TASK-API-001 | ✅ Complete |
-| User management admin page | REQ-USER-007 | - | ⭕ TASK-USER-002 (Phase 8) |
+| User management admin page | REQ-USER-007 | TASK-USER-002 | ✅ Complete |
 
 ### XERO Domain Coverage (Cross-cutting)
 
@@ -315,21 +315,21 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | Payment sync | REQ-XERO-004 | TASK-PAY-011 | ✅ Complete |
 | Retry on API failure | REQ-XERO-005 | TASK-TRANS-014 | ✅ Complete |
 | Rate limiting | REQ-XERO-006 | TASK-MCP-001 | ✅ Complete |
-| Conflict resolution | REQ-XERO-007 | - | ⭕ TASK-XERO-001 (Phase 8) |
+| Conflict resolution | REQ-XERO-007 | TASK-XERO-001 | ✅ Complete |
 | Connection status widget | REQ-XERO-008 | - | ⭕ TASK-XERO-002 (Phase 8) |
 
 ### Phase 8 Summary
 
 | Domain | Total Reqs | Complete | Pending | Coverage |
 |--------|-----------|----------|---------|----------|
-| TRANS (Phase 8) | 2 | 0 | 2 | 0% |
-| BILL (Phase 8) | 2 | 0 | 2 | 0% |
-| USER (Phase 8) | 2 | 0 | 2 | 0% |
-| XERO (Phase 8) | 2 | 0 | 2 | 0% |
-| Edge Cases (Phase 8) | 5 | 0 | 5 | 0% |
-| **Phase 8 Total** | **13** | **0** | **13** | **0%** |
+| TRANS (Phase 8) | 4 | 1 | 3 | 25% |
+| BILL (Phase 8) | 2 | 2 | 0 | 100% |
+| USER (Phase 8) | 2 | 2 | 0 | 100% |
+| XERO (Phase 8) | 2 | 1 | 1 | 50% |
+| Edge Cases (Phase 8) | 3 | 2 | 1 | 67% |
+| **Phase 8 Total** | **13** | **8** | **5** | **62%** |
 
-**Traceability Status**: ⚠️ 90% COMPLETE (Phase 8 Outstanding)
+**Traceability Status**: 🔄 96% COMPLETE (129/134 tasks done, 5 remaining)
 
 ---
 
@@ -418,3 +418,12 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2026-01-04 | Added XERO domain requirements (REQ-XERO-001 to REQ-XERO-008) | AI Agent |
 | 2026-01-04 | Mapped outstanding edge cases to Phase 8 tasks | AI Agent |
 | 2026-01-04 | Updated traceability status to 90% (121/134 tasks complete) | AI Agent |
+| 2026-01-04 | TASK-BILL-018 marked complete (VAT Calculation - 24 tests) | AI Agent |
+| 2026-01-04 | TASK-USER-001 marked complete (Multi-Tenant User Roles - 28 tests) | AI Agent |
+| 2026-01-04 | TASK-XERO-001 marked complete (Sync Conflict Resolution - 34 tests) | AI Agent |
+| 2026-01-04 | TASK-EC-001 marked complete (Payee Variation Detection - 31 tests) | AI Agent |
+| 2026-01-04 | TASK-BILL-019 marked complete (Enrollment Register UI) | AI Agent |
+| 2026-01-04 | TASK-USER-002 marked complete (User Management Admin UI) | AI Agent |
+| 2026-01-04 | TASK-TRANS-022 marked complete (Reversal Detection - 18 tests) | AI Agent |
+| 2026-01-04 | TASK-EC-003 marked complete (Amount Variation Threshold - 24 tests) | AI Agent |
+| 2026-01-04 | **Phase 8 Progress**: 8/13 tasks complete (62%), Overall: 129/134 (96%) | AI Agent |

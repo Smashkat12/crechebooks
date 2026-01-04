@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Payment Reminder Template Editor</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>124</sequence>
   <priority>P2-HIGH</priority>

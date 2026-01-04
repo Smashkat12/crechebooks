@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Payee Name Variation Detection Algorithm</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>logic</layer>
   <sequence>136</sequence>

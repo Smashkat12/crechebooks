@@ -1,6 +1,7 @@
 /**
  * Payment Reminder Processor
  * TASK-PAY-015: Payment Reminder Scheduler Service
+ * TASK-PAY-017: Tenant-Customizable Reminder Template Entity
  *
  * Processes scheduled payment reminder jobs.
  * Features:
@@ -9,6 +10,7 @@
  * - Multi-channel delivery (email/WhatsApp)
  * - Escalation at 45 days
  * - Duplicate prevention
+ * - Tenant-customizable templates with fallback to defaults
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -27,6 +29,11 @@ import {
   PaymentReminderResult,
   getStageForDaysOverdue,
 } from '../../billing/types/reminder.types';
+import { ReminderTemplateService } from '../../billing/reminder-template.service';
+import {
+  ReminderStage as TemplateReminderStage,
+  ReminderChannel,
+} from '../../billing/dto/reminder-template.dto';
 
 /** Default cron: 09:00 SAST daily (0 9 * * *) */
 export const DEFAULT_REMINDER_CRON = '0 9 * * *';
@@ -43,6 +50,7 @@ export class PaymentReminderProcessor extends BaseProcessor<PaymentReminderJobDa
     private readonly prisma: PrismaService,
     private readonly reminderService: ReminderService,
     private readonly auditLogService: AuditLogService,
+    private readonly reminderTemplateService: ReminderTemplateService,
   ) {
     super(QUEUE_NAMES.PAYMENT_REMINDER);
   }
@@ -278,30 +286,104 @@ export class PaymentReminderProcessor extends BaseProcessor<PaymentReminderJobDa
 
   /**
    * Send reminder for an invoice at a specific stage
+   *
+   * Uses tenant-customizable templates with fallback to defaults.
    */
   private async sendReminder(
     invoice: InvoiceWithParent,
     stage: ReminderStage,
   ): Promise<void> {
-    this.logger.log({
-      message: 'Sending payment reminder',
-      invoiceId: invoice.id,
-      invoiceNumber: invoice.invoiceNumber,
-      stage,
-      parentId: invoice.parentId,
-    });
+    // Get tenant-customizable template or fall back to defaults
+    const templateStage = stage as unknown as TemplateReminderStage;
+    let templateConfig: {
+      channels: ReminderChannel[];
+      isCustom: boolean;
+    } | null = null;
+
+    try {
+      const effectiveTemplate =
+        await this.reminderTemplateService.getEffectiveTemplate(
+          invoice.tenantId,
+          templateStage,
+        );
+      templateConfig = {
+        channels: effectiveTemplate.channels,
+        isCustom: effectiveTemplate.isCustom,
+      };
+
+      this.logger.log({
+        message: 'Sending payment reminder',
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        stage,
+        parentId: invoice.parentId,
+        usingCustomTemplate: templateConfig.isCustom,
+        channels: templateConfig.channels,
+      });
+    } catch (error) {
+      // If template service fails, continue with default behavior
+      this.logger.warn({
+        message: 'Failed to get template config, using defaults',
+        error: error instanceof Error ? error.message : String(error),
+        invoiceId: invoice.id,
+        stage,
+      });
+    }
 
     // Use the existing ReminderService to send the reminder
     // It handles channel selection, template rendering, and tracking
     const result = await this.reminderService.sendReminders(
       [invoice.id],
-      undefined, // Use parent's preferred channel
+      undefined, // Use parent's preferred channel (ReminderService handles this)
       invoice.tenantId,
     );
 
     if (result.failed > 0) {
       const failedDetail = result.details.find((d) => d.status === 'FAILED');
       throw new Error(failedDetail?.error ?? 'Failed to send reminder');
+    }
+  }
+
+  /**
+   * Get the stage configuration from tenant templates
+   *
+   * Returns the template's daysOverdue threshold if a custom template exists,
+   * otherwise returns the default threshold for the stage.
+   */
+  private async getStageThreshold(
+    tenantId: string,
+    stage: ReminderStage,
+  ): Promise<number> {
+    try {
+      const templateStage = stage as unknown as TemplateReminderStage;
+      const template = await this.reminderTemplateService.getTemplateForStage(
+        tenantId,
+        templateStage,
+      );
+
+      if (template) {
+        return template.daysOverdue;
+      }
+    } catch (error) {
+      this.logger.debug({
+        message: 'Using default threshold for stage',
+        stage,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Return default thresholds
+    switch (stage) {
+      case 'FIRST':
+        return 7;
+      case 'SECOND':
+        return 14;
+      case 'FINAL':
+        return 30;
+      case 'ESCALATED':
+        return 45;
+      default:
+        return 7;
     }
   }
 

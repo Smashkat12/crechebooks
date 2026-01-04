@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Invoice Generation Scheduling Cron Job</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>101</sequence>
   <priority>P1-CRITICAL</priority>

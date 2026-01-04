@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Categorization Explainability Display</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>surface</layer>
   <sequence>127</sequence>

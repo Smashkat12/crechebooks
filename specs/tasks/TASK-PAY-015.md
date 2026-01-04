@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Payment Reminder Scheduler Service</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>102</sequence>
   <priority>P1-CRITICAL</priority>

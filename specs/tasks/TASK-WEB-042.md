@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Invoice Send Button API Integration</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>121</sequence>
   <priority>P0-BLOCKER</priority>

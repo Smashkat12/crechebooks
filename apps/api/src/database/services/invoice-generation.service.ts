@@ -23,6 +23,7 @@ import { ParentRepository } from '../repositories/parent.repository';
 import { EnrollmentService } from './enrollment.service';
 import { AuditLogService } from './audit-log.service';
 import { XeroSyncService } from './xero-sync.service';
+import { ProRataService } from './pro-rata.service';
 import { InvoiceStatus } from '../entities/invoice.entity';
 import { LineType, isVatApplicable } from '../entities/invoice-line.entity';
 import {
@@ -65,6 +66,7 @@ export class InvoiceGenerationService {
     private readonly enrollmentService: EnrollmentService,
     private readonly auditLogService: AuditLogService,
     private readonly xeroSyncService: XeroSyncService,
+    private readonly proRataService: ProRataService,
   ) {}
 
   /**
@@ -210,14 +212,20 @@ export class InvoiceGenerationService {
             enrollment.customFeeOverrideCents ??
             enrollment.feeStructure.amountCents;
 
-          // Pro-rata calculation is available via ProRataService (TASK-BILL-014)
-          // Full monthly fee is used here; pro-rata is applied at enrollment level
+          // TASK-BILL-036: Calculate pro-rata for mid-month enrollment/withdrawal
+          const proRataResult = await this.calculateMonthlyFeeWithProRata(
+            enrollment,
+            billingPeriodStart,
+            billingPeriodEnd,
+            tenantId,
+            monthlyFeeCents,
+          );
 
-          // Add monthly fee line
+          // Add monthly fee line (may be pro-rated)
           lineItems.push({
-            description: enrollment.feeStructure.name,
+            description: proRataResult.description,
             quantity: new Decimal(1),
-            unitPriceCents: monthlyFeeCents,
+            unitPriceCents: proRataResult.amountCents,
             discountCents: 0,
             lineType: LineType.MONTHLY_FEE,
             accountCode: this.SCHOOL_FEES_ACCOUNT,
@@ -243,12 +251,13 @@ export class InvoiceGenerationService {
           }
 
           // Apply sibling discount if applicable
+          // TASK-BILL-036: Apply discount to actual fee charged (may be pro-rated)
           const discountPercentage =
             siblingDiscounts.get(enrollment.childId) ?? new Decimal(0);
 
           if (discountPercentage.greaterThan(0)) {
-            // Calculate discount amount
-            const discountAmount = new Decimal(monthlyFeeCents)
+            // Calculate discount amount based on actual fee charged (including pro-rata)
+            const discountAmount = new Decimal(proRataResult.amountCents)
               .mul(discountPercentage)
               .div(100);
             const discountCents = discountAmount
@@ -745,5 +754,115 @@ export class InvoiceGenerationService {
         invoiceId,
       },
     });
+  }
+
+  /**
+   * TASK-BILL-036: Calculate monthly fee with automatic pro-rata for mid-month enrollment/withdrawal
+   *
+   * Checks if the enrollment starts after the billing period start (mid-month enrollment)
+   * or ends before the billing period end (mid-month withdrawal) and applies pro-rata
+   * calculation accordingly.
+   *
+   * @param enrollment - Enrollment with relations
+   * @param billingPeriodStart - First day of billing month
+   * @param billingPeriodEnd - Last day of billing month
+   * @param tenantId - Tenant ID for pro-rata calculation
+   * @param monthlyFeeCents - Full monthly fee in cents
+   * @returns Object with amount in cents, description, and whether pro-rata was applied
+   */
+  private async calculateMonthlyFeeWithProRata(
+    enrollment: EnrollmentWithRelations,
+    billingPeriodStart: Date,
+    billingPeriodEnd: Date,
+    tenantId: string,
+    monthlyFeeCents: number,
+  ): Promise<{ amountCents: number; description: string; isProRata: boolean }> {
+    // Normalize all dates to remove time component
+    const normalizedBillingStart = this.normalizeDate(billingPeriodStart);
+    const normalizedBillingEnd = this.normalizeDate(billingPeriodEnd);
+    const normalizedEnrollmentStart = this.normalizeDate(enrollment.startDate);
+    const normalizedEnrollmentEnd = enrollment.endDate
+      ? this.normalizeDate(enrollment.endDate)
+      : null;
+
+    // Determine actual billing period for this enrollment
+    // effectiveStart: later of enrollment start or billing period start
+    const effectiveStart =
+      normalizedEnrollmentStart > normalizedBillingStart
+        ? normalizedEnrollmentStart
+        : normalizedBillingStart;
+
+    // effectiveEnd: earlier of enrollment end (if exists) or billing period end
+    const effectiveEnd =
+      normalizedEnrollmentEnd && normalizedEnrollmentEnd < normalizedBillingEnd
+        ? normalizedEnrollmentEnd
+        : normalizedBillingEnd;
+
+    // Check if pro-rata is needed
+    const isMidMonthStart = normalizedEnrollmentStart > normalizedBillingStart;
+    const isMidMonthEnd =
+      normalizedEnrollmentEnd &&
+      normalizedEnrollmentEnd < normalizedBillingEnd;
+
+    if (!isMidMonthStart && !isMidMonthEnd) {
+      // Full month - no pro-rata needed
+      return {
+        amountCents: monthlyFeeCents,
+        description: enrollment.feeStructure.name,
+        isProRata: false,
+      };
+    }
+
+    // Calculate pro-rata amount using ProRataService
+    const proRataAmountCents = await this.proRataService.calculateProRata(
+      monthlyFeeCents,
+      effectiveStart,
+      effectiveEnd,
+      tenantId,
+    );
+
+    // Build description with date range
+    const startDay = effectiveStart.getDate();
+    const endDay = effectiveEnd.getDate();
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const monthName = monthNames[effectiveStart.getMonth()];
+
+    const description = `${enrollment.feeStructure.name} (Pro-rata: ${startDay} ${monthName} - ${endDay} ${monthName})`;
+
+    this.logger.log(
+      `Pro-rata applied for child ${enrollment.childId}: ` +
+        `${monthlyFeeCents} cents -> ${proRataAmountCents} cents ` +
+        `(${startDay} ${monthName} - ${endDay} ${monthName})`,
+    );
+
+    return {
+      amountCents: proRataAmountCents,
+      description,
+      isProRata: true,
+    };
+  }
+
+  /**
+   * Normalize a date by removing time component
+   * @param date - Date to normalize
+   * @returns Date with time set to 00:00:00.000
+   */
+  private normalizeDate(date: Date): Date {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
   }
 }

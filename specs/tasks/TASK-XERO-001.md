@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Bi-directional Sync Conflict Resolution</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>logic</layer>
   <sequence>134</sequence>

@@ -2,7 +2,7 @@
 
 <metadata>
   <title>3-Day Business Day Timing Window for Reconciliation</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>106</sequence>
   <priority>P1-CRITICAL</priority>

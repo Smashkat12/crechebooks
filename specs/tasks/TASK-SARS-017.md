@@ -2,7 +2,7 @@
 
 <metadata>
   <title>SARS Deadline Reminder System</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>104</sequence>
   <priority>P0-BLOCKER</priority>

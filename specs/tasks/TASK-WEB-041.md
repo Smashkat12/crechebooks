@@ -2,7 +2,7 @@
 
 <metadata>
   <title>SARS VAT201 Real Data Hook</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>120</sequence>
   <priority>P0-BLOCKER</priority>

@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Delivery Status Webhook Handlers</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>112</sequence>
   <priority>P2-HIGH</priority>

@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Multi-Channel Notification Service Enhancement</title>
-  <status>pending</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>115</sequence>
   <priority>P2-HIGH</priority>

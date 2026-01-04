@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Xero Connection Status Dashboard Widget</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>surface</layer>
   <sequence>135</sequence>

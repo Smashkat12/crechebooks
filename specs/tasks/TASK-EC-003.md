@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Recurring Amount Variation Threshold Configuration</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>logic</layer>
   <sequence>138</sequence>

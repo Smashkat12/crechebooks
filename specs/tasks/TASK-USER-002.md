@@ -2,7 +2,7 @@
 
 <metadata>
   <title>User Management Admin Page</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>surface</layer>
   <sequence>133</sequence>

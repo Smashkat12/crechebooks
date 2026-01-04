@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Split Transaction UI Implementation</title>
-  <status>pending</status>
+  <status>complete</status>
   <phase>8</phase>
   <layer>surface</layer>
   <sequence>126</sequence>

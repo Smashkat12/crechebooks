@@ -31,12 +31,7 @@ import {
   ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import {
-  randomBytes,
-  createHash,
-  createCipheriv,
-  createDecipheriv,
-} from 'crypto';
+import { randomBytes, createCipheriv, createDecipheriv } from 'crypto';
 import { XeroClient } from 'xero-node';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { TokenManager, TokenSet } from '../../mcp/xero-mcp/auth/token-manager';
@@ -46,6 +41,7 @@ import { CurrentUser } from '../../api/auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../api/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../api/auth/guards/roles.guard';
 import { Roles } from '../../api/auth/decorators/roles.decorator';
+import { Public } from '../../api/auth/decorators/public.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import { BusinessException, NotFoundException } from '../../shared/exceptions';
 import {
@@ -106,11 +102,44 @@ export class XeroController {
     const tenantId = user.tenantId;
     this.logger.log(`Initiating Xero connection for tenant ${tenantId}`);
 
+    // Fail fast: Validate required Xero credentials
+    const clientId = process.env.XERO_CLIENT_ID;
+    const clientSecret = process.env.XERO_CLIENT_SECRET;
+    const redirectUri = process.env.XERO_REDIRECT_URI;
+
+    if (!clientId) {
+      this.logger.error(
+        'XERO_CLIENT_ID environment variable is not configured',
+      );
+      throw new BusinessException(
+        'Xero integration is not configured. Missing XERO_CLIENT_ID.',
+        'XERO_NOT_CONFIGURED',
+      );
+    }
+    if (!clientSecret) {
+      this.logger.error(
+        'XERO_CLIENT_SECRET environment variable is not configured',
+      );
+      throw new BusinessException(
+        'Xero integration is not configured. Missing XERO_CLIENT_SECRET.',
+        'XERO_NOT_CONFIGURED',
+      );
+    }
+    if (!redirectUri) {
+      this.logger.error(
+        'XERO_REDIRECT_URI environment variable is not configured',
+      );
+      throw new BusinessException(
+        'Xero integration is not configured. Missing XERO_REDIRECT_URI.',
+        'XERO_NOT_CONFIGURED',
+      );
+    }
+
     // Create Xero client
     const xeroClient = new XeroClient({
-      clientId: process.env.XERO_CLIENT_ID ?? '',
-      clientSecret: process.env.XERO_CLIENT_SECRET ?? '',
-      redirectUris: [process.env.XERO_REDIRECT_URI ?? ''],
+      clientId,
+      clientSecret,
+      redirectUris: [redirectUri],
       scopes: [
         'openid',
         'profile',
@@ -119,50 +148,40 @@ export class XeroController {
         'accounting.transactions',
         'accounting.contacts',
         'accounting.settings',
-        'bankfeeds',
+        // 'finance.bankstatementsplus.read', // Requires Xero partner approval
+        // 'bankfeeds', // Requires special Xero approval
       ],
     });
-
-    // Generate PKCE code verifier and challenge
-    const codeVerifier = randomBytes(32).toString('base64url');
-    const codeChallenge = createHash('sha256')
-      .update(codeVerifier)
-      .digest('base64url');
 
     // Create encrypted state with CSRF protection
     const statePayload: OAuthStatePayload = {
       tenantId,
-      returnUrl: process.env.FRONTEND_URL ?? 'http://localhost:3001',
+      returnUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
       createdAt: Date.now(),
       nonce: randomBytes(16).toString('hex'),
     };
 
     const state = this.encryptState(statePayload);
 
-    // Store code verifier temporarily (expires in 10 minutes)
+    // Store state temporarily (expires in 10 minutes)
     await this.prisma.xeroOAuthState.upsert({
       where: { tenantId },
       create: {
         tenantId,
-        codeVerifier,
+        codeVerifier: 'not-used', // Keep for schema compatibility
         state,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       },
       update: {
-        codeVerifier,
+        codeVerifier: 'not-used',
         state,
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
       },
     });
 
-    // Generate authorization URL with PKCE
-    // buildConsentUrl may return a string or Promise depending on xero-node version
+    // Generate authorization URL (standard OAuth, no PKCE for server-side apps)
     const baseUrl = await Promise.resolve(xeroClient.buildConsentUrl());
-    const authUrl =
-      `${baseUrl}` +
-      `&code_challenge=${codeChallenge}` +
-      `&code_challenge_method=S256` +
-      `&state=${encodeURIComponent(state)}`;
+    const authUrl = `${baseUrl}&state=${encodeURIComponent(state)}`;
 
     return { authUrl };
   }
@@ -170,8 +189,10 @@ export class XeroController {
   /**
    * Handle OAuth callback from Xero
    * GET /xero/callback
+   * NOTE: This endpoint is public because Xero redirects here without auth headers
    */
   @Get('callback')
+  @Public()
   @ApiOperation({
     summary: 'Handle Xero OAuth callback',
     description:
@@ -213,11 +234,26 @@ export class XeroController {
         );
       }
 
+      // Fail fast: Validate required Xero credentials
+      const clientId = process.env.XERO_CLIENT_ID;
+      const clientSecret = process.env.XERO_CLIENT_SECRET;
+      const redirectUri = process.env.XERO_REDIRECT_URI;
+
+      if (!clientId || !clientSecret || !redirectUri) {
+        this.logger.error(
+          'Xero OAuth callback failed: Missing required environment variables',
+        );
+        throw new BusinessException(
+          'Xero integration is not configured properly.',
+          'XERO_NOT_CONFIGURED',
+        );
+      }
+
       // Create Xero client
       const xeroClient = new XeroClient({
-        clientId: process.env.XERO_CLIENT_ID ?? '',
-        clientSecret: process.env.XERO_CLIENT_SECRET ?? '',
-        redirectUris: [process.env.XERO_REDIRECT_URI ?? ''],
+        clientId,
+        clientSecret,
+        redirectUris: [redirectUri],
         scopes: [
           'openid',
           'profile',
@@ -226,14 +262,15 @@ export class XeroController {
           'accounting.transactions',
           'accounting.contacts',
           'accounting.settings',
-          'bankfeeds',
+          // 'finance.bankstatementsplus.read', // Requires Xero partner approval
+          // 'bankfeeds', // Requires special Xero approval
         ],
       });
 
       // Exchange code for tokens
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const tokenSet = await xeroClient.apiCallback(
-        `${process.env.XERO_REDIRECT_URI}?code=${query.code}&state=${query.state}`,
+        `${redirectUri}?code=${query.code}`,
       );
 
       // Type guard
@@ -427,6 +464,215 @@ export class XeroController {
   }
 
   /**
+   * Get available bank accounts from Xero
+   * GET /xero/bank-accounts
+   */
+  @Get('bank-accounts')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'List available bank accounts from Xero',
+    description:
+      'Returns all bank accounts from the connected Xero organization.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bank accounts retrieved',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getBankAccounts(@CurrentUser() user: IUser): Promise<{
+    accounts: Array<{
+      accountId: string;
+      name: string;
+      accountNumber: string;
+      bankAccountType: string;
+      isConnected: boolean;
+      connectionId?: string;
+    }>;
+  }> {
+    const tenantId = user.tenantId;
+    this.logger.log(`Fetching Xero bank accounts for tenant ${tenantId}`);
+
+    // Check connection
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException(
+        'No valid Xero connection. Please connect to Xero first.',
+        'XERO_NOT_CONNECTED',
+      );
+    }
+
+    // Get access token and Xero tenant ID
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    // Create Xero client
+    const xeroClient = new XeroClient({
+      clientId: process.env.XERO_CLIENT_ID ?? '',
+      clientSecret: process.env.XERO_CLIENT_SECRET ?? '',
+      redirectUris: [process.env.XERO_REDIRECT_URI ?? ''],
+      scopes: ['accounting.settings'],
+    });
+
+    xeroClient.setTokenSet({
+      access_token: accessToken,
+      token_type: 'Bearer',
+    });
+
+    // Fetch accounts from Xero
+    const accountsResponse = await xeroClient.accountingApi.getAccounts(
+      xeroTenantId,
+      undefined, // ifModifiedSince
+      'Type=="BANK"', // where - only bank accounts
+    );
+
+    const xeroAccounts = accountsResponse.body.accounts ?? [];
+
+    // Get existing connections for this tenant
+    const existingConnections = await this.prisma.bankConnection.findMany({
+      where: { tenantId },
+    });
+
+    const connectionMap = new Map(
+      existingConnections.map((c) => [c.xeroAccountId, c]),
+    );
+
+    // Map to response format
+    const accounts = xeroAccounts.map((account) => {
+      const connection = connectionMap.get(account.accountID ?? '');
+      return {
+        accountId: account.accountID ?? '',
+        name: account.name ?? 'Unknown',
+        accountNumber: account.bankAccountNumber ?? '',
+        bankAccountType: String(account.bankAccountType ?? 'Unknown'),
+        isConnected: connection?.status === 'ACTIVE',
+        connectionId: connection?.id,
+      };
+    });
+
+    this.logger.log(`Found ${accounts.length} bank accounts in Xero`);
+    return { accounts };
+  }
+
+  /**
+   * Connect a bank account from Xero
+   * POST /xero/bank-accounts/:accountId/connect
+   */
+  @Post('bank-accounts/connect')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Connect a bank account from Xero',
+    description: 'Connects a specific bank account for transaction syncing.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Bank account connected',
+  })
+  @ApiForbiddenResponse({ description: 'Requires OWNER or ADMIN role' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async connectBankAccount(
+    @Body() body: { accountId: string },
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; connectionId: string; message: string }> {
+    const tenantId = user.tenantId;
+    this.logger.log(
+      `Connecting bank account ${body.accountId} for tenant ${tenantId}`,
+    );
+
+    const connection = await this.bankFeedService.connectBankAccount(
+      tenantId,
+      body.accountId,
+    );
+
+    return {
+      success: true,
+      connectionId: connection.id,
+      message: `Connected bank account: ${connection.accountName}`,
+    };
+  }
+
+  /**
+   * Disconnect a bank account
+   * POST /xero/bank-accounts/:connectionId/disconnect
+   */
+  @Post('bank-accounts/disconnect')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Disconnect a bank account',
+    description: 'Disconnects a bank account from transaction syncing.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bank account disconnected',
+  })
+  @ApiForbiddenResponse({ description: 'Requires OWNER or ADMIN role' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async disconnectBankAccount(
+    @Body() body: { connectionId: string },
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; message: string }> {
+    const tenantId = user.tenantId;
+    this.logger.log(
+      `Disconnecting bank connection ${body.connectionId} for tenant ${tenantId}`,
+    );
+
+    await this.bankFeedService.disconnectBankAccount(
+      tenantId,
+      body.connectionId,
+    );
+
+    return {
+      success: true,
+      message: 'Bank account disconnected successfully',
+    };
+  }
+
+  /**
+   * Get connected bank accounts
+   * GET /xero/bank-connections
+   */
+  @Get('bank-connections')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'Get connected bank accounts',
+    description: 'Returns all connected bank accounts for the tenant.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Connected bank accounts retrieved',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getBankConnections(@CurrentUser() user: IUser): Promise<{
+    connections: Array<{
+      id: string;
+      accountName: string;
+      accountNumber: string;
+      bankName: string;
+      status: string;
+      lastSyncAt: Date | null;
+      errorMessage: string | null;
+    }>;
+  }> {
+    const tenantId = user.tenantId;
+
+    const connections = await this.prisma.bankConnection.findMany({
+      where: { tenantId },
+      orderBy: { connectedAt: 'desc' },
+    });
+
+    return {
+      connections: connections.map((c) => ({
+        id: c.id,
+        accountName: c.accountName,
+        accountNumber: c.accountNumber,
+        bankName: c.bankName,
+        status: c.status,
+        lastSyncAt: c.lastSyncAt,
+        errorMessage: c.errorMessage,
+      })),
+    };
+  }
+
+  /**
    * Disconnect from Xero
    * POST /xero/disconnect
    */
@@ -530,8 +776,51 @@ export class XeroController {
           tenantId,
           {
             fromDate: options.fromDate ? new Date(options.fromDate) : undefined,
+            forceFullSync: options.fullSync ?? false,
           },
         );
+
+        this.syncGateway.emitProgress(tenantId, {
+          entity: 'transactions',
+          total: syncResult.transactionsFound,
+          processed:
+            syncResult.transactionsCreated + syncResult.duplicatesSkipped,
+          percentage: 75,
+        });
+
+        // Sync unreconciled bank statement lines if requested
+        if (options.includeUnreconciled) {
+          this.logger.log(
+            `Fetching unreconciled statement lines for tenant ${tenantId}`,
+          );
+
+          this.syncGateway.emitProgress(tenantId, {
+            entity: 'unreconciled',
+            total: 100,
+            processed: 0,
+            percentage: 0,
+          });
+
+          const unreconciledResult =
+            await this.bankFeedService.syncUnreconciledStatements(tenantId, {
+              fromDate: options.fromDate
+                ? new Date(options.fromDate)
+                : undefined,
+              forceFullSync: options.fullSync ?? false,
+            });
+
+          this.logger.log(
+            `Unreconciled sync: ${unreconciledResult.created} created, ` +
+              `${unreconciledResult.skipped} skipped`,
+          );
+
+          this.syncGateway.emitProgress(tenantId, {
+            entity: 'unreconciled',
+            total: unreconciledResult.found,
+            processed: unreconciledResult.created + unreconciledResult.skipped,
+            percentage: 100,
+          });
+        }
 
         this.syncGateway.emitProgress(tenantId, {
           entity: 'transactions',

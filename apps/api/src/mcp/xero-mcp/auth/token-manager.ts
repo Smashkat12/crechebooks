@@ -123,6 +123,7 @@ export class TokenManager {
 
   /**
    * Check if a tenant has valid Xero connection
+   * Attempts to refresh token if expired but refresh token is still valid
    */
   async hasValidConnection(tenantId: string): Promise<boolean> {
     const record = await this.prisma.xeroToken.findUnique({
@@ -134,7 +135,24 @@ export class TokenManager {
     }
 
     const tokens = this.decryptTokens(record.encryptedTokens);
-    return Date.now() < tokens.expiresAt;
+
+    // If token is still valid, return true
+    if (Date.now() < tokens.expiresAt - this.REFRESH_BUFFER_MS) {
+      return true;
+    }
+
+    // Token expired or expiring soon - try to refresh
+    try {
+      this.logger.info('Token expired, attempting refresh', { tenantId });
+      await this.refreshAccessToken(tenantId);
+      return true;
+    } catch (error) {
+      this.logger.warn('Failed to refresh token', {
+        tenantId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
   }
 
   /**
@@ -163,7 +181,7 @@ export class TokenManager {
 
       const oldTokens = this.decryptTokens(record.encryptedTokens);
 
-      // Create Xero client and set old tokens
+      // Create Xero client and initialize it (required for refresh)
       const xeroClient = new XeroClient({
         clientId: process.env.XERO_CLIENT_ID ?? '',
         clientSecret: process.env.XERO_CLIENT_SECRET ?? '',
@@ -177,6 +195,9 @@ export class TokenManager {
           'accounting.settings',
         ],
       });
+
+      // Initialize the client to set up openIdClient (required before refreshToken)
+      await xeroClient.initialize();
 
       xeroClient.setTokenSet({
         access_token: oldTokens.accessToken,

@@ -36,6 +36,7 @@ import {
   XeroBankTransaction,
   BankSyncOptions,
   WebhookVerificationResult,
+  XeroStatementLine,
 } from './types/bank-feed.types';
 
 // Rate limiting: 60 calls/minute per Xero constraints
@@ -244,11 +245,12 @@ export class BankFeedService {
         await this.checkRateLimit(tenantId);
 
         // Fetch bank transactions from Xero for this account
+        // Note: Xero API requires GUID values wrapped in Guid() function
         const bankTransactionsResponse =
           await client.accountingApi.getBankTransactions(
             xeroTenantId,
             undefined, // ifModifiedSince
-            `BankAccount.AccountID=="${connection.xeroAccountId}"`, // where
+            `BankAccount.AccountID==Guid("${connection.xeroAccountId}")`, // where
             undefined, // order
             undefined, // page
             undefined, // unitdp
@@ -257,12 +259,30 @@ export class BankFeedService {
         const xeroTransactions =
           bankTransactionsResponse.body.bankTransactions ?? [];
 
+        this.logger.log(
+          `Fetched ${xeroTransactions.length} transactions from Xero for account ${connection.accountName}`,
+        );
+
+        // Debug: Log first transaction structure to understand available fields
+        if (xeroTransactions.length > 0) {
+          const sample = xeroTransactions[0];
+          this.logger.debug(
+            `Sample transaction fields: date=${sample.date}, reference=${sample.reference}, ` +
+              `contact=${sample.contact?.name}, lineItemDesc=${sample.lineItems?.[0]?.description}, ` +
+              `type=${sample.type}, status=${sample.status}`,
+          );
+        }
+
         // Filter by date range
         const filteredTransactions = xeroTransactions.filter((tx) => {
           if (!tx.date) return false;
           const txDate = new Date(tx.date);
           return txDate >= fromDate && txDate <= toDate;
         });
+
+        this.logger.log(
+          `After date filter (${fromDate.toISOString()} to ${toDate.toISOString()}): ${filteredTransactions.length} transactions`,
+        );
 
         result.transactionsFound += filteredTransactions.length;
 
@@ -470,13 +490,24 @@ export class BankFeedService {
       xeroTx.type === 'RECEIVE-OVERPAYMENT' ||
       xeroTx.type === 'RECEIVE-PREPAYMENT';
 
+    // Build description from available fields (priority order):
+    // 1. Line item description (often contains bank statement narrative)
+    // 2. Reference field (contains bank reference/narrative)
+    // 3. Contact name (payee/payer name)
+    // 4. Fallback to transaction type
+    const description =
+      xeroTx.lineItems?.[0]?.description?.trim() ||
+      xeroTx.reference?.trim() ||
+      xeroTx.contact?.name?.trim() ||
+      `${xeroTx.type} Transaction`;
+
     // Create transaction
     await this.transactionRepo.create({
       tenantId,
       xeroTransactionId: xeroTx.bankTransactionID,
       bankAccount: connection.accountName,
       date: new Date(xeroTx.date),
-      description: xeroTx.lineItems[0]?.description ?? 'Xero Bank Feed Import',
+      description,
       payeeName: xeroTx.contact?.name ?? undefined,
       reference: xeroTx.reference ?? undefined,
       amountCents: Math.abs(amountCents),
@@ -546,7 +577,6 @@ export class BankFeedService {
         'email',
         'accounting.transactions',
         'accounting.settings',
-        'bankfeeds',
       ],
     });
 
@@ -596,15 +626,218 @@ export class BankFeedService {
    */
   private getDefaultFromDate(forceFullSync?: boolean): Date {
     if (forceFullSync) {
-      // Full sync: last 90 days
+      // Full sync: last 2 years (covers most historical data)
       const date = new Date();
-      date.setDate(date.getDate() - 90);
+      date.setFullYear(date.getFullYear() - 2);
       return date;
     }
     // Incremental sync: last 7 days
     const date = new Date();
     date.setDate(date.getDate() - 7);
     return date;
+  }
+
+  /**
+   * Fetch unreconciled bank statement lines from Xero Finance API
+   * This gets raw bank feed data that hasn't been matched to transactions yet
+   */
+  async syncUnreconciledStatements(
+    tenantId: string,
+    options?: BankSyncOptions,
+  ): Promise<{
+    found: number;
+    created: number;
+    skipped: number;
+    errors: BankSyncError[];
+  }> {
+    this.logger.log(
+      `Fetching unreconciled bank statements for tenant ${tenantId}`,
+    );
+
+    const result = {
+      found: 0,
+      created: 0,
+      skipped: 0,
+      errors: [] as BankSyncError[],
+    };
+
+    // Get connections to sync
+    const connections = await this.prisma.bankConnection.findMany({
+      where: {
+        tenantId,
+        status: BankConnectionStatus.ACTIVE,
+        ...(options?.connectionId && { id: options.connectionId }),
+      },
+    });
+
+    if (connections.length === 0) {
+      this.logger.log('No active bank connections for unreconciled sync');
+      return result;
+    }
+
+    const { client, xeroTenantId } =
+      await this.getAuthenticatedClient(tenantId);
+
+    // Determine date range
+    const fromDate =
+      options?.fromDate ?? this.getDefaultFromDate(options?.forceFullSync);
+    const toDate = options?.toDate ?? new Date();
+
+    // Format dates as YYYY-MM-DD for Finance API
+    const fromDateStr = fromDate.toISOString().split('T')[0];
+    const toDateStr = toDate.toISOString().split('T')[0];
+
+    for (const connection of connections) {
+      try {
+        await this.checkRateLimit(tenantId);
+
+        this.logger.log(
+          `Fetching unreconciled statements for account ${connection.accountName} (${connection.xeroAccountId})`,
+        );
+
+        // Call Finance API to get bank statement with accounting data
+        const statementsResponse =
+          await client.financeApi.getBankStatementAccounting(
+            xeroTenantId,
+            connection.xeroAccountId,
+            fromDateStr,
+            toDateStr,
+            false, // summaryOnly = false to get line items
+          );
+
+        const statements = statementsResponse.body.statements ?? [];
+        this.logger.log(
+          `Fetched ${statements.length} statements from Finance API for ${connection.accountName}`,
+        );
+
+        // Process each statement
+        for (const statement of statements) {
+          const statementLines = statement.statementLines ?? [];
+
+          // Debug: Log first statement line structure
+          if (statementLines.length > 0) {
+            const sample = statementLines[0];
+            this.logger.debug(
+              `Sample statement line: date=${sample.postedDate}, payee=${sample.payee}, ` +
+                `reference=${sample.reference}, amount=${sample.amount}, isReconciled=${sample.isReconciled}`,
+            );
+          }
+
+          // Filter for unreconciled lines only
+          const unreconciledLines = statementLines.filter(
+            (line) =>
+              !line.isReconciled && !line.isDeleted && !line.isDuplicate,
+          );
+
+          this.logger.log(
+            `Statement ${statement.statementId}: ${unreconciledLines.length} unreconciled lines ` +
+              `(out of ${statementLines.length} total)`,
+          );
+
+          result.found += unreconciledLines.length;
+
+          for (const line of unreconciledLines) {
+            try {
+              const importResult = await this.importStatementLine(
+                tenantId,
+                connection,
+                line as XeroStatementLine,
+              );
+
+              if (importResult === 'created') {
+                result.created++;
+              } else {
+                result.skipped++;
+              }
+            } catch (error) {
+              result.errors.push({
+                transactionId: line.statementLineId ?? 'unknown',
+                error: error instanceof Error ? error.message : String(error),
+                code: 'IMPORT_ERROR',
+              });
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to fetch unreconciled statements for ${connection.accountName}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+
+        result.errors.push({
+          transactionId: `connection:${connection.id}`,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Failed to fetch unreconciled statements',
+          code: 'FINANCE_API_ERROR',
+        });
+      }
+    }
+
+    this.logger.log(
+      `Unreconciled sync complete: ${result.created} created, ${result.skipped} skipped, ` +
+        `${result.errors.length} errors`,
+    );
+
+    return result;
+  }
+
+  /**
+   * Import a single statement line from Finance API
+   * @returns 'created' | 'duplicate' | 'skipped'
+   */
+  private async importStatementLine(
+    tenantId: string,
+    connection: PrismaBankConnection,
+    line: XeroStatementLine,
+  ): Promise<'created' | 'duplicate' | 'skipped'> {
+    // Check for duplicate using statement line ID
+    const existing = await this.transactionRepo.findByXeroId(
+      tenantId,
+      line.statementLineId,
+    );
+
+    if (existing) {
+      return 'duplicate';
+    }
+
+    // Calculate amount in cents (Finance API returns decimal)
+    const amountCents = Math.round(Math.abs(line.amount) * 100);
+    const isCredit = line.amount > 0;
+
+    // Build description from available fields
+    // Priority: payee > reference > notes > fallback
+    const description =
+      line.payee?.trim() ||
+      line.reference?.trim() ||
+      line.notes?.trim() ||
+      `Bank Statement Line`;
+
+    // Use postedDate or transactionDate
+    const txDate = line.transactionDate || line.postedDate;
+    if (!txDate) {
+      this.logger.warn(
+        `Statement line ${line.statementLineId} has no date, skipping`,
+      );
+      return 'skipped';
+    }
+
+    // Create transaction with [UNRECONCILED] prefix to distinguish
+    await this.transactionRepo.create({
+      tenantId,
+      xeroTransactionId: line.statementLineId,
+      bankAccount: connection.accountName,
+      date: new Date(txDate),
+      description: `[UNRECONCILED] ${description}`,
+      payeeName: line.payee ?? undefined,
+      reference: line.reference ?? undefined,
+      amountCents,
+      isCredit,
+      source: ImportSource.BANK_FEED,
+    });
+
+    return 'created';
   }
 
   /**

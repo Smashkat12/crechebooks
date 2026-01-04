@@ -10,6 +10,7 @@ import { ParentsModule } from './parents/parents.module';
 import { StaffModule } from './staff/staff.module';
 import { ArrearsModule } from './arrears/arrears.module';
 import { SettingsModule } from './settings/settings.module';
+import { XeroModule } from '../integrations/xero/xero.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { SettingsModule } from './settings/settings.module';
     StaffModule,
     ArrearsModule,
     SettingsModule,
+    XeroModule,
   ],
   exports: [
     AuthModule,
@@ -37,6 +39,7 @@ import { SettingsModule } from './settings/settings.module';
     StaffModule,
     ArrearsModule,
     SettingsModule,
+    XeroModule,
   ],
 })
 export class ApiModule {}

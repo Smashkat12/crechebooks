@@ -10,9 +10,6 @@ import { WhatsAppModule } from '../../integrations/whatsapp/whatsapp.module';
 @Module({
   imports: [DatabaseModule, EmailModule, WhatsAppModule],
   controllers: [InvoiceController, ChildController],
-  providers: [
-    InvoicePdfService,
-    AdhocChargeService,
-  ],
+  providers: [InvoicePdfService, AdhocChargeService],
 })
 export class BillingApiModule {}

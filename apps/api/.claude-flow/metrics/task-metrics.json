@@ -30,5 +30,13 @@
     "duration": 197.23092499999998,
     "timestamp": 1767492513185,
     "metadata": {}
+  },
+  {
+    "id": "cmd-memory-1767563704117",
+    "type": "memory",
+    "success": true,
+    "duration": 224.14460699999998,
+    "timestamp": 1767563704341,
+    "metadata": {}
   }
 ]

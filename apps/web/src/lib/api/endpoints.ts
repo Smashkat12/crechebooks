@@ -91,5 +91,9 @@ export const endpoints = {
     sync: '/xero/sync',
     connect: '/xero/connect',
     disconnect: '/xero/disconnect',
+    bankAccounts: '/xero/bank-accounts',
+    bankConnections: '/xero/bank-connections',
+    connectBankAccount: '/xero/bank-accounts/connect',
+    disconnectBankAccount: '/xero/bank-accounts/disconnect',
   },
 } as const;

@@ -38,18 +38,27 @@ interface SaveSplitResponse {
   };
 }
 
-export function useSplitTransaction(transactionId: string) {
+export function useSplitTransaction(transactionId: string, transactionAmount?: number) {
   const queryClient = useQueryClient();
   const [splits, setSplits] = useState<SplitRow[]>([]);
 
   // Calculate totals using Decimal.js for precision
   const { total, remaining, isValid, validationError } = useMemo(() => {
-    // Get transaction from query cache
-    const transaction = queryClient.getQueryData(
-      queryKeys.transactions.detail(transactionId)
-    ) as { amount: number } | undefined;
+    // Use provided amount or try to get from cache
+    let amount: number | undefined = transactionAmount;
 
-    if (!transaction) {
+    if (amount === undefined) {
+      // Try detail cache first
+      const detailTransaction = queryClient.getQueryData(
+        queryKeys.transactions.detail(transactionId)
+      ) as { amount: number } | undefined;
+
+      if (detailTransaction) {
+        amount = detailTransaction.amount;
+      }
+    }
+
+    if (amount === undefined) {
       return {
         total: new Decimal(0),
         remaining: new Decimal(0),
@@ -58,22 +67,22 @@ export function useSplitTransaction(transactionId: string) {
       };
     }
 
-    const transactionAmount = new Decimal(transaction.amount).div(100).abs();
+    const transactionAmountDecimal = new Decimal(amount).div(100).abs();
 
     // Sum all split amounts
     const splitTotal = splits.reduce((sum, split) => {
-      const amount = split.amount ? new Decimal(split.amount) : new Decimal(0);
-      return sum.plus(amount);
+      const splitAmount = split.amount ? new Decimal(split.amount) : new Decimal(0);
+      return sum.plus(splitAmount);
     }, new Decimal(0));
 
-    const remainingAmount = transactionAmount.minus(splitTotal);
-    const valid = splits.length >= 2 && splitTotal.equals(transactionAmount);
+    const remainingAmount = transactionAmountDecimal.minus(splitTotal);
+    const valid = splits.length >= 2 && splitTotal.equals(transactionAmountDecimal);
 
     let error: string | null = null;
     if (splits.length > 0 && splits.length < 2) {
       error = 'A split transaction requires at least 2 allocations';
-    } else if (splits.length >= 2 && !splitTotal.equals(transactionAmount)) {
-      error = `Split amounts (${formatCurrency(splitTotal.toNumber())}) must equal transaction amount (${formatCurrency(transactionAmount.toNumber())})`;
+    } else if (splits.length >= 2 && !splitTotal.equals(transactionAmountDecimal)) {
+      error = `Split amounts (${formatCurrency(splitTotal.toNumber())}) must equal transaction amount (${formatCurrency(transactionAmountDecimal.toNumber())})`;
     }
 
     // Validate each split has required fields
@@ -98,7 +107,7 @@ export function useSplitTransaction(transactionId: string) {
       isValid: valid,
       validationError: error,
     };
-  }, [splits, transactionId, queryClient]);
+  }, [splits, transactionId, transactionAmount, queryClient]);
 
   // Save splits mutation
   const saveMutation = useMutation<SaveSplitResponse, AxiosError, void>({

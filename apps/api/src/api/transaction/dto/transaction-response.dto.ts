@@ -47,6 +47,18 @@ export class TransactionResponseDto {
   })
   categorization?: CategorizationResponseDto;
 
+  @ApiProperty({
+    example: false,
+    description: 'True if transaction has been split across multiple categories',
+  })
+  is_split: boolean;
+
+  @ApiProperty({
+    example: 0,
+    description: 'Number of split allocations (0 if not split)',
+  })
+  split_count: number;
+
   @ApiProperty({ example: '2025-01-15T08:00:00Z' })
   created_at: Date;
 }

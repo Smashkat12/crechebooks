@@ -19,6 +19,8 @@ export interface ITransaction {
   reconciledAt?: Date;
   confidence?: number;
   needsReview: boolean;
+  isSplit?: boolean; // True if transaction is split across multiple categories
+  splitCount?: number; // Number of split allocations
 }
 
 export enum TransactionType {

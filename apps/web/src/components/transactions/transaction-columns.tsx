@@ -17,7 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Edit, Trash2, Split } from 'lucide-react';
+import { MoreHorizontal, Eye, Edit, Trash2, Split, GitBranch } from 'lucide-react';
 import { ConfidenceBadge } from './confidence-badge';
 import { CategorizationReasoning } from './CategorizationReasoning';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -161,6 +161,8 @@ export function getTransactionColumns(
         const confidence = row.getValue('confidence') as number | undefined;
         const alternatives = (row.original as any).categorizationAlternatives as Array<{ category: string; confidence: number }> | undefined;
         const matchedPatterns = (row.original as any).matchedPatterns as string[] | undefined;
+        const isSplit = row.original.isSplit;
+        const splitCount = row.original.splitCount;
 
         if (!code && !categoryId) {
           return <span className="text-muted-foreground">Uncategorized</span>;
@@ -168,6 +170,15 @@ export function getTransactionColumns(
 
         return (
           <div className="flex items-center gap-2 max-w-[250px]">
+            {isSplit && (
+              <div
+                className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400"
+                title={`Split into ${splitCount} categories`}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+                <span className="font-medium">{splitCount}</span>
+              </div>
+            )}
             <div className="flex-1 truncate" title={code || categoryId || ''}>
               {code || categoryId}
             </div>

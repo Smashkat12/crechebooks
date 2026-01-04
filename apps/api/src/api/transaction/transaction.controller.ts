@@ -108,10 +108,16 @@ export class TransactionController {
     // Fetch categorizations for all transactions in batch
     const transactionIds = result.data.map((tx) => tx.id);
     const categorizationMap = new Map<string, CategorizationResponseDto>();
+    const splitInfoMap = new Map<string, { isSplit: boolean; splitCount: number }>();
 
     for (const txId of transactionIds) {
       const cats = await this.categorizationRepo.findByTransaction(txId);
       if (cats.length > 0) {
+        // Check if transaction has splits
+        const splitCats = cats.filter((c) => c.isSplit);
+        const isSplit = splitCats.length > 0;
+        splitInfoMap.set(txId, { isSplit, splitCount: isSplit ? splitCats.length : 0 });
+
         // Use most recent non-split categorization, or first if all are splits
         const primary = cats.find((c) => !c.isSplit) ?? cats[0];
         categorizationMap.set(txId, {
@@ -121,23 +127,30 @@ export class TransactionController {
           source: primary.source as unknown as CategorizationSourceEnum,
           reviewed_at: primary.reviewedAt ?? undefined,
         });
+      } else {
+        splitInfoMap.set(txId, { isSplit: false, splitCount: 0 });
       }
     }
 
     // Transform to response DTOs
-    const data: TransactionResponseDto[] = result.data.map((tx) => ({
-      id: tx.id,
-      date: tx.date.toISOString().split('T')[0],
-      description: tx.description,
-      payee_name: tx.payeeName,
-      reference: tx.reference,
-      amount_cents: tx.amountCents,
-      is_credit: tx.isCredit,
-      status: tx.status as TransactionStatus,
-      is_reconciled: tx.isReconciled,
-      categorization: categorizationMap.get(tx.id),
-      created_at: tx.createdAt,
-    }));
+    const data: TransactionResponseDto[] = result.data.map((tx) => {
+      const splitInfo = splitInfoMap.get(tx.id) ?? { isSplit: false, splitCount: 0 };
+      return {
+        id: tx.id,
+        date: tx.date.toISOString().split('T')[0],
+        description: tx.description,
+        payee_name: tx.payeeName,
+        reference: tx.reference,
+        amount_cents: tx.amountCents,
+        is_credit: tx.isCredit,
+        status: tx.status as TransactionStatus,
+        is_reconciled: tx.isReconciled,
+        categorization: categorizationMap.get(tx.id),
+        is_split: splitInfo.isSplit,
+        split_count: splitInfo.splitCount,
+        created_at: tx.createdAt,
+      };
+    });
 
     return {
       success: true,

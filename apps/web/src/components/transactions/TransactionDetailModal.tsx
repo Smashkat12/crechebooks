@@ -35,6 +35,7 @@ import {
   Percent,
   Edit,
   Split,
+  GitBranch,
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { ConfidenceBadge } from './confidence-badge';
@@ -159,6 +160,15 @@ export function TransactionDetailModal({
               Categorization
             </h4>
 
+            {transaction.isSplit && (
+              <div className="flex items-center gap-2 p-2 rounded bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 mb-2">
+                <GitBranch className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">
+                  Split Transaction ({transaction.splitCount} allocations)
+                </span>
+              </div>
+            )}
+
             <DetailRow
               icon={Tag}
               label="Category / Account Code"
@@ -166,6 +176,9 @@ export function TransactionDetailModal({
                 transaction.accountCode || transaction.categoryId ? (
                   <span className="font-mono">
                     {transaction.accountCode || transaction.categoryId}
+                    {transaction.isSplit && (
+                      <span className="text-muted-foreground ml-1">(primary)</span>
+                    )}
                   </span>
                 ) : (
                   <span className="text-muted-foreground italic">Uncategorized</span>

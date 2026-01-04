@@ -79,6 +79,8 @@ interface ApiTransaction {
   status: string;
   is_reconciled: boolean;
   categorization?: ApiCategorization;
+  is_split: boolean;
+  split_count: number;
   created_at: string;
 }
 
@@ -108,6 +110,8 @@ function transformTransaction(api: ApiTransaction): TransactionWithCategorizatio
     reconciled: api.is_reconciled,
     confidence: api.categorization?.confidence_score,
     needsReview: api.status === 'NEEDS_REVIEW',
+    isSplit: api.is_split,
+    splitCount: api.split_count,
     categorization: api.categorization ? {
       transactionId: api.id,
       categoryId: api.categorization.account_code, // Use account_code as ID

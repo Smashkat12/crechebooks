@@ -11,22 +11,25 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface ConfidenceBadgeProps {
-  confidence: number;
+  confidence: number; // Accepts 0-100 (percentage) or 0-1 (decimal)
   className?: string;
 }
 
 export function ConfidenceBadge({ confidence, className }: ConfidenceBadgeProps) {
-  const percentage = Math.round(confidence * 100);
+  // Normalize: if confidence > 1, assume it's already 0-100; otherwise multiply by 100
+  const percentage = confidence > 1 ? Math.round(confidence) : Math.round(confidence * 100);
+  // Use normalized value for comparisons (0-100 scale)
+  const normalized = confidence > 1 ? confidence : confidence * 100;
 
-  const variant = confidence >= 0.8
+  const variant = normalized >= 80
     ? 'default'
-    : confidence >= 0.5
+    : normalized >= 50
     ? 'secondary'
     : 'destructive';
 
-  const colorClass = confidence >= 0.8
+  const colorClass = normalized >= 80
     ? 'bg-green-500 hover:bg-green-600 text-white'
-    : confidence >= 0.5
+    : normalized >= 50
     ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
     : 'bg-red-500 hover:bg-red-600 text-white';
 

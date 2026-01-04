@@ -6,13 +6,39 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ParentForm } from '@/components/parents';
+import { useCreateParent } from '@/hooks/use-parents';
+import { useToast } from '@/hooks/use-toast';
 
 export default function NewParentPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const createParentMutation = useCreateParent();
 
-  const handleSave = async () => {
-    // Parent created via form submission
-    router.push('/parents');
+  const handleSave = async (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    whatsappNumber?: string;
+    address?: string;
+    preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'BOTH';
+  }) => {
+    try {
+      await createParentMutation.mutateAsync(data);
+      toast({
+        title: 'Parent Created',
+        description: `${data.firstName} ${data.lastName} has been added successfully.`,
+      });
+      router.push('/parents');
+    } catch (error) {
+      console.error('Failed to create parent:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create parent. Please try again.',
+        variant: 'destructive',
+      });
+      throw error;
+    }
   };
 
   return (
@@ -39,6 +65,7 @@ export default function NewParentPage() {
           <ParentForm
             onSave={handleSave}
             onCancel={() => router.push('/parents')}
+            isLoading={createParentMutation.isPending}
           />
         </CardContent>
       </Card>

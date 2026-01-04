@@ -79,6 +79,40 @@ export function useChild(id: string, enabled = true) {
   });
 }
 
+// Create parent params
+interface CreateParentParams {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  whatsappNumber?: string;
+  address?: string;
+  preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'BOTH';
+}
+
+// Create a new parent
+export function useCreateParent() {
+  const queryClient = useQueryClient();
+
+  return useMutation<IParent, AxiosError, CreateParentParams>({
+    mutationFn: async (params) => {
+      const { data } = await apiClient.post<IParent>(endpoints.parents.list, {
+        firstName: params.firstName,
+        lastName: params.lastName,
+        email: params.email,
+        phone: params.phone || null,
+        whatsapp: params.whatsappNumber || null,
+        address: params.address || null,
+        preferredContact: params.preferredCommunication,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.parents.list() });
+    },
+  });
+}
+
 // Enroll a child
 export function useEnrollChild() {
   const queryClient = useQueryClient();

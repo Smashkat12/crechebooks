@@ -432,3 +432,41 @@ This document ensures 100% coverage of all requirements in the specifications. E
 | 2026-01-04 | TASK-TRANS-023 marked complete (Learning Mode Indicator - 2 components + hook) | AI Agent |
 | 2026-01-04 | TASK-EC-002 marked complete (Conflicting Correction Resolution UI - 3 components + service) | AI Agent |
 | 2026-01-04 | **Phase 8 COMPLETE**: 13/13 tasks (100%), Overall: 134/134 (100%) **PROJECT COMPLETE** | AI Agent |
+| 2026-01-05 | E2E Testing identified 3 bugs requiring hotfixes | AI Agent |
+| 2026-01-05 | BUG-001: Confidence badge displayed 10000% instead of 100% (ConfidenceBadge.tsx fixed) | AI Agent |
+| 2026-01-05 | BUG-002: Parents form didn't POST to API (NewParentPage.tsx + useCreateParent hook added) | AI Agent |
+| 2026-01-05 | BUG-003: Enrollments API returned 404 (EnrollmentController.ts created) | AI Agent |
+| 2026-01-05 | **E2E Hotfixes COMPLETE**: All 3 bugs fixed | AI Agent |
+
+---
+
+## E2E Testing Bug Fixes (2026-01-05)
+
+### Bugs Identified During Testing
+
+| Bug ID | Description | Root Cause | Files Modified | Status |
+|--------|-------------|------------|----------------|--------|
+| BUG-001 | Confidence displays 10000% instead of 100% | ConfidenceBadge multiplied by 100 but API already returns 0-100 | `apps/web/src/components/transactions/confidence-badge.tsx` | ✅ Fixed |
+| BUG-002 | Parent creation form doesn't POST to API | handleSave only redirected without calling API mutation | `apps/web/src/app/(dashboard)/parents/new/page.tsx`, `apps/web/src/hooks/use-parents.ts` | ✅ Fixed |
+| BUG-003 | Enrollments page returns 404 | No dedicated /enrollments controller existed | `apps/api/src/api/billing/enrollment.controller.ts`, `apps/api/src/api/billing/billing.module.ts` | ✅ Fixed |
+
+### Bug Fix Details
+
+**BUG-001: Confidence Badge Display**
+- **Problem**: API returns confidence as 0-100 scale, but component assumed 0-1 (decimal) and multiplied by 100
+- **Fix**: Added normalization logic to detect input range (>1 = already percentage, ≤1 = needs multiplication)
+- **File**: `apps/web/src/components/transactions/confidence-badge.tsx`
+
+**BUG-002: Parent Creation Silent Failure**
+- **Problem**: NewParentPage.tsx had empty handleSave that only called router.push()
+- **Fix**: Added useCreateParent mutation hook and updated handleSave to call API
+- **Files**:
+  - `apps/web/src/hooks/use-parents.ts` - Added useCreateParent() mutation
+  - `apps/web/src/app/(dashboard)/parents/new/page.tsx` - Updated to use mutation
+
+**BUG-003: Missing Enrollments Endpoint**
+- **Problem**: Frontend called GET /enrollments but no controller existed
+- **Fix**: Created EnrollmentController with full CRUD operations
+- **Files**:
+  - `apps/api/src/api/billing/enrollment.controller.ts` - New controller
+  - `apps/api/src/api/billing/billing.module.ts` - Registered controller

@@ -15,6 +15,7 @@ import { getTransactionColumns, TransactionColumnOptions } from './transaction-c
 import { TransactionFilters, TransactionFiltersState } from './transaction-filters';
 import { CategorizationDialog } from './categorization-dialog';
 import { SplitTransactionModal, SplitRow } from './SplitTransactionModal';
+import { TransactionDetailModal } from './TransactionDetailModal';
 import { useTransactionsList } from '@/hooks/use-transactions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
@@ -35,6 +36,8 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [splitModalOpen, setSplitModalOpen] = React.useState(false);
   const [splitTransaction, setSplitTransaction] = React.useState<ITransaction | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = React.useState(false);
+  const [viewTransaction, setViewTransaction] = React.useState<ITransaction | null>(null);
 
   // Reset page when filters change
   React.useEffect(() => {
@@ -61,8 +64,8 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
   };
 
   const handleView = (transaction: ITransaction) => {
-    // TODO: Implement view details modal or navigate to detail page
-    console.log('View transaction:', transaction);
+    setViewTransaction(transaction);
+    setDetailModalOpen(true);
   };
 
   const handleDelete = async (transaction: ITransaction) => {
@@ -184,6 +187,18 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
           onSave={handleSplitSave}
         />
       )}
+
+      {/* Transaction Detail Modal */}
+      <TransactionDetailModal
+        transaction={viewTransaction}
+        isOpen={detailModalOpen}
+        onClose={() => {
+          setDetailModalOpen(false);
+          setViewTransaction(null);
+        }}
+        onEditCategory={handleEdit}
+        onSplitTransaction={handleSplit}
+      />
     </div>
   );
 }

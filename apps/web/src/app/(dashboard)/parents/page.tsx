@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, Search } from 'lucide-react';
@@ -10,14 +10,29 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ParentTable } from '@/components/parents';
 import { useParentsList } from '@/hooks/use-parents';
 
+const PAGE_SIZE = 20;
+
 export default function ParentsPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
-  const { data, isLoading, error } = useParentsList({ search: search || undefined });
+  const [page, setPage] = useState(1);
+
+  // Reset page when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  const { data, isLoading, error } = useParentsList({
+    search: search || undefined,
+    page,
+    limit: PAGE_SIZE,
+  });
 
   if (error) {
     throw new Error(`Failed to load parents: ${error.message}`);
   }
+
+  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
   return (
     <div className="space-y-6">
@@ -55,6 +70,36 @@ export default function ParentsPage() {
             isLoading={isLoading}
             onView={(parent) => router.push(`/parents/${parent.id}`)}
           />
+
+          {/* Server-side Pagination */}
+          {data && data.total > PAGE_SIZE && (
+            <div className="flex items-center justify-between py-4 border-t mt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {((page - 1) * PAGE_SIZE) + 1} to {Math.min(page * PAGE_SIZE, data.total)} of {data.total} parents
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm px-2">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -143,6 +143,7 @@ export function ParentTable({
     <DataTable
       columns={columns}
       data={parents}
+      manualPagination={true}
     />
   );
 }

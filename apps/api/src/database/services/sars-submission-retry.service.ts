@@ -534,7 +534,8 @@ export class SarsSubmissionRetryService {
         function: 'callSarsApi',
         inputs: { submissionId: submission.id, correlationId },
         timestamp: new Date().toISOString(),
-        action: 'Import SarsModule and configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
+        action:
+          'Import SarsModule and configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
       });
       throw error;
     }
@@ -557,13 +558,14 @@ export class SarsSubmissionRetryService {
         function: 'callSarsApi',
         inputs: { submissionId: submission.id, correlationId },
         timestamp: new Date().toISOString(),
-        action: 'Configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
+        action:
+          'Configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
       });
       throw error;
     }
 
     // Extract VAT201 data from submission document
-    const documentData = submission.documentData as any;
+    const documentData = submission.documentData;
     if (!documentData?.fields) {
       const error: SarsApiError = {
         statusCode: 400,
@@ -591,12 +593,15 @@ export class SarsSubmissionRetryService {
       periodStart: new Date(submission.periodStart),
       periodEnd: new Date(submission.periodEnd),
       fields: {
-        field1OutputStandardCents: documentData.fields.field1OutputStandardCents || 0,
-        field2ZeroRatedCents: documentData.fields.field2OutputZeroRatedCents || 0,
+        field1OutputStandardCents:
+          documentData.fields.field1OutputStandardCents || 0,
+        field2ZeroRatedCents:
+          documentData.fields.field2OutputZeroRatedCents || 0,
         field3ExemptCents: documentData.fields.field3OutputExemptCents || 0,
         field4TotalOutputCents: documentData.fields.field4TotalOutputCents || 0,
         field5InputTaxCents: documentData.fields.field5InputTaxCents || 0,
-        field6CapitalGoodsCents: documentData.fields.field6DeductibleInputCents || 0,
+        field6CapitalGoodsCents:
+          documentData.fields.field6DeductibleInputCents || 0,
         field15NetVatCents: documentData.fields.field15NetVatCents || 0,
         field19TotalDueCents: documentData.fields.field19TotalDueCents || 0,
       },

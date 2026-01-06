@@ -11,7 +11,11 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { format } from 'date-fns';
-import { XeroClient, Invoice as XeroInvoice, Payment as XeroPaymentModel } from 'xero-node';
+import {
+  XeroClient,
+  Invoice as XeroInvoice,
+  Payment as XeroPaymentModel,
+} from 'xero-node';
 import { Payment, Invoice, Parent } from '@prisma/client';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';

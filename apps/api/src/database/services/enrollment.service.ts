@@ -475,7 +475,11 @@ export class EnrollmentService {
     // 2. Calculate billing period (remaining days in current month)
     const startDate = new Date(enrollment.startDate);
     startDate.setHours(0, 0, 0, 0);
-    const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    const monthEnd = new Date(
+      startDate.getFullYear(),
+      startDate.getMonth() + 1,
+      0,
+    );
     monthEnd.setHours(23, 59, 59, 999);
 
     // 3. Calculate pro-rated fee using ProRataService
@@ -593,6 +597,11 @@ export class EnrollmentService {
       totalCents: subtotalCents, // VAT calculated separately if tenant is VAT registered
     });
 
+    // IMPORTANT: Update local object to reflect database state (TASK-E2E-006 fix)
+    // Without this, the returned invoice has totalCents: 0 from initial creation
+    invoice.subtotalCents = subtotalCents;
+    invoice.totalCents = subtotalCents;
+
     // 9. Audit log
     await this.auditLogService.logCreate({
       tenantId,
@@ -619,7 +628,8 @@ export class EnrollmentService {
   }
 
   /**
-   * Generate unique invoice number in format INV-YYYY-NNNNN
+   * Generate unique invoice number in format INV-YYYY-NNN
+   * Uses 3-digit padding to match InvoiceGenerationService format
    * @param tenantId - Tenant ID for tenant-specific numbering
    * @param year - Year for the invoice
    * @returns Generated invoice number
@@ -634,17 +644,45 @@ export class EnrollmentService {
       year,
     );
 
-    let sequenceNumber = 1;
+    let maxSequence = 0;
     if (lastInvoice && lastInvoice.invoiceNumber) {
-      // Extract sequence number from INV-YYYY-NNNNN format
+      // Extract sequence number from INV-YYYY-NNN or INV-YYYY-NNNNN format
       const match = lastInvoice.invoiceNumber.match(/^INV-\d{4}-(\d+)$/);
       if (match) {
-        sequenceNumber = parseInt(match[1], 10) + 1;
+        maxSequence = parseInt(match[1], 10);
       }
     }
 
-    // Format with 5-digit padding
-    const paddedSequence = sequenceNumber.toString().padStart(5, '0');
+    // Also check if there are any invoices with the next sequence to avoid duplicates
+    // This handles cases where there are mixed format invoices (3-digit vs 5-digit)
+    const nextSequence = maxSequence + 1;
+    const candidateNumber = `INV-${year}-${nextSequence.toString().padStart(3, '0')}`;
+    const existing = await this.invoiceRepo.findByInvoiceNumber(
+      tenantId,
+      candidateNumber,
+    );
+
+    if (existing) {
+      // If the candidate already exists, find a higher sequence
+      // Query all invoices for this year and find the max
+      const allInvoices = await this.invoiceRepo.findByTenant(tenantId, {});
+      let highestSeq = maxSequence;
+      for (const inv of allInvoices) {
+        const m = inv.invoiceNumber.match(/^INV-(\d{4})-(\d+)$/);
+        if (m && parseInt(m[1], 10) === year) {
+          const seq = parseInt(m[2], 10);
+          if (seq > highestSeq) {
+            highestSeq = seq;
+          }
+        }
+      }
+      // Format with 3-digit padding to match InvoiceGenerationService
+      const paddedSequence = (highestSeq + 1).toString().padStart(3, '0');
+      return `INV-${year}-${paddedSequence}`;
+    }
+
+    // Format with 3-digit padding to match InvoiceGenerationService
+    const paddedSequence = nextSequence.toString().padStart(3, '0');
     return `INV-${year}-${paddedSequence}`;
   }
 }

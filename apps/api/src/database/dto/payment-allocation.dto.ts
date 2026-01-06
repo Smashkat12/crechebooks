@@ -94,3 +94,26 @@ export interface AllocationResult {
   xeroSyncStatus: XeroSyncStatus;
   errors: AllocationError[];
 }
+
+/**
+ * TASK-STMT-002: Suggested allocation result for FIFO allocation
+ */
+export interface SuggestedAllocationResult {
+  invoiceId: string;
+  invoiceNumber: string;
+  dueDate: Date;
+  totalCents: number;
+  outstandingCents: number;
+  suggestedAmountCents: number;
+}
+
+/**
+ * TASK-STMT-002: Input for allocating a transaction to invoices
+ */
+export interface AllocateTransactionInput {
+  tenantId: string;
+  transactionId: string;
+  parentId: string;
+  allocations: AllocationDto[];
+  userId: string;
+}

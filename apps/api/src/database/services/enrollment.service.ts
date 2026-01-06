@@ -8,19 +8,40 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Enrollment } from '@prisma/client';
+import { Enrollment, FeeStructure, Invoice } from '@prisma/client';
+import Decimal from 'decimal.js';
 import { EnrollmentRepository } from '../repositories/enrollment.repository';
 import { ChildRepository } from '../repositories/child.repository';
 import { FeeStructureRepository } from '../repositories/fee-structure.repository';
+import { InvoiceRepository } from '../repositories/invoice.repository';
+import { InvoiceLineRepository } from '../repositories/invoice-line.repository';
+import { TenantRepository } from '../repositories/tenant.repository';
 import { AuditLogService } from './audit-log.service';
+import { ProRataService } from './pro-rata.service';
+import { CreditNoteService } from './credit-note.service';
 import { EnrollmentStatus, IEnrollment } from '../entities/enrollment.entity';
-import { Decimal } from 'decimal.js';
+import { LineType } from '../entities/invoice-line.entity';
 import {
   NotFoundException,
   ConflictException,
   ValidationException,
 } from '../../shared/exceptions';
 import { UpdateEnrollmentDto } from '../dto/enrollment.dto';
+
+// Configure Decimal.js for banker's rounding
+Decimal.set({
+  precision: 20,
+  rounding: Decimal.ROUND_HALF_EVEN,
+});
+
+/**
+ * Result of enrolling a child, including the generated invoice (if any)
+ * TASK-BILL-023: Enrollment Invoice UI Integration
+ */
+export interface EnrollChildResult {
+  enrollment: IEnrollment;
+  invoice: Invoice | null;
+}
 
 @Injectable()
 export class EnrollmentService {
@@ -30,6 +51,10 @@ export class EnrollmentService {
     private readonly enrollmentRepo: EnrollmentRepository,
     private readonly childRepo: ChildRepository,
     private readonly feeStructureRepo: FeeStructureRepository,
+    private readonly invoiceRepo: InvoiceRepository,
+    private readonly invoiceLineRepo: InvoiceLineRepository,
+    private readonly proRataService: ProRataService,
+    private readonly creditNoteService: CreditNoteService,
     private readonly auditLogService: AuditLogService,
   ) {}
 
@@ -40,7 +65,7 @@ export class EnrollmentService {
    * @param feeStructureId - Fee structure to enroll child in
    * @param startDate - Enrollment start date
    * @param userId - User performing the enrollment
-   * @returns Created enrollment
+   * @returns Created enrollment with generated invoice (if any)
    * @throws NotFoundException if child or fee structure doesn't exist
    * @throws ConflictException if child already has active enrollment
    * @throws ValidationException if startDate is in the past
@@ -51,7 +76,7 @@ export class EnrollmentService {
     feeStructureId: string,
     startDate: Date,
     userId: string,
-  ): Promise<IEnrollment> {
+  ): Promise<EnrollChildResult> {
     // 1. Validate child exists and belongs to tenant
     const child = await this.childRepo.findById(childId);
     if (!child || child.tenantId !== tenantId) {
@@ -122,11 +147,34 @@ export class EnrollmentService {
       afterValue: JSON.parse(JSON.stringify(enrollment)),
     });
 
+    // 7. Generate enrollment invoice (registration fee + pro-rated first month)
+    let enrollmentInvoice: Invoice | null = null;
+    try {
+      enrollmentInvoice = await this.createEnrollmentInvoice(
+        tenantId,
+        enrollment,
+        feeStructure,
+        userId,
+      );
+      this.logger.log(
+        `Created enrollment invoice ${enrollmentInvoice.invoiceNumber} for child ${childId}`,
+      );
+    } catch (error) {
+      // Log error but don't fail enrollment if invoice creation fails
+      this.logger.error(
+        `Failed to create enrollment invoice for child ${childId}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
     this.logger.log(
       `Successfully enrolled child ${childId} in enrollment ${enrollment.id}`,
     );
 
-    return enrollment as IEnrollment;
+    return {
+      enrollment: enrollment as IEnrollment,
+      invoice: enrollmentInvoice,
+    };
   }
 
   /**
@@ -281,6 +329,37 @@ export class EnrollmentService {
       changeSummary: 'Child withdrawn from enrollment',
     });
 
+    // Generate credit note for unused days (TASK-BILL-022)
+    try {
+      const creditNoteResult =
+        await this.creditNoteService.createWithdrawalCreditNote(
+          tenantId,
+          updated,
+          endDate,
+          userId,
+        );
+      this.logger.log(
+        `Created credit note ${creditNoteResult.creditNote.invoiceNumber} for ${creditNoteResult.daysUnused} unused days`,
+      );
+    } catch (error) {
+      // ValidationException means no credit needed (e.g., withdrawn on last day)
+      if (
+        error instanceof ValidationException &&
+        (error.message.includes('No unused days') ||
+          error.message.includes('no credit'))
+      ) {
+        this.logger.debug(
+          `No credit note needed for enrollment ${enrollmentId}: ${error.message}`,
+        );
+      } else {
+        // Log other errors but don't fail the withdrawal
+        this.logger.error(
+          `Failed to create credit note for enrollment ${enrollmentId}: ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
+
     this.logger.log(
       `Successfully withdrew child from enrollment ${enrollmentId}`,
     );
@@ -369,5 +448,203 @@ export class EnrollmentService {
     );
 
     return discountMap;
+  }
+
+  /**
+   * Create enrollment invoice with registration fee and pro-rated first month
+   * TASK-BILL-021: Implements EC-BILL-001 and REQ-BILL-001
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param enrollment - The created enrollment
+   * @param feeStructure - Fee structure with registration fee and monthly amount
+   * @param userId - User performing the enrollment
+   * @returns Created invoice
+   */
+  async createEnrollmentInvoice(
+    tenantId: string,
+    enrollment: Enrollment,
+    feeStructure: FeeStructure,
+    userId: string,
+  ): Promise<Invoice> {
+    // 1. Get child info for parent reference
+    const child = await this.childRepo.findById(enrollment.childId);
+    if (!child) {
+      throw new NotFoundException('Child', enrollment.childId);
+    }
+
+    // 2. Calculate billing period (remaining days in current month)
+    const startDate = new Date(enrollment.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    // 3. Calculate pro-rated fee using ProRataService
+    const fullMonthFeeCents = feeStructure.amountCents;
+    let proRatedFeeCents = fullMonthFeeCents;
+    let isProRated = false;
+
+    // Only pro-rate if not starting on the 1st of the month
+    if (startDate.getDate() !== 1) {
+      proRatedFeeCents = await this.proRataService.calculateProRata(
+        fullMonthFeeCents,
+        startDate,
+        monthEnd,
+        tenantId,
+      );
+      isProRated = true;
+      this.logger.debug(
+        `Pro-rated fee for enrollment: ${fullMonthFeeCents} cents → ${proRatedFeeCents} cents (from day ${startDate.getDate()})`,
+      );
+    }
+
+    // 4. Generate invoice number (INV-YYYY-NNNNN format)
+    const year = startDate.getFullYear();
+    const invoiceNumber = await this.generateInvoiceNumber(tenantId, year);
+
+    // 5. Create invoice with DRAFT status
+    const today = new Date();
+    const issueDate = new Date(today);
+    issueDate.setHours(0, 0, 0, 0);
+    const dueDate = new Date(today);
+    dueDate.setDate(dueDate.getDate() + 7); // Due in 7 days
+    dueDate.setHours(23, 59, 59, 999);
+
+    const invoice = await this.invoiceRepo.create({
+      tenantId,
+      invoiceNumber,
+      parentId: child.parentId,
+      childId: enrollment.childId,
+      billingPeriodStart: startDate,
+      billingPeriodEnd: monthEnd,
+      issueDate,
+      dueDate,
+      subtotalCents: 0, // Will be updated after line items
+      vatCents: 0,
+      totalCents: 0,
+    });
+
+    // 6. Prepare line items
+    const lineItems: Array<{
+      invoiceId: string;
+      description: string;
+      quantity: number;
+      unitPriceCents: number;
+      discountCents: number;
+      subtotalCents: number;
+      vatCents: number;
+      totalCents: number;
+      lineType: LineType;
+      accountCode: string;
+      sortOrder: number;
+    }> = [];
+    let sortOrder = 0;
+
+    // Registration fee line (if registrationFeeCents > 0)
+    const registrationFeeCents = feeStructure.registrationFeeCents ?? 0;
+    if (registrationFeeCents > 0) {
+      lineItems.push({
+        invoiceId: invoice.id,
+        description: 'Registration Fee',
+        quantity: 1,
+        unitPriceCents: registrationFeeCents,
+        discountCents: 0,
+        subtotalCents: registrationFeeCents,
+        vatCents: 0, // Registration fees typically VAT exempt
+        totalCents: registrationFeeCents,
+        lineType: LineType.REGISTRATION,
+        accountCode: '4010', // Registration income account
+        sortOrder: sortOrder++,
+      });
+    }
+
+    // Monthly fee line (pro-rated if needed)
+    const description = isProRated
+      ? `${feeStructure.name} (Pro-rated from ${startDate.getDate()}/${startDate.getMonth() + 1}/${startDate.getFullYear()})`
+      : feeStructure.name;
+
+    lineItems.push({
+      invoiceId: invoice.id,
+      description,
+      quantity: 1,
+      unitPriceCents: proRatedFeeCents,
+      discountCents: 0,
+      subtotalCents: proRatedFeeCents,
+      vatCents: 0, // VAT calculated separately if tenant is registered
+      totalCents: proRatedFeeCents,
+      lineType: LineType.MONTHLY_FEE,
+      accountCode: '4000', // School fees income account
+      sortOrder: sortOrder++,
+    });
+
+    // 7. Create line items and calculate totals using Decimal.js
+    let subtotalDecimal = new Decimal(0);
+    for (const line of lineItems) {
+      await this.invoiceLineRepo.create(line);
+      subtotalDecimal = subtotalDecimal.plus(line.subtotalCents);
+    }
+
+    const subtotalCents = subtotalDecimal
+      .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+      .toNumber();
+
+    // 8. Update invoice totals
+    await this.invoiceRepo.update(invoice.id, {
+      subtotalCents,
+      totalCents: subtotalCents, // VAT calculated separately if tenant is VAT registered
+    });
+
+    // 9. Audit log
+    await this.auditLogService.logCreate({
+      tenantId,
+      userId,
+      entityType: 'Invoice',
+      entityId: invoice.id,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      afterValue: JSON.parse(
+        JSON.stringify({
+          ...invoice,
+          subtotalCents,
+          totalCents: subtotalCents,
+          lines: lineItems,
+          _changeSummary: `Enrollment invoice created for child ${child.firstName ?? 'Unknown'}`,
+        }),
+      ),
+    });
+
+    this.logger.log(
+      `Created enrollment invoice ${invoiceNumber} with ${lineItems.length} line(s), total: ${subtotalCents} cents`,
+    );
+
+    return invoice;
+  }
+
+  /**
+   * Generate unique invoice number in format INV-YYYY-NNNNN
+   * @param tenantId - Tenant ID for tenant-specific numbering
+   * @param year - Year for the invoice
+   * @returns Generated invoice number
+   */
+  private async generateInvoiceNumber(
+    tenantId: string,
+    year: number,
+  ): Promise<string> {
+    // Find the last invoice for this tenant in this year
+    const lastInvoice = await this.invoiceRepo.findLastInvoiceForYear(
+      tenantId,
+      year,
+    );
+
+    let sequenceNumber = 1;
+    if (lastInvoice && lastInvoice.invoiceNumber) {
+      // Extract sequence number from INV-YYYY-NNNNN format
+      const match = lastInvoice.invoiceNumber.match(/^INV-\d{4}-(\d+)$/);
+      if (match) {
+        sequenceNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+
+    // Format with 5-digit padding
+    const paddedSequence = sequenceNumber.toString().padStart(5, '0');
+    return `INV-${year}-${paddedSequence}`;
   }
 }

@@ -25,7 +25,7 @@ import {
   SendInvoicesDto,
   RetryFailedDto,
 } from '../dto/invoice-delivery.dto';
-import { DeliveryMethod, DeliveryStatus } from '../entities/invoice.entity';
+import { DeliveryMethod, DeliveryStatus, InvoiceStatus } from '../entities/invoice.entity';
 import { PreferredContact } from '../entities/parent.entity';
 import { AuditAction } from '../entities/audit-log.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
@@ -377,6 +377,7 @@ Please ensure payment is made by the due date.
     channel: 'EMAIL' | 'WHATSAPP',
   ): Promise<void> {
     await this.invoiceRepo.update(invoice.id, {
+      status: InvoiceStatus.SENT, // Update invoice status from DRAFT to SENT
       deliveryStatus: DeliveryStatus.SENT,
       deliveryMethod:
         channel === 'EMAIL' ? DeliveryMethod.EMAIL : DeliveryMethod.WHATSAPP,

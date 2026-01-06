@@ -9,13 +9,16 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Payment, InvoiceStatus } from '@prisma/client';
+import { Payment, Invoice, InvoiceStatus } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentRepository } from '../repositories/payment.repository';
 import { InvoiceRepository } from '../repositories/invoice.repository';
 import { TransactionRepository } from '../repositories/transaction.repository';
+import { ParentRepository } from '../repositories/parent.repository';
 import { AuditLogService } from './audit-log.service';
+import { CreditBalanceService } from './credit-balance.service';
+import { XeroSyncService } from './xero-sync.service';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import { MatchType, MatchedBy } from '../entities/payment.entity';
 import { AuditAction } from '../entities/audit-log.entity';
@@ -37,7 +40,10 @@ export class PaymentAllocationService {
     private readonly paymentRepo: PaymentRepository,
     private readonly invoiceRepo: InvoiceRepository,
     private readonly transactionRepo: TransactionRepository,
+    private readonly parentRepo: ParentRepository,
     private readonly auditLogService: AuditLogService,
+    private readonly creditBalanceService: CreditBalanceService,
+    private readonly xeroSyncService: XeroSyncService,
   ) {}
 
   /**
@@ -178,8 +184,8 @@ export class PaymentAllocationService {
       );
     }
 
-    // 8. Sync to Xero (stub for now)
-    const xeroSyncStatus = this.syncToXero(payment);
+    // 8. Sync to Xero (TASK-XERO-003: Real implementation)
+    const xeroSyncStatus = await this.syncToXero(payment, invoice);
 
     // 9. Create audit log entry
     await this.auditLogService.logAction({
@@ -367,11 +373,20 @@ export class PaymentAllocationService {
       .minus(totalAllocated)
       .toNumber();
 
-    // Sync first payment to Xero (stub)
-    const xeroSyncStatus =
-      createdPayments.length > 0
-        ? this.syncToXero(createdPayments[0])
-        : XeroSyncStatus.SKIPPED;
+    // Sync all payments to Xero (TASK-XERO-003: Real implementation)
+    let xeroSyncStatus = XeroSyncStatus.SKIPPED;
+    for (const payment of createdPayments) {
+      const invoice = await this.invoiceRepo.findById(payment.invoiceId);
+      if (invoice) {
+        const status = await this.syncToXero(payment, invoice);
+        // Use the most significant status (SUCCESS > FAILED > SKIPPED)
+        if (status === XeroSyncStatus.SUCCESS) {
+          xeroSyncStatus = XeroSyncStatus.SUCCESS;
+        } else if (status === XeroSyncStatus.FAILED && xeroSyncStatus !== XeroSyncStatus.SUCCESS) {
+          xeroSyncStatus = XeroSyncStatus.FAILED;
+        }
+      }
+    }
 
     // 4. Audit log each allocation
     for (const payment of createdPayments) {
@@ -465,13 +480,23 @@ export class PaymentAllocationService {
       matchConfidence: userId ? undefined : 0.9, // Slightly lower confidence for overpayments
     });
 
-    // 4. Log overpayment amount for credit balance (future feature)
-    const excessAmount = overpaymentDecimal
+    // 4. Create credit balance for overpayment (TASK-PAY-018)
+    const excessAmountCents = overpaymentDecimal
       .minus(outstandingDecimal)
       .toNumber();
-    this.logger.warn(
-      `Overpayment of ${excessAmount} cents on invoice ${invoiceId}. Excess amount not allocated (future: credit balance).`,
-    );
+
+    if (excessAmountCents > 0) {
+      await this.creditBalanceService.createFromOverpayment(
+        tenantId,
+        invoice.parentId,
+        payment.id,
+        excessAmountCents,
+        userId,
+      );
+      this.logger.log(
+        `Created credit balance of R${(excessAmountCents / 100).toFixed(2)} for parent ${invoice.parentId} from overpayment on invoice ${invoiceId}`,
+      );
+    }
 
     // 5. Update invoice to PAID via recordPayment()
     await this.invoiceRepo.recordPayment(invoiceId, outstandingCents);
@@ -621,8 +646,16 @@ export class PaymentAllocationService {
       changeSummary: `Payment reversed: ${dto.reason}`,
     });
 
-    // 6. Sync reversal to Xero (stub)
-    this.syncToXero(reversedPayment);
+    // 6. Sync reversal to Xero (TASK-XERO-003: Real implementation)
+    // Note: Xero handles payment deletions differently - we log the reversal but don't delete in Xero
+    // The payment reversal is tracked in CrecheBooks; Xero sync would require payment deletion API
+    const invoice = await this.invoiceRepo.findById(payment.invoiceId);
+    if (invoice) {
+      // Log the reversal attempt - actual Xero payment deletion is out of scope for TASK-XERO-003
+      this.logger.log(
+        `Payment ${reversedPayment.id} reversed locally. Xero payment ID: ${reversedPayment.xeroPaymentId ?? 'not synced'}`,
+      );
+    }
 
     return reversedPayment;
   }
@@ -679,18 +712,48 @@ export class PaymentAllocationService {
   }
 
   /**
-   * Sync payment to Xero (stub for now - XeroMcpService not implemented yet)
+   * Sync payment to Xero
+   * TASK-XERO-003: Real Xero payment sync implementation
    * @param payment - Payment to sync
+   * @param invoice - Related invoice (needed for Xero invoice ID)
    * @returns Xero sync status
    * @private
    */
-  private syncToXero(payment: Payment): XeroSyncStatus {
-    // 1. Log stub message
-    this.logger.log(
-      `Xero sync: skipped (not implemented) for payment ${payment.id}`,
-    );
+  private async syncToXero(
+    payment: Payment,
+    invoice: Invoice,
+  ): Promise<XeroSyncStatus> {
+    try {
+      // Get parent for contact info
+      const parent = await this.parentRepo.findById(invoice.parentId);
+      if (!parent) {
+        this.logger.warn(
+          `Cannot sync payment: Parent ${invoice.parentId} not found`,
+        );
+        return XeroSyncStatus.SKIPPED;
+      }
 
-    // 2. Return 'SKIPPED' status
-    return XeroSyncStatus.SKIPPED;
+      // Sync via XeroSyncService
+      const xeroPaymentId = await this.xeroSyncService.syncPayment(
+        payment,
+        invoice,
+        parent,
+      );
+
+      if (xeroPaymentId) {
+        this.logger.log(
+          `Payment ${payment.id} synced to Xero: ${xeroPaymentId}`,
+        );
+        return XeroSyncStatus.SUCCESS;
+      }
+
+      // No Xero connection or invoice not synced - skip without error
+      return XeroSyncStatus.SKIPPED;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(`Xero payment sync error: ${errorMessage}`);
+      return XeroSyncStatus.FAILED;
+    }
   }
 }

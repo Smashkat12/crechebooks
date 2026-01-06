@@ -1,11 +1,51 @@
 import * as React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { DayPicker } from 'react-day-picker';
+import { DayPicker, DropdownProps } from 'react-day-picker';
 
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
+
+// Custom dropdown component for month/year selection
+function CalendarDropdown({ value, onChange, options }: DropdownProps) {
+  const selected = options?.find((option) => option.value === value);
+  const handleChange = (newValue: string) => {
+    const changeEvent = {
+      target: { value: newValue },
+    } as React.ChangeEvent<HTMLSelectElement>;
+    onChange?.(changeEvent);
+  };
+
+  return (
+    <Select
+      value={value?.toString()}
+      onValueChange={(val) => handleChange(val)}
+    >
+      <SelectTrigger className="h-7 w-auto gap-1 border-none px-2 font-medium focus:ring-0 focus:ring-offset-0">
+        <SelectValue>{selected?.label}</SelectValue>
+      </SelectTrigger>
+      <SelectContent className="max-h-[200px] overflow-y-auto">
+        {options?.map((option) => (
+          <SelectItem
+            key={option.value}
+            value={option.value.toString()}
+            disabled={option.disabled}
+          >
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 function Calendar({
   className,
@@ -13,15 +53,24 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
+  // Default year range: 10 years back to 5 years forward
+  const currentYear = new Date().getFullYear();
+  const fromYear = props.fromYear ?? currentYear - 10;
+  const toYear = props.toYear ?? currentYear + 5;
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
+      captionLayout="dropdown"
+      fromYear={fromYear}
+      toYear={toYear}
       className={cn('p-3', className)}
       classNames={{
         months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
         month: 'space-y-4',
-        caption: 'flex justify-center pt-1 relative items-center',
-        caption_label: 'text-sm font-medium',
+        caption: 'flex justify-center pt-1 relative items-center gap-1',
+        caption_label: 'text-sm font-medium hidden',
+        dropdowns: 'flex gap-1 items-center',
         nav: 'space-x-1 flex items-center',
         button_previous: cn(
           buttonVariants({ variant: 'outline' }),
@@ -68,6 +117,7 @@ function Calendar({
           ) : (
             <ChevronRight className="h-4 w-4" />
           ),
+        Dropdown: CalendarDropdown,
       }}
       {...props}
     />

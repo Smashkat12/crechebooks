@@ -8,14 +8,26 @@ export interface IStaff {
   lastName: string;
   idNumber: string;
   taxNumber?: string;
+  email?: string;
+  phone?: string;
   dateOfBirth: Date;
   startDate: Date;
   endDate?: Date;
-  status: StaffStatus;
-  salary: number; // Monthly salary in cents
-  paymentMethod: PaymentMethod;
-  bankAccountNumber?: string;
+  employmentType?: 'PERMANENT' | 'CONTRACT' | 'PART_TIME';
+  payFrequency?: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY';
+  basicSalaryCents?: number;
+  bankName?: string;
+  bankAccount?: string;
   bankBranchCode?: string;
+  medicalAidMembers?: number;
+  isActive?: boolean;
+  status: StaffStatus;
+  salary: number; // Monthly salary in cents (alias for basicSalaryCents)
+  createdAt?: Date;
+  updatedAt?: Date;
+  // Legacy fields for backward compatibility
+  paymentMethod?: PaymentMethod;
+  bankAccountNumber?: string;
 }
 
 export enum StaffStatus {

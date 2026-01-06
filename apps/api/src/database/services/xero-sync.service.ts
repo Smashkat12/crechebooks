@@ -11,9 +11,11 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { format } from 'date-fns';
-import { XeroClient, Invoice as XeroInvoice } from 'xero-node';
+import { XeroClient, Invoice as XeroInvoice, Payment as XeroPaymentModel } from 'xero-node';
+import { Payment, Invoice, Parent } from '@prisma/client';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
+import { PaymentRepository } from '../repositories/payment.repository';
 import { AuditLogService } from './audit-log.service';
 import { ConflictDetectionService } from './conflict-detection.service';
 import { ConflictResolutionService } from './conflict-resolution.service';
@@ -49,6 +51,7 @@ export class XeroSyncService {
   constructor(
     private readonly transactionRepo: TransactionRepository,
     private readonly categorizationRepo: CategorizationRepository,
+    private readonly paymentRepo: PaymentRepository,
     private readonly auditLogService: AuditLogService,
     private readonly conflictDetection: ConflictDetectionService,
     private readonly conflictResolution: ConflictResolutionService,
@@ -568,5 +571,137 @@ export class XeroSyncService {
       // Don't throw - allow local invoice to exist without Xero sync
       return null;
     }
+  }
+
+  /**
+   * Sync payment to Xero
+   * TASK-XERO-003: Payment sync to Xero
+   * Creates a payment record in Xero linked to the invoice
+   *
+   * @param payment - Payment record from CrecheBooks
+   * @param invoice - Invoice being paid
+   * @param parent - Parent who made the payment
+   * @returns Xero payment ID or null if sync failed
+   * @throws BusinessException if no valid Xero connection
+   */
+  async syncPayment(
+    payment: Payment,
+    invoice: Invoice,
+    parent: Parent,
+  ): Promise<string | null> {
+    this.logger.log(
+      `Syncing payment ${payment.id} to Xero for invoice ${invoice.invoiceNumber}`,
+    );
+
+    // FAIL FAST: Check if invoice has been synced to Xero
+    if (!invoice.xeroInvoiceId) {
+      this.logger.warn(
+        `FAIL FAST: Cannot sync payment - Invoice ${invoice.id} not synced to Xero (no xeroInvoiceId)`,
+      );
+      return null;
+    }
+
+    // Check Xero connection
+    const hasConnection = await this.hasValidConnection(payment.tenantId);
+    if (!hasConnection) {
+      this.logger.warn(
+        `Cannot sync payment: Tenant ${payment.tenantId} not connected to Xero`,
+      );
+      return null;
+    }
+
+    try {
+      // Get authenticated client
+      const { client, xeroTenantId } = await this.getAuthenticatedClient(
+        payment.tenantId,
+      );
+
+      // Format payment date for Xero API
+      const formattedDate = format(payment.paymentDate, 'yyyy-MM-dd');
+
+      // Get payment account code (default to bank account 090)
+      const accountCode = this.getPaymentAccountCode(payment);
+
+      // Create payment via Xero API
+      const response = await client.accountingApi.createPayment(xeroTenantId, {
+        invoice: { invoiceID: invoice.xeroInvoiceId },
+        account: { code: accountCode },
+        date: formattedDate,
+        amount: payment.amountCents / 100, // Convert cents to rands
+        reference: payment.reference || `CrecheBooks Payment ${payment.id}`,
+      });
+
+      // response.body is of type Payments which has a payments array
+      const createdPayment = response.body.payments?.[0];
+      const xeroPaymentId = createdPayment?.paymentID;
+
+      if (xeroPaymentId) {
+        // Update payment with Xero ID
+        await this.paymentRepo.update(payment.id, { xeroPaymentId });
+
+        // Log audit trail
+        await this.auditLogService.logAction({
+          tenantId: payment.tenantId,
+          entityType: 'Payment',
+          entityId: payment.id,
+          action: AuditAction.UPDATE,
+          afterValue: {
+            xeroPaymentId,
+            xeroInvoiceId: invoice.xeroInvoiceId,
+            syncedAt: new Date().toISOString(),
+            syncType: 'XERO_PAYMENT_SYNC',
+          },
+          changeSummary: `Payment synced to Xero: ${xeroPaymentId}`,
+        });
+
+        this.logger.log(
+          `Payment ${payment.id} synced to Xero successfully: ${xeroPaymentId}`,
+        );
+        return xeroPaymentId;
+      }
+
+      this.logger.warn(
+        `Xero payment creation returned no paymentID for payment ${payment.id}`,
+      );
+      return null;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `Failed to sync payment ${payment.id} to Xero: ${errorMessage}`,
+        errorStack,
+      );
+
+      // Log audit trail for failure
+      await this.auditLogService.logAction({
+        tenantId: payment.tenantId,
+        entityType: 'Payment',
+        entityId: payment.id,
+        action: AuditAction.UPDATE,
+        afterValue: {
+          syncError: errorMessage,
+          syncType: 'XERO_PAYMENT_SYNC_FAILED',
+          attemptedAt: new Date().toISOString(),
+        },
+        changeSummary: `Payment Xero sync failed: ${errorMessage}`,
+      });
+
+      // FAIL FAST: Don't swallow errors silently
+      // Return null but ensure error is logged for debugging
+      return null;
+    }
+  }
+
+  /**
+   * Get appropriate Xero account code for payment
+   * @param payment - Payment record
+   * @returns Xero account code (default bank account)
+   */
+  private getPaymentAccountCode(payment: Payment): string {
+    // Standard bank account code for payments
+    // In production, this could be configurable per tenant
+    return '090';
   }
 }

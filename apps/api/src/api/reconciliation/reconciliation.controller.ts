@@ -19,6 +19,7 @@ import {
   HttpCode,
   UseGuards,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -46,7 +47,15 @@ import {
   ApiIncomeStatementQueryDto,
   ApiIncomeStatementResponseDto,
   ReconciliationSummaryResponseDto,
+  ReconciliationListQueryDto,
+  ReconciliationListResponseDto,
+  ReconciliationListItemDto,
+  DiscrepanciesResponseDto,
+  DiscrepancyItemDto,
+  DiscrepancySummaryDto,
 } from './dto';
+import { DiscrepancyService } from '../../database/services/discrepancy.service';
+import { NotFoundException } from '../../shared/exceptions';
 import { BalanceSheetResponse } from '../../database/dto/balance-sheet.dto';
 import {
   AuditLogQueryDto,
@@ -66,6 +75,7 @@ export class ReconciliationController {
     private readonly financialReportService: FinancialReportService,
     private readonly balanceSheetService: BalanceSheetService,
     private readonly auditLogService: AuditLogService,
+    private readonly discrepancyService: DiscrepancyService,
   ) {}
 
   @Post()
@@ -133,6 +143,188 @@ export class ReconciliationController {
         matched_count: result.matchedCount,
         unmatched_count: result.unmatchedCount,
       },
+    };
+  }
+
+  // ============================================
+  // TASK-RECON-UI: List and Detail Endpoints
+  // ============================================
+
+  @Get()
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'List reconciliations with filtering and pagination' })
+  @ApiResponse({
+    status: 200,
+    type: ReconciliationListResponseDto,
+    description: 'Paginated list of reconciliations',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getReconciliations(
+    @Query() query: ReconciliationListQueryDto,
+    @CurrentUser() user: IUser,
+  ): Promise<ReconciliationListResponseDto> {
+    this.logger.log(
+      `List reconciliations: tenant=${user.tenantId}, bank_account=${query.bank_account ?? 'all'}, status=${query.status ?? 'all'}, page=${query.page}, limit=${query.limit}`,
+    );
+
+    // Transform API snake_case filter to service camelCase
+    const filter = {
+      bankAccount: query.bank_account,
+      status: query.status as
+        | 'IN_PROGRESS'
+        | 'RECONCILED'
+        | 'DISCREPANCY'
+        | undefined,
+    };
+
+    const reconciliations =
+      await this.reconciliationService.getReconciliationsByTenant(
+        user.tenantId,
+      );
+
+    // Apply filters manually since service returns all
+    let filtered = reconciliations;
+    if (filter.bankAccount) {
+      filtered = filtered.filter((r) => r.bankAccount === filter.bankAccount);
+    }
+    if (filter.status) {
+      filtered = filtered.filter((r) => r.status === filter.status);
+    }
+
+    // Calculate pagination
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const total = filtered.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedResults = filtered.slice(startIndex, endIndex);
+
+    // Transform to API response format (cents to Rands, camelCase to snake_case)
+    // Note: matchedCount/unmatchedCount are computed during reconciliation but not stored in DB
+    // For list view, we set them to 0 - use GET /:id for detailed counts if needed
+    const data: ReconciliationListItemDto[] = paginatedResults.map((r) => ({
+      id: r.id,
+      status: r.status,
+      bank_account: r.bankAccount,
+      period_start: r.periodStart.toISOString().split('T')[0],
+      period_end: r.periodEnd.toISOString().split('T')[0],
+      opening_balance: r.openingBalanceCents / 100,
+      closing_balance: r.closingBalanceCents / 100,
+      calculated_balance: r.calculatedBalanceCents / 100,
+      discrepancy: r.discrepancyCents / 100,
+      matched_count: 0, // Not stored in DB, computed during reconciliation
+      unmatched_count: 0, // Not stored in DB, computed during reconciliation
+      reconciled_at: r.reconciledAt?.toISOString() ?? null,
+      created_at: r.createdAt.toISOString(),
+    }));
+
+    return {
+      success: true,
+      data,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  @Get('discrepancies')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get all discrepancies for review' })
+  @ApiResponse({
+    status: 200,
+    type: DiscrepanciesResponseDto,
+    description: 'List of discrepancies across all reconciliations',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getDiscrepancies(
+    @CurrentUser() user: IUser,
+  ): Promise<DiscrepanciesResponseDto> {
+    this.logger.log(`Get discrepancies: tenant=${user.tenantId}`);
+
+    // Get all reconciliations with discrepancies
+    const reconciliations =
+      await this.reconciliationService.getReconciliationsByTenant(
+        user.tenantId,
+      );
+
+    // Filter to those with status DISCREPANCY or non-zero discrepancy
+    const withDiscrepancies = reconciliations.filter(
+      (r) => r.status === 'DISCREPANCY' || r.discrepancyCents !== 0,
+    );
+
+    const allDiscrepancies: DiscrepancyItemDto[] = [];
+    let totalInBankNotXero = 0;
+    let totalInXeroNotBank = 0;
+    let totalAmountMismatches = 0;
+    let totalDateMismatches = 0;
+    let totalAmountCents = 0;
+
+    // Detect discrepancies for each reconciliation
+    for (const recon of withDiscrepancies) {
+      try {
+        const report = await this.discrepancyService.detectDiscrepancies(
+          user.tenantId,
+          recon.id,
+        );
+
+        // Transform discrepancies to API format
+        for (const d of report.discrepancies) {
+          allDiscrepancies.push({
+            id: d.transactionId ?? `discrepancy-${recon.id}-${allDiscrepancies.length}`,
+            reconciliation_id: recon.id,
+            type: d.type,
+            description: d.description,
+            amount: d.amountCents / 100,
+            severity: d.severity.toLowerCase() as 'low' | 'medium' | 'high',
+            period_start: recon.periodStart.toISOString().split('T')[0],
+            period_end: recon.periodEnd.toISOString().split('T')[0],
+            bank_account: recon.bankAccount,
+            transaction_date: d.date?.toISOString().split('T')[0] ?? null,
+            xero_transaction_id: d.xeroTransactionId ?? null,
+          });
+        }
+
+        // Accumulate summary
+        totalInBankNotXero += report.summary.inBankNotXero;
+        totalInXeroNotBank += report.summary.inXeroNotBank;
+        totalAmountMismatches += report.summary.amountMismatches;
+        totalDateMismatches += report.summary.dateMismatches;
+        totalAmountCents += report.totalDiscrepancyCents;
+      } catch (error) {
+        // Log but continue processing other reconciliations
+        this.logger.warn(
+          `Failed to detect discrepancies for reconciliation ${recon.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    const summary: DiscrepancySummaryDto = {
+      in_bank_not_xero: totalInBankNotXero,
+      in_xero_not_bank: totalInXeroNotBank,
+      amount_mismatches: totalAmountMismatches,
+      date_mismatches: totalDateMismatches,
+      total_count: allDiscrepancies.length,
+      total_amount: totalAmountCents / 100,
+    };
+
+    this.logger.log(
+      `Found ${allDiscrepancies.length} discrepancies, total amount: R${summary.total_amount}`,
+    );
+
+    return {
+      success: true,
+      data: allDiscrepancies,
+      summary,
     };
   }
 
@@ -264,11 +456,237 @@ export class ReconciliationController {
 
     // Future: handle pdf/excel format by adding document_url
     if (query.format === 'pdf' || query.format === 'excel') {
-      // For now, just return the data - PDF/Excel export is NOT_IMPLEMENTED in service
-      response.data.document_url = `/reports/income-statement/download?format=${query.format}`;
+      response.data.document_url = `/api/reconciliation/income-statement/export?period_start=${query.period_start}&period_end=${query.period_end}&format=${query.format === 'excel' ? 'xlsx' : 'pdf'}`;
     }
 
     return response;
+  }
+
+  @Get('income-statement/export')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Export Income Statement as PDF or Excel' })
+  @ApiResponse({
+    status: 200,
+    description: 'Income statement exported successfully',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format or unsupported format',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async exportIncomeStatement(
+    @Query('period_start') periodStart: string,
+    @Query('period_end') periodEnd: string,
+    @Query('format') format: 'pdf' | 'xlsx',
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(
+      `Income Statement Export: tenant=${user.tenantId}, period=${periodStart} to ${periodEnd}, format=${format}`,
+    );
+
+    // Validate format
+    if (!['pdf', 'xlsx'].includes(format)) {
+      throw new BadRequestException('Invalid format. Use "pdf" or "xlsx"');
+    }
+
+    // Parse and validate dates
+    const start = new Date(periodStart);
+    const end = new Date(periodEnd);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    // Generate income statement
+    const report = await this.financialReportService.generateIncomeStatement(
+      user.tenantId,
+      start,
+      end,
+    );
+
+    // Export to requested format
+    let buffer: Buffer;
+    let mimeType: string;
+    let filename: string;
+
+    const tenantName = 'CrecheBooks'; // Default branding
+
+    if (format === 'pdf') {
+      buffer = await this.financialReportService.exportIncomeStatementPDF(
+        report,
+        tenantName,
+      );
+      mimeType = 'application/pdf';
+      filename = `income-statement-${periodStart}-${periodEnd}.pdf`;
+    } else {
+      buffer = await this.financialReportService.exportIncomeStatementExcel(
+        report,
+        tenantName,
+      );
+      mimeType =
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      filename = `income-statement-${periodStart}-${periodEnd}.xlsx`;
+    }
+
+    this.logger.log(
+      `Income Statement exported: format=${format}, size=${buffer.length} bytes`,
+    );
+
+    // Set response headers
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+
+    // Send buffer
+    res.send(buffer);
+  }
+
+  @Get('trial-balance')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Generate Trial Balance' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trial balance generated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getTrialBalance(
+    @Query('as_at_date') asAtDate: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: any }> {
+    this.logger.log(
+      `Trial Balance: tenant=${user.tenantId}, as_at_date=${asAtDate}`,
+    );
+
+    // Parse and validate date
+    const date = new Date(asAtDate);
+    if (isNaN(date.getTime())) {
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    const trialBalance = await this.financialReportService.generateTrialBalance(
+      user.tenantId,
+      date,
+    );
+
+    this.logger.log(
+      `Trial Balance generated: accounts=${trialBalance.accounts.length}, balanced=${trialBalance.isBalanced}`,
+    );
+
+    return {
+      success: true,
+      data: {
+        as_at_date: trialBalance.asOfDate.toISOString().slice(0, 10),
+        accounts: trialBalance.accounts.map((acc) => ({
+          account_code: acc.accountCode,
+          account_name: acc.accountName,
+          debit: acc.debitRands,
+          credit: acc.creditRands,
+        })),
+        totals: {
+          debits: trialBalance.totals.debitsRands,
+          credits: trialBalance.totals.creditsRands,
+        },
+        is_balanced: trialBalance.isBalanced,
+        generated_at: trialBalance.generatedAt.toISOString(),
+      },
+    };
+  }
+
+  @Get('trial-balance/export')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Export Trial Balance as PDF or Excel' })
+  @ApiResponse({
+    status: 200,
+    description: 'Trial balance exported successfully',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format or unsupported format',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async exportTrialBalance(
+    @Query('as_at_date') asAtDate: string,
+    @Query('format') format: 'pdf' | 'xlsx',
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(
+      `Trial Balance Export: tenant=${user.tenantId}, as_at_date=${asAtDate}, format=${format}`,
+    );
+
+    // Validate format
+    if (!['pdf', 'xlsx'].includes(format)) {
+      throw new BadRequestException('Invalid format. Use "pdf" or "xlsx"');
+    }
+
+    // Parse and validate date
+    const date = new Date(asAtDate);
+    if (isNaN(date.getTime())) {
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    // Generate trial balance
+    const trialBalance = await this.financialReportService.generateTrialBalance(
+      user.tenantId,
+      date,
+    );
+
+    // Export to requested format
+    let buffer: Buffer;
+    let mimeType: string;
+    let filename: string;
+
+    const tenantName = 'CrecheBooks'; // Default branding
+
+    if (format === 'pdf') {
+      buffer = await this.financialReportService.exportTrialBalancePDF(
+        trialBalance,
+        tenantName,
+      );
+      mimeType = 'application/pdf';
+      filename = `trial-balance-${asAtDate}.pdf`;
+    } else {
+      buffer = await this.financialReportService.exportTrialBalanceExcel(
+        trialBalance,
+        tenantName,
+      );
+      mimeType =
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      filename = `trial-balance-${asAtDate}.xlsx`;
+    }
+
+    this.logger.log(
+      `Trial Balance exported: format=${format}, size=${buffer.length} bytes`,
+    );
+
+    // Set response headers
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+
+    // Send buffer
+    res.send(buffer);
   }
 
   @Get('balance-sheet')
@@ -299,7 +717,7 @@ export class ReconciliationController {
     // Parse and validate date
     const date = new Date(asAtDate);
     if (isNaN(date.getTime())) {
-      throw new Error('Invalid date format. Use YYYY-MM-DD');
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
     }
 
     const balanceSheet = await this.balanceSheetService.generate(
@@ -350,13 +768,13 @@ export class ReconciliationController {
 
     // Validate format
     if (!['pdf', 'xlsx'].includes(format)) {
-      throw new Error('Invalid format. Use "pdf" or "xlsx"');
+      throw new BadRequestException('Invalid format. Use "pdf" or "xlsx"');
     }
 
     // Parse and validate date
     const date = new Date(asAtDate);
     if (isNaN(date.getTime())) {
-      throw new Error('Invalid date format. Use YYYY-MM-DD');
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
     }
 
     // Generate balance sheet
@@ -546,5 +964,71 @@ export class ReconciliationController {
       entityId,
     );
     return logs as AuditLogResponseDto[];
+  }
+
+  // ============================================
+  // TASK-RECON-UI: Get Reconciliation by ID
+  // NOTE: This must be LAST to avoid matching specific routes like 'summary', 'discrepancies'
+  // ============================================
+
+  @Get(':id')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get single reconciliation by ID' })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  @ApiResponse({
+    status: 200,
+    type: ApiReconciliationResponseDto,
+    description: 'Reconciliation details',
+  })
+  @ApiResponse({ status: 404, description: 'Reconciliation not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getReconciliationById(
+    @Param('id') id: string,
+    @CurrentUser() user: IUser,
+  ): Promise<ApiReconciliationResponseDto> {
+    this.logger.log(
+      `Get reconciliation by ID: tenant=${user.tenantId}, id=${id}`,
+    );
+
+    // Use the repository to find by ID
+    const reconciliations =
+      await this.reconciliationService.getReconciliationsByTenant(
+        user.tenantId,
+      );
+
+    const reconciliation = reconciliations.find((r) => r.id === id);
+
+    if (!reconciliation) {
+      throw new NotFoundException('Reconciliation', id);
+    }
+
+    // Verify tenant ownership (already filtered by tenant above, but explicit check)
+    if (reconciliation.tenantId !== user.tenantId) {
+      throw new NotFoundException('Reconciliation', id);
+    }
+
+    // Transform to API response (cents to Rands, camelCase to snake_case)
+    // Note: matchedCount/unmatchedCount are computed during reconciliation but not stored in DB
+    return {
+      success: true,
+      data: {
+        id: reconciliation.id,
+        status: reconciliation.status,
+        bank_account: reconciliation.bankAccount,
+        period_start: reconciliation.periodStart.toISOString().split('T')[0],
+        period_end: reconciliation.periodEnd.toISOString().split('T')[0],
+        opening_balance: reconciliation.openingBalanceCents / 100,
+        closing_balance: reconciliation.closingBalanceCents / 100,
+        calculated_balance: reconciliation.calculatedBalanceCents / 100,
+        discrepancy: reconciliation.discrepancyCents / 100,
+        matched_count: 0, // Not stored in DB, computed during reconciliation
+        unmatched_count: 0, // Not stored in DB, computed during reconciliation
+      },
+    };
   }
 }

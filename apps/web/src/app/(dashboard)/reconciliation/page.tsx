@@ -1,26 +1,35 @@
 'use client';
 
-import { RefreshCw, CheckCircle, AlertTriangle } from 'lucide-react';
+import * as React from 'react';
+import { RefreshCw, CheckCircle, AlertTriangle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useReconciliationSummary, useReconcile } from '@/hooks/use-reconciliation';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { useReconciliationSummary, useReconciliationHistory, useReconciliationDiscrepancies } from '@/hooks/use-reconciliation';
+import { ReconciliationForm, ReconciliationHistory, DiscrepancyList } from '@/components/reconciliation';
 import { formatCurrency } from '@/lib/utils/format';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ReconciliationPage() {
-  const { data: summary, isLoading, error } = useReconciliationSummary();
-  const reconcile = useReconcile();
+  const { data: summary, isLoading, error, refetch } = useReconciliationSummary();
+  const { data: history, isLoading: historyLoading, error: historyError } = useReconciliationHistory();
+  const { data: discrepancies, isLoading: discrepanciesLoading, error: discrepanciesError } = useReconciliationDiscrepancies();
+  const [isFormOpen, setIsFormOpen] = React.useState(false);
 
-  if (error) {
-    throw new Error(`Failed to load reconciliation: ${error.message}`);
+  if (error || historyError || discrepanciesError) {
+    throw new Error(`Failed to load reconciliation: ${(error || historyError || discrepanciesError)?.message}`);
   }
 
-  const handleStartReconciliation = async () => {
-    const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const endDate = now.toISOString();
-    await reconcile.mutateAsync({ startDate, endDate });
+  const handleReconciliationSuccess = () => {
+    setIsFormOpen(false);
+    refetch();
   };
 
   return (
@@ -32,11 +41,32 @@ export default function ReconciliationPage() {
             Reconcile bank transactions with invoices and payments
           </p>
         </div>
-        <Button onClick={handleStartReconciliation} disabled={reconcile.isPending}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${reconcile.isPending ? 'animate-spin' : ''}`} />
-          {reconcile.isPending ? 'Reconciling...' : 'Start Reconciliation'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button onClick={() => setIsFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Start Reconciliation
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>New Reconciliation</DialogTitle>
+            <DialogDescription>
+              Enter your bank statement details to reconcile transactions for a specific period.
+            </DialogDescription>
+          </DialogHeader>
+          <ReconciliationForm
+            onSuccess={handleReconciliationSuccess}
+            onCancel={() => setIsFormOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-3">
@@ -113,33 +143,30 @@ export default function ReconciliationPage() {
         </>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Discrepancies</CardTitle>
-          <CardDescription>
-            Items that need attention and manual review
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            Run a reconciliation to see any discrepancies
-          </p>
-        </CardContent>
-      </Card>
+      {discrepanciesLoading ? (
+        <Skeleton className="h-48" />
+      ) : discrepancies?.items && discrepancies.items.length > 0 ? (
+        <DiscrepancyList items={discrepancies.items} />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Discrepancies</CardTitle>
+            <CardDescription>
+              Items that need attention and manual review
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground text-center py-8">
+              No discrepancies found. Run a reconciliation to check for issues.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>History</CardTitle>
-          <CardDescription>
-            Previous reconciliation records
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-center py-8">
-            No reconciliation history available
-          </p>
-        </CardContent>
-      </Card>
+      <ReconciliationHistory
+        reconciliations={history?.data || []}
+        isLoading={historyLoading}
+      />
     </div>
   );
 }

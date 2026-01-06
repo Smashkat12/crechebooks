@@ -18,7 +18,7 @@ const parentSchema = z.object({
   phone: z.string().regex(SA_PHONE_REGEX, 'Invalid SA phone number (e.g., 0821234567)').optional().or(z.literal('')),
   whatsappNumber: z.string().regex(SA_PHONE_REGEX, 'Invalid SA WhatsApp number').optional().or(z.literal('')),
   address: z.string().max(255).optional(),
-  preferredCommunication: z.enum(['EMAIL', 'WHATSAPP', 'BOTH']),
+  preferredCommunication: z.enum(['EMAIL', 'WHATSAPP', 'SMS', 'BOTH']),
 });
 
 type ParentFormValues = z.infer<typeof parentSchema>;
@@ -33,6 +33,7 @@ interface ParentFormProps {
 const communicationOptions = [
   { value: 'EMAIL', label: 'Email Only' },
   { value: 'WHATSAPP', label: 'WhatsApp Only' },
+  { value: 'SMS', label: 'SMS Only' },
   { value: 'BOTH', label: 'Email and WhatsApp' },
 ];
 
@@ -44,9 +45,9 @@ export function ParentForm({ parent, onSave, onCancel, isLoading = false }: Pare
       lastName: parent?.lastName ?? '',
       email: parent?.email ?? '',
       phone: parent?.phone ?? '',
-      whatsappNumber: parent?.whatsappNumber ?? '',
+      whatsappNumber: parent?.whatsapp ?? '',
       address: parent?.address ?? '',
-      preferredCommunication: parent?.preferredCommunication ?? 'EMAIL',
+      preferredCommunication: parent?.preferredContact ?? 'EMAIL',
     },
   });
 

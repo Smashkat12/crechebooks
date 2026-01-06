@@ -266,13 +266,22 @@ graph TD
 | Gap Remediation - Xero | 2 | 2 | 100% |
 | Gap Remediation - Edge Cases | 3 | 3 | 100% |
 | **Subtotal (Phase 8)** | **13** | **13** | **100%** |
-| **Grand Total** | **134** | **134** | **100%** |
+| PRD Compliance - Billing | 4 | 4 | 100% |
+| PRD Compliance - Payment | 3 | 3 | 100% |
+| PRD Compliance - Notifications | 2 | 2 | 100% |
+| PRD Compliance - SARS | 1 | 0 | 0% |
+| PRD Compliance - Reports | 2 | 0 | 0% |
+| PRD Compliance - Xero | 1 | 0 | 0% |
+| PRD Compliance - Foundation | 2 | 0 | 0% |
+| **Subtotal (Phase 9)** | **15** | **9** | **60%** |
+| **Grand Total** | **149** | **143** | **96%** |
 
-**Last Updated**: 2026-01-04
+**Last Updated**: 2026-01-06
 - Phases 1-6 (Core): 93/93 tasks complete (100%) ✅
 - Phase 7 (Remediation): 28/28 tasks complete (100%) ✅
 - Phase 8 (Gap Remediation): 13/13 tasks complete (100%) ✅
-- Overall Progress: 134/134 tasks (100%) ✅ **PROJECT COMPLETE**
+- Phase 9 (PRD Compliance): 9/15 tasks complete (60%) 🟡 **IN PROGRESS**
+- Overall Progress: 143/149 tasks (96%)
 
 ---
 
@@ -397,6 +406,88 @@ Based on PRD analysis review against AI-Agent-SpecTaskCreator methodology, the f
 | P2-HIGH | 8 | 8 | 0 | 100% |
 | P3-MEDIUM | 4 | 4 | 0 | 100% |
 | **Total Phase 8** | **13** | **13** | **0** | **100%** |
+
+---
+
+## Phase 9: PRD Compliance (Critical Implementation Gaps)
+
+Analysis Date: 2026-01-06
+These tasks address critical PRD violations discovered during comprehensive gap analysis.
+
+### 9.1 Billing Domain (Auto-Invoice on Enrollment)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 139 | TASK-BILL-020 | Add registrationFeeCents to FeeStructure Entity | foundation | TASK-BILL-002 | P0-BLOCKER | ✅ Complete |
+| 140 | TASK-BILL-021 | Trigger Auto-Invoice on Enrollment | logic | TASK-BILL-012, TASK-BILL-020 | P0-BLOCKER | ✅ Complete |
+| 141 | TASK-BILL-022 | Credit Note Generation for Mid-Month Withdrawal | logic | TASK-BILL-014 | P1-CRITICAL | ✅ Complete |
+| 142 | TASK-BILL-023 | Enrollment Invoice UI Integration | surface | TASK-BILL-021, TASK-WEB-037 | P2-HIGH | ✅ Complete |
+
+### 9.2 Payment Domain
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 143 | TASK-PAY-018 | Overpayment Credit Balance Implementation | logic | TASK-PAY-012 | P1-CRITICAL | ✅ Complete |
+| 144 | TASK-PAY-019 | Payment Receipt PDF Generation | logic | TASK-PAY-012 | P1-CRITICAL | ✅ Complete |
+| 145 | TASK-PAY-020 | Credit Balance Application to Future Invoices | logic | TASK-PAY-018, TASK-BILL-012 | P2-HIGH | ✅ Complete |
+
+### 9.3 Notification Domain
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 146 | TASK-NOTIF-001 | Implement SMS Channel Adapter (Replace NOT_IMPLEMENTED) | logic | TASK-BILL-015 | P0-BLOCKER | ✅ Complete |
+| 147 | TASK-NOTIF-002 | SMS Gateway Integration (Twilio/Africa's Talking) | logic | TASK-NOTIF-001 | P1-CRITICAL | ✅ Complete |
+
+### 9.4 SARS Compliance
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 148 | TASK-SARS-019 | SARS eFiling API Real Integration (Replace Mock) | logic | TASK-SARS-018 | P1-CRITICAL | ⭕ Pending |
+
+### 9.5 Financial Reports
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 149 | TASK-RECON-017 | Income Statement PDF/Excel Export | logic | TASK-RECON-013 | P1-CRITICAL | ⭕ Pending |
+| 150 | TASK-RECON-018 | Balance Sheet PDF/Excel Export | logic | TASK-RECON-013 | P1-CRITICAL | ⭕ Pending |
+
+### 9.6 Xero Integration
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 151 | TASK-XERO-003 | Payment Sync to Xero (Replace Stub) | logic | TASK-PAY-012, TASK-MCP-001 | P1-CRITICAL | ⭕ Pending |
+
+### 9.7 Foundation (Testing Infrastructure)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 152 | TASK-TEST-001 | Remove Mock Data from E2E Tests | testing | — | P0-BLOCKER | ⭕ Pending |
+| 153 | TASK-TEST-002 | Add Fail-Fast Error Logging Throughout | testing | — | P0-BLOCKER | ⭕ Pending |
+
+---
+
+## Phase 9 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-BLOCKER | 4 | 3 | 1 | 75% |
+| P1-CRITICAL | 8 | 5 | 3 | 63% |
+| P2-HIGH | 3 | 1 | 2 | 33% |
+| **Total Phase 9** | **15** | **9** | **6** | **60%** |
+
+### Critical Gaps Summary
+
+| Gap ID | Description | PRD Reference | Code Location | Impact |
+|--------|-------------|---------------|---------------|--------|
+| GAP-001 | ~~Registration fee field missing~~ | EC-BILL-001 | `fee-structure.entity.ts` | ✅ Fixed (TASK-BILL-020) |
+| GAP-002 | Auto-invoice on enrollment missing | EC-BILL-001 | `enrollment.service.ts:48-130` | No invoice generated when child enrolled |
+| GAP-003 | ~~SMS channel NOT_IMPLEMENTED~~ | REQ-BILL-007 | `sms-channel.adapter.ts` | ✅ Fixed (TASK-NOTIF-001) |
+| GAP-004 | SARS eFiling API mocked | EC-SARS-010 | `sars-submission-retry.service.ts:98-502` | No actual SARS submission |
+| GAP-005 | Payment Xero sync stub | REQ-XERO-004 | `payment-allocation.service.ts:687-695` | Payments not synced to Xero |
+| GAP-006 | Financial report export NOT_IMPLEMENTED | REQ-RECON-008 | `financial-report.service.ts:463-486` | Cannot export PDF/Excel |
+| GAP-007 | Overpayment credit balance missing | EC-PAY-008 | `payment-allocation.service.ts:469-474` | Overpayments not credited |
+| GAP-008 | Payment receipt generation missing | EC-PAY-009 | N/A (no service exists) | No payment receipts for parents |
+| GAP-009 | Credit note for withdrawal missing | EC-BILL-002 | N/A (no service exists) | No refund on mid-month withdrawal |
 
 ---
 

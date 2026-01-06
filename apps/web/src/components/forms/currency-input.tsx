@@ -56,7 +56,7 @@ interface CurrencyInputFieldProps extends Omit<
 > {
   field: {
     value: string | number | undefined | null;
-    onChange: (value: string) => void;
+    onChange: (value: number | undefined) => void;
     onBlur: () => void;
   };
 }
@@ -83,7 +83,7 @@ function CurrencyInputField({ field, ...inputProps }: CurrencyInputFieldProps) {
           // Allow empty input
           if (input === '' || input === 'R') {
             setDisplayValue('');
-            field.onChange('');
+            field.onChange(undefined);
             return;
           }
 
@@ -91,8 +91,9 @@ function CurrencyInputField({ field, ...inputProps }: CurrencyInputFieldProps) {
           const parsed = parseCurrency(input);
 
           if (parsed !== '') {
-            // Update the field value with the raw number
-            field.onChange(parsed);
+            // Update the field value with the raw number (as number type)
+            const numValue = parseFloat(parsed);
+            field.onChange(isNaN(numValue) ? undefined : numValue);
             // Update display with formatted version
             setDisplayValue(formatCurrency(parsed));
           }

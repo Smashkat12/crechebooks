@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmissionStatus } from '@prisma/client';
 import {
@@ -17,10 +17,15 @@ import {
   TRANSIENT_STATUS_CODES,
   PERMANENT_STATUS_CODES,
 } from '../types/sars-submission.types';
+import {
+  SarsEfilingClient,
+  SarsSubmissionPayload,
+} from '../../integrations/sars/sars-efiling.client';
 
 /**
  * SARS Submission Retry Service
  * TASK-SARS-018: SARS eFiling Submission Error Handling and Retry
+ * TASK-SARS-019: SARS eFiling API Real Integration
  *
  * Handles submission retries with exponential backoff, error classification,
  * and dead letter queue management for SARS eFiling submissions.
@@ -34,7 +39,8 @@ export class SarsSubmissionRetryService {
 
   constructor(
     private readonly prisma: PrismaService,
-    retryConfig?: Partial<RetryConfig>,
+    @Optional() private readonly sarsClient?: SarsEfilingClient,
+    @Optional() @Inject('RETRY_CONFIG') retryConfig?: Partial<RetryConfig>,
   ) {
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
   }
@@ -499,30 +505,189 @@ export class SarsSubmissionRetryService {
 
   /**
    * Call SARS eFiling API
-   * TODO: Replace with actual SARS API integration
+   * TASK-SARS-019: Real SARS eFiling integration (no mocks)
+   *
+   * @param submission - SARS submission record with document data
+   * @param correlationId - Correlation ID for tracking
+   * @returns SARS reference number
+   * @throws SarsApiError if submission fails
    */
   private async callSarsApi(
     submission: any,
     correlationId: string,
   ): Promise<{ reference: string }> {
-    // This is a placeholder for actual SARS API integration
-    // In production, this would:
-    // 1. Format submission data according to SARS eFiling API spec
-    // 2. Make authenticated HTTP request to SARS
-    // 3. Parse and validate response
-    // 4. Return SARS reference number
+    // FAIL FAST: Require SARS client to be configured
+    if (!this.sarsClient) {
+      const error: SarsApiError = {
+        statusCode: 0,
+        message:
+          'SARS eFiling client not available. Ensure SarsModule is imported and configured.',
+        sarsErrorCode: 'CLIENT_NOT_AVAILABLE',
+        isTransient: false,
+      };
+      this.logger.error({
+        error: {
+          message: error.message,
+          name: 'ConfigurationError',
+        },
+        file: 'sars-submission-retry.service.ts',
+        function: 'callSarsApi',
+        inputs: { submissionId: submission.id, correlationId },
+        timestamp: new Date().toISOString(),
+        action: 'Import SarsModule and configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
+      });
+      throw error;
+    }
 
-    this.logger.debug(
-      `[MOCK] Calling SARS API for submission ${submission.id}`,
-      { correlationId },
-    );
+    // FAIL FAST: Check if SARS client is configured with credentials
+    if (!this.sarsClient.getIsConfigured()) {
+      const error: SarsApiError = {
+        statusCode: 0,
+        message:
+          'SARS eFiling credentials not configured. Set SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables.',
+        sarsErrorCode: 'SARS_NOT_CONFIGURED',
+        isTransient: false,
+      };
+      this.logger.error({
+        error: {
+          message: error.message,
+          name: 'ConfigurationError',
+        },
+        file: 'sars-submission-retry.service.ts',
+        function: 'callSarsApi',
+        inputs: { submissionId: submission.id, correlationId },
+        timestamp: new Date().toISOString(),
+        action: 'Configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
+      });
+      throw error;
+    }
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Extract VAT201 data from submission document
+    const documentData = submission.documentData as any;
+    if (!documentData?.fields) {
+      const error: SarsApiError = {
+        statusCode: 400,
+        message: 'Invalid submission document: missing VAT201 fields',
+        sarsErrorCode: 'INVALID_DOCUMENT',
+        isTransient: false,
+      };
+      this.logger.error({
+        error: {
+          message: error.message,
+          name: 'ValidationError',
+        },
+        file: 'sars-submission-retry.service.ts',
+        function: 'callSarsApi',
+        inputs: { submissionId: submission.id, correlationId },
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
+    }
 
-    // For now, return mock reference
-    return {
-      reference: `SARS${Date.now()}${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+    // Build SARS submission payload
+    const payload: SarsSubmissionPayload = {
+      submissionType: 'VAT201',
+      vatNumber: documentData.vatNumber,
+      periodStart: new Date(submission.periodStart),
+      periodEnd: new Date(submission.periodEnd),
+      fields: {
+        field1OutputStandardCents: documentData.fields.field1OutputStandardCents || 0,
+        field2ZeroRatedCents: documentData.fields.field2OutputZeroRatedCents || 0,
+        field3ExemptCents: documentData.fields.field3OutputExemptCents || 0,
+        field4TotalOutputCents: documentData.fields.field4TotalOutputCents || 0,
+        field5InputTaxCents: documentData.fields.field5InputTaxCents || 0,
+        field6CapitalGoodsCents: documentData.fields.field6DeductibleInputCents || 0,
+        field15NetVatCents: documentData.fields.field15NetVatCents || 0,
+        field19TotalDueCents: documentData.fields.field19TotalDueCents || 0,
+      },
     };
+
+    this.logger.log({
+      message: 'Submitting VAT201 to SARS eFiling',
+      submissionId: submission.id,
+      correlationId,
+      periodStart: payload.periodStart.toISOString().split('T')[0],
+      periodEnd: payload.periodEnd.toISOString().split('T')[0],
+    });
+
+    // Call real SARS eFiling API
+    const response = await this.sarsClient.submitVat201(payload, correlationId);
+
+    // Handle SARS API response
+    if (!response.success) {
+      const error: SarsApiError = {
+        statusCode: response.errorCode?.startsWith('HTTP_')
+          ? parseInt(response.errorCode.replace('HTTP_', ''), 10)
+          : 500,
+        message: response.errorMessage || 'SARS submission failed',
+        sarsErrorCode: response.errorCode,
+        isTransient: this.isTransientError(response.errorCode),
+      };
+      this.logger.error({
+        error: {
+          message: error.message,
+          name: 'SarsSubmissionError',
+          sarsErrorCode: error.sarsErrorCode,
+        },
+        file: 'sars-submission-retry.service.ts',
+        function: 'callSarsApi',
+        inputs: { submissionId: submission.id, correlationId },
+        response: response.rawResponse,
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
+    }
+
+    if (!response.reference) {
+      const error: SarsApiError = {
+        statusCode: 500,
+        message: 'SARS submission accepted but no reference number returned',
+        sarsErrorCode: 'NO_REFERENCE',
+        isTransient: false,
+      };
+      this.logger.error({
+        error: {
+          message: error.message,
+          name: 'SarsResponseError',
+        },
+        file: 'sars-submission-retry.service.ts',
+        function: 'callSarsApi',
+        inputs: { submissionId: submission.id, correlationId },
+        response: response.rawResponse,
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
+    }
+
+    this.logger.log({
+      message: 'SARS submission successful',
+      submissionId: submission.id,
+      correlationId,
+      reference: response.reference,
+      status: response.status,
+    });
+
+    return { reference: response.reference };
+  }
+
+  /**
+   * Determine if a SARS error code indicates a transient error
+   */
+  private isTransientError(errorCode?: string): boolean {
+    if (!errorCode) return false;
+
+    // Transient error patterns
+    const transientPatterns = [
+      /^T/, // SARS transient codes start with T
+      /RATE_LIMIT/i,
+      /TIMEOUT/i,
+      /UNAVAILABLE/i,
+      /HTTP_429/,
+      /HTTP_502/,
+      /HTTP_503/,
+      /HTTP_504/,
+    ];
+
+    return transientPatterns.some((pattern) => pattern.test(errorCode));
   }
 }

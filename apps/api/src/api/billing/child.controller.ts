@@ -130,8 +130,8 @@ export class ChildController {
 
     this.logger.log(`Created child: ${child.id}`);
 
-    // 4. Create enrollment using service (handles validation, audit)
-    const enrollment = await this.enrollmentService.enrollChild(
+    // 4. Create enrollment using service (handles validation, audit, invoice generation)
+    const { enrollment, invoice } = await this.enrollmentService.enrollChild(
       user.tenantId,
       child.id,
       dto.fee_structure_id,
@@ -140,6 +140,9 @@ export class ChildController {
     );
 
     this.logger.log(`Created enrollment: ${enrollment.id}`);
+    if (invoice) {
+      this.logger.log(`Created enrollment invoice: ${invoice.invoiceNumber}`);
+    }
 
     // 5. Transform to response (camelCase -> snake_case)
     return {
@@ -163,6 +166,16 @@ export class ChildController {
             : undefined,
           status: enrollment.status,
         },
+        // TASK-BILL-023: Include invoice in response for UI display
+        invoice: invoice
+          ? {
+              id: invoice.id,
+              invoice_number: invoice.invoiceNumber,
+              total: invoice.totalCents / 100,
+              due_date: invoice.dueDate.toISOString().split('T')[0],
+              status: invoice.status,
+            }
+          : null,
       },
     };
   }

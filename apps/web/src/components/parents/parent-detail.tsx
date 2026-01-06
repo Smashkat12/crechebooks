@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Mail, Phone, MapPin, MessageCircle, Edit, UserPlus } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageCircle, Edit, UserPlus, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ interface ParentDetailProps {
 const communicationLabels: Record<CommunicationMethod, { label: string; icon: React.ElementType }> = {
   EMAIL: { label: 'Email', icon: Mail },
   WHATSAPP: { label: 'WhatsApp', icon: MessageCircle },
+  SMS: { label: 'SMS', icon: Smartphone },
   BOTH: { label: 'Email & WhatsApp', icon: MessageCircle },
 };
 
@@ -38,7 +39,7 @@ export function ParentDetail({
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isAddChildOpen, setIsAddChildOpen] = useState(false);
 
-  const commPref = communicationLabels[parent.preferredCommunication];
+  const commPref = communicationLabels[parent.preferredContact];
   const CommIcon = commPref.icon;
 
   return (
@@ -68,7 +69,8 @@ export function ParentDetail({
                   onSave={async (data) => {
                     await onUpdateParent({
                       ...data,
-                      preferredCommunication: data.preferredCommunication as CommunicationMethod,
+                      whatsapp: data.whatsappNumber,
+                      preferredContact: data.preferredCommunication as CommunicationMethod,
                     });
                     setIsEditOpen(false);
                   }}
@@ -91,10 +93,10 @@ export function ParentDetail({
                 <span>{parent.phone}</span>
               </div>
             )}
-            {parent.whatsappNumber && (
+            {parent.whatsapp && (
               <div className="flex items-center gap-2">
                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                <span>{parent.whatsappNumber}</span>
+                <span>{parent.whatsapp}</span>
               </div>
             )}
             {parent.address && (

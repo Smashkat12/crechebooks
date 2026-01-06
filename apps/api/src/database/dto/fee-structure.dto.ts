@@ -37,6 +37,11 @@ export class CreateFeeStructureDto {
   amountCents!: number;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  registrationFeeCents?: number;
+
+  @IsOptional()
   @IsBoolean()
   vatInclusive?: boolean;
 

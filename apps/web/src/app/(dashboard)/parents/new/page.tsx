@@ -21,7 +21,7 @@ export default function NewParentPage() {
     phone?: string;
     whatsappNumber?: string;
     address?: string;
-    preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'BOTH';
+    preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'BOTH';
   }) => {
     try {
       await createParentMutation.mutateAsync(data);

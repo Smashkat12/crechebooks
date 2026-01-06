@@ -87,7 +87,7 @@ interface CreateParentParams {
   phone?: string;
   whatsappNumber?: string;
   address?: string;
-  preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'BOTH';
+  preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'BOTH';
 }
 
 // Create a new parent
@@ -135,6 +135,126 @@ export function useEnrollChild() {
       queryClient.invalidateQueries({ queryKey: queryKeys.parents.detail(variables.parentId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.parents.children(variables.parentId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.children.detail(variables.childId) });
+    },
+  });
+}
+
+// Create child params (creates child AND enrolls them)
+interface CreateChildParams {
+  parentId: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER';
+  feeStructureId: string;
+  startDate: string;
+  medicalNotes?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+}
+
+// Invoice summary in enrollment response (TASK-BILL-023)
+interface EnrollmentInvoiceSummary {
+  id: string;
+  invoice_number: string;
+  total: number;
+  due_date: string;
+  status: string;
+}
+
+interface CreateChildResponse {
+  success: boolean;
+  data: {
+    child: { id: string; first_name: string; last_name: string };
+    enrollment: {
+      id: string;
+      fee_structure: { id: string; name: string; amount: number };
+      start_date: string;
+      status: string;
+    };
+    invoice: EnrollmentInvoiceSummary | null;
+  };
+}
+
+// Helper to convert SA phone numbers to E.164 format
+function toE164(phone: string | undefined): string | null {
+  if (!phone) return null;
+  const cleaned = phone.replace(/\s+/g, '').replace(/-/g, '');
+  // SA number starting with 0 -> +27
+  if (cleaned.startsWith('0') && cleaned.length === 10) {
+    return '+27' + cleaned.slice(1);
+  }
+  // Already has + prefix
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+  // SA number without leading 0 (e.g., 27...)
+  if (cleaned.startsWith('27') && cleaned.length === 11) {
+    return '+' + cleaned;
+  }
+  return cleaned || null;
+}
+
+// Create a new child with enrollment
+export function useCreateChild() {
+  const queryClient = useQueryClient();
+
+  return useMutation<CreateChildResponse, AxiosError, CreateChildParams>({
+    mutationFn: async (params) => {
+      const { data } = await apiClient.post<CreateChildResponse>(endpoints.children.list, {
+        parent_id: params.parentId,
+        first_name: params.firstName,
+        last_name: params.lastName,
+        date_of_birth: params.dateOfBirth,
+        gender: params.gender || null,
+        fee_structure_id: params.feeStructureId,
+        start_date: params.startDate,
+        medical_notes: params.medicalNotes || null,
+        emergency_contact: params.emergencyContact || null,
+        emergency_phone: toE164(params.emergencyPhone),
+      });
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.parents.detail(variables.parentId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.parents.children(variables.parentId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.children.list() });
+    },
+  });
+}
+
+// Update parent params
+interface UpdateParentParams {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  whatsappNumber?: string;
+  address?: string;
+  preferredCommunication?: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'BOTH';
+}
+
+// Update a parent
+export function useUpdateParent() {
+  const queryClient = useQueryClient();
+
+  return useMutation<IParent, AxiosError, UpdateParentParams>({
+    mutationFn: async ({ id, ...params }) => {
+      const { data } = await apiClient.put<IParent>(endpoints.parents.detail(id), {
+        firstName: params.firstName,
+        lastName: params.lastName,
+        email: params.email,
+        phone: params.phone || null,
+        whatsapp: params.whatsappNumber || null,
+        address: params.address || null,
+        preferredContact: params.preferredCommunication,
+      });
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.parents.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.parents.list() });
     },
   });
 }

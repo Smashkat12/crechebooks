@@ -151,7 +151,11 @@ export async function safeOperation<T>(
   try {
     return await operation();
   } catch (error) {
-    logError(logger, error instanceof Error ? error : new Error(String(error)), context);
+    logError(
+      logger,
+      error instanceof Error ? error : new Error(String(error)),
+      context,
+    );
     return fallback;
   }
 }

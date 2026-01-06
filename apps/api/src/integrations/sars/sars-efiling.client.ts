@@ -111,7 +111,10 @@ export class SarsEfilingClient implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {
     const isSandbox = this.configService.get<boolean>('SARS_SANDBOX', true);
     const clientId = this.configService.get<string>('SARS_CLIENT_ID', '');
-    const clientSecret = this.configService.get<string>('SARS_CLIENT_SECRET', '');
+    const clientSecret = this.configService.get<string>(
+      'SARS_CLIENT_SECRET',
+      '',
+    );
 
     this.config = {
       baseUrl: isSandbox
@@ -173,7 +176,8 @@ export class SarsEfilingClient implements OnModuleInit {
     if (!this.isConfigured) {
       this.logger.error({
         error: {
-          message: 'Cannot authenticate - SARS eFiling credentials not configured',
+          message:
+            'Cannot authenticate - SARS eFiling credentials not configured',
           name: 'ConfigurationError',
         },
         file: 'sars-efiling.client.ts',
@@ -242,7 +246,8 @@ export class SarsEfilingClient implements OnModuleInit {
         throw error;
       }
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error({
         error: {
           message: errorMessage,
@@ -386,7 +391,9 @@ export class SarsEfilingClient implements OnModuleInit {
       return {
         success: true,
         reference: responseData.reference,
-        status: (responseData.status as 'ACCEPTED' | 'PENDING' | 'QUEUED') || 'ACCEPTED',
+        status:
+          (responseData.status as 'ACCEPTED' | 'PENDING' | 'QUEUED') ||
+          'ACCEPTED',
         rawResponse: responseText,
       };
     } catch (error) {
@@ -399,7 +406,8 @@ export class SarsEfilingClient implements OnModuleInit {
         };
       }
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.error({
         error: {
           message: errorMessage,
@@ -474,7 +482,8 @@ export class SarsEfilingClient implements OnModuleInit {
         status: data.status || 'PENDING',
       };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
         success: false,
         reference,
@@ -558,6 +567,10 @@ export class SarsEfilingClient implements OnModuleInit {
    */
   private maskVatNumber(vatNumber: string): string {
     if (vatNumber.length <= 4) return '****';
-    return vatNumber.substring(0, 2) + '****' + vatNumber.substring(vatNumber.length - 2);
+    return (
+      vatNumber.substring(0, 2) +
+      '****' +
+      vatNumber.substring(vatNumber.length - 2)
+    );
   }
 }

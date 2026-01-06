@@ -130,7 +130,9 @@ export class ReminderTemplateService {
     tenantId: string,
     stage: ReminderStage,
   ): Promise<ReminderTemplateResponse | null> {
-    this.logger.debug(`Getting template for stage ${stage} (tenant: ${tenantId})`);
+    this.logger.debug(
+      `Getting template for stage ${stage} (tenant: ${tenantId})`,
+    );
 
     try {
       const template = await this.prisma.reminderTemplate.findUnique({
@@ -143,7 +145,9 @@ export class ReminderTemplateService {
       });
 
       if (!template) {
-        this.logger.debug(`No custom template found for stage ${stage}, using defaults`);
+        this.logger.debug(
+          `No custom template found for stage ${stage}, using defaults`,
+        );
         return null;
       }
 
@@ -212,7 +216,9 @@ export class ReminderTemplateService {
     tenantId: string,
     data: CreateReminderTemplateDto,
   ): Promise<ReminderTemplateResponse> {
-    this.logger.log(`Upserting template for stage ${data.stage} (tenant: ${tenantId})`);
+    this.logger.log(
+      `Upserting template for stage ${data.stage} (tenant: ${tenantId})`,
+    );
 
     try {
       // Validate email content if email channel is included
@@ -266,7 +272,9 @@ export class ReminderTemplateService {
         },
       });
 
-      this.logger.log(`Template upserted for stage ${data.stage} (id: ${template.id})`);
+      this.logger.log(
+        `Template upserted for stage ${data.stage} (id: ${template.id})`,
+      );
       return mapToResponse(template);
     } catch (error) {
       if (error instanceof BusinessException) {
@@ -347,7 +355,10 @@ export class ReminderTemplateService {
       this.logger.log(`Template ${id} updated successfully`);
       return mapToResponse(template);
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BusinessException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BusinessException
+      ) {
         throw error;
       }
       this.logger.error(
@@ -460,7 +471,9 @@ export class ReminderTemplateService {
               isActive: true,
             },
           });
-          this.logger.debug(`Created default template for stage ${defaultTemplate.stage}`);
+          this.logger.debug(
+            `Created default template for stage ${defaultTemplate.stage}`,
+          );
         }
       }
 

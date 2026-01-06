@@ -175,8 +175,7 @@ export const DEFAULT_TEMPLATES: DefaultTemplateContent[] = [
     stage: ReminderStage.FIRST,
     daysOverdue: 7,
     channels: [ReminderChannel.EMAIL],
-    emailSubject:
-      'Friendly Reminder: Invoice {{invoiceNumber}} Payment Due',
+    emailSubject: 'Friendly Reminder: Invoice {{invoiceNumber}} Payment Due',
     emailBody: `Dear {{parentName}},
 
 We hope this message finds you well. This is a friendly reminder that payment for {{childName}}'s invoice {{invoiceNumber}} is now {{daysOverdue}} days overdue.
@@ -200,8 +199,7 @@ Kind regards,
     stage: ReminderStage.SECOND,
     daysOverdue: 14,
     channels: [ReminderChannel.EMAIL, ReminderChannel.WHATSAPP],
-    emailSubject:
-      'Second Notice: Invoice {{invoiceNumber}} - Payment Required',
+    emailSubject: 'Second Notice: Invoice {{invoiceNumber}} - Payment Required',
     emailBody: `Dear {{parentName}},
 
 This is our second notice regarding the outstanding payment for {{childName}}'s invoice {{invoiceNumber}}.
@@ -257,8 +255,7 @@ Regards,
     stage: ReminderStage.ESCALATED,
     daysOverdue: 45,
     channels: [ReminderChannel.EMAIL],
-    emailSubject:
-      'URGENT: Account Escalated - Invoice {{invoiceNumber}}',
+    emailSubject: 'URGENT: Account Escalated - Invoice {{invoiceNumber}}',
     emailBody: `Dear {{parentName}},
 
 ACCOUNT ESCALATED

@@ -11,9 +11,15 @@ importers:
       '@types/node':
         specifier: ^22.10.7
         version: 22.19.3
+      '@types/pdfkit':
+        specifier: ^0.17.4
+        version: 0.17.4
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
+      pdfkit:
+        specifier: ^0.17.2
+        version: 0.17.2
     devDependencies:
       prettier:
         specifier: ^3.4.2

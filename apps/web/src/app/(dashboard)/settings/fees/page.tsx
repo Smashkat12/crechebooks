@@ -52,6 +52,7 @@ export default function FeeStructuresSettingsPage() {
     description: '',
     fee_type: 'FULL_DAY' as FeeType,
     amount: '',
+    registration_fee: '',
     vat_inclusive: true,
     sibling_discount_percent: '',
     effective_from: new Date().toISOString().split('T')[0],
@@ -72,6 +73,9 @@ export default function FeeStructuresSettingsPage() {
         description: formData.description || undefined,
         fee_type: formData.fee_type,
         amount: parseFloat(formData.amount),
+        registration_fee: formData.registration_fee
+          ? parseFloat(formData.registration_fee)
+          : undefined,
         vat_inclusive: formData.vat_inclusive,
         sibling_discount_percent: formData.sibling_discount_percent
           ? parseFloat(formData.sibling_discount_percent)
@@ -85,6 +89,7 @@ export default function FeeStructuresSettingsPage() {
         description: '',
         fee_type: 'FULL_DAY',
         amount: '',
+        registration_fee: '',
         vat_inclusive: true,
         sibling_discount_percent: '',
         effective_from: new Date().toISOString().split('T')[0],
@@ -148,7 +153,8 @@ export default function FeeStructuresSettingsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Amount</TableHead>
+                  <TableHead>Monthly Fee</TableHead>
+                  <TableHead>Registration Fee</TableHead>
                   <TableHead>VAT</TableHead>
                   <TableHead>Sibling Discount</TableHead>
                   <TableHead>Status</TableHead>
@@ -172,6 +178,9 @@ export default function FeeStructuresSettingsPage() {
                       {FEE_TYPES.find((t) => t.value === fee.fee_type)?.label ?? fee.fee_type}
                     </TableCell>
                     <TableCell>{formatCurrency(fee.amount)}</TableCell>
+                    <TableCell>
+                      {fee.registration_fee ? formatCurrency(fee.registration_fee) : '-'}
+                    </TableCell>
                     <TableCell>
                       {fee.vat_inclusive ? 'Inclusive' : 'Exclusive'}
                     </TableCell>
@@ -260,7 +269,7 @@ export default function FeeStructuresSettingsPage() {
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="amount">Amount (R)</Label>
+                  <Label htmlFor="amount">Monthly Fee (R)</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -274,6 +283,20 @@ export default function FeeStructuresSettingsPage() {
                     required
                   />
                 </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="registration_fee">Registration Fee (R)</Label>
+                <Input
+                  id="registration_fee"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.registration_fee}
+                  onChange={(e) =>
+                    setFormData({ ...formData, registration_fee: e.target.value })
+                  }
+                  placeholder="0.00 (one-time fee on enrollment)"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">

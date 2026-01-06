@@ -26,7 +26,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useParent } from "@/hooks/use-parents";
 import { useToast } from "@/hooks/use-toast";
-import { Skeleton } from "@/components/ui/skeleton";
 
 const reminderSchema = z.object({
   message: z.string().min(10, "Message must be at least 10 characters"),
@@ -126,7 +125,7 @@ Best regards,
           <DialogTitle>Send Payment Reminder</DialogTitle>
           <DialogDescription>
             {isLoading ? (
-              <Skeleton className="h-4 w-48" />
+              <span className="inline-block h-4 w-48 animate-pulse rounded-md bg-primary/10" />
             ) : parent ? (
               `Send a payment reminder to ${parent.firstName} ${parent.lastName}`
             ) : (

@@ -90,7 +90,7 @@ export default function ArrearsPage() {
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">
+            <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
               {formatCurrency(summary?.totalOutstanding ?? 0)}
             </div>
           </CardContent>
@@ -100,7 +100,7 @@ export default function ArrearsPage() {
             <CardTitle className="text-sm font-medium">90+ Days Overdue</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">
+            <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
               {formatCurrency(summary?.byAgeBucket.days90Plus ?? 0)}
             </div>
           </CardContent>

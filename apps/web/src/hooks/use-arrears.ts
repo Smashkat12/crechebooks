@@ -56,45 +56,67 @@ interface SendReminderParams {
   template?: string;
 }
 
-// API response types (snake_case from backend)
-interface ApiArrearsItem {
-  id: string;
+// API response types (snake_case from backend) - matches /payments/arrears endpoint
+interface ApiArrearsInvoice {
+  invoice_id: string;
+  invoice_number: string;
   parent_id: string;
   parent_name: string;
   child_id: string;
   child_name: string;
+  issue_date: string;
+  due_date: string;
+  total: number;
+  amount_paid: number;
+  outstanding: number;
+  days_overdue: number;
+  aging_bucket: string;
+}
+
+interface ApiTopDebtor {
+  parent_id: string;
+  parent_name: string;
+  email?: string;
+  phone?: string;
   total_outstanding: number;
   oldest_invoice_date: string;
-  days_past_due: number;
   invoice_count: number;
-  last_payment_date?: string;
-  contact_email?: string;
-  contact_phone?: string;
+  max_days_overdue: number;
 }
 
-interface ApiArrearsListResponse {
+interface ApiArrearsResponse {
   success: boolean;
-  arrears: ApiArrearsItem[];
-  total: number;
-  page: number;
-  limit: number;
+  data: {
+    summary: {
+      total_outstanding: number;
+      total_invoices: number;
+      aging: {
+        current: number;
+        days_30: number;
+        days_60: number;
+        days_90_plus: number;
+      };
+    };
+    top_debtors: ApiTopDebtor[];
+    invoices: ApiArrearsInvoice[];
+    generated_at: string;
+  };
 }
 
-// Transform API response to frontend format
-function transformArrearsItem(api: ApiArrearsItem): ArrearsItem {
+// Transform API invoice to frontend ArrearsItem format
+function transformInvoiceToArrearsItem(inv: ApiArrearsInvoice): ArrearsItem {
   return {
-    id: api.id,
-    parentId: api.parent_id,
-    parentName: api.parent_name,
-    childId: api.child_id,
-    childName: api.child_name,
-    totalOutstanding: api.total_outstanding,
-    oldestInvoiceDate: api.oldest_invoice_date,
-    daysPastDue: api.days_past_due,
-    invoiceCount: api.invoice_count,
-    lastPaymentDate: api.last_payment_date,
-    contactEmail: api.contact_email,
-    contactPhone: api.contact_phone,
+    id: inv.invoice_id,
+    parentId: inv.parent_id,
+    parentName: inv.parent_name,
+    childId: inv.child_id,
+    childName: inv.child_name,
+    totalOutstanding: inv.outstanding, // Already in cents from API
+    oldestInvoiceDate: inv.due_date,
+    daysPastDue: inv.days_overdue,
+    invoiceCount: 1,
+    contactEmail: undefined,
+    contactPhone: undefined,
   };
 }
 
@@ -103,26 +125,60 @@ export function useArrearsList(params?: ArrearsListParams) {
   return useQuery<ArrearsListResponse, AxiosError>({
     queryKey: queryKeys.arrears.list(params),
     queryFn: async () => {
-      const { data } = await apiClient.get<ApiArrearsListResponse>(endpoints.arrears.list, {
-        params,
+      const { data } = await apiClient.get<ApiArrearsResponse>(endpoints.arrears.list, {
+        params: {
+          date_from: params?.minDays ? undefined : undefined,
+          min_amount: params?.minAmount,
+          parent_id: params?.parentId,
+        },
       });
+
+      // Transform invoices to ArrearsItem format
+      const arrears = data.data.invoices.map(transformInvoiceToArrearsItem);
+
+      // Apply client-side pagination if needed
+      const page = params?.page ?? 1;
+      const limit = params?.limit ?? 20;
+      const startIndex = (page - 1) * limit;
+      const paginatedArrears = arrears.slice(startIndex, startIndex + limit);
+
       return {
-        arrears: data.arrears.map(transformArrearsItem),
-        total: data.total,
-        page: data.page,
-        limit: data.limit,
+        arrears: paginatedArrears,
+        total: arrears.length,
+        page,
+        limit,
       };
     },
   });
 }
 
-// Get arrears summary
+// Get arrears summary - transforms API response to match ArrearsSummary interface
 export function useArrearsSummary() {
   return useQuery<ArrearsSummary, AxiosError>({
     queryKey: queryKeys.arrears.summary(),
     queryFn: async () => {
-      const { data } = await apiClient.get<ArrearsSummary>(endpoints.arrears.summary);
-      return data;
+      const { data } = await apiClient.get<ApiArrearsResponse>(endpoints.arrears.summary);
+
+      // Transform API summary to frontend format
+      // API returns values in cents, no conversion needed
+      const apiSummary = data.data.summary;
+
+      return {
+        totalOutstanding: apiSummary.total_outstanding,
+        totalAccounts: apiSummary.total_invoices,
+        byAgeBucket: {
+          current: apiSummary.aging.current,
+          days30: apiSummary.aging.days_30,
+          days60: apiSummary.aging.days_60,
+          days90: 0, // Not provided separately, included in days90Plus
+          days90Plus: apiSummary.aging.days_90_plus,
+        },
+        trend: {
+          previousMonth: 0, // Not calculated by API
+          change: 0,
+          changePercent: 0,
+        },
+      };
     },
     staleTime: 60 * 1000, // 1 minute
   });

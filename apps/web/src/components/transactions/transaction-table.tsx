@@ -23,11 +23,12 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 interface TransactionTableProps {
   tenantId: string;
   className?: string;
+  year?: number;
 }
 
 const PAGE_SIZE = 20;
 
-export function TransactionTable({ tenantId, className }: TransactionTableProps) {
+export function TransactionTable({ tenantId, className, year }: TransactionTableProps) {
   const [filters, setFilters] = React.useState<TransactionFiltersState>({
     status: 'all',
   });
@@ -39,10 +40,10 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
   const [detailModalOpen, setDetailModalOpen] = React.useState(false);
   const [viewTransaction, setViewTransaction] = React.useState<ITransaction | null>(null);
 
-  // Reset page when filters change
+  // Reset page when filters or year change
   React.useEffect(() => {
     setPage(1);
-  }, [filters]);
+  }, [filters, year]);
 
   // Build query parameters from filters
   const queryParams = React.useMemo(() => ({
@@ -54,7 +55,8 @@ export function TransactionTable({ tenantId, className }: TransactionTableProps)
     status: filters.status !== 'all' ? filters.status : undefined,
     categoryCode: filters.categoryCode,
     search: filters.search,
-  }), [tenantId, page, filters]);
+    year: !filters.dateRange?.from && !filters.dateRange?.to ? year : undefined, // Only use year if no date range filter
+  }), [tenantId, page, filters, year]);
 
   const { data, isLoading, isError, error, refetch } = useTransactionsList(queryParams);
 

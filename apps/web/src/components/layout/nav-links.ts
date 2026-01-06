@@ -11,6 +11,7 @@ import {
   BarChart3,
   Settings,
   GraduationCap,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export const mainNavLinks: NavLink[] = [
   { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { title: 'Transactions', href: '/transactions', icon: Receipt },
   { title: 'Invoices', href: '/invoices', icon: FileText },
+  { title: 'Statements', href: '/statements', icon: ClipboardList },
   { title: 'Payments', href: '/payments', icon: Wallet },
   { title: 'Arrears', href: '/arrears', icon: AlertTriangle },
 ];

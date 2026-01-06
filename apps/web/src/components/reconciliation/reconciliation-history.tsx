@@ -23,13 +23,18 @@ interface ReconciliationHistoryProps {
 }
 
 const statusConfig: Record<
-  ReconciliationStatus,
+  string,
   { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
 > = {
   IN_PROGRESS: { label: 'In Progress', variant: 'secondary' },
   PENDING_REVIEW: { label: 'Pending Review', variant: 'outline' },
   COMPLETED: { label: 'Completed', variant: 'default' },
+  RECONCILED: { label: 'Reconciled', variant: 'default' },
   DISCREPANCY: { label: 'Discrepancy', variant: 'destructive' },
+};
+
+const getStatusConfig = (status: string) => {
+  return statusConfig[status] || { label: status, variant: 'outline' as const };
 };
 
 export function ReconciliationHistory({
@@ -80,7 +85,7 @@ export function ReconciliationHistory({
               </TableHeader>
               <TableBody>
                 {reconciliations.map((recon) => {
-                  const status = statusConfig[recon.status];
+                  const status = getStatusConfig(recon.status);
                   const hasDiscrepancy = recon.discrepancy !== 0;
 
                   return (

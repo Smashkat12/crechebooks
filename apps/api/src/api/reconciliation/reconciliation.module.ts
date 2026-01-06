@@ -4,6 +4,7 @@
  * TASK-RECON-032: Financial Reports Endpoint
  * TASK-RECON-033: Balance Sheet API Endpoint
  * TASK-RECON-034: Audit Log Pagination and Filtering
+ * TASK-RECON-UI: Reconciliation List and Discrepancies Endpoints
  *
  * Provides the ReconciliationController with required dependencies.
  */
@@ -14,6 +15,7 @@ import { ReconciliationRepository } from '../../database/repositories/reconcilia
 import { FinancialReportService } from '../../database/services/financial-report.service';
 import { BalanceSheetService } from '../../database/services/balance-sheet.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
+import { DiscrepancyService } from '../../database/services/discrepancy.service';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import { PrismaModule } from '../../database/prisma';
 
@@ -26,6 +28,7 @@ import { PrismaModule } from '../../database/prisma';
     FinancialReportService,
     BalanceSheetService,
     AuditLogService,
+    DiscrepancyService,
     InvoiceRepository,
   ],
 })

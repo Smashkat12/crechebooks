@@ -7,9 +7,11 @@ export interface IParent {
   lastName: string;
   email: string;
   phone?: string;
-  whatsappNumber?: string;
+  whatsapp?: string;
   address?: string;
-  preferredCommunication: CommunicationMethod;
+  preferredContact: CommunicationMethod;
+  whatsappOptIn?: boolean;
+  smsOptIn?: boolean;
   children: IChild[];
 }
 
@@ -37,6 +39,7 @@ export enum EnrollmentStatus {
 export enum CommunicationMethod {
   EMAIL = 'EMAIL',
   WHATSAPP = 'WHATSAPP',
+  SMS = 'SMS',
   BOTH = 'BOTH',
 }
 
@@ -45,10 +48,26 @@ export interface IFeeStructure {
   tenantId: string;
   name: string;
   description?: string;
-  baseAmount: number; // Stored in cents
-  includes: string[];
-  extras: IFeeExtra[];
+  feeType?: FeeType;
+  baseAmount?: number; // Legacy: Stored in cents
+  amountCents?: number; // Primary: Monthly fee in cents
+  registrationFeeCents?: number; // One-time registration fee in cents
+  vatInclusive?: boolean;
+  siblingDiscountPercent?: number;
+  effectiveFrom?: Date;
+  effectiveTo?: Date;
+  includes?: string[];
+  extras?: IFeeExtra[];
   isActive: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export enum FeeType {
+  FULL_DAY = 'FULL_DAY',
+  HALF_DAY = 'HALF_DAY',
+  HOURLY = 'HOURLY',
+  CUSTOM = 'CUSTOM',
 }
 
 export interface IFeeExtra {

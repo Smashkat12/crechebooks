@@ -260,6 +260,7 @@ model Tenant {
   xeroOAuthState          XeroOAuthState?
   invoiceDeliveryLogs     InvoiceDeliveryLog[]
   reminderTemplates       ReminderTemplate[]
+  creditBalances          CreditBalance[]
 
   @@map("tenants")
 }
@@ -421,6 +422,7 @@ model FeeStructure {
   description            String?
   feeType                FeeType   @map("fee_type")
   amountCents            Int       @map("amount_cents")
+  registrationFeeCents   Int       @default(0) @map("registration_fee_cents")
   vatInclusive           Boolean   @default(true) @map("vat_inclusive")
   siblingDiscountPercent Decimal?  @map("sibling_discount_percent") @db.Decimal(5, 2)
   effectiveFrom          DateTime  @map("effective_from") @db.Date
@@ -471,6 +473,7 @@ model Parent {
   whatsapp         String?          @db.VarChar(20)
   preferredContact PreferredContact @default(EMAIL) @map("preferred_contact")
   whatsappOptIn    Boolean          @default(false) @map("whatsapp_opt_in")
+  smsOptIn         Boolean          @default(false) @map("sms_opt_in")
   idNumber         String?          @map("id_number") @db.VarChar(20)
   address          String?
   notes            String?
@@ -478,15 +481,47 @@ model Parent {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  tenant    Tenant     @relation(fields: [tenantId], references: [id])
-  children  Child[]
-  invoices  Invoice[]
-  reminders Reminder[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  children       Child[]
+  invoices       Invoice[]
+  reminders      Reminder[]
+  creditBalances CreditBalance[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([tenantId, lastName, firstName])
   @@map("parents")
+}
+
+// TASK-PAY-018: Credit Balance for Overpayments
+enum CreditBalanceSourceType {
+  OVERPAYMENT
+  REFUND
+  CREDIT_NOTE
+  ADJUSTMENT
+}
+
+model CreditBalance {
+  id                 String                  @id @default(uuid())
+  tenantId           String                  @map("tenant_id")
+  parentId           String                  @map("parent_id")
+  amountCents        Int                     @map("amount_cents")
+  sourceType         CreditBalanceSourceType @map("source_type")
+  sourceId           String?                 @map("source_id")
+  description        String?
+  appliedToInvoiceId String?                 @map("applied_to_invoice_id")
+  appliedAt          DateTime?               @map("applied_at")
+  isApplied          Boolean                 @default(false) @map("is_applied")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
+
+  tenant             Tenant                  @relation(fields: [tenantId], references: [id])
+  parent             Parent                  @relation(fields: [parentId], references: [id])
+  appliedToInvoice   Invoice?                @relation("CreditAppliedToInvoice", fields: [appliedToInvoiceId], references: [id])
+
+  @@index([tenantId, parentId])
+  @@index([tenantId, isApplied])
+  @@map("credit_balances")
 }
 
 model Child {
@@ -545,11 +580,12 @@ model Invoice {
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   parent        Parent         @relation(fields: [parentId], references: [id])
   child         Child          @relation(fields: [childId], references: [id])
-  lines         InvoiceLine[]
-  payments      Payment[]
-  reminders     Reminder[]
-  adHocCharges  AdHocCharge[]
-  deliveryLogs  InvoiceDeliveryLog[]
+  lines          InvoiceLine[]
+  payments       Payment[]
+  reminders      Reminder[]
+  adHocCharges   AdHocCharge[]
+  deliveryLogs   InvoiceDeliveryLog[]
+  creditBalances CreditBalance[]      @relation("CreditAppliedToInvoice")
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, parentId])

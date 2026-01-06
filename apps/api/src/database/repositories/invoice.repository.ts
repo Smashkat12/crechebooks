@@ -708,4 +708,38 @@ export class InvoiceRepository {
       );
     }
   }
+
+  /**
+   * Find last invoice by number prefix (for credit note numbering)
+   * @param tenantId - Tenant ID
+   * @param prefix - Invoice number prefix (e.g., "CN-2026-")
+   * @returns Last invoice matching prefix or null
+   * @throws DatabaseException for database errors
+   */
+  async findLastByPrefix(
+    tenantId: string,
+    prefix: string,
+  ): Promise<Invoice | null> {
+    try {
+      return await this.prisma.invoice.findFirst({
+        where: {
+          tenantId,
+          invoiceNumber: {
+            startsWith: prefix,
+          },
+        },
+        orderBy: { invoiceNumber: 'desc' },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find last invoice with prefix ${prefix} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findLastByPrefix',
+        'Failed to find last invoice by prefix',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
 }

@@ -75,11 +75,10 @@ export function DatePicker<
               selected={field.value ? new Date(field.value) : undefined}
               onSelect={(date) => {
                 if (date) {
-                  // Convert to SAST timezone (UTC+2)
-                  // Store as ISO string to preserve the date
+                  // Set to noon to avoid timezone issues, return as Date object
                   const localDate = new Date(date);
-                  localDate.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
-                  field.onChange(localDate.toISOString());
+                  localDate.setHours(12, 0, 0, 0);
+                  field.onChange(localDate);
                 } else {
                   field.onChange(null);
                 }

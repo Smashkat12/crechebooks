@@ -10,6 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,7 +29,6 @@ import { UserRole } from '../../database/entities/user.entity';
 import type { IUser } from '../../database/entities/user.entity';
 import { StaffRepository } from '../../database/repositories/staff.repository';
 import {
-  CreateStaffDto,
   UpdateStaffDto,
   StaffFilterDto,
 } from '../../database/dto/staff.dto';
@@ -36,6 +37,7 @@ import {
   PayFrequency,
 } from '../../database/entities/staff.entity';
 import { Staff } from '@prisma/client';
+import { ApiCreateStaffDto } from './dto';
 
 /**
  * Transform staff to snake_case response
@@ -128,7 +130,7 @@ export class StaffController {
   ): Promise<Record<string, unknown>> {
     const staff = await this.staffRepository.findById(id);
     if (!staff || staff.tenantId !== user.tenantId) {
-      throw new Error('Staff member not found');
+      throw new NotFoundException('Staff member not found');
     }
     return toSnakeCase(staff);
   }
@@ -141,13 +143,34 @@ export class StaffController {
   @ApiResponse({ status: 400, description: 'Invalid input' })
   async create(
     @CurrentUser() user: IUser,
-    @Body() dto: Omit<CreateStaffDto, 'tenantId'>,
+    @Body() dto: ApiCreateStaffDto,
   ): Promise<Record<string, unknown>> {
-    const staff = await this.staffRepository.create({
-      ...dto,
-      tenantId: user.tenantId,
-    });
-    return toSnakeCase(staff);
+    try {
+      // Transform API snake_case to service camelCase
+      // Note: isActive defaults to true in Prisma schema, no need to pass explicitly
+      const staff = await this.staffRepository.create({
+        tenantId: user.tenantId,
+        employeeNumber: dto.employee_number,
+        firstName: dto.first_name,
+        lastName: dto.last_name,
+        idNumber: dto.id_number,
+        taxNumber: dto.tax_number,
+        dateOfBirth: new Date(dto.date_of_birth),
+        startDate: new Date(dto.start_date),
+        endDate: dto.end_date ? new Date(dto.end_date) : undefined,
+        employmentType: EmploymentType.PERMANENT, // Default to PERMANENT
+        payFrequency: PayFrequency.MONTHLY, // Default to MONTHLY
+        basicSalaryCents: dto.salary,
+        bankAccount: dto.bank_account_number,
+        bankBranchCode: dto.bank_branch_code,
+      });
+      return toSnakeCase(staff);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   @Put(':id')
@@ -164,7 +187,7 @@ export class StaffController {
     // Verify staff belongs to tenant
     const existing = await this.staffRepository.findById(id);
     if (!existing || existing.tenantId !== user.tenantId) {
-      throw new Error('Staff member not found');
+      throw new NotFoundException('Staff member not found');
     }
     const staff = await this.staffRepository.update(id, dto);
     return toSnakeCase(staff);
@@ -184,7 +207,7 @@ export class StaffController {
     // Verify staff belongs to tenant
     const existing = await this.staffRepository.findById(id);
     if (!existing || existing.tenantId !== user.tenantId) {
-      throw new Error('Staff member not found');
+      throw new NotFoundException('Staff member not found');
     }
     // Use deactivate instead of hard delete to preserve payroll history
     await this.staffRepository.deactivate(id);

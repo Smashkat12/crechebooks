@@ -66,9 +66,9 @@ importers:
       '@prisma/client':
         specifier: ^7.2.0
         version: 7.2.0(prisma@7.2.0(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3))(typescript@5.9.3)
-      '@types/pdfkit':
-        specifier: ^0.17.4
-        version: 0.17.4
+      africastalking:
+        specifier: ^0.7.0
+        version: 0.7.8
       bull:
         specifier: ^4.16.5
         version: 4.16.5
@@ -93,6 +93,9 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
+      exceljs:
+        specifier: ^4.4.0
+        version: 4.4.0
       joi:
         specifier: ^18.0.2
         version: 18.0.2
@@ -178,6 +181,9 @@ importers:
       '@types/pdf-parse':
         specifier: ^1.1.5
         version: 1.1.5
+      '@types/pdfkit':
+        specifier: ^0.17.4
+        version: 0.17.4
       '@types/pg':
         specifier: ^8.16.0
         version: 8.16.0
@@ -2997,6 +3003,10 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  africastalking@0.7.8:
+    resolution: {integrity: sha512-IPQFB0bZiUe2mxje9xNIiLVT/ubvYWk2IBw70FpbaUVM99SFAywaenK3FKalSwBlNatHla8t6AhD/I2ZpB2x3w==}
+    engines: {node: '>=18'}
+
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
@@ -4391,6 +4401,10 @@ packages:
   globalthis@1.0.4:
     resolution: {integrity: sha512-DpLKbNU4WylpxJykQujfCcwYWiV/Jhm50Goo0wrVILAv5jOr9d+H+UR3PhSCD2rCCEIg0uc+G+muBTwD54JhDQ==}
     engines: {node: '>= 0.4'}
+
+  google-libphonenumber@3.2.43:
+    resolution: {integrity: sha512-TbIX/UC3BFRJwCxbBeCPwuRC4Qws9Jz/CECmfTM1t9RFoI3X6eRThurv6AYr9wSrt640IA9KFIHuAD/vlyjqRw==}
+    engines: {node: '>=0.10'}
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -10192,6 +10206,16 @@ snapshots:
 
   acorn@8.15.0: {}
 
+  africastalking@0.7.8:
+    dependencies:
+      axios: 1.13.2
+      dotenv: 17.2.3
+      google-libphonenumber: 3.2.43
+      joi: 18.0.2
+      lodash: 4.17.21
+    transitivePeerDependencies:
+      - debug
+
   agent-base@7.1.4: {}
 
   aggregate-error@3.1.0:
@@ -11840,6 +11864,8 @@ snapshots:
     dependencies:
       define-properties: 1.2.1
       gopd: 1.2.0
+
+  google-libphonenumber@3.2.43: {}
 
   gopd@1.2.0: {}
 

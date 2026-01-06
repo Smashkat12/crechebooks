@@ -28,8 +28,8 @@ function calculateProrata(feeStructure: IFeeStructure, enrollmentDate: Date): Pr
   const dayOfMonth = getDate(enrollDate);
   const remainingDays = monthDays - dayOfMonth + 1;
 
-  // Base amount is stored in cents
-  const monthlyAmount = feeStructure.baseAmount / 100;
+  // Amount is stored in cents (prefer amountCents, fallback to baseAmount for legacy)
+  const monthlyAmount = (feeStructure.amountCents ?? feeStructure.baseAmount ?? 0) / 100;
   const dailyRate = monthlyAmount / monthDays;
   const prorataAmount = dailyRate * remainingDays;
 
@@ -55,7 +55,7 @@ export function ProrataDisplay({ feeStructure, enrollmentDate }: ProrataDisplayP
         <AlertTitle>Full Month Billing</AlertTitle>
         <AlertDescription>
           Enrollment starts on the 1st of {prorata.monthName}. Full monthly fee of{' '}
-          <strong>{formatCurrency(feeStructure.baseAmount / 100)}</strong> will apply.
+          <strong>{formatCurrency((feeStructure.amountCents ?? feeStructure.baseAmount ?? 0) / 100)}</strong> will apply.
         </AlertDescription>
       </Alert>
     );
@@ -73,7 +73,7 @@ export function ProrataDisplay({ feeStructure, enrollmentDate }: ProrataDisplayP
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Monthly fee:</span>
-            <span>{formatCurrency(feeStructure.baseAmount / 100)}</span>
+            <span>{formatCurrency((feeStructure.amountCents ?? feeStructure.baseAmount ?? 0) / 100)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Days in month:</span>

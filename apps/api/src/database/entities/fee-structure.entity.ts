@@ -17,6 +17,8 @@ export interface IFeeStructure {
   description: string | null;
   feeType: FeeType;
   amountCents: number;
+  /** Registration fee in cents (one-time fee charged on enrollment) */
+  registrationFeeCents: number;
   vatInclusive: boolean;
   siblingDiscountPercent: number | null;
   effectiveFrom: Date;

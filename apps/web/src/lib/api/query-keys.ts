@@ -41,6 +41,8 @@ export const queryKeys = {
   },
   children: {
     all: ['children'] as const,
+    lists: () => [...queryKeys.children.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.children.lists(), params] as const,
     detail: (id: string) => [...queryKeys.children.all, 'detail', id] as const,
   },
   // Enrollments (uses children API)
@@ -60,6 +62,8 @@ export const queryKeys = {
   // Reconciliation
   reconciliation: {
     all: ['reconciliation'] as const,
+    lists: () => [...queryKeys.reconciliation.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.reconciliation.lists(), params] as const,
     summary: (params?: Record<string, unknown>) => [...queryKeys.reconciliation.all, 'summary', params] as const,
     discrepancies: () => [...queryKeys.reconciliation.all, 'discrepancies'] as const,
   },

@@ -13,10 +13,17 @@ import {
   Post,
   Body,
   Query,
+  Param,
+  Res,
   Logger,
   HttpCode,
   UseGuards,
+  StreamableFile,
+  NotFoundException,
 } from '@nestjs/common';
+import type { Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   ApiTags,
   ApiOperation,
@@ -28,6 +35,7 @@ import {
 import { UserRole } from '@prisma/client';
 import { PaymentAllocationService } from '../../database/services/payment-allocation.service';
 import { PaymentMatchingService } from '../../database/services/payment-matching.service';
+import { PaymentReceiptService } from '../../database/services/payment-receipt.service';
 import { ArrearsService } from '../../database/services/arrears.service';
 import { PaymentRepository } from '../../database/repositories/payment.repository';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
@@ -61,6 +69,7 @@ export class PaymentController {
   constructor(
     private readonly paymentAllocationService: PaymentAllocationService,
     private readonly paymentMatchingService: PaymentMatchingService,
+    private readonly paymentReceiptService: PaymentReceiptService,
     private readonly arrearsService: ArrearsService,
     private readonly paymentRepo: PaymentRepository,
     private readonly invoiceRepo: InvoiceRepository,
@@ -422,5 +431,142 @@ export class PaymentController {
         generated_at: report.generatedAt.toISOString(),
       },
     };
+  }
+
+  /**
+   * Generate a payment receipt PDF.
+   * TASK-PAY-019: Payment Receipt PDF Generation
+   */
+  @Post(':paymentId/receipt')
+  @HttpCode(201)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Generate payment receipt PDF',
+    description:
+      'Generates a PDF receipt for a payment. The receipt includes tenant branding, ' +
+      'payment details, parent/child information, and invoice reference.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Receipt generated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        data: {
+          type: 'object',
+          properties: {
+            receipt_number: { type: 'string', example: 'REC-2026-00001' },
+            download_url: {
+              type: 'string',
+              example: '/api/payments/uuid/receipt',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async generateReceipt(
+    @Param('paymentId') paymentId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: { receipt_number: string; download_url: string };
+  }> {
+    this.logger.log(
+      `Generate receipt: tenant=${user.tenantId}, payment=${paymentId}`,
+    );
+
+    const result = await this.paymentReceiptService.generateReceipt(
+      user.tenantId,
+      paymentId,
+    );
+
+    this.logger.log(
+      `Receipt generated: ${result.receiptNumber} for payment ${paymentId}`,
+    );
+
+    return {
+      success: true,
+      data: {
+        receipt_number: result.receiptNumber,
+        download_url: result.downloadUrl,
+      },
+    };
+  }
+
+  /**
+   * Download a payment receipt PDF.
+   * TASK-PAY-019: Payment Receipt PDF Generation
+   */
+  @Get(':paymentId/receipt')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Download payment receipt PDF',
+    description:
+      'Downloads the PDF receipt for a payment. If no receipt exists, generates one first.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Receipt PDF file',
+    content: {
+      'application/pdf': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Payment or receipt not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async downloadReceipt(
+    @Param('paymentId') paymentId: string,
+    @CurrentUser() user: IUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    this.logger.log(
+      `Download receipt: tenant=${user.tenantId}, payment=${paymentId}`,
+    );
+
+    // Check if receipt exists, generate if not
+    let receipt = await this.paymentReceiptService.findReceiptByPaymentId(
+      user.tenantId,
+      paymentId,
+    );
+
+    if (!receipt) {
+      // Generate receipt on-the-fly if it doesn't exist
+      receipt = await this.paymentReceiptService.generateReceipt(
+        user.tenantId,
+        paymentId,
+      );
+    }
+
+    // Verify file exists
+    if (!fs.existsSync(receipt.filePath)) {
+      throw new NotFoundException(
+        `Receipt file not found for payment ${paymentId}`,
+      );
+    }
+
+    // Stream the PDF file
+    const file = fs.createReadStream(receipt.filePath);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${receipt.receiptNumber}.pdf"`,
+    });
+
+    this.logger.log(`Streaming receipt ${receipt.receiptNumber} for download`);
+
+    return new StreamableFile(file);
   }
 }

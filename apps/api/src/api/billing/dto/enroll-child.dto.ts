@@ -145,6 +145,26 @@ export class EnrollmentSummaryDto {
 }
 
 /**
+ * Invoice summary in enrollment response (TASK-BILL-023)
+ */
+export class EnrollmentInvoiceSummaryDto {
+  @ApiProperty({ description: 'Invoice UUID' })
+  id!: string;
+
+  @ApiProperty({ description: 'Invoice number (INV-YYYY-NNNNN)' })
+  invoice_number!: string;
+
+  @ApiProperty({ description: 'Total amount in Rands' })
+  total!: number;
+
+  @ApiProperty({ description: 'Due date (YYYY-MM-DD)' })
+  due_date!: string;
+
+  @ApiProperty({ description: 'Invoice status' })
+  status!: string;
+}
+
+/**
  * Enrolled data structure
  */
 export class EnrollChildDataDto {
@@ -156,6 +176,14 @@ export class EnrollChildDataDto {
     description: 'Enrollment details',
   })
   enrollment!: EnrollmentSummaryDto;
+
+  @ApiProperty({
+    type: EnrollmentInvoiceSummaryDto,
+    required: false,
+    nullable: true,
+    description: 'Enrollment invoice (if created successfully)',
+  })
+  invoice?: EnrollmentInvoiceSummaryDto | null;
 }
 
 /**

@@ -22,6 +22,7 @@ import { InvoiceGenerationService } from './services/invoice-generation.service'
 import { InvoiceDeliveryService } from './services/invoice-delivery.service';
 import { InvoiceVatService } from './services/invoice-vat.service';
 import { ProRataService } from './services/pro-rata.service';
+import { CreditNoteService } from './services/credit-note.service';
 import { PaymentMatchingService } from './services/payment-matching.service';
 import { PaymentAllocationService } from './services/payment-allocation.service';
 import { ArrearsService } from './services/arrears.service';
@@ -48,8 +49,11 @@ import { ConflictDetectionService } from './services/conflict-detection.service'
 import { ConflictResolutionService } from './services/conflict-resolution.service';
 import { ReversalDetectionService } from './services/reversal-detection.service';
 import { CorrectionConflictService } from './services/correction-conflict.service';
+import { CreditBalanceService } from './services/credit-balance.service';
+import { PaymentReceiptService } from './services/payment-receipt.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
+import { SarsModule } from '../integrations/sars/sars.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
 import { PaymentMatcherModule } from '../agents/payment-matcher/matcher.module';
 import { SarsAgentModule } from '../agents/sars-agent/sars.module';
@@ -58,6 +62,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
   imports: [
     EmailModule,
     forwardRef(() => WhatsAppModule),
+    SarsModule,
     TransactionCategorizerModule,
     PaymentMatcherModule,
     forwardRef(() => SarsAgentModule),
@@ -86,6 +91,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     InvoiceDeliveryService,
     InvoiceVatService,
     ProRataService,
+    CreditNoteService,
     PaymentMatchingService,
     PaymentAllocationService,
     ArrearsService,
@@ -112,6 +118,8 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     PayeeVariationDetectorService,
     ReversalDetectionService,
     CorrectionConflictService,
+    CreditBalanceService,
+    PaymentReceiptService,
   ],
   exports: [
     PrismaService,
@@ -137,6 +145,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     InvoiceDeliveryService,
     InvoiceVatService,
     ProRataService,
+    CreditNoteService,
     PaymentMatchingService,
     PaymentAllocationService,
     ArrearsService,
@@ -163,6 +172,8 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     ConflictResolutionService,
     ReversalDetectionService,
     CorrectionConflictService,
+    CreditBalanceService,
+    PaymentReceiptService,
   ],
 })
 export class DatabaseModule {}

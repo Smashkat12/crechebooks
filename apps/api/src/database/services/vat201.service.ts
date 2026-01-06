@@ -8,7 +8,13 @@
  * All monetary values in CENTS (integers)
  * Uses Decimal.js with banker's rounding (ROUND_HALF_EVEN)
  */
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { v4 as uuidv4 } from 'uuid';
 import { SubmissionType, SubmissionStatus, TaxStatus } from '@prisma/client';
@@ -57,18 +63,18 @@ export class Vat201Service {
     });
 
     if (!tenant) {
-      throw new Error(`VAT201 generation failed: Tenant ${tenantId} not found`);
+      throw new NotFoundException(`Tenant not found`);
     }
 
     if (tenant.taxStatus !== TaxStatus.VAT_REGISTERED) {
-      throw new Error(
-        `VAT201 generation failed: Tenant ${tenantId} is not VAT registered`,
+      throw new ForbiddenException(
+        `VAT201 generation requires VAT registration. Please register for VAT in Settings.`,
       );
     }
 
     if (!tenant.vatNumber) {
-      throw new Error(
-        `VAT201 generation failed: Tenant ${tenantId} has no VAT number`,
+      throw new BadRequestException(
+        `VAT number is required. Please add your VAT number in Settings.`,
       );
     }
 

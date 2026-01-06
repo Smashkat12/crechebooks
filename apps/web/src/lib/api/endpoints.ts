@@ -50,9 +50,11 @@ export const endpoints = {
     submissions: '/sars/submissions',
   },
   reconciliation: {
+    list: '/reconciliation',
     reconcile: '/reconciliation',
     summary: '/reconciliation/summary',
     incomeStatement: '/reconciliation/income-statement',
+    discrepancies: '/reconciliation/discrepancies',
   },
   staff: {
     list: '/staff',

@@ -24,6 +24,7 @@ import { EnrollmentService } from './enrollment.service';
 import { AuditLogService } from './audit-log.service';
 import { XeroSyncService } from './xero-sync.service';
 import { ProRataService } from './pro-rata.service';
+import { CreditBalanceService } from './credit-balance.service';
 import { InvoiceStatus } from '../entities/invoice.entity';
 import { LineType, isVatApplicable } from '../entities/invoice-line.entity';
 import {
@@ -67,6 +68,7 @@ export class InvoiceGenerationService {
     private readonly auditLogService: AuditLogService,
     private readonly xeroSyncService: XeroSyncService,
     private readonly proRataService: ProRataService,
+    private readonly creditBalanceService: CreditBalanceService,
   ) {}
 
   /**
@@ -290,9 +292,74 @@ export class InvoiceGenerationService {
           }
 
           // Refresh invoice to get updated totals
-          const updatedInvoice = await this.invoiceRepo.findById(invoice.id);
+          let updatedInvoice = await this.invoiceRepo.findById(invoice.id);
           if (!updatedInvoice) {
             throw new Error('Invoice not found after creation');
+          }
+
+          // TASK-PAY-020: Check and apply available credit balances
+          if (updatedInvoice.totalCents > 0) {
+            const availableCreditCents = await this.creditBalanceService.getAvailableCredit(
+              tenantId,
+              enrollment.child.parentId,
+            );
+
+            if (availableCreditCents > 0) {
+              const creditToApply = Math.min(availableCreditCents, updatedInvoice.totalCents);
+
+              if (creditToApply > 0) {
+                // Apply credit using CreditBalanceService
+                const appliedCredit = await this.creditBalanceService.applyCreditToInvoice(
+                  tenantId,
+                  enrollment.child.parentId,
+                  invoice.id,
+                  creditToApply,
+                  userId,
+                );
+
+                if (appliedCredit > 0) {
+                  // Add credit line item (negative amount)
+                  await this.invoiceLineRepo.create({
+                    invoiceId: invoice.id,
+                    description: 'Credit Applied',
+                    quantity: 1,
+                    unitPriceCents: -appliedCredit, // Negative for credit
+                    discountCents: 0,
+                    subtotalCents: -appliedCredit,
+                    vatCents: 0, // Credits don't have VAT
+                    totalCents: -appliedCredit,
+                    lineType: LineType.CREDIT,
+                    accountCode: this.SCHOOL_FEES_ACCOUNT,
+                    sortOrder: 99, // Place credit line last
+                  });
+
+                  // Calculate new totals
+                  const newSubtotalCents = updatedInvoice.subtotalCents - appliedCredit;
+                  const newTotalCents = updatedInvoice.totalCents - appliedCredit;
+                  const newStatus: InvoiceStatus =
+                    newTotalCents <= 0 ? InvoiceStatus.PAID : (updatedInvoice.status as InvoiceStatus);
+
+                  // Update invoice totals
+                  await this.invoiceRepo.update(invoice.id, {
+                    subtotalCents: newSubtotalCents,
+                    totalCents: newTotalCents,
+                    amountPaidCents: appliedCredit, // Credit counts as partial payment
+                    status: newStatus,
+                  });
+
+                  this.logger.log(
+                    `Applied R${(appliedCredit / 100).toFixed(2)} credit to invoice ${updatedInvoice.invoiceNumber}, ` +
+                    `new total: R${(newTotalCents / 100).toFixed(2)}, status: ${newStatus}`,
+                  );
+
+                  // Refresh invoice with updated totals
+                  updatedInvoice = await this.invoiceRepo.findById(invoice.id);
+                  if (!updatedInvoice) {
+                    throw new Error('Invoice not found after credit application');
+                  }
+                }
+              }
+            }
           }
 
           // Sync to Xero - errors are logged but don't fail invoice creation

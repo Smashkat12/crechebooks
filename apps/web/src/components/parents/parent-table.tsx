@@ -26,6 +26,7 @@ interface ParentTableProps {
 const communicationLabels: Record<CommunicationMethod, string> = {
   EMAIL: 'Email',
   WHATSAPP: 'WhatsApp',
+  SMS: 'SMS',
   BOTH: 'Both',
 };
 
@@ -81,11 +82,11 @@ export function ParentTable({
       ),
     },
     {
-      accessorKey: 'preferredCommunication',
+      accessorKey: 'preferredContact',
       header: 'Contact Method',
       cell: ({ row }) => (
         <Badge variant="outline">
-          {communicationLabels[row.original.preferredCommunication]}
+          {communicationLabels[row.original.preferredContact]}
         </Badge>
       ),
     },

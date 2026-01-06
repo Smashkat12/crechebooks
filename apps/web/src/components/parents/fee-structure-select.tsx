@@ -62,7 +62,7 @@ export function FeeStructureSelect<
                 <div className="flex flex-col">
                   <span className="font-medium">{structure.name}</span>
                   <span className="text-sm text-muted-foreground">
-                    {formatCurrency(structure.baseAmount / 100)} / month
+                    {formatCurrency((structure.amountCents ?? structure.baseAmount ?? 0) / 100)} / month
                   </span>
                 </div>
               </SelectItem>

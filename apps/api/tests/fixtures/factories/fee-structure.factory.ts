@@ -50,7 +50,11 @@ export async function createFeeStructure(
 export async function createStandardFeeStructures(
   prisma: PrismaService,
   tenantId: string,
-): Promise<{ fullDay: FeeStructure; halfDay: FeeStructure; hourly: FeeStructure }> {
+): Promise<{
+  fullDay: FeeStructure;
+  halfDay: FeeStructure;
+  hourly: FeeStructure;
+}> {
   const fullDay = await createFeeStructure(prisma, {
     tenantId,
     name: 'Full Day Care',

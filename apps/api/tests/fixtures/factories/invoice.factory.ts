@@ -3,7 +3,12 @@
  * TASK-TEST-001: Centralized test fixtures
  */
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
-import { Invoice, InvoiceStatus, DeliveryMethod, DeliveryStatus } from '@prisma/client';
+import {
+  Invoice,
+  InvoiceStatus,
+  DeliveryMethod,
+  DeliveryStatus,
+} from '@prisma/client';
 import { generateUniqueId } from '../utils';
 
 export interface InvoiceFactoryOptions {
@@ -42,7 +47,8 @@ export async function createInvoice(
       tenantId: opts.tenantId,
       parentId: opts.parentId,
       childId: opts.childId,
-      invoiceNumber: opts.invoiceNumber ?? `INV-TEST-${uniqueId.slice(0, 8).toUpperCase()}`,
+      invoiceNumber:
+        opts.invoiceNumber ?? `INV-TEST-${uniqueId.slice(0, 8).toUpperCase()}`,
       billingPeriodStart: opts.billingPeriodStart ?? new Date('2025-01-01'),
       billingPeriodEnd: opts.billingPeriodEnd ?? new Date('2025-01-31'),
       issueDate: opts.issueDate ?? new Date(),
@@ -66,7 +72,8 @@ export async function createPaidInvoice(
   prisma: PrismaService,
   opts: InvoiceFactoryOptions,
 ): Promise<Invoice> {
-  const totalCents = opts.totalCents ?? (opts.subtotalCents ?? 300000) + (opts.vatCents ?? 0);
+  const totalCents =
+    opts.totalCents ?? (opts.subtotalCents ?? 300000) + (opts.vatCents ?? 0);
 
   return createInvoice(prisma, {
     ...opts,

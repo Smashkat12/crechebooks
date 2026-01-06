@@ -1,4 +1,64 @@
 // Payment types
+// TASK-STMT-002: Enhanced payment allocation types for statement generation
+
+/**
+ * Summary of a parent's account for statement generation
+ */
+export interface IParentAccountSummary {
+  parentId: string;
+  parentName: string;
+  email: string | null;
+  phone: string | null;
+  totalOutstandingCents: number;
+  creditBalanceCents: number;
+  netBalanceCents: number; // positive = owes, negative = credit
+  childCount: number;
+  oldestOutstandingDate?: Date;
+}
+
+/**
+ * Transaction record for account statement
+ */
+export interface IAccountTransaction {
+  id: string;
+  date: Date;
+  type: 'INVOICE' | 'PAYMENT' | 'CREDIT_NOTE' | 'ADJUSTMENT';
+  referenceNumber: string;
+  description: string;
+  debitCents: number;
+  creditCents: number;
+  runningBalanceCents: number;
+}
+
+/**
+ * Input for allocating a payment to invoices
+ */
+export interface IAllocatePaymentInput {
+  tenantId: string;
+  transactionId: string;
+  parentId: string;
+  allocations: IInvoiceAllocation[];
+  userId: string;
+}
+
+/**
+ * Single invoice allocation within a payment
+ */
+export interface IInvoiceAllocation {
+  invoiceId: string;
+  amountCents: number;
+}
+
+/**
+ * Suggested allocation for FIFO payment allocation
+ */
+export interface ISuggestedAllocation {
+  invoiceId: string;
+  invoiceNumber: string;
+  dueDate: Date;
+  outstandingCents: number;
+  suggestedAmountCents: number;
+}
 
 export interface IPayment {
   id: string;

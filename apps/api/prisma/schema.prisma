@@ -261,6 +261,7 @@ model Tenant {
   invoiceDeliveryLogs     InvoiceDeliveryLog[]
   reminderTemplates       ReminderTemplate[]
   creditBalances          CreditBalance[]
+  statements              Statement[]
 
   @@map("tenants")
 }
@@ -486,6 +487,7 @@ model Parent {
   invoices       Invoice[]
   reminders      Reminder[]
   creditBalances CreditBalance[]
+  statements     Statement[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -989,6 +991,73 @@ model Invitation {
   @@index([status])
   @@index([expiresAt])
   @@map("invitations")
+}
+
+// TASK-STMT-001: Statement Entity and Data Model (Phase 12)
+enum StatementStatus {
+  DRAFT
+  FINAL
+  DELIVERED
+  CANCELLED
+}
+
+enum StatementLineType {
+  OPENING_BALANCE
+  INVOICE
+  PAYMENT
+  CREDIT_NOTE
+  ADJUSTMENT
+  CLOSING_BALANCE
+}
+
+model Statement {
+  id                  String          @id @default(uuid())
+  tenantId            String          @map("tenant_id")
+  parentId            String          @map("parent_id")
+  statementNumber     String          @map("statement_number")
+  periodStart         DateTime        @map("period_start") @db.Date
+  periodEnd           DateTime        @map("period_end") @db.Date
+  openingBalanceCents Int             @map("opening_balance_cents") @default(0)
+  totalChargesCents   Int             @map("total_charges_cents") @default(0)
+  totalPaymentsCents  Int             @map("total_payments_cents") @default(0)
+  totalCreditsCents   Int             @map("total_credits_cents") @default(0)
+  closingBalanceCents Int             @map("closing_balance_cents") @default(0)
+  status              StatementStatus @default(DRAFT)
+  generatedAt         DateTime        @default(now()) @map("generated_at")
+  deliveryStatus      String?         @map("delivery_status") @db.VarChar(20)
+  deliveredAt         DateTime?       @map("delivered_at")
+  deliveryChannel     String?         @map("delivery_channel") @db.VarChar(20)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  tenant              Tenant          @relation(fields: [tenantId], references: [id])
+  parent              Parent          @relation(fields: [parentId], references: [id])
+  lines               StatementLine[]
+
+  @@unique([tenantId, statementNumber])
+  @@index([tenantId, parentId])
+  @@index([tenantId, periodStart, periodEnd])
+  @@map("statements")
+}
+
+model StatementLine {
+  id              String            @id @default(uuid())
+  statementId     String            @map("statement_id")
+  date            DateTime          @db.Date
+  description     String
+  lineType        StatementLineType @map("line_type")
+  referenceNumber String?           @map("reference_number") @db.VarChar(100)
+  referenceId     String?           @map("reference_id")
+  debitCents      Int               @map("debit_cents") @default(0)
+  creditCents     Int               @map("credit_cents") @default(0)
+  balanceCents    Int               @map("balance_cents") @default(0)
+  sortOrder       Int               @map("sort_order") @default(0)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  statement       Statement         @relation(fields: [statementId], references: [id], onDelete: Cascade)
+
+  @@index([statementId])
+  @@map("statement_lines")
 }
 
 // TASK-XERO-001: Bi-directional Sync Conflict Resolution

@@ -2,11 +2,22 @@
 
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
+import { resetAuthState } from '@/lib/api/client';
 
 export function useAuth() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  // Sync token to localStorage when session changes
+  useEffect(() => {
+    if (status === 'authenticated' && session?.accessToken) {
+      localStorage.setItem('token', session.accessToken);
+      resetAuthState(); // Reset 401 handling flag on successful auth
+    } else if (status === 'unauthenticated') {
+      localStorage.removeItem('token');
+    }
+  }, [session, status]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -20,6 +31,7 @@ export function useAuth() {
         throw new Error(result.error);
       }
 
+      resetAuthState(); // Reset after successful login
       router.push('/dashboard');
       router.refresh();
     },
@@ -27,6 +39,7 @@ export function useAuth() {
   );
 
   const logout = useCallback(async () => {
+    localStorage.removeItem('token');
     await signOut({ redirect: false });
     router.push('/login');
     router.refresh();

@@ -154,7 +154,9 @@ export class ReconciliationController {
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiOperation({ summary: 'List reconciliations with filtering and pagination' })
+  @ApiOperation({
+    summary: 'List reconciliations with filtering and pagination',
+  })
   @ApiResponse({
     status: 200,
     type: ReconciliationListResponseDto,
@@ -280,7 +282,9 @@ export class ReconciliationController {
         // Transform discrepancies to API format
         for (const d of report.discrepancies) {
           allDiscrepancies.push({
-            id: d.transactionId ?? `discrepancy-${recon.id}-${allDiscrepancies.length}`,
+            id:
+              d.transactionId ??
+              `discrepancy-${recon.id}-${allDiscrepancies.length}`,
             reconciliation_id: recon.id,
             type: d.type,
             description: d.description,

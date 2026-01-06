@@ -6,6 +6,7 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  IsUUID,
   Min,
   ValidateNested,
   MaxLength,
@@ -97,6 +98,33 @@ export class UpdateCategorizationRequestDto {
   @IsOptional()
   @IsBoolean()
   create_pattern?: boolean;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description:
+      'Parent ID for income allocation. When provided for income categories (4000-4999) on credit transactions, ' +
+      'creates a payment record and auto-allocates to oldest outstanding invoices (FIFO)',
+  })
+  @IsOptional()
+  @IsUUID()
+  parent_id?: string;
+}
+
+/**
+ * Payment allocation info for income categorization
+ */
+export class PaymentAllocationInfoDto {
+  @ApiProperty({ example: 'uuid-payment-id' })
+  payment_id: string;
+
+  @ApiProperty({ example: 'uuid-invoice-id' })
+  invoice_id: string;
+
+  @ApiProperty({ example: 'INV-2025-001' })
+  invoice_number: string;
+
+  @ApiProperty({ example: 150000, description: 'Amount allocated in cents' })
+  amount_cents: number;
 }
 
 /**
@@ -114,5 +142,9 @@ export class UpdateCategorizationResponseDto {
     account_name: string;
     source: string;
     pattern_created: boolean;
+    /** Payment allocations created (for income categories with parent_id) */
+    payment_allocations?: PaymentAllocationInfoDto[];
+    /** Unallocated amount in cents (if transaction exceeds outstanding invoices) */
+    unallocated_cents?: number;
   };
 }

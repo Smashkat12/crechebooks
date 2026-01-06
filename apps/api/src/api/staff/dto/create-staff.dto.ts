@@ -77,7 +77,10 @@ export class ApiCreateStaffDto {
   @MaxLength(10)
   bank_branch_code?: string;
 
-  @ApiProperty({ example: 'ACTIVE', enum: ['ACTIVE', 'INACTIVE', 'TERMINATED'] })
+  @ApiProperty({
+    example: 'ACTIVE',
+    enum: ['ACTIVE', 'INACTIVE', 'TERMINATED'],
+  })
   @IsEnum(['ACTIVE', 'INACTIVE', 'TERMINATED'])
   status!: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
 }

@@ -49,7 +49,8 @@ export class TransactionResponseDto {
 
   @ApiProperty({
     example: false,
-    description: 'True if transaction has been split across multiple categories',
+    description:
+      'True if transaction has been split across multiple categories',
   })
   is_split: boolean;
 

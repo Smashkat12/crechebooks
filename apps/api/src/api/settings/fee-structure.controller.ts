@@ -46,6 +46,8 @@ function toSnakeCase(fee: FeeStructure): Record<string, unknown> {
     fee_type: fee.feeType,
     amount_cents: fee.amountCents,
     amount: fee.amountCents / 100,
+    registration_fee_cents: fee.registrationFeeCents,
+    registration_fee: fee.registrationFeeCents / 100,
     vat_inclusive: fee.vatInclusive,
     sibling_discount_percent: fee.siblingDiscountPercent,
     effective_from: fee.effectiveFrom,
@@ -125,6 +127,7 @@ export class FeeStructureController {
       description?: string;
       fee_type: FeeType;
       amount: number;
+      registration_fee?: number;
       vat_inclusive?: boolean;
       sibling_discount_percent?: number;
       effective_from: string;
@@ -141,6 +144,9 @@ export class FeeStructureController {
       description: body.description,
       feeType: body.fee_type,
       amountCents: Math.round(body.amount * 100),
+      registrationFeeCents: body.registration_fee
+        ? Math.round(body.registration_fee * 100)
+        : 0,
       vatInclusive: body.vat_inclusive ?? true,
       siblingDiscountPercent: body.sibling_discount_percent,
       effectiveFrom: new Date(body.effective_from),
@@ -170,6 +176,7 @@ export class FeeStructureController {
       description?: string;
       fee_type?: FeeType;
       amount?: number;
+      registration_fee?: number;
       vat_inclusive?: boolean;
       sibling_discount_percent?: number;
       effective_from?: string;
@@ -190,6 +197,10 @@ export class FeeStructureController {
       feeType: body.fee_type,
       amountCents:
         body.amount !== undefined ? Math.round(body.amount * 100) : undefined,
+      registrationFeeCents:
+        body.registration_fee !== undefined
+          ? Math.round(body.registration_fee * 100)
+          : undefined,
       vatInclusive: body.vat_inclusive,
       siblingDiscountPercent: body.sibling_discount_percent,
       effectiveFrom: body.effective_from

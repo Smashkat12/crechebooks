@@ -5,7 +5,13 @@
  * Provides reusable test context creation and cleanup for E2E tests.
  */
 import { PrismaService } from '../../src/database/prisma/prisma.service';
-import { createTestTenant, createTestUser, getAuthToken, TestTenant, TestUser } from '../helpers';
+import {
+  createTestTenant,
+  createTestUser,
+  getAuthToken,
+  TestTenant,
+  TestUser,
+} from '../helpers';
 import { UserRole } from '@prisma/client';
 
 // Import generateUniqueId from utils for local use

@@ -89,7 +89,7 @@ export class AfricasTalkingSmsGateway implements ISmsGateway {
 
     try {
       // Dynamic import to avoid issues if package not installed
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+
       const AfricasTalking = require('africastalking');
       const client: AfricasTalkingSDK = AfricasTalking({
         apiKey,
@@ -174,7 +174,7 @@ export class AfricasTalkingSmsGateway implements ISmsGateway {
 
       // Log outgoing request
       this.logger.debug({
-        message: 'Sending SMS via Africa\'s Talking',
+        message: "Sending SMS via Africa's Talking",
         to: this.maskPhone(to),
         senderId: options?.senderId || this.senderId,
         messageLength: message.length,
@@ -299,10 +299,7 @@ export class AfricasTalkingSmsGateway implements ISmsGateway {
    * - 501: GatewayError
    * - 502: RejectedByGateway
    */
-  private mapStatus(
-    atStatus: string,
-    statusCode: number,
-  ): SmsDeliveryStatus {
+  private mapStatus(atStatus: string, statusCode: number): SmsDeliveryStatus {
     // Handle by status code first (more reliable)
     switch (statusCode) {
       case 100:

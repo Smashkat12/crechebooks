@@ -99,7 +99,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message = (resp.message as string) || message;
         code = (resp.error as string) || code;
       } else {
-        message = exceptionResponse as string;
+        message = exceptionResponse;
       }
     }
 

@@ -27,6 +27,7 @@ interface TransactionListParams extends Record<string, unknown> {
   startDate?: string;
   endDate?: string;
   search?: string;
+  year?: number;
 }
 
 interface CategorizeTransactionParams {
@@ -34,6 +35,7 @@ interface CategorizeTransactionParams {
   categoryId: string; // Actually account_code from Chart of Accounts
   confidence?: number; // Optional, for UI display purposes
   notes?: string; // Optional notes
+  parentId?: string; // For income categories - allocate payment to parent account
 }
 
 // Map account codes to names (must match CategorySelect)
@@ -187,11 +189,12 @@ export function useCategorizeTransaction() {
   const queryClient = useQueryClient();
 
   return useMutation<TransactionWithCategorization, AxiosError, CategorizeTransactionParams>({
-    mutationFn: async ({ transactionId, categoryId }) => {
+    mutationFn: async ({ transactionId, categoryId, parentId }) => {
       // categoryId is actually an account_code (e.g., '5100')
       const accountName = ACCOUNT_CODE_TO_NAME[categoryId] || 'Unknown Category';
 
       // API expects PUT with account_code, account_name, is_split, vat_type
+      // For income categories with parent_id, backend will create a payment record
       const { data } = await apiClient.put<UpdateCategorizationResponse>(
         endpoints.transactions.categorize(transactionId),
         {
@@ -200,6 +203,7 @@ export function useCategorizeTransaction() {
           is_split: false,
           vat_type: 'STANDARD',
           create_pattern: true, // Learn from user corrections
+          parent_id: parentId, // For income allocation to parent account
         }
       );
 

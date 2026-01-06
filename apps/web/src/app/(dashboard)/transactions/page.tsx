@@ -18,10 +18,13 @@ import { TransactionTable } from '@/components/transactions';
 import { useAuth } from '@/hooks/use-auth';
 import { useImportTransactions } from '@/hooks/use-transactions';
 import { apiClient, endpoints } from '@/lib/api';
+import { YearSelector } from '@/components/common/year-selector';
 
 export default function TransactionsPage() {
   const { user } = useAuth();
   const tenantId = user?.tenantId ?? '';
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -99,25 +102,33 @@ export default function TransactionsPage() {
               View and categorize bank transactions
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExport} disabled={isExporting}>
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-2" />
-              )}
-              Export
-            </Button>
-            <Button onClick={() => setIsImportDialogOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Import Statement
-            </Button>
+          <div className="flex items-center gap-4">
+            <YearSelector
+              value={selectedYear}
+              onChange={setSelectedYear}
+              startYear={2024}
+              endYear={currentYear}
+            />
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Export
+              </Button>
+              <Button onClick={() => setIsImportDialogOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import Statement
+              </Button>
+            </div>
           </div>
         </div>
 
         <Card>
           <CardContent className="pt-6">
-            <TransactionTable tenantId={tenantId} />
+            <TransactionTable tenantId={tenantId} year={selectedYear} />
           </CardContent>
         </Card>
       </div>

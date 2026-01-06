@@ -29,8 +29,9 @@ export const endpoints = {
     suggestions: (id: string) => `/payments/${id}/suggestions`,
   },
   arrears: {
-    list: '/arrears',
-    summary: '/arrears/summary',
+    // Arrears is served under /payments/arrears
+    list: '/payments/arrears',
+    summary: '/payments/arrears',
     sendReminder: '/arrears/reminder',
   },
   parents: {
@@ -97,5 +98,15 @@ export const endpoints = {
     bankConnections: '/xero/bank-connections',
     connectBankAccount: '/xero/bank-accounts/connect',
     disconnectBankAccount: '/xero/bank-accounts/disconnect',
+  },
+  statements: {
+    list: '/statements',
+    detail: (id: string) => `/statements/${id}`,
+    pdf: (id: string) => `/statements/${id}/pdf`,
+    generate: '/statements/generate',
+    generateBulk: '/statements/generate/bulk',
+    finalize: (id: string) => `/statements/${id}/finalize`,
+    forParent: (parentId: string) => `/statements/parents/${parentId}`,
+    parentAccount: (parentId: string) => `/statements/parents/${parentId}/account`,
   },
 } as const;

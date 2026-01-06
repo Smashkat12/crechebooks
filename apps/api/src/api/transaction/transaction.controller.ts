@@ -25,11 +25,13 @@ import {
 } from '@nestjs/swagger';
 import { TransactionRepository } from '../../database/repositories/transaction.repository';
 import { CategorizationRepository } from '../../database/repositories/categorization.repository';
+import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import {
   TransactionImportService,
   ImportFile,
 } from '../../database/services/transaction-import.service';
 import { CategorizationService } from '../../database/services/categorization.service';
+import { PaymentAllocationService } from '../../database/services/payment-allocation.service';
 import { UserCategorizationDto as ServiceUserCategorizationDto } from '../../database/dto/categorization-service.dto';
 import { VatType } from '../../database/entities/categorization.entity';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -62,11 +64,16 @@ import { SuggestionsResponseDto } from './dto/suggestions.dto';
 export class TransactionController {
   private readonly logger = new Logger(TransactionController.name);
 
+  // Income category codes (4000-4999 range)
+  private readonly INCOME_CATEGORIES = ['4000', '4100', '4200', '4900'];
+
   constructor(
     private readonly transactionRepo: TransactionRepository,
     private readonly categorizationRepo: CategorizationRepository,
+    private readonly invoiceRepo: InvoiceRepository,
     private readonly importService: TransactionImportService,
     private readonly categorizationService: CategorizationService,
+    private readonly paymentAllocationService: PaymentAllocationService,
   ) {}
 
   @Get()
@@ -92,10 +99,20 @@ export class TransactionController {
     );
 
     // Build filter for repository
+    // Handle year filter - convert to date range
+    let dateFrom = query.date_from ? new Date(query.date_from) : undefined;
+    let dateTo = query.date_to ? new Date(query.date_to) : undefined;
+
+    if (query.year && !dateFrom && !dateTo) {
+      // Year filter takes precedence when no explicit date range provided
+      dateFrom = new Date(Date.UTC(query.year, 0, 1, 0, 0, 0, 0)); // Jan 1
+      dateTo = new Date(Date.UTC(query.year, 11, 31, 23, 59, 59, 999)); // Dec 31
+    }
+
     const filter = {
       status: query.status,
-      dateFrom: query.date_from ? new Date(query.date_from) : undefined,
-      dateTo: query.date_to ? new Date(query.date_to) : undefined,
+      dateFrom,
+      dateTo,
       isReconciled: query.is_reconciled,
       search: query.search,
       page: query.page ?? 1,
@@ -108,7 +125,10 @@ export class TransactionController {
     // Fetch categorizations for all transactions in batch
     const transactionIds = result.data.map((tx) => tx.id);
     const categorizationMap = new Map<string, CategorizationResponseDto>();
-    const splitInfoMap = new Map<string, { isSplit: boolean; splitCount: number }>();
+    const splitInfoMap = new Map<
+      string,
+      { isSplit: boolean; splitCount: number }
+    >();
 
     for (const txId of transactionIds) {
       const cats = await this.categorizationRepo.findByTransaction(txId);
@@ -116,7 +136,10 @@ export class TransactionController {
         // Check if transaction has splits
         const splitCats = cats.filter((c) => c.isSplit);
         const isSplit = splitCats.length > 0;
-        splitInfoMap.set(txId, { isSplit, splitCount: isSplit ? splitCats.length : 0 });
+        splitInfoMap.set(txId, {
+          isSplit,
+          splitCount: isSplit ? splitCats.length : 0,
+        });
 
         // Use most recent non-split categorization, or first if all are splits
         const primary = cats.find((c) => !c.isSplit) ?? cats[0];
@@ -134,7 +157,10 @@ export class TransactionController {
 
     // Transform to response DTOs
     const data: TransactionResponseDto[] = result.data.map((tx) => {
-      const splitInfo = splitInfoMap.get(tx.id) ?? { isSplit: false, splitCount: 0 };
+      const splitInfo = splitInfoMap.get(tx.id) ?? {
+        isSplit: false,
+        splitCount: 0,
+      };
       return {
         id: tx.id,
         date: tx.date.toISOString().split('T')[0],
@@ -298,7 +324,7 @@ export class TransactionController {
     @CurrentUser() user: IUser,
   ): Promise<UpdateCategorizationResponseDto> {
     this.logger.log(
-      `Update categorization: tx=${id}, account=${dto.account_code}, tenant=${user.tenantId}`,
+      `Update categorization: tx=${id}, account=${dto.account_code}, parent_id=${dto.parent_id ?? 'none'}, tenant=${user.tenantId}`,
     );
 
     // Map API DTO to service DTO
@@ -324,7 +350,8 @@ export class TransactionController {
       user.tenantId,
     );
 
-    return {
+    // Base response
+    const response: UpdateCategorizationResponseDto = {
       success: true,
       data: {
         id: transaction.id,
@@ -335,6 +362,82 @@ export class TransactionController {
         pattern_created: dto.create_pattern !== false && !dto.is_split,
       },
     };
+
+    // Handle income allocation to parent account
+    // When parent_id is provided for income categories on credit transactions,
+    // auto-allocate to outstanding invoices (FIFO - oldest first)
+    if (dto.parent_id && this.INCOME_CATEGORIES.includes(dto.account_code)) {
+      // Get the full transaction to check if it's a credit
+      const fullTransaction = await this.transactionRepo.findById(
+        user.tenantId,
+        id,
+      );
+
+      if (fullTransaction && fullTransaction.isCredit) {
+        this.logger.log(
+          `Income allocation: tx=${id}, parent=${dto.parent_id}, amount=${fullTransaction.amountCents} cents`,
+        );
+
+        try {
+          // Get suggested allocations (FIFO - oldest invoices first)
+          const suggestions =
+            await this.paymentAllocationService.suggestAllocation(
+              user.tenantId,
+              id,
+              dto.parent_id,
+            );
+
+          if (suggestions.length > 0) {
+            // Allocate to outstanding invoices
+            const allocationResult =
+              await this.paymentAllocationService.allocatePayment({
+                tenantId: user.tenantId,
+                transactionId: id,
+                allocations: suggestions.map((s) => ({
+                  invoiceId: s.invoiceId,
+                  amountCents: s.suggestedAmountCents,
+                })),
+                userId: user.id,
+              });
+
+            // Add payment allocations to response
+            response.data.payment_allocations = [];
+            for (const payment of allocationResult.payments) {
+              const invoice = await this.invoiceRepo.findById(
+                payment.invoiceId,
+              );
+              response.data.payment_allocations.push({
+                payment_id: payment.id,
+                invoice_id: payment.invoiceId,
+                invoice_number: invoice?.invoiceNumber ?? 'Unknown',
+                amount_cents: payment.amountCents,
+              });
+            }
+
+            response.data.unallocated_cents =
+              allocationResult.unallocatedAmountCents;
+
+            this.logger.log(
+              `Allocated ${allocationResult.payments.length} payments, unallocated=${allocationResult.unallocatedAmountCents} cents`,
+            );
+          } else {
+            // No outstanding invoices - keep full amount as credit balance
+            this.logger.log(
+              `No outstanding invoices for parent ${dto.parent_id}, transaction remains unallocated`,
+            );
+            response.data.unallocated_cents = fullTransaction.amountCents;
+          }
+        } catch (error) {
+          // Log error but don't fail the categorization
+          this.logger.warn(
+            `Failed to auto-allocate income to invoices: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          // Still return success since categorization succeeded
+        }
+      }
+    }
+
+    return response;
   }
 
   @Post('categorize/batch')

@@ -82,8 +82,8 @@ export const queryKeys = {
   // Dashboard
   dashboard: {
     all: ['dashboard'] as const,
-    metrics: (period?: string) => [...queryKeys.dashboard.all, 'metrics', period] as const,
-    trends: (period?: string) => [...queryKeys.dashboard.all, 'trends', period] as const,
+    metrics: (period?: string, year?: number) => [...queryKeys.dashboard.all, 'metrics', period, year] as const,
+    trends: (period?: string, year?: number) => [...queryKeys.dashboard.all, 'trends', period, year] as const,
     learningMode: () => [...queryKeys.dashboard.all, 'learning-mode'] as const,
   },
   // Reports
@@ -111,5 +111,14 @@ export const queryKeys = {
     all: ['xero'] as const,
     status: () => [...queryKeys.xero.all, 'status'] as const,
     syncJobs: () => [...queryKeys.xero.all, 'sync-jobs'] as const,
+  },
+  // Statements
+  statements: {
+    all: ['statements'] as const,
+    lists: () => [...queryKeys.statements.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.statements.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.statements.all, 'detail', id] as const,
+    forParent: (parentId: string) => [...queryKeys.statements.all, 'parent', parentId] as const,
+    parentAccount: (parentId: string) => [...queryKeys.statements.all, 'account', parentId] as const,
   },
 } as const;

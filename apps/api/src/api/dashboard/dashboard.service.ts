@@ -12,25 +12,41 @@ export class DashboardService {
   async getMetrics(
     tenantId: string,
     period?: string,
+    year?: number,
   ): Promise<DashboardMetricsResponseDto> {
     this.logger.debug(
-      `Getting dashboard metrics for tenant ${tenantId}, period: ${period || 'current_month'}`,
+      `Getting dashboard metrics for tenant ${tenantId}, period: ${period || 'current_month'}, year: ${year || 'auto'}`,
     );
 
-    // Find the most recent transaction date to determine which month to show
-    const latestTransaction = await this.prisma.transaction.findFirst({
-      where: { tenantId, isDeleted: false },
-      orderBy: { date: 'desc' },
-      select: { date: true },
-    });
+    let startOfPeriod: Date;
+    let endOfPeriod: Date;
+    let referenceDate: Date;
 
-    // Use the latest transaction's month, or current month if no transactions
-    const referenceDate = latestTransaction?.date || new Date();
-    // Use UTC dates to avoid timezone issues
-    const year = referenceDate.getUTCFullYear();
-    const month = referenceDate.getUTCMonth();
-    const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
-    const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+    if (year) {
+      // Year filter provided - show full calendar year data
+      startOfPeriod = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)); // Jan 1
+      endOfPeriod = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)); // Dec 31
+      referenceDate = new Date(Date.UTC(year, 11, 31)); // Use Dec 31 as reference
+    } else {
+      // No year filter - use latest transaction's month
+      const latestTransaction = await this.prisma.transaction.findFirst({
+        where: { tenantId, isDeleted: false },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      });
+
+      // Use the latest transaction's month, or current month if no transactions
+      referenceDate = latestTransaction?.date || new Date();
+      // Use UTC dates to avoid timezone issues
+      const refYear = referenceDate.getUTCFullYear();
+      const month = referenceDate.getUTCMonth();
+      startOfPeriod = new Date(Date.UTC(refYear, month, 1, 0, 0, 0, 0));
+      endOfPeriod = new Date(Date.UTC(refYear, month + 1, 0, 23, 59, 59, 999));
+    }
+
+    // For backward compatibility, also support these as aliases
+    const startOfMonth = startOfPeriod;
+    const endOfMonth = endOfPeriod;
 
     this.logger.debug(
       `Using date range: ${startOfMonth.toISOString()} to ${endOfMonth.toISOString()} (based on latest transaction)`,
@@ -234,29 +250,42 @@ export class DashboardService {
   async getTrends(
     tenantId: string,
     period?: string,
+    year?: number,
   ): Promise<DashboardTrendsResponseDto> {
     this.logger.debug(
-      `Getting dashboard trends for tenant ${tenantId}, period: ${period || 'last_6_months'}`,
+      `Getting dashboard trends for tenant ${tenantId}, period: ${period || 'last_6_months'}, year: ${year || 'auto'}`,
     );
 
-    // Find the most recent transaction date to determine the reference point
-    const latestTransaction = await this.prisma.transaction.findFirst({
-      where: { tenantId, isDeleted: false },
-      orderBy: { date: 'desc' },
-      select: { date: true },
-    });
+    let refYear: number;
+    let refMonth: number;
+    let monthsToShow: number;
 
-    // Use the latest transaction's month as reference, or current date if no transactions
-    const referenceDate = latestTransaction?.date || new Date();
-    const refYear = referenceDate.getUTCFullYear();
-    const refMonth = referenceDate.getUTCMonth();
-    this.logger.debug(
-      `Trends reference date: ${referenceDate.toISOString()} (latest transaction)`,
-    );
+    if (year) {
+      // Year filter - show all 12 months of the specified year
+      refYear = year;
+      refMonth = 11; // December
+      monthsToShow = 12;
+      this.logger.debug(`Trends for calendar year ${year} (12 months)`);
+    } else {
+      // No year filter - use latest transaction's month as reference
+      const latestTransaction = await this.prisma.transaction.findFirst({
+        where: { tenantId, isDeleted: false },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      });
+
+      const referenceDate = latestTransaction?.date || new Date();
+      refYear = referenceDate.getUTCFullYear();
+      refMonth = referenceDate.getUTCMonth();
+      monthsToShow = 6;
+      this.logger.debug(
+        `Trends reference date: ${referenceDate.toISOString()} (latest transaction)`,
+      );
+    }
 
     const data: DashboardTrendsResponseDto['data'] = [];
 
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < monthsToShow; i++) {
       // Use UTC dates to avoid timezone issues
       const monthStart = new Date(
         Date.UTC(refYear, refMonth - 5 + i, 1, 0, 0, 0, 0),

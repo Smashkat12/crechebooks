@@ -272,16 +272,28 @@ graph TD
 | PRD Compliance - SARS | 1 | 0 | 0% |
 | PRD Compliance - Reports | 2 | 0 | 0% |
 | PRD Compliance - Xero | 1 | 0 | 0% |
-| PRD Compliance - Foundation | 2 | 0 | 0% |
-| **Subtotal (Phase 9)** | **15** | **9** | **60%** |
-| **Grand Total** | **149** | **143** | **96%** |
+| PRD Compliance - Foundation | 2 | 2 | 100% |
+| **Subtotal (Phase 9)** | **15** | **15** | **100%** |
+| E2E Bug Fixes - Foundation | 1 | 1 | 100% |
+| E2E Bug Fixes - Logic | 1 | 1 | 100% |
+| E2E Bug Fixes - Surface | 3 | 3 | 100% |
+| **Subtotal (Phase 10)** | **5** | **5** | **100%** |
+| **Subtotal (Phase 11)** | **4** | **4** | **100%** |
+| Statement - Foundation | 1 | 0 | 0% |
+| Statement - Logic | 5 | 0 | 0% |
+| Statement - Surface | 2 | 0 | 0% |
+| **Subtotal (Phase 12)** | **8** | **0** | **0%** |
+| **Grand Total** | **166** | **158** | **95%** |
 
 **Last Updated**: 2026-01-06
 - Phases 1-6 (Core): 93/93 tasks complete (100%) ✅
 - Phase 7 (Remediation): 28/28 tasks complete (100%) ✅
 - Phase 8 (Gap Remediation): 13/13 tasks complete (100%) ✅
-- Phase 9 (PRD Compliance): 9/15 tasks complete (60%) 🟡 **IN PROGRESS**
-- Overall Progress: 143/149 tasks (96%)
+- Phase 9 (PRD Compliance): 15/15 tasks complete (100%) ✅
+- Phase 10 (E2E Bug Fixes): 5/5 tasks complete (100%) ✅
+- Phase 11 (E2E Bug Fixes R2): 4/4 tasks complete (100%) ✅
+- Phase 12 (Account Statements): 0/8 tasks pending (0%) ⭕
+- Overall Progress: 158/166 tasks (95%)
 
 ---
 
@@ -461,8 +473,160 @@ These tasks address critical PRD violations discovered during comprehensive gap 
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 152 | TASK-TEST-001 | Remove Mock Data from E2E Tests | testing | — | P0-BLOCKER | ⭕ Pending |
-| 153 | TASK-TEST-002 | Add Fail-Fast Error Logging Throughout | testing | — | P0-BLOCKER | ⭕ Pending |
+| 152 | TASK-TEST-001 | Remove Mock Data from E2E Tests | testing | — | P0-BLOCKER | ✅ Complete |
+| 153 | TASK-TEST-002 | Add Fail-Fast Error Logging Throughout | testing | — | P0-BLOCKER | ✅ Complete |
+
+---
+
+## Phase 10: E2E Bug Fixes (Playwright Testing)
+
+Analysis Date: 2026-01-06
+These tasks address bugs discovered during comprehensive Playwright E2E testing.
+
+### 10.1 Foundation Layer (Database)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 154 | TASK-E2E-001 | Critical Prisma Schema Mismatch Fix | foundation | — | P0-BLOCKER | ✅ Complete |
+
+### 10.2 Logic Layer (Services)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 157 | TASK-E2E-004 | VAT201 Duplicate Submission Error | logic | TASK-SARS-014 | P1-CRITICAL | ✅ Complete |
+
+### 10.3 Surface Layer (UI/UX)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 155 | TASK-E2E-002 | Date Picker Year Range for DOB Fields | surface | TASK-WEB-008 | P2-HIGH | ✅ Complete |
+| 156 | TASK-E2E-003 | SA ID Validation Too Strict | surface | — | P2-HIGH | ✅ Complete |
+| 158 | TASK-E2E-005 | Arrears Page Data Mismatch | surface | TASK-PAY-033 | P2-HIGH | ✅ Complete |
+
+---
+
+## Phase 10 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-BLOCKER | 1 | 1 | 0 | 100% |
+| P1-CRITICAL | 1 | 1 | 0 | 100% |
+| P2-HIGH | 3 | 3 | 0 | 100% |
+| **Total Phase 10** | **5** | **5** | **0** | **100%** |
+
+---
+
+## Phase 11: E2E Bug Fixes - Round 2 (Playwright Testing)
+
+Analysis Date: 2026-01-06
+These tasks address bugs discovered during comprehensive Playwright E2E testing (second round).
+
+### 11.1 Surface Layer (UI/UX)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 159 | TASK-E2E-006 | Enrollment Success Modal Shows R 0.00 | surface | TASK-BILL-023 | P2-MEDIUM | ✅ Complete |
+| 162 | TASK-E2E-009 | React Hydration Error on Arrears Page | surface | — | P3-LOW | ✅ Complete |
+
+### 11.2 Logic Layer (API)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 161 | TASK-E2E-008 | Staff Creation Fails with 400 Bad Request | logic | TASK-SARS-001 | P1-HIGH | ✅ Complete |
+
+### 11.3 Foundation Layer (Schema)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 160 | TASK-E2E-007 | Add Registration Fee to Fee Structures | foundation | TASK-BILL-003 | P3-LOW | ✅ Complete |
+
+---
+
+## Phase 11 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-HIGH | 1 | 1 | 0 | 100% |
+| P2-MEDIUM | 1 | 1 | 0 | 100% |
+| P3-LOW | 2 | 2 | 0 | 100% |
+| **Total Phase 11** | **4** | **4** | **0** | **100%** |
+
+### E2E Testing Summary - Round 2 (2026-01-06)
+
+| Page | Status | Issue | Task |
+|------|--------|-------|------|
+| Dashboard | ✅ Works | Shows metrics correctly | — |
+| Parents | ✅ Works | CRUD operations work | — |
+| Parents > Add Child | ✅ Fixed | ~~Success modal shows R 0.00~~ | TASK-E2E-006 ✅ |
+| Invoices | ✅ Works | Lists and details work | — |
+| Transactions | ✅ Works | Filters and pagination work | — |
+| Staff List | ✅ Works | Shows staff members | — |
+| Staff > New | ✅ Fixed | ~~400 Bad Request on submit~~ | TASK-E2E-008 ✅ |
+| Payroll | ✅ Works | Shows deductions, no staff to process | — |
+| Reconciliation | ✅ Works | Form and history work | — |
+| SARS | ✅ Works | VAT201/EMP201 pages work | — |
+| Payments | ✅ Works | Empty state, filters work | — |
+| Arrears | ✅ Fixed | ~~Hydration error in console~~ | TASK-E2E-009 ✅ |
+| Settings | ✅ Works | Fee structures work | — |
+| Fee Structures | ✅ Fixed | ~~No registration fee field~~ | TASK-E2E-007 ✅ |
+
+---
+
+## Phase 12: Account Statements
+
+Analysis Date: 2026-01-06
+These tasks implement parent account statements, payment allocation, and periodic statement generation.
+
+### 12.1 Foundation Layer
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 163 | TASK-STMT-001 | Statement Entity and Data Model | foundation | TASK-BILL-003, TASK-PAY-001 | P1-CRITICAL | ⭕ Pending |
+
+### 12.2 Logic Layer
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 164 | TASK-STMT-002 | Payment Allocation to Invoices Service | logic | TASK-STMT-001, TASK-PAY-012 | P1-CRITICAL | ⭕ Pending |
+| 165 | TASK-STMT-003 | Statement Generation Service | logic | TASK-STMT-001, TASK-STMT-002 | P1-CRITICAL | ⭕ Pending |
+| 166 | TASK-STMT-005 | Statement PDF Generation Service | logic | TASK-STMT-003 | P2-HIGH | ⭕ Pending |
+| 167 | TASK-STMT-007 | Statement Delivery Service | logic | TASK-STMT-005, TASK-BILL-015, TASK-NOTIF-002 | P2-HIGH | ⭕ Pending |
+| 168 | TASK-STMT-008 | Scheduled Monthly Statement Generation | logic | TASK-STMT-003, TASK-STMT-007, TASK-INFRA-011 | P2-HIGH | ⭕ Pending |
+
+### 12.3 Surface Layer
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 169 | TASK-STMT-004 | Statement API Endpoints | surface | TASK-STMT-003 | P1-CRITICAL | ⭕ Pending |
+| 170 | TASK-STMT-006 | Statement UI Components | surface | TASK-STMT-004 | P1-CRITICAL | ⭕ Pending |
+
+---
+
+## Phase 12 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 5 | 0 | 5 | 0% |
+| P2-HIGH | 3 | 0 | 3 | 0% |
+| **Total Phase 12** | **8** | **0** | **8** | **0%** |
+
+### E2E Testing Summary (2026-01-06)
+
+| Page | Status | Issue | Fix |
+|------|--------|-------|-----|
+| Dashboard | ✅ Works | — | — |
+| Transactions | ✅ Works | — | — |
+| Parents | ✅ Fixed | ~~500 - Prisma schema mismatch~~ | TASK-E2E-001 ✅ |
+| Invoices | ✅ Fixed | ~~500 - Same as Parents~~ | TASK-E2E-001 ✅ |
+| Staff List | ✅ Works | — | — |
+| Staff Form | ✅ Fixed | ~~DOB picker + SA ID validation~~ | TASK-E2E-002/003 ✅ |
+| Reconciliation | ✅ Works | Form tested, submission works | — |
+| SARS | ✅ Works | — | — |
+| VAT201 | ✅ Fixed | ~~500 - Duplicate constraint~~ | TASK-E2E-004 ✅ |
+| Payments | ✅ Works | — | — |
+| Arrears | ✅ Fixed | ~~Summary/table mismatch~~ | TASK-E2E-005 ✅ |
+| Settings | ✅ Works | — | — |
+| Integrations | ✅ Works | Xero connected | — |
 
 ---
 

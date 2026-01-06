@@ -29,7 +29,12 @@ export class DiscrepancyItemDto {
   @ApiProperty({
     example: 'IN_BANK_NOT_XERO',
     description: 'Type of discrepancy',
-    enum: ['IN_BANK_NOT_XERO', 'IN_XERO_NOT_BANK', 'AMOUNT_MISMATCH', 'DATE_MISMATCH'],
+    enum: [
+      'IN_BANK_NOT_XERO',
+      'IN_XERO_NOT_BANK',
+      'AMOUNT_MISMATCH',
+      'DATE_MISMATCH',
+    ],
   })
   type!: string;
 

@@ -28,10 +28,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
 import type { IUser } from '../../database/entities/user.entity';
 import { StaffRepository } from '../../database/repositories/staff.repository';
-import {
-  UpdateStaffDto,
-  StaffFilterDto,
-} from '../../database/dto/staff.dto';
+import { UpdateStaffDto, StaffFilterDto } from '../../database/dto/staff.dto';
 import {
   EmploymentType,
   PayFrequency,

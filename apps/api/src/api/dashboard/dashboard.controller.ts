@@ -37,6 +37,12 @@ export class DashboardController {
     required: false,
     description: 'Period for metrics (e.g., "current_month", "last_quarter")',
   })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    description: 'Calendar year to filter by (e.g., 2024, 2025)',
+    type: Number,
+  })
   @ApiResponse({
     status: 200,
     description: 'Dashboard metrics retrieved successfully',
@@ -48,9 +54,13 @@ export class DashboardController {
   async getMetrics(
     @CurrentUser() user: IUser,
     @Query('period') period?: string,
+    @Query('year') year?: string,
   ): Promise<DashboardMetricsResponseDto> {
-    this.logger.debug(`Getting metrics for tenant ${user.tenantId}`);
-    return this.dashboardService.getMetrics(user.tenantId, period);
+    this.logger.debug(
+      `Getting metrics for tenant ${user.tenantId}, year=${year || 'auto'}`,
+    );
+    const yearNum = year ? parseInt(year, 10) : undefined;
+    return this.dashboardService.getMetrics(user.tenantId, period, yearNum);
   }
 
   @Get('trends')
@@ -64,6 +74,13 @@ export class DashboardController {
     required: false,
     description: 'Period for trends (e.g., "last_6_months", "last_year")',
   })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    description:
+      'Calendar year to filter by (e.g., 2024, 2025). Shows all 12 months when specified.',
+    type: Number,
+  })
   @ApiResponse({
     status: 200,
     description: 'Dashboard trends retrieved successfully',
@@ -75,9 +92,13 @@ export class DashboardController {
   async getTrends(
     @CurrentUser() user: IUser,
     @Query('period') period?: string,
+    @Query('year') year?: string,
   ): Promise<DashboardTrendsResponseDto> {
-    this.logger.debug(`Getting trends for tenant ${user.tenantId}`);
-    return this.dashboardService.getTrends(user.tenantId, period);
+    this.logger.debug(
+      `Getting trends for tenant ${user.tenantId}, year=${year || 'auto'}`,
+    );
+    const yearNum = year ? parseInt(year, 10) : undefined;
+    return this.dashboardService.getTrends(user.tenantId, period, yearNum);
   }
 
   @Get('learning-mode')

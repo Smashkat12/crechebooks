@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { DollarSign, Receipt, AlertTriangle, Users } from 'lucide-react';
 import {
   MetricCard,
@@ -11,10 +12,14 @@ import {
 import { useDashboardMetrics, useDashboardTrends } from '@/hooks/use-dashboard';
 import { useLearningMode } from '@/hooks/useLearningMode';
 import { Skeleton } from '@/components/ui/skeleton';
+import { YearSelector } from '@/components/common/year-selector';
 
 export default function DashboardPage() {
-  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useDashboardMetrics();
-  const { data: trends, isLoading: trendsLoading } = useDashboardTrends();
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useDashboardMetrics(undefined, selectedYear);
+  const { data: trends, isLoading: trendsLoading } = useDashboardTrends(undefined, selectedYear);
   const { progress, isLoading: learningModeLoading, isDismissed, dismissIndicator } = useLearningMode();
 
   if (metricsError) {
@@ -51,11 +56,19 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Overview of your creche finances
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Overview of your creche finances
+          </p>
+        </div>
+        <YearSelector
+          value={selectedYear}
+          onChange={setSelectedYear}
+          startYear={2024}
+          endYear={currentYear}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

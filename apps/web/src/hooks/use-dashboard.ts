@@ -50,12 +50,12 @@ interface DashboardTrends {
 }
 
 // Get dashboard metrics
-export function useDashboardMetrics(period?: string) {
+export function useDashboardMetrics(period?: string, year?: number) {
   return useQuery<DashboardMetrics, AxiosError>({
-    queryKey: queryKeys.dashboard.metrics(period),
+    queryKey: queryKeys.dashboard.metrics(period, year),
     queryFn: async () => {
       const { data } = await apiClient.get<DashboardMetrics>(endpoints.dashboard.metrics, {
-        params: { period },
+        params: { period, year },
       });
       return data;
     },
@@ -65,12 +65,12 @@ export function useDashboardMetrics(period?: string) {
 }
 
 // Get dashboard trends
-export function useDashboardTrends(period?: string) {
+export function useDashboardTrends(period?: string, year?: number) {
   return useQuery<DashboardTrends, AxiosError>({
-    queryKey: queryKeys.dashboard.trends(period),
+    queryKey: queryKeys.dashboard.trends(period, year),
     queryFn: async () => {
       const { data } = await apiClient.get<DashboardTrends>(endpoints.dashboard.trends, {
-        params: { period },
+        params: { period, year },
       });
       return data;
     },

@@ -93,4 +93,16 @@ export class ListTransactionsQueryDto {
     example: 'Woolworths',
   })
   search?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(2000)
+  @Max(2100)
+  @Type(() => Number)
+  @ApiProperty({
+    required: false,
+    description: 'Filter by calendar year (e.g., 2024, 2025)',
+    example: 2024,
+  })
+  year?: number;
 }

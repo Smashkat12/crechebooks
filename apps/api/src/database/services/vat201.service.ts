@@ -128,7 +128,41 @@ export class Vat201Service {
     // Step 8: Calculate deadline (last business day of month following period end)
     const deadline = this.calculateDeadline(periodEnd);
 
-    // Step 9: Store submission as DRAFT
+    // Step 9: Check for existing submission and upsert
+    const existing = await this.prisma.sarsSubmission.findFirst({
+      where: {
+        tenantId,
+        submissionType: SubmissionType.VAT201,
+        periodStart,
+      },
+    });
+
+    if (existing) {
+      // If already submitted, return existing without modification
+      if (existing.status === SubmissionStatus.SUBMITTED) {
+        this.logger.log(`VAT201 already submitted: ${existing.id}`);
+        return existing;
+      }
+
+      // Update existing DRAFT with fresh calculations
+      const submission = await this.prisma.sarsSubmission.update({
+        where: { id: existing.id },
+        data: {
+          periodEnd,
+          deadline,
+          outputVatCents: outputVat.vatAmountCents,
+          inputVatCents: inputVat.vatAmountCents,
+          netVatCents: document.netVatCents,
+          documentData: JSON.parse(JSON.stringify(document)) as object,
+          updatedAt: new Date(),
+        },
+      });
+
+      this.logger.log(`VAT201 updated: ${submission.id}`);
+      return submission;
+    }
+
+    // Create new submission
     const submission = await this.prisma.sarsSubmission.create({
       data: {
         tenantId,

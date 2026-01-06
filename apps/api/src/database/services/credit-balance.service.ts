@@ -167,7 +167,10 @@ export class CreditBalanceService {
    * @param parentId - Parent ID
    * @returns Total available credit in cents
    */
-  async getAvailableCredit(tenantId: string, parentId: string): Promise<number> {
+  async getAvailableCredit(
+    tenantId: string,
+    parentId: string,
+  ): Promise<number> {
     const result = await this.prisma.creditBalance.aggregate({
       where: {
         tenantId,
@@ -379,7 +382,10 @@ export class CreditBalanceService {
     }
 
     // 1. Get available credits (oldest first - FIFO)
-    const availableCredits = await this.getAvailableCreditBalances(tenantId, parentId);
+    const availableCredits = await this.getAvailableCreditBalances(
+      tenantId,
+      parentId,
+    );
 
     if (availableCredits.length === 0) {
       this.logger.debug(`No available credits for parent ${parentId}`);

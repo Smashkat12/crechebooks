@@ -20,7 +20,10 @@ import { FeeStructureRepository } from '../repositories/fee-structure.repository
 import { ProRataService } from './pro-rata.service';
 import { AuditLogService } from './audit-log.service';
 import { LineType } from '../entities/invoice-line.entity';
-import { ValidationException, NotFoundException } from '../../shared/exceptions';
+import {
+  ValidationException,
+  NotFoundException,
+} from '../../shared/exceptions';
 
 // Configure Decimal.js for banker's rounding
 Decimal.set({
@@ -96,8 +99,7 @@ export class CreditNoteService {
       throw new ValidationException('No unused days to credit', [
         {
           field: 'withdrawalDate',
-          message:
-            'Withdrawal on last day of month - no credit note required',
+          message: 'Withdrawal on last day of month - no credit note required',
           value: withdrawalDate,
         },
       ]);

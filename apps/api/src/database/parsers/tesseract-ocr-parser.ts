@@ -99,9 +99,7 @@ export class TesseractOcrParser {
     this.worker = await createWorker(this.config.languages, OEM.LSTM_ONLY, {
       logger: (m) => {
         if (m.status === 'recognizing text') {
-          this.logger.debug(
-            `OCR progress: ${Math.round(m.progress * 100)}%`,
-          );
+          this.logger.debug(`OCR progress: ${Math.round(m.progress * 100)}%`);
         }
       },
     });
@@ -140,7 +138,11 @@ export class TesseractOcrParser {
     // Need to convert Buffer to Uint8Array for pdf-to-png-converter
     let pngPages: PngPage[];
     try {
-      const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length);
+      const uint8Array = new Uint8Array(
+        buffer.buffer,
+        buffer.byteOffset,
+        buffer.length,
+      );
       pngPages = await pdfToPng(uint8Array.buffer, {
         disableFontFace: true,
         useSystemFonts: true,
@@ -466,9 +468,7 @@ export class TesseractOcrParser {
       }
     }
 
-    this.logger.log(
-      `OCR parser extracted ${transactions.length} transactions`,
-    );
+    this.logger.log(`OCR parser extracted ${transactions.length} transactions`);
     return transactions;
   }
 

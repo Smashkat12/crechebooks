@@ -29,6 +29,8 @@ import {
   AllocationResult,
   XeroSyncStatus,
   AllocationError,
+  SuggestedAllocationResult,
+  AllocateTransactionInput,
 } from '../dto/payment-allocation.dto';
 
 @Injectable()
@@ -382,7 +384,10 @@ export class PaymentAllocationService {
         // Use the most significant status (SUCCESS > FAILED > SKIPPED)
         if (status === XeroSyncStatus.SUCCESS) {
           xeroSyncStatus = XeroSyncStatus.SUCCESS;
-        } else if (status === XeroSyncStatus.FAILED && xeroSyncStatus !== XeroSyncStatus.SUCCESS) {
+        } else if (
+          status === XeroSyncStatus.FAILED &&
+          xeroSyncStatus !== XeroSyncStatus.SUCCESS
+        ) {
           xeroSyncStatus = XeroSyncStatus.FAILED;
         }
       }
@@ -719,6 +724,174 @@ export class PaymentAllocationService {
    * @returns Xero sync status
    * @private
    */
+  /**
+   * TASK-STMT-002: Suggest FIFO allocation for a transaction to a parent's invoices
+   * Returns suggested allocations for outstanding invoices, oldest first
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param transactionId - Bank transaction ID to allocate
+   * @param parentId - Parent ID whose invoices to allocate to
+   * @returns Array of suggested allocations with invoice details
+   * @throws NotFoundException if transaction not found
+   * @throws BusinessException if transaction is not a credit
+   */
+  async suggestAllocation(
+    tenantId: string,
+    transactionId: string,
+    parentId: string,
+  ): Promise<SuggestedAllocationResult[]> {
+    this.logger.log(
+      `Suggesting allocation for transaction ${transactionId} to parent ${parentId}`,
+    );
+
+    // 1. Get transaction and validate
+    const transaction = await this.transactionRepo.findById(
+      tenantId,
+      transactionId,
+    );
+    if (!transaction) {
+      throw new NotFoundException('Transaction', transactionId);
+    }
+
+    if (!transaction.isCredit) {
+      throw new BusinessException(
+        'Transaction must be a credit (incoming payment) to suggest allocations',
+        'TRANSACTION_NOT_CREDIT',
+        { transactionId, isCredit: transaction.isCredit },
+      );
+    }
+
+    // 2. Check how much is already allocated
+    const existingPayments = await this.paymentRepo.findByTenantId(tenantId, {
+      transactionId,
+    });
+    const totalAlreadyAllocated = existingPayments.reduce(
+      (sum, p) => sum + p.amountCents,
+      0,
+    );
+
+    const availableAmount = new Decimal(transaction.amountCents).minus(
+      totalAlreadyAllocated,
+    );
+
+    if (availableAmount.lte(0)) {
+      return []; // Transaction fully allocated
+    }
+
+    // 3. Get outstanding invoices for parent, oldest first (FIFO)
+    const outstandingInvoices = await this.prisma.invoice.findMany({
+      where: {
+        tenantId,
+        parentId,
+        isDeleted: false,
+        status: {
+          notIn: ['PAID', 'VOID'],
+        },
+        totalCents: { gt: 0 }, // Exclude credit notes
+      },
+      orderBy: [
+        { dueDate: 'asc' },
+        { issueDate: 'asc' },
+        { invoiceNumber: 'asc' },
+      ],
+    });
+
+    const suggestions: SuggestedAllocationResult[] = [];
+    let remainingAmount = availableAmount;
+
+    // 4. Allocate to invoices in FIFO order
+    for (const invoice of outstandingInvoices) {
+      if (remainingAmount.lte(0)) break;
+
+      const outstandingCents = new Decimal(invoice.totalCents).minus(
+        invoice.amountPaidCents,
+      );
+
+      if (outstandingCents.lte(0)) continue;
+
+      const suggestedAmount = Decimal.min(remainingAmount, outstandingCents);
+
+      suggestions.push({
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        dueDate: invoice.dueDate,
+        totalCents: invoice.totalCents,
+        outstandingCents: outstandingCents.toNumber(),
+        suggestedAmountCents: suggestedAmount.toNumber(),
+      });
+
+      remainingAmount = remainingAmount.minus(suggestedAmount);
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * TASK-STMT-002: Allocate a bank transaction to specific invoices
+   * Wrapper around allocatePayment for statement generation workflow
+   *
+   * @param input - Allocation input with transaction, parent, and invoice allocations
+   * @returns AllocationResult with created payments
+   */
+  async allocateTransactionToInvoices(
+    input: AllocateTransactionInput,
+  ): Promise<AllocationResult> {
+    this.logger.log(
+      `Allocating transaction ${input.transactionId} to ${input.allocations.length} invoices for parent ${input.parentId}`,
+    );
+
+    // Validate all invoices belong to the specified parent
+    for (const allocation of input.allocations) {
+      const invoice = await this.invoiceRepo.findById(allocation.invoiceId);
+      if (!invoice) {
+        throw new NotFoundException('Invoice', allocation.invoiceId);
+      }
+      if (invoice.parentId !== input.parentId) {
+        throw new BusinessException(
+          'Invoice does not belong to the specified parent',
+          'PARENT_MISMATCH',
+          {
+            invoiceId: allocation.invoiceId,
+            invoiceParentId: invoice.parentId,
+            requestParentId: input.parentId,
+          },
+        );
+      }
+    }
+
+    // Delegate to existing allocatePayment
+    return this.allocatePayment({
+      tenantId: input.tenantId,
+      transactionId: input.transactionId,
+      allocations: input.allocations.map((a) => ({
+        invoiceId: a.invoiceId,
+        amountCents: a.amountCents,
+      })),
+      userId: input.userId,
+    });
+  }
+
+  /**
+   * TASK-STMT-002: Get all payment allocations for an invoice
+   *
+   * @param invoiceId - Invoice ID to get allocations for
+   * @returns Array of payments allocated to this invoice
+   */
+  async getAllocationsForInvoice(invoiceId: string): Promise<Payment[]> {
+    this.logger.debug(`Getting allocations for invoice ${invoiceId}`);
+
+    return this.prisma.payment.findMany({
+      where: {
+        invoiceId,
+        isReversed: false,
+      },
+      include: {
+        transaction: true,
+      },
+      orderBy: { paymentDate: 'desc' },
+    });
+  }
+
   private async syncToXero(
     payment: Payment,
     invoice: Invoice,

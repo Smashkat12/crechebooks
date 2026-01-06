@@ -102,7 +102,9 @@ export class PaymentReceiptService {
     const filePath = path.join(tenantDir, `${receiptNumber}.pdf`);
     await this.createPdfDocument(receiptData, filePath);
 
-    this.logger.log(`Generated receipt ${receiptNumber} for payment ${paymentId}`);
+    this.logger.log(
+      `Generated receipt ${receiptNumber} for payment ${paymentId}`,
+    );
 
     return {
       receiptNumber,
@@ -224,7 +226,10 @@ export class PaymentReceiptService {
         .fontSize(20)
         .font('Helvetica-Bold')
         .text(data.tenantName, { align: 'center' });
-      doc.fontSize(10).font('Helvetica').text(data.tenantAddress, { align: 'center' });
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text(data.tenantAddress, { align: 'center' });
       doc.text(`Tel: ${data.tenantPhone}`, { align: 'center' });
       doc.text(`Email: ${data.tenantEmail}`, { align: 'center' });
       if (data.tenantVatNumber) {
@@ -254,9 +259,7 @@ export class PaymentReceiptService {
       doc.font('Helvetica').text(` ${data.receiptNumber}`);
 
       doc.font('Helvetica-Bold').text(`Date:`, { continued: true });
-      doc
-        .font('Helvetica')
-        .text(` ${this.formatDate(data.paymentDate)}`);
+      doc.font('Helvetica').text(` ${this.formatDate(data.paymentDate)}`);
       doc.moveDown();
 
       // Payment Details Section
@@ -331,9 +334,12 @@ export class PaymentReceiptService {
         .fontSize(9)
         .font('Helvetica')
         .fillColor('#666666')
-        .text('This is a computer-generated receipt and is valid without a signature.', {
-          align: 'center',
-        });
+        .text(
+          'This is a computer-generated receipt and is valid without a signature.',
+          {
+            align: 'center',
+          },
+        );
       doc.text(
         `Generated on ${this.formatDate(new Date())} at ${this.formatTime(new Date())}`,
         { align: 'center' },
@@ -352,7 +358,11 @@ export class PaymentReceiptService {
    * @param label - Field label
    * @param value - Field value
    */
-  private addDetailRow(doc: PDFKit.PDFDocument, label: string, value: string): void {
+  private addDetailRow(
+    doc: PDFKit.PDFDocument,
+    label: string,
+    value: string,
+  ): void {
     doc.font('Helvetica-Bold').text(label, { continued: true });
     doc.font('Helvetica').text(` ${value}`);
   }
@@ -404,7 +414,11 @@ export class PaymentReceiptService {
     tenantId: string,
     receiptNumber: string,
   ): Promise<string | null> {
-    const filePath = path.join(this.uploadDir, tenantId, `${receiptNumber}.pdf`);
+    const filePath = path.join(
+      this.uploadDir,
+      tenantId,
+      `${receiptNumber}.pdf`,
+    );
     return fs.existsSync(filePath) ? filePath : null;
   }
 

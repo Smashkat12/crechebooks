@@ -28,6 +28,7 @@ export class FeeStructureRepository {
           description: dto.description ?? null,
           feeType: dto.feeType,
           amountCents: dto.amountCents,
+          registrationFeeCents: dto.registrationFeeCents ?? 0,
           vatInclusive: dto.vatInclusive ?? true,
           siblingDiscountPercent: dto.siblingDiscountPercent ?? null,
           effectiveFrom: dto.effectiveFrom,
@@ -207,6 +208,9 @@ export class FeeStructureRepository {
       }
       if (dto.amountCents !== undefined) {
         updateData.amountCents = dto.amountCents;
+      }
+      if (dto.registrationFeeCents !== undefined) {
+        updateData.registrationFeeCents = dto.registrationFeeCents;
       }
       if (dto.vatInclusive !== undefined) {
         updateData.vatInclusive = dto.vatInclusive;

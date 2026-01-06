@@ -497,11 +497,15 @@ export class FinancialReportService {
 
       // Header
       doc.fontSize(20).text(tenantName, { align: 'center' });
-      doc.fontSize(16).text('Income Statement (Profit & Loss)', { align: 'center' });
-      doc.fontSize(12).text(
-        `Period: ${formatDate(report.period.start)} - ${formatDate(report.period.end)}`,
-        { align: 'center' },
-      );
+      doc
+        .fontSize(16)
+        .text('Income Statement (Profit & Loss)', { align: 'center' });
+      doc
+        .fontSize(12)
+        .text(
+          `Period: ${formatDate(report.period.start)} - ${formatDate(report.period.end)}`,
+          { align: 'center' },
+        );
       doc.moveDown(2);
 
       // INCOME Section
@@ -509,7 +513,10 @@ export class FinancialReportService {
       doc.moveDown(0.5);
 
       if (report.income.breakdown.length === 0) {
-        doc.fontSize(10).fillColor('gray').text('  No income recorded for this period');
+        doc
+          .fontSize(10)
+          .fillColor('gray')
+          .text('  No income recorded for this period');
         doc.fillColor('black');
       } else {
         for (const item of report.income.breakdown) {
@@ -537,7 +544,10 @@ export class FinancialReportService {
       doc.moveDown(0.5);
 
       if (report.expenses.breakdown.length === 0) {
-        doc.fontSize(10).fillColor('gray').text('  No expenses recorded for this period');
+        doc
+          .fontSize(10)
+          .fillColor('gray')
+          .text('  No expenses recorded for this period');
         doc.fillColor('black');
       } else {
         for (const item of report.expenses.breakdown) {
@@ -561,14 +571,17 @@ export class FinancialReportService {
       doc.fillColor('black').moveDown(2);
 
       // NET PROFIT/LOSS
-      const netProfitLabel = report.netProfitCents >= 0 ? 'NET PROFIT' : 'NET LOSS';
+      const netProfitLabel =
+        report.netProfitCents >= 0 ? 'NET PROFIT' : 'NET LOSS';
       const netProfitColor = report.netProfitCents >= 0 ? '#008000' : '#CC0000';
 
       doc
         .fontSize(16)
         .fillColor(netProfitColor)
         .text(netProfitLabel, { continued: true, width: 350 })
-        .text(formatAmount(Math.abs(report.netProfitCents)), { align: 'right' });
+        .text(formatAmount(Math.abs(report.netProfitCents)), {
+          align: 'right',
+        });
 
       doc.fillColor('black').moveDown(3);
 
@@ -635,7 +648,8 @@ export class FinancialReportService {
     rowNum++;
 
     sheet.mergeCells(`A${rowNum}:C${rowNum}`);
-    sheet.getCell(`A${rowNum}`).value = `Period: ${formatDate(report.period.start)} - ${formatDate(report.period.end)}`;
+    sheet.getCell(`A${rowNum}`).value =
+      `Period: ${formatDate(report.period.start)} - ${formatDate(report.period.end)}`;
     sheet.getCell(`A${rowNum}`).alignment = { horizontal: 'center' };
     rowNum += 2;
 
@@ -677,7 +691,10 @@ export class FinancialReportService {
       sheet.getCell(`C${rowNum}`).value = 0;
     }
     sheet.getCell(`C${rowNum}`).numFmt = 'R #,##0.00';
-    sheet.getCell(`C${rowNum}`).font = { bold: true, color: { argb: 'FF008000' } };
+    sheet.getCell(`C${rowNum}`).font = {
+      bold: true,
+      color: { argb: 'FF008000' },
+    };
     const totalIncomeRow = rowNum;
     rowNum += 2;
 
@@ -694,7 +711,8 @@ export class FinancialReportService {
       sheet.getCell(`C${rowNum}`).numFmt = 'R #,##0.00';
       rowNum++;
     }
-    const expenseEndRow = rowNum > expenseStartRow ? rowNum - 1 : expenseStartRow;
+    const expenseEndRow =
+      rowNum > expenseStartRow ? rowNum - 1 : expenseStartRow;
 
     // Total Expenses with formula
     sheet.getCell(`B${rowNum}`).value = 'Total Expenses';
@@ -707,12 +725,16 @@ export class FinancialReportService {
       sheet.getCell(`C${rowNum}`).value = 0;
     }
     sheet.getCell(`C${rowNum}`).numFmt = 'R #,##0.00';
-    sheet.getCell(`C${rowNum}`).font = { bold: true, color: { argb: 'FFCC0000' } };
+    sheet.getCell(`C${rowNum}`).font = {
+      bold: true,
+      color: { argb: 'FFCC0000' },
+    };
     const totalExpenseRow = rowNum;
     rowNum += 2;
 
     // Net Profit/Loss with formula
-    const netProfitLabel = report.netProfitCents >= 0 ? 'NET PROFIT' : 'NET LOSS';
+    const netProfitLabel =
+      report.netProfitCents >= 0 ? 'NET PROFIT' : 'NET LOSS';
     sheet.getCell(`B${rowNum}`).value = netProfitLabel;
     sheet.getCell(`B${rowNum}`).font = { bold: true, size: 12 };
     sheet.getCell(`C${rowNum}`).value = {
@@ -728,7 +750,8 @@ export class FinancialReportService {
 
     // Generated timestamp
     sheet.mergeCells(`A${rowNum}:C${rowNum}`);
-    sheet.getCell(`A${rowNum}`).value = `Generated: ${report.generatedAt.toLocaleString('en-ZA')}`;
+    sheet.getCell(`A${rowNum}`).value =
+      `Generated: ${report.generatedAt.toLocaleString('en-ZA')}`;
     sheet.getCell(`A${rowNum}`).font = { size: 8, color: { argb: 'FF808080' } };
 
     // Return as buffer
@@ -774,7 +797,9 @@ export class FinancialReportService {
       // Header
       doc.fontSize(20).text(tenantName, { align: 'center' });
       doc.fontSize(16).text('Trial Balance', { align: 'center' });
-      doc.fontSize(12).text(`As at ${formatDate(report.asOfDate)}`, { align: 'center' });
+      doc
+        .fontSize(12)
+        .text(`As at ${formatDate(report.asOfDate)}`, { align: 'center' });
       doc.moveDown(2);
 
       // Column headers
@@ -830,7 +855,11 @@ export class FinancialReportService {
       doc
         .moveTo(startX, doc.y)
         .lineTo(
-          startX + colWidths.code + colWidths.name + colWidths.debit + colWidths.credit,
+          startX +
+            colWidths.code +
+            colWidths.name +
+            colWidths.debit +
+            colWidths.credit,
           doc.y,
         )
         .stroke();
@@ -839,7 +868,9 @@ export class FinancialReportService {
       // Totals
       const totalY = doc.y;
       doc.fontSize(11).fillColor('black');
-      doc.text('TOTALS', startX, totalY, { width: colWidths.code + colWidths.name });
+      doc.text('TOTALS', startX, totalY, {
+        width: colWidths.code + colWidths.name,
+      });
       doc.text(
         formatAmount(report.totals.debitsCents),
         startX + colWidths.code + colWidths.name,
@@ -859,14 +890,19 @@ export class FinancialReportService {
         doc
           .fontSize(10)
           .fillColor('#CC0000')
-          .text('WARNING: Trial balance does not balance! Debits do not equal credits.', {
-            align: 'center',
-          });
+          .text(
+            'WARNING: Trial balance does not balance! Debits do not equal credits.',
+            {
+              align: 'center',
+            },
+          );
       } else {
         doc
           .fontSize(10)
           .fillColor('#008000')
-          .text('Trial balance is balanced (Debits = Credits)', { align: 'center' });
+          .text('Trial balance is balanced (Debits = Credits)', {
+            align: 'center',
+          });
       }
 
       doc.fillColor('black').moveDown(2);
@@ -995,19 +1031,24 @@ export class FinancialReportService {
     // Balance status
     sheet.mergeCells(`A${rowNum}:D${rowNum}`);
     if (report.isBalanced) {
-      sheet.getCell(`A${rowNum}`).value = 'Trial balance is balanced (Debits = Credits)';
+      sheet.getCell(`A${rowNum}`).value =
+        'Trial balance is balanced (Debits = Credits)';
       sheet.getCell(`A${rowNum}`).font = { color: { argb: 'FF008000' } };
     } else {
       sheet.getCell(`A${rowNum}`).value =
         'WARNING: Trial balance does not balance! Debits do not equal credits.';
-      sheet.getCell(`A${rowNum}`).font = { color: { argb: 'FFCC0000' }, bold: true };
+      sheet.getCell(`A${rowNum}`).font = {
+        color: { argb: 'FFCC0000' },
+        bold: true,
+      };
     }
     sheet.getCell(`A${rowNum}`).alignment = { horizontal: 'center' };
     rowNum += 2;
 
     // Generated timestamp
     sheet.mergeCells(`A${rowNum}:D${rowNum}`);
-    sheet.getCell(`A${rowNum}`).value = `Generated: ${report.generatedAt.toLocaleString('en-ZA')}`;
+    sheet.getCell(`A${rowNum}`).value =
+      `Generated: ${report.generatedAt.toLocaleString('en-ZA')}`;
     sheet.getCell(`A${rowNum}`).font = { size: 8, color: { argb: 'FF808080' } };
 
     // Return as buffer

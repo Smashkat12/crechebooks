@@ -299,23 +299,28 @@ export class InvoiceGenerationService {
 
           // TASK-PAY-020: Check and apply available credit balances
           if (updatedInvoice.totalCents > 0) {
-            const availableCreditCents = await this.creditBalanceService.getAvailableCredit(
-              tenantId,
-              enrollment.child.parentId,
-            );
+            const availableCreditCents =
+              await this.creditBalanceService.getAvailableCredit(
+                tenantId,
+                enrollment.child.parentId,
+              );
 
             if (availableCreditCents > 0) {
-              const creditToApply = Math.min(availableCreditCents, updatedInvoice.totalCents);
+              const creditToApply = Math.min(
+                availableCreditCents,
+                updatedInvoice.totalCents,
+              );
 
               if (creditToApply > 0) {
                 // Apply credit using CreditBalanceService
-                const appliedCredit = await this.creditBalanceService.applyCreditToInvoice(
-                  tenantId,
-                  enrollment.child.parentId,
-                  invoice.id,
-                  creditToApply,
-                  userId,
-                );
+                const appliedCredit =
+                  await this.creditBalanceService.applyCreditToInvoice(
+                    tenantId,
+                    enrollment.child.parentId,
+                    invoice.id,
+                    creditToApply,
+                    userId,
+                  );
 
                 if (appliedCredit > 0) {
                   // Add credit line item (negative amount)
@@ -334,10 +339,14 @@ export class InvoiceGenerationService {
                   });
 
                   // Calculate new totals
-                  const newSubtotalCents = updatedInvoice.subtotalCents - appliedCredit;
-                  const newTotalCents = updatedInvoice.totalCents - appliedCredit;
+                  const newSubtotalCents =
+                    updatedInvoice.subtotalCents - appliedCredit;
+                  const newTotalCents =
+                    updatedInvoice.totalCents - appliedCredit;
                   const newStatus: InvoiceStatus =
-                    newTotalCents <= 0 ? InvoiceStatus.PAID : (updatedInvoice.status as InvoiceStatus);
+                    newTotalCents <= 0
+                      ? InvoiceStatus.PAID
+                      : (updatedInvoice.status as InvoiceStatus);
 
                   // Update invoice totals
                   await this.invoiceRepo.update(invoice.id, {
@@ -349,13 +358,15 @@ export class InvoiceGenerationService {
 
                   this.logger.log(
                     `Applied R${(appliedCredit / 100).toFixed(2)} credit to invoice ${updatedInvoice.invoiceNumber}, ` +
-                    `new total: R${(newTotalCents / 100).toFixed(2)}, status: ${newStatus}`,
+                      `new total: R${(newTotalCents / 100).toFixed(2)}, status: ${newStatus}`,
                   );
 
                   // Refresh invoice with updated totals
                   updatedInvoice = await this.invoiceRepo.findById(invoice.id);
                   if (!updatedInvoice) {
-                    throw new Error('Invoice not found after credit application');
+                    throw new Error(
+                      'Invoice not found after credit application',
+                    );
                   }
                 }
               }
@@ -868,8 +879,7 @@ export class InvoiceGenerationService {
     // Check if pro-rata is needed
     const isMidMonthStart = normalizedEnrollmentStart > normalizedBillingStart;
     const isMidMonthEnd =
-      normalizedEnrollmentEnd &&
-      normalizedEnrollmentEnd < normalizedBillingEnd;
+      normalizedEnrollmentEnd && normalizedEnrollmentEnd < normalizedBillingEnd;
 
     if (!isMidMonthStart && !isMidMonthEnd) {
       // Full month - no pro-rata needed

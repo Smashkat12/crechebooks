@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Sidebar } from './sidebar';
 import { Header } from './header';
 import { useUIStore } from '@/stores/ui-store';
-import { useAuthSync } from '@/hooks/use-auth-sync';
+import { useAuth } from '@/hooks/use-auth';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -12,8 +12,8 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
-  // Sync auth token to localStorage for API client
-  useAuthSync();
+  // Auth hook syncs token to localStorage and handles session
+  useAuth();
 
   return (
     <div className="min-h-screen bg-background">

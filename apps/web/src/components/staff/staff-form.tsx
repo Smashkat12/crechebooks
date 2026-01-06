@@ -141,7 +141,7 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
             control={form.control}
             name="idNumber"
             label="SA ID Number"
-            placeholder="8501015800083"
+            placeholder="8501015800088"
             description="13-digit South African ID number"
             required
           />
@@ -159,6 +159,7 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
             control={form.control}
             name="dateOfBirth"
             label="Date of Birth"
+            mode="dob"
             required
           />
           <DatePicker

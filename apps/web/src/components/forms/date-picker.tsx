@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/popover';
 import { FormFieldWrapper } from './form-field';
 
+type DatePickerMode = 'default' | 'dob' | 'future';
+
 interface DatePickerProps<
   TFieldValues extends FieldValues = FieldValues,
   TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
@@ -26,6 +28,8 @@ interface DatePickerProps<
   disabled?: boolean;
   minDate?: Date;
   maxDate?: Date;
+  /** Mode preset: 'dob' for date of birth (1940-now), 'future' for future dates, 'default' for ±10 years */
+  mode?: DatePickerMode;
 }
 
 export function DatePicker<
@@ -41,7 +45,30 @@ export function DatePicker<
   disabled,
   minDate,
   maxDate,
+  mode = 'default',
 }: DatePickerProps<TFieldValues, TName>) {
+  // Calculate year range based on mode
+  const currentYear = new Date().getFullYear();
+  let fromYear: number;
+  let toYear: number;
+
+  switch (mode) {
+    case 'dob':
+      // Date of birth: 1940 to current year (staff could be born any time)
+      fromYear = 1940;
+      toYear = currentYear;
+      break;
+    case 'future':
+      // Future dates: current year to 10 years ahead
+      fromYear = currentYear;
+      toYear = currentYear + 10;
+      break;
+    default:
+      // Default: 10 years back to 5 years forward
+      fromYear = currentYear - 10;
+      toYear = currentYear + 5;
+  }
+
   return (
     <FormFieldWrapper
       control={control}
@@ -89,6 +116,8 @@ export function DatePicker<
                 if (maxDate && date > maxDate) return true;
                 return false;
               }}
+              fromYear={fromYear}
+              toYear={toYear}
               initialFocus
             />
           </PopoverContent>

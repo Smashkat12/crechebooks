@@ -183,21 +183,36 @@ export function useCreateStaff() {
 
   return useMutation<IStaff, AxiosError, CreateStaffParams>({
     mutationFn: async (params) => {
-      const { data } = await apiClient.post<IStaff>(endpoints.staff.list, {
+      // Build payload with only defined optional fields
+      // DTO validators use @IsOptional() + @IsString() which rejects null
+      // So we omit empty optional fields entirely instead of sending null
+      const payload: Record<string, unknown> = {
         employee_number: params.employeeNumber,
         first_name: params.firstName,
         last_name: params.lastName,
         id_number: params.idNumber,
-        tax_number: params.taxNumber || null,
         date_of_birth: params.dateOfBirth.toISOString().split('T')[0],
         start_date: params.startDate.toISOString().split('T')[0],
-        end_date: params.endDate ? params.endDate.toISOString().split('T')[0] : null,
         salary: params.salary,
         payment_method: params.paymentMethod,
-        bank_account_number: params.bankAccountNumber || null,
-        bank_branch_code: params.bankBranchCode || null,
         status: params.status,
-      });
+      };
+
+      // Only add optional fields if they have values
+      if (params.taxNumber) {
+        payload.tax_number = params.taxNumber;
+      }
+      if (params.endDate) {
+        payload.end_date = params.endDate.toISOString().split('T')[0];
+      }
+      if (params.bankAccountNumber) {
+        payload.bank_account_number = params.bankAccountNumber;
+      }
+      if (params.bankBranchCode) {
+        payload.bank_branch_code = params.bankBranchCode;
+      }
+
+      const { data } = await apiClient.post<IStaff>(endpoints.staff.list, payload);
       return data;
     },
     onSuccess: () => {

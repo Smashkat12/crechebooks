@@ -8,3 +8,4 @@ export * from './update-child.dto';
 export * from './list-children.dto';
 export * from './adhoc-charge-request.dto';
 export * from './adhoc-charge-response.dto';
+export * from './statement.dto';

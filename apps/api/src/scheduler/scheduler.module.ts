@@ -5,6 +5,7 @@ import { SchedulerService } from './scheduler.service';
 import { SarsDeadlineProcessor } from './processors/sars-deadline.processor';
 import { InvoiceSchedulerProcessor } from './processors/invoice-scheduler.processor';
 import { PaymentReminderProcessor } from './processors/payment-reminder.processor';
+import { StatementSchedulerProcessor } from './processors/statement-scheduler.processor';
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
@@ -69,6 +70,9 @@ const bullImports = isRedisConfigured()
         {
           name: QUEUE_NAMES.BANK_SYNC,
         },
+        {
+          name: QUEUE_NAMES.STATEMENT_GENERATION,
+        },
       ),
     ]
   : [];
@@ -87,6 +91,7 @@ const schedulerProviders = isRedisConfigured()
       SarsDeadlineProcessor,
       InvoiceSchedulerProcessor,
       PaymentReminderProcessor,
+      StatementSchedulerProcessor,
     ]
   : [];
 

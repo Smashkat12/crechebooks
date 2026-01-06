@@ -3,6 +3,7 @@ export const QUEUE_NAMES = {
   PAYMENT_REMINDER: 'payment-reminder',
   SARS_DEADLINE: 'sars-deadline',
   BANK_SYNC: 'bank-sync',
+  STATEMENT_GENERATION: 'statement-generation',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -32,6 +33,23 @@ export interface SarsDeadlineJobData extends ScheduledJobData {
 export interface BankSyncJobData extends ScheduledJobData {
   accountId?: string;
   fullSync?: boolean;
+}
+
+export interface StatementGenerationJobData extends ScheduledJobData {
+  /** Statement period month in YYYY-MM format */
+  statementMonth: string;
+  /** Optional parent IDs to generate statements for. If omitted, generates for all active parents */
+  parentIds?: string[];
+  /** Only generate statements for parents with activity in the period */
+  onlyWithActivity?: boolean;
+  /** Only generate statements for parents with a non-zero balance */
+  onlyWithBalance?: boolean;
+  /** Whether this is a dry run (validate only, no creation) */
+  dryRun?: boolean;
+  /** Whether to auto-finalize generated statements */
+  autoFinalize?: boolean;
+  /** Whether to auto-deliver finalized statements */
+  autoDeliver?: boolean;
 }
 
 export interface JobOptions {

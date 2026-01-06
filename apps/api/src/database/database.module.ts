@@ -51,7 +51,13 @@ import { ReversalDetectionService } from './services/reversal-detection.service'
 import { CorrectionConflictService } from './services/correction-conflict.service';
 import { CreditBalanceService } from './services/credit-balance.service';
 import { PaymentReceiptService } from './services/payment-receipt.service';
+import { ParentAccountService } from './services/parent-account.service';
+import { StatementRepository } from './repositories/statement.repository';
+import { StatementGenerationService } from './services/statement-generation.service';
+import { StatementPdfService } from './services/statement-pdf.service';
+import { StatementDeliveryService } from './services/statement-delivery.service';
 import { EmailModule } from '../integrations/email/email.module';
+import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { SarsModule } from '../integrations/sars/sars.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
@@ -66,6 +72,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     TransactionCategorizerModule,
     PaymentMatcherModule,
     forwardRef(() => SarsAgentModule),
+    forwardRef(() => NotificationModule),
   ],
   providers: [
     PrismaService,
@@ -120,6 +127,11 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     CorrectionConflictService,
     CreditBalanceService,
     PaymentReceiptService,
+    ParentAccountService,
+    StatementRepository,
+    StatementGenerationService,
+    StatementPdfService,
+    StatementDeliveryService,
   ],
   exports: [
     PrismaService,
@@ -174,6 +186,11 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     CorrectionConflictService,
     CreditBalanceService,
     PaymentReceiptService,
+    ParentAccountService,
+    StatementRepository,
+    StatementGenerationService,
+    StatementPdfService,
+    StatementDeliveryService,
   ],
 })
 export class DatabaseModule {}

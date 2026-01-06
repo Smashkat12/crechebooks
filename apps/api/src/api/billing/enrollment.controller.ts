@@ -106,13 +106,20 @@ export class EnrollmentController {
     const filter: { status?: EnrollmentStatus; feeStructureId?: string } = {};
     if (status) {
       const upperStatus = status.toUpperCase();
-      if (Object.values(EnrollmentStatus).includes(upperStatus as EnrollmentStatus)) {
+      if (
+        Object.values(EnrollmentStatus).includes(
+          upperStatus as EnrollmentStatus,
+        )
+      ) {
         filter.status = upperStatus as EnrollmentStatus;
       }
     }
     if (feeTierId) filter.feeStructureId = feeTierId;
 
-    const allEnrollments = await this.enrollmentRepo.findByTenant(tenantId, filter);
+    const allEnrollments = await this.enrollmentRepo.findByTenant(
+      tenantId,
+      filter,
+    );
 
     // Build enriched enrollment list
     const enrichedEnrollments: EnrollmentResponse[] = [];
@@ -131,18 +138,24 @@ export class EnrollmentController {
       }
 
       const parent = await this.parentRepo.findById(child.parentId);
-      const feeStructure = await this.feeStructureRepo.findById(enrollment.feeStructureId);
+      const feeStructure = await this.feeStructureRepo.findById(
+        enrollment.feeStructureId,
+      );
 
       enrichedEnrollments.push({
         id: enrollment.id,
         child_id: child.id,
         child_name: `${child.firstName} ${child.lastName}`,
         parent_id: parent?.id || '',
-        parent_name: parent ? `${parent.firstName} ${parent.lastName}` : 'Unknown',
+        parent_name: parent
+          ? `${parent.firstName} ${parent.lastName}`
+          : 'Unknown',
         fee_tier_id: feeStructure?.id || '',
         fee_tier_name: feeStructure?.name || 'Unknown',
         start_date: enrollment.startDate.toISOString().split('T')[0],
-        end_date: enrollment.endDate ? enrollment.endDate.toISOString().split('T')[0] : null,
+        end_date: enrollment.endDate
+          ? enrollment.endDate.toISOString().split('T')[0]
+          : null,
         status: enrollment.status.toLowerCase(),
         created_at: enrollment.createdAt.toISOString(),
         updated_at: enrollment.updatedAt.toISOString(),
@@ -152,7 +165,10 @@ export class EnrollmentController {
     // Pagination
     const total = enrichedEnrollments.length;
     const startIndex = (pageNum - 1) * limitNum;
-    const paginatedEnrollments = enrichedEnrollments.slice(startIndex, startIndex + limitNum);
+    const paginatedEnrollments = enrichedEnrollments.slice(
+      startIndex,
+      startIndex + limitNum,
+    );
 
     return {
       success: true,
@@ -182,7 +198,9 @@ export class EnrollmentController {
     if (!child) throw new NotFoundException('Child', enrollment.childId);
 
     const parent = await this.parentRepo.findById(child.parentId);
-    const feeStructure = await this.feeStructureRepo.findById(enrollment.feeStructureId);
+    const feeStructure = await this.feeStructureRepo.findById(
+      enrollment.feeStructureId,
+    );
 
     return {
       success: true,
@@ -191,11 +209,15 @@ export class EnrollmentController {
         child_id: child.id,
         child_name: `${child.firstName} ${child.lastName}`,
         parent_id: parent?.id || '',
-        parent_name: parent ? `${parent.firstName} ${parent.lastName}` : 'Unknown',
+        parent_name: parent
+          ? `${parent.firstName} ${parent.lastName}`
+          : 'Unknown',
         fee_tier_id: feeStructure?.id || '',
         fee_tier_name: feeStructure?.name || 'Unknown',
         start_date: enrollment.startDate.toISOString().split('T')[0],
-        end_date: enrollment.endDate ? enrollment.endDate.toISOString().split('T')[0] : null,
+        end_date: enrollment.endDate
+          ? enrollment.endDate.toISOString().split('T')[0]
+          : null,
         status: enrollment.status.toLowerCase(),
         created_at: enrollment.createdAt.toISOString(),
         updated_at: enrollment.updatedAt.toISOString(),
@@ -223,8 +245,12 @@ export class EnrollmentController {
     }
 
     const upperStatus = body.status.toUpperCase();
-    if (!Object.values(EnrollmentStatus).includes(upperStatus as EnrollmentStatus)) {
-      throw new Error(`Invalid status: ${body.status}. Valid values: ${Object.values(EnrollmentStatus).join(', ')}`);
+    if (
+      !Object.values(EnrollmentStatus).includes(upperStatus as EnrollmentStatus)
+    ) {
+      throw new Error(
+        `Invalid status: ${body.status}. Valid values: ${Object.values(EnrollmentStatus).join(', ')}`,
+      );
     }
 
     const updated = await this.enrollmentRepo.update(id, {
@@ -235,7 +261,9 @@ export class EnrollmentController {
     if (!child) throw new NotFoundException('Child', updated.childId);
 
     const parent = await this.parentRepo.findById(child.parentId);
-    const feeStructure = await this.feeStructureRepo.findById(updated.feeStructureId);
+    const feeStructure = await this.feeStructureRepo.findById(
+      updated.feeStructureId,
+    );
 
     return {
       success: true,
@@ -244,11 +272,15 @@ export class EnrollmentController {
         child_id: child.id,
         child_name: `${child.firstName} ${child.lastName}`,
         parent_id: parent?.id || '',
-        parent_name: parent ? `${parent.firstName} ${parent.lastName}` : 'Unknown',
+        parent_name: parent
+          ? `${parent.firstName} ${parent.lastName}`
+          : 'Unknown',
         fee_tier_id: feeStructure?.id || '',
         fee_tier_name: feeStructure?.name || 'Unknown',
         start_date: updated.startDate.toISOString().split('T')[0],
-        end_date: updated.endDate ? updated.endDate.toISOString().split('T')[0] : null,
+        end_date: updated.endDate
+          ? updated.endDate.toISOString().split('T')[0]
+          : null,
         status: updated.status.toLowerCase(),
         created_at: updated.createdAt.toISOString(),
         updated_at: updated.updatedAt.toISOString(),
@@ -266,11 +298,17 @@ export class EnrollmentController {
     @CurrentUser() user: IUser,
     @Body() body: { enrollment_ids: string[]; status: string },
   ): Promise<{ success: boolean; count: number }> {
-    this.logger.log(`Bulk update enrollment statuses: ${body.enrollment_ids.length} enrollments`);
+    this.logger.log(
+      `Bulk update enrollment statuses: ${body.enrollment_ids.length} enrollments`,
+    );
 
     const upperStatus = body.status.toUpperCase();
-    if (!Object.values(EnrollmentStatus).includes(upperStatus as EnrollmentStatus)) {
-      throw new Error(`Invalid status: ${body.status}. Valid values: ${Object.values(EnrollmentStatus).join(', ')}`);
+    if (
+      !Object.values(EnrollmentStatus).includes(upperStatus as EnrollmentStatus)
+    ) {
+      throw new Error(
+        `Invalid status: ${body.status}. Valid values: ${Object.values(EnrollmentStatus).join(', ')}`,
+      );
     }
 
     let count = 0;

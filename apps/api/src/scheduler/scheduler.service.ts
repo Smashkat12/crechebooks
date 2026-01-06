@@ -9,6 +9,7 @@ import {
   PaymentReminderJobData,
   SarsDeadlineJobData,
   BankSyncJobData,
+  StatementGenerationJobData,
   JobOptions,
   DEFAULT_JOB_OPTIONS,
   QueueMetrics,
@@ -28,6 +29,8 @@ export class SchedulerService {
     private readonly sarsQueue: Queue<SarsDeadlineJobData>,
     @InjectQueue(QUEUE_NAMES.BANK_SYNC)
     private readonly bankQueue: Queue<BankSyncJobData>,
+    @InjectQueue(QUEUE_NAMES.STATEMENT_GENERATION)
+    private readonly statementQueue: Queue<StatementGenerationJobData>,
   ) {}
 
   private getQueue(queueName: QueueName): Queue<ScheduledJobData> {
@@ -40,6 +43,8 @@ export class SchedulerService {
         return this.sarsQueue as Queue<ScheduledJobData>;
       case QUEUE_NAMES.BANK_SYNC:
         return this.bankQueue as Queue<ScheduledJobData>;
+      case QUEUE_NAMES.STATEMENT_GENERATION:
+        return this.statementQueue as Queue<ScheduledJobData>;
       default:
         throw new Error(`Unknown queue name: ${queueName}`);
     }

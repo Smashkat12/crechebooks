@@ -8,7 +8,7 @@
  * Supports Africa's Talking (production) and Mock (development) gateways.
  */
 
-import { Module, Logger } from '@nestjs/common';
+import { Module, Logger, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DatabaseModule } from '../database/database.module';
 import { EmailService } from '../integrations/email/email.service';
@@ -25,7 +25,7 @@ import { AfricasTalkingSmsGateway } from './gateways/africastalking-sms.gateway'
 const logger = new Logger('NotificationModule');
 
 @Module({
-  imports: [DatabaseModule, ConfigModule],
+  imports: [forwardRef(() => DatabaseModule), ConfigModule],
   providers: [
     // Services
     EmailService,

@@ -208,77 +208,159 @@ enum InvitationStatus {
   REVOKED
 }
 
+// TASK-STAFF-001: Staff Onboarding Document Types
+// DSD Compliance document categories for childcare workers
+enum DocumentType {
+  ID_DOCUMENT
+  PROOF_OF_ADDRESS
+  TAX_CERTIFICATE
+  QUALIFICATIONS
+  POLICE_CLEARANCE
+  MEDICAL_CERTIFICATE
+  FIRST_AID_CERTIFICATE
+  EMPLOYMENT_CONTRACT
+  BANK_CONFIRMATION
+  POPIA_CONSENT
+  SIGNED_CONTRACT
+  SIGNED_POPIA
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  UPLOADED
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DOCUMENTS_PENDING
+  VERIFICATION_PENDING
+  COMPLETED
+  CANCELLED
+}
+
+enum ChecklistItemStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  BLOCKED
+}
+
+// TASK-STAFF-002: Staff Offboarding Enums
+enum OffboardingReason {
+  RESIGNATION
+  TERMINATION
+  RETIREMENT
+  DEATH
+  CONTRACT_END
+  MUTUAL_AGREEMENT
+  RETRENCHMENT
+  DISMISSAL
+  ABSCONDED
+}
+
+enum StaffOffboardingStatus {
+  INITIATED
+  IN_PROGRESS
+  PENDING_FINAL_PAY
+  COMPLETED
+  CANCELLED
+}
+
+enum AssetReturnStatus {
+  NOT_APPLICABLE
+  PENDING
+  RETURNED
+  NOT_RETURNED
+  WRITE_OFF
+}
+
 // ============================================
 // MODELS
 // ============================================
 
 model Tenant {
-  id                    String             @id @default(uuid())
-  name                  String             @db.VarChar(200)
-  tradingName           String?            @map("trading_name") @db.VarChar(200)
-  registrationNumber    String?            @map("registration_number") @db.VarChar(50)
-  vatNumber             String?            @map("vat_number") @db.VarChar(20)
-  taxStatus             TaxStatus          @default(NOT_REGISTERED) @map("tax_status")
-  vatRegistrationDate   DateTime?          @map("vat_registration_date") @db.Date
-  cumulativeTurnoverCents BigInt           @default(0) @map("cumulative_turnover_cents")
-  addressLine1          String             @map("address_line1") @db.VarChar(200)
-  addressLine2          String?            @map("address_line2") @db.VarChar(200)
-  city                  String             @db.VarChar(100)
-  province              String             @db.VarChar(50)
-  postalCode            String             @map("postal_code") @db.VarChar(10)
-  phone                 String             @db.VarChar(20)
-  email                 String             @unique @db.VarChar(255)
-  xeroTenantId          String?            @unique @map("xero_tenant_id") @db.VarChar(50)
-  subscriptionStatus    SubscriptionStatus @default(TRIAL) @map("subscription_status")
-  invoiceDayOfMonth     Int                @default(1) @map("invoice_day_of_month")
-  invoiceDueDays        Int                @default(7) @map("invoice_due_days")
-  closureDates          Json               @default("[]") @map("closure_dates")
-  xeroConnectedAt       DateTime?          @map("xero_connected_at")
-  xeroTenantName        String?            @map("xero_tenant_name") @db.VarChar(200)
-  createdAt             DateTime           @default(now()) @map("created_at")
-  updatedAt             DateTime           @updatedAt @map("updated_at")
+  id                      String             @id @default(uuid())
+  name                    String             @db.VarChar(200)
+  tradingName             String?            @map("trading_name") @db.VarChar(200)
+  registrationNumber      String?            @map("registration_number") @db.VarChar(50)
+  vatNumber               String?            @map("vat_number") @db.VarChar(20)
+  taxStatus               TaxStatus          @default(NOT_REGISTERED) @map("tax_status")
+  vatRegistrationDate     DateTime?          @map("vat_registration_date") @db.Date
+  cumulativeTurnoverCents BigInt             @default(0) @map("cumulative_turnover_cents")
+  addressLine1            String             @map("address_line1") @db.VarChar(200)
+  addressLine2            String?            @map("address_line2") @db.VarChar(200)
+  city                    String             @db.VarChar(100)
+  province                String             @db.VarChar(50)
+  postalCode              String             @map("postal_code") @db.VarChar(10)
+  phone                   String             @db.VarChar(20)
+  email                   String             @unique @db.VarChar(255)
+  xeroTenantId            String?            @unique @map("xero_tenant_id") @db.VarChar(50)
+  subscriptionStatus      SubscriptionStatus @default(TRIAL) @map("subscription_status")
+  invoiceDayOfMonth       Int                @default(1) @map("invoice_day_of_month")
+  invoiceDueDays          Int                @default(7) @map("invoice_due_days")
+  closureDates            Json               @default("[]") @map("closure_dates")
+  xeroConnectedAt         DateTime?          @map("xero_connected_at")
+  xeroTenantName          String?            @map("xero_tenant_name") @db.VarChar(200)
+  createdAt               DateTime           @default(now()) @map("created_at")
+  updatedAt               DateTime           @updatedAt @map("updated_at")
 
-  users            User[]
-  userTenantRoles  UserTenantRole[]
-  invitations      Invitation[]
-  transactions     Transaction[]
-  payeePatterns    PayeePattern[]
-  feeStructures    FeeStructure[]
-  enrollments      Enrollment[]
-  parents          Parent[]
-  children         Child[]
-  invoices         Invoice[]
-  payments         Payment[]
-  staff            Staff[]
-  payrolls         Payroll[]
-  sarsSubmissions  SarsSubmission[]
-  reconciliations  Reconciliation[]
-  xeroToken        XeroToken?
-  bankConnections         BankConnection[]
-  reminders               Reminder[]
-  categorizationMetrics   CategorizationMetric[]
-  xeroOAuthState          XeroOAuthState?
-  invoiceDeliveryLogs     InvoiceDeliveryLog[]
-  reminderTemplates       ReminderTemplate[]
-  creditBalances          CreditBalance[]
-  statements              Statement[]
+  users                 User[]
+  userTenantRoles       UserTenantRole[]
+  invitations           Invitation[]
+  transactions          Transaction[]
+  payeePatterns         PayeePattern[]
+  feeStructures         FeeStructure[]
+  enrollments           Enrollment[]
+  parents               Parent[]
+  children              Child[]
+  invoices              Invoice[]
+  payments              Payment[]
+  staff                 Staff[]
+  payrolls              Payroll[]
+  sarsSubmissions       SarsSubmission[]
+  reconciliations       Reconciliation[]
+  xeroToken             XeroToken?
+  bankConnections       BankConnection[]
+  reminders             Reminder[]
+  categorizationMetrics CategorizationMetric[]
+  xeroOAuthState        XeroOAuthState?
+  invoiceDeliveryLogs   InvoiceDeliveryLog[]
+  reminderTemplates     ReminderTemplate[]
+  creditBalances        CreditBalance[]
+  statements            Statement[]
+  staffDocuments        StaffDocument[]
+  staffOnboardings      StaffOnboarding[]
+  xeroAccountMappings   XeroAccountMapping[]
+  payrollJournals       PayrollJournal[]
+  staffOffboardings     StaffOffboarding[]
+
+  // TASK-STAFF-004: SimplePay Integration
+  simplePayConnection       SimplePayConnection?
+  simplePayEmployeeMappings SimplePayEmployeeMapping[]
+  simplePayPayslipImports   SimplePayPayslipImport[]
 
   @@map("tenants")
 }
 
 model User {
-  id                String    @id @default(uuid())
-  tenantId          String    @map("tenant_id")
-  tenant            Tenant    @relation(fields: [tenantId], references: [id])
-  auth0Id           String    @unique @map("auth0_id")
-  email             String
-  name              String
-  role              UserRole  // Kept for backward compatibility - primary tenant role
-  isActive          Boolean   @default(true) @map("is_active")
-  lastLoginAt       DateTime? @map("last_login_at")
-  currentTenantId   String?   @map("current_tenant_id")  // Active tenant in current session
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  auth0Id         String    @unique @map("auth0_id")
+  email           String
+  name            String
+  role            UserRole // Kept for backward compatibility - primary tenant role
+  isActive        Boolean   @default(true) @map("is_active")
+  lastLoginAt     DateTime? @map("last_login_at")
+  currentTenantId String?   @map("current_tenant_id") // Active tenant in current session
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   tenantRoles             UserTenantRole[] @relation("UserTenantRoles")
   receivedInvitations     Invitation[]
@@ -349,11 +431,11 @@ model Transaction {
   createdAt             DateTime          @default(now()) @map("created_at")
   updatedAt             DateTime          @updatedAt @map("updated_at")
 
-  tenant                Tenant                  @relation(fields: [tenantId], references: [id])
-  duplicateOf           Transaction?            @relation("TransactionDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
-  duplicates            Transaction[]           @relation("TransactionDuplicates")
-  reversesTransaction   Transaction?            @relation("TransactionReversals", fields: [reversesTransactionId], references: [id], onDelete: SetNull)
-  reversals             Transaction[]           @relation("TransactionReversals")
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id])
+  duplicateOf           Transaction?           @relation("TransactionDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates            Transaction[]          @relation("TransactionDuplicates")
+  reversesTransaction   Transaction?           @relation("TransactionReversals", fields: [reversesTransactionId], references: [id], onDelete: SetNull)
+  reversals             Transaction[]          @relation("TransactionReversals")
   categorizations       Categorization[]
   payments              Payment[]
   categorizationMetrics CategorizationMetric[]
@@ -424,6 +506,7 @@ model FeeStructure {
   feeType                FeeType   @map("fee_type")
   amountCents            Int       @map("amount_cents")
   registrationFeeCents   Int       @default(0) @map("registration_fee_cents")
+  reRegistrationFeeCents Int       @default(0) @map("re_registration_fee_cents")
   vatInclusive           Boolean   @default(true) @map("vat_inclusive")
   siblingDiscountPercent Decimal?  @map("sibling_discount_percent") @db.Decimal(5, 2)
   effectiveFrom          DateTime  @map("effective_from") @db.Date
@@ -517,9 +600,9 @@ model CreditBalance {
   createdAt          DateTime                @default(now()) @map("created_at")
   updatedAt          DateTime                @updatedAt @map("updated_at")
 
-  tenant             Tenant                  @relation(fields: [tenantId], references: [id])
-  parent             Parent                  @relation(fields: [parentId], references: [id])
-  appliedToInvoice   Invoice?                @relation("CreditAppliedToInvoice", fields: [appliedToInvoiceId], references: [id])
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  parent           Parent   @relation(fields: [parentId], references: [id])
+  appliedToInvoice Invoice? @relation("CreditAppliedToInvoice", fields: [appliedToInvoiceId], references: [id])
 
   @@index([tenantId, parentId])
   @@index([tenantId, isApplied])
@@ -579,9 +662,9 @@ model Invoice {
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  parent        Parent         @relation(fields: [parentId], references: [id])
-  child         Child          @relation(fields: [childId], references: [id])
+  tenant         Tenant               @relation(fields: [tenantId], references: [id])
+  parent         Parent               @relation(fields: [parentId], references: [id])
+  child          Child                @relation(fields: [childId], references: [id])
   lines          InvoiceLine[]
   payments       Payment[]
   reminders      Reminder[]
@@ -626,8 +709,8 @@ model InvoiceDeliveryLog {
   id                String   @id @default(uuid())
   invoiceId         String   @map("invoice_id")
   tenantId          String   @map("tenant_id")
-  channel           String   @db.VarChar(20)  // EMAIL, WHATSAPP
-  status            String   @db.VarChar(20)  // DeliveryStatus
+  channel           String   @db.VarChar(20) // EMAIL, WHATSAPP
+  status            String   @db.VarChar(20) // DeliveryStatus
   eventType         String   @map("event_type") @db.VarChar(50)
   externalMessageId String?  @map("external_message_id") @db.VarChar(255)
   metadata          Json     @default("{}")
@@ -690,13 +773,46 @@ model Staff {
   bankName          String?        @map("bank_name") @db.VarChar(100)
   bankAccount       String?        @map("bank_account") @db.VarChar(20)
   bankBranchCode    String?        @map("bank_branch_code") @db.VarChar(10)
+  bankAccountType   String?        @map("bank_account_type") @db.VarChar(50)
   medicalAidMembers Int            @default(0) @map("medical_aid_members")
   isActive          Boolean        @default(true) @map("is_active")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  payrolls        Payroll[]
+  // TASK-STAFF-001: Additional onboarding fields
+  // Emergency contact details
+  emergencyContactName     String?  @map("emergency_contact_name") @db.VarChar(200)
+  emergencyContactPhone    String?  @map("emergency_contact_phone") @db.VarChar(20)
+  emergencyContactRelation String?  @map("emergency_contact_relation") @db.VarChar(50)
+
+  // Address details
+  address    String? @db.VarChar(500)
+  suburb     String? @db.VarChar(100)
+  city       String? @db.VarChar(100)
+  province   String? @db.VarChar(100)
+  postalCode String? @map("postal_code") @db.VarChar(10)
+
+  // Employment details
+  department   String? @db.VarChar(100)
+  position     String? @db.VarChar(100)
+  workSchedule String? @map("work_schedule") @db.VarChar(100)
+  hoursPerWeek Int?    @map("hours_per_week")
+  reportingTo  String? @map("reporting_to") @db.VarChar(200)
+
+  // Tax details
+  taxStatus     String? @map("tax_status") @db.VarChar(50)
+  paymentMethod String? @map("payment_method") @db.VarChar(50)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  payrolls    Payroll[]
+  documents   StaffDocument[]
+  onboarding  StaffOnboarding?
+  offboarding StaffOffboarding?
+
+  // TASK-STAFF-004: SimplePay Integration
+  simplePayMapping  SimplePayEmployeeMapping?
+  simplePayPayslips SimplePayPayslipImport[]
 
   @@unique([tenantId, idNumber])
   @@index([tenantId, isActive])
@@ -704,30 +820,30 @@ model Staff {
 }
 
 model SarsSubmission {
-  id              String           @id @default(uuid())
-  tenantId        String           @map("tenant_id")
-  submissionType  SubmissionType   @map("submission_type")
-  periodStart     DateTime         @map("period_start") @db.Date
-  periodEnd       DateTime         @map("period_end") @db.Date
-  deadline        DateTime         @db.Date
-  outputVatCents  Int?             @map("output_vat_cents")
-  inputVatCents   Int?             @map("input_vat_cents")
-  netVatCents     Int?             @map("net_vat_cents")
-  totalPayeCents  Int?             @map("total_paye_cents")
-  totalUifCents   Int?             @map("total_uif_cents")
-  totalSdlCents   Int?             @map("total_sdl_cents")
-  status          SubmissionStatus @default(DRAFT)
-  submittedAt     DateTime?        @map("submitted_at")
-  submittedBy     String?          @map("submitted_by")
-  sarsReference   String?          @map("sars_reference") @db.VarChar(100)
-  documentData    Json             @default("{}") @map("document_data")
-  notes           String?          @db.Text
-  isFinalized     Boolean          @default(false) @map("is_finalized")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
+  id             String           @id @default(uuid())
+  tenantId       String           @map("tenant_id")
+  submissionType SubmissionType   @map("submission_type")
+  periodStart    DateTime         @map("period_start") @db.Date
+  periodEnd      DateTime         @map("period_end") @db.Date
+  deadline       DateTime         @db.Date
+  outputVatCents Int?             @map("output_vat_cents")
+  inputVatCents  Int?             @map("input_vat_cents")
+  netVatCents    Int?             @map("net_vat_cents")
+  totalPayeCents Int?             @map("total_paye_cents")
+  totalUifCents  Int?             @map("total_uif_cents")
+  totalSdlCents  Int?             @map("total_sdl_cents")
+  status         SubmissionStatus @default(DRAFT)
+  submittedAt    DateTime?        @map("submitted_at")
+  submittedBy    String?          @map("submitted_by")
+  sarsReference  String?          @map("sars_reference") @db.VarChar(100)
+  documentData   Json             @default("{}") @map("document_data")
+  notes          String?          @db.Text
+  isFinalized    Boolean          @default(false) @map("is_finalized")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  submitter       User?            @relation(fields: [submittedBy], references: [id])
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  submitter User?  @relation(fields: [submittedBy], references: [id])
 
   @@unique([tenantId, submissionType, periodStart])
   @@index([tenantId, status])
@@ -757,8 +873,9 @@ model Payroll {
   createdAt             DateTime      @default(now()) @map("created_at")
   updatedAt             DateTime      @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  staff  Staff  @relation(fields: [staffId], references: [id])
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  staff          Staff           @relation(fields: [staffId], references: [id])
+  payrollJournal PayrollJournal?
 
   @@unique([tenantId, staffId, payPeriodStart])
   @@index([tenantId, status])
@@ -783,8 +900,8 @@ model Reconciliation {
   createdAt              DateTime             @default(now()) @map("created_at")
   updatedAt              DateTime             @updatedAt @map("updated_at")
 
-  tenant                 Tenant               @relation(fields: [tenantId], references: [id])
-  reconciler             User?                @relation("ReconciliationReconciler", fields: [reconciledBy], references: [id])
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  reconciler User?  @relation("ReconciliationReconciler", fields: [reconciledBy], references: [id])
 
   @@unique([tenantId, bankAccount, periodStart])
   @@index([tenantId, status])
@@ -792,15 +909,15 @@ model Reconciliation {
 }
 
 model XeroToken {
-  id                String   @id @default(uuid())
-  tenantId          String   @unique @map("tenant_id")
-  xeroTenantId      String   @map("xero_tenant_id")
-  encryptedTokens   String   @map("encrypted_tokens") @db.Text
-  tokenExpiresAt    DateTime @map("token_expires_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id              String   @id @default(uuid())
+  tenantId        String   @unique @map("tenant_id")
+  xeroTenantId    String   @map("xero_tenant_id")
+  encryptedTokens String   @map("encrypted_tokens") @db.Text
+  tokenExpiresAt  DateTime @map("token_expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@map("xero_tokens")
@@ -814,20 +931,20 @@ enum BankConnectionStatus {
 }
 
 model BankConnection {
-  id               String               @id @default(uuid())
-  tenantId         String               @map("tenant_id")
-  xeroAccountId    String               @map("xero_account_id")
-  accountName      String               @map("account_name")
-  accountNumber    String               @map("account_number")
-  bankName         String               @map("bank_name")
-  status           BankConnectionStatus @default(ACTIVE)
-  errorMessage     String?              @map("error_message")
-  connectedAt      DateTime             @default(now()) @map("connected_at")
-  lastSyncAt       DateTime?            @map("last_sync_at")
-  createdAt        DateTime             @default(now()) @map("created_at")
-  updatedAt        DateTime             @updatedAt @map("updated_at")
+  id            String               @id @default(uuid())
+  tenantId      String               @map("tenant_id")
+  xeroAccountId String               @map("xero_account_id")
+  accountName   String               @map("account_name")
+  accountNumber String               @map("account_number")
+  bankName      String               @map("bank_name")
+  status        BankConnectionStatus @default(ACTIVE)
+  errorMessage  String?              @map("error_message")
+  connectedAt   DateTime             @default(now()) @map("connected_at")
+  lastSyncAt    DateTime?            @map("last_sync_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  updatedAt     DateTime             @updatedAt @map("updated_at")
 
-  tenant           Tenant               @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, xeroAccountId])
   @@index([tenantId, status])
@@ -841,19 +958,19 @@ enum MetricEventType {
 }
 
 model CategorizationMetric {
-  id                  String           @id @default(uuid())
-  tenantId            String           @map("tenant_id")
-  transactionId       String           @map("transaction_id")
-  date                DateTime         @default(now())
-  eventType           MetricEventType  @map("event_type")
-  confidence          Decimal          @db.Decimal(5, 2)
-  isAutoApplied       Boolean          @default(false) @map("is_auto_applied")
-  originalAccountCode String?          @map("original_account_code")
+  id                   String          @id @default(uuid())
+  tenantId             String          @map("tenant_id")
+  transactionId        String          @map("transaction_id")
+  date                 DateTime        @default(now())
+  eventType            MetricEventType @map("event_type")
+  confidence           Decimal         @db.Decimal(5, 2)
+  isAutoApplied        Boolean         @default(false) @map("is_auto_applied")
+  originalAccountCode  String?         @map("original_account_code")
   correctedAccountCode String?         @map("corrected_account_code")
-  createdAt           DateTime         @default(now()) @map("created_at")
+  createdAt            DateTime        @default(now()) @map("created_at")
 
-  tenant              Tenant           @relation(fields: [tenantId], references: [id])
-  transaction         Transaction      @relation(fields: [transactionId], references: [id])
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  transaction Transaction @relation(fields: [transactionId], references: [id])
 
   @@index([tenantId, date])
   @@index([tenantId, eventType])
@@ -873,7 +990,7 @@ model AdHocCharge {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  invoice      Invoice?       @relation(fields: [invoiceId], references: [id])
+  invoice      Invoice?      @relation(fields: [invoiceId], references: [id])
   invoiceLines InvoiceLine[]
 
   @@index([tenantId, childId])
@@ -883,22 +1000,22 @@ model AdHocCharge {
 }
 
 model Reminder {
-  id               String           @id @default(uuid())
-  tenantId         String           @map("tenant_id")
-  invoiceId        String           @map("invoice_id")
-  parentId         String           @map("parent_id")
-  escalationLevel  EscalationLevel  @map("escalation_level")
-  deliveryMethod   DeliveryMethod   @map("delivery_method")
-  reminderStatus   ReminderStatus   @default(PENDING) @map("reminder_status")
-  scheduledFor     DateTime?        @map("scheduled_for")
-  sentAt           DateTime?        @map("sent_at")
-  deliveredAt      DateTime?        @map("delivered_at")
-  readAt           DateTime?        @map("read_at")
-  content          String           @db.Text
-  subject          String?          @db.VarChar(500)
-  failureReason    String?          @map("failure_reason") @db.Text
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
+  id              String          @id @default(uuid())
+  tenantId        String          @map("tenant_id")
+  invoiceId       String          @map("invoice_id")
+  parentId        String          @map("parent_id")
+  escalationLevel EscalationLevel @map("escalation_level")
+  deliveryMethod  DeliveryMethod  @map("delivery_method")
+  reminderStatus  ReminderStatus  @default(PENDING) @map("reminder_status")
+  scheduledFor    DateTime?       @map("scheduled_for")
+  sentAt          DateTime?       @map("sent_at")
+  deliveredAt     DateTime?       @map("delivered_at")
+  readAt          DateTime?       @map("read_at")
+  content         String          @db.Text
+  subject         String?         @db.VarChar(500)
+  failureReason   String?         @map("failure_reason") @db.Text
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
   invoice Invoice @relation(fields: [invoiceId], references: [id])
@@ -919,7 +1036,7 @@ model XeroOAuthState {
   expiresAt    DateTime @map("expires_at")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@map("xero_oauth_states")
@@ -939,7 +1056,7 @@ model ReminderTemplate {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, stage])
   @@index([tenantId])
@@ -969,18 +1086,18 @@ model UserTenantRole {
 
 // TASK-USER-001: Invitation System for Multi-Tenant Users
 model Invitation {
-  id          String           @id @default(uuid())
-  email       String           @db.VarChar(255)
-  tenantId    String           @map("tenant_id")
-  role        UserRole
-  status      InvitationStatus @default(PENDING)
-  invitedBy   String?          @map("invited_by")
-  acceptedBy  String?          @map("accepted_by")
-  expiresAt   DateTime         @map("expires_at")
-  acceptedAt  DateTime?        @map("accepted_at")
-  revokedAt   DateTime?        @map("revoked_at")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  id         String           @id @default(uuid())
+  email      String           @db.VarChar(255)
+  tenantId   String           @map("tenant_id")
+  role       UserRole
+  status     InvitationStatus @default(PENDING)
+  invitedBy  String?          @map("invited_by")
+  acceptedBy String?          @map("accepted_by")
+  expiresAt  DateTime         @map("expires_at")
+  acceptedAt DateTime?        @map("accepted_at")
+  revokedAt  DateTime?        @map("revoked_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
 
   tenant       Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   acceptedUser User?  @relation(fields: [acceptedBy], references: [id])
@@ -1017,11 +1134,11 @@ model Statement {
   statementNumber     String          @map("statement_number")
   periodStart         DateTime        @map("period_start") @db.Date
   periodEnd           DateTime        @map("period_end") @db.Date
-  openingBalanceCents Int             @map("opening_balance_cents") @default(0)
-  totalChargesCents   Int             @map("total_charges_cents") @default(0)
-  totalPaymentsCents  Int             @map("total_payments_cents") @default(0)
-  totalCreditsCents   Int             @map("total_credits_cents") @default(0)
-  closingBalanceCents Int             @map("closing_balance_cents") @default(0)
+  openingBalanceCents Int             @default(0) @map("opening_balance_cents")
+  totalChargesCents   Int             @default(0) @map("total_charges_cents")
+  totalPaymentsCents  Int             @default(0) @map("total_payments_cents")
+  totalCreditsCents   Int             @default(0) @map("total_credits_cents")
+  closingBalanceCents Int             @default(0) @map("closing_balance_cents")
   status              StatementStatus @default(DRAFT)
   generatedAt         DateTime        @default(now()) @map("generated_at")
   deliveryStatus      String?         @map("delivery_status") @db.VarChar(20)
@@ -1030,9 +1147,9 @@ model Statement {
   createdAt           DateTime        @default(now()) @map("created_at")
   updatedAt           DateTime        @updatedAt @map("updated_at")
 
-  tenant              Tenant          @relation(fields: [tenantId], references: [id])
-  parent              Parent          @relation(fields: [parentId], references: [id])
-  lines               StatementLine[]
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  parent Parent          @relation(fields: [parentId], references: [id])
+  lines  StatementLine[]
 
   @@unique([tenantId, statementNumber])
   @@index([tenantId, parentId])
@@ -1048,13 +1165,13 @@ model StatementLine {
   lineType        StatementLineType @map("line_type")
   referenceNumber String?           @map("reference_number") @db.VarChar(100)
   referenceId     String?           @map("reference_id")
-  debitCents      Int               @map("debit_cents") @default(0)
-  creditCents     Int               @map("credit_cents") @default(0)
-  balanceCents    Int               @map("balance_cents") @default(0)
-  sortOrder       Int               @map("sort_order") @default(0)
+  debitCents      Int               @default(0) @map("debit_cents")
+  creditCents     Int               @default(0) @map("credit_cents")
+  balanceCents    Int               @default(0) @map("balance_cents")
+  sortOrder       Int               @default(0) @map("sort_order")
   createdAt       DateTime          @default(now()) @map("created_at")
 
-  statement       Statement         @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statement Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
 
   @@index([statementId])
   @@map("statement_lines")
@@ -1075,24 +1192,361 @@ enum ConflictStatus {
 }
 
 model SyncConflict {
-  id                String         @id @default(uuid())
-  tenantId          String         @map("tenant_id")
-  entityType        String         @map("entity_type") @db.VarChar(50)
-  entityId          String         @map("entity_id")
-  conflictType      ConflictType   @map("conflict_type")
-  localData         Json           @map("local_data")
-  xeroData          Json           @map("xero_data")
-  localModifiedAt   DateTime       @map("local_modified_at")
-  xeroModifiedAt    DateTime       @map("xero_modified_at")
-  status            ConflictStatus @default(PENDING)
-  resolvedBy        String?        @map("resolved_by")
-  resolution        String?        @db.VarChar(50)
-  resolvedAt        DateTime?      @map("resolved_at")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
+  id              String         @id @default(uuid())
+  tenantId        String         @map("tenant_id")
+  entityType      String         @map("entity_type") @db.VarChar(50)
+  entityId        String         @map("entity_id")
+  conflictType    ConflictType   @map("conflict_type")
+  localData       Json           @map("local_data")
+  xeroData        Json           @map("xero_data")
+  localModifiedAt DateTime       @map("local_modified_at")
+  xeroModifiedAt  DateTime       @map("xero_modified_at")
+  status          ConflictStatus @default(PENDING)
+  resolvedBy      String?        @map("resolved_by")
+  resolution      String?        @db.VarChar(50)
+  resolvedAt      DateTime?      @map("resolved_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@index([tenantId, status])
   @@index([tenantId, entityType, entityId])
   @@index([createdAt])
   @@map("sync_conflicts")
+}
+
+// ============================================
+// TASK-STAFF-001: Staff Onboarding Models
+// ============================================
+
+model StaffDocument {
+  id              String         @id @default(uuid())
+  tenantId        String         @map("tenant_id")
+  staffId         String         @map("staff_id")
+  documentType    DocumentType   @map("document_type")
+  fileName        String         @map("file_name") @db.VarChar(255)
+  fileUrl         String         @map("file_url") @db.VarChar(500)
+  fileSize        Int            @map("file_size")
+  mimeType        String         @map("mime_type") @db.VarChar(100)
+  status          DocumentStatus @default(PENDING)
+  uploadedAt      DateTime       @default(now()) @map("uploaded_at")
+  verifiedAt      DateTime?      @map("verified_at")
+  verifiedBy      String?        @map("verified_by")
+  expiryDate      DateTime?      @map("expiry_date") @db.Date
+  rejectionReason String?        @map("rejection_reason")
+  notes           String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, staffId])
+  @@index([tenantId, documentType])
+  @@map("staff_documents")
+}
+
+model StaffOnboarding {
+  id                     String           @id @default(uuid())
+  tenantId               String           @map("tenant_id")
+  staffId                String           @unique @map("staff_id")
+  status                 OnboardingStatus @default(NOT_STARTED)
+  currentStep            String           @default("PERSONAL_INFO") @map("current_step") @db.VarChar(50)
+  startedAt              DateTime?        @map("started_at")
+  completedAt            DateTime?        @map("completed_at")
+  completedBy            String?          @map("completed_by")
+  welcomePackSentAt      DateTime?        @map("welcome_pack_sent_at")
+  welcomePackGeneratedAt DateTime?        @map("welcome_pack_generated_at")
+  notes                  String?
+  createdAt              DateTime         @default(now()) @map("created_at")
+  updatedAt              DateTime         @updatedAt @map("updated_at")
+
+  tenant             Tenant                    @relation(fields: [tenantId], references: [id])
+  staff              Staff                     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  checklistItems     OnboardingChecklistItem[]
+  generatedDocuments StaffGeneratedDocument[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("staff_onboardings")
+}
+
+// TASK-STAFF-001: Auto-Generated Employment Documents
+// Stores generated employment contracts, POPIA consent forms, and welcome packs
+enum GeneratedDocumentType {
+  EMPLOYMENT_CONTRACT
+  POPIA_CONSENT
+  WELCOME_PACK
+}
+
+model StaffGeneratedDocument {
+  id           String                @id @default(uuid())
+  onboardingId String                @map("onboarding_id")
+  documentType GeneratedDocumentType @map("document_type")
+  fileName     String                @map("file_name") @db.VarChar(255)
+  filePath     String                @map("file_path") @db.VarChar(500)
+  fileSize     Int                   @map("file_size")
+  mimeType     String                @default("application/pdf") @map("mime_type") @db.VarChar(100)
+  generatedAt  DateTime              @default(now()) @map("generated_at")
+  signedAt     DateTime?             @map("signed_at")
+  signedByName String?               @map("signed_by_name") @db.VarChar(200)
+  signedByIp   String?               @map("signed_by_ip") @db.VarChar(45)
+  acknowledged Boolean               @default(false)
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  onboarding StaffOnboarding @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+
+  @@index([onboardingId])
+  @@index([onboardingId, documentType])
+  @@map("staff_generated_documents")
+}
+
+model OnboardingChecklistItem {
+  id           String              @id @default(uuid())
+  onboardingId String              @map("onboarding_id")
+  itemKey      String              @map("item_key") @db.VarChar(100)
+  title        String              @db.VarChar(255)
+  description  String?
+  category     String              @db.VarChar(50)
+  status       ChecklistItemStatus @default(NOT_STARTED)
+  isRequired   Boolean             @default(true) @map("is_required")
+  sortOrder    Int                 @default(0) @map("sort_order")
+  completedAt  DateTime?           @map("completed_at")
+  completedBy  String?             @map("completed_by")
+  notes        String?
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  onboarding StaffOnboarding @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+
+  @@unique([onboardingId, itemKey])
+  @@index([onboardingId])
+  @@map("onboarding_checklist_items")
+}
+
+// ============================================
+// TASK-STAFF-003: Xero Payroll Journal Integration
+// ============================================
+
+enum XeroAccountType {
+  SALARY_EXPENSE
+  UIF_EMPLOYER_EXPENSE
+  SDL_EXPENSE
+  PENSION_EXPENSE
+  PAYE_PAYABLE
+  UIF_PAYABLE
+  SDL_PAYABLE
+  PENSION_PAYABLE
+  NET_PAY_CLEARING
+  BONUS_EXPENSE
+  OVERTIME_EXPENSE
+  OTHER_DEDUCTION
+}
+
+enum PayrollJournalStatus {
+  PENDING
+  POSTED
+  FAILED
+  CANCELLED
+}
+
+model XeroAccountMapping {
+  id              String          @id @default(uuid())
+  tenantId        String          @map("tenant_id")
+  accountType     XeroAccountType @map("account_type")
+  xeroAccountId   String          @map("xero_account_id") @db.VarChar(50)
+  xeroAccountCode String          @map("xero_account_code") @db.VarChar(20)
+  xeroAccountName String          @map("xero_account_name") @db.VarChar(200)
+  isActive        Boolean         @default(true) @map("is_active")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, accountType])
+  @@index([tenantId])
+  @@map("xero_account_mappings")
+}
+
+model PayrollJournal {
+  id               String               @id @default(uuid())
+  tenantId         String               @map("tenant_id")
+  payrollId        String               @unique @map("payroll_id")
+  xeroJournalId    String?              @map("xero_journal_id") @db.VarChar(50)
+  journalNumber    String?              @map("journal_number") @db.VarChar(50)
+  payPeriodStart   DateTime             @map("pay_period_start") @db.Date
+  payPeriodEnd     DateTime             @map("pay_period_end") @db.Date
+  status           PayrollJournalStatus @default(PENDING)
+  totalDebitCents  Int                  @map("total_debit_cents")
+  totalCreditCents Int                  @map("total_credit_cents")
+  narration        String               @db.VarChar(500)
+  postedAt         DateTime?            @map("posted_at")
+  errorMessage     String?              @map("error_message")
+  retryCount       Int                  @default(0) @map("retry_count")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  payroll      Payroll              @relation(fields: [payrollId], references: [id])
+  journalLines PayrollJournalLine[]
+
+  @@index([tenantId, status])
+  @@map("payroll_journals")
+}
+
+model PayrollJournalLine {
+  id              String          @id @default(uuid())
+  journalId       String          @map("journal_id")
+  accountType     XeroAccountType @map("account_type")
+  xeroAccountCode String          @map("xero_account_code") @db.VarChar(20)
+  description     String          @db.VarChar(255)
+  debitCents      Int             @default(0) @map("debit_cents")
+  creditCents     Int             @default(0) @map("credit_cents")
+  sortOrder       Int             @default(0) @map("sort_order")
+
+  journal PayrollJournal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+
+  @@index([journalId])
+  @@map("payroll_journal_lines")
+}
+
+// ============================================
+// TASK-STAFF-002: Staff Offboarding Models
+// ============================================
+
+model StaffOffboarding {
+  id                 String                 @id @default(uuid())
+  tenantId           String                 @map("tenant_id")
+  staffId            String                 @unique @map("staff_id")
+  status             StaffOffboardingStatus @default(INITIATED)
+  reason             OffboardingReason
+  initiatedAt        DateTime               @default(now()) @map("initiated_at")
+  initiatedBy        String?                @map("initiated_by")
+  lastWorkingDay     DateTime               @map("last_working_day") @db.Date
+  noticePeriodDays   Int                    @map("notice_period_days")
+  noticePeriodWaived Boolean                @default(false) @map("notice_period_waived")
+
+  // Final Pay Calculation (all in cents)
+  outstandingSalaryCents Int     @default(0) @map("outstanding_salary_cents")
+  leavePayoutCents       Int     @default(0) @map("leave_payout_cents")
+  leaveBalanceDays       Decimal @default(0) @map("leave_balance_days") @db.Decimal(5, 2)
+  noticePayCents         Int     @default(0) @map("notice_pay_cents")
+  proRataBonusCents      Int     @default(0) @map("pro_rata_bonus_cents")
+  otherEarningsCents     Int     @default(0) @map("other_earnings_cents")
+  deductionsCents        Int     @default(0) @map("deductions_cents")
+  finalPayGrossCents     Int     @default(0) @map("final_pay_gross_cents")
+  finalPayNetCents       Int     @default(0) @map("final_pay_net_cents")
+
+  // Documents Generated
+  ui19GeneratedAt        DateTime? @map("ui19_generated_at")
+  certificateGeneratedAt DateTime? @map("certificate_generated_at")
+  irp5GeneratedAt        DateTime? @map("irp5_generated_at")
+  exitPackGeneratedAt    DateTime? @map("exit_pack_generated_at")
+
+  // Exit Interview
+  exitInterviewDate      DateTime? @map("exit_interview_date")
+  exitInterviewNotes     String?   @map("exit_interview_notes")
+  exitInterviewCompleted Boolean   @default(false) @map("exit_interview_completed")
+
+  // Completion
+  completedAt DateTime? @map("completed_at")
+  completedBy String?   @map("completed_by")
+  notes       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  staff        Staff         @relation(fields: [staffId], references: [id])
+  assetReturns AssetReturn[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("staff_offboardings")
+}
+
+model AssetReturn {
+  id               String            @id @default(uuid())
+  offboardingId    String            @map("offboarding_id")
+  assetType        String            @map("asset_type") @db.VarChar(100)
+  assetDescription String            @map("asset_description") @db.VarChar(255)
+  serialNumber     String?           @map("serial_number") @db.VarChar(100)
+  status           AssetReturnStatus @default(PENDING)
+  returnedAt       DateTime?         @map("returned_at")
+  checkedBy        String?           @map("checked_by")
+  notes            String?
+
+  offboarding StaffOffboarding @relation(fields: [offboardingId], references: [id], onDelete: Cascade)
+
+  @@index([offboardingId])
+  @@map("asset_returns")
+}
+
+// ============================================
+// TASK-STAFF-004: SimplePay Integration
+// ============================================
+
+enum SimplePaySyncStatus {
+  NOT_SYNCED
+  SYNCED
+  SYNC_FAILED
+  OUT_OF_SYNC
+}
+
+model SimplePayConnection {
+  id               String    @id @default(uuid())
+  tenantId         String    @unique @map("tenant_id")
+  clientId         String    @map("client_id") @db.VarChar(50)
+  apiKey           String    @map("api_key") @db.VarChar(255)
+  isActive         Boolean   @default(true) @map("is_active")
+  lastSyncAt       DateTime? @map("last_sync_at")
+  syncErrorMessage String?   @map("sync_error_message")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@map("simplepay_connections")
+}
+
+model SimplePayEmployeeMapping {
+  id                  String              @id @default(uuid())
+  tenantId            String              @map("tenant_id")
+  staffId             String              @unique @map("staff_id")
+  simplePayEmployeeId String              @map("simplepay_employee_id") @db.VarChar(50)
+  syncStatus          SimplePaySyncStatus @default(NOT_SYNCED) @map("sync_status")
+  lastSyncAt          DateTime?           @map("last_sync_at")
+  lastSyncError       String?             @map("last_sync_error")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([simplePayEmployeeId])
+  @@map("simplepay_employee_mappings")
+}
+
+model SimplePayPayslipImport {
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  staffId            String   @map("staff_id")
+  simplePayPayslipId String   @map("simplepay_payslip_id") @db.VarChar(50)
+  payPeriodStart     DateTime @map("pay_period_start") @db.Date
+  payPeriodEnd       DateTime @map("pay_period_end") @db.Date
+  grossSalaryCents   Int      @map("gross_salary_cents")
+  netSalaryCents     Int      @map("net_salary_cents")
+  payeCents          Int      @map("paye_cents")
+  uifEmployeeCents   Int      @map("uif_employee_cents")
+  uifEmployerCents   Int      @map("uif_employer_cents")
+  payslipData        Json     @map("payslip_data")
+  importedAt         DateTime @default(now()) @map("imported_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id])
+
+  @@unique([tenantId, staffId, simplePayPayslipId])
+  @@index([tenantId, staffId])
+  @@map("simplepay_payslip_imports")
 }

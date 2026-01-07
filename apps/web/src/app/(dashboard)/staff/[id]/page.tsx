@@ -1,14 +1,17 @@
 'use client';
 
 import { use } from 'react';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { ArrowLeft, Edit, ClipboardList, FileText, UserX, Play, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useStaff } from '@/hooks/use-staff';
+import { useOnboardingStatus } from '@/hooks/use-staff-onboarding';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { OnboardingStatusBadge } from '@/components/staff/OnboardingStatusBadge';
 import type { StaffStatus } from '@crechebooks/types';
 
 interface StaffDetailPageProps {
@@ -24,6 +27,7 @@ const statusConfig: Record<StaffStatus, { label: string; variant: 'default' | 's
 export default function StaffDetailPage({ params }: StaffDetailPageProps) {
   const { id } = use(params);
   const { data: staff, isLoading, error } = useStaff(id);
+  const { data: onboarding, isLoading: onboardingLoading } = useOnboardingStatus(id);
 
   if (error) {
     throw new Error(`Failed to load staff member: ${error.message}`);
@@ -67,13 +71,100 @@ export default function StaffDetailPage({ params }: StaffDetailPageProps) {
             </p>
           </div>
         </div>
-        <Link href={`/staff/${id}/edit`}>
-          <Button variant="outline">
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/staff/${id}/edit`}>
+            <Button variant="outline">
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+          </Link>
+          <Link href={`/staff/${id}/onboarding`}>
+            <Button variant={onboarding?.status === 'COMPLETED' ? 'outline' : 'default'}>
+              {onboarding?.status === 'NOT_STARTED' ? (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Onboarding
+                </>
+              ) : onboarding?.status === 'COMPLETED' ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  View Onboarding
+                </>
+              ) : (
+                <>
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  Continue Onboarding
+                </>
+              )}
+            </Button>
+          </Link>
+        </div>
       </div>
+
+      {/* Onboarding Status Card */}
+      <Card className={onboarding?.status === 'IN_PROGRESS' ? 'border-blue-200 bg-blue-50/50' : ''}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">Onboarding Status</CardTitle>
+            {!onboardingLoading && onboarding && (
+              <OnboardingStatusBadge
+                status={onboarding.status}
+                currentStep={onboarding.currentStep}
+                size="sm"
+              />
+            )}
+          </div>
+          {onboarding?.status === 'IN_PROGRESS' && (
+            <CardDescription>
+              Complete all steps to finish onboarding
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          {onboardingLoading ? (
+            <Skeleton className="h-4 w-full" />
+          ) : onboarding?.status === 'NOT_STARTED' ? (
+            <div className="text-sm text-muted-foreground">
+              <p>Onboarding has not been started yet.</p>
+              <Link href={`/staff/${id}/onboarding`} className="text-primary hover:underline mt-2 inline-block">
+                Start onboarding →
+              </Link>
+            </div>
+          ) : onboarding?.status === 'IN_PROGRESS' ? (
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span>Progress</span>
+                <span className="font-medium">
+                  {onboarding.completedSteps?.length || 0} of 6 steps
+                </span>
+              </div>
+              <Progress
+                value={((onboarding.completedSteps?.length || 0) / 6) * 100}
+                className="h-2"
+              />
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">
+                  Current: {onboarding.currentStep?.replace('_', ' ') || 'Personal Info'}
+                </span>
+                <Link href={`/staff/${id}/onboarding`}>
+                  <Button size="sm" variant="outline">
+                    Continue
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : onboarding?.status === 'COMPLETED' ? (
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle className="h-4 w-4" />
+              <span>Onboarding completed on {formatDate(onboarding.completedAt)}</span>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              Status: {onboarding?.status || 'Unknown'}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

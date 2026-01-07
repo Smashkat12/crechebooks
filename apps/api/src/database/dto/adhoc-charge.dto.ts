@@ -12,7 +12,6 @@ import {
   IsInt,
   IsOptional,
   IsNumber,
-  Min,
   MinLength,
   MaxLength,
   IsPositive,

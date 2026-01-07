@@ -9,8 +9,8 @@
 import {
   IsString,
   IsNumber,
-  IsEnum,
   IsOptional,
+  IsEnum,
   Min,
   Max,
 } from 'class-validator';
@@ -19,7 +19,11 @@ import { VatType } from '../entities/categorization.entity';
 /**
  * Recurring frequency types
  */
-export type RecurringFrequency = 'WEEKLY' | 'BI_WEEKLY' | 'MONTHLY';
+export enum RecurringFrequency {
+  WEEKLY = 'WEEKLY',
+  BI_WEEKLY = 'BI_WEEKLY',
+  MONTHLY = 'MONTHLY',
+}
 
 /**
  * Detection constants for recurring pattern analysis
@@ -52,7 +56,7 @@ export class CreateRecurringPatternDto {
   @IsString()
   payeeName!: string;
 
-  @IsString()
+  @IsEnum(RecurringFrequency)
   frequency!: RecurringFrequency;
 
   @IsNumber()

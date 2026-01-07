@@ -68,6 +68,10 @@ export default function StaffPage() {
             staff={filteredStaff}
             isLoading={isLoading}
             onView={(staff) => router.push(`/staff/${staff.id}`)}
+            onEdit={(staff) => router.push(`/staff/${staff.id}/edit`)}
+            onOnboarding={(staff) => router.push(`/staff/${staff.id}/onboarding`)}
+            onDocuments={(staff) => router.push(`/staff/${staff.id}/onboarding?tab=documents`)}
+            onOffboarding={(staff) => router.push(`/staff/${staff.id}/offboarding`)}
           />
         </CardContent>
       </Card>

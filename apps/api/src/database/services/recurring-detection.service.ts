@@ -326,7 +326,7 @@ export class RecurringDetectionService {
       RECURRING_DETECTION_CONSTANTS.WEEKLY_TOLERANCE_DAYS
     ) {
       return {
-        frequency: 'WEEKLY',
+        frequency: RecurringFrequency.WEEKLY,
         expectedInterval: RECURRING_DETECTION_CONSTANTS.WEEKLY_INTERVAL,
         tolerance: RECURRING_DETECTION_CONSTANTS.WEEKLY_TOLERANCE_DAYS,
       };
@@ -339,7 +339,7 @@ export class RecurringDetectionService {
       ) <= RECURRING_DETECTION_CONSTANTS.BI_WEEKLY_TOLERANCE_DAYS
     ) {
       return {
-        frequency: 'BI_WEEKLY',
+        frequency: RecurringFrequency.BI_WEEKLY,
         expectedInterval: RECURRING_DETECTION_CONSTANTS.BI_WEEKLY_INTERVAL,
         tolerance: RECURRING_DETECTION_CONSTANTS.BI_WEEKLY_TOLERANCE_DAYS,
       };
@@ -351,7 +351,7 @@ export class RecurringDetectionService {
       RECURRING_DETECTION_CONSTANTS.MONTHLY_TOLERANCE_DAYS
     ) {
       return {
-        frequency: 'MONTHLY',
+        frequency: RecurringFrequency.MONTHLY,
         expectedInterval: RECURRING_DETECTION_CONSTANTS.MONTHLY_INTERVAL,
         tolerance: RECURRING_DETECTION_CONSTANTS.MONTHLY_TOLERANCE_DAYS,
       };
@@ -408,11 +408,11 @@ export class RecurringDetectionService {
    */
   private getIntervalDays(frequency: RecurringFrequency): number {
     switch (frequency) {
-      case 'WEEKLY':
+      case RecurringFrequency.WEEKLY:
         return RECURRING_DETECTION_CONSTANTS.WEEKLY_INTERVAL;
-      case 'BI_WEEKLY':
+      case RecurringFrequency.BI_WEEKLY:
         return RECURRING_DETECTION_CONSTANTS.BI_WEEKLY_INTERVAL;
-      case 'MONTHLY':
+      case RecurringFrequency.MONTHLY:
         return RECURRING_DETECTION_CONSTANTS.MONTHLY_INTERVAL;
     }
   }
@@ -424,7 +424,7 @@ export class RecurringDetectionService {
    */
   private mapToRecurringPattern(pattern: PayeePattern): RecurringPattern {
     // Determine frequency from expected interval
-    const frequency: RecurringFrequency = 'MONTHLY'; // Default
+    const frequency: RecurringFrequency = RecurringFrequency.MONTHLY; // Default
     const intervalDays = 30; // Default
 
     return {

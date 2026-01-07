@@ -11,6 +11,8 @@ import { StaffModule } from './staff/staff.module';
 import { ArrearsModule } from './arrears/arrears.module';
 import { SettingsModule } from './settings/settings.module';
 import { XeroModule } from '../integrations/xero/xero.module';
+import { XeroPayrollModule } from './xero/xero-payroll.module';
+import { IntegrationsModule } from './integrations/integrations.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { XeroModule } from '../integrations/xero/xero.module';
     ArrearsModule,
     SettingsModule,
     XeroModule,
+    XeroPayrollModule,
+    IntegrationsModule,
   ],
   exports: [
     AuthModule,
@@ -40,6 +44,8 @@ import { XeroModule } from '../integrations/xero/xero.module';
     ArrearsModule,
     SettingsModule,
     XeroModule,
+    XeroPayrollModule,
+    IntegrationsModule,
   ],
 })
 export class ApiModule {}

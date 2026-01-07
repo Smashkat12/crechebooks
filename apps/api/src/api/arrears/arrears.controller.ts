@@ -291,16 +291,15 @@ export class ArrearsController {
     description: 'Requires OWNER or ADMIN role',
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
-  async sendReminder(
+  sendReminder(
     @Body() dto: SendReminderDto,
     @CurrentUser() user: IUser,
-  ): Promise<SendReminderResponseDto> {
+  ): SendReminderResponseDto {
     this.logger.log(
       `Send reminder: tenant=${user.tenantId}, count=${dto.parentIds.length}, method=${dto.method}`,
     );
 
-    // For now, just simulate sending reminders
-    // In a real implementation, this would integrate with email/WhatsApp services
+    // TODO: In a real implementation, this would integrate with email/WhatsApp services
     const sent = dto.parentIds.length;
     const failed = 0;
 

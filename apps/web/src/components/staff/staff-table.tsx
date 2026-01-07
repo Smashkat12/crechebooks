@@ -1,7 +1,7 @@
 'use client';
 
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, DollarSign, Calendar, Eye, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, DollarSign, Calendar, Eye, Edit, Trash2, ClipboardList, FileText, UserX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +22,9 @@ interface StaffTableProps {
   onView?: (staff: IStaff) => void;
   onEdit?: (staff: IStaff) => void;
   onDelete?: (staff: IStaff) => void;
+  onOnboarding?: (staff: IStaff) => void;
+  onDocuments?: (staff: IStaff) => void;
+  onOffboarding?: (staff: IStaff) => void;
 }
 
 const statusConfig: Record<StaffStatus, { label: string; className: string }> = {
@@ -36,6 +39,9 @@ export function StaffTable({
   onView,
   onEdit,
   onDelete,
+  onOnboarding,
+  onDocuments,
+  onOffboarding,
 }: StaffTableProps) {
   const columns: ColumnDef<IStaff>[] = [
     {
@@ -117,6 +123,28 @@ export function StaffTable({
               <DropdownMenuItem onClick={() => onEdit(row.original)}>
                 <Edit className="mr-2 h-4 w-4" />
                 Edit
+              </DropdownMenuItem>
+            )}
+            {onOnboarding && (
+              <DropdownMenuItem onClick={() => onOnboarding(row.original)}>
+                <ClipboardList className="mr-2 h-4 w-4" />
+                Onboarding
+              </DropdownMenuItem>
+            )}
+            {onDocuments && (
+              <DropdownMenuItem onClick={() => onDocuments(row.original)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Documents
+              </DropdownMenuItem>
+            )}
+            {(onDelete || onOffboarding) && <DropdownMenuSeparator />}
+            {onOffboarding && row.original.status === 'ACTIVE' && (
+              <DropdownMenuItem
+                onClick={() => onOffboarding(row.original)}
+                className="text-orange-600"
+              >
+                <UserX className="mr-2 h-4 w-4" />
+                Offboard
               </DropdownMenuItem>
             )}
             {onDelete && (

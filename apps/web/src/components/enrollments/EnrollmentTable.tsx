@@ -37,6 +37,7 @@ interface EnrollmentTableProps {
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
   onStatusChange: (enrollmentId: string, status: 'active' | 'inactive' | 'pending') => void;
+  onOffboard?: (enrollment: Enrollment) => void;
   isLoading?: boolean;
 }
 
@@ -45,6 +46,7 @@ export function EnrollmentTable({
   selectedIds,
   onSelectionChange,
   onStatusChange,
+  onOffboard,
   isLoading = false,
 }: EnrollmentTableProps) {
   const [lastSelectedIndex, setLastSelectedIndex] = React.useState<number | null>(null);
@@ -198,6 +200,17 @@ export function EnrollmentTable({
                     >
                       Mark as Pending
                     </DropdownMenuItem>
+                    {onOffboard && enrollment.status === 'active' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => onOffboard(enrollment)}
+                          className="text-amber-600 focus:text-amber-600"
+                        >
+                          Off-board Enrollment
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

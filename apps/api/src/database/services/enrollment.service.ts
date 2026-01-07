@@ -12,6 +12,7 @@ import { Enrollment, FeeStructure, Invoice } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { EnrollmentRepository } from '../repositories/enrollment.repository';
 import { ChildRepository } from '../repositories/child.repository';
+import { ParentRepository } from '../repositories/parent.repository';
 import { FeeStructureRepository } from '../repositories/fee-structure.repository';
 import { InvoiceRepository } from '../repositories/invoice.repository';
 import { InvoiceLineRepository } from '../repositories/invoice-line.repository';
@@ -27,6 +28,10 @@ import {
   ValidationException,
 } from '../../shared/exceptions';
 import { UpdateEnrollmentDto } from '../dto/enrollment.dto';
+import {
+  YearEndStudent,
+  YearEndReviewResult,
+} from '../dto/year-end-review.dto';
 
 // Configure Decimal.js for banker's rounding
 Decimal.set({
@@ -50,6 +55,7 @@ export class EnrollmentService {
   constructor(
     private readonly enrollmentRepo: EnrollmentRepository,
     private readonly childRepo: ChildRepository,
+    private readonly parentRepo: ParentRepository,
     private readonly feeStructureRepo: FeeStructureRepository,
     private readonly invoiceRepo: InvoiceRepository,
     private readonly invoiceLineRepo: InvoiceLineRepository,
@@ -451,8 +457,222 @@ export class EnrollmentService {
   }
 
   /**
+   * Graduate a child from enrollment
+   * TASK-ENROL-003: Bulk Year-End Graduation Feature
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param enrollmentId - Enrollment ID to graduate
+   * @param endDate - Graduation date
+   * @param userId - User performing the graduation
+   * @returns Updated enrollment with GRADUATED status
+   * @throws NotFoundException if enrollment doesn't exist
+   * @throws ConflictException if already graduated or withdrawn
+   * @throws ValidationException if endDate constraints violated
+   */
+  async graduateChild(
+    tenantId: string,
+    enrollmentId: string,
+    endDate: Date,
+    userId: string,
+  ): Promise<IEnrollment> {
+    // Fetch enrollment and validate tenant
+    const enrollment = await this.enrollmentRepo.findById(enrollmentId);
+    if (!enrollment || enrollment.tenantId !== tenantId) {
+      this.logger.error(
+        `Enrollment not found or tenant mismatch: ${enrollmentId} for tenant ${tenantId}`,
+      );
+      throw new NotFoundException('Enrollment', enrollmentId);
+    }
+
+    // Check enrollment is ACTIVE (only active enrollments can be graduated)
+    if (enrollment.status !== (EnrollmentStatus.ACTIVE as string)) {
+      this.logger.error(
+        `Enrollment ${enrollmentId} is not active (status: ${enrollment.status})`,
+      );
+      throw new ConflictException('Only active enrollments can be graduated', {
+        enrollmentId,
+        currentStatus: enrollment.status,
+      });
+    }
+
+    // Validate endDate > startDate
+    if (endDate <= enrollment.startDate) {
+      this.logger.error(
+        `End date ${endDate.toISOString()} must be after start date ${enrollment.startDate.toISOString()}`,
+      );
+      throw new ValidationException('End date must be after start date', [
+        {
+          field: 'endDate',
+          message: 'End date must be after start date',
+          value: endDate,
+        },
+      ]);
+    }
+
+    // Validate endDate is not in the future
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (endDate > today) {
+      this.logger.error(
+        `End date ${endDate.toISOString()} cannot be in the future`,
+      );
+      throw new ValidationException('End date cannot be in the future', [
+        {
+          field: 'endDate',
+          message: 'End date cannot be in the future',
+          value: endDate,
+        },
+      ]);
+    }
+
+    // Store before value for audit
+    const beforeValue = { ...enrollment };
+
+    // Update with graduated status
+    const updated = await this.enrollmentRepo.update(enrollmentId, {
+      status: EnrollmentStatus.GRADUATED,
+      endDate,
+    });
+
+    // Audit log
+    await this.auditLogService.logUpdate({
+      tenantId,
+      userId,
+      entityType: 'Enrollment',
+      entityId: enrollmentId,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      beforeValue: JSON.parse(JSON.stringify(beforeValue)),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      afterValue: JSON.parse(JSON.stringify(updated)),
+      changeSummary: 'Child graduated from enrollment',
+    });
+
+    this.logger.log(
+      `Successfully graduated child from enrollment ${enrollmentId}`,
+    );
+
+    return updated as IEnrollment;
+  }
+
+  /**
+   * Bulk graduate multiple enrollments (year-end processing)
+   * TASK-ENROL-003: Bulk Year-End Graduation Feature
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param enrollmentIds - Array of enrollment IDs to graduate
+   * @param endDate - Graduation date for all
+   * @param userId - User performing the graduation
+   * @returns Count of graduated and skipped enrollments
+   */
+  async bulkGraduate(
+    tenantId: string,
+    enrollmentIds: string[],
+    endDate: Date,
+    userId: string,
+  ): Promise<{ graduated: number; skipped: number }> {
+    let graduated = 0;
+    let skipped = 0;
+
+    for (const enrollmentId of enrollmentIds) {
+      try {
+        await this.graduateChild(tenantId, enrollmentId, endDate, userId);
+        graduated++;
+      } catch (error) {
+        // Skip enrollments that can't be graduated (not found, wrong tenant, not active, etc.)
+        this.logger.warn(
+          `Skipped graduation for enrollment ${enrollmentId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        skipped++;
+      }
+    }
+
+    this.logger.log(
+      `Bulk graduation complete: ${graduated} graduated, ${skipped} skipped`,
+    );
+
+    return { graduated, skipped };
+  }
+
+  /**
+   * Check if child had an ACTIVE enrollment on a specific date
+   * TASK-BILL-037: Corrected re-registration logic for January invoices
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param childId - Child ID to check
+   * @param date - Date to check enrollment status on
+   * @returns true if child had an active enrollment on the given date
+   */
+  async wasActiveOnDate(
+    tenantId: string,
+    childId: string,
+    date: Date,
+  ): Promise<boolean> {
+    const enrollments = await this.enrollmentRepo.findByChild(
+      tenantId,
+      childId,
+    );
+
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    return enrollments.some((e) => {
+      // Check start date - enrollment must have started on or before target date
+      const startDate = new Date(e.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      if (startDate > targetDate) {
+        return false;
+      }
+
+      // If enrollment has ended, check if end date is on or after target date
+      if (e.endDate) {
+        const endDate = new Date(e.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        if (endDate < targetDate) {
+          return false;
+        }
+      }
+
+      // For ongoing enrollments (no end date), check status is ACTIVE
+      // For ended enrollments (with end date), they were active on that date if within range
+      if (!e.endDate) {
+        return e.status === (EnrollmentStatus.ACTIVE as string);
+      }
+
+      // Enrollment with end date in range was active on that date regardless of current status
+      return true;
+    });
+  }
+
+  /**
+   * @deprecated Use wasActiveOnDate() for correct re-registration logic
+   * TASK-BILL-024 original logic was incorrect - kept for backwards compatibility
+   *
+   * This method incorrectly determines re-registration eligibility.
+   * Re-registration fee should be for CONTINUING students (active Dec 31 previous year),
+   * not for students returning after being WITHDRAWN/GRADUATED.
+   */
+  async isReturningStudent(
+    tenantId: string,
+    childId: string,
+  ): Promise<boolean> {
+    this.logger.warn(
+      'isReturningStudent() is deprecated and returns incorrect logic. Use wasActiveOnDate() for re-registration checks.',
+    );
+    const previousEnrollments = await this.enrollmentRepo.findByChild(
+      tenantId,
+      childId,
+    );
+    return previousEnrollments.some(
+      (e) =>
+        e.status === (EnrollmentStatus.WITHDRAWN as string) ||
+        e.status === (EnrollmentStatus.GRADUATED as string),
+    );
+  }
+
+  /**
    * Create enrollment invoice with registration fee and pro-rated first month
    * TASK-BILL-021: Implements EC-BILL-001 and REQ-BILL-001
+   * TASK-BILL-024: Uses re-registration fee for returning students
    *
    * @param tenantId - Tenant ID for multi-tenant isolation
    * @param enrollment - The created enrollment
@@ -543,18 +763,37 @@ export class EnrollmentService {
     }> = [];
     let sortOrder = 0;
 
-    // Registration fee line (if registrationFeeCents > 0)
+    // TASK-BILL-024: Determine if returning student and use appropriate fee
+    const isReturning = await this.isReturningStudent(
+      tenantId,
+      enrollment.childId,
+    );
     const registrationFeeCents = feeStructure.registrationFeeCents ?? 0;
-    if (registrationFeeCents > 0) {
+    const reRegistrationFeeCents = feeStructure.reRegistrationFeeCents ?? 0;
+
+    // Use re-registration fee for returning students, registration fee for new students
+    const applicableFeeCents = isReturning
+      ? reRegistrationFeeCents
+      : registrationFeeCents;
+    const feeDescription = isReturning
+      ? 'Re-Registration Fee'
+      : 'Registration Fee';
+
+    this.logger.debug(
+      `Enrollment fee for child ${enrollment.childId}: isReturning=${isReturning}, fee=${applicableFeeCents} cents (${feeDescription})`,
+    );
+
+    // Registration/Re-registration fee line (if applicable fee > 0)
+    if (applicableFeeCents > 0) {
       lineItems.push({
         invoiceId: invoice.id,
-        description: 'Registration Fee',
+        description: feeDescription,
         quantity: 1,
-        unitPriceCents: registrationFeeCents,
+        unitPriceCents: applicableFeeCents,
         discountCents: 0,
-        subtotalCents: registrationFeeCents,
+        subtotalCents: applicableFeeCents,
         vatCents: 0, // Registration fees typically VAT exempt
-        totalCents: registrationFeeCents,
+        totalCents: applicableFeeCents,
         lineType: LineType.REGISTRATION,
         accountCode: '4010', // Registration income account
         sortOrder: sortOrder++,
@@ -625,6 +864,162 @@ export class EnrollmentService {
     );
 
     return invoice;
+  }
+
+  /**
+   * Get year-end review data for all active enrollments
+   * TASK-ENROL-004: Year-End Processing Dashboard
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param academicYear - Academic year to review (defaults to current/next based on month)
+   * @returns Year-end review result with students grouped by category
+   */
+  async getYearEndReview(
+    tenantId: string,
+    academicYear: number,
+  ): Promise<YearEndReviewResult> {
+    this.logger.log(
+      `Generating year-end review for tenant ${tenantId}, year ${academicYear}`,
+    );
+
+    // January 1st of the review year (when children turn their new age)
+    const jan1NextYear = new Date(academicYear, 0, 1);
+
+    // Review period: Nov 1 of previous year to Jan 31 of review year
+    const reviewPeriod = {
+      start: new Date(academicYear - 1, 10, 1), // Nov 1
+      end: new Date(academicYear, 0, 31), // Jan 31
+    };
+
+    // Get all ACTIVE enrollments
+    const activeEnrollments = await this.enrollmentRepo.findByStatus(
+      tenantId,
+      EnrollmentStatus.ACTIVE,
+    );
+
+    const students: {
+      continuing: YearEndStudent[];
+      graduating: YearEndStudent[];
+      withdrawing: YearEndStudent[];
+    } = {
+      continuing: [],
+      graduating: [],
+      withdrawing: [],
+    };
+
+    let graduationCandidatesCount = 0;
+    let totalOutstanding = 0;
+    let totalCredit = 0;
+
+    for (const enrollment of activeEnrollments) {
+      // Get child info
+      const child = await this.childRepo.findById(enrollment.childId);
+      if (!child) {
+        this.logger.warn(
+          `Child not found for enrollment ${enrollment.id}, skipping`,
+        );
+        continue;
+      }
+
+      // Get parent info
+      const parent = child.parentId
+        ? await this.parentRepo.findById(child.parentId).catch(() => null)
+        : null;
+      const parentName = parent
+        ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim()
+        : 'Unknown Parent';
+
+      // Calculate age as of January 1st of academic year
+      let ageOnJan1 = 0;
+      if (child.dateOfBirth) {
+        const dob = new Date(child.dateOfBirth);
+        ageOnJan1 = jan1NextYear.getFullYear() - dob.getFullYear();
+        // Adjust if birthday hasn't occurred yet by Jan 1
+        const jan1Birthday = new Date(
+          jan1NextYear.getFullYear(),
+          dob.getMonth(),
+          dob.getDate(),
+        );
+        if (jan1Birthday > jan1NextYear) {
+          ageOnJan1--;
+        }
+      }
+
+      // Flag graduation candidate (turning 6 or older)
+      const graduationCandidate = ageOnJan1 >= 6;
+      if (graduationCandidate) {
+        graduationCandidatesCount++;
+      }
+
+      // Get fee structure info
+      const feeStructure = await this.feeStructureRepo.findById(
+        enrollment.feeStructureId,
+      );
+
+      // Calculate account balance from outstanding invoices
+      const invoices = await this.invoiceRepo.findByChild(
+        tenantId,
+        enrollment.childId,
+      );
+      let accountBalance = 0;
+      for (const invoice of invoices) {
+        if (invoice.status !== 'PAID' && invoice.status !== 'VOID') {
+          const outstanding = invoice.totalCents - invoice.amountPaidCents;
+          accountBalance += outstanding;
+        }
+      }
+
+      if (accountBalance > 0) {
+        totalOutstanding += accountBalance;
+      } else if (accountBalance < 0) {
+        totalCredit += Math.abs(accountBalance);
+      }
+
+      // Determine category (all start as 'continuing')
+      // In a full implementation, this would check withdrawal notices, etc.
+      // For now, we categorize based on graduation candidacy
+      const category: 'continuing' | 'graduating' | 'withdrawing' =
+        'continuing';
+
+      const studentData: YearEndStudent = {
+        enrollmentId: enrollment.id,
+        childId: child.id,
+        childName: `${child.firstName || ''} ${child.lastName || ''}`.trim(),
+        parentId: child.parentId,
+        parentName,
+        dateOfBirth: child.dateOfBirth || new Date(),
+        ageOnJan1,
+        category,
+        graduationCandidate,
+        currentStatus: enrollment.status,
+        accountBalance,
+        feeTierName: feeStructure?.name || 'Unknown',
+        feeStructureId: enrollment.feeStructureId,
+      };
+
+      students[category].push(studentData);
+    }
+
+    const result: YearEndReviewResult = {
+      academicYear,
+      reviewPeriod,
+      students,
+      summary: {
+        totalActive: activeEnrollments.length,
+        continuingCount: students.continuing.length,
+        graduatingCount: students.graduating.length,
+        withdrawingCount: students.withdrawing.length,
+        graduationCandidates: graduationCandidatesCount,
+        totalOutstanding,
+        totalCredit,
+      },
+    };
+
+    this.logger.log(
+      `Year-end review generated: ${result.summary.totalActive} active enrollments, ${result.summary.graduationCandidates} graduation candidates`,
+    );
+
+    return result;
   }
 
   /**

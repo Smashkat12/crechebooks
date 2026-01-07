@@ -17,7 +17,8 @@
  */
 
 import * as React from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { Download, Loader2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -25,12 +26,15 @@ import {
   EnrollmentTable,
   EnrollmentFilters,
   BulkActionsBar,
+  OffboardingDialog,
 } from '@/components/enrollments';
 import type { EnrollmentFiltersState } from '@/components/enrollments/EnrollmentFilters';
+import type { Enrollment } from '@/lib/api/enrollments';
 import {
   useEnrollments,
   useUpdateEnrollmentStatus,
   useBulkUpdateEnrollmentStatus,
+  useBulkGraduate,
 } from '@/hooks/use-enrollments';
 import { exportEnrollments } from '@/lib/api/enrollments';
 
@@ -44,6 +48,7 @@ export default function EnrollmentsPage() {
   const [page, setPage] = React.useState(1);
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = React.useState(false);
+  const [offboardingEnrollment, setOffboardingEnrollment] = React.useState<Enrollment | null>(null);
 
   // Reset page when filters change
   React.useEffect(() => {
@@ -66,6 +71,7 @@ export default function EnrollmentsPage() {
   const { data, isLoading, isError, error, refetch } = useEnrollments(queryParams);
   const updateStatusMutation = useUpdateEnrollmentStatus();
   const bulkUpdateMutation = useBulkUpdateEnrollmentStatus();
+  const bulkGraduateMutation = useBulkGraduate();
 
   const handleStatusChange = async (enrollmentId: string, status: 'active' | 'inactive' | 'pending') => {
     try {
@@ -75,7 +81,7 @@ export default function EnrollmentsPage() {
         description: `Enrollment status changed to ${status}`,
       });
       refetch();
-    } catch (err) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to update enrollment status',
@@ -94,10 +100,29 @@ export default function EnrollmentsPage() {
       });
       setSelectedIds(new Set());
       refetch();
-    } catch (err) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to update enrollments',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleBulkGraduate = async (endDate: string) => {
+    try {
+      const enrollmentIds = Array.from(selectedIds);
+      const result = await bulkGraduateMutation.mutateAsync({ enrollmentIds, endDate });
+      toast({
+        title: 'Graduation complete',
+        description: `Graduated ${result.graduated} enrollment(s)${result.skipped > 0 ? `, ${result.skipped} skipped (not active)` : ''}`,
+      });
+      setSelectedIds(new Set());
+      refetch();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to graduate enrollments',
         variant: 'destructive',
       });
     }
@@ -126,7 +151,7 @@ export default function EnrollmentsPage() {
         title: 'Export successful',
         description: 'Enrollments have been exported to CSV',
       });
-    } catch (err) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to export enrollments',
@@ -148,6 +173,12 @@ export default function EnrollmentsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href="/enrollments/year-end">
+            <Button variant="outline">
+              <Calendar className="h-4 w-4 mr-2" />
+              Year-End Review
+            </Button>
+          </Link>
           <Button variant="outline" onClick={handleExport} disabled={isExporting}>
             {isExporting ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -175,7 +206,9 @@ export default function EnrollmentsPage() {
           selectedCount={selectedIds.size}
           onClearSelection={() => setSelectedIds(new Set())}
           onBulkStatusChange={handleBulkStatusChange}
+          onBulkGraduate={handleBulkGraduate}
           isLoading={bulkUpdateMutation.isPending}
+          isGraduating={bulkGraduateMutation.isPending}
         />
       )}
 
@@ -195,6 +228,7 @@ export default function EnrollmentsPage() {
                 selectedIds={selectedIds}
                 onSelectionChange={setSelectedIds}
                 onStatusChange={handleStatusChange}
+                onOffboard={setOffboardingEnrollment}
                 isLoading={isLoading}
               />
 
@@ -231,6 +265,20 @@ export default function EnrollmentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Off-boarding Dialog */}
+      <OffboardingDialog
+        enrollment={offboardingEnrollment}
+        open={!!offboardingEnrollment}
+        onOpenChange={(open) => !open && setOffboardingEnrollment(null)}
+        onSuccess={() => {
+          refetch();
+          toast({
+            title: 'Off-boarding complete',
+            description: `${offboardingEnrollment?.child_name} has been successfully off-boarded`,
+          });
+        }}
+      />
     </div>
   );
 }

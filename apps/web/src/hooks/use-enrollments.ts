@@ -14,11 +14,16 @@ import {
   listEnrollments,
   updateEnrollmentStatus,
   bulkUpdateEnrollmentStatus,
+  bulkGraduateEnrollments,
+  getYearEndReview,
   type Enrollment,
   type EnrollmentListParams,
   type EnrollmentListResponse,
   type UpdateEnrollmentStatusParams,
   type BulkUpdateStatusParams,
+  type BulkGraduateParams,
+  type BulkGraduateResponse,
+  type YearEndReviewResult,
 } from '@/lib/api/enrollments';
 
 // Query keys
@@ -28,6 +33,7 @@ const enrollmentKeys = {
   list: (params?: EnrollmentListParams) => [...enrollmentKeys.lists(), params] as const,
   details: () => [...enrollmentKeys.all, 'detail'] as const,
   detail: (id: string) => [...enrollmentKeys.details(), id] as const,
+  yearEndReview: (year?: number) => [...enrollmentKeys.all, 'yearEndReview', year] as const,
 };
 
 // List enrollments with filters
@@ -59,6 +65,59 @@ export function useBulkUpdateEnrollmentStatus() {
     mutationFn: bulkUpdateEnrollmentStatus,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: enrollmentKeys.lists() });
+    },
+  });
+}
+
+// Bulk graduate enrollments (year-end processing)
+export function useBulkGraduate() {
+  const queryClient = useQueryClient();
+
+  return useMutation<BulkGraduateResponse, AxiosError, BulkGraduateParams>({
+    mutationFn: bulkGraduateEnrollments,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: enrollmentKeys.lists() });
+    },
+  });
+}
+
+// Get year-end review data (TASK-ENROL-004)
+export function useYearEndReview(year?: number) {
+  return useQuery<YearEndReviewResult, AxiosError>({
+    queryKey: enrollmentKeys.yearEndReview(year),
+    queryFn: () => getYearEndReview(year),
+    staleTime: 60000, // 1 minute
+  });
+}
+
+// Off-boarding hooks (TASK-ENROL-005)
+import {
+  getSettlementPreview,
+  initiateOffboarding,
+  type AccountSettlement,
+  type OffboardingResult,
+  type InitiateOffboardingParams,
+} from '@/lib/api/enrollments';
+
+// Settlement preview hook
+export function useSettlementPreview(enrollmentId: string, endDate: string, enabled = true) {
+  return useQuery<AccountSettlement, AxiosError>({
+    queryKey: [...enrollmentKeys.detail(enrollmentId), 'settlement', endDate],
+    queryFn: () => getSettlementPreview(enrollmentId, endDate),
+    enabled: enabled && !!enrollmentId && !!endDate,
+    staleTime: 30000, // 30 seconds
+  });
+}
+
+// Initiate off-boarding mutation
+export function useInitiateOffboarding() {
+  const queryClient = useQueryClient();
+
+  return useMutation<OffboardingResult, AxiosError, InitiateOffboardingParams>({
+    mutationFn: initiateOffboarding,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: enrollmentKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: enrollmentKeys.all });
     },
   });
 }

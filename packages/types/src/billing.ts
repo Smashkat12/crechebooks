@@ -51,7 +51,8 @@ export interface IFeeStructure {
   feeType?: FeeType;
   baseAmount?: number; // Legacy: Stored in cents
   amountCents?: number; // Primary: Monthly fee in cents
-  registrationFeeCents?: number; // One-time registration fee in cents
+  registrationFeeCents?: number; // One-time registration fee in cents (for new students)
+  reRegistrationFeeCents?: number; // One-time re-registration fee in cents (for returning students)
   vatInclusive?: boolean;
   siblingDiscountPercent?: number;
   effectiveFrom?: Date;

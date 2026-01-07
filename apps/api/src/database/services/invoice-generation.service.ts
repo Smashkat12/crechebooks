@@ -233,6 +233,31 @@ export class InvoiceGenerationService {
             accountCode: this.SCHOOL_FEES_ACCOUNT,
           });
 
+          // TASK-BILL-037: Add re-registration fee for January invoices (continuing students)
+          const reRegistrationFeeCents =
+            enrollment.feeStructure.reRegistrationFeeCents ?? 0;
+          if (reRegistrationFeeCents > 0) {
+            const isEligibleForReReg = await this.isEligibleForReRegistration(
+              tenantId,
+              enrollment.childId,
+              billingMonth,
+            );
+
+            if (isEligibleForReReg) {
+              lineItems.push({
+                description: 'Annual Re-Registration Fee',
+                quantity: new Decimal(1),
+                unitPriceCents: reRegistrationFeeCents,
+                discountCents: 0,
+                lineType: LineType.REGISTRATION,
+                accountCode: '4010', // Registration income account
+              });
+              this.logger.log(
+                `Added re-registration fee (${reRegistrationFeeCents} cents) for child ${enrollment.childId} - January continuing student`,
+              );
+            }
+          }
+
           // TASK-BILL-017: Get and include pending ad-hoc charges for this child
           const adHocCharges = await this.getAdHocCharges(
             tenantId,
@@ -763,6 +788,7 @@ export class InvoiceGenerationService {
             name: true,
             amountCents: true,
             vatInclusive: true,
+            reRegistrationFeeCents: true, // TASK-BILL-037: For January re-registration
           },
         },
       },
@@ -941,5 +967,50 @@ export class InvoiceGenerationService {
     const normalized = new Date(date);
     normalized.setHours(0, 0, 0, 0);
     return normalized;
+  }
+
+  /**
+   * TASK-BILL-037: Check if child is eligible for January re-registration fee
+   *
+   * Re-registration fee applies ONLY to continuing students:
+   * - Billing month must be January (YYYY-01)
+   * - Child must have been ACTIVE on December 31st of previous year
+   *
+   * This is NOT for students returning after WITHDRAWN/GRADUATED status.
+   * Those are new enrollments and pay the full registration fee (R500).
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param childId - Child ID to check
+   * @param billingMonth - Format: YYYY-MM
+   * @returns true if child is eligible for re-registration fee
+   */
+  private async isEligibleForReRegistration(
+    tenantId: string,
+    childId: string,
+    billingMonth: string,
+  ): Promise<boolean> {
+    // Only applies to January invoices
+    if (!billingMonth.endsWith('-01')) {
+      return false;
+    }
+
+    // Get previous year's December 31st
+    const year = parseInt(billingMonth.substring(0, 4), 10);
+    const previousDecember31 = new Date(year - 1, 11, 31); // Month is 0-indexed
+
+    // Check if child was active on that date using EnrollmentService
+    const wasActive = await this.enrollmentService.wasActiveOnDate(
+      tenantId,
+      childId,
+      previousDecember31,
+    );
+
+    if (wasActive) {
+      this.logger.debug(
+        `Child ${childId} is eligible for re-registration fee: was active on ${year - 1}-12-31`,
+      );
+    }
+
+    return wasActive;
   }
 }

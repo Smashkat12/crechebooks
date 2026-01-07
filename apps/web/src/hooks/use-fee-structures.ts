@@ -14,6 +14,8 @@ export interface FeeStructure {
   amount: number;
   registration_fee_cents: number;
   registration_fee: number;
+  re_registration_fee_cents: number;
+  re_registration_fee: number;
   vat_inclusive: boolean;
   sibling_discount_percent: number | null;
   effective_from: string;
@@ -34,6 +36,7 @@ interface CreateFeeStructureParams {
   fee_type: FeeType;
   amount: number;
   registration_fee?: number;
+  re_registration_fee?: number;
   vat_inclusive?: boolean;
   sibling_discount_percent?: number;
   effective_from: string;

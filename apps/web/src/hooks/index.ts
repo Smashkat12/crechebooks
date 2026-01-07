@@ -12,3 +12,4 @@ export { useExportReport } from './useExportReport';
 export type { ExportReportParams } from './useExportReport';
 export { useBreakpoint, useMinBreakpoint, useMaxBreakpoint } from './useBreakpoint';
 export type { UseBreakpointReturn } from './useBreakpoint';
+export * from './use-simplepay';

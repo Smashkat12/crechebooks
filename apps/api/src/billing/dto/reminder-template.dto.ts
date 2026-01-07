@@ -19,7 +19,6 @@ import {
   ArrayNotEmpty,
   ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 /**
  * Reminder stage based on days overdue

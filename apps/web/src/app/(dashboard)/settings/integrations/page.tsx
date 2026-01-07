@@ -5,14 +5,17 @@ import { useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { XCircle, CheckCircle2, Link2, RefreshCw, Loader2, AlertCircle, Building2, Plus, Trash2 } from 'lucide-react';
+import { XCircle, CheckCircle2, Link2, RefreshCw, Loader2, AlertCircle, Building2, Plus, Trash2, Shield, ArrowRight } from 'lucide-react';
 import { useXeroStatus } from '@/hooks/useXeroStatus';
 import { xeroApi, XeroBankAccount, BankConnection } from '@/lib/api/xero';
+import { useSimplePayStatus } from '@/hooks/use-simplepay';
 import { formatDistanceToNow } from 'date-fns';
+import Link from 'next/link';
 
 export default function IntegrationsSettingsPage() {
   const searchParams = useSearchParams();
   const { status, isLoading, error, syncNow, isSyncing } = useXeroStatus();
+  const { status: simplePayStatus, isLoading: simplePayLoading } = useSimplePayStatus();
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
 
@@ -398,6 +401,69 @@ export default function IntegrationsSettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* SimplePay Integration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-blue-600" />
+                SimplePay
+                {simplePayLoading ? (
+                  <Badge variant="secondary">
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Loading...
+                  </Badge>
+                ) : simplePayStatus?.isConnected ? (
+                  <Badge variant="default" className="bg-green-600">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Not Connected
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Payroll integration for employee sync, payslips, and tax certificates
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {simplePayStatus?.isConnected && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Employees synced</span>
+                <span className="font-medium text-green-600">{simplePayStatus.employeesSynced}</span>
+              </div>
+              {simplePayStatus.employeesOutOfSync > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Out of sync</span>
+                  <span className="font-medium text-yellow-600">{simplePayStatus.employeesOutOfSync}</span>
+                </div>
+              )}
+              {simplePayStatus.lastSyncAt && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Last synced</span>
+                  <span className="font-medium">
+                    {formatDistanceToNow(new Date(simplePayStatus.lastSyncAt), { addSuffix: true })}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+          <Button asChild>
+            <Link href="/settings/integrations/simplepay">
+              {simplePayStatus?.isConnected ? 'Manage SimplePay' : 'Connect SimplePay'}
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

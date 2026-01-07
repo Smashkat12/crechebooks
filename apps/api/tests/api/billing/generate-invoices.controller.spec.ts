@@ -231,11 +231,10 @@ describe('InvoiceController - Generate Invoices', () => {
       ).rejects.toThrow('Cannot generate invoices for future months');
 
       // Verify service was never called for future month
-      /* eslint-disable @typescript-eslint/unbound-method */
+
       expect(
         invoiceGenerationService.generateMonthlyInvoices,
       ).not.toHaveBeenCalled();
-      /* eslint-enable @typescript-eslint/unbound-method */
     });
 
     it('should allow current month billing', async () => {
@@ -348,7 +347,7 @@ describe('InvoiceController - Generate Invoices', () => {
 
       // Verify the endpoint metadata has role restriction
       // (The actual blocking is done by RolesGuard at runtime)
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       const generateMethod = InvoiceController.prototype.generateInvoices;
       const metadata = Reflect.getMetadata(
         'roles',

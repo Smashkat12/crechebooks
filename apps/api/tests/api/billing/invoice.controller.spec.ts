@@ -145,7 +145,7 @@ describe('InvoiceController', () => {
       expect(result.data[0].child.name).toBe('Emma Smith');
       expect(result.meta.page).toBe(1);
       expect(result.meta.total).toBe(1);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       expect(invoiceRepo.findByTenant).toHaveBeenCalledWith(
         'tenant-456',
         expect.objectContaining({ isDeleted: false }),

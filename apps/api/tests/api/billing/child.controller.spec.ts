@@ -318,7 +318,7 @@ describe('ChildController', () => {
         expect.objectContaining({
           firstName: 'Emma',
           lastName: 'Smith',
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
           dateOfBirth: expect.any(Date),
           medicalNotes: 'Notes',
           emergencyContact: 'Contact',
@@ -561,7 +561,6 @@ describe('ChildController', () => {
 
   describe('Role restrictions', () => {
     it('should enforce OWNER/ADMIN role for enrollChild via decorators', () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       const enrollMethod = ChildController.prototype.enrollChild;
       const metadata = Reflect.getMetadata('roles', enrollMethod) as UserRole[];
 
@@ -571,7 +570,6 @@ describe('ChildController', () => {
     });
 
     it('should enforce OWNER/ADMIN role for updateChild via decorators', () => {
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       const updateMethod = ChildController.prototype.updateChild;
       const metadata = Reflect.getMetadata('roles', updateMethod) as UserRole[];
 

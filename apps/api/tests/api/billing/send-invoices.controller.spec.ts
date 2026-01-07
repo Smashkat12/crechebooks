@@ -349,7 +349,7 @@ describe('InvoiceController - Send Invoices', () => {
 
     it('should enforce OWNER/ADMIN role restriction via decorators', () => {
       // Verify the endpoint metadata has role restriction
-      // eslint-disable-next-line @typescript-eslint/unbound-method
+
       const sendMethod = InvoiceController.prototype.sendInvoices;
       const metadata = Reflect.getMetadata('roles', sendMethod) as UserRole[];
 

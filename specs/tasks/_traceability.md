@@ -581,6 +581,19 @@ Analysis Date: 2026-01-06
 | 2026-01-06 | Scheduled monthly statement generation with BullMQ | AI Agent |
 | 2026-01-06 | Statement UI components including payment allocation modal | AI Agent |
 | 2026-01-06 | **PHASE 12 PENDING**: 0/8 tasks complete - Statement feature to implement | AI Agent |
+| 2026-01-07 | Phase 13: Staff Management & Integrations designed based on HR best practices research | AI Agent |
+| 2026-01-07 | Research completed: BCEA notice periods, UIF requirements, DSD compliance for childcare | AI Agent |
+| 2026-01-07 | Research completed: Xero Manual Journals API (no native SA Payroll API), SimplePay REST API | AI Agent |
+| 2026-01-07 | Created TASK-STAFF-001: Staff Onboarding Workflow with Welcome Pack | AI Agent |
+| 2026-01-07 | Created TASK-STAFF-002: Staff Offboarding Workflow with Exit Pack (BCEA compliant) | AI Agent |
+| 2026-01-07 | Created TASK-STAFF-003: Xero Integration for Payroll Journal Entries | AI Agent |
+| 2026-01-07 | Created TASK-STAFF-004: SimplePay Integration for Payroll Processing | AI Agent |
+| 2026-01-07 | Added 30 new requirements across Staff Onboarding, Offboarding, Payroll Integration, and HR Compliance | AI Agent |
+| 2026-01-07 | **PHASE 13 CREATED**: 0/4 tasks complete - Staff Management & Integrations to implement | AI Agent |
+| 2026-01-08 | **TASK-STAFF-001 Complete**: Staff Onboarding Workflow with Welcome Pack (all 7 requirements met) | AI Agent |
+| 2026-01-08 | Implementation: StaffDocument entity, OnboardingChecklist, 8-step wizard UI, Welcome Pack PDF, ZIP bundle download, email to employee | AI Agent |
+| 2026-01-08 | DSD compliance checklist with Police Clearance, Medical Certificate, First Aid tracking | AI Agent |
+| 2026-01-08 | Phase 13 Progress: 1/4 tasks complete (25%), Overall: 159/170 (94%) | AI Agent |
 
 ---
 
@@ -709,7 +722,71 @@ Testing performed using Playwright MCP browser automation with the following met
 | E2E-BUG-004 | Added findFirst check before create, update existing DRAFT | `vat201.service.ts` |
 | E2E-BUG-005 | Fixed endpoint path `/payments/arrears`, proper data transform | `endpoints.ts`, `use-arrears.ts` |
 
-**Traceability Status**: 🟡 95% COMPLETE (158/166 tasks done) - Phase 12 in progress
+**Traceability Status**: 🟡 94% COMPLETE (159/170 tasks done) - Phases 12-13 in progress
+
+---
+
+## Phase 13: Staff Management & Integrations (2026-01-07)
+
+### Staff Onboarding Domain Coverage (New)
+
+| Spec Item | ID | Covered by Task ID | Status |
+|-----------|----|--------------------|--------|
+| StaffDocument entity for uploads | REQ-STAFF-001 | TASK-STAFF-001 | ✅ Complete |
+| OnboardingChecklist entity | REQ-STAFF-002 | TASK-STAFF-001 | ✅ Complete |
+| Document upload service | REQ-STAFF-003 | TASK-STAFF-001 | ✅ Complete |
+| DSD compliance checklist | REQ-STAFF-004 | TASK-STAFF-001 | ✅ Complete |
+| Welcome Pack PDF generation | REQ-STAFF-005 | TASK-STAFF-001 | ✅ Complete |
+| Probation period tracking | REQ-STAFF-006 | TASK-STAFF-001 | ✅ Complete |
+| Onboarding wizard UI | REQ-STAFF-007 | TASK-STAFF-001 | ✅ Complete |
+
+### Staff Offboarding Domain Coverage (New)
+
+| Spec Item | ID | Covered by Task ID | Status |
+|-----------|----|--------------------|--------|
+| StaffOffboarding entity | REQ-STAFF-010 | TASK-STAFF-002 | ⭕ Pending |
+| BCEA notice period calculation | REQ-STAFF-011 | TASK-STAFF-002 | ⭕ Pending |
+| Final pay calculation service | REQ-STAFF-012 | TASK-STAFF-002 | ⭕ Pending |
+| Leave payout calculation | REQ-STAFF-013 | TASK-STAFF-002 | ⭕ Pending |
+| UI-19 form generation | REQ-STAFF-014 | TASK-STAFF-002 | ⭕ Pending |
+| Certificate of Service generation | REQ-STAFF-015 | TASK-STAFF-002 | ⭕ Pending |
+| Exit Pack PDF generation | REQ-STAFF-016 | TASK-STAFF-002 | ⭕ Pending |
+| Asset return tracking | REQ-STAFF-017 | TASK-STAFF-002 | ⭕ Pending |
+| Offboarding wizard UI | REQ-STAFF-018 | TASK-STAFF-002 | ⭕ Pending |
+
+### Payroll Integration Domain Coverage (New)
+
+| Spec Item | ID | Covered by Task ID | Status |
+|-----------|----|--------------------|--------|
+| Xero Manual Journals API integration | REQ-PAYINT-001 | TASK-STAFF-003 | ⭕ Pending |
+| Chart of Accounts mapping | REQ-PAYINT-002 | TASK-STAFF-003 | ⭕ Pending |
+| Payroll journal entry creation | REQ-PAYINT-003 | TASK-STAFF-003 | ⭕ Pending |
+| SimplePay REST API client | REQ-PAYINT-010 | TASK-STAFF-004 | ⭕ Pending |
+| Employee sync (CrecheBooks ↔ SimplePay) | REQ-PAYINT-011 | TASK-STAFF-004 | ⭕ Pending |
+| Payslip import and storage | REQ-PAYINT-012 | TASK-STAFF-004 | ⭕ Pending |
+| IRP5/EMP201 document fetch | REQ-PAYINT-013 | TASK-STAFF-004 | ⭕ Pending |
+
+### SA HR Compliance Requirements
+
+| Spec Item | ID | Covered by Task ID | Status | Regulation |
+|-----------|----|--------------------|--------|------------|
+| BCEA notice periods | EC-HR-001 | TASK-STAFF-002 | ⭕ Pending | BCEA Section 37 |
+| Leave payout on termination | EC-HR-002 | TASK-STAFF-002 | ⭕ Pending | BCEA Section 40 |
+| Certificate of Service | EC-HR-003 | TASK-STAFF-002 | ⭕ Pending | BCEA Section 42 |
+| UI-19 within 14 days | EC-HR-004 | TASK-STAFF-002 | ⭕ Pending | UIF Act Section 56 |
+| DSD Police Clearance | EC-HR-005 | TASK-STAFF-001 | ✅ Complete | Children's Act Section 110 |
+| POPIA data consent | EC-HR-006 | TASK-STAFF-001 | ✅ Complete | POPIA Sections 11-12 |
+| Pro-rata 13th cheque | EC-HR-007 | TASK-STAFF-002 | ⭕ Pending | BCEA Section 35 |
+
+### Phase 13 Summary
+
+| Domain | Total Reqs | Complete | Pending | Coverage |
+|--------|-----------|----------|---------|----------|
+| Staff Onboarding | 7 | 7 | 0 | 100% |
+| Staff Offboarding | 9 | 0 | 9 | 0% |
+| Payroll Integration | 7 | 0 | 7 | 0% |
+| SA HR Compliance | 7 | 2 | 5 | 29% |
+| **Phase 13 Total** | **30** | **9** | **21** | **30%** |
 
 ---
 

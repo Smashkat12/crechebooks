@@ -149,6 +149,8 @@ export interface EnrollmentWithRelations {
     name: string;
     amountCents: number;
     vatInclusive: boolean;
+    /** TASK-BILL-037: Re-registration fee for continuing students */
+    reRegistrationFeeCents?: number;
   };
 }
 

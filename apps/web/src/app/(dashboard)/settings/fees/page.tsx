@@ -53,6 +53,7 @@ export default function FeeStructuresSettingsPage() {
     fee_type: 'FULL_DAY' as FeeType,
     amount: '',
     registration_fee: '',
+    re_registration_fee: '',
     vat_inclusive: true,
     sibling_discount_percent: '',
     effective_from: new Date().toISOString().split('T')[0],
@@ -76,6 +77,9 @@ export default function FeeStructuresSettingsPage() {
         registration_fee: formData.registration_fee
           ? parseFloat(formData.registration_fee)
           : undefined,
+        re_registration_fee: formData.re_registration_fee
+          ? parseFloat(formData.re_registration_fee)
+          : undefined,
         vat_inclusive: formData.vat_inclusive,
         sibling_discount_percent: formData.sibling_discount_percent
           ? parseFloat(formData.sibling_discount_percent)
@@ -90,6 +94,7 @@ export default function FeeStructuresSettingsPage() {
         fee_type: 'FULL_DAY',
         amount: '',
         registration_fee: '',
+        re_registration_fee: '',
         vat_inclusive: true,
         sibling_discount_percent: '',
         effective_from: new Date().toISOString().split('T')[0],
@@ -155,6 +160,7 @@ export default function FeeStructuresSettingsPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Monthly Fee</TableHead>
                   <TableHead>Registration Fee</TableHead>
+                  <TableHead>Re-Reg Fee</TableHead>
                   <TableHead>VAT</TableHead>
                   <TableHead>Sibling Discount</TableHead>
                   <TableHead>Status</TableHead>
@@ -180,6 +186,9 @@ export default function FeeStructuresSettingsPage() {
                     <TableCell>{formatCurrency(fee.amount)}</TableCell>
                     <TableCell>
                       {fee.registration_fee ? formatCurrency(fee.registration_fee) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {fee.re_registration_fee ? formatCurrency(fee.re_registration_fee) : '-'}
                     </TableCell>
                     <TableCell>
                       {fee.vat_inclusive ? 'Inclusive' : 'Exclusive'}
@@ -284,19 +293,35 @@ export default function FeeStructuresSettingsPage() {
                   />
                 </div>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="registration_fee">Registration Fee (R)</Label>
-                <Input
-                  id="registration_fee"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.registration_fee}
-                  onChange={(e) =>
-                    setFormData({ ...formData, registration_fee: e.target.value })
-                  }
-                  placeholder="0.00 (one-time fee on enrollment)"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="registration_fee">Registration Fee (R)</Label>
+                  <Input
+                    id="registration_fee"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.registration_fee}
+                    onChange={(e) =>
+                      setFormData({ ...formData, registration_fee: e.target.value })
+                    }
+                    placeholder="500.00 (new students)"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="re_registration_fee">Re-Registration Fee (R)</Label>
+                  <Input
+                    id="re_registration_fee"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.re_registration_fee}
+                    onChange={(e) =>
+                      setFormData({ ...formData, re_registration_fee: e.target.value })
+                    }
+                    placeholder="300.00 (returning students)"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">

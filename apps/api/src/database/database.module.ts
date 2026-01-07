@@ -56,6 +56,23 @@ import { StatementRepository } from './repositories/statement.repository';
 import { StatementGenerationService } from './services/statement-generation.service';
 import { StatementPdfService } from './services/statement-pdf.service';
 import { StatementDeliveryService } from './services/statement-delivery.service';
+import { OffboardingService } from './services/offboarding.service';
+import { XeroPayrollJournalRepository } from './repositories/xero-payroll-journal.repository';
+import { XeroPayrollJournalService } from './services/xero-payroll-journal.service';
+import { XeroAccountMappingService } from './services/xero-account-mapping.service';
+import { StaffOffboardingRepository } from './repositories/staff-offboarding.repository';
+import { StaffOnboardingRepository } from './repositories/staff-onboarding.repository';
+import { SimplePayRepository } from './repositories/simplepay.repository';
+import { StaffRepository } from './repositories/staff.repository';
+import { StaffOnboardingService } from './services/staff-onboarding.service';
+import { StaffDocumentService } from './services/staff-document.service';
+import { WelcomePackPdfService } from './services/welcome-pack-pdf.service';
+import { StaffOffboardingService } from './services/staff-offboarding.service';
+import { Ui19GeneratorService } from './services/ui19-generator.service';
+import { CertificateOfServiceService } from './services/certificate-of-service.service';
+import { ExitPackPdfService } from './services/exit-pack-pdf.service';
+import { EmploymentContractPdfService } from './services/employment-contract-pdf.service';
+import { PopiaConsentPdfService } from './services/popia-consent-pdf.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
@@ -132,6 +149,23 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     StatementGenerationService,
     StatementPdfService,
     StatementDeliveryService,
+    OffboardingService,
+    XeroPayrollJournalRepository,
+    XeroPayrollJournalService,
+    XeroAccountMappingService,
+    StaffOffboardingRepository,
+    StaffOnboardingRepository,
+    SimplePayRepository,
+    StaffRepository,
+    StaffOnboardingService,
+    StaffDocumentService,
+    WelcomePackPdfService,
+    StaffOffboardingService,
+    Ui19GeneratorService,
+    CertificateOfServiceService,
+    ExitPackPdfService,
+    EmploymentContractPdfService,
+    PopiaConsentPdfService,
   ],
   exports: [
     PrismaService,
@@ -191,6 +225,23 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     StatementGenerationService,
     StatementPdfService,
     StatementDeliveryService,
+    OffboardingService,
+    XeroPayrollJournalRepository,
+    XeroPayrollJournalService,
+    XeroAccountMappingService,
+    StaffOffboardingRepository,
+    StaffOnboardingRepository,
+    StaffRepository,
+    StaffOnboardingService,
+    StaffDocumentService,
+    WelcomePackPdfService,
+    StaffOffboardingService,
+    Ui19GeneratorService,
+    CertificateOfServiceService,
+    ExitPackPdfService,
+    EmploymentContractPdfService,
+    PopiaConsentPdfService,
+    SimplePayRepository,
   ],
 })
 export class DatabaseModule {}

@@ -1,8 +1,9 @@
 /**
  * EmailService
  * TASK-BILL-013: Invoice Delivery Service
+ * TASK-STAFF-001: Staff Onboarding Workflow with Welcome Pack
  *
- * Handles email sending for invoice delivery.
+ * Handles email sending for invoice delivery and staff onboarding.
  * Uses nodemailer for SMTP.
  *
  * CRITICAL: Fail fast with detailed error logging.
@@ -12,6 +13,25 @@ import { Injectable, Logger } from '@nestjs/common';
 import { createTransport, Transporter } from 'nodemailer';
 import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import { BusinessException } from '../../shared/exceptions';
+
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+  path?: string; // Alternative: path to file on disk
+}
+
+export interface EmailOptions {
+  to: string;
+  subject: string;
+  body: string;
+  html?: string;
+  from?: string;
+  attachments?: EmailAttachment[];
+  replyTo?: string;
+  cc?: string[];
+  bcc?: string[];
+}
 
 export interface EmailResult {
   messageId: string;
@@ -52,7 +72,7 @@ export class EmailService {
   }
 
   /**
-   * Send email
+   * Send email (simple - backwards compatible)
    * @throws BusinessException if SMTP not configured or send fails
    */
   async sendEmail(
@@ -61,6 +81,20 @@ export class EmailService {
     body: string,
     from?: string,
   ): Promise<EmailResult> {
+    return this.sendEmailWithOptions({
+      to,
+      subject,
+      body,
+      from,
+    });
+  }
+
+  /**
+   * Send email with full options (attachments, HTML, CC, etc.)
+   * TASK-STAFF-001: Added for welcome pack email delivery
+   * @throws BusinessException if SMTP not configured or send fails
+   */
+  async sendEmailWithOptions(options: EmailOptions): Promise<EmailResult> {
     if (!this.transporter) {
       this.logger.error('Email send failed: SMTP transporter not configured');
       throw new BusinessException(
@@ -69,28 +103,47 @@ export class EmailService {
       );
     }
 
-    if (!this.isValidEmail(to)) {
-      this.logger.error(`Email send failed: Invalid email address: ${to}`);
+    if (!this.isValidEmail(options.to)) {
+      this.logger.error(
+        `Email send failed: Invalid email address: ${options.to}`,
+      );
       throw new BusinessException(
-        `Invalid email address: ${to}`,
+        `Invalid email address: ${options.to}`,
         'INVALID_EMAIL',
       );
     }
 
-    const fromAddress = from ?? process.env.SMTP_FROM ?? process.env.SMTP_USER;
+    const fromAddress =
+      options.from ?? process.env.SMTP_FROM ?? process.env.SMTP_USER;
 
-    this.logger.log(`Sending email to ${to}: ${subject}`);
+    this.logger.log(`Sending email to ${options.to}: ${options.subject}`);
+    if (options.attachments?.length) {
+      this.logger.log(`  with ${options.attachments.length} attachment(s)`);
+    }
 
     try {
+      // Build nodemailer attachments format
+      const attachments = options.attachments?.map((att) => ({
+        filename: att.filename,
+        content: att.content,
+        contentType: att.contentType,
+        path: att.path,
+      }));
+
       const result = await this.transporter.sendMail({
         from: fromAddress,
-        to,
-        subject,
-        text: body,
+        to: options.to,
+        cc: options.cc?.join(', '),
+        bcc: options.bcc?.join(', '),
+        replyTo: options.replyTo,
+        subject: options.subject,
+        text: options.body,
+        html: options.html,
+        attachments,
       });
 
       this.logger.log(
-        `Email sent successfully to ${to}, messageId: ${result.messageId}`,
+        `Email sent successfully to ${options.to}, messageId: ${result.messageId}`,
       );
 
       return {
@@ -101,7 +154,7 @@ export class EmailService {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Email send failed to ${to}: ${errorMessage}`,
+        `Email send failed to ${options.to}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
       throw new BusinessException(
@@ -109,6 +162,13 @@ export class EmailService {
         'EMAIL_SEND_FAILED',
       );
     }
+  }
+
+  /**
+   * Check if SMTP is configured
+   */
+  isConfigured(): boolean {
+    return this.transporter !== null;
   }
 
   /**

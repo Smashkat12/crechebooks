@@ -283,9 +283,12 @@ graph TD
 | Statement - Logic | 5 | 0 | 0% |
 | Statement - Surface | 2 | 0 | 0% |
 | **Subtotal (Phase 12)** | **8** | **0** | **0%** |
-| **Grand Total** | **166** | **158** | **95%** |
+| Staff - Onboarding/Offboarding | 2 | 1 | 50% |
+| Staff - Integrations | 2 | 0 | 0% |
+| **Subtotal (Phase 13)** | **4** | **1** | **25%** |
+| **Grand Total** | **170** | **159** | **94%** |
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-08
 - Phases 1-6 (Core): 93/93 tasks complete (100%) ✅
 - Phase 7 (Remediation): 28/28 tasks complete (100%) ✅
 - Phase 8 (Gap Remediation): 13/13 tasks complete (100%) ✅
@@ -293,7 +296,8 @@ graph TD
 - Phase 10 (E2E Bug Fixes): 5/5 tasks complete (100%) ✅
 - Phase 11 (E2E Bug Fixes R2): 4/4 tasks complete (100%) ✅
 - Phase 12 (Account Statements): 0/8 tasks pending (0%) ⭕
-- Overall Progress: 158/166 tasks (95%)
+- Phase 13 (Staff Management & Integrations): 1/4 tasks complete (25%) 🔄
+- Overall Progress: 159/170 tasks (94%)
 
 ---
 
@@ -609,6 +613,67 @@ These tasks implement parent account statements, payment allocation, and periodi
 | P1-CRITICAL | 5 | 0 | 5 | 0% |
 | P2-HIGH | 3 | 0 | 3 | 0% |
 | **Total Phase 12** | **8** | **0** | **8** | **0%** |
+
+---
+
+## Phase 13: Staff Management & Integrations
+
+Analysis Date: 2026-01-07
+These tasks implement comprehensive staff onboarding/offboarding workflows with SA HR compliance, and payroll system integrations with Xero and SimplePay.
+
+### 13.1 Foundation Layer (Staff Management)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 171 | TASK-STAFF-001 | Staff Onboarding Workflow with Welcome Pack | foundation + logic + surface | TASK-SARS-001 | P1-CRITICAL | ✅ Complete |
+| 172 | TASK-STAFF-002 | Staff Offboarding Workflow with Exit Pack | foundation + logic + surface | TASK-STAFF-001 | P1-CRITICAL | ⭕ Pending |
+
+### 13.2 Integration Layer (Payroll Systems)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 173 | TASK-STAFF-003 | Xero Integration for Payroll Journal Entries | integration | TASK-MCP-001, TASK-SARS-001 | P2-HIGH | ⭕ Pending |
+| 174 | TASK-STAFF-004 | SimplePay Integration for Payroll Processing | integration | TASK-SARS-001 | P3-MEDIUM | ⭕ Pending |
+
+### Phase 13 Key Features
+
+**Staff Onboarding (TASK-STAFF-001)**:
+- Document upload system (CV, ID copy, qualifications, Police Clearance, Medical, First Aid)
+- DSD compliance checklist for childcare workers
+- Probation tracking (3-month period)
+- Welcome Pack PDF generation
+- POPIA-compliant data collection
+
+**Staff Offboarding (TASK-STAFF-002)**:
+- BCEA-compliant notice period tracking (1 week < 6 months, 2 weeks 6-12 months, 4 weeks > 12 months)
+- Final pay calculation (outstanding salary + leave payout + notice pay - deductions)
+- UI-19 form generation for UIF claims
+- Certificate of Service generation (BCEA Section 42)
+- Exit Pack PDF with all required documents
+- Asset return tracking
+
+**Xero Integration (TASK-STAFF-003)**:
+- Manual Journals API for payroll entries (no native SA Payroll API)
+- Chart of Accounts mapping (Salaries, PAYE, UIF, SDL)
+- Monthly payroll journal posting
+- Configurable account codes
+
+**SimplePay Integration (TASK-STAFF-004)**:
+- REST API integration (https://api.payroll.simplepay.cloud/v1/)
+- Employee sync between CrecheBooks and SimplePay
+- Payslip import with PDF storage
+- IRP5/EMP201 document fetching for SARS compliance
+
+---
+
+## Phase 13 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 2 | 0 | 2 | 0% |
+| P2-HIGH | 1 | 0 | 1 | 0% |
+| P3-MEDIUM | 1 | 0 | 1 | 0% |
+| **Total Phase 13** | **4** | **0** | **4** | **0%** |
 
 ### E2E Testing Summary (2026-01-06)
 

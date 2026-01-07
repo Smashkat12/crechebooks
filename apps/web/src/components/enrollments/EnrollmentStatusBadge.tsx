@@ -5,33 +5,45 @@
  * - active: green
  * - inactive: gray
  * - pending: yellow
+ * - graduated: blue
+ * - withdrawn: red
  */
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface EnrollmentStatusBadgeProps {
-  status: 'active' | 'inactive' | 'pending';
+  status: string;
   className?: string;
 }
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; variant: 'success' | 'secondary' | 'warning' | 'default' | 'destructive' }> = {
   active: {
     label: 'Active',
-    variant: 'success' as const,
+    variant: 'success',
   },
   inactive: {
     label: 'Inactive',
-    variant: 'secondary' as const,
+    variant: 'secondary',
   },
   pending: {
     label: 'Pending',
-    variant: 'warning' as const,
+    variant: 'warning',
+  },
+  graduated: {
+    label: 'Graduated',
+    variant: 'default',
+  },
+  withdrawn: {
+    label: 'Withdrawn',
+    variant: 'destructive',
   },
 };
 
 export function EnrollmentStatusBadge({ status, className }: EnrollmentStatusBadgeProps) {
-  const config = statusConfig[status];
+  // Normalize status to lowercase for lookup
+  const normalizedStatus = status?.toLowerCase() ?? 'inactive';
+  const config = statusConfig[normalizedStatus] ?? statusConfig.inactive;
 
   return (
     <Badge variant={config.variant} className={cn('capitalize', className)}>

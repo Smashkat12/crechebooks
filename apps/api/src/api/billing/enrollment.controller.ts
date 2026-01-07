@@ -36,6 +36,14 @@ import { EnrollmentRepository } from '../../database/repositories/enrollment.rep
 import { ChildRepository } from '../../database/repositories/child.repository';
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { FeeStructureRepository } from '../../database/repositories/fee-structure.repository';
+import { EnrollmentService } from '../../database/services/enrollment.service';
+import { OffboardingService } from '../../database/services/offboarding.service';
+import {
+  AccountSettlement,
+  OffboardingResult,
+  CreditAction,
+  OffboardingReason,
+} from '../../database/dto/offboarding.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -43,6 +51,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import { EnrollmentStatus } from '../../database/entities/enrollment.entity';
 import { NotFoundException } from '../../shared/exceptions';
+import { YearEndReviewResult } from '../../database/dto/year-end-review.dto';
 
 interface EnrollmentResponse {
   id: string;
@@ -71,6 +80,8 @@ export class EnrollmentController {
     private readonly childRepo: ChildRepository,
     private readonly parentRepo: ParentRepository,
     private readonly feeStructureRepo: FeeStructureRepository,
+    private readonly enrollmentService: EnrollmentService,
+    private readonly offboardingService: OffboardingService,
   ) {}
 
   @Get()
@@ -323,5 +334,190 @@ export class EnrollmentController {
     }
 
     return { success: true, count };
+  }
+
+  @Post('bulk/graduate')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Bulk graduate enrollments (year-end processing)' })
+  @ApiResponse({ status: 200, description: 'Enrollments graduated' })
+  @ApiForbiddenResponse({ description: 'Insufficient permissions' })
+  async bulkGraduate(
+    @CurrentUser() user: IUser,
+    @Body() body: { enrollment_ids: string[]; end_date: string },
+  ): Promise<{ success: boolean; graduated: number; skipped: number }> {
+    this.logger.log(
+      `Bulk graduate enrollments: ${body.enrollment_ids.length} enrollments, end_date=${body.end_date}`,
+    );
+
+    // Parse and validate end_date
+    const endDate = new Date(body.end_date);
+    if (isNaN(endDate.getTime())) {
+      throw new Error(
+        'Invalid end_date format. Use ISO date string (YYYY-MM-DD)',
+      );
+    }
+
+    const result = await this.enrollmentService.bulkGraduate(
+      user.tenantId,
+      body.enrollment_ids,
+      endDate,
+      user.id,
+    );
+
+    return {
+      success: true,
+      graduated: result.graduated,
+      skipped: result.skipped,
+    };
+  }
+
+  /**
+   * GET /enrollments/year-end/review
+   * TASK-ENROL-004: Year-End Processing Dashboard
+   *
+   * Returns year-end review data with students grouped by category
+   * (continuing, graduating, withdrawing)
+   */
+  @Get('year-end/review')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get year-end review for academic year' })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description: 'Academic year (defaults to current/next based on month)',
+  })
+  @ApiResponse({ status: 200, description: 'Year-end review data' })
+  @ApiForbiddenResponse({ description: 'Insufficient permissions' })
+  async getYearEndReview(
+    @CurrentUser() user: IUser,
+    @Query('year') yearStr?: string,
+  ): Promise<{ success: boolean; data: YearEndReviewResult }> {
+    // Determine academic year (default: current year if before July, next year if after)
+    let year: number;
+    if (yearStr) {
+      year = parseInt(yearStr, 10);
+      if (isNaN(year) || year < 2020 || year > 2100) {
+        throw new Error('Invalid year. Must be between 2020 and 2100.');
+      }
+    } else {
+      const now = new Date();
+      const currentMonth = now.getMonth(); // 0-11
+      // If we're in November or December, default to next year
+      // Otherwise default to current year
+      year = currentMonth >= 10 ? now.getFullYear() + 1 : now.getFullYear();
+    }
+
+    this.logger.log(
+      `Year-end review requested for tenant ${user.tenantId}, year ${year}`,
+    );
+
+    const result = await this.enrollmentService.getYearEndReview(
+      user.tenantId,
+      year,
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  /**
+   * GET /enrollments/:id/settlement-preview
+   * TASK-ENROL-005: Off-Boarding Workflow
+   *
+   * Preview account settlement for an enrollment before off-boarding
+   */
+  @Get(':id/settlement-preview')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Preview account settlement for off-boarding' })
+  @ApiQuery({
+    name: 'end_date',
+    required: true,
+    type: String,
+    description: 'Off-boarding date (YYYY-MM-DD)',
+  })
+  @ApiResponse({ status: 200, description: 'Account settlement preview' })
+  @ApiNotFoundResponse({ description: 'Enrollment not found' })
+  @ApiForbiddenResponse({ description: 'Insufficient permissions' })
+  async getSettlementPreview(
+    @CurrentUser() user: IUser,
+    @Param('id', ParseUUIDPipe) enrollmentId: string,
+    @Query('end_date') endDateStr: string,
+  ): Promise<{ success: boolean; data: AccountSettlement }> {
+    const endDate = new Date(endDateStr);
+    if (isNaN(endDate.getTime())) {
+      throw new Error(
+        'Invalid end_date format. Use ISO date string (YYYY-MM-DD)',
+      );
+    }
+
+    this.logger.log(
+      `Settlement preview for enrollment ${enrollmentId}, end_date=${endDateStr}`,
+    );
+
+    const settlement = await this.offboardingService.calculateAccountSettlement(
+      user.tenantId,
+      enrollmentId,
+      endDate,
+    );
+
+    return {
+      success: true,
+      data: settlement,
+    };
+  }
+
+  /**
+   * POST /enrollments/:id/offboard
+   * TASK-ENROL-005: Off-Boarding Workflow
+   *
+   * Initiate off-boarding for an enrollment
+   */
+  @Post(':id/offboard')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Initiate off-boarding for an enrollment' })
+  @ApiResponse({ status: 200, description: 'Off-boarding completed' })
+  @ApiNotFoundResponse({ description: 'Enrollment not found' })
+  @ApiForbiddenResponse({ description: 'Insufficient permissions' })
+  async offboardEnrollment(
+    @CurrentUser() user: IUser,
+    @Param('id', ParseUUIDPipe) enrollmentId: string,
+    @Body()
+    body: {
+      end_date: string;
+      reason: OffboardingReason;
+      credit_action: CreditAction;
+      sibling_enrollment_id?: string;
+    },
+  ): Promise<{ success: boolean; data: OffboardingResult }> {
+    const endDate = new Date(body.end_date);
+    if (isNaN(endDate.getTime())) {
+      throw new Error(
+        'Invalid end_date format. Use ISO date string (YYYY-MM-DD)',
+      );
+    }
+
+    this.logger.log(
+      `Off-boarding enrollment ${enrollmentId}: reason=${body.reason}, credit_action=${body.credit_action}`,
+    );
+
+    const result = await this.offboardingService.initiateOffboarding(
+      user.tenantId,
+      enrollmentId,
+      endDate,
+      body.reason,
+      body.credit_action,
+      body.sibling_enrollment_id,
+      user.id,
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
   }
 }

@@ -98,6 +98,51 @@ export class SimplePayController {
   // Connection Management
   // ============================================
 
+  @Post('discover-clients')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Discover SimplePay clients',
+    description:
+      'List all SimplePay clients accessible with the given API key. ' +
+      'Use this to find your client ID before setting up the connection.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of accessible clients',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        clients: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              name: { type: 'string' },
+            },
+          },
+        },
+        message: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid API key' })
+  async discoverClients(@Body() body: { apiKey: string }): Promise<{
+    success: boolean;
+    clients?: Array<{ id: string; name: string }>;
+    message?: string;
+  }> {
+    const result = await this.connectionService.listAvailableClients(
+      body.apiKey,
+    );
+    if (!result.success) {
+      throw new BadRequestException(result.message || 'Failed to list clients');
+    }
+    return result;
+  }
+
   @Post('connect')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({

@@ -75,6 +75,18 @@ export class SimplePayConnectionService {
   }
 
   /**
+   * List all clients accessible with the given API key
+   * Use this to discover client IDs before setting up connection
+   */
+  async listAvailableClients(apiKey: string): Promise<{
+    success: boolean;
+    clients?: Array<{ id: string; name: string }>;
+    message?: string;
+  }> {
+    return this.apiClient.listClients(apiKey);
+  }
+
+  /**
    * Get connection status
    */
   async getConnectionStatus(tenantId: string): Promise<ConnectionStatus> {

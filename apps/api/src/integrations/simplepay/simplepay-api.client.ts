@@ -268,7 +268,8 @@ export class SimplePayApiClient {
   }
 
   /**
-   * Test connection by making a simple API call
+   * Test connection by verifying the client ID exists in the accessible clients list
+   * Note: SimplePay API doesn't have a /clients/{id} endpoint - we must list and filter
    */
   async testConnection(
     apiKey: string,
@@ -284,10 +285,27 @@ export class SimplePayApiClient {
         timeout: 10000,
       });
 
-      const response = await testClient.get(`/clients/${clientId}`);
+      // SimplePay returns clients wrapped: [{ client: {...} }, ...]
+      interface ClientWrapper {
+        client: { id: number; name: string };
+      }
+      const response = await testClient.get<ClientWrapper[]>('/clients');
+      const clients = response.data.map((w) => w.client);
+
+      // Find the matching client by ID (SimplePay uses numeric IDs)
+      const targetId = parseInt(clientId, 10);
+      const matchingClient = clients.find((c) => c.id === targetId);
+
+      if (!matchingClient) {
+        return {
+          success: false,
+          message: `Client ID ${clientId} not found. Available clients: ${clients.map((c) => `${c.name} (${c.id})`).join(', ')}`,
+        };
+      }
+
       return {
         success: true,
-        clientName: (response.data as { name?: string })?.name || 'Unknown',
+        clientName: matchingClient.name,
       };
     } catch (error) {
       const axiosError = error as AxiosError;
@@ -296,9 +314,55 @@ export class SimplePayApiClient {
         message:
           axiosError.response?.status === 401
             ? 'Invalid API key'
-            : axiosError.response?.status === 404
-              ? 'Client ID not found'
-              : 'Connection failed',
+            : `Connection failed: ${axiosError.message}`,
+      };
+    }
+  }
+
+  /**
+   * List all clients accessible with the given API key
+   * Use this to discover the client ID needed for connection setup
+   * Note: SimplePay returns clients wrapped: [{ client: {...} }, ...]
+   */
+  async listClients(apiKey: string): Promise<{
+    success: boolean;
+    clients?: Array<{ id: string; name: string }>;
+    message?: string;
+  }> {
+    try {
+      const testClient = axios.create({
+        baseURL: this.baseUrl,
+        headers: {
+          Authorization: apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      });
+
+      // SimplePay returns clients wrapped: [{ client: {...} }, ...]
+      interface ClientWrapper {
+        client: { id: number; name: string };
+      }
+      const response = await testClient.get<ClientWrapper[]>('/clients');
+      const clients = response.data.map((w) => w.client);
+
+      this.logger.log(`Found ${clients.length} SimplePay clients`);
+
+      return {
+        success: true,
+        clients: clients.map((c) => ({ id: String(c.id), name: c.name })),
+      };
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      this.logger.error(
+        `Failed to list SimplePay clients: ${axiosError.message}`,
+      );
+      return {
+        success: false,
+        message:
+          axiosError.response?.status === 401
+            ? 'Invalid API key'
+            : `Failed to list clients: ${axiosError.message}`,
       };
     }
   }

@@ -153,6 +153,9 @@ export async function cleanupTestData(
   tenantId: string,
 ): Promise<void> {
   // Delete in order respecting foreign keys
+  await prisma.categorizationMetric.deleteMany({
+    where: { tenantId },
+  });
   await prisma.categorization.deleteMany({
     where: { transaction: { tenantId } },
   });
@@ -167,6 +170,9 @@ export async function cleanupTestData(
   await prisma.child.deleteMany({ where: { tenantId } });
   await prisma.parent.deleteMany({ where: { tenantId } });
   await prisma.feeStructure.deleteMany({ where: { tenantId } });
+
+  // SARS data cleanup
+  await prisma.sarsSubmission.deleteMany({ where: { tenantId } });
 
   await prisma.user.deleteMany({ where: { tenantId } });
   await prisma.tenant.delete({ where: { id: tenantId } });

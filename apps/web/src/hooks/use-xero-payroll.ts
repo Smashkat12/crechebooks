@@ -33,8 +33,8 @@ export interface PayrollJournalLine {
 export interface PayrollJournal {
   id: string;
   tenantId: string;
-  payrollPeriodStart: string;
-  payrollPeriodEnd: string;
+  payPeriodStart: string;
+  payPeriodEnd: string;
   status: 'DRAFT' | 'PENDING' | 'POSTED' | 'FAILED';
   totalDebitCents: number;
   totalCreditCents: number;

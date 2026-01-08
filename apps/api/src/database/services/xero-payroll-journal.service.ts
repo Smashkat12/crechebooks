@@ -16,6 +16,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   XeroAccountType,
   PayrollJournalStatus,
+  PayrollStatus,
   XeroAccountMapping,
 } from '@prisma/client';
 import { XeroClient, ManualJournal, LineAmountTypes } from 'xero-node';
@@ -368,6 +369,100 @@ export class XeroPayrollJournalService {
   }
 
   /**
+   * Generate journals for all payrolls in a period
+   * Creates journals for payrolls that don't already have one
+   */
+  async generateJournalsForPeriod(
+    tenantId: string,
+    periodStart: Date,
+    periodEnd: Date,
+    userId?: string,
+  ): Promise<{
+    created: PayrollJournalWithRelations[];
+    skipped: { payrollId: string; reason: string }[];
+  }> {
+    this.logger.log(
+      `Generating journals for period ${periodStart.toISOString()} to ${periodEnd.toISOString()}`,
+    );
+
+    // Validate account mappings exist
+    const { hasAll, missing } = await this.journalRepo.hasRequiredMappings(
+      tenantId,
+      REQUIRED_ACCOUNT_TYPES,
+    );
+
+    if (!hasAll) {
+      throw new ValidationException('Missing required account mappings', [
+        ...missing.map((type) => ({
+          field: type,
+          message: `${type} mapping is required for payroll journal creation`,
+        })),
+      ]);
+    }
+
+    // Find payrolls in the period (PAID or APPROVED status)
+    const payrolls = await this.prisma.payroll.findMany({
+      where: {
+        tenantId,
+        payPeriodStart: { gte: periodStart },
+        payPeriodEnd: { lte: periodEnd },
+        status: { in: [PayrollStatus.PAID, PayrollStatus.APPROVED] },
+      },
+      include: {
+        staff: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
+
+    if (payrolls.length === 0) {
+      this.logger.log('No processed payrolls found for period');
+      return { created: [], skipped: [] };
+    }
+
+    this.logger.log(`Found ${payrolls.length} payrolls for period`);
+
+    const created: PayrollJournalWithRelations[] = [];
+    const skipped: { payrollId: string; reason: string }[] = [];
+
+    for (const payroll of payrolls) {
+      // Check if journal already exists
+      const existing = await this.journalRepo.findJournalByPayrollId(payroll.id);
+      if (existing) {
+        skipped.push({
+          payrollId: payroll.id,
+          reason: `Journal already exists: ${existing.id}`,
+        });
+        continue;
+      }
+
+      try {
+        const journal = await this.createPayrollJournal(
+          payroll.id,
+          tenantId,
+          userId,
+        );
+        created.push(journal);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        skipped.push({
+          payrollId: payroll.id,
+          reason: message,
+        });
+        this.logger.warn(
+          `Failed to create journal for payroll ${payroll.id}: ${message}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      `Generated ${created.length} journals, skipped ${skipped.length}`,
+    );
+
+    return { created, skipped };
+  }
+
+  /**
    * Get journal preview before creation
    * Shows what the journal will look like without actually creating it
    */
@@ -639,6 +734,14 @@ export class XeroPayrollJournalService {
       } catch (error) {
         attempt++;
 
+        // Log the full error for debugging
+        this.logger.error('Xero API call failed', {
+          attempt,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          response: (error as { response?: { body?: unknown } })?.response?.body,
+        });
+
         // Check for rate limit error (429)
         if (this.isRateLimitError(error)) {
           this.logger.warn(
@@ -664,8 +767,9 @@ export class XeroPayrollJournalService {
           ]);
         }
 
-        // Re-throw other errors
-        throw error;
+        // Re-throw other errors with better context
+        const errorMessage = this.extractXeroErrorMessage(error);
+        throw new Error(`Xero API error: ${errorMessage}`);
       }
     }
 
@@ -709,6 +813,9 @@ export class XeroPayrollJournalService {
         'accounting.settings',
       ],
     });
+
+    // Initialize the client (required before making API calls)
+    await client.initialize();
 
     client.setTokenSet({
       access_token: accessToken,
@@ -765,6 +872,41 @@ export class XeroPayrollJournalService {
       message: error instanceof Error ? error.message : 'Unknown Xero error',
       details: null,
     };
+  }
+
+  /**
+   * Extract human-readable error message from Xero API error
+   */
+  private extractXeroErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      // Check for response body errors
+      const responseBody = (error as { response?: { body?: unknown } })?.response?.body;
+      if (responseBody && typeof responseBody === 'object') {
+        const body = responseBody as {
+          Message?: string;
+          ErrorNumber?: number;
+          Type?: string;
+          Elements?: Array<{ ValidationErrors?: Array<{ Message?: string }> }>;
+        };
+
+        // Check for validation errors in Elements
+        if (body.Elements?.[0]?.ValidationErrors?.[0]?.Message) {
+          return body.Elements[0].ValidationErrors[0].Message;
+        }
+
+        if (body.Message) {
+          return body.Message;
+        }
+
+        if (body.Type) {
+          return `${body.Type}: ${body.ErrorNumber ?? 'Unknown'}`;
+        }
+      }
+
+      return error.message;
+    }
+
+    return String(error);
   }
 
   /**

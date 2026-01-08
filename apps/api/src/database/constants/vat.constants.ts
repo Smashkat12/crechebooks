@@ -67,19 +67,28 @@ export const ZERO_RATED_ACCOUNTS: string[] = [
 
 /**
  * Account codes for exempt supplies
- * Exempt: No VAT, input VAT is NOT claimable
+ * Exempt: No VAT charged, input VAT is NOT claimable
  *
- * Per SA VAT Act Schedule 1:
- * - Financial services
- * - Residential accommodation
- * - Educational services
+ * Per SA VAT Act Section 12(h) - Educational services are exempt
+ * This includes tuition fees, registration, and educational activities
  */
 export const EXEMPT_ACCOUNTS: string[] = [
-  '8100', // Bank charges
-  '8200', // Interest expense
-  '4200', // Residential rent
-  '4201', // Long-term insurance
-  '4202', // Educational services
+  // Educational services (Section 12(h))
+  '4110', // Monthly Tuition Fees
+  '4115', // Registration Fees
+  '4120', // Activity Fees (educational)
+  '4125', // Transport Fees (student transport)
+  '4130', // After Care Fees
+  '4135', // Holiday Program Fees
+  // Financial services (Section 12(a))
+  '7710', // Bank Charges
+  '7720', // Interest on Overdraft
+  '7725', // Loan Interest
+  // Insurance (Section 12(d))
+  '6710', // Property Insurance
+  '7525', // Vehicle Insurance
+  '7610', // Public Liability Insurance
+  '7615', // Professional Indemnity Insurance
 ];
 
 /**
@@ -106,4 +115,34 @@ export const EXEMPT_KEYWORDS: string[] = [
   'residential rent',
   'educational',
   'tuition',
+  'school fees',
+  'registration fee',
+  'activity fee',
+  'after care',
+  'transport fee',
+];
+
+/**
+ * Account codes for standard-rated supplies (15% VAT)
+ * These are GOODS sales by the creche - VAT must be charged
+ *
+ * Even though the creche provides exempt educational services,
+ * selling goods (uniforms, books, stationery) is a taxable supply
+ */
+export const STANDARD_RATED_ACCOUNTS: string[] = [
+  '4410', // Uniform Sales - 15% VAT
+  '4415', // Book Sales - 15% VAT
+  '4420', // Stationery Sales - 15% VAT
+  '4225', // School Trip Income - 15% VAT (includes entrance fees)
+];
+
+/**
+ * Keywords in descriptions that indicate standard-rated supplies
+ */
+export const STANDARD_RATED_KEYWORDS: string[] = [
+  'uniform',
+  'book sale',
+  'stationery',
+  'school trip',
+  'excursion',
 ];

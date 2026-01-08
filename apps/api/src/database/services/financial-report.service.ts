@@ -237,8 +237,8 @@ export class FinancialReportService {
     // Build asset accounts
     const currentAssets: AccountBreakdown[] = [
       {
-        accountCode: DEFAULT_ACCOUNTS.BANK.code,
-        accountName: DEFAULT_ACCOUNTS.BANK.name,
+        accountCode: DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code,
+        accountName: DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.name,
         amountCents: bankBalanceCents.toNumber(),
         amountRands: bankBalanceCents
           .dividedBy(100)
@@ -363,7 +363,7 @@ export class FinancialReportService {
 
     for (const tx of transactions) {
       const accountCode =
-        tx.categorizations?.[0]?.accountCode || DEFAULT_ACCOUNTS.BANK.code;
+        tx.categorizations?.[0]?.accountCode || DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code;
       const accountName = this.getAccountName(accountCode);
 
       if (!accountBalances.has(accountCode)) {

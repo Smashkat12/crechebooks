@@ -49,6 +49,7 @@ import { XeroPayrollJournalService } from '../../database/services/xero-payroll-
 import { XeroAccountMappingService } from '../../database/services/xero-account-mapping.service';
 import {
   CreatePayrollJournalDto,
+  GenerateJournalsFromPeriodDto,
   BulkPostJournalsDto,
   UpsertAccountMappingDto,
   BulkUpsertMappingsDto,
@@ -149,9 +150,61 @@ export class XeroPayrollJournalController {
       `Listing journals for tenant ${tenantId}, status filter: ${status ?? 'none'}`,
     );
 
-    return this.journalService.getJournals(
+    const journals = await this.journalService.getJournals(
       tenantId,
       status ? { status } : undefined,
+    );
+
+    // Transform journalLines to lines for frontend compatibility
+    const transformedJournals = journals.map((journal) => ({
+      ...journal,
+      lines: journal.journalLines,
+    }));
+
+    // Return in format expected by frontend
+    return {
+      data: transformedJournals,
+      total: transformedJournals.length,
+    };
+  }
+
+  /**
+   * Generate journals from a pay period
+   * POST /xero/payroll-journals/generate
+   */
+  @Post('generate')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Generate journals for a pay period',
+    description:
+      'Generates payroll journals for all processed payrolls in the specified period.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Journals generated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Missing required account mappings',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async generateJournalsForPeriod(
+    @CurrentUser() user: IUser,
+    @Body() dto: GenerateJournalsFromPeriodDto,
+  ) {
+    const tenantId = user.tenantId;
+    this.logger.log(
+      `Generating journals for period ${dto.payrollPeriodStart} to ${dto.payrollPeriodEnd}, tenant ${tenantId}`,
+    );
+
+    return this.journalService.generateJournalsForPeriod(
+      tenantId,
+      new Date(dto.payrollPeriodStart),
+      new Date(dto.payrollPeriodEnd),
+      user.id,
     );
   }
 
@@ -303,7 +356,13 @@ export class XeroPayrollJournalController {
     const tenantId = user.tenantId;
     this.logger.debug(`Getting journal ${journalId} for tenant ${tenantId}`);
 
-    return this.journalService.getJournal(journalId, tenantId);
+    const journal = await this.journalService.getJournal(journalId, tenantId);
+
+    // Transform journalLines to lines for frontend compatibility
+    return {
+      ...journal,
+      lines: journal.journalLines,
+    };
   }
 
   /**

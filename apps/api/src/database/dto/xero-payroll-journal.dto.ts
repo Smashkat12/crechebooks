@@ -89,6 +89,17 @@ export class CreatePayrollJournalDto {
 }
 
 /**
+ * DTO for generating journals from a pay period
+ */
+export class GenerateJournalsFromPeriodDto {
+  @IsString()
+  payrollPeriodStart!: string;
+
+  @IsString()
+  payrollPeriodEnd!: string;
+}
+
+/**
  * DTO for bulk creating journals from multiple payrolls
  */
 export class BulkCreateJournalsDto {

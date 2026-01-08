@@ -70,7 +70,7 @@ function JournalDetailDialog({
           <DialogTitle>Journal Details</DialogTitle>
           <DialogDescription>
             {journal
-              ? `Period: ${formatDate(journal.payrollPeriodStart)} - ${formatDate(journal.payrollPeriodEnd)}`
+              ? `Period: ${formatDate(journal.payPeriodStart)} - ${formatDate(journal.payPeriodEnd)}`
               : 'Loading...'}
           </DialogDescription>
         </DialogHeader>
@@ -415,8 +415,8 @@ export function PayrollJournalsTable() {
               journals.map((journal) => (
                 <TableRow key={journal.id}>
                   <TableCell>
-                    {formatDate(journal.payrollPeriodStart)} -{' '}
-                    {formatDate(journal.payrollPeriodEnd)}
+                    {formatDate(journal.payPeriodStart)} -{' '}
+                    {formatDate(journal.payPeriodEnd)}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={journal.status} />
@@ -440,7 +440,7 @@ export function PayrollJournalsTable() {
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
-                      {journal.status === 'DRAFT' && (
+                      {journal.status === 'PENDING' && !journal.xeroJournalId && (
                         <>
                           <Button
                             variant="ghost"
@@ -456,13 +456,13 @@ export function PayrollJournalsTable() {
                             size="icon"
                             onClick={() => handleDelete(journal.id)}
                             disabled={isBusy}
-                            title="Delete Draft"
+                            title="Delete"
                           >
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
                         </>
                       )}
-                      {journal.status === 'PENDING' && (
+                      {journal.status === 'PENDING' && journal.xeroJournalId && (
                         <Button
                           variant="ghost"
                           size="icon"

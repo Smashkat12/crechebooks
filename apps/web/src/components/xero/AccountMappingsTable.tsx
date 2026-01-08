@@ -45,15 +45,17 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 const ACCOUNT_TYPES = [
-  { value: 'GROSS_SALARY', label: 'Gross Salary (Expense)' },
-  { value: 'PAYE', label: 'PAYE Tax (Liability)' },
-  { value: 'UIF_EMPLOYEE', label: 'UIF Employee (Liability)' },
-  { value: 'UIF_EMPLOYER', label: 'UIF Employer (Expense)' },
-  { value: 'SDL', label: 'SDL (Expense)' },
-  { value: 'NET_SALARY', label: 'Net Salary (Liability)' },
-  { value: 'PENSION_EMPLOYEE', label: 'Pension Employee (Liability)' },
-  { value: 'PENSION_EMPLOYER', label: 'Pension Employer (Expense)' },
-  { value: 'MEDICAL_AID', label: 'Medical Aid (Liability)' },
+  { value: 'SALARY_EXPENSE', label: 'Gross Salary (Expense)' },
+  { value: 'PAYE_PAYABLE', label: 'PAYE Tax (Liability)' },
+  { value: 'UIF_PAYABLE', label: 'UIF Employee (Liability)' },
+  { value: 'UIF_EMPLOYER_EXPENSE', label: 'UIF Employer (Expense)' },
+  { value: 'SDL_EXPENSE', label: 'SDL (Expense)' },
+  { value: 'NET_PAY_CLEARING', label: 'Net Salary (Liability)' },
+  { value: 'PENSION_PAYABLE', label: 'Pension Employee (Liability)' },
+  { value: 'PENSION_EXPENSE', label: 'Pension Employer (Expense)' },
+  { value: 'BONUS_EXPENSE', label: 'Bonus (Expense)' },
+  { value: 'OVERTIME_EXPENSE', label: 'Overtime (Expense)' },
+  { value: 'OTHER_DEDUCTION', label: 'Other Deductions (Liability)' },
 ] as const;
 
 interface FormData {

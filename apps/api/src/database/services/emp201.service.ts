@@ -8,7 +8,7 @@
  * All monetary values in CENTS (integers)
  * Uses Decimal.js with banker's rounding (ROUND_HALF_EVEN)
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -104,8 +104,8 @@ export class Emp201Service {
     });
 
     if (payrolls.length === 0) {
-      throw new Error(
-        `EMP201 generation failed: No approved payroll records for period ${periodMonth}`,
+      throw new BadRequestException(
+        `No approved payroll records for period ${periodMonth}`,
       );
     }
 
@@ -208,7 +208,41 @@ export class Emp201Service {
     // Step 11: Calculate deadline (7th of following month, or next business day)
     const deadline = this.calculateDeadline(periodEnd);
 
-    // Step 12: Store submission as DRAFT
+    // Step 12: Check for existing submission and upsert
+    const existing = await this.prisma.sarsSubmission.findFirst({
+      where: {
+        tenantId,
+        submissionType: SubmissionType.EMP201,
+        periodStart,
+      },
+    });
+
+    if (existing) {
+      // If already submitted, return existing without modification
+      if (existing.status === SubmissionStatus.SUBMITTED) {
+        this.logger.log(`EMP201 already submitted: ${existing.id}`);
+        return existing;
+      }
+
+      // Update existing DRAFT with fresh calculations
+      const submission = await this.prisma.sarsSubmission.update({
+        where: { id: existing.id },
+        data: {
+          periodEnd,
+          deadline,
+          totalPayeCents: summary.totalPayeCents,
+          totalUifCents: summary.totalUifCents,
+          totalSdlCents: summary.totalSdlCents,
+          documentData: JSON.parse(JSON.stringify(document)) as object,
+          updatedAt: new Date(),
+        },
+      });
+
+      this.logger.log(`EMP201 updated: ${submission.id}`);
+      return submission;
+    }
+
+    // Create new submission
     const submission = await this.prisma.sarsSubmission.create({
       data: {
         tenantId,

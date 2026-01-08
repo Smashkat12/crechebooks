@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../api/auth/decorators/public.decorator';
 
 interface HealthResponse {
   status: 'ok' | 'degraded' | 'unhealthy';
@@ -8,6 +9,7 @@ interface HealthResponse {
 }
 
 @Controller('health')
+@Public()
 export class HealthController {
   private readonly startTime = Date.now();
 

@@ -159,7 +159,9 @@ describe('E2E: SARS Submission Flow', () => {
           invoiceNumber: 'INV-2025-001',
           parentId,
           childId,
-          invoiceDate: new Date('2025-01-15'),
+          billingPeriodStart: new Date('2025-01-01'),
+          billingPeriodEnd: new Date('2025-01-31'),
+          issueDate: new Date('2025-01-15'),
           dueDate: new Date('2025-02-15'),
           subtotalCents: 1000000, // R10,000
           vatCents: 150000, // R1,500 (15%)
@@ -188,32 +190,32 @@ describe('E2E: SARS Submission Flow', () => {
     });
 
     it('should calculate input VAT from categorized expenses', async () => {
-      // Create expense transaction with VAT
+      // Create expense transaction with VAT (amountCents positive, isCredit=false means expense)
       const transaction = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
-          transactionDate: new Date('2025-01-20'),
+          bankAccount: 'FNB Business Current',
+          date: new Date('2025-01-20'),
           description: 'Office supplies purchase',
-          amountCents: -50000, // -R500
-          balance: 0,
+          amountCents: 50000, // R500 (positive amount, isCredit=false = expense)
+          isCredit: false,
           payeeName: 'OFFICE DEPOT',
-          category: 'EXPENSE',
+          source: 'BANK_FEED',
           status: 'CATEGORIZED',
         },
       });
       transactionIds.push(transaction.id);
 
-      // Categorize with VAT
+      // Categorize with VAT (positive vatAmountCents for input VAT)
       await prisma.categorization.create({
         data: {
           transactionId: transaction.id,
           accountCode: '5500',
           accountName: 'Office Expenses',
-          amountCents: -50000,
           vatType: 'STANDARD',
-          vatAmountCents: Math.round(-50000 * 0.15), // -R75 VAT (15% of R500)
+          vatAmountCents: Math.round(50000 * 0.15), // R75 VAT (15% of R500)
           source: 'USER_OVERRIDE',
-          confidence: 100,
+          confidenceScore: 100,
         },
       });
 
@@ -258,12 +260,13 @@ describe('E2E: SARS Submission Flow', () => {
       const txWithoutVat = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
-          transactionDate: new Date('2025-01-25'),
+          bankAccount: 'FNB Business Current',
+          date: new Date('2025-01-25'),
           description: 'Uncategorized purchase',
-          amountCents: -30000, // -R300
-          balance: 0,
+          amountCents: -30000, // -R300 (negative = expense/debit)
+          isCredit: false,
           payeeName: 'UNKNOWN VENDOR',
-          category: 'EXPENSE',
+          source: 'BANK_FEED',
           status: 'PENDING',
         },
       });
@@ -369,12 +372,13 @@ describe('E2E: SARS Submission Flow', () => {
           firstName: 'John',
           lastName: 'Doe',
           idNumber: '8501015800080', // Valid SA ID
+          dateOfBirth: new Date('1985-01-01'),
           taxNumber: '0123456789',
           email: 'john.doe@test.com',
           phone: '+27 11 123 4567',
           startDate: new Date('2024-01-01'),
-          grossSalaryCents: 1500000, // R15,000/month
-          uifEligible: true,
+          employmentType: 'PERMANENT',
+          basicSalaryCents: 1500000, // R15,000/month
         },
       });
       staff1Id = staff1.id;
@@ -387,12 +391,13 @@ describe('E2E: SARS Submission Flow', () => {
           firstName: 'Jane',
           lastName: 'Smith',
           idNumber: '9202024800081', // Valid SA ID
+          dateOfBirth: new Date('1992-02-02'),
           taxNumber: '9876543210',
           email: 'jane.smith@test.com',
           phone: '+27 11 123 4568',
           startDate: new Date('2024-01-01'),
-          grossSalaryCents: 5000000, // R50,000/month (high earner, UIF capped)
-          uifEligible: true,
+          employmentType: 'PERMANENT',
+          basicSalaryCents: 5000000, // R50,000/month (high earner, UIF capped)
         },
       });
       staff2Id = staff2.id;
@@ -405,8 +410,9 @@ describe('E2E: SARS Submission Flow', () => {
         data: {
           tenantId: testTenant.id,
           staffId: staff1Id,
-          payPeriodStart: new Date('2025-01-01'),
-          payPeriodEnd: new Date('2025-01-31'),
+          payPeriodStart: new Date(2025, 0, 1), // Jan 1, 2025 local time
+          payPeriodEnd: new Date(2025, 0, 31), // Jan 31, 2025 local time
+          basicSalaryCents: 1500000, // R15,000
           grossSalaryCents: 1500000, // R15,000
           netSalaryCents: 1200000, // After deductions
           payeCents: 225000, // PAYE: R2,250 (15% for R15k/month = R180k/year, 18% bracket)
@@ -438,8 +444,9 @@ describe('E2E: SARS Submission Flow', () => {
         data: {
           tenantId: testTenant.id,
           staffId: staff2Id,
-          payPeriodStart: new Date('2025-01-01'),
-          payPeriodEnd: new Date('2025-01-31'),
+          payPeriodStart: new Date(2025, 0, 1), // Jan 1, 2025 local time
+          payPeriodEnd: new Date(2025, 0, 31), // Jan 31, 2025 local time
+          basicSalaryCents: 5000000, // R50,000
           grossSalaryCents: 5000000, // R50,000
           netSalaryCents: 3500000,
           payeCents: 1000000, // Higher PAYE
@@ -514,12 +521,13 @@ describe('E2E: SARS Submission Flow', () => {
           firstName: 'Low',
           lastName: 'Earner',
           idNumber: '7801015800082',
+          dateOfBirth: new Date('1978-01-01'),
           taxNumber: '1111111111',
           email: 'low@test.com',
           phone: '+27 11 111 1111',
           startDate: new Date('2024-01-01'),
-          grossSalaryCents: 1000000, // R10,000/month
-          uifEligible: true,
+          employmentType: 'PERMANENT',
+          basicSalaryCents: 1000000, // R10,000/month
         },
       });
 
@@ -528,8 +536,9 @@ describe('E2E: SARS Submission Flow', () => {
         data: {
           tenantId: smallTenant.id,
           staffId: lowPaidStaff.id,
-          payPeriodStart: new Date('2025-01-01'),
-          payPeriodEnd: new Date('2025-01-31'),
+          payPeriodStart: new Date(2025, 0, 1), // Jan 1, 2025 local time
+          payPeriodEnd: new Date(2025, 0, 31), // Jan 31, 2025 local time
+          basicSalaryCents: 1000000,
           grossSalaryCents: 1000000,
           netSalaryCents: 850000,
           payeCents: 100000,
@@ -642,13 +651,14 @@ describe('E2E: SARS Submission Flow', () => {
           firstName: 'Terminated',
           lastName: 'Employee',
           idNumber: '8801015800083',
+          dateOfBirth: new Date('1988-01-01'),
           taxNumber: '2222222222',
           email: 'terminated@test.com',
           phone: '+27 11 222 2222',
           startDate: new Date('2024-01-01'),
-          terminationDate: new Date('2025-01-15'), // Terminated mid-month
-          grossSalaryCents: 2000000,
-          uifEligible: true,
+          employmentType: 'PERMANENT',
+          endDate: new Date('2025-01-15'), // Terminated mid-month
+          basicSalaryCents: 2000000,
         },
       });
       staffIds.push(terminatedStaff.id);
@@ -658,8 +668,9 @@ describe('E2E: SARS Submission Flow', () => {
         data: {
           tenantId: testTenant.id,
           staffId: terminatedStaff.id,
-          payPeriodStart: new Date('2025-01-01'),
-          payPeriodEnd: new Date('2025-01-15'),
+          payPeriodStart: new Date(2025, 0, 1), // Jan 1, 2025 local time
+          payPeriodEnd: new Date(2025, 0, 15), // Jan 15, 2025 local time
+          basicSalaryCents: 1000000, // Half month
           grossSalaryCents: 1000000, // Half month
           netSalaryCents: 850000,
           payeCents: 100000,
@@ -698,6 +709,12 @@ describe('E2E: SARS Submission Flow', () => {
 
       submissionId = response.body.data.id;
       submissionIds.push(submissionId);
+
+      // Mark submission as READY (required before submit)
+      await prisma.sarsSubmission.update({
+        where: { id: submissionId },
+        data: { status: 'READY' },
+      });
     });
 
     it('should mark submission as finalized after submit', async () => {
@@ -706,12 +723,14 @@ describe('E2E: SARS Submission Flow', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           sars_reference: 'SARS-2025-001',
+          submitted_date: '2025-02-25',
         });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.data.status).toBe('SUBMITTED');
-      expect(response.body.data.is_finalized).toBe(true);
+      // is_finalized becomes true only after ACKNOWLEDGED status, not on submit
+      expect(response.body.data.is_finalized).toBe(false);
       expect(response.body.data.sars_reference).toBe('SARS-2025-001');
       expect(response.body.data.submitted_at).toBeDefined();
     });
@@ -722,10 +741,11 @@ describe('E2E: SARS Submission Flow', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           sars_reference: 'SARS-2025-002',
+          submitted_date: '2025-02-26',
         });
 
-      expect(response.status).toBe(409); // Conflict
-      expect(response.body.message).toContain('not in READY status');
+      expect(response.status).toBe(422); // Unprocessable - submission not in READY status
+      expect(response.body.message).toContain("expected 'READY'");
     });
 
     it('should validate SARS reference format on submission', async () => {
@@ -746,9 +766,10 @@ describe('E2E: SARS Submission Flow', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           sars_reference: '', // Invalid: empty reference
+          submitted_date: '2025-03-25',
         });
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422); // Validation error
     });
 
     it('should return 404 for non-existent submission', async () => {
@@ -759,40 +780,41 @@ describe('E2E: SARS Submission Flow', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           sars_reference: 'SARS-2025-999',
+          submitted_date: '2025-03-25',
         });
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(404); // Not Found
     });
   });
 
   describe('Edge Cases and Error Handling', () => {
     it('should handle negative net VAT (refund scenario)', async () => {
-      // Create large expense to exceed output VAT
+      // Create large expense to exceed output VAT (amountCents positive, isCredit=false = expense)
       const largeExpense = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
-          transactionDate: new Date('2025-04-10'),
+          bankAccount: 'FNB Business Current',
+          date: new Date('2025-04-10'),
           description: 'Large equipment purchase',
-          amountCents: -10000000, // -R100,000
-          balance: 0,
+          amountCents: 10000000, // R100,000 (positive amount, isCredit=false = expense)
+          isCredit: false,
           payeeName: 'EQUIPMENT SUPPLIER',
-          category: 'EXPENSE',
+          source: 'BANK_FEED',
           status: 'CATEGORIZED',
         },
       });
       transactionIds.push(largeExpense.id);
 
-      // Categorize with VAT
+      // Categorize with VAT (positive vatAmountCents for input VAT)
       await prisma.categorization.create({
         data: {
           transactionId: largeExpense.id,
           accountCode: '6100',
           accountName: 'Equipment',
-          amountCents: -10000000,
           vatType: 'STANDARD',
-          vatAmountCents: Math.round(-10000000 * 0.15), // Large input VAT
+          vatAmountCents: Math.round(10000000 * 0.15), // R15,000 input VAT
           source: 'USER_OVERRIDE',
-          confidence: 100,
+          confidenceScore: 100,
         },
       });
 
@@ -827,8 +849,8 @@ describe('E2E: SARS Submission Flow', () => {
           period_end: '2025-01-31',
         });
 
-      expect(response.status).toBe(400);
-      expect(response.body.message).toContain('not VAT registered');
+      expect(response.status).toBe(403); // Forbidden - tenant not VAT registered
+      expect(response.body.message).toContain('VAT registration');
 
       // Cleanup
       await cleanupTestData(prisma, nonVatTenant.id);

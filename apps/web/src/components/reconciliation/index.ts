@@ -4,3 +4,6 @@ export { DiscrepancyList } from './discrepancy-list';
 export { TransactionMatchTable } from './transaction-match-table';
 export { ReconciliationHistory } from './reconciliation-history';
 export { ReconciliationForm } from './reconciliation-form';
+export { BankStatementUpload } from './bank-statement-upload';
+export { BankStatementMatchResults } from './bank-statement-match-results';
+export { ManualMatchDialog } from './manual-match-dialog';

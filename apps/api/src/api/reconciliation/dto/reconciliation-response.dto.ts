@@ -5,7 +5,7 @@
  * Response DTOs for reconciliation operations.
  * Uses snake_case for external API consistency.
  */
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ReconciliationDataDto {
   @ApiProperty({ example: 'uuid-here' })
@@ -55,6 +55,26 @@ export class ReconciliationDataDto {
 
   @ApiProperty({ example: 0, description: 'Transactions not matched' })
   unmatched_count!: number;
+
+  @ApiPropertyOptional({
+    description: 'Detailed match summary breakdown',
+    example: {
+      matched: 45,
+      in_bank_only: 2,
+      in_xero_only: 0,
+      amount_mismatch: 1,
+      date_mismatch: 0,
+      total: 48,
+    },
+  })
+  match_summary?: {
+    matched: number;
+    in_bank_only: number;
+    in_xero_only: number;
+    amount_mismatch: number;
+    date_mismatch: number;
+    total: number;
+  };
 }
 
 export class ApiReconciliationResponseDto {

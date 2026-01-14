@@ -102,7 +102,7 @@ export function CategorizationDialog({
     }
 
     try {
-      await categorizeTransaction.mutateAsync({
+      const result = await categorizeTransaction.mutateAsync({
         transactionId: transaction.id,
         categoryId: selectedCategory,
         confidence: transaction.confidence || 1.0,
@@ -110,10 +110,28 @@ export function CategorizationDialog({
         parentId: requiresParentAllocation ? selectedParentId : undefined,
       });
 
+      // TASK-XERO-005: Show appropriate toast based on Xero sync status
       if (requiresParentAllocation) {
         toast({
           title: 'Income Allocated',
           description: 'Transaction categorized and allocated to parent account. Check Payments to match with invoices.',
+        });
+      } else if (result.xeroSyncStatus === 'synced') {
+        toast({
+          title: 'Synced to Xero',
+          description: 'Transaction categorized and automatically synced to Xero.',
+        });
+      } else if (result.xeroSyncStatus === 'failed') {
+        toast({
+          variant: 'destructive',
+          title: 'Xero Sync Failed',
+          description: `Category saved locally but Xero sync failed: ${result.xeroSyncError || 'Unknown error'}. You can retry from the Xero Sync page.`,
+        });
+      } else {
+        // Synced locally, Xero sync skipped (no xero transaction ID, no connection, etc.)
+        toast({
+          title: 'Category Saved',
+          description: 'Transaction categorized successfully.',
         });
       }
 
@@ -121,6 +139,11 @@ export function CategorizationDialog({
       onSuccess?.();
     } catch (error) {
       console.error('Failed to categorize transaction:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Categorization Failed',
+        description: 'Failed to save categorization. Please try again.',
+      });
     }
   };
 

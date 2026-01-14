@@ -175,9 +175,28 @@ export class CsvParser {
     let isCredit: boolean;
 
     if (columns.amount !== null) {
-      // Single amount column logic
+      // Single amount column - check for Type column to determine debit/credit
       amountCents = parseCurrency(columns.amount);
-      isCredit = amountCents > 0;
+
+      if (columns.type !== null && columns.type.trim() !== '') {
+        // Use Type column to determine debit/credit
+        const typeValue = columns.type.trim().toLowerCase();
+        if (typeValue === 'debit' || typeValue === 'dr' || typeValue === 'd') {
+          isCredit = false;
+        } else if (
+          typeValue === 'credit' ||
+          typeValue === 'cr' ||
+          typeValue === 'c'
+        ) {
+          isCredit = true;
+        } else {
+          // Unknown type value - fall back to sign-based logic
+          isCredit = amountCents > 0;
+        }
+      } else {
+        // No Type column - use sign of amount
+        isCredit = amountCents > 0;
+      }
       amountCents = Math.abs(amountCents); // Store as positive
     } else if (columns.debit !== null || columns.credit !== null) {
       // Separate debit/credit columns
@@ -218,6 +237,7 @@ export class CsvParser {
     amount: string | null;
     debit: string | null;
     credit: string | null;
+    type: string | null;
   } {
     // Normalize column names for matching
     const normalized: Record<string, string> = {};
@@ -295,6 +315,18 @@ export class CsvParser {
     ];
     const creditValue = this.findColumn(normalized, creditKeys);
 
+    // Type column mapping (Debit/Credit indicator)
+    const typeKeys = [
+      'type',
+      'transaction type',
+      'transaction_type',
+      'trans type',
+      'trans_type',
+      'dr/cr',
+      'dr cr',
+    ];
+    const typeValue = this.findColumn(normalized, typeKeys);
+
     return {
       date: dateValue,
       description: descriptionValue,
@@ -302,6 +334,7 @@ export class CsvParser {
       amount: amountValue,
       debit: debitValue,
       credit: creditValue,
+      type: typeValue,
     };
   }
 

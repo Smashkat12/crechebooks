@@ -15,11 +15,21 @@ import {
   XeroClient,
   Invoice as XeroInvoice,
   Payment as XeroPaymentModel,
+  ManualJournal,
+  LineAmountTypes,
 } from 'xero-node';
-import { Payment, Invoice, Parent } from '@prisma/client';
+import {
+  Payment,
+  Invoice,
+  Parent,
+  XeroAccountStatus,
+  CategorizationJournalStatus,
+} from '@prisma/client';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
 import { PaymentRepository } from '../repositories/payment.repository';
+import { XeroAccountRepository } from '../repositories/xero-account.repository';
+import { CategorizationJournalRepository } from '../repositories/categorization-journal.repository';
 import { AuditLogService } from './audit-log.service';
 import { ConflictDetectionService } from './conflict-detection.service';
 import { ConflictResolutionService } from './conflict-resolution.service';
@@ -37,7 +47,13 @@ import {
 } from '../entities/transaction.entity';
 import { AuditAction } from '../entities/audit-log.entity';
 import { ConflictType } from '../entities/sync-conflict.entity';
+import {
+  CoaSyncResult,
+  AccountValidationResult,
+} from '../entities/xero-account.entity';
+import { SUSPENSE_ACCOUNT_CODE } from '../entities/categorization-journal.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
+import { RateLimiter } from '../../mcp/xero-mcp/utils/rate-limiter';
 
 // Import Xero MCP tools
 import {
@@ -47,15 +63,26 @@ import {
 } from '../../mcp/xero-mcp/tools';
 import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
 
+// Error message indicating transaction is reconciled and cannot be edited
+const RECONCILED_TRANSACTION_ERROR =
+  'This Bank Transaction cannot be edited as it has been reconciled';
+
 @Injectable()
 export class XeroSyncService {
   private readonly logger = new Logger(XeroSyncService.name);
   private tokenManager: TokenManager;
+  private readonly rateLimiter: RateLimiter;
+
+  // Rate limit retry configuration
+  private readonly MAX_RATE_LIMIT_RETRIES = 3;
+  private readonly RATE_LIMIT_BACKOFF_MS = 2000;
 
   constructor(
     private readonly transactionRepo: TransactionRepository,
     private readonly categorizationRepo: CategorizationRepository,
     private readonly paymentRepo: PaymentRepository,
+    private readonly xeroAccountRepo: XeroAccountRepository,
+    private readonly categorizationJournalRepo: CategorizationJournalRepository,
     private readonly auditLogService: AuditLogService,
     private readonly conflictDetection: ConflictDetectionService,
     private readonly conflictResolution: ConflictResolutionService,
@@ -63,6 +90,8 @@ export class XeroSyncService {
   ) {
     // Pass PrismaService (extends PrismaClient) to TokenManager
     this.tokenManager = new TokenManager(this.prisma);
+    // Rate limiter: 60 requests per minute as per Xero API limits
+    this.rateLimiter = new RateLimiter(60, 60000);
   }
 
   /**
@@ -707,5 +736,646 @@ export class XeroSyncService {
     // Standard bank account code for payments
     // In production, this could be configurable per tenant
     return '090';
+  }
+
+  /**
+   * Create a Xero contact for a parent
+   * TASK-XERO-004: Auto-sync parents to Xero as contacts
+   *
+   * @param tenantId - CrecheBooks tenant ID
+   * @param parent - Parent record from CrecheBooks
+   * @returns Xero contact ID or null if sync failed
+   */
+  async createContactForParent(
+    tenantId: string,
+    parent: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string | null;
+      phone: string | null;
+    },
+  ): Promise<string | null> {
+    this.logger.log(
+      `Creating Xero contact for parent ${parent.id} (${parent.firstName} ${parent.lastName})`,
+    );
+
+    // Check Xero connection
+    const hasConnection = await this.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      this.logger.warn(
+        `Cannot sync parent: Tenant ${tenantId} not connected to Xero`,
+      );
+      return null;
+    }
+
+    try {
+      // Get authenticated client
+      const { client, xeroTenantId } =
+        await this.getAuthenticatedClient(tenantId);
+
+      // Import createContact tool
+      const { createContact } =
+        await import('../../mcp/xero-mcp/tools/index.js');
+
+      // Create contact via Xero API
+      const contactName = `${parent.firstName} ${parent.lastName}`;
+      const result = await createContact(client, xeroTenantId, {
+        name: contactName,
+        firstName: parent.firstName,
+        lastName: parent.lastName,
+        email: parent.email ?? undefined,
+        phone: parent.phone ?? undefined,
+        isCustomer: true,
+        isSupplier: false,
+      });
+
+      if (result?.contactId) {
+        // Update parent with Xero contact ID
+        await this.prisma.parent.update({
+          where: { id: parent.id },
+          data: { xeroContactId: result.contactId },
+        });
+
+        // Log audit trail
+        await this.auditLogService.logAction({
+          tenantId,
+          entityType: 'Parent',
+          entityId: parent.id,
+          action: AuditAction.UPDATE,
+          afterValue: {
+            xeroContactId: result.contactId,
+            syncedAt: new Date().toISOString(),
+            syncType: 'XERO_CONTACT_SYNC',
+          },
+          changeSummary: `Parent synced to Xero as contact: ${result.contactId}`,
+        });
+
+        this.logger.log(
+          `Parent ${parent.id} synced to Xero contact: ${result.contactId}`,
+        );
+        return result.contactId;
+      }
+
+      this.logger.warn(
+        `Xero contact creation returned no contactId for parent ${parent.id}`,
+      );
+      return null;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `Failed to sync parent ${parent.id} to Xero: ${errorMessage}`,
+        errorStack,
+      );
+
+      // Don't throw - allow local parent to exist without Xero sync
+      return null;
+    }
+  }
+
+  /**
+   * Sync Chart of Accounts from Xero to local database
+   * TASK-XERO-006: Store Xero accounts locally for validation
+   *
+   * @param tenantId - CrecheBooks tenant ID
+   * @param forceSync - Force sync even if recently synced
+   * @returns Sync result with counts
+   */
+  async syncChartOfAccountsToDb(
+    tenantId: string,
+    forceSync = false,
+  ): Promise<CoaSyncResult> {
+    this.logger.log(
+      `Syncing Chart of Accounts to database for tenant ${tenantId}`,
+    );
+
+    const result: CoaSyncResult = {
+      accountsFetched: 0,
+      accountsCreated: 0,
+      accountsUpdated: 0,
+      accountsArchived: 0,
+      errors: [],
+      syncedAt: new Date(),
+    };
+
+    // Check last sync time (skip if synced within last hour unless forced)
+    if (!forceSync) {
+      const lastSync = await this.xeroAccountRepo.getLastSyncTime(tenantId);
+      if (lastSync) {
+        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        if (lastSync > hourAgo) {
+          this.logger.debug(
+            `Chart of Accounts synced recently (${lastSync.toISOString()}), skipping`,
+          );
+          return {
+            ...result,
+            errors: ['Skipped: Recently synced. Use forceSync to override.'],
+          };
+        }
+      }
+    }
+
+    // Get authenticated client
+    const { client, xeroTenantId } =
+      await this.getAuthenticatedClient(tenantId);
+
+    // Fetch accounts from Xero
+    const accounts = await getAccounts(client, xeroTenantId);
+    result.accountsFetched = accounts.length;
+
+    this.logger.log(`Fetched ${accounts.length} accounts from Xero`);
+
+    // Track active account codes for archiving stale ones
+    const activeCodes: string[] = [];
+
+    // Upsert each account
+    for (const xeroAccount of accounts) {
+      try {
+        // Skip accounts without required fields
+        if (!xeroAccount.code || !xeroAccount.name) {
+          this.logger.debug(
+            `Skipping account without code or name: ${JSON.stringify(xeroAccount)}`,
+          );
+          continue;
+        }
+
+        activeCodes.push(xeroAccount.code);
+
+        const { account, isNew } = await this.xeroAccountRepo.upsert({
+          tenantId,
+          accountCode: xeroAccount.code,
+          name: xeroAccount.name,
+          type: xeroAccount.type ?? 'UNKNOWN',
+          taxType: xeroAccount.taxType ?? undefined,
+          status:
+            xeroAccount.status === 'ARCHIVED'
+              ? XeroAccountStatus.ARCHIVED
+              : XeroAccountStatus.ACTIVE,
+          xeroAccountId: xeroAccount.accountId,
+        });
+
+        if (isNew) {
+          result.accountsCreated++;
+        } else {
+          result.accountsUpdated++;
+        }
+      } catch (error) {
+        const errorMsg = `Failed to sync account ${xeroAccount.code}: ${
+          error instanceof Error ? error.message : String(error)
+        }`;
+        result.errors.push(errorMsg);
+        this.logger.error(errorMsg);
+      }
+    }
+
+    // Archive accounts that are no longer in Xero
+    if (activeCodes.length > 0) {
+      result.accountsArchived = await this.xeroAccountRepo.archiveNotInCodes(
+        tenantId,
+        activeCodes,
+      );
+    }
+
+    // Log audit trail
+    await this.auditLogService.logAction({
+      tenantId,
+      entityType: 'ChartOfAccounts',
+      entityId: 'SYNC_TO_DB',
+      action: AuditAction.UPDATE,
+      afterValue: {
+        accountsFetched: result.accountsFetched,
+        accountsCreated: result.accountsCreated,
+        accountsUpdated: result.accountsUpdated,
+        accountsArchived: result.accountsArchived,
+        syncedAt: result.syncedAt.toISOString(),
+        syncType: 'XERO_COA_DB_SYNC',
+      },
+      changeSummary: `Synced ${result.accountsFetched} accounts from Xero: ${result.accountsCreated} created, ${result.accountsUpdated} updated, ${result.accountsArchived} archived`,
+    });
+
+    this.logger.log(
+      `Chart of Accounts sync complete: ${result.accountsCreated} created, ${result.accountsUpdated} updated, ${result.accountsArchived} archived`,
+    );
+
+    return result;
+  }
+
+  /**
+   * Validate an account code exists and is active in the local database
+   * TASK-XERO-006: Validate before pushing categorizations
+   *
+   * @param tenantId - CrecheBooks tenant ID
+   * @param accountCode - Account code to validate
+   * @returns Validation result with account details or error
+   */
+  async validateAccountCode(
+    tenantId: string,
+    accountCode: string,
+  ): Promise<AccountValidationResult> {
+    this.logger.debug(
+      `Validating account code ${accountCode} for tenant ${tenantId}`,
+    );
+
+    return this.xeroAccountRepo.validateAccountCode(tenantId, accountCode);
+  }
+
+  /**
+   * Get all synced accounts for a tenant
+   * TASK-XERO-006: List accounts from local database
+   *
+   * @param tenantId - CrecheBooks tenant ID
+   * @param options - Filter options
+   * @returns List of accounts with total count
+   */
+  async getSyncedAccounts(
+    tenantId: string,
+    options?: {
+      status?: XeroAccountStatus;
+      type?: string;
+      codePrefix?: string;
+      nameSearch?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<{
+    accounts: Array<{
+      id: string;
+      accountCode: string;
+      name: string;
+      type: string;
+      taxType: string | null;
+      status: XeroAccountStatus;
+    }>;
+    total: number;
+    lastSyncedAt: Date | null;
+  }> {
+    const { accounts, total } = await this.xeroAccountRepo.findByTenant(
+      tenantId,
+      options,
+    );
+
+    const lastSyncedAt = await this.xeroAccountRepo.getLastSyncTime(tenantId);
+
+    return {
+      accounts: accounts.map((a) => ({
+        id: a.id,
+        accountCode: a.accountCode,
+        name: a.name,
+        type: a.type,
+        taxType: a.taxType,
+        status: a.status,
+      })),
+      total,
+      lastSyncedAt,
+    };
+  }
+
+  /**
+   * Check if an error indicates the transaction is reconciled in Xero
+   * TASK-XERO-007: Detect reconciled transaction errors
+   */
+  isReconciledTransactionError(error: unknown): boolean {
+    // Check error message directly
+    if (error instanceof Error) {
+      if (error.message.includes(RECONCILED_TRANSACTION_ERROR)) {
+        return true;
+      }
+    }
+
+    // Check string errors
+    if (typeof error === 'string') {
+      if (error.includes(RECONCILED_TRANSACTION_ERROR)) {
+        return true;
+      }
+    }
+
+    // Check for XeroMCPError or errors with details/originalError
+    const errorWithDetails = error as {
+      details?: { originalError?: string };
+      originalError?: string;
+    };
+    if (errorWithDetails?.details?.originalError) {
+      if (errorWithDetails.details.originalError.includes(RECONCILED_TRANSACTION_ERROR)) {
+        return true;
+      }
+    }
+    if (errorWithDetails?.originalError) {
+      if (errorWithDetails.originalError.includes(RECONCILED_TRANSACTION_ERROR)) {
+        return true;
+      }
+    }
+
+    // Last resort: stringify and check
+    try {
+      const errorString = JSON.stringify(error);
+      if (errorString.includes(RECONCILED_TRANSACTION_ERROR)) {
+        return true;
+      }
+    } catch {
+      // JSON.stringify failed, try toString
+      const errorStr = String(error);
+      if (errorStr.includes(RECONCILED_TRANSACTION_ERROR)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Create a categorization journal for a reconciled transaction
+   * TASK-XERO-007: Journal Entry Approach for Categorization Sync
+   *
+   * When a transaction is reconciled in Xero (can't be edited), this creates
+   * a manual journal to move the amount from suspense to the correct account.
+   *
+   * @param transactionId - Transaction ID that was categorized
+   * @param tenantId - Tenant ID for isolation
+   * @param toAccountCode - Target expense account from categorization
+   * @returns Result with journal ID and Xero sync status
+   */
+  async createCategorizationJournal(
+    transactionId: string,
+    tenantId: string,
+    toAccountCode: string,
+  ): Promise<{
+    journalId: string;
+    xeroJournalId: string | null;
+    posted: boolean;
+    error?: string;
+  }> {
+    this.logger.log(
+      `Creating categorization journal for transaction ${transactionId} to account ${toAccountCode}`,
+    );
+
+    // Load transaction
+    const transaction = await this.transactionRepo.findById(
+      tenantId,
+      transactionId,
+    );
+    if (!transaction) {
+      throw new NotFoundException('Transaction', transactionId);
+    }
+
+    // Check if journal already exists for this transaction
+    const existingJournal =
+      await this.categorizationJournalRepo.findByTransactionId(transactionId);
+    if (existingJournal) {
+      this.logger.warn(
+        `Categorization journal already exists for transaction ${transactionId}`,
+      );
+
+      // If already posted, return success
+      if (existingJournal.status === CategorizationJournalStatus.POSTED) {
+        return {
+          journalId: existingJournal.id,
+          xeroJournalId: existingJournal.xeroJournalId,
+          posted: true,
+        };
+      }
+
+      // If pending or failed, try to post it
+      return this.postCategorizationJournal(existingJournal.id, tenantId);
+    }
+
+    // Create narration for the journal
+    const narration = `Categorization: ${transaction.description} - ${transaction.payeeName || 'N/A'} moved from Suspense (${SUSPENSE_ACCOUNT_CODE}) to ${toAccountCode}`;
+
+    // Create journal record
+    const journal = await this.categorizationJournalRepo.create({
+      tenantId,
+      transactionId,
+      fromAccountCode: SUSPENSE_ACCOUNT_CODE,
+      toAccountCode,
+      amountCents: transaction.amountCents,
+      isCredit: transaction.isCredit,
+      narration,
+    });
+
+    this.logger.log(
+      `Created categorization journal ${journal.id} for transaction ${transactionId}`,
+    );
+
+    // Log audit trail
+    await this.auditLogService.logAction({
+      tenantId,
+      entityType: 'CategorizationJournal',
+      entityId: journal.id,
+      action: AuditAction.CREATE,
+      afterValue: {
+        transactionId,
+        fromAccountCode: SUSPENSE_ACCOUNT_CODE,
+        toAccountCode,
+        amountCents: transaction.amountCents,
+        narration,
+      },
+      changeSummary: `Created categorization journal for reconciled transaction`,
+    });
+
+    // Attempt to post to Xero
+    return this.postCategorizationJournal(journal.id, tenantId);
+  }
+
+  /**
+   * Post a categorization journal to Xero
+   * TASK-XERO-007: Post manual journal for categorization
+   *
+   * @param journalId - Categorization journal ID
+   * @param tenantId - Tenant ID for isolation
+   * @returns Result with Xero journal ID and status
+   */
+  async postCategorizationJournal(
+    journalId: string,
+    tenantId: string,
+  ): Promise<{
+    journalId: string;
+    xeroJournalId: string | null;
+    posted: boolean;
+    error?: string;
+  }> {
+    const journal = await this.categorizationJournalRepo.findById(journalId);
+    if (!journal) {
+      throw new NotFoundException('CategorizationJournal', journalId);
+    }
+
+    if (journal.tenantId !== tenantId) {
+      throw new NotFoundException('CategorizationJournal', journalId);
+    }
+
+    // Skip if already posted
+    if (journal.status === CategorizationJournalStatus.POSTED) {
+      return {
+        journalId,
+        xeroJournalId: journal.xeroJournalId,
+        posted: true,
+      };
+    }
+
+    try {
+      // Get authenticated client
+      const { client, xeroTenantId } =
+        await this.getAuthenticatedClient(tenantId);
+
+      // Build journal lines
+      // For expenses (debits in bank): Debit expense, Credit suspense
+      // For income (credits in bank): Debit suspense, Credit income
+      const journalLines = this.buildCategorizationJournalLines(journal);
+
+      // Apply rate limiting
+      await this.rateLimiter.acquire();
+
+      // Create manual journal in Xero
+      const manualJournal: ManualJournal = {
+        narration: journal.narration,
+        date: new Date().toISOString().split('T')[0],
+        status: ManualJournal.StatusEnum.POSTED,
+        lineAmountTypes: LineAmountTypes.NoTax,
+        journalLines,
+      };
+
+      const response = await client.accountingApi.createManualJournals(
+        xeroTenantId,
+        { manualJournals: [manualJournal] },
+      );
+
+      const createdJournal = response.body.manualJournals?.[0];
+      if (!createdJournal?.manualJournalID) {
+        throw new Error('Xero API returned no journal ID');
+      }
+
+      const xeroJournalId = createdJournal.manualJournalID;
+      const journalNumber = xeroJournalId.substring(0, 8).toUpperCase();
+
+      // Mark as posted
+      await this.categorizationJournalRepo.markAsPosted(
+        journalId,
+        xeroJournalId,
+        journalNumber,
+      );
+
+      // Log audit trail
+      await this.auditLogService.logAction({
+        tenantId,
+        entityType: 'CategorizationJournal',
+        entityId: journalId,
+        action: AuditAction.UPDATE,
+        afterValue: {
+          status: 'POSTED',
+          xeroJournalId,
+          journalNumber,
+          postedAt: new Date().toISOString(),
+        },
+        changeSummary: `Posted categorization journal to Xero: ${journalNumber}`,
+      });
+
+      this.logger.log(
+        `Posted categorization journal ${journalId} to Xero: ${xeroJournalId}`,
+      );
+
+      return {
+        journalId,
+        xeroJournalId,
+        posted: true,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      this.logger.error(
+        `Failed to post categorization journal ${journalId} to Xero: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      // Mark as failed
+      await this.categorizationJournalRepo.markAsFailed(journalId, errorMessage);
+
+      // Log audit trail
+      await this.auditLogService.logAction({
+        tenantId,
+        entityType: 'CategorizationJournal',
+        entityId: journalId,
+        action: AuditAction.UPDATE,
+        afterValue: {
+          status: 'FAILED',
+          errorMessage,
+          attemptedAt: new Date().toISOString(),
+        },
+        changeSummary: `Categorization journal Xero post failed: ${errorMessage}`,
+      });
+
+      return {
+        journalId,
+        xeroJournalId: null,
+        posted: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Build journal lines for a categorization journal
+   * TASK-XERO-007: Journal lines for moving from suspense to correct account
+   *
+   * For bank debits (expenses):
+   * - Debit: Target expense account
+   * - Credit: Suspense account (9999)
+   *
+   * For bank credits (income):
+   * - Debit: Suspense account (9999)
+   * - Credit: Target income account
+   */
+  private buildCategorizationJournalLines(
+    journal: {
+      fromAccountCode: string;
+      toAccountCode: string;
+      amountCents: number;
+      isCredit: boolean;
+    },
+  ): Array<{
+    lineAmount: number;
+    accountCode: string;
+    description: string;
+  }> {
+    const amount = journal.amountCents / 100; // Convert cents to dollars/rands
+
+    if (journal.isCredit) {
+      // Bank credit (income received): Move from suspense to income
+      return [
+        {
+          lineAmount: amount, // Debit (positive)
+          accountCode: journal.fromAccountCode, // Suspense
+          description: 'Reclass from Suspense',
+        },
+        {
+          lineAmount: -amount, // Credit (negative)
+          accountCode: journal.toAccountCode, // Income account
+          description: 'Categorized income',
+        },
+      ];
+    } else {
+      // Bank debit (expense paid): Move from suspense to expense
+      return [
+        {
+          lineAmount: amount, // Debit (positive)
+          accountCode: journal.toAccountCode, // Expense account
+          description: 'Categorized expense',
+        },
+        {
+          lineAmount: -amount, // Credit (negative)
+          accountCode: journal.fromAccountCode, // Suspense
+          description: 'Reclass from Suspense',
+        },
+      ];
+    }
+  }
+
+  /**
+   * Sleep utility for rate limit backoff
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

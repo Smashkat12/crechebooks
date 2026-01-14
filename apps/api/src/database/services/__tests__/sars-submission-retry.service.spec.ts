@@ -65,6 +65,11 @@ describe('SarsSubmissionRetryService', () => {
         sarsReference: 'SARS12345',
       });
 
+      // Mock the callSarsApi private method to simulate successful submission
+      jest
+        .spyOn(service as any, 'callSarsApi')
+        .mockResolvedValue({ reference: 'SARS12345' });
+
       const result = await service.submitWithRetry(submissionId);
 
       expect(result.success).toBe(true);

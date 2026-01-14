@@ -62,6 +62,15 @@ export class CreateTransactionDto {
   @IsOptional()
   @IsUUID()
   importBatchId?: string;
+
+  @IsOptional()
+  @IsEnum(TransactionStatus)
+  status?: TransactionStatus;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  xeroAccountCode?: string;
 }
 
 export class UpdateTransactionDto extends PartialType(CreateTransactionDto) {

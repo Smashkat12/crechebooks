@@ -71,10 +71,11 @@ export class EnrollmentService {
    * @param feeStructureId - Fee structure to enroll child in
    * @param startDate - Enrollment start date
    * @param userId - User performing the enrollment
+   * @param allowHistoricDates - If true, allows historical start dates (for data imports)
    * @returns Created enrollment with generated invoice (if any)
    * @throws NotFoundException if child or fee structure doesn't exist
    * @throws ConflictException if child already has active enrollment
-   * @throws ValidationException if startDate is in the past
+   * @throws ValidationException if startDate is in the past (unless allowHistoricDates is true)
    */
   async enrollChild(
     tenantId: string,
@@ -82,6 +83,7 @@ export class EnrollmentService {
     feeStructureId: string,
     startDate: Date,
     userId: string,
+    allowHistoricDates = false,
   ): Promise<EnrollChildResult> {
     // 1. Validate child exists and belongs to tenant
     const child = await this.childRepo.findById(childId);
@@ -116,12 +118,12 @@ export class EnrollmentService {
       });
     }
 
-    // 4. Validate startDate not in past (allow today)
+    // 4. Validate startDate not in past (allow today, or allow if historic imports enabled)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const startNorm = new Date(startDate);
     startNorm.setHours(0, 0, 0, 0);
-    if (startNorm < today) {
+    if (startNorm < today && !allowHistoricDates) {
       this.logger.error(
         `Start date ${startDate.toISOString()} is in the past (today: ${today.toISOString()})`,
       );
@@ -132,6 +134,11 @@ export class EnrollmentService {
           value: startDate,
         },
       ]);
+    }
+    if (startNorm < today && allowHistoricDates) {
+      this.logger.log(
+        `Allowing historical start date ${startDate.toISOString()} for data import`,
+      );
     }
 
     // 5. Create enrollment
@@ -429,23 +436,21 @@ export class EnrollmentService {
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
     );
 
+    // Sibling discount per TASK-INT-002 specification:
+    // - 1st child: 0% discount
+    // - 2nd child: 10% discount
+    // - 3rd+ child: 15% discount
     for (let i = 0; i < enrollments.length; i++) {
       const childId = enrollments[i].childId;
       if (i === 0) {
         // First child: 0%
         discountMap.set(childId, new Decimal(0));
-      } else if (enrollments.length === 2) {
-        // 2 children: second gets 10%
+      } else if (i === 1) {
+        // Second child: 10%
         discountMap.set(childId, new Decimal(10));
       } else {
-        // 3+ children
-        if (i === 1) {
-          // Second child: 15%
-          discountMap.set(childId, new Decimal(15));
-        } else {
-          // Third+: 20%
-          discountMap.set(childId, new Decimal(20));
-        }
+        // Third+ child: 15%
+        discountMap.set(childId, new Decimal(15));
       }
     }
 

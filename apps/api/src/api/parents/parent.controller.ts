@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -33,6 +34,7 @@ import {
   ParentFilterDto,
 } from '../../database/dto/parent.dto';
 import { Parent } from '@prisma/client';
+import { XeroSyncService } from '../../database/services/xero-sync.service';
 
 /**
  * Transform parent to camelCase response matching IParent interface
@@ -63,7 +65,12 @@ function toResponse(
 @Controller('parents')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ParentController {
-  constructor(private readonly parentRepository: ParentRepository) {}
+  private readonly logger = new Logger(ParentController.name);
+
+  constructor(
+    private readonly parentRepository: ParentRepository,
+    private readonly xeroSyncService: XeroSyncService,
+  ) {}
 
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
@@ -171,7 +178,58 @@ export class ParentController {
       ...dto,
       tenantId: user.tenantId,
     });
+
+    // TASK-XERO-004: Auto-sync to Xero as contact if connected
+    // Fire-and-forget - don't block parent creation on Xero sync
+    this.syncToXero(user.tenantId, parent).catch((error) => {
+      this.logger.warn(
+        `Failed to auto-sync parent ${parent.id} to Xero: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+
     return toResponse(parent);
+  }
+
+  /**
+   * Auto-sync parent to Xero as a contact
+   * Called asynchronously after parent creation
+   */
+  private async syncToXero(tenantId: string, parent: Parent): Promise<void> {
+    try {
+      // Check if Xero is connected for this tenant
+      const isConnected =
+        await this.xeroSyncService.hasValidConnection(tenantId);
+      if (!isConnected) {
+        this.logger.debug(
+          `Xero not connected for tenant ${tenantId}, skipping auto-sync`,
+        );
+        return;
+      }
+
+      // Create contact in Xero
+      const xeroContactId = await this.xeroSyncService.createContactForParent(
+        tenantId,
+        {
+          id: parent.id,
+          firstName: parent.firstName,
+          lastName: parent.lastName,
+          email: parent.email,
+          phone: parent.phone,
+        },
+      );
+
+      if (xeroContactId) {
+        this.logger.log(
+          `Parent ${parent.id} auto-synced to Xero contact ${xeroContactId}`,
+        );
+      }
+    } catch (error) {
+      // Log but don't throw - parent creation should succeed even if Xero sync fails
+      this.logger.error(
+        `Failed to sync parent ${parent.id} to Xero`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
   }
 
   @Put(':id')

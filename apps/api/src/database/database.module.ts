@@ -64,6 +64,15 @@ import { StaffOffboardingRepository } from './repositories/staff-offboarding.rep
 import { StaffOnboardingRepository } from './repositories/staff-onboarding.repository';
 import { SimplePayRepository } from './repositories/simplepay.repository';
 import { StaffRepository } from './repositories/staff.repository';
+import { LeaveRequestRepository } from './repositories/leave-request.repository';
+import { CalculationCacheRepository } from './repositories/calculation-cache.repository';
+import { PayrollAdjustmentRepository } from './repositories/payroll-adjustment.repository';
+import { ServicePeriodSyncRepository } from './repositories/service-period-sync.repository';
+import { ReportRequestRepository } from './repositories/report-request.repository';
+import { BulkOperationLogRepository } from './repositories/bulk-operation-log.repository';
+import { EmployeeSetupLogRepository } from './repositories/employee-setup-log.repository';
+import { XeroAccountRepository } from './repositories/xero-account.repository';
+import { CategorizationJournalRepository } from './repositories/categorization-journal.repository';
 import { StaffOnboardingService } from './services/staff-onboarding.service';
 import { StaffDocumentService } from './services/staff-document.service';
 import { WelcomePackPdfService } from './services/welcome-pack-pdf.service';
@@ -80,6 +89,9 @@ import { SarsModule } from '../integrations/sars/sars.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
 import { PaymentMatcherModule } from '../agents/payment-matcher/matcher.module';
 import { SarsAgentModule } from '../agents/sars-agent/sars.module';
+import { OrchestratorModule } from '../agents/orchestrator/orchestrator.module';
+import { ExtractionValidatorModule } from '../agents/extraction-validator/validator.module';
+import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
 
 @Module({
   imports: [
@@ -89,7 +101,10 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     TransactionCategorizerModule,
     PaymentMatcherModule,
     forwardRef(() => SarsAgentModule),
+    forwardRef(() => OrchestratorModule), // TASK-AGENT-005: Orchestrator Agent
+    ExtractionValidatorModule, // TASK-AGENT-006: PDF Extraction Validation Agent
     forwardRef(() => NotificationModule),
+    forwardRef(() => SimplePayModule), // TASK-STAFF-006: For SimplePay offboarding integration
   ],
   providers: [
     PrismaService,
@@ -157,6 +172,7 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     StaffOnboardingRepository,
     SimplePayRepository,
     StaffRepository,
+    LeaveRequestRepository,
     StaffOnboardingService,
     StaffDocumentService,
     WelcomePackPdfService,
@@ -166,6 +182,14 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     ExitPackPdfService,
     EmploymentContractPdfService,
     PopiaConsentPdfService,
+    CalculationCacheRepository,
+    PayrollAdjustmentRepository,
+    ServicePeriodSyncRepository,
+    ReportRequestRepository,
+    BulkOperationLogRepository,
+    EmployeeSetupLogRepository,
+    XeroAccountRepository,
+    CategorizationJournalRepository,
   ],
   exports: [
     PrismaService,
@@ -242,6 +266,15 @@ import { SarsAgentModule } from '../agents/sars-agent/sars.module';
     EmploymentContractPdfService,
     PopiaConsentPdfService,
     SimplePayRepository,
+    LeaveRequestRepository,
+    CalculationCacheRepository,
+    PayrollAdjustmentRepository,
+    ServicePeriodSyncRepository,
+    ReportRequestRepository,
+    BulkOperationLogRepository,
+    EmployeeSetupLogRepository,
+    XeroAccountRepository,
+    CategorizationJournalRepository,
   ],
 })
 export class DatabaseModule {}

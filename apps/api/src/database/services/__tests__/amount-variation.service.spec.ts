@@ -32,9 +32,9 @@ describe('AmountVariationService', () => {
 
     const mockPrisma = {
       auditLog: {
-        create: jest.fn(),
+        create: jest.fn().mockResolvedValue({} as any),
       },
-    };
+    } as unknown as jest.Mocked<PrismaService>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -61,10 +61,9 @@ describe('AmountVariationService', () => {
   describe('analyzeVariation', () => {
     it('should return null when insufficient historical data', async () => {
       // Only 2 transactions (need 3 minimum)
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions([500000, 520000]),
-        total: 2,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions([500000, 520000])),
+      );
 
       const result = await service.analyzeVariation(
         TENANT_ID,
@@ -78,10 +77,9 @@ describe('AmountVariationService', () => {
     it('should calculate correct statistics for consistent amounts', async () => {
       // 5 transactions with very similar amounts (R500 +/- R10)
       const amounts = [500000, 495000, 505000, 498000, 502000];
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       const result = await service.analyzeVariation(
         TENANT_ID,
@@ -100,10 +98,9 @@ describe('AmountVariationService', () => {
       // Historical: R500 average with wide spread (stdDev ~71k)
       // Mean = 500k, StdDev = 70711
       const amounts = [500000, 400000, 600000, 450000, 550000];
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       // Current: R660 (32% increase)
       // z-score = (660k - 500k) / 70711 = 2.26 (< 3)
@@ -126,10 +123,9 @@ describe('AmountVariationService', () => {
     it('should detect 100%+ variance and recommend block', async () => {
       // Historical: R500 average
       const amounts = [500000, 490000, 510000, 495000, 505000];
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       // Current: R1200 (>100% increase)
       const result = await service.analyzeVariation(
@@ -147,10 +143,9 @@ describe('AmountVariationService', () => {
     it('should calculate correct z-score for anomaly detection', async () => {
       // Mean: 500000, StdDev: ~10000
       const amounts = [500000, 490000, 510000, 495000, 505000];
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       // Current: 530000 (3 standard deviations away)
       const result = await service.analyzeVariation(
@@ -169,10 +164,9 @@ describe('AmountVariationService', () => {
       service.clearCache();
 
       const amounts = [500000, 490000, 510000, 495000, 505000];
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       // Set z-score threshold BEFORE analyzing
       await service.setThresholdConfig(TENANT_ID, {
@@ -194,10 +188,9 @@ describe('AmountVariationService', () => {
     it('should handle negative amounts correctly', async () => {
       // Credits (negative amounts)
       const amounts = [-500000, -490000, -510000, -495000, -505000];
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       const result = await service.analyzeVariation(
         TENANT_ID,
@@ -211,14 +204,14 @@ describe('AmountVariationService', () => {
     });
 
     it('should filter to exact payee matches (case-insensitive)', async () => {
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: [
-          ...createTransactions([500000], 'ESKOM'),
-          ...createTransactions([600000], 'Eskom Power'), // Different payee
-          ...createTransactions([510000, 505000], 'eskom'), // Same payee, different case
-        ],
-        total: 4,
-      });
+      const allTransactions = [
+        ...createTransactions([500000], 'ESKOM'),
+        ...createTransactions([600000], 'Eskom Power'), // Different payee
+        ...createTransactions([510000, 505000], 'eskom'), // Same payee, different case
+      ];
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(allTransactions),
+      );
 
       const result = await service.analyzeVariation(
         TENANT_ID,
@@ -271,8 +264,6 @@ describe('AmountVariationService', () => {
 
   describe('setThresholdConfig', () => {
     it('should update percentage threshold', async () => {
-      prisma.auditLog.create.mockResolvedValue({} as any);
-
       const updated = await service.setThresholdConfig(TENANT_ID, {
         thresholdType: 'percentage',
         percentageThreshold: 50,
@@ -283,8 +274,6 @@ describe('AmountVariationService', () => {
     });
 
     it('should update z-score threshold', async () => {
-      prisma.auditLog.create.mockResolvedValue({} as any);
-
       const updated = await service.setThresholdConfig(TENANT_ID, {
         thresholdType: 'z_score',
         zScoreThreshold: 3.0,
@@ -295,8 +284,6 @@ describe('AmountVariationService', () => {
     });
 
     it('should update absolute threshold', async () => {
-      prisma.auditLog.create.mockResolvedValue({} as any);
-
       const updated = await service.setThresholdConfig(TENANT_ID, {
         thresholdType: 'absolute',
         absoluteThresholdCents: 10000, // R100
@@ -307,8 +294,6 @@ describe('AmountVariationService', () => {
     });
 
     it('should support per-payee threshold override', async () => {
-      prisma.auditLog.create.mockResolvedValue({} as any);
-
       const updated = await service.setThresholdConfig(
         TENANT_ID,
         {
@@ -323,8 +308,6 @@ describe('AmountVariationService', () => {
     });
 
     it('should create audit log entry', async () => {
-      prisma.auditLog.create.mockResolvedValue({} as any);
-
       await service.setThresholdConfig(TENANT_ID, {
         thresholdType: 'percentage',
         percentageThreshold: 50,
@@ -371,10 +354,9 @@ describe('AmountVariationService', () => {
 
   describe('getPayeeStatistics', () => {
     it('should return null when insufficient data', async () => {
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions([500000, 510000]), // Only 2
-        total: 2,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions([500000, 510000])), // Only 2
+      );
 
       const stats = await service.getPayeeStatistics(TENANT_ID, PAYEE_NAME);
 
@@ -383,10 +365,9 @@ describe('AmountVariationService', () => {
 
     it('should calculate correct statistics', async () => {
       const amounts = [500000, 490000, 510000, 495000, 505000];
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       const stats = await service.getPayeeStatistics(TENANT_ID, PAYEE_NAME);
 
@@ -400,10 +381,9 @@ describe('AmountVariationService', () => {
 
     it('should handle single large outlier', async () => {
       const amounts = [500000, 495000, 505000, 1000000]; // One outlier
-      transactionRepo.findByTenant.mockResolvedValue({
-        data: createTransactions(amounts),
-        total: amounts.length,
-      });
+      transactionRepo.findByTenant.mockResolvedValue(
+        createPaginatedResult(createTransactions(amounts)),
+      );
 
       const stats = await service.getPayeeStatistics(TENANT_ID, PAYEE_NAME);
 
@@ -415,8 +395,6 @@ describe('AmountVariationService', () => {
 
   describe('clearCache', () => {
     it('should clear all cached threshold configs', async () => {
-      prisma.auditLog.create.mockResolvedValue({} as any);
-
       // Set multiple configs
       await service.setThresholdConfig(TENANT_ID, {
         thresholdType: 'percentage',
@@ -473,5 +451,18 @@ describe('AmountVariationService', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
+  }
+
+  /**
+   * Helper: Create paginated result with all required fields
+   */
+  function createPaginatedResult(transactions: Transaction[]) {
+    return {
+      data: transactions,
+      total: transactions.length,
+      page: 1,
+      limit: 100,
+      totalPages: 1,
+    };
   }
 });

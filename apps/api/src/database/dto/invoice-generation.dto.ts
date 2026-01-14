@@ -61,6 +61,8 @@ export class CreateSingleInvoiceDto {
 /**
  * Line item for invoice generation
  * Uses Decimal for precision calculations
+ *
+ * @see TASK-BILL-038 - SA VAT Compliance Enhancement
  */
 export interface LineItemInput {
   description: string;
@@ -71,6 +73,12 @@ export interface LineItemInput {
   accountCode?: string;
   /** TASK-BILL-017: Reference to ad-hoc charge if applicable */
   adHocChargeId?: string;
+  /**
+   * TASK-BILL-038: VAT exemption override for AD_HOC items
+   * When true, the line item is VAT exempt regardless of default behavior
+   * When false or undefined, default VAT rules apply based on lineType
+   */
+  isVatExempt?: boolean;
 }
 
 /**

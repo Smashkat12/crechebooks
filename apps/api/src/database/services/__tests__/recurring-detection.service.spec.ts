@@ -7,9 +7,11 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import Decimal from 'decimal.js';
 import { RecurringDetectionService } from '../recurring-detection.service';
 import { TransactionRepository } from '../../repositories/transaction.repository';
 import { PayeePatternRepository } from '../../repositories/payee-pattern.repository';
+import { AmountVariationService } from '../amount-variation.service';
 import { Transaction, PayeePattern } from '@prisma/client';
 import {
   ImportSource,
@@ -47,6 +49,22 @@ describe('RecurringDetectionService', () => {
             incrementMatchCount: jest.fn(),
           },
         },
+        {
+          provide: AmountVariationService,
+          useValue: {
+            detectAmountVariation: jest.fn().mockResolvedValue({
+              hasVariation: false,
+              variationType: null,
+              percentageChange: null,
+            }),
+            analyzeVariation: jest.fn().mockResolvedValue({
+              percentageVariation: 0,
+              exceedsThreshold: false,
+              zScore: 0,
+              recommendedAction: 'auto_categorize',
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -72,8 +90,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 3,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       const existingPattern: Partial<PayeePattern> = {
@@ -82,7 +101,7 @@ describe('RecurringDetectionService', () => {
         payeePattern: 'NETFLIX',
         defaultAccountCode: '5400',
         defaultAccountName: 'Subscriptions',
-        confidenceBoost: 10,
+        confidenceBoost: new Decimal(10),
         isRecurring: true,
         matchCount: 5,
         createdAt: new Date(),
@@ -129,8 +148,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 4,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       const existingPattern: Partial<PayeePattern> = {
@@ -139,7 +159,7 @@ describe('RecurringDetectionService', () => {
         payeePattern: 'GYM MEMBERSHIP',
         defaultAccountCode: '5500',
         defaultAccountName: 'Fitness',
-        confidenceBoost: 10,
+        confidenceBoost: new Decimal(10),
         isRecurring: true,
         matchCount: 8,
         createdAt: new Date(),
@@ -173,8 +193,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 3,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       const existingPattern: Partial<PayeePattern> = {
@@ -183,7 +204,7 @@ describe('RecurringDetectionService', () => {
         payeePattern: 'INSURANCE',
         defaultAccountCode: '5600',
         defaultAccountName: 'Insurance',
-        confidenceBoost: 10,
+        confidenceBoost: new Decimal(10),
         isRecurring: true,
         matchCount: 6,
         createdAt: new Date(),
@@ -216,8 +237,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 2,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       const testTransaction = transactions[1] as Transaction;
@@ -271,8 +293,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 3,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       const testTransaction = transactions[2] as Transaction;
@@ -296,8 +319,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 3,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       payeePatternRepo.findByPayeeName.mockResolvedValue(null);
@@ -324,8 +348,8 @@ describe('RecurringDetectionService', () => {
           defaultAccountName: 'Subscriptions',
           isRecurring: true,
           expectedAmountCents: 9900,
-          amountVariancePercent: 5,
-          confidenceBoost: 10,
+          amountVariancePercent: new Decimal(5),
+          confidenceBoost: new Decimal(10),
           matchCount: 5,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -338,8 +362,8 @@ describe('RecurringDetectionService', () => {
           defaultAccountName: 'Fitness',
           isRecurring: true,
           expectedAmountCents: 50000,
-          amountVariancePercent: 10,
-          confidenceBoost: 12,
+          amountVariancePercent: new Decimal(10),
+          confidenceBoost: new Decimal(12),
           matchCount: 10,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -385,8 +409,8 @@ describe('RecurringDetectionService', () => {
         defaultAccountName: 'Subscriptions',
         isRecurring: true,
         expectedAmountCents: 15000,
-        amountVariancePercent: 10,
-        confidenceBoost: 10,
+        amountVariancePercent: new Decimal(10),
+        confidenceBoost: new Decimal(10),
         matchCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -433,7 +457,7 @@ describe('RecurringDetectionService', () => {
         ...existingPattern,
         isRecurring: true,
         expectedAmountCents: 5000,
-        amountVariancePercent: 5,
+        amountVariancePercent: new Decimal(5),
         defaultAccountCode: '5500',
         defaultAccountName: 'Updated Account',
       };
@@ -478,8 +502,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 3,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       const existingPattern: Partial<PayeePattern> = {
@@ -488,7 +513,7 @@ describe('RecurringDetectionService', () => {
         payeePattern: 'NETFLIX',
         defaultAccountCode: '5400',
         defaultAccountName: 'Subscriptions',
-        confidenceBoost: 10,
+        confidenceBoost: new Decimal(10),
         isRecurring: true,
         matchCount: 5,
         createdAt: new Date(),
@@ -532,8 +557,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: transactions as Transaction[],
         total: 4,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
       });
 
       const existingPattern: Partial<PayeePattern> = {
@@ -542,7 +568,7 @@ describe('RecurringDetectionService', () => {
         payeePattern: 'PERFECT',
         defaultAccountCode: '5400',
         defaultAccountName: 'Test',
-        confidenceBoost: 10,
+        confidenceBoost: new Decimal(10),
         isRecurring: true,
         matchCount: 8,
         createdAt: new Date(),
@@ -576,8 +602,9 @@ describe('RecurringDetectionService', () => {
       transactionRepo.findByTenant.mockResolvedValue({
         data: [],
         total: 0,
-        page: 0,
-        pageSize: 100,
+        page: 1,
+        limit: 100,
+        totalPages: 0,
       });
 
       // Act

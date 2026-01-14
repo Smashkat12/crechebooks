@@ -427,7 +427,9 @@ export class XeroPayrollJournalService {
 
     for (const payroll of payrolls) {
       // Check if journal already exists
-      const existing = await this.journalRepo.findJournalByPayrollId(payroll.id);
+      const existing = await this.journalRepo.findJournalByPayrollId(
+        payroll.id,
+      );
       if (existing) {
         skipped.push({
           payrollId: payroll.id,
@@ -444,7 +446,8 @@ export class XeroPayrollJournalService {
         );
         created.push(journal);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
         skipped.push({
           payrollId: payroll.id,
           reason: message,
@@ -739,7 +742,8 @@ export class XeroPayrollJournalService {
           attempt,
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
-          response: (error as { response?: { body?: unknown } })?.response?.body,
+          response: (error as { response?: { body?: unknown } })?.response
+            ?.body,
         });
 
         // Check for rate limit error (429)
@@ -880,7 +884,8 @@ export class XeroPayrollJournalService {
   private extractXeroErrorMessage(error: unknown): string {
     if (error instanceof Error) {
       // Check for response body errors
-      const responseBody = (error as { response?: { body?: unknown } })?.response?.body;
+      const responseBody = (error as { response?: { body?: unknown } })
+        ?.response?.body;
       if (responseBody && typeof responseBody === 'object') {
         const body = responseBody as {
           Message?: string;

@@ -19,6 +19,7 @@ import { EnrollmentService } from '../enrollment.service';
 import { AuditLogService } from '../audit-log.service';
 import { XeroSyncService } from '../xero-sync.service';
 import { ProRataService } from '../pro-rata.service';
+import { CreditBalanceService } from '../credit-balance.service';
 import { LineType } from '../../entities/invoice-line.entity';
 
 describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () => {
@@ -106,6 +107,19 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
           provide: ProRataService,
           useValue: {
             calculateProRata: jest.fn(),
+          },
+        },
+        {
+          provide: CreditBalanceService,
+          useValue: {
+            getAvailableCredit: jest.fn().mockResolvedValue(0),
+            applyCredit: jest.fn(),
+            getCreditSummary: jest.fn().mockResolvedValue({
+              totalCreditCents: 0,
+              availableCreditCents: 0,
+              appliedCreditCents: 0,
+              creditCount: 0,
+            }),
           },
         },
       ],

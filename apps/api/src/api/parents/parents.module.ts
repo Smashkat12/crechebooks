@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ParentController } from './parent.controller';
 import { ParentRepository } from '../../database/repositories/parent.repository';
-import { PrismaModule } from '../../database/prisma/prisma.module';
+import { DatabaseModule } from '../../database/database.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [DatabaseModule],
   controllers: [ParentController],
   providers: [ParentRepository],
   exports: [ParentRepository],

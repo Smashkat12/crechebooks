@@ -7,6 +7,7 @@ import { PaymentReminderProcessor } from '../payment-reminder.processor';
 import { ReminderService } from '../../../database/services/reminder.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+import { ReminderTemplateService } from '../../../billing/reminder-template.service';
 import { InvoiceStatus } from '../../../database/entities/invoice.entity';
 import {
   ReminderStatus,
@@ -19,6 +20,7 @@ describe('PaymentReminderProcessor', () => {
   let mockReminderService: any;
   let mockAuditLogService: any;
   let mockPrisma: any;
+  let mockReminderTemplateService: any;
 
   const tenantId = 'tenant-123';
 
@@ -44,12 +46,24 @@ describe('PaymentReminderProcessor', () => {
       },
     };
 
+    mockReminderTemplateService = {
+      getEffectiveTemplate: jest.fn().mockResolvedValue({
+        channels: ['email'],
+        isCustom: false,
+      }),
+      getTemplateForStage: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentReminderProcessor,
         { provide: ReminderService, useValue: mockReminderService },
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: PrismaService, useValue: mockPrisma },
+        {
+          provide: ReminderTemplateService,
+          useValue: mockReminderTemplateService,
+        },
       ],
     }).compile();
 

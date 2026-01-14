@@ -62,7 +62,8 @@ export function InvoicePreview({ invoice }: InvoicePreviewProps) {
 
         <div>
           <h3 className="font-medium mb-4">Line Items</h3>
-          <InvoiceLineItems lines={invoice.lines} />
+          {/* TASK-BILL-038: Enable VAT display to show per-line VAT status */}
+          <InvoiceLineItems lines={invoice.lines} showVat={true} />
         </div>
 
         <Separator />

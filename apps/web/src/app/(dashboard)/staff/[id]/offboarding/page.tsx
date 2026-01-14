@@ -113,7 +113,9 @@ export default function StaffOffboardingPage() {
       {hasOffboarding && <OffboardingStatusCard staffId={staffId} />}
 
       {/* Asset Returns */}
-      {hasOffboarding && <AssetReturns staffId={staffId} />}
+      {hasOffboarding && offboardingStatus?.id && (
+        <AssetReturns staffId={staffId} offboardingId={offboardingStatus.id} />
+      )}
 
       {/* Quick Links */}
       <div className="flex flex-wrap gap-2 pt-4 border-t">

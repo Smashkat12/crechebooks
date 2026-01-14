@@ -1,11 +1,12 @@
 'use client';
 
-import { RefreshCw, Link2, AlertCircle, Clock } from 'lucide-react';
+import { RefreshCw, Link2, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { XeroStatusIndicator, type ConnectionState } from './XeroStatusIndicator';
 import { useXeroStatus, type XeroConnectionStatus } from '@/hooks/useXeroStatus';
+import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 
 export interface XeroStatusWidgetProps {
@@ -53,6 +54,23 @@ function formatLastSync(lastSyncAt: Date | null): string {
 
 export function XeroStatusWidget({ compact = false }: XeroStatusWidgetProps) {
   const { status, isLoading, error, syncNow, reconnect, isSyncing } = useXeroStatus();
+  const { toast } = useToast();
+
+  const handleSyncNow = async () => {
+    try {
+      await syncNow();
+      toast({
+        title: 'Sync complete',
+        description: 'Xero data has been synchronized successfully.',
+      });
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Sync failed',
+        description: err instanceof Error ? err.message : 'Failed to sync with Xero',
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -154,7 +172,7 @@ export function XeroStatusWidget({ compact = false }: XeroStatusWidgetProps) {
               variant="outline"
               size="sm"
               className="flex-1"
-              onClick={() => syncNow()}
+              onClick={handleSyncNow}
               disabled={isSyncing}
             >
               <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isSyncing ? 'animate-spin' : ''}`} />

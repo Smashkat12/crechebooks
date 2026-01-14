@@ -47,6 +47,7 @@ import { formatDate } from '@/lib/utils';
 
 interface AssetReturnsProps {
   staffId: string;
+  offboardingId: string;
 }
 
 const ASSET_STATUSES = [
@@ -70,14 +71,15 @@ function getStatusConfig(status: AssetReturn['returnStatus']) {
 interface AssetRowProps {
   asset: AssetReturn;
   staffId: string;
+  offboardingId: string;
   onUpdate: () => void;
 }
 
-function AssetRow({ asset, staffId, onUpdate }: AssetRowProps) {
+function AssetRow({ asset, staffId, offboardingId, onUpdate }: AssetRowProps) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notes, setNotes] = useState(asset.notes || '');
 
-  const { mutate: updateAsset, isPending: updating } = useUpdateAssetReturn(staffId);
+  const { mutate: updateAsset, isPending: updating } = useUpdateAssetReturn(staffId, offboardingId);
 
   const statusConfig = getStatusConfig(asset.returnStatus);
   const StatusIcon = statusConfig.icon;
@@ -188,8 +190,8 @@ function AssetRow({ asset, staffId, onUpdate }: AssetRowProps) {
   );
 }
 
-export function AssetReturns({ staffId }: AssetReturnsProps) {
-  const { data: assets, isLoading, refetch } = useAssetReturns(staffId);
+export function AssetReturns({ staffId, offboardingId }: AssetReturnsProps) {
+  const { data: assets, isLoading, refetch } = useAssetReturns(staffId, offboardingId);
 
   // Loading state
   if (isLoading) {
@@ -300,6 +302,7 @@ export function AssetReturns({ staffId }: AssetReturnsProps) {
                   key={asset.id}
                   asset={asset}
                   staffId={staffId}
+                  offboardingId={offboardingId}
                   onUpdate={() => refetch()}
                 />
               ))}

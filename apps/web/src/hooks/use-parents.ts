@@ -108,7 +108,8 @@ export function useCreateParent() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.parents.list() });
+      // Invalidate all parent list queries regardless of pagination params
+      queryClient.invalidateQueries({ queryKey: queryKeys.parents.lists() });
     },
   });
 }

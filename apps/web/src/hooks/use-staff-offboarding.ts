@@ -27,28 +27,33 @@ export interface OffboardingStatus {
 }
 
 // Settlement preview for calculating final pay
+// Matches backend ISettlementPreview and IFinalPayCalculation
 export interface SettlementPreview {
   staffId: string;
   staffName: string;
-  lastWorkingDate: string;
-  reason: string;
-  noticePeriodDays: number;
-  bceanCompliant: boolean;
-  finalPay: {
-    basicSalary: number;
-    proRataAmount: number;
-    leaveEncashment: number;
-    otherEarnings: number;
-    totalGross: number;
-    deductions: {
-      paye: number;
-      uif: number;
-      other: number;
-      total: number;
-    };
-    netPay: number;
+  lastWorkingDay: string; // ISO date from backend
+  tenure: {
+    years: number;
+    months: number;
+    days: number;
   };
-  documents: string[];
+  noticePeriodDays: number;
+  finalPay: {
+    outstandingSalaryCents: number;
+    leavePayoutCents: number;
+    leaveBalanceDays: number;
+    noticePayCents: number;
+    proRataBonusCents: number;
+    otherEarningsCents: number;
+    grossEarningsCents: number;
+    payeCents: number;
+    uifEmployeeCents: number;
+    deductionsCents: number;
+    totalDeductionsCents: number;
+    netPayCents: number;
+    dailyRateCents: number;
+  };
+  documentsRequired: string[];
 }
 
 // Asset return tracking
@@ -69,13 +74,15 @@ export const offboardingKeys = {
   status: (staffId: string) => [...offboardingKeys.all, 'status', staffId] as const,
   settlementPreview: (staffId: string, date?: string, reason?: string) =>
     [...offboardingKeys.all, 'settlement', staffId, date, reason] as const,
-  assets: (staffId: string) => [...offboardingKeys.all, 'assets', staffId] as const,
+  assets: (staffId: string, offboardingId?: string) =>
+    [...offboardingKeys.all, 'assets', staffId, offboardingId] as const,
 };
 
 // Initiate offboarding params
+// Note: Backend expects 'lastWorkingDay' field name
 interface InitiateOffboardingParams {
   reason: string;
-  lastWorkingDate: string;
+  lastWorkingDate: string; // Frontend uses this name
   notes?: string;
 }
 
@@ -87,17 +94,99 @@ interface UpdateAssetReturnParams {
   notes?: string;
 }
 
+// Backend response when no offboarding exists
+interface NoOffboardingResponse {
+  exists: false;
+  message: string;
+}
+
+// Backend IOffboardingProgress response structure
+interface BackendOffboardingProgress {
+  offboarding: {
+    id: string;
+    staffId: string;
+    status: string;
+    reason: string;
+    lastWorkingDay: string;
+    finalPayNetCents: number;
+    createdAt: string;
+    updatedAt: string;
+  };
+  assets: unknown[];
+  documentsGenerated: {
+    ui19: boolean;
+    certificate: boolean;
+    irp5: boolean;
+    exitPack: boolean;
+  };
+  progress: {
+    assetsReturned: number;
+    totalAssets: number;
+    exitInterviewComplete: boolean;
+    finalPayCalculated: boolean;
+  };
+}
+
+// Type guard to check if response is "no offboarding" response
+function isNoOffboardingResponse(data: unknown): data is NoOffboardingResponse {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'exists' in data &&
+    (data as NoOffboardingResponse).exists === false
+  );
+}
+
+// Map backend status to frontend status
+function mapBackendStatus(status: string): OffboardingStatus['status'] {
+  const statusMap: Record<string, OffboardingStatus['status']> = {
+    INITIATED: 'PENDING',
+    IN_PROGRESS: 'IN_PROGRESS',
+    PENDING_FINAL_PAY: 'PENDING_SETTLEMENT',
+    COMPLETED: 'COMPLETED',
+    CANCELLED: 'CANCELLED',
+  };
+  return statusMap[status] || 'PENDING';
+}
+
+// Map backend response to frontend OffboardingStatus
+function mapBackendToOffboardingStatus(data: BackendOffboardingProgress): OffboardingStatus {
+  const { offboarding, documentsGenerated, progress } = data;
+  return {
+    id: offboarding.id,
+    staffId: offboarding.staffId,
+    reason: offboarding.reason,
+    lastWorkingDate: offboarding.lastWorkingDay,
+    status: mapBackendStatus(offboarding.status),
+    settlementCalculated: progress.finalPayCalculated,
+    settlementAmount: offboarding.finalPayNetCents,
+    documentsGenerated:
+      documentsGenerated.ui19 ||
+      documentsGenerated.certificate ||
+      documentsGenerated.irp5 ||
+      documentsGenerated.exitPack,
+    createdAt: offboarding.createdAt,
+    updatedAt: offboarding.updatedAt,
+  };
+}
+
 /**
  * Fetch offboarding status for a staff member
+ * Returns null if no offboarding exists for the staff member
  */
 export function useOffboardingStatus(staffId: string, enabled = true) {
-  return useQuery<OffboardingStatus, AxiosError>({
+  return useQuery<OffboardingStatus | null, AxiosError>({
     queryKey: offboardingKeys.status(staffId),
     queryFn: async () => {
-      const { data } = await apiClient.get<OffboardingStatus>(
+      const { data } = await apiClient.get<BackendOffboardingProgress | NoOffboardingResponse>(
         `/staff/${staffId}/offboarding`
       );
-      return data;
+      // Backend returns { exists: false, message: '...' } when no offboarding exists
+      if (isNoOffboardingResponse(data)) {
+        return null;
+      }
+      // Map backend response to frontend interface
+      return mapBackendToOffboardingStatus(data as BackendOffboardingProgress);
     },
     enabled: enabled && !!staffId,
     retry: false, // Don't retry 404s for staff without offboarding
@@ -106,6 +195,7 @@ export function useOffboardingStatus(staffId: string, enabled = true) {
 
 /**
  * Get settlement preview for offboarding calculation
+ * Note: Backend expects 'lastWorkingDay' field name in ISO format
  */
 export function useSettlementPreview(
   staffId: string,
@@ -116,10 +206,13 @@ export function useSettlementPreview(
   return useQuery<SettlementPreview, AxiosError>({
     queryKey: offboardingKeys.settlementPreview(staffId, lastWorkingDate, reason),
     queryFn: async () => {
+      // Convert date to ISO format for backend
+      const lastWorkingDay = new Date(lastWorkingDate).toISOString();
       const { data } = await apiClient.get<SettlementPreview>(
         `/staff/${staffId}/offboarding/settlement-preview`,
         {
-          params: { lastWorkingDate, reason },
+          // Backend DTO uses lastWorkingDay in ISO format
+          params: { lastWorkingDay },
         }
       );
       return data;
@@ -130,17 +223,18 @@ export function useSettlementPreview(
 
 /**
  * Fetch asset returns for offboarding staff
+ * TASK-STAFF-005: Updated to use offboardingId in endpoint path
  */
-export function useAssetReturns(staffId: string, enabled = true) {
+export function useAssetReturns(staffId: string, offboardingId: string, enabled = true) {
   return useQuery<AssetReturn[], AxiosError>({
-    queryKey: offboardingKeys.assets(staffId),
+    queryKey: offboardingKeys.assets(staffId, offboardingId),
     queryFn: async () => {
       const { data } = await apiClient.get<AssetReturn[]>(
-        `/staff/${staffId}/offboarding/assets`
+        `/staff/${staffId}/offboarding/${offboardingId}/assets`
       );
       return data;
     },
-    enabled: enabled && !!staffId,
+    enabled: enabled && !!staffId && !!offboardingId,
   });
 }
 
@@ -152,9 +246,16 @@ export function useInitiateOffboarding(staffId: string) {
 
   return useMutation<OffboardingStatus, AxiosError, InitiateOffboardingParams>({
     mutationFn: async (params) => {
+      // Transform to backend field names and ensure date is in ISO format
+      const lastWorkingDay = new Date(params.lastWorkingDate);
       const { data } = await apiClient.post<OffboardingStatus>(
         `/staff/${staffId}/offboarding/initiate`,
-        params
+        {
+          staffId, // Required by DTO validation (controller also sets it from path)
+          reason: params.reason,
+          lastWorkingDay: lastWorkingDay.toISOString(), // Backend expects ISO date
+          notes: params.notes,
+        }
       );
       return data;
     },
@@ -168,20 +269,21 @@ export function useInitiateOffboarding(staffId: string) {
 
 /**
  * Update asset return status
+ * TASK-STAFF-005: Updated to use offboardingId in endpoint path
  */
-export function useUpdateAssetReturn(staffId: string) {
+export function useUpdateAssetReturn(staffId: string, offboardingId: string) {
   const queryClient = useQueryClient();
 
   return useMutation<AssetReturn, AxiosError, UpdateAssetReturnParams>({
     mutationFn: async ({ assetId, ...params }) => {
       const { data } = await apiClient.patch<AssetReturn>(
-        `/staff/${staffId}/offboarding/assets/${assetId}`,
+        `/staff/${staffId}/offboarding/${offboardingId}/assets/${assetId}/return`,
         params
       );
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: offboardingKeys.assets(staffId) });
+      queryClient.invalidateQueries({ queryKey: offboardingKeys.assets(staffId, offboardingId) });
     },
   });
 }

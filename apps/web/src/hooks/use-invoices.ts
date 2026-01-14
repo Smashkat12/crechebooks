@@ -161,6 +161,8 @@ function transformInvoiceDetail(apiInvoice: ApiInvoiceDetailResponse): InvoiceWi
       lineAmount: Math.round(line.subtotal * 100),
       vatAmount: Math.round(line.vat * 100),
       accountCode: line.account_code ?? '', // Required string field
+      // TASK-BILL-038: VAT compliance fields
+      lineType: line.line_type,
     })),
   };
 }

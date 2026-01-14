@@ -118,9 +118,13 @@ export class SimplePayApiClient {
    */
   async post<T>(endpoint: string, data: unknown): Promise<T> {
     this.ensureInitialized();
+    this.logger.debug(`POST ${endpoint} - Request: ${JSON.stringify(data)}`);
     return this.executeWithRetry(async () => {
       await this.acquireRateLimit();
       const response = await this.axiosInstance!.post<T>(endpoint, data);
+      this.logger.debug(
+        `POST ${endpoint} - Response: ${JSON.stringify(response.data)}`,
+      );
       return response.data;
     });
   }
@@ -379,7 +383,16 @@ export class SimplePayApiClient {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<SimplePayApiError>;
       const status = axiosError.response?.status || 500;
-      const message = axiosError.response?.data?.message || axiosError.message;
+      const responseData = axiosError.response?.data;
+      const message =
+        (responseData as SimplePayApiError)?.message ||
+        (typeof responseData === 'string' ? responseData : null) ||
+        axiosError.message;
+
+      // Log full response for debugging
+      this.logger.error(
+        `SimplePay API error: ${status} - Response: ${JSON.stringify(responseData)}`,
+      );
 
       if (status === 429) {
         this.logger.warn('SimplePay rate limit hit');
@@ -394,8 +407,7 @@ export class SimplePayApiClient {
         return new Error('SimplePay resource not found');
       }
 
-      this.logger.error(`SimplePay API error: ${status} - ${message}`);
-      return new Error(`SimplePay API error: ${message}`);
+      return new Error(`SimplePay API error (${status}): ${message}`);
     }
 
     return error as Error;

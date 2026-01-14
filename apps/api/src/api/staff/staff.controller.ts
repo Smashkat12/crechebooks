@@ -35,6 +35,9 @@ import {
 } from '../../database/entities/staff.entity';
 import { Staff } from '@prisma/client';
 import { ApiCreateStaffDto } from './dto';
+import { SimplePayEmployeeService } from '../../integrations/simplepay/simplepay-employee.service';
+import { SimplePayConnectionService } from '../../integrations/simplepay/simplepay-connection.service';
+import { Logger } from '@nestjs/common';
 
 /**
  * Transform staff to snake_case response
@@ -71,7 +74,13 @@ function toSnakeCase(staff: Staff): Record<string, unknown> {
 @Controller('staff')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class StaffController {
-  constructor(private readonly staffRepository: StaffRepository) {}
+  private readonly logger = new Logger(StaffController.name);
+
+  constructor(
+    private readonly staffRepository: StaffRepository,
+    private readonly simplePayEmployeeService: SimplePayEmployeeService,
+    private readonly simplePayConnectionService: SimplePayConnectionService,
+  ) {}
 
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
@@ -161,12 +170,58 @@ export class StaffController {
         bankAccount: dto.bank_account_number,
         bankBranchCode: dto.bank_branch_code,
       });
+
+      // TASK-STAFF-004: Auto-sync to SimplePay if connected
+      // Fire-and-forget - don't block staff creation on SimplePay sync
+      this.syncToSimplePay(user.tenantId, staff.id).catch((error) => {
+        this.logger.warn(
+          `Failed to auto-sync staff ${staff.id} to SimplePay: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+
       return toSnakeCase(staff);
     } catch (error) {
       if (error instanceof Error) {
         throw new BadRequestException(error.message);
       }
       throw error;
+    }
+  }
+
+  /**
+   * Auto-sync staff member to SimplePay
+   * Called asynchronously after staff creation
+   */
+  private async syncToSimplePay(
+    tenantId: string,
+    staffId: string,
+  ): Promise<void> {
+    try {
+      // Check if SimplePay is connected for this tenant
+      const connectionStatus =
+        await this.simplePayConnectionService.getConnectionStatus(tenantId);
+      if (!connectionStatus.isConnected) {
+        this.logger.debug(
+          `SimplePay not connected for tenant ${tenantId}, skipping auto-sync`,
+        );
+        return;
+      }
+
+      // Sync employee to SimplePay
+      const mapping = await this.simplePayEmployeeService.syncEmployee(
+        tenantId,
+        staffId,
+      );
+
+      this.logger.log(
+        `Staff ${staffId} auto-synced to SimplePay employee ${mapping.simplePayEmployeeId}`,
+      );
+    } catch (error) {
+      // Log but don't throw - staff creation should succeed even if SimplePay sync fails
+      this.logger.error(
+        `Failed to sync staff ${staffId} to SimplePay`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 

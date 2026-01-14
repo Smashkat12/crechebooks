@@ -124,17 +124,27 @@ enum DeliveryStatus {
 }
 
 enum LineType {
+  // VAT EXEMPT - Educational/Childcare Services (Section 12(h))
   MONTHLY_FEE
   REGISTRATION
-  EXTRA
-  DISCOUNT
-  CREDIT
-  // Creche-specific line types (VAT applicable)
+  RE_REGISTRATION     // TASK-BILL-038: New - Continuing student annual fee
+  EXTRA_MURAL         // TASK-BILL-038: New - Subordinate to education
+  EXTRA               // Deprecated - Use specific types
+
+  // VAT APPLICABLE - Goods & Non-Educational Services (15%)
   BOOKS
   SCHOOL_TRIP
   STATIONERY
   UNIFORM
-  AD_HOC
+  MEALS               // TASK-BILL-038: New - Prepared food
+  TRANSPORT           // TASK-BILL-038: New - To/from school
+  LATE_PICKUP         // TASK-BILL-038: New - Penalty fee
+  DAMAGED_EQUIPMENT   // TASK-BILL-038: New - Replacement charge
+  AD_HOC              // Configurable via isVatExempt flag
+
+  // NO VAT - Adjustments
+  DISCOUNT
+  CREDIT
 }
 
 enum MatchType {
@@ -185,6 +195,15 @@ enum ReconciliationStatus {
   IN_PROGRESS
   RECONCILED
   DISCREPANCY
+}
+
+// TASK-RECON-019: Bank Statement Transaction Matching
+enum BankStatementMatchStatus {
+  MATCHED          // Transaction exists in both bank and Xero
+  IN_BANK_ONLY     // Transaction in bank statement, not in Xero
+  IN_XERO_ONLY     // Transaction in Xero, not in bank statement
+  AMOUNT_MISMATCH  // Same transaction, different amounts
+  DATE_MISMATCH    // Same transaction, dates differ > 1 day
 }
 
 enum EscalationLevel {
@@ -345,6 +364,40 @@ model Tenant {
   simplePayEmployeeMappings SimplePayEmployeeMapping[]
   simplePayPayslipImports   SimplePayPayslipImport[]
 
+  // TASK-SPAY-001: Leave Management
+  leaveRequests LeaveRequest[]
+
+  // TASK-SPAY-002: Pay Run Tracking
+  payRunSyncs PayRunSync[]
+
+  // TASK-SPAY-003: Calculations Management
+  calculationItemCache CalculationItemCache[]
+  payrollAdjustments   PayrollAdjustment[]
+
+  // TASK-SPAY-004: Service Period Management
+  servicePeriodSyncs ServicePeriodSync[]
+
+  // TASK-SPAY-005: Report Requests
+  reportRequests ReportRequest[]
+
+  // TASK-SPAY-006: Profile Mapping Sync
+  profileMappingSyncs ProfileMappingSync[]
+
+  // TASK-SPAY-007: Bulk Operations
+  bulkOperationLogs BulkOperationLog[]
+
+  // TASK-SPAY-008: Employee Setup Pipeline
+  employeeSetupLogs EmployeeSetupLog[]
+
+  // TASK-XERO-006: Chart of Accounts Database Sync
+  xeroAccounts XeroAccount[]
+
+  // TASK-RECON-019: Bank Statement Transaction Matching
+  bankStatementMatches BankStatementMatch[]
+
+  // TASK-XERO-007: Categorization Journals for Reconciled Transactions
+  categorizationJournals CategorizationJournal[]
+
   @@map("tenants")
 }
 
@@ -428,6 +481,7 @@ model Transaction {
   duplicateStatus       DuplicateStatus   @default(NONE) @map("duplicate_status")
   reversesTransactionId String?           @map("reverses_transaction_id")
   isReversal            Boolean           @default(false) @map("is_reversal")
+  xeroAccountCode       String?           @map("xero_account_code") @db.VarChar(20)
   createdAt             DateTime          @default(now()) @map("created_at")
   updatedAt             DateTime          @updatedAt @map("updated_at")
 
@@ -436,9 +490,11 @@ model Transaction {
   duplicates            Transaction[]          @relation("TransactionDuplicates")
   reversesTransaction   Transaction?           @relation("TransactionReversals", fields: [reversesTransactionId], references: [id], onDelete: SetNull)
   reversals             Transaction[]          @relation("TransactionReversals")
-  categorizations       Categorization[]
-  payments              Payment[]
-  categorizationMetrics CategorizationMetric[]
+  categorizations        Categorization[]
+  payments               Payment[]
+  categorizationMetrics  CategorizationMetric[]
+  bankStatementMatches   BankStatementMatch[]
+  categorizationJournal  CategorizationJournal?
 
   @@index([tenantId, date])
   @@index([tenantId, status])
@@ -814,6 +870,21 @@ model Staff {
   simplePayMapping  SimplePayEmployeeMapping?
   simplePayPayslips SimplePayPayslipImport[]
 
+  // TASK-SPAY-001: Leave Management
+  leaveRequests LeaveRequest[]
+
+  // TASK-SPAY-003: Payroll Adjustments
+  payrollAdjustments PayrollAdjustment[]
+
+  // TASK-SPAY-004: Service Period Management
+  servicePeriodSyncs ServicePeriodSync[]
+
+  // TASK-SPAY-006: Profile Mapping Sync
+  profileMappingSyncs ProfileMappingSync[]
+
+  // TASK-SPAY-008: Employee Setup Pipeline
+  employeeSetupLog EmployeeSetupLog?
+
   @@unique([tenantId, idNumber])
   @@index([tenantId, isActive])
   @@map("staff")
@@ -900,12 +971,51 @@ model Reconciliation {
   createdAt              DateTime             @default(now()) @map("created_at")
   updatedAt              DateTime             @updatedAt @map("updated_at")
 
-  tenant     Tenant @relation(fields: [tenantId], references: [id])
-  reconciler User?  @relation("ReconciliationReconciler", fields: [reconciledBy], references: [id])
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  reconciler           User?                 @relation("ReconciliationReconciler", fields: [reconciledBy], references: [id])
+  bankStatementMatches BankStatementMatch[]
 
   @@unique([tenantId, bankAccount, periodStart])
   @@index([tenantId, status])
   @@map("reconciliations")
+}
+
+// TASK-RECON-019: Bank Statement to Xero Transaction Matching
+model BankStatementMatch {
+  id               String                   @id @default(uuid())
+  tenantId         String                   @map("tenant_id")
+  reconciliationId String                   @map("reconciliation_id")
+
+  // Bank statement side
+  bankDate        DateTime @map("bank_date") @db.Date
+  bankDescription String   @map("bank_description")
+  bankAmountCents Int      @map("bank_amount_cents")
+  bankIsCredit    Boolean  @map("bank_is_credit")
+
+  // Xero/CrecheBooks side (nullable if no match)
+  transactionId   String?   @map("transaction_id")
+  xeroDate        DateTime? @map("xero_date") @db.Date
+  xeroDescription String?   @map("xero_description")
+  xeroAmountCents Int?      @map("xero_amount_cents")
+  xeroIsCredit    Boolean?  @map("xero_is_credit")
+
+  // Match result
+  status            BankStatementMatchStatus
+  matchConfidence   Decimal?                 @map("match_confidence") @db.Decimal(5, 2)
+  discrepancyReason String?                  @map("discrepancy_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  reconciliation Reconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  transaction    Transaction?   @relation(fields: [transactionId], references: [id])
+
+  @@index([tenantId])
+  @@index([reconciliationId])
+  @@index([transactionId])
+  @@index([tenantId, status])
+  @@map("bank_statement_matches")
 }
 
 model XeroToken {
@@ -921,6 +1031,37 @@ model XeroToken {
 
   @@index([tenantId])
   @@map("xero_tokens")
+}
+
+// ============================================
+// TASK-XERO-006: Chart of Accounts Database Sync
+// Stores Xero Chart of Accounts for validation before pushing categorizations
+// ============================================
+
+enum XeroAccountStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model XeroAccount {
+  id            String             @id @default(uuid())
+  tenantId      String             @map("tenant_id")
+  accountCode   String             @map("account_code") @db.VarChar(20)
+  name          String             @db.VarChar(255)
+  type          String             @db.VarChar(50)
+  taxType       String?            @map("tax_type") @db.VarChar(50)
+  status        XeroAccountStatus  @default(ACTIVE)
+  xeroAccountId String?            @map("xero_account_id") @db.VarChar(50)
+  lastSyncedAt  DateTime           @map("last_synced_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, accountCode])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("xero_accounts")
 }
 
 // TASK-TRANS-016: Bank Feed Integration via Xero API
@@ -978,17 +1119,31 @@ model CategorizationMetric {
   @@map("categorization_metrics")
 }
 
+// TASK-BILL-038: Ad-Hoc Charge types for VAT categorization
+enum AdHocChargeType {
+  MEALS
+  TRANSPORT
+  LATE_PICKUP
+  EXTRA_MURAL
+  DAMAGED_EQUIPMENT
+  OTHER
+}
+
 model AdHocCharge {
-  id          String    @id @default(uuid())
-  tenantId    String    @map("tenant_id")
-  childId     String    @map("child_id")
-  description String    @db.VarChar(500)
-  amountCents Int       @map("amount_cents")
-  chargeDate  DateTime  @map("charge_date") @db.Date
-  invoicedAt  DateTime? @map("invoiced_at")
-  invoiceId   String?   @map("invoice_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id          String          @id @default(uuid())
+  tenantId    String          @map("tenant_id")
+  childId     String          @map("child_id")
+  description String          @db.VarChar(500)
+  amountCents Int             @map("amount_cents")
+  chargeDate  DateTime        @map("charge_date") @db.Date
+  // TASK-BILL-038: VAT compliance fields
+  chargeType  AdHocChargeType @default(OTHER) @map("charge_type")
+  isVatExempt Boolean         @default(false) @map("is_vat_exempt")
+  vatCents    Int?            @map("vat_cents")
+  invoicedAt  DateTime?       @map("invoiced_at")
+  invoiceId   String?         @map("invoice_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
 
   invoice      Invoice?      @relation(fields: [invoiceId], references: [id])
   invoiceLines InvoiceLine[]
@@ -1350,6 +1505,14 @@ enum PayrollJournalStatus {
   CANCELLED
 }
 
+// TASK-XERO-007: Categorization Journal Status
+enum CategorizationJournalStatus {
+  PENDING
+  POSTED
+  FAILED
+  CANCELLED
+}
+
 model XeroAccountMapping {
   id              String          @id @default(uuid())
   tenantId        String          @map("tenant_id")
@@ -1411,6 +1574,36 @@ model PayrollJournalLine {
 }
 
 // ============================================
+// TASK-XERO-007: Categorization Journal Model
+// For reconciled transactions that can't be edited
+// ============================================
+
+model CategorizationJournal {
+  id              String                      @id @default(uuid())
+  tenantId        String                      @map("tenant_id")
+  transactionId   String                      @unique @map("transaction_id")
+  xeroJournalId   String?                     @map("xero_journal_id") @db.VarChar(50)
+  journalNumber   String?                     @map("journal_number") @db.VarChar(50)
+  status          CategorizationJournalStatus @default(PENDING)
+  fromAccountCode String                      @map("from_account_code") @db.VarChar(20) // Suspense account (9999)
+  toAccountCode   String                      @map("to_account_code") @db.VarChar(20)   // Target expense account
+  amountCents     Int                         @map("amount_cents")
+  isCredit        Boolean                     @map("is_credit")
+  narration       String                      @db.VarChar(500)
+  postedAt        DateTime?                   @map("posted_at")
+  errorMessage    String?                     @map("error_message")
+  retryCount      Int                         @default(0) @map("retry_count")
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  updatedAt       DateTime                    @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("categorization_journals")
+}
+
+// ============================================
 // TASK-STAFF-002: Staff Offboarding Models
 // ============================================
 
@@ -1452,6 +1645,11 @@ model StaffOffboarding {
   completedAt DateTime? @map("completed_at")
   completedBy String?   @map("completed_by")
   notes       String?
+
+  // SimplePay Integration (TASK-STAFF-006)
+  simplePaySyncStatus String?   @map("simplepay_sync_status") @db.VarChar(20) // PENDING, SUCCESS, FAILED, NOT_APPLICABLE
+  simplePaySyncError  String?   @map("simplepay_sync_error")
+  simplePaySyncedAt   DateTime? @map("simplepay_synced_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1549,4 +1747,341 @@ model SimplePayPayslipImport {
   @@unique([tenantId, staffId, simplePayPayslipId])
   @@index([tenantId, staffId])
   @@map("simplepay_payslip_imports")
+}
+
+// ============================================
+// TASK-SPAY-001: SimplePay Leave Management
+// ============================================
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model LeaveRequest {
+  id               String             @id @default(uuid())
+  tenantId         String             @map("tenant_id")
+  staffId          String             @map("staff_id")
+  leaveTypeId      Int                @map("leave_type_id")
+  leaveTypeName    String             @map("leave_type_name") @db.VarChar(100)
+  startDate        DateTime           @map("start_date") @db.Date
+  endDate          DateTime           @map("end_date") @db.Date
+  totalDays        Decimal            @map("total_days") @db.Decimal(4, 1)
+  totalHours       Decimal            @map("total_hours") @db.Decimal(5, 1)
+  reason           String?
+  status           LeaveRequestStatus @default(PENDING)
+  approvedBy       String?            @map("approved_by")
+  approvedAt       DateTime?          @map("approved_at")
+  rejectedReason   String?            @map("rejected_reason")
+  simplePaySynced  Boolean            @default(false) @map("simplepay_synced")
+  simplePayIds     String[]           @map("simplepay_ids")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([staffId])
+  @@index([tenantId, status])
+  @@map("leave_requests")
+}
+
+// ============================================
+// TASK-SPAY-002: Pay Run Tracking
+// ============================================
+
+enum PayRunSyncStatus {
+  PENDING
+  SYNCED
+  XERO_POSTED
+  XERO_FAILED
+}
+
+model PayRunSync {
+  id                    String           @id @default(uuid())
+  tenantId              String           @map("tenant_id")
+  simplePayPayRunId     String           @map("simplepay_payrun_id")
+  waveId                Int              @map("wave_id")
+  waveName              String           @map("wave_name") @db.VarChar(100)
+  periodStart           DateTime         @map("period_start") @db.Date
+  periodEnd             DateTime         @map("period_end") @db.Date
+  payDate               DateTime         @map("pay_date") @db.Date
+  status                String           @default("draft") @db.VarChar(20)
+  employeeCount         Int              @map("employee_count")
+  totalGrossCents       Int              @map("total_gross_cents")
+  totalNetCents         Int              @map("total_net_cents")
+  totalPayeCents        Int              @map("total_paye_cents")
+  totalUifEmployeeCents Int              @map("total_uif_employee_cents")
+  totalUifEmployerCents Int              @map("total_uif_employer_cents")
+  totalSdlCents         Int              @map("total_sdl_cents")
+  totalEtiCents         Int              @default(0) @map("total_eti_cents")
+  syncStatus            PayRunSyncStatus @default(PENDING) @map("sync_status")
+  xeroJournalId         String?          @map("xero_journal_id")
+  xeroSyncedAt          DateTime?        @map("xero_synced_at")
+  xeroSyncError         String?          @map("xero_sync_error") @db.Text
+  accountingData        Json?            @map("accounting_data")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, simplePayPayRunId])
+  @@index([tenantId])
+  @@index([tenantId, periodStart])
+  @@index([syncStatus])
+  @@map("payrun_syncs")
+}
+
+// ============================================
+// TASK-SPAY-003: SimplePay Calculations Management
+// ============================================
+
+enum CalculationType {
+  EARNING
+  DEDUCTION
+  COMPANY_CONTRIBUTION
+}
+
+model CalculationItemCache {
+  id         String          @id @default(uuid())
+  tenantId   String          @map("tenant_id")
+  code       String          @db.VarChar(50)
+  name       String          @db.VarChar(200)
+  type       CalculationType
+  taxable    Boolean
+  affectsUif Boolean         @map("affects_uif")
+  category   String?         @db.VarChar(100)
+  cachedAt   DateTime        @default(now()) @map("cached_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@map("calculation_item_cache")
+}
+
+model PayrollAdjustment {
+  id                String          @id @default(uuid())
+  tenantId          String          @map("tenant_id")
+  staffId           String          @map("staff_id")
+  itemCode          String          @map("item_code") @db.VarChar(50)
+  itemName          String          @map("item_name") @db.VarChar(200)
+  type              CalculationType
+  amountCents       Int?            @map("amount_cents")
+  percentage        Decimal?        @db.Decimal(5, 2)
+  isRecurring       Boolean         @default(true) @map("is_recurring")
+  effectiveDate     DateTime        @map("effective_date") @db.Date
+  endDate           DateTime?       @map("end_date") @db.Date
+  simplePayCalcId   String?         @map("simplepay_calc_id")
+  syncedToSimplePay Boolean         @default(false) @map("synced_to_simplepay")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([staffId])
+  @@index([tenantId, staffId, isRecurring])
+  @@map("payroll_adjustments")
+}
+
+// ============================================
+// TASK-SPAY-004: Service Period Management
+// South African UI-19 Termination Codes
+// ============================================
+
+enum TerminationCode {
+  RESIGNATION          // Code 1: UIF eligible after waiting period
+  DISMISSAL_MISCONDUCT // Code 2: NOT UIF eligible
+  DISMISSAL_INCAPACITY // Code 3: UIF eligible
+  RETRENCHMENT         // Code 4: UIF eligible
+  CONTRACT_EXPIRY      // Code 5: UIF eligible
+  RETIREMENT           // Code 6: UIF eligible
+  DEATH                // Code 7: Benefits to dependents
+  ABSCONDED            // Code 8: NOT UIF eligible
+  TRANSFER             // Code 9: N/A
+}
+
+model ServicePeriodSync {
+  id                  String           @id @default(uuid())
+  tenantId            String           @map("tenant_id")
+  staffId             String           @map("staff_id")
+  simplePayEmployeeId String           @map("simplepay_employee_id") @db.VarChar(50)
+  simplePayPeriodId   String           @map("simplepay_period_id") @db.VarChar(50)
+  startDate           DateTime         @map("start_date") @db.Date
+  endDate             DateTime?        @map("end_date") @db.Date
+  terminationCode     TerminationCode? @map("termination_code")
+  terminationReason   String?          @map("termination_reason") @db.Text
+  lastWorkingDay      DateTime?        @map("last_working_day") @db.Date
+  finalPayslipId      String?          @map("final_payslip_id") @db.VarChar(50)
+  isActive            Boolean          @default(true) @map("is_active")
+  syncedAt            DateTime         @default(now()) @map("synced_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, simplePayPeriodId])
+  @@index([tenantId])
+  @@index([staffId])
+  @@index([tenantId, isActive])
+  @@map("service_period_syncs")
+}
+
+// ============================================
+// TASK-SPAY-005: SimplePay Reports Management
+// ============================================
+
+enum ReportStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReportType {
+  ETI
+  TRANSACTION_HISTORY
+  VARIANCE
+  LEAVE_COMPARISON
+  LEAVE_LIABILITY
+  TRACKED_BALANCES
+}
+
+model ReportRequest {
+  id           String       @id @default(uuid())
+  tenantId     String       @map("tenant_id")
+  reportType   ReportType   @map("report_type")
+  params       Json
+  status       ReportStatus @default(QUEUED)
+  asyncUuid    String?      @map("async_uuid") @db.VarChar(100)
+  resultData   Json?        @map("result_data")
+  errorMessage String?      @map("error_message")
+  requestedBy  String?      @map("requested_by")
+  requestedAt  DateTime     @default(now()) @map("requested_at")
+  completedAt  DateTime?    @map("completed_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([asyncUuid])
+  @@map("report_requests")
+}
+
+// ============================================
+// TASK-SPAY-006: SimplePay Profile Mapping Sync
+// ============================================
+
+model ProfileMappingSync {
+  id                  String   @id @default(uuid())
+  tenantId            String   @map("tenant_id")
+  staffId             String   @map("staff_id")
+  simplePayMappingId  Int      @map("simplepay_mapping_id")
+  simplePayProfileId  Int      @map("simplepay_profile_id")
+  profileName         String   @map("profile_name") @db.VarChar(100)
+  calculationSettings Json     @map("calculation_settings")
+  syncedAt            DateTime @default(now()) @map("synced_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, staffId, simplePayMappingId])
+  @@index([tenantId])
+  @@index([staffId])
+  @@index([simplePayProfileId])
+  @@map("profile_mapping_sync")
+}
+
+// ============================================
+// TASK-SPAY-007: SimplePay Bulk Operations
+// ============================================
+
+enum BulkOperationType {
+  GENERIC_INPUT
+  SALARY_ADJUSTMENT
+  BONUS_DISTRIBUTION
+  DEDUCTION_SETUP
+  EMPLOYEE_UPDATE
+}
+
+enum BulkOperationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  PARTIAL_FAILURE
+  FAILED
+}
+
+model BulkOperationLog {
+  id              String              @id @default(cuid())
+  tenantId        String              @map("tenant_id")
+  operationType   BulkOperationType   @map("operation_type")
+  status          BulkOperationStatus @default(PENDING)
+  totalEntities   Int                 @map("total_entities")
+  successCount    Int                 @default(0) @map("success_count")
+  failureCount    Int                 @default(0) @map("failure_count")
+  requestData     Json                @map("request_data")
+  resultData      Json?               @map("result_data")
+  errors          Json?
+  warnings        Json?
+  executedBy      String              @map("executed_by")
+  startedAt       DateTime            @default(now()) @map("started_at")
+  completedAt     DateTime?           @map("completed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([operationType])
+  @@index([status])
+  @@map("bulk_operation_logs")
+}
+
+// ============================================
+// TASK-SPAY-008: Employee Setup Pipeline
+// Auto-setup pipeline for one-click payroll setup
+// ============================================
+
+enum SetupStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  PARTIAL
+  FAILED
+  ROLLED_BACK
+}
+
+model EmployeeSetupLog {
+  id                  String       @id @default(cuid())
+  tenantId            String       @map("tenant_id")
+  staffId             String       @unique @map("staff_id")
+  simplePayEmployeeId String?      @map("simplepay_employee_id")
+  status              SetupStatus  @default(PENDING)
+  setupSteps          Json         @default("[]") @map("setup_steps")
+  profileAssigned     String?      @map("profile_assigned")
+  leaveInitialized    Boolean      @default(false) @map("leave_initialized")
+  taxConfigured       Boolean      @default(false) @map("tax_configured")
+  calculationsAdded   Int          @default(0) @map("calculations_added")
+  triggeredBy         String       @map("triggered_by")
+  errors              Json?
+  warnings            Json?
+  startedAt           DateTime     @default(now()) @map("started_at")
+  completedAt         DateTime?    @map("completed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("employee_setup_logs")
 }

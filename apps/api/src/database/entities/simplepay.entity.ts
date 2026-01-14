@@ -24,21 +24,32 @@ export type PayslipDataInput = Prisma.InputJsonValue;
 
 // SimplePay API Response Types
 export interface SimplePayEmployee {
-  id: string;
+  id: string | number;
+  wave_id?: number;
   first_name: string;
   last_name: string;
-  identification_number?: string;
+  id_number?: string;
+  identification_type?: string;
+  other_number?: string;
+  passport_code?: string;
   tax_number?: string;
   email?: string;
   mobile?: string;
   birthdate?: string;
   appointment_date: string;
   termination_date?: string;
-  employment_type: string;
-  basic_salary: number;
-  bank_name?: string;
-  bank_account?: string;
-  branch_code?: string;
+  employment_type?: string;
+  payment_method?: string;
+  basic_salary?: number;
+  number?: string;
+  job_title?: string;
+  bank_account?: {
+    bank_id: number;
+    account_number: string;
+    branch_code: string;
+    account_type: string;
+    holder_relationship: string;
+  };
 }
 
 export interface SimplePayPayslip {

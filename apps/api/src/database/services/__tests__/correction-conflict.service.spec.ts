@@ -11,7 +11,15 @@ import {
 import { TransactionRepository } from '../../repositories/transaction.repository';
 import { PayeePatternRepository } from '../../repositories/payee-pattern.repository';
 import { CategorizationRepository } from '../../repositories/categorization.repository';
-import { Transaction, PayeePattern, Categorization } from '@prisma/client';
+import {
+  Transaction,
+  PayeePattern,
+  Categorization,
+  CategorizationSource,
+  DuplicateStatus,
+  VatType,
+} from '@prisma/client';
+import { Decimal } from 'decimal.js';
 
 describe('CorrectionConflictService', () => {
   let service: CorrectionConflictService;
@@ -44,6 +52,7 @@ describe('CorrectionConflictService', () => {
           provide: CategorizationRepository,
           useValue: {
             findByTenant: jest.fn(),
+            findWithFilters: jest.fn(),
             findByTransaction: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),
@@ -84,7 +93,7 @@ describe('CorrectionConflictService', () => {
         payeeAliases: [],
         defaultAccountCode: '500',
         defaultAccountName: 'Groceries',
-        confidenceBoost: 10,
+        confidenceBoost: new Decimal(10),
         matchCount: 5,
         isRecurring: false,
         expectedAmountCents: null,
@@ -113,7 +122,7 @@ describe('CorrectionConflictService', () => {
         payeeAliases: [],
         defaultAccountCode: '500',
         defaultAccountName: 'Groceries',
-        confidenceBoost: 10,
+        confidenceBoost: new Decimal(10),
         matchCount: 5,
         isRecurring: false,
         expectedAmountCents: null,
@@ -125,27 +134,35 @@ describe('CorrectionConflictService', () => {
       const mockCategorizations: Categorization[] = [
         {
           id: 'cat-1',
-          tenantId: mockTenantId,
           transactionId: 'tx-1',
           accountCode: '500',
           accountName: 'Groceries',
-          isConfirmed: false,
-          confidence: 0.85,
+          confidenceScore: new Decimal(0.85),
           reasoning: null,
-          alternatives: null,
+          source: CategorizationSource.RULE_BASED,
+          isSplit: false,
+          splitAmountCents: null,
+          vatAmountCents: null,
+          vatType: VatType.STANDARD,
+          reviewedBy: null,
+          reviewedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
           id: 'cat-2',
-          tenantId: mockTenantId,
           transactionId: 'tx-2',
           accountCode: '500',
           accountName: 'Groceries',
-          isConfirmed: false,
-          confidence: 0.9,
+          confidenceScore: new Decimal(0.9),
           reasoning: null,
-          alternatives: null,
+          source: CategorizationSource.RULE_BASED,
+          isSplit: false,
+          splitAmountCents: null,
+          vatAmountCents: null,
+          vatType: VatType.STANDARD,
+          reviewedBy: null,
+          reviewedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -170,6 +187,9 @@ describe('CorrectionConflictService', () => {
           reconciledAt: null,
           isDeleted: false,
           deletedAt: null,
+          transactionHash: null,
+          duplicateOfId: null,
+          duplicateStatus: DuplicateStatus.NONE,
           reversesTransactionId: null,
           isReversal: false,
           createdAt: new Date(),
@@ -193,6 +213,9 @@ describe('CorrectionConflictService', () => {
           reconciledAt: null,
           isDeleted: false,
           deletedAt: null,
+          transactionHash: null,
+          duplicateOfId: null,
+          duplicateStatus: DuplicateStatus.NONE,
           reversesTransactionId: null,
           isReversal: false,
           createdAt: new Date(),
@@ -201,7 +224,13 @@ describe('CorrectionConflictService', () => {
       ];
 
       patternRepo.findByPayeeName.mockResolvedValue(mockPattern);
-      categorizationRepo.findByTenant.mockResolvedValue(mockCategorizations);
+      categorizationRepo.findWithFilters.mockResolvedValue({
+        data: mockCategorizations,
+        total: mockCategorizations.length,
+        page: 1,
+        limit: 1000,
+        totalPages: 1,
+      });
       transactionRepo.findByIds.mockResolvedValue(mockTransactions);
 
       const result = await service.detectConflict(
@@ -240,21 +269,25 @@ describe('CorrectionConflictService', () => {
 
       const mockCategorization: Categorization = {
         id: 'cat-1',
-        tenantId: mockTenantId,
         transactionId: 'tx-1',
         accountCode: '500',
         accountName: 'Groceries',
-        isConfirmed: false,
-        confidence: 0.85,
+        confidenceScore: new Decimal(0.85),
         reasoning: null,
-        alternatives: null,
+        source: CategorizationSource.RULE_BASED,
+        isSplit: false,
+        splitAmountCents: null,
+        vatAmountCents: null,
+        vatType: VatType.STANDARD,
+        reviewedBy: null,
+        reviewedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      categorizationRepo.findByTransaction.mockResolvedValue(
+      categorizationRepo.findByTransaction.mockResolvedValue([
         mockCategorization,
-      );
+      ]);
       categorizationRepo.update.mockResolvedValue({
         ...mockCategorization,
         accountCode: '400',
@@ -295,26 +328,30 @@ describe('CorrectionConflictService', () => {
 
       const mockCategorization: Categorization = {
         id: 'cat-1',
-        tenantId: mockTenantId,
         transactionId: mockTransactionId,
         accountCode: '500',
         accountName: 'Groceries',
-        isConfirmed: false,
-        confidence: 0.85,
+        confidenceScore: new Decimal(0.85),
         reasoning: null,
-        alternatives: null,
+        source: CategorizationSource.RULE_BASED,
+        isSplit: false,
+        splitAmountCents: null,
+        vatAmountCents: null,
+        vatType: VatType.STANDARD,
+        reviewedBy: null,
+        reviewedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
 
-      categorizationRepo.findByTransaction.mockResolvedValue(
+      categorizationRepo.findByTransaction.mockResolvedValue([
         mockCategorization,
-      );
+      ]);
       categorizationRepo.update.mockResolvedValue({
         ...mockCategorization,
         accountCode: '400',
         accountName: 'Clothing',
-        isConfirmed: true,
+        source: CategorizationSource.USER_OVERRIDE,
       });
 
       await service.resolveConflict(
@@ -330,13 +367,12 @@ describe('CorrectionConflictService', () => {
       // Verify only the single transaction was updated
       expect(categorizationRepo.findByTransaction).toHaveBeenCalledTimes(1);
       expect(categorizationRepo.findByTransaction).toHaveBeenCalledWith(
-        mockTenantId,
         mockTransactionId,
       );
       expect(categorizationRepo.update).toHaveBeenCalledWith('cat-1', {
         accountCode: '400',
         accountName: 'Clothing',
-        isConfirmed: true,
+        source: 'USER_OVERRIDE',
       });
     });
   });
@@ -346,40 +382,52 @@ describe('CorrectionConflictService', () => {
       const mockCategorizations: Categorization[] = [
         {
           id: 'cat-1',
-          tenantId: mockTenantId,
           transactionId: 'tx-1',
           accountCode: '500',
           accountName: 'Groceries',
-          isConfirmed: false,
-          confidence: 0.85,
+          confidenceScore: new Decimal(0.85),
           reasoning: null,
-          alternatives: null,
+          source: CategorizationSource.RULE_BASED,
+          isSplit: false,
+          splitAmountCents: null,
+          vatAmountCents: null,
+          vatType: VatType.STANDARD,
+          reviewedBy: null,
+          reviewedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
           id: 'cat-2',
-          tenantId: mockTenantId,
           transactionId: 'tx-2',
           accountCode: '500',
           accountName: 'Groceries',
-          isConfirmed: false,
-          confidence: 0.9,
+          confidenceScore: new Decimal(0.9),
           reasoning: null,
-          alternatives: null,
+          source: CategorizationSource.RULE_BASED,
+          isSplit: false,
+          splitAmountCents: null,
+          vatAmountCents: null,
+          vatType: VatType.STANDARD,
+          reviewedBy: null,
+          reviewedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
         {
           id: 'cat-3',
-          tenantId: mockTenantId,
           transactionId: 'tx-3',
           accountCode: '500',
           accountName: 'Groceries',
-          isConfirmed: false,
-          confidence: 0.8,
+          confidenceScore: new Decimal(0.8),
           reasoning: null,
-          alternatives: null,
+          source: CategorizationSource.RULE_BASED,
+          isSplit: false,
+          splitAmountCents: null,
+          vatAmountCents: null,
+          vatType: VatType.STANDARD,
+          reviewedBy: null,
+          reviewedAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -404,6 +452,9 @@ describe('CorrectionConflictService', () => {
           reconciledAt: null,
           isDeleted: false,
           deletedAt: null,
+          transactionHash: null,
+          duplicateOfId: null,
+          duplicateStatus: DuplicateStatus.NONE,
           reversesTransactionId: null,
           isReversal: false,
           createdAt: new Date(),
@@ -427,6 +478,9 @@ describe('CorrectionConflictService', () => {
           reconciledAt: null,
           isDeleted: false,
           deletedAt: null,
+          transactionHash: null,
+          duplicateOfId: null,
+          duplicateStatus: DuplicateStatus.NONE,
           reversesTransactionId: null,
           isReversal: false,
           createdAt: new Date(),
@@ -450,6 +504,9 @@ describe('CorrectionConflictService', () => {
           reconciledAt: null,
           isDeleted: false,
           deletedAt: null,
+          transactionHash: null,
+          duplicateOfId: null,
+          duplicateStatus: DuplicateStatus.NONE,
           reversesTransactionId: null,
           isReversal: false,
           createdAt: new Date(),
@@ -457,7 +514,13 @@ describe('CorrectionConflictService', () => {
         },
       ];
 
-      categorizationRepo.findByTenant.mockResolvedValue(mockCategorizations);
+      categorizationRepo.findWithFilters.mockResolvedValue({
+        data: mockCategorizations,
+        total: mockCategorizations.length,
+        page: 1,
+        limit: 1000,
+        totalPages: 1,
+      });
       transactionRepo.findByIds.mockResolvedValue(mockTransactions);
 
       const result = await service.getAffectedTransactions(
@@ -471,7 +534,13 @@ describe('CorrectionConflictService', () => {
     });
 
     it('should return empty array when no categorizations found', async () => {
-      categorizationRepo.findByTenant.mockResolvedValue([]);
+      categorizationRepo.findWithFilters.mockResolvedValue({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 1000,
+        totalPages: 0,
+      });
 
       const result = await service.getAffectedTransactions(
         mockTenantId,

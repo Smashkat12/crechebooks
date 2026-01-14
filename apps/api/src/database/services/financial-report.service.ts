@@ -363,7 +363,8 @@ export class FinancialReportService {
 
     for (const tx of transactions) {
       const accountCode =
-        tx.categorizations?.[0]?.accountCode || DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code;
+        tx.categorizations?.[0]?.accountCode ||
+        DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code;
       const accountName = this.getAccountName(accountCode);
 
       if (!accountBalances.has(accountCode)) {

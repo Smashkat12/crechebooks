@@ -160,6 +160,14 @@ export class InvoiceGenerationService {
       errors: [],
     };
 
+    // Pre-calculate starting sequential number to avoid race conditions
+    // when creating multiple invoices in the same batch
+    const batchYear = billingPeriodStart.getFullYear();
+    let currentSequential = await this.getNextInvoiceSequential(
+      tenantId,
+      batchYear,
+    );
+
     // Group enrollments by parent for sibling discount calculation
     const enrollmentsByParent = new Map<string, EnrollmentWithRelations[]>();
     for (const enrollment of filteredEnrollments) {
@@ -197,13 +205,18 @@ export class InvoiceGenerationService {
             continue;
           }
 
-          // Create invoice
+          // Create invoice with pre-computed invoice number to avoid race conditions
+          const invoiceNumber = this.formatInvoiceNumber(
+            batchYear,
+            currentSequential++,
+          );
           const invoice = await this.createInvoice(
             tenantId,
             enrollment,
             billingPeriodStart,
             billingPeriodEnd,
             userId,
+            invoiceNumber,
           );
 
           // Build line items
@@ -265,6 +278,7 @@ export class InvoiceGenerationService {
             billingMonth,
           );
 
+          // TASK-BILL-038: Process ad-hoc charges with VAT exemption support
           for (const charge of adHocCharges) {
             lineItems.push({
               description: charge.description,
@@ -274,6 +288,7 @@ export class InvoiceGenerationService {
               lineType: LineType.AD_HOC,
               accountCode: this.SCHOOL_FEES_ACCOUNT,
               adHocChargeId: charge.id, // Track which charge this came from
+              isVatExempt: charge.isVatExempt, // TASK-BILL-038: Pass VAT exemption override
             });
           }
 
@@ -488,10 +503,13 @@ export class InvoiceGenerationService {
     billingPeriodStart: Date,
     billingPeriodEnd: Date,
     userId: string,
+    precomputedInvoiceNumber?: string,
   ): Promise<Invoice> {
-    // Generate invoice number
+    // Use precomputed number or generate one (for backward compatibility)
     const year = billingPeriodStart.getFullYear();
-    const invoiceNumber = await this.generateInvoiceNumber(tenantId, year);
+    const invoiceNumber =
+      precomputedInvoiceNumber ??
+      (await this.generateInvoiceNumber(tenantId, year));
 
     // Get tenant for due days setting
     const tenant = await this.tenantRepo.findById(tenantId);
@@ -559,15 +577,16 @@ export class InvoiceGenerationService {
       // Note: unitPriceCents can be negative for discounts
       const lineSubtotal = new Decimal(item.unitPriceCents).mul(item.quantity);
 
-      // Calculate VAT based on line type and tenant VAT registration
-      // Uses isVatApplicable() which handles:
-      // - MONTHLY_FEE, REGISTRATION: VAT exempt (educational services)
-      // - BOOKS, STATIONERY, UNIFORM, SCHOOL_TRIP, EXTRA: VAT applicable (goods/services)
-      // - DISCOUNT, CREDIT: No VAT (adjustments)
+      // TASK-BILL-038: Calculate VAT based on line type, tenant VAT registration, and override
+      // Uses isVatApplicable() per South African VAT Act No. 89 of 1991, Section 12(h):
+      // - VAT EXEMPT: MONTHLY_FEE, REGISTRATION, RE_REGISTRATION, EXTRA_MURAL
+      // - VAT APPLICABLE (15%): BOOKS, STATIONERY, UNIFORM, SCHOOL_TRIP, MEALS, TRANSPORT, LATE_PICKUP, DAMAGED_EQUIPMENT
+      // - AD_HOC: Configurable via isVatExempt override
+      // - NO VAT: DISCOUNT, CREDIT (adjustments)
       let lineVatCents = 0;
       if (
         isVatRegistered &&
-        isVatApplicable(item.lineType) &&
+        isVatApplicable(item.lineType, item.isVatExempt) &&
         item.unitPriceCents > 0
       ) {
         lineVatCents = this.calculateVAT(
@@ -665,6 +684,51 @@ export class InvoiceGenerationService {
     }
 
     // Format with leading zeros (001, 002, etc.)
+    const sequentialPadded = sequential.toString().padStart(3, '0');
+    return `INV-${year}-${sequentialPadded}`;
+  }
+
+  /**
+   * Get the next sequential number for batch invoice generation
+   * Used to pre-allocate numbers before creating invoices to avoid race conditions
+   *
+   * @param tenantId - Tenant ID
+   * @param year - Year for invoice numbering
+   * @returns Next sequential number (starting from 1)
+   */
+  async getNextInvoiceSequential(
+    tenantId: string,
+    year: number,
+  ): Promise<number> {
+    const lastInvoice = await this.invoiceRepo.findLastInvoiceForYear(
+      tenantId,
+      year,
+    );
+
+    if (!lastInvoice) {
+      return 1;
+    }
+
+    // Extract sequential number from last invoice (Format: INV-2025-001)
+    const parts = lastInvoice.invoiceNumber.split('-');
+    if (parts.length === 3) {
+      const lastSequential = parseInt(parts[2], 10);
+      if (!isNaN(lastSequential)) {
+        return lastSequential + 1;
+      }
+    }
+
+    return 1;
+  }
+
+  /**
+   * Format an invoice number from year and sequential
+   *
+   * @param year - Year for invoice
+   * @param sequential - Sequential number
+   * @returns Formatted invoice number (e.g., INV-2025-001)
+   */
+  formatInvoiceNumber(year: number, sequential: number): string {
     const sequentialPadded = sequential.toString().padStart(3, '0');
     return `INV-${year}-${sequentialPadded}`;
   }

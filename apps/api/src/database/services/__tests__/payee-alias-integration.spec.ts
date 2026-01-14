@@ -18,6 +18,8 @@ import { PayeePatternRepository } from '../../repositories/payee-pattern.reposit
 import { TransactionRepository } from '../../repositories/transaction.repository';
 import { CategorizationRepository } from '../../repositories/categorization.repository';
 import { AuditLogService } from '../audit-log.service';
+import { PayeeVariationDetectorService } from '../payee-variation-detector.service';
+import { CorrectionConflictService } from '../correction-conflict.service';
 import { Transaction, PayeePattern } from '@prisma/client';
 import {
   ImportSource,
@@ -105,6 +107,22 @@ describe('PayeeAlias Integration', () => {
       logUpdate: jest.fn(),
     };
 
+    const mockVariationDetector = {
+      detectVariations: jest.fn().mockResolvedValue([]),
+      findAllPotentialGroups: jest.fn().mockResolvedValue([]),
+      normalize: jest.fn((name: string) => name.toUpperCase().trim()),
+      calculateSimilarity: jest
+        .fn()
+        .mockReturnValue({ score: 0, method: 'fuzzy' }),
+      getSuggestedAliases: jest.fn().mockResolvedValue([]),
+    };
+
+    const mockConflictService = {
+      detectConflict: jest.fn().mockResolvedValue(null),
+      resolveConflict: jest.fn().mockResolvedValue(undefined),
+      getAffectedTransactions: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PayeeAliasService,
@@ -125,6 +143,14 @@ describe('PayeeAlias Integration', () => {
         {
           provide: AuditLogService,
           useValue: mockAuditLogService,
+        },
+        {
+          provide: PayeeVariationDetectorService,
+          useValue: mockVariationDetector,
+        },
+        {
+          provide: CorrectionConflictService,
+          useValue: mockConflictService,
         },
       ],
     }).compile();
@@ -238,6 +264,20 @@ describe('PayeeAlias Integration', () => {
   });
 
   describe('Similarity Detection', () => {
+    let variationDetector: jest.Mocked<PayeeVariationDetectorService>;
+
+    beforeEach(() => {
+      variationDetector = {
+        detectVariations: jest.fn().mockResolvedValue([]),
+        findAllPotentialGroups: jest.fn().mockResolvedValue([]),
+        normalize: jest.fn((name: string) => name.toUpperCase().trim()),
+        calculateSimilarity: jest
+          .fn()
+          .mockReturnValue({ score: 0, method: 'fuzzy' }),
+        getSuggestedAliases: jest.fn().mockResolvedValue([]),
+      } as any;
+    });
+
     it('should find similar payees with minor spelling differences', async () => {
       const variations = [
         { pattern: canonicalPayee, payeeAliases: [] },
@@ -252,6 +292,23 @@ describe('PayeeAlias Integration', () => {
           payeeAliases: v.payeeAliases,
         })),
       );
+
+      // Mock the variation detector to return similar payees
+      const mockVariationDetectorService =
+        payeeAliasService['variationDetector'];
+      (
+        mockVariationDetectorService.detectVariations as jest.Mock
+      ).mockResolvedValue([
+        {
+          payeeA: 'WOLWORTHS',
+          payeeB: 'WOOLWORTHS',
+          similarity: 0.9,
+          matchType: 'fuzzy',
+          confidence: 90,
+          normalizedA: 'WOLWORTHS',
+          normalizedB: 'WOOLWORTHS',
+        },
+      ]);
 
       const similar = await payeeAliasService.findSimilar(
         mockTenantId,

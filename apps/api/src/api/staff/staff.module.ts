@@ -8,9 +8,10 @@ import {
 import { StaffRepository } from '../../database/repositories/staff.repository';
 import { DatabaseModule } from '../../database/database.module';
 import { EmailModule } from '../../integrations/email/email.module';
+import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
 
 @Module({
-  imports: [DatabaseModule, EmailModule],
+  imports: [DatabaseModule, EmailModule, SimplePayModule],
   controllers: [
     StaffController,
     StaffOnboardingController,

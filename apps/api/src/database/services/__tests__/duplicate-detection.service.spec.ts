@@ -3,6 +3,7 @@
  * TASK-RECON-015: Reconciliation Duplicate Detection Service
  */
 
+import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DuplicateDetectionService } from '../duplicate-detection.service';
 import { AuditLogService } from '../audit-log.service';
@@ -37,8 +38,8 @@ describe('DuplicateDetectionService', () => {
     auditLogService = module.get<AuditLogService>(AuditLogService);
     prisma = module.get<PrismaService>(PrismaService);
 
-    // Connect to database
-    await prisma.$connect();
+    // Initialize Prisma connection
+    await prisma.onModuleInit();
 
     // Create a test tenant
     const tenant = await prisma.tenant.create({
@@ -63,7 +64,7 @@ describe('DuplicateDetectionService', () => {
     await prisma.tenant.delete({
       where: { id: testTenantId },
     });
-    await prisma.$disconnect();
+    await prisma.onModuleDestroy();
   });
 
   beforeEach(() => {

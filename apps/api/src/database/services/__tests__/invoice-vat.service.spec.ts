@@ -52,16 +52,16 @@ describe('InvoiceVatService', () => {
   beforeEach(async () => {
     const mockPrismaService = {
       tenant: {
-        update: jest.fn(),
+        update: jest.fn().mockResolvedValue({} as any),
       },
-    };
+    } as unknown as jest.Mocked<PrismaService>;
 
     const mockTenantRepo = {
       findById: jest.fn(),
     };
 
     const mockAuditLogService = {
-      logUpdate: jest.fn(),
+      logUpdate: jest.fn().mockResolvedValue({} as any),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -261,8 +261,6 @@ describe('InvoiceVatService', () => {
   describe('registerForVat', () => {
     it('should register tenant for VAT with valid number', async () => {
       tenantRepo.findById.mockResolvedValue(mockTenantNotRegistered as never);
-      prismaService.tenant.update.mockResolvedValue({} as never);
-      auditLogService.logUpdate.mockResolvedValue(undefined);
 
       await service.registerForVat(
         'tenant-no-vat',
@@ -291,8 +289,6 @@ describe('InvoiceVatService', () => {
 
     it('should clean VAT number (remove non-digits)', async () => {
       tenantRepo.findById.mockResolvedValue(mockTenantNotRegistered as never);
-      prismaService.tenant.update.mockResolvedValue({} as never);
-      auditLogService.logUpdate.mockResolvedValue(undefined);
 
       await service.registerForVat(
         'tenant-no-vat',
@@ -340,7 +336,6 @@ describe('InvoiceVatService', () => {
         ...mockTenantNotRegistered,
         cumulativeTurnoverCents: BigInt(50_000_000), // After update
       } as never);
-      prismaService.tenant.update.mockResolvedValue({} as never);
 
       const result = await service.updateTurnover('tenant-no-vat', 1000000); // R10,000
 
@@ -362,8 +357,6 @@ describe('InvoiceVatService', () => {
   describe('resetTurnover', () => {
     it('should reset turnover to zero', async () => {
       tenantRepo.findById.mockResolvedValue(mockTenantNotRegistered as never);
-      prismaService.tenant.update.mockResolvedValue({} as never);
-      auditLogService.logUpdate.mockResolvedValue(undefined);
 
       await service.resetTurnover('tenant-no-vat', 'user-123');
 

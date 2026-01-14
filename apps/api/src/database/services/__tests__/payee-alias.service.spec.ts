@@ -6,6 +6,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PayeeAliasService } from '../payee-alias.service';
 import { PayeePatternRepository } from '../../repositories/payee-pattern.repository';
+import { PayeeVariationDetectorService } from '../payee-variation-detector.service';
 import {
   BusinessException,
   NotFoundException,
@@ -15,6 +16,7 @@ import { PayeePattern } from '@prisma/client';
 describe('PayeeAliasService', () => {
   let service: PayeeAliasService;
   let patternRepo: jest.Mocked<PayeePatternRepository>;
+  let variationDetector: jest.Mocked<PayeeVariationDetectorService>;
 
   const mockTenantId = 'tenant-123';
   const mockPattern: PayeePattern = {
@@ -42,6 +44,16 @@ describe('PayeeAliasService', () => {
       update: jest.fn(),
     };
 
+    const mockVariationDetector = {
+      detectVariations: jest.fn().mockResolvedValue([]),
+      findAllPotentialGroups: jest.fn().mockResolvedValue([]),
+      normalize: jest.fn((name: string) => name.toUpperCase().trim()),
+      calculateSimilarity: jest
+        .fn()
+        .mockReturnValue({ score: 0, method: 'fuzzy' }),
+      getSuggestedAliases: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PayeeAliasService,
@@ -49,11 +61,16 @@ describe('PayeeAliasService', () => {
           provide: PayeePatternRepository,
           useValue: mockPatternRepo,
         },
+        {
+          provide: PayeeVariationDetectorService,
+          useValue: mockVariationDetector,
+        },
       ],
     }).compile();
 
     service = module.get<PayeeAliasService>(PayeeAliasService);
     patternRepo = module.get(PayeePatternRepository);
+    variationDetector = module.get(PayeeVariationDetectorService);
   });
 
   describe('resolveAlias', () => {
@@ -322,6 +339,17 @@ describe('PayeeAliasService', () => {
 
     it('should find similar payee names using Levenshtein distance', async () => {
       patternRepo.findByTenant.mockResolvedValue(mockPatterns);
+      variationDetector.detectVariations.mockResolvedValue([
+        {
+          payeeA: 'WOLWORTHS',
+          payeeB: 'WOOLWORTHS',
+          similarity: 0.9,
+          matchType: 'fuzzy',
+          confidence: 90,
+          normalizedA: 'WOLWORTHS',
+          normalizedB: 'WOOLWORTHS',
+        },
+      ]);
 
       const result = await service.findSimilar(mockTenantId, 'WOLWORTHS');
 
@@ -331,15 +359,46 @@ describe('PayeeAliasService', () => {
 
     it('should return results sorted by similarity', async () => {
       patternRepo.findByTenant.mockResolvedValue(mockPatterns);
+      variationDetector.detectVariations.mockResolvedValue([
+        {
+          payeeA: 'WOOLWRTHS',
+          payeeB: 'WOOLWORTHS',
+          similarity: 0.95,
+          matchType: 'fuzzy',
+          confidence: 95,
+          normalizedA: 'WOOLWRTHS',
+          normalizedB: 'WOOLWORTHS',
+        },
+        {
+          payeeA: 'WOOLWRTHS',
+          payeeB: 'WOOLWORTH',
+          similarity: 0.85,
+          matchType: 'fuzzy',
+          confidence: 85,
+          normalizedA: 'WOOLWRTHS',
+          normalizedB: 'WOOLWORTH',
+        },
+      ]);
 
       const result = await service.findSimilar(mockTenantId, 'WOOLWRTHS');
 
-      // "WOOLWORTHS" should be first (more similar than "WOOLWORTH")
+      // "WOOLWORTHS" should be first (higher confidence)
       expect(result[0]).toBe('WOOLWORTHS');
     });
 
     it('should check aliases for similarity', async () => {
       patternRepo.findByTenant.mockResolvedValue([mockPattern]);
+      variationDetector.detectVariations.mockResolvedValue([
+        {
+          payeeA: 'WOOLWORTHS SNTON',
+          payeeB: 'WOOLWORTHS SANDTON',
+          similarity: 0.88,
+          matchType: 'fuzzy',
+          confidence: 88,
+          normalizedA: 'WOOLWORTHS SNTON',
+          normalizedB: 'WOOLWORTHS SANDTON',
+        },
+      ]);
 
       const result = await service.findSimilar(
         mockTenantId,
@@ -351,6 +410,7 @@ describe('PayeeAliasService', () => {
 
     it('should not return dissimilar names', async () => {
       patternRepo.findByTenant.mockResolvedValue(mockPatterns);
+      variationDetector.detectVariations.mockResolvedValue([]);
 
       const result = await service.findSimilar(mockTenantId, 'CHECKERS');
 
@@ -362,11 +422,22 @@ describe('PayeeAliasService', () => {
       const result = await service.findSimilar(mockTenantId, '');
 
       expect(result).toEqual([]);
-      expect(patternRepo.findByTenant).not.toHaveBeenCalled();
+      expect(variationDetector.detectVariations).not.toHaveBeenCalled();
     });
 
     it('should handle special characters in search', async () => {
       patternRepo.findByTenant.mockResolvedValue([mockPattern]);
+      variationDetector.detectVariations.mockResolvedValue([
+        {
+          payeeA: 'W/WRTHS',
+          payeeB: 'W/WORTHS',
+          similarity: 0.85,
+          matchType: 'fuzzy',
+          confidence: 85,
+          normalizedA: 'W WRTHS',
+          normalizedB: 'W WORTHS',
+        },
+      ]);
 
       const result = await service.findSimilar(mockTenantId, 'W/WRTHS');
 
@@ -377,6 +448,17 @@ describe('PayeeAliasService', () => {
   describe('Levenshtein distance calculation', () => {
     it('should calculate distance for identical strings', async () => {
       patternRepo.findByTenant.mockResolvedValue([mockPattern]);
+      variationDetector.detectVariations.mockResolvedValue([
+        {
+          payeeA: 'WOOLWORTHS',
+          payeeB: 'WOOLWORTHS',
+          similarity: 1.0,
+          matchType: 'exact',
+          confidence: 100,
+          normalizedA: 'WOOLWORTHS',
+          normalizedB: 'WOOLWORTHS',
+        },
+      ]);
 
       const result = await service.findSimilar(mockTenantId, 'WOOLWORTHS');
 
@@ -389,6 +471,17 @@ describe('PayeeAliasService', () => {
         payeePattern: 'WOOLWORTH',
       };
       patternRepo.findByTenant.mockResolvedValue([pattern]);
+      variationDetector.detectVariations.mockResolvedValue([
+        {
+          payeeA: 'WOOLWORTHS',
+          payeeB: 'WOOLWORTH',
+          similarity: 0.9,
+          matchType: 'fuzzy',
+          confidence: 90,
+          normalizedA: 'WOOLWORTHS',
+          normalizedB: 'WOOLWORTH',
+        },
+      ]);
 
       const result = await service.findSimilar(mockTenantId, 'WOOLWORTHS');
 

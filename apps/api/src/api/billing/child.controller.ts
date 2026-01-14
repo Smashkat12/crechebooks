@@ -131,12 +131,14 @@ export class ChildController {
     this.logger.log(`Created child: ${child.id}`);
 
     // 4. Create enrollment using service (handles validation, audit, invoice generation)
+    // NOTE: allowHistoricDates=true enables historical data imports (e.g., Jan 2023 enrollments)
     const { enrollment, invoice } = await this.enrollmentService.enrollChild(
       user.tenantId,
       child.id,
       dto.fee_structure_id,
       new Date(dto.start_date),
       user.id,
+      true, // Allow historic dates for data imports
     );
 
     this.logger.log(`Created enrollment: ${enrollment.id}`);

@@ -488,16 +488,13 @@ export class InvoiceRepository {
     year: number,
   ): Promise<Invoice | null> {
     try {
-      const yearStart = new Date(year, 0, 1);
-      const yearEnd = new Date(year + 1, 0, 1);
-
+      // NOTE: Only filter by invoice number pattern, not issueDate.
+      // Invoice numbers use the billing period year (e.g., INV-2025-001 for billing period 2025)
+      // but issueDate is the current date when the invoice is generated.
+      // This ensures we find all invoices for a billing year regardless of when they were issued.
       return await this.prisma.invoice.findFirst({
         where: {
           tenantId,
-          issueDate: {
-            gte: yearStart,
-            lt: yearEnd,
-          },
           invoiceNumber: {
             startsWith: `INV-${year}-`,
           },

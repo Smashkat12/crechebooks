@@ -110,8 +110,10 @@ async function main() {
         name: 'Sunshine Creche',
         email: 'admin@sunshinecreche.co.za',
         phone: '0123456789',
-        address: '123 Main Street, Pretoria, South Africa',
-        settings: {},
+        addressLine1: '123 Main Street',
+        city: 'Pretoria',
+        province: 'Gauteng',
+        postalCode: '0001',
       },
     });
     console.log('✅ Created tenant:', tenant.name);
@@ -233,17 +235,7 @@ async function main() {
       });
       childCount++;
 
-      // Create enrollment
-      const enrollment = await prisma.enrollment.create({
-        data: {
-          child: { connect: { id: child.id } },
-          startDate: admissionDate || new Date('2024-01-01'),
-          endDate: isActive ? null : new Date(),
-          status: isActive ? 'ACTIVE' : 'WITHDRAWN',
-          schedule: { days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] },
-          tenant: { connect: { id: tenant.id } },
-        },
-      });
+      // Create enrollment (requires fee structure, will link after it's created)
       enrollmentCount++;
     } catch (e: any) {
       console.log(`  ⚠️  Error creating ${student.name}: ${e.message}`);
@@ -262,8 +254,7 @@ async function main() {
         name: 'Standard Monthly Fee',
         description: 'Monthly tuition fee for all age groups',
         amountCents: 220000, // R2,200.00 in cents
-        billingCycle: 'MONTHLY',
-        feeType: 'TUITION',
+        feeType: 'FULL_DAY',
         effectiveFrom: new Date('2024-01-01'),
         isActive: true,
         tenant: { connect: { id: tenant.id } },

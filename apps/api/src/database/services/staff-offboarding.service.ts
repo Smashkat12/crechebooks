@@ -11,7 +11,7 @@
  * All monetary values in CENTS (integers)
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PayFrequency, Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,12 +19,16 @@ import { StaffOffboardingRepository } from '../repositories/staff-offboarding.re
 import { PayeService } from './paye.service';
 import { UifService } from './uif.service';
 import { AuditLogService } from './audit-log.service';
+import { SimplePayServicePeriodService } from '../../integrations/simplepay/simplepay-service-period.service';
+import { SimplePayRepository } from '../repositories/simplepay.repository';
 import {
   OffboardingReason,
   StaffOffboardingStatus,
   IFinalPayCalculation,
   ISettlementPreview,
   IOffboardingProgress,
+  SimplePaySyncStatus,
+  offboardingReasonToTerminationCode,
 } from '../entities/staff-offboarding.entity';
 import {
   InitiateOffboardingDto,
@@ -72,6 +76,9 @@ export class StaffOffboardingService {
     private readonly payeService: PayeService,
     private readonly uifService: UifService,
     private readonly auditLogService: AuditLogService,
+    @Inject(forwardRef(() => SimplePayServicePeriodService))
+    private readonly simplePayServicePeriod: SimplePayServicePeriodService,
+    private readonly simplePayRepo: SimplePayRepository,
   ) {}
 
   /**
@@ -481,6 +488,10 @@ export class StaffOffboardingService {
         completedAt: offboarding.completedAt,
         completedBy: offboarding.completedBy,
         notes: offboarding.notes,
+        // SimplePay Integration (TASK-STAFF-006)
+        simplePaySyncStatus: offboarding.simplePaySyncStatus,
+        simplePaySyncError: offboarding.simplePaySyncError,
+        simplePaySyncedAt: offboarding.simplePaySyncedAt,
         createdAt: offboarding.createdAt,
         updatedAt: offboarding.updatedAt,
       },
@@ -654,6 +665,15 @@ export class StaffOffboardingService {
       },
     });
 
+    // TASK-STAFF-006: Sync termination to SimplePay
+    await this.syncTerminationToSimplePay(
+      offboardingId,
+      offboarding.staffId,
+      tenantId,
+      offboarding.reason as OffboardingReason,
+      offboarding.lastWorkingDay,
+    );
+
     await this.auditLogService.logUpdate({
       tenantId,
       userId: dto.completedBy,
@@ -782,5 +802,224 @@ export class StaffOffboardingService {
    */
   async getOffboardingStats(tenantId: string) {
     return this.offboardingRepo.getOffboardingStats(tenantId);
+  }
+
+  // ============ SimplePay Integration (TASK-STAFF-006) ============
+
+  /**
+   * Sync termination to SimplePay when offboarding is completed
+   * This is called automatically when completeOffboarding is successful.
+   * If the employee is not linked to SimplePay, marks as NOT_APPLICABLE.
+   * Errors are logged but don't fail the offboarding completion.
+   *
+   * @param offboardingId - Offboarding ID
+   * @param staffId - Staff ID
+   * @param tenantId - Tenant ID
+   * @param reason - Offboarding reason
+   * @param lastWorkingDay - Last working date
+   */
+  private async syncTerminationToSimplePay(
+    offboardingId: string,
+    staffId: string,
+    tenantId: string,
+    reason: OffboardingReason,
+    lastWorkingDay: Date,
+  ): Promise<void> {
+    try {
+      // Check if employee is linked to SimplePay
+      const mapping = await this.simplePayRepo.findEmployeeMapping(staffId);
+
+      if (!mapping) {
+        // Employee not linked to SimplePay - mark as not applicable
+        await this.prisma.staffOffboarding.update({
+          where: { id: offboardingId },
+          data: {
+            simplePaySyncStatus: SimplePaySyncStatus.NOT_APPLICABLE,
+            simplePaySyncedAt: new Date(),
+          },
+        });
+        this.logger.log(
+          `Staff ${staffId} not linked to SimplePay - sync not applicable`,
+        );
+        return;
+      }
+
+      // Check if SimplePay connection is active
+      const connection = await this.simplePayRepo.findConnection(tenantId);
+      if (!connection?.isActive) {
+        await this.prisma.staffOffboarding.update({
+          where: { id: offboardingId },
+          data: {
+            simplePaySyncStatus: SimplePaySyncStatus.FAILED,
+            simplePaySyncError: 'SimplePay connection not active',
+          },
+        });
+        this.logger.warn(
+          `SimplePay connection not active for tenant ${tenantId}`,
+        );
+        return;
+      }
+
+      // Map offboarding reason to termination code
+      const terminationCode = offboardingReasonToTerminationCode(reason);
+
+      // Call SimplePay to terminate employee
+      const result = await this.simplePayServicePeriod.terminateEmployee(
+        tenantId,
+        {
+          staffId,
+          terminationCode,
+          endDate: lastWorkingDay,
+          lastWorkingDay,
+          generateFinalPayslip: true,
+        },
+      );
+
+      if (result.success) {
+        await this.prisma.staffOffboarding.update({
+          where: { id: offboardingId },
+          data: {
+            simplePaySyncStatus: SimplePaySyncStatus.SUCCESS,
+            simplePaySyncedAt: new Date(),
+            simplePaySyncError: null,
+          },
+        });
+
+        this.logger.log(
+          `Successfully synced termination to SimplePay for staff ${staffId}`,
+        );
+
+        // Log the sync
+        await this.auditLogService.logCreate({
+          tenantId,
+          entityType: 'SimplePaySync',
+          entityId: offboardingId,
+          afterValue: {
+            action: 'TERMINATION',
+            staffId,
+            simplePayEmployeeId: result.simplePayEmployeeId,
+            terminationCode,
+            uifEligible: result.uifEligible,
+          },
+        });
+      } else {
+        await this.prisma.staffOffboarding.update({
+          where: { id: offboardingId },
+          data: {
+            simplePaySyncStatus: SimplePaySyncStatus.FAILED,
+            simplePaySyncError: result.error || 'Unknown error',
+          },
+        });
+
+        this.logger.error(
+          `Failed to sync termination to SimplePay for staff ${staffId}: ${result.error}`,
+        );
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+
+      await this.prisma.staffOffboarding.update({
+        where: { id: offboardingId },
+        data: {
+          simplePaySyncStatus: SimplePaySyncStatus.FAILED,
+          simplePaySyncError: errorMessage,
+        },
+      });
+
+      this.logger.error(
+        `Exception syncing termination to SimplePay for staff ${staffId}: ${errorMessage}`,
+      );
+      // Don't throw - offboarding should still complete even if SimplePay sync fails
+    }
+  }
+
+  /**
+   * Retry SimplePay sync for a failed offboarding
+   * Can be called manually if initial sync failed
+   *
+   * @param offboardingId - Offboarding ID
+   * @param tenantId - Tenant ID
+   * @returns Sync result
+   */
+  async retrySimplePaySync(
+    offboardingId: string,
+    tenantId: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    const offboarding =
+      await this.offboardingRepo.findOffboardingById(offboardingId);
+
+    if (!offboarding) {
+      throw new NotFoundException('Offboarding', offboardingId);
+    }
+
+    if (offboarding.status !== StaffOffboardingStatus.COMPLETED) {
+      throw new BusinessException(
+        'Can only retry SimplePay sync for completed offboardings',
+        'OFFBOARDING_NOT_COMPLETED',
+        { offboardingId, status: offboarding.status },
+      );
+    }
+
+    if (offboarding.simplePaySyncStatus === SimplePaySyncStatus.SUCCESS) {
+      throw new BusinessException(
+        'SimplePay sync already successful',
+        'SIMPLEPAY_ALREADY_SYNCED',
+        { offboardingId },
+      );
+    }
+
+    if (
+      offboarding.simplePaySyncStatus === SimplePaySyncStatus.NOT_APPLICABLE
+    ) {
+      throw new BusinessException(
+        'Employee is not linked to SimplePay',
+        'SIMPLEPAY_NOT_APPLICABLE',
+        { offboardingId },
+      );
+    }
+
+    // Retry the sync
+    await this.syncTerminationToSimplePay(
+      offboardingId,
+      offboarding.staffId,
+      tenantId,
+      offboarding.reason as OffboardingReason,
+      offboarding.lastWorkingDay,
+    );
+
+    // Fetch updated status
+    const updated =
+      await this.offboardingRepo.findOffboardingById(offboardingId);
+
+    return {
+      success: updated?.simplePaySyncStatus === SimplePaySyncStatus.SUCCESS,
+      error: updated?.simplePaySyncError || undefined,
+    };
+  }
+
+  /**
+   * Get SimplePay sync status for an offboarding
+   *
+   * @param offboardingId - Offboarding ID
+   * @returns Sync status info
+   */
+  async getSimplePaySyncStatus(offboardingId: string): Promise<{
+    status: string | null;
+    error: string | null;
+    syncedAt: Date | null;
+  }> {
+    const offboarding =
+      await this.offboardingRepo.findOffboardingById(offboardingId);
+
+    if (!offboarding) {
+      throw new NotFoundException('Offboarding', offboardingId);
+    }
+
+    return {
+      status: offboarding.simplePaySyncStatus,
+      error: offboarding.simplePaySyncError,
+      syncedAt: offboarding.simplePaySyncedAt,
+    };
   }
 }

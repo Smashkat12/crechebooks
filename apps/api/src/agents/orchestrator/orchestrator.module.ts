@@ -7,7 +7,7 @@
  * Imports and coordinates all specialized agent modules.
  */
 
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { OrchestratorAgent } from './orchestrator.agent';
 import { WorkflowRouter } from './workflow-router';
 import { EscalationManager } from './escalation-manager';
@@ -18,7 +18,7 @@ import { DatabaseModule } from '../../database/database.module';
 
 @Module({
   imports: [
-    DatabaseModule,
+    forwardRef(() => DatabaseModule), // Use forwardRef to break circular dependency
     TransactionCategorizerModule,
     PaymentMatcherModule,
     SarsAgentModule,

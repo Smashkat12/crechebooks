@@ -45,20 +45,40 @@ describe('Vat201Service', () => {
     // Clean database in FK order
     await prisma.sarsSubmission.deleteMany({});
     await prisma.reminder.deleteMany({});
+    await prisma.bankStatementMatch.deleteMany({});
     await prisma.reconciliation.deleteMany({});
+    await prisma.payrollJournalLine.deleteMany({});
+    await prisma.payrollJournal.deleteMany({});
     await prisma.payroll.deleteMany({});
+    await prisma.payRunSync.deleteMany({});
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.payrollAdjustment.deleteMany({});
+    await prisma.employeeSetupLog.deleteMany({});
     await prisma.staff.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.feeStructure.deleteMany({});
     await prisma.child.deleteMany({});
+    await prisma.creditBalance.deleteMany({});
     await prisma.parent.deleteMany({});
     await prisma.payeePattern.deleteMany({});
     await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
+    await prisma.simplePayConnection.deleteMany({});
     await prisma.user.deleteMany({});
+    await prisma.bankConnection.deleteMany({});
+    await prisma.xeroAccountMapping.deleteMany({});
+    await prisma.xeroToken.deleteMany({});
+    await prisma.reportRequest.deleteMany({});
+    await prisma.bulkOperationLog.deleteMany({});
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({});
 
     // Create VAT-registered test tenant
@@ -265,7 +285,7 @@ describe('Vat201Service', () => {
           periodStart: new Date('2025-01-01'),
           periodEnd: new Date('2025-01-31'),
         }),
-      ).rejects.toThrow('not VAT registered');
+      ).rejects.toThrow('VAT201 generation requires VAT registration');
     });
 
     it('should throw error for tenant without VAT number', async () => {
@@ -281,7 +301,7 @@ describe('Vat201Service', () => {
           periodStart: new Date('2025-01-01'),
           periodEnd: new Date('2025-01-31'),
         }),
-      ).rejects.toThrow('no VAT number');
+      ).rejects.toThrow('VAT number is required');
     });
 
     it('should throw error for non-existent tenant', async () => {

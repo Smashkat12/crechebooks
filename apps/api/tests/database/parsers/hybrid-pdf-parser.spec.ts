@@ -15,7 +15,7 @@ import { ValidationException } from '../../../src/shared/exceptions';
 describe('HybridPdfParser', () => {
   let parser: HybridPdfParser;
   let localParser: PdfParser;
-  const bankStatementsDir = path.join(process.cwd(), 'bank-statements');
+  const bankStatementsDir = path.join(process.cwd(), '../../bank-statements');
 
   beforeAll(() => {
     parser = new HybridPdfParser();

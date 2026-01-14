@@ -5,6 +5,8 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { ChildRepository } from '../../../src/database/repositories/child.repository';
 import { InvoiceGenerationService } from '../../../src/database/services/invoice-generation.service';
 import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
+import { AdhocChargeService } from '../../../src/database/services/adhoc-charge.service';
+import { InvoicePdfService } from '../../../src/database/services/invoice-pdf.service';
 import { IUser, UserRole } from '../../../src/database/entities/user.entity';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 
@@ -118,6 +120,19 @@ describe('InvoiceController', () => {
           provide: InvoiceDeliveryService,
           useValue: {
             sendInvoices: jest.fn(),
+          },
+        },
+        {
+          provide: AdhocChargeService,
+          useValue: {
+            createAdhocCharge: jest.fn(),
+            getAdhocCharges: jest.fn(),
+          },
+        },
+        {
+          provide: InvoicePdfService,
+          useValue: {
+            generateInvoicePdf: jest.fn(),
           },
         },
       ],

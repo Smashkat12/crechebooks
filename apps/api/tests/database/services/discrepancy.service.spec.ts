@@ -51,6 +51,7 @@ describe('DiscrepancyService', () => {
     // Cleanup test data in FK order - CRITICAL
     if (testTenant?.id) {
       await prisma.auditLog.deleteMany({ where: { tenantId: testTenant.id } });
+      await prisma.bankStatementMatch.deleteMany({});
       await prisma.reconciliation.deleteMany({
         where: { tenantId: testTenant.id },
       });

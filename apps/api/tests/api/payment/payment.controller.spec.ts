@@ -10,6 +10,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PaymentController } from '../../../src/api/payment/payment.controller';
 import { PaymentAllocationService } from '../../../src/database/services/payment-allocation.service';
 import { PaymentMatchingService } from '../../../src/database/services/payment-matching.service';
+import { PaymentReceiptService } from '../../../src/database/services/payment-receipt.service';
 import { ArrearsService } from '../../../src/database/services/arrears.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
@@ -74,6 +75,12 @@ describe('PaymentController', () => {
           provide: PaymentMatchingService,
           useValue: {
             matchPayments: jest.fn(),
+          },
+        },
+        {
+          provide: PaymentReceiptService,
+          useValue: {
+            generateReceipt: jest.fn(),
           },
         },
         {

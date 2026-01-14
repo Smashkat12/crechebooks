@@ -13,7 +13,7 @@ import { BusinessException } from '../../../src/shared/exceptions';
 
 describe('LLMWhispererParser', () => {
   let parser: LLMWhispererParser;
-  const bankStatementsDir = path.join(process.cwd(), 'bank-statements');
+  const bankStatementsDir = path.join(process.cwd(), '../../bank-statements');
 
   beforeAll(() => {
     parser = new LLMWhispererParser();

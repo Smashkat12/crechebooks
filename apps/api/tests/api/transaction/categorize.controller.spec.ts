@@ -2,8 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionController } from '../../../src/api/transaction/transaction.controller';
 import { TransactionRepository } from '../../../src/database/repositories/transaction.repository';
 import { CategorizationRepository } from '../../../src/database/repositories/categorization.repository';
+import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { TransactionImportService } from '../../../src/database/services/transaction-import.service';
 import { CategorizationService } from '../../../src/database/services/categorization.service';
+import { PaymentAllocationService } from '../../../src/database/services/payment-allocation.service';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { Transaction } from '@prisma/client';
 import type {
@@ -68,8 +70,10 @@ describe('TransactionController Categorization Endpoints', () => {
       providers: [
         { provide: TransactionRepository, useValue: mockTransactionRepo },
         { provide: CategorizationRepository, useValue: {} },
+        { provide: InvoiceRepository, useValue: {} },
         { provide: TransactionImportService, useValue: {} },
         { provide: CategorizationService, useValue: mockCategorizationService },
+        { provide: PaymentAllocationService, useValue: {} },
       ],
     }).compile();
 

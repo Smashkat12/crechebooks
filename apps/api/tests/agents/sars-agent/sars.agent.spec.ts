@@ -5,6 +5,7 @@
  * CRITICAL: Tests use REAL PostgreSQL database - NO MOCKS.
  * All SARS calculations must ALWAYS return requiresReview: true.
  */
+import 'dotenv/config';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
@@ -50,15 +51,32 @@ describe('SarsAgent', () => {
     agent = module.get<SarsAgent>(SarsAgent);
     contextValidator = module.get<SarsContextValidator>(SarsContextValidator);
 
+    await prisma.onModuleInit();
+
     // Initialize context
     await contextValidator.loadContext();
   });
 
   beforeEach(async () => {
-    // Clean up test data
+    // Clean up test data in correct order (respecting foreign keys)
     await prisma.sarsSubmission.deleteMany({});
+    await prisma.payrollJournalLine.deleteMany({});
+    await prisma.payrollJournal.deleteMany({});
     await prisma.payroll.deleteMany({});
+    await prisma.payRunSync.deleteMany({});
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.payrollAdjustment.deleteMany({});
+    await prisma.employeeSetupLog.deleteMany({});
     await prisma.staff.deleteMany({});
+    // Delete transaction-related tables before tenant
+    await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
+    await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
+    await prisma.reportRequest.deleteMany({});
+    await prisma.bulkOperationLog.deleteMany({});
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({});
 
     // Create test tenant
@@ -78,7 +96,7 @@ describe('SarsAgent', () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    await prisma.onModuleDestroy();
   });
 
   describe('calculatePayeForReview()', () => {
@@ -280,7 +298,7 @@ describe('SarsAgent', () => {
   describe('SarsContextValidator', () => {
     it('should load SARS tables context', () => {
       const context = contextValidator.getContext();
-      expect(context.version).toBe('2025');
+      expect(context.version).toBe('2024-2025');
       expect(context.paye.taxBrackets.length).toBe(7);
       expect(context.vat.standardRate).toBe(0.15);
     });
@@ -294,13 +312,14 @@ describe('SarsAgent', () => {
       const rates = contextValidator.getUifRates();
       expect(rates.employeeRate).toBe(0.01);
       expect(rates.employerRate).toBe(0.01);
-      expect(rates.maxContributionCents).toBe(17712);
+      expect(rates.maxContributionCents).toBe(17896); // 2024-2025 value
     });
 
     it('should return correct rebate amounts', () => {
-      expect(contextValidator.getPrimaryRebateCents()).toBe(1760000);
-      expect(contextValidator.getSecondaryRebateCents()).toBe(975000);
-      expect(contextValidator.getTertiaryRebateCents()).toBe(325500);
+      // 2024-2025 SARS rebate values
+      expect(contextValidator.getPrimaryRebateCents()).toBe(1771400);
+      expect(contextValidator.getSecondaryRebateCents()).toBe(973200);
+      expect(contextValidator.getTertiaryRebateCents()).toBe(324100);
     });
 
     it('should validate correct PAYE calculation', () => {

@@ -234,7 +234,8 @@ async function cleanupPaymentTestData(
 ): Promise<void> {
   // Delete in order respecting foreign keys
   await prisma.payment.deleteMany({ where: { tenantId } });
-  await prisma.transaction.deleteMany({ where: { tenantId } });
+  await prisma.categorizationJournal.deleteMany({ where: { tenantId } });
+    await prisma.transaction.deleteMany({ where: { tenantId } });
   await prisma.invoiceLine.deleteMany({ where: { invoice: { tenantId } } });
   await prisma.invoice.deleteMany({ where: { tenantId } });
   await prisma.child.deleteMany({ where: { tenantId } });

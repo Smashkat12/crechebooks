@@ -65,6 +65,7 @@ describe('ReconciliationService', () => {
   afterEach(async () => {
     // Cleanup test data in FK order - CRITICAL
     if (testTenant?.id) {
+      await prisma.bankStatementMatch.deleteMany({});
       await prisma.reconciliation.deleteMany({
         where: { tenantId: testTenant.id },
       });

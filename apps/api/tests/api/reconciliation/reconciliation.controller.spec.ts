@@ -9,9 +9,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ReconciliationController } from '../../../src/api/reconciliation/reconciliation.controller';
 import { ReconciliationService } from '../../../src/database/services/reconciliation.service';
-import { ReconciliationRepository } from '../../../src/database/repositories/reconciliation.repository';
 import { FinancialReportService } from '../../../src/database/services/financial-report.service';
-import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
+import { BalanceSheetService } from '../../../src/database/services/balance-sheet.service';
+import { AuditLogService } from '../../../src/database/services/audit-log.service';
+import { DiscrepancyService } from '../../../src/database/services/discrepancy.service';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { ReconcileResult } from '../../../src/database/dto/reconciliation-service.dto';
@@ -75,16 +76,20 @@ describe('ReconciliationController - reconcile', () => {
           useValue: { reconcile: jest.fn() },
         },
         {
-          provide: ReconciliationRepository,
-          useValue: {},
-        },
-        {
           provide: FinancialReportService,
           useValue: { generateIncomeStatement: jest.fn() },
         },
         {
-          provide: InvoiceRepository,
-          useValue: {},
+          provide: BalanceSheetService,
+          useValue: { generate: jest.fn() },
+        },
+        {
+          provide: AuditLogService,
+          useValue: { findAll: jest.fn(), getById: jest.fn() },
+        },
+        {
+          provide: DiscrepancyService,
+          useValue: { detectDiscrepancies: jest.fn() },
         },
       ],
     }).compile();

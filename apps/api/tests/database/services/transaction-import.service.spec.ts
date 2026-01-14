@@ -9,6 +9,8 @@ import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { TransactionRepository } from '../../../src/database/repositories/transaction.repository';
+import { AuditLogService } from '../../../src/database/services/audit-log.service';
+import { CategorizationService } from '../../../src/database/services/categorization.service';
 import {
   TransactionImportService,
   ImportFile,
@@ -16,6 +18,22 @@ import {
 import { ImportSource } from '../../../src/database/entities/transaction.entity';
 import { Tenant } from '@prisma/client';
 import { ValidationException } from '../../../src/shared/exceptions';
+
+/**
+ * Mock CategorizationService for tests
+ * This service has many dependencies (PatternLearningService, etc.)
+ * For import tests, we only need the basic queueCategorization method
+ */
+const mockCategorizationService = {
+  queueCategorization: jest.fn().mockResolvedValue(undefined),
+  categorizeBatch: jest.fn().mockResolvedValue({
+    total: 0,
+    categorized: 0,
+    skipped: 0,
+    errors: [],
+  }),
+  categorizeSingle: jest.fn().mockResolvedValue(null),
+};
 
 describe('TransactionImportService', () => {
   let service: TransactionImportService;
@@ -29,6 +47,8 @@ describe('TransactionImportService', () => {
         PrismaService,
         TransactionRepository,
         TransactionImportService,
+        AuditLogService,
+        { provide: CategorizationService, useValue: mockCategorizationService },
       ],
     }).compile();
 
@@ -45,22 +65,42 @@ describe('TransactionImportService', () => {
 
   beforeEach(async () => {
     // Clean database in FK order
+    await prisma.bankStatementMatch.deleteMany({});
     await prisma.reconciliation.deleteMany({});
     await prisma.sarsSubmission.deleteMany({});
+    await prisma.payrollJournalLine.deleteMany({});
+    await prisma.payrollJournal.deleteMany({});
     await prisma.payroll.deleteMany({});
+    await prisma.payRunSync.deleteMany({});
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.payrollAdjustment.deleteMany({});
+    await prisma.employeeSetupLog.deleteMany({});
     await prisma.staff.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
     await prisma.reminder.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.feeStructure.deleteMany({});
     await prisma.child.deleteMany({});
+    await prisma.creditBalance.deleteMany({});
     await prisma.parent.deleteMany({});
     await prisma.payeePattern.deleteMany({});
     await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
+    await prisma.simplePayConnection.deleteMany({});
     await prisma.user.deleteMany({});
+    await prisma.bankConnection.deleteMany({});
+    await prisma.xeroAccountMapping.deleteMany({});
+    await prisma.xeroToken.deleteMany({});
+    await prisma.reportRequest.deleteMany({});
+    await prisma.bulkOperationLog.deleteMany({});
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({});
 
     testTenant = await prisma.tenant.create({
@@ -102,7 +142,7 @@ describe('TransactionImportService', () => {
         testTenant.id,
       );
 
-      expect(result.status).toBe('PROCESSING');
+      expect(result.status).toBe('COMPLETED');
       expect(result.totalParsed).toBe(3);
       expect(result.transactionsCreated).toBe(3);
       expect(result.duplicatesSkipped).toBe(0);

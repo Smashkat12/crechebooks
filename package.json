@@ -38,6 +38,7 @@
     "turbo": "^2.3.3"
   },
   "dependencies": {
+    "@nestjs/event-emitter": "^3.0.1",
     "@types/node": "^22.10.7",
     "@types/pdfkit": "^0.17.4",
     "exceljs": "^4.4.0",

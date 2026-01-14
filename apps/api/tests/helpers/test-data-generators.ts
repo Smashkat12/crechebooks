@@ -159,6 +159,7 @@ export async function cleanupTestData(
   await prisma.categorization.deleteMany({
     where: { transaction: { tenantId } },
   });
+  await prisma.categorizationJournal.deleteMany({ where: { tenantId } });
   await prisma.transaction.deleteMany({ where: { tenantId } });
   await prisma.payeePattern.deleteMany({ where: { tenantId } });
 

@@ -1,0 +1,451 @@
+/**
+ * Profile Mapping Sync Repository Tests
+ * TASK-SPAY-006: SimplePay Profile Mapping Management
+ */
+
+import 'dotenv/config';
+import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaService } from '../../../src/database/prisma/prisma.service';
+import { ProfileMappingSyncRepository } from '../../../src/database/repositories/profile-mapping-sync.repository';
+import { CreateProfileMappingSyncDto } from '../../../src/database/dto/profile.dto';
+import {
+  NotFoundException,
+  ConflictException,
+} from '../../../src/shared/exceptions';
+import { Tenant, Staff } from '@prisma/client';
+
+describe('ProfileMappingSyncRepository', () => {
+  let repository: ProfileMappingSyncRepository;
+  let prisma: PrismaService;
+  let tenant: Tenant;
+  let staff: Staff;
+
+  beforeAll(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [PrismaService, ProfileMappingSyncRepository],
+    }).compile();
+
+    prisma = module.get<PrismaService>(PrismaService);
+    repository = module.get<ProfileMappingSyncRepository>(
+      ProfileMappingSyncRepository,
+    );
+
+    await prisma.onModuleInit();
+  });
+
+  beforeEach(async () => {
+    // Clean database in FK order - profileMappingSync and servicePeriodSync first
+    await prisma.profileMappingSync.deleteMany({});
+    await prisma.servicePeriodSync.deleteMany({});
+    await prisma.payRunSync.deleteMany({});
+    await prisma.bankStatementMatch.deleteMany({});
+    await prisma.reconciliation.deleteMany({});
+    await prisma.sarsSubmission.deleteMany({});
+    await prisma.payrollJournalLine.deleteMany({});
+    await prisma.payrollJournal.deleteMany({});
+    await prisma.payroll.deleteMany({});
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.payrollAdjustment.deleteMany({});
+    await prisma.simplePayPayslipImport.deleteMany({});
+    await prisma.simplePayEmployeeMapping.deleteMany({});
+    await prisma.employeeSetupLog.deleteMany({});
+    await prisma.staff.deleteMany({});
+    await prisma.payment.deleteMany({});
+    await prisma.invoiceLine.deleteMany({});
+    await prisma.reminder.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
+    await prisma.invoice.deleteMany({});
+    await prisma.enrollment.deleteMany({});
+    await prisma.feeStructure.deleteMany({});
+    await prisma.child.deleteMany({});
+    await prisma.creditBalance.deleteMany({});
+    await prisma.parent.deleteMany({});
+    await prisma.payeePattern.deleteMany({});
+    await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
+    await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
+    await prisma.simplePayConnection.deleteMany({});
+    await prisma.user.deleteMany({});
+    await prisma.bankConnection.deleteMany({});
+    await prisma.xeroAccountMapping.deleteMany({});
+    await prisma.xeroToken.deleteMany({});
+    await prisma.reportRequest.deleteMany({});
+    await prisma.bulkOperationLog.deleteMany({});
+    await prisma.xeroAccount.deleteMany({});
+    await prisma.tenant.deleteMany({});
+
+    // Create test tenant
+    tenant = await prisma.tenant.create({
+      data: {
+        name: 'Little Stars Daycare',
+        addressLine1: '123 Main Street',
+        city: 'Johannesburg',
+        province: 'Gauteng',
+        postalCode: '2196',
+        phone: '+27211234567',
+        email: `test${Date.now()}@littlestars.co.za`,
+      },
+    });
+
+    // Create test staff
+    staff = await prisma.staff.create({
+      data: {
+        tenantId: tenant.id,
+        firstName: 'Thabo',
+        lastName: 'Mokoena',
+        idNumber: '9001015009087',
+        email: 'thabo@example.com',
+        phone: '+27821234567',
+        dateOfBirth: new Date('1990-01-01'),
+        startDate: new Date('2024-01-15'),
+        employmentType: 'PERMANENT',
+        payFrequency: 'MONTHLY',
+        basicSalaryCents: 2500000, // R25,000
+        isActive: true,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.onModuleDestroy();
+  });
+
+  // Test data for profile mapping syncs
+  const createTestProfileMappingData = (): CreateProfileMappingSyncDto => ({
+    tenantId: tenant.id,
+    staffId: staff.id,
+    simplePayMappingId: 12345,
+    simplePayProfileId: 100,
+    profileName: 'Teacher Profile',
+    calculationSettings: [
+      {
+        calculation_id: 1,
+        calculation_code: 'BASIC',
+        calculation_name: 'Basic Salary',
+        is_enabled: true,
+        amount_cents: null,
+        percentage: null,
+        formula: null,
+      },
+      {
+        calculation_id: 2,
+        calculation_code: 'UIF',
+        calculation_name: 'UIF Contribution',
+        is_enabled: true,
+        amount_cents: null,
+        percentage: 1,
+        formula: null,
+      },
+    ],
+  });
+
+  describe('create', () => {
+    it('should create a profile mapping sync', async () => {
+      const data = createTestProfileMappingData();
+      const result = await repository.create(data);
+
+      expect(result).toBeDefined();
+      expect(result.id).toBeDefined();
+      expect(result.tenantId).toBe(tenant.id);
+      expect(result.staffId).toBe(staff.id);
+      expect(result.simplePayMappingId).toBe(12345);
+      expect(result.simplePayProfileId).toBe(100);
+      expect(result.profileName).toBe('Teacher Profile');
+      expect(result.calculationSettings).toBeDefined();
+    });
+
+    it('should throw ConflictException for duplicate tenant/staff/mapping combination', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      await expect(repository.create(data)).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException for non-existent tenant', async () => {
+      const data = createTestProfileMappingData();
+      data.tenantId = '00000000-0000-0000-0000-000000000000';
+
+      await expect(repository.create(data)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException for non-existent staff', async () => {
+      const data = createTestProfileMappingData();
+      data.staffId = '00000000-0000-0000-0000-000000000000';
+
+      await expect(repository.create(data)).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findById', () => {
+    it('should find a profile mapping sync by ID', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      const result = await repository.findById(created.id);
+
+      expect(result).toBeDefined();
+      expect(result?.id).toBe(created.id);
+    });
+
+    it('should return null for non-existent ID', async () => {
+      const result = await repository.findById(
+        '00000000-0000-0000-0000-000000000000',
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findByIdOrThrow', () => {
+    it('should find a profile mapping sync by ID', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      const result = await repository.findByIdOrThrow(created.id);
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe(created.id);
+    });
+
+    it('should throw NotFoundException for non-existent ID', async () => {
+      await expect(
+        repository.findByIdOrThrow('00000000-0000-0000-0000-000000000000'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('findBySimplePayMappingId', () => {
+    it('should find by SimplePay mapping ID', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      const result = await repository.findBySimplePayMappingId(
+        tenant.id,
+        staff.id,
+        12345,
+      );
+
+      expect(result).toBeDefined();
+      expect(result?.simplePayMappingId).toBe(12345);
+    });
+
+    it('should return null for non-existent mapping ID', async () => {
+      const result = await repository.findBySimplePayMappingId(
+        tenant.id,
+        staff.id,
+        99999,
+      );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findByStaff', () => {
+    it('should find all profile mappings for a staff member', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      // Create second mapping
+      await repository.create({
+        ...data,
+        simplePayMappingId: 12346,
+        simplePayProfileId: 101,
+        profileName: 'Assistant Profile',
+      });
+
+      const results = await repository.findByStaff(tenant.id, staff.id);
+
+      expect(results.length).toBe(2);
+    });
+
+    it('should return empty array for staff with no mappings', async () => {
+      const results = await repository.findByStaff(tenant.id, staff.id);
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe('findByTenant', () => {
+    it('should find all profile mappings for a tenant', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      const results = await repository.findByTenant(tenant.id);
+
+      expect(results.length).toBe(1);
+    });
+
+    it('should filter by profile ID', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+      await repository.create({
+        ...data,
+        simplePayMappingId: 12346,
+        simplePayProfileId: 101,
+      });
+
+      const results = await repository.findByTenant(tenant.id, {
+        profileId: 100,
+      });
+
+      expect(results.length).toBe(1);
+      expect(results[0].simplePayProfileId).toBe(100);
+    });
+
+    it('should filter by profile name', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      const results = await repository.findByTenant(tenant.id, {
+        profileName: 'Teacher',
+      });
+
+      expect(results.length).toBe(1);
+    });
+  });
+
+  describe('findByProfile', () => {
+    it('should find all mappings for a specific profile', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      const results = await repository.findByProfile(tenant.id, 100);
+
+      expect(results.length).toBe(1);
+      expect(results[0].simplePayProfileId).toBe(100);
+    });
+  });
+
+  describe('update', () => {
+    it('should update a profile mapping sync', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      const result = await repository.update(created.id, {
+        profileName: 'Updated Profile Name',
+      });
+
+      expect(result.profileName).toBe('Updated Profile Name');
+    });
+
+    it('should throw NotFoundException for non-existent ID', async () => {
+      await expect(
+        repository.update('00000000-0000-0000-0000-000000000000', {
+          profileName: 'Test',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('upsert', () => {
+    it('should create when record does not exist', async () => {
+      const data = createTestProfileMappingData();
+      const result = await repository.upsert(data);
+
+      expect(result).toBeDefined();
+      expect(result.id).toBeDefined();
+    });
+
+    it('should update when record exists', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.upsert(data);
+
+      const updatedData: CreateProfileMappingSyncDto = {
+        ...data,
+        profileName: 'Updated via Upsert',
+      };
+
+      const result = await repository.upsert(updatedData);
+
+      expect(result.id).toBe(created.id);
+      expect(result.profileName).toBe('Updated via Upsert');
+    });
+  });
+
+  describe('delete', () => {
+    it('should delete a profile mapping sync', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      await repository.delete(created.id);
+
+      const result = await repository.findById(created.id);
+      expect(result).toBeNull();
+    });
+
+    it('should throw NotFoundException for non-existent ID', async () => {
+      await expect(
+        repository.delete('00000000-0000-0000-0000-000000000000'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteBySimplePayMappingId', () => {
+    it('should delete by SimplePay mapping ID', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      await repository.deleteBySimplePayMappingId(tenant.id, staff.id, 12345);
+
+      const result = await repository.findBySimplePayMappingId(
+        tenant.id,
+        staff.id,
+        12345,
+      );
+      expect(result).toBeNull();
+    });
+
+    it('should throw NotFoundException for non-existent mapping ID', async () => {
+      await expect(
+        repository.deleteBySimplePayMappingId(tenant.id, staff.id, 99999),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteByStaff', () => {
+    it('should delete all mappings for a staff member', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+      await repository.create({
+        ...data,
+        simplePayMappingId: 12346,
+      });
+
+      const deletedCount = await repository.deleteByStaff(tenant.id, staff.id);
+
+      expect(deletedCount).toBe(2);
+
+      const results = await repository.findByStaff(tenant.id, staff.id);
+      expect(results.length).toBe(0);
+    });
+  });
+
+  describe('getStaffIdsByProfile', () => {
+    it('should return staff IDs that have a profile assigned', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+
+      const staffIds = await repository.getStaffIdsByProfile(tenant.id, 100);
+
+      expect(staffIds).toContain(staff.id);
+    });
+  });
+
+  describe('getUniqueProfileIds', () => {
+    it('should return unique profile IDs for a tenant', async () => {
+      const data = createTestProfileMappingData();
+      await repository.create(data);
+      await repository.create({
+        ...data,
+        simplePayMappingId: 12346,
+        simplePayProfileId: 101,
+      });
+
+      const profileIds = await repository.getUniqueProfileIds(tenant.id);
+
+      expect(profileIds).toContain(100);
+      expect(profileIds).toContain(101);
+      expect(profileIds.length).toBe(2);
+    });
+  });
+});

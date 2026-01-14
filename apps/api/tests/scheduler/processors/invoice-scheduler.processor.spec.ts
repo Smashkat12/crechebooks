@@ -20,6 +20,9 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { TenantRepository } from '../../../src/database/repositories/tenant.repository';
 import { EnrollmentService } from '../../../src/database/services/enrollment.service';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
+import { ProRataService } from '../../../src/database/services/pro-rata.service';
+import { CreditBalanceService } from '../../../src/database/services/credit-balance.service';
+import { CreditNoteService } from '../../../src/database/services/credit-note.service';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { EnrollmentStatus } from '../../../src/database/entities/enrollment.entity';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
@@ -104,6 +107,9 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
         ParentRepository,
         TenantRepository,
         AuditLogService,
+        ProRataService,
+        CreditBalanceService,
+        CreditNoteService,
         { provide: XeroSyncService, useValue: mockXeroSyncService },
       ],
     }).compile();
@@ -128,6 +134,33 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
   });
 
   async function setupTestData() {
+    // Clean up any stale data from previous runs
+    const existingTenant = await prisma.tenant.findUnique({
+      where: { email: 'scheduler@test.co.za' },
+    });
+    if (existingTenant) {
+      await prisma.invoiceLine.deleteMany({
+        where: { invoice: { tenantId: existingTenant.id } },
+      });
+      await prisma.invoice.deleteMany({
+        where: { tenantId: existingTenant.id },
+      });
+      await prisma.enrollment.deleteMany({
+        where: { tenantId: existingTenant.id },
+      });
+      await prisma.feeStructure.deleteMany({
+        where: { tenantId: existingTenant.id },
+      });
+      await prisma.child.deleteMany({ where: { tenantId: existingTenant.id } });
+      await prisma.parent.deleteMany({
+        where: { tenantId: existingTenant.id },
+      });
+      await prisma.auditLog.deleteMany({
+        where: { tenantId: existingTenant.id },
+      });
+      await prisma.tenant.delete({ where: { id: existingTenant.id } });
+    }
+
     // Create test tenant
     testTenant = await prisma.tenant.create({
       data: {

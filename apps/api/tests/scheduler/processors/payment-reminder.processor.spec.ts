@@ -18,6 +18,7 @@ import { ReminderRepository } from '../../../src/database/repositories/reminder.
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { EmailService } from '../../../src/integrations/email/email.service';
 import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
+import { ReminderTemplateService } from '../../../src/billing/reminder-template.service';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
 import { getStageForDaysOverdue } from '../../../src/billing/types/reminder.types';
@@ -120,6 +121,7 @@ describe('PaymentReminderProcessor Integration Tests', () => {
         ParentRepository,
         ReminderRepository,
         PaymentRepository,
+        ReminderTemplateService,
         { provide: EmailService, useValue: mockEmailService },
         { provide: WhatsAppService, useValue: mockWhatsAppService },
       ],

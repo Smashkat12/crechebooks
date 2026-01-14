@@ -5,6 +5,7 @@
  * CRITICAL: Uses REAL PostgreSQL database - NO MOCKS
  * ALL monetary values in CENTS (integers)
  */
+import 'dotenv/config';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
@@ -33,20 +34,28 @@ describe('PaymentMatcherAgent', () => {
 
     prisma = module.get<PrismaService>(PrismaService);
     agent = module.get<PaymentMatcherAgent>(PaymentMatcherAgent);
+
+    await prisma.onModuleInit();
   });
 
   beforeEach(async () => {
     // Clean up test data in correct order (respecting foreign keys)
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.child.deleteMany({});
     await prisma.parent.deleteMany({
       where: { email: { contains: 'matcher-test' } },
     });
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({
       where: { email: { contains: 'matcher-test' } },
     });
@@ -92,18 +101,24 @@ describe('PaymentMatcherAgent', () => {
     // Clean up
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.child.deleteMany({});
     await prisma.parent.deleteMany({
       where: { email: { contains: 'matcher-test' } },
     });
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({
       where: { email: { contains: 'matcher-test' } },
     });
-    await prisma.$disconnect();
+    await prisma.onModuleDestroy();
   });
 
   describe('findCandidates()', () => {

@@ -14,7 +14,11 @@ import { ChildRepository } from '../../../src/database/repositories/child.reposi
 import { FeeStructureRepository } from '../../../src/database/repositories/fee-structure.repository';
 import { ParentRepository } from '../../../src/database/repositories/parent.repository';
 import { TenantRepository } from '../../../src/database/repositories/tenant.repository';
+import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
+import { InvoiceLineRepository } from '../../../src/database/repositories/invoice-line.repository';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
+import { ProRataService } from '../../../src/database/services/pro-rata.service';
+import { CreditNoteService } from '../../../src/database/services/credit-note.service';
 import {
   NotFoundException,
   ConflictException,
@@ -53,7 +57,11 @@ describe('EnrollmentService', () => {
         FeeStructureRepository,
         ParentRepository,
         TenantRepository,
+        InvoiceRepository,
+        InvoiceLineRepository,
         AuditLogService,
+        ProRataService,
+        CreditNoteService,
       ],
     }).compile();
 
@@ -78,22 +86,43 @@ describe('EnrollmentService', () => {
     // CRITICAL: Clean database in FK order - leaf tables first!
     await prisma.auditLog.deleteMany({});
     await prisma.sarsSubmission.deleteMany({});
+    await prisma.bankStatementMatch.deleteMany({});
     await prisma.reconciliation.deleteMany({});
+    await prisma.payrollJournalLine.deleteMany({});
+    await prisma.payrollJournal.deleteMany({});
     await prisma.payroll.deleteMany({});
+    await prisma.payRunSync.deleteMany({});
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.payrollAdjustment.deleteMany({});
+    await prisma.employeeSetupLog.deleteMany({});
     await prisma.staff.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
     await prisma.reminder.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.feeStructure.deleteMany({});
     await prisma.child.deleteMany({});
+    await prisma.creditBalance.deleteMany({});
     await prisma.parent.deleteMany({});
     await prisma.payeePattern.deleteMany({});
     await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
+    await prisma.xeroAccountMapping.deleteMany({});
     await prisma.xeroToken.deleteMany({});
+    await prisma.simplePayConnection.deleteMany({});
     await prisma.user.deleteMany({});
+    await prisma.bankConnection.deleteMany({});
+    await prisma.xeroAccountMapping.deleteMany({});
+    await prisma.xeroToken.deleteMany({});
+    await prisma.reportRequest.deleteMany({});
+    await prisma.bulkOperationLog.deleteMany({});
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({});
 
     // Create test tenant
@@ -187,7 +216,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 1); // Tomorrow
 
-      const enrollment = await service.enrollChild(
+      const result = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -195,17 +224,18 @@ describe('EnrollmentService', () => {
         testUser.id,
       );
 
-      expect(enrollment).toBeDefined();
-      expect(enrollment.childId).toBe(testChild1.id);
-      expect(enrollment.feeStructureId).toBe(testFeeStructure.id);
-      expect(enrollment.status).toBe(EnrollmentStatus.ACTIVE);
-      expect(enrollment.tenantId).toBe(testTenant.id);
+      expect(result).toBeDefined();
+      expect(result.enrollment).toBeDefined();
+      expect(result.enrollment.childId).toBe(testChild1.id);
+      expect(result.enrollment.feeStructureId).toBe(testFeeStructure.id);
+      expect(result.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+      expect(result.enrollment.tenantId).toBe(testTenant.id);
 
       // Verify audit log created
       const auditLogs = await prisma.auditLog.findMany({
         where: {
           entityType: 'Enrollment',
-          entityId: enrollment.id,
+          entityId: result.enrollment.id,
           action: 'CREATE',
         },
       });
@@ -217,7 +247,7 @@ describe('EnrollmentService', () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const enrollment = await service.enrollChild(
+      const result = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -225,8 +255,8 @@ describe('EnrollmentService', () => {
         testUser.id,
       );
 
-      expect(enrollment).toBeDefined();
-      expect(enrollment.status).toBe(EnrollmentStatus.ACTIVE);
+      expect(result).toBeDefined();
+      expect(result.enrollment.status).toBe(EnrollmentStatus.ACTIVE);
     });
 
     it('should throw NotFoundException for invalid childId', async () => {
@@ -363,7 +393,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 1);
 
-      const enrollment = await service.enrollChild(
+      const { enrollment } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -423,7 +453,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 10);
 
-      const enrollment = await service.enrollChild(
+      const { enrollment } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -448,7 +478,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 1);
 
-      const enrollment = await service.enrollChild(
+      const { enrollment } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -472,7 +502,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 1);
 
-      const enrollment = await service.enrollChild(
+      const { enrollment } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -514,7 +544,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 1);
 
-      const enrollment = await service.enrollChild(
+      const { enrollment } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -548,7 +578,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 10);
 
-      const enrollment = await service.enrollChild(
+      const { enrollment } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -676,7 +706,7 @@ describe('EnrollmentService', () => {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() + 1);
 
-      const enrollment1 = await service.enrollChild(
+      const { enrollment: enrollment1 } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,
@@ -867,7 +897,7 @@ describe('EnrollmentService', () => {
       startDate3.setDate(startDate3.getDate() + 1);
 
       // Enroll all 3
-      const enrollment1 = await service.enrollChild(
+      const { enrollment: enrollment1 } = await service.enrollChild(
         testTenant.id,
         testChild1.id,
         testFeeStructure.id,

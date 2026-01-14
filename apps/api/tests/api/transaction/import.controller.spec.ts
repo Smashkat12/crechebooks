@@ -3,8 +3,10 @@ import { BadRequestException } from '@nestjs/common';
 import { TransactionController } from '../../../src/api/transaction/transaction.controller';
 import { TransactionRepository } from '../../../src/database/repositories/transaction.repository';
 import { CategorizationRepository } from '../../../src/database/repositories/categorization.repository';
+import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { TransactionImportService } from '../../../src/database/services/transaction-import.service';
 import { CategorizationService } from '../../../src/database/services/categorization.service';
+import { PaymentAllocationService } from '../../../src/database/services/payment-allocation.service';
 import { ImportResult } from '../../../src/database/dto/import.dto';
 import type { IUser } from '../../../src/database/entities/user.entity';
 
@@ -43,8 +45,10 @@ describe('TransactionController.importTransactions', () => {
       providers: [
         { provide: TransactionRepository, useValue: {} },
         { provide: CategorizationRepository, useValue: {} },
+        { provide: InvoiceRepository, useValue: {} },
         { provide: TransactionImportService, useValue: mockImportService },
         { provide: CategorizationService, useValue: {} },
+        { provide: PaymentAllocationService, useValue: {} },
       ],
     }).compile();
 

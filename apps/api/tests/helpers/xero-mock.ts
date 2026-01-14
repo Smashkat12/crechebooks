@@ -67,12 +67,23 @@ export class XeroMockServer {
   }
 
   async stop(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (this.server) {
-        this.server.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
+        // Use listening check to avoid "Server is not running" error
+        if (this.server.listening) {
+          this.server.close((err) => {
+            if (err) {
+              // Log but don't fail - server may already be stopped
+              console.log(`XeroMockServer stop warning: ${err.message}`);
+            }
+            this.server = null;
+            resolve();
+          });
+        } else {
+          // Server exists but not listening - just clear the reference
+          this.server = null;
+          resolve();
+        }
       } else {
         resolve();
       }

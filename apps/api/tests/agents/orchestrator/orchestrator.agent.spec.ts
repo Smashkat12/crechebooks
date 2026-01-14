@@ -4,6 +4,7 @@
  *
  * CRITICAL: Tests use REAL PostgreSQL database - NO MOCKS.
  */
+import 'dotenv/config';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
@@ -68,6 +69,8 @@ describe('OrchestratorAgent', () => {
     prisma = module.get<PrismaService>(PrismaService);
     orchestrator = module.get<OrchestratorAgent>(OrchestratorAgent);
     workflowRouter = module.get<WorkflowRouter>(WorkflowRouter);
+
+    await prisma.onModuleInit();
   });
 
   beforeEach(async () => {
@@ -75,15 +78,30 @@ describe('OrchestratorAgent', () => {
     await prisma.sarsSubmission.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
+    await prisma.payrollJournalLine.deleteMany({});
+    await prisma.payrollJournal.deleteMany({});
     await prisma.payroll.deleteMany({});
+    await prisma.payRunSync.deleteMany({});
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.payrollAdjustment.deleteMany({});
+    await prisma.employeeSetupLog.deleteMany({});
     await prisma.staff.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.child.deleteMany({});
     await prisma.feeStructure.deleteMany({});
+    await prisma.creditBalance.deleteMany({});
     await prisma.parent.deleteMany({});
+    await prisma.reportRequest.deleteMany({});
+    await prisma.bulkOperationLog.deleteMany({});
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({});
 
     // Create test tenant
@@ -103,7 +121,7 @@ describe('OrchestratorAgent', () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    await prisma.onModuleDestroy();
   });
 
   describe('WorkflowRouter', () => {

@@ -100,6 +100,9 @@ export async function cleanupTestData(
     // Fee structures
     await prisma.feeStructure.deleteMany({ where: { tenantId } });
 
+    // Categorization journals (must be before transactions due to FK)
+    await prisma.categorizationJournal.deleteMany({ where: { tenantId } });
+
     // Transactions
     await prisma.transaction.deleteMany({ where: { tenantId } });
 
@@ -107,6 +110,7 @@ export async function cleanupTestData(
     await prisma.bankConnection.deleteMany({ where: { tenantId } });
 
     // Reconciliations
+    await prisma.bankStatementMatch.deleteMany({});
     await prisma.reconciliation.deleteMany({ where: { tenantId } });
 
     // SARS submissions

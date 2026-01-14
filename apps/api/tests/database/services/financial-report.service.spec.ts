@@ -20,6 +20,7 @@ import { EnrollmentRepository } from '../../../src/database/repositories/enrollm
 import { FeeStructureRepository } from '../../../src/database/repositories/fee-structure.repository';
 import { InvoiceLineRepository } from '../../../src/database/repositories/invoice-line.repository';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
+import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { BusinessException } from '../../../src/shared/exceptions';
 import { DEFAULT_ACCOUNTS } from '../../../src/database/constants/chart-of-accounts.constants';
 import { ImportSource } from '../../../src/database/entities/transaction.entity';
@@ -61,6 +62,7 @@ describe('FinancialReportService (Integration)', () => {
         FeeStructureRepository,
         InvoiceLineRepository,
         PaymentRepository,
+        AuditLogService,
       ],
     }).compile();
 
@@ -80,6 +82,12 @@ describe('FinancialReportService (Integration)', () => {
     );
     invoiceLineRepo = module.get<InvoiceLineRepository>(InvoiceLineRepository);
     paymentRepo = module.get<PaymentRepository>(PaymentRepository);
+
+    await prisma.onModuleInit();
+  });
+
+  afterAll(async () => {
+    await prisma.onModuleDestroy();
   });
 
   beforeEach(async () => {
@@ -118,10 +126,6 @@ describe('FinancialReportService (Integration)', () => {
       });
       await prisma.tenant.delete({ where: { id: testTenantId } });
     }
-  });
-
-  afterAll(async () => {
-    await prisma.$disconnect();
   });
 
   describe('generateIncomeStatement', () => {
@@ -261,8 +265,9 @@ describe('FinancialReportService (Integration)', () => {
       const result = await service.generateBalanceSheet(testTenantId, asOfDate);
 
       // Bank balance should be R1,000 - R300 = R700
+      // The service puts bank balance in SAVINGS_ACCOUNT
       const bankAccount = result.assets.current.find(
-        (acc) => acc.accountCode === DEFAULT_ACCOUNTS.BANK.code,
+        (acc) => acc.accountCode === DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code,
       );
       expect(bankAccount).toBeDefined();
       expect(bankAccount!.amountCents).toBe(70000);
@@ -285,8 +290,8 @@ describe('FinancialReportService (Integration)', () => {
 
       await categorizationRepo.create({
         transactionId: creditTx.id,
-        accountCode: DEFAULT_ACCOUNTS.BANK.code,
-        accountName: DEFAULT_ACCOUNTS.BANK.name,
+        accountCode: DEFAULT_ACCOUNTS.PETTY_CASH.code,
+        accountName: DEFAULT_ACCOUNTS.PETTY_CASH.name,
         confidenceScore: 100,
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
@@ -336,8 +341,8 @@ describe('FinancialReportService (Integration)', () => {
 
       await categorizationRepo.create({
         transactionId: tx1.id,
-        accountCode: DEFAULT_ACCOUNTS.BANK.code,
-        accountName: DEFAULT_ACCOUNTS.BANK.name,
+        accountCode: DEFAULT_ACCOUNTS.PETTY_CASH.code,
+        accountName: DEFAULT_ACCOUNTS.PETTY_CASH.name,
         confidenceScore: 100,
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
@@ -424,36 +429,28 @@ describe('FinancialReportService (Integration)', () => {
   });
 
   describe('export methods', () => {
-    it('should throw NOT_IMPLEMENTED for PDF export', async () => {
+    it('should export income statement to PDF', async () => {
       const report = await service.generateIncomeStatement(
         testTenantId,
         new Date('2025-01-01'),
         new Date('2025-01-31'),
       );
 
-      try {
-        await service.exportPDF(report);
-        fail('Expected BusinessException to be thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(BusinessException);
-        expect((error as BusinessException).code).toBe('NOT_IMPLEMENTED');
-      }
+      const pdfBuffer = await service.exportPDF(report);
+      expect(pdfBuffer).toBeInstanceOf(Buffer);
+      expect(pdfBuffer.length).toBeGreaterThan(0);
     });
 
-    it('should throw NOT_IMPLEMENTED for Excel export', async () => {
+    it('should export income statement to Excel', async () => {
       const report = await service.generateIncomeStatement(
         testTenantId,
         new Date('2025-01-01'),
         new Date('2025-01-31'),
       );
 
-      try {
-        await service.exportExcel(report);
-        fail('Expected BusinessException to be thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(BusinessException);
-        expect((error as BusinessException).code).toBe('NOT_IMPLEMENTED');
-      }
+      const excelBuffer = await service.exportExcel(report);
+      expect(excelBuffer).toBeInstanceOf(Buffer);
+      expect(excelBuffer.length).toBeGreaterThan(0);
     });
   });
 });

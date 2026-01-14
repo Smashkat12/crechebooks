@@ -14,6 +14,8 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { ChildRepository } from '../../../src/database/repositories/child.repository';
 import { InvoiceGenerationService } from '../../../src/database/services/invoice-generation.service';
 import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
+import { AdhocChargeService } from '../../../src/database/services/adhoc-charge.service';
+import { InvoicePdfService } from '../../../src/database/services/invoice-pdf.service';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import { DeliveryMethod } from '../../../src/database/entities/invoice.entity';
@@ -71,6 +73,14 @@ describe('InvoiceController - Send Invoices', () => {
           useValue: {
             sendInvoices: jest.fn(),
           },
+        },
+        {
+          provide: AdhocChargeService,
+          useValue: {},
+        },
+        {
+          provide: InvoicePdfService,
+          useValue: {},
         },
       ],
     }).compile();

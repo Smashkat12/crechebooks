@@ -143,7 +143,23 @@ describe('ChildController', () => {
         {
           provide: EnrollmentService,
           useValue: {
-            enrollChild: jest.fn(),
+            enrollChild: jest.fn().mockResolvedValue({
+              enrollment: {
+                id: 'enroll-001',
+                tenantId: mockTenantId,
+                childId: 'child-001',
+                feeStructureId: 'fee-001',
+                startDate: new Date('2025-02-01'),
+                endDate: null,
+                status: 'ACTIVE',
+                siblingDiscountApplied: false,
+                customFeeOverrideCents: null,
+                notes: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+              invoice: null,
+            }),
           },
         },
       ],
@@ -185,18 +201,21 @@ describe('ChildController', () => {
         .mockResolvedValue(mockFeeStructure);
       jest.spyOn(childRepo, 'create').mockResolvedValue(mockChild);
       jest.spyOn(enrollmentService, 'enrollChild').mockResolvedValue({
-        id: 'enroll-001',
-        tenantId: mockTenantId,
-        childId: mockChild.id,
-        feeStructureId: mockFeeStructure.id,
-        startDate: new Date('2025-02-01'),
-        endDate: null,
-        status: EnrollmentStatus.ACTIVE,
-        siblingDiscountApplied: false,
-        customFeeOverrideCents: null,
-        notes: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        enrollment: {
+          id: 'enroll-001',
+          tenantId: mockTenantId,
+          childId: mockChild.id,
+          feeStructureId: mockFeeStructure.id,
+          startDate: new Date('2025-02-01'),
+          endDate: null,
+          status: EnrollmentStatus.ACTIVE,
+          siblingDiscountApplied: false,
+          customFeeOverrideCents: null,
+          notes: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        invoice: null,
       });
 
       // Act
@@ -296,18 +315,21 @@ describe('ChildController', () => {
         .spyOn(childRepo, 'create')
         .mockResolvedValue(mockChild);
       jest.spyOn(enrollmentService, 'enrollChild').mockResolvedValue({
-        id: mockEnrollment.id,
-        tenantId: mockEnrollment.tenantId,
-        childId: mockEnrollment.childId,
-        feeStructureId: mockEnrollment.feeStructureId,
-        startDate: mockEnrollment.startDate,
-        endDate: mockEnrollment.endDate,
-        status: mockEnrollment.status as EnrollmentStatus,
-        siblingDiscountApplied: mockEnrollment.siblingDiscountApplied,
-        customFeeOverrideCents: mockEnrollment.customFeeOverrideCents,
-        notes: mockEnrollment.notes,
-        createdAt: mockEnrollment.createdAt,
-        updatedAt: mockEnrollment.updatedAt,
+        enrollment: {
+          id: mockEnrollment.id,
+          tenantId: mockEnrollment.tenantId,
+          childId: mockEnrollment.childId,
+          feeStructureId: mockEnrollment.feeStructureId,
+          startDate: mockEnrollment.startDate,
+          endDate: mockEnrollment.endDate,
+          status: mockEnrollment.status as EnrollmentStatus,
+          siblingDiscountApplied: mockEnrollment.siblingDiscountApplied,
+          customFeeOverrideCents: mockEnrollment.customFeeOverrideCents,
+          notes: mockEnrollment.notes,
+          createdAt: mockEnrollment.createdAt,
+          updatedAt: mockEnrollment.updatedAt,
+        },
+        invoice: null,
       });
 
       // Act

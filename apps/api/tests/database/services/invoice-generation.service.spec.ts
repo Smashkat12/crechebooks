@@ -19,6 +19,9 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { TenantRepository } from '../../../src/database/repositories/tenant.repository';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
+import { ProRataService } from '../../../src/database/services/pro-rata.service';
+import { CreditBalanceService } from '../../../src/database/services/credit-balance.service';
+import { CreditNoteService } from '../../../src/database/services/credit-note.service';
 
 /**
  * Mock XeroSyncService for tests
@@ -107,6 +110,9 @@ describe('InvoiceGenerationService', () => {
         ParentRepository,
         TenantRepository,
         AuditLogService,
+        ProRataService,
+        CreditBalanceService,
+        CreditNoteService,
         // Mock XeroSyncService because it requires external Xero API credentials
         // This is a SERVICE mock for external integration, not a DATA mock
         { provide: XeroSyncService, useValue: mockXeroSyncService },
@@ -131,22 +137,43 @@ describe('InvoiceGenerationService', () => {
     // CRITICAL: Clean database in FK order - leaf tables first!
     await prisma.auditLog.deleteMany({});
     await prisma.sarsSubmission.deleteMany({});
+    await prisma.bankStatementMatch.deleteMany({});
     await prisma.reconciliation.deleteMany({});
+    await prisma.payrollJournalLine.deleteMany({});
+    await prisma.payrollJournal.deleteMany({});
     await prisma.payroll.deleteMany({});
+    await prisma.payRunSync.deleteMany({});
+    await prisma.leaveRequest.deleteMany({});
+    await prisma.payrollAdjustment.deleteMany({});
+    await prisma.employeeSetupLog.deleteMany({});
     await prisma.staff.deleteMany({});
     await prisma.payment.deleteMany({});
     await prisma.invoiceLine.deleteMany({});
     await prisma.reminder.deleteMany({});
+    await prisma.statementLine.deleteMany({});
+    await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
     await prisma.enrollment.deleteMany({});
     await prisma.feeStructure.deleteMany({});
     await prisma.child.deleteMany({});
+    await prisma.creditBalance.deleteMany({});
     await prisma.parent.deleteMany({});
     await prisma.payeePattern.deleteMany({});
     await prisma.categorization.deleteMany({});
+    await prisma.categorizationMetric.deleteMany({});
+    await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
+    await prisma.calculationItemCache.deleteMany({});
+    await prisma.xeroAccountMapping.deleteMany({});
     await prisma.xeroToken.deleteMany({});
+    await prisma.simplePayConnection.deleteMany({});
     await prisma.user.deleteMany({});
+    await prisma.bankConnection.deleteMany({});
+    await prisma.xeroAccountMapping.deleteMany({});
+    await prisma.xeroToken.deleteMany({});
+    await prisma.reportRequest.deleteMany({});
+    await prisma.bulkOperationLog.deleteMany({});
+    await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({});
 
     const timestamp = Date.now();
@@ -472,9 +499,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should generate invoices for all active enrollments', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -484,15 +515,19 @@ describe('InvoiceGenerationService', () => {
 
       // Verify invoice numbers
       const invoiceNumbers = result.invoices.map((i) => i.invoiceNumber);
-      expect(invoiceNumbers).toContain('INV-2025-001');
-      expect(invoiceNumbers).toContain('INV-2025-002');
-      expect(invoiceNumbers).toContain('INV-2025-003');
+      expect(invoiceNumbers).toContain(`INV-${currentYear}-001`);
+      expect(invoiceNumbers).toContain(`INV-${currentYear}-002`);
+      expect(invoiceNumbers).toContain(`INV-${currentYear}-003`);
     });
 
     it('should filter by childIds when provided', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
         [testChild1.id, testChild2.id], // Only first 2 children
       );
@@ -507,17 +542,21 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should prevent duplicate invoices for same billing period', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       // Generate first batch
       await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
       // Try to generate again for same month
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -527,9 +566,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should apply sibling discounts correctly for 3 children', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -567,9 +610,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should NOT calculate VAT for non-VAT-registered tenant', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -588,23 +635,27 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should set correct billing period dates', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
       const invoice = await invoiceRepo.findById(result.invoices[0].id);
       expect(invoice).toBeDefined();
 
-      // June 2025 billing period
+      // June billing period
       // Verify start is beginning of month and end is end of month
       const start = invoice!.billingPeriodStart;
       const end = invoice!.billingPeriodEnd;
 
       // Billing period dates should be set (regardless of timezone)
-      expect(start.getFullYear()).toBe(2025);
-      expect(end.getFullYear()).toBe(2025);
+      expect(start.getFullYear()).toBe(currentYear);
+      expect(end.getFullYear()).toBe(currentYear);
 
       // End date should be after start date
       expect(end.getTime()).toBeGreaterThan(start.getTime());
@@ -618,9 +669,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should set status to DRAFT for all invoices', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -630,9 +685,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should use tenant invoice due days setting', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -649,9 +708,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should create audit log entries for generated invoices', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -660,7 +723,7 @@ describe('InvoiceGenerationService', () => {
         where: {
           tenantId: testTenant.id,
           entityType: 'InvoiceBatch',
-          entityId: '2025-06',
+          entityId: billingMonth,
         },
       });
       expect(batchLog).toBeDefined();
@@ -737,9 +800,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should calculate VAT for VAT-registered tenant', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenantVatRegistered.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -750,19 +817,24 @@ describe('InvoiceGenerationService', () => {
       );
       expect(invoice).toBeDefined();
 
-      // R5000 + 15% VAT = R5750
-      // 500000 + 75000 = 575000 cents
+      // Monthly fee line type (MONTHLY_FEE) is VAT EXEMPT for educational services
+      // So NO VAT is charged on R5000 tuition fee
+      // Per isVatApplicable() in invoice-line.entity.ts
       expect(invoice!.subtotalCents).toBe(500000);
-      expect(invoice!.vatCents).toBe(75000);
-      expect(invoice!.totalCents).toBe(575000);
+      expect(invoice!.vatCents).toBe(0); // No VAT on educational services
+      expect(invoice!.totalCents).toBe(500000);
 
-      // Line item should also have VAT
+      // Line item should NOT have VAT (educational service exemption)
       expect(invoice!.lines[0].subtotalCents).toBe(500000);
-      expect(invoice!.lines[0].vatCents).toBe(75000);
-      expect(invoice!.lines[0].totalCents).toBe(575000);
+      expect(invoice!.lines[0].vatCents).toBe(0);
+      expect(invoice!.lines[0].totalCents).toBe(500000);
     });
 
     it('should NOT calculate VAT on discount lines', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       // Add second child for sibling discount
       const vatChild2 = await prisma.child.create({
         data: {
@@ -786,7 +858,7 @@ describe('InvoiceGenerationService', () => {
 
       const result = await service.generateMonthlyInvoices(
         testTenantVatRegistered.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -800,13 +872,13 @@ describe('InvoiceGenerationService', () => {
       expect(invoice).toBeDefined();
       expect(invoice!.lines).toHaveLength(2);
 
-      // Fee line has VAT
+      // Fee line does NOT have VAT (MONTHLY_FEE is VAT exempt for educational services)
       const feeLine = invoice!.lines.find(
         (l) => l.lineType === LineType.MONTHLY_FEE,
       );
-      expect(feeLine!.vatCents).toBe(75000);
+      expect(feeLine!.vatCents).toBe(0); // Educational services are VAT exempt
 
-      // Discount line has NO VAT
+      // Discount line also has NO VAT (discounts never have VAT)
       const discountLine = invoice!.lines.find(
         (l) => l.lineType === LineType.DISCOUNT,
       );
@@ -816,6 +888,10 @@ describe('InvoiceGenerationService', () => {
 
   describe('Single Child (No Sibling Discount)', () => {
     it('should generate invoice without sibling discount for single child', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       // Create enrollment for child4 (only child of parent2)
       await prisma.enrollment.create({
         data: {
@@ -829,7 +905,7 @@ describe('InvoiceGenerationService', () => {
 
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
         [testChild4.id], // Only this child
       );
@@ -851,6 +927,10 @@ describe('InvoiceGenerationService', () => {
 
   describe('Custom Fee Override', () => {
     it('should use custom fee override when set on enrollment', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       // Update enrollment with custom fee
       await prisma.enrollment.update({
         where: { id: testEnrollment1.id },
@@ -859,7 +939,7 @@ describe('InvoiceGenerationService', () => {
 
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
         [testChild1.id],
       );
@@ -877,10 +957,14 @@ describe('InvoiceGenerationService', () => {
 
   describe('buildXeroLineItems', () => {
     it('should format invoice lines for Xero', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       // Generate an invoice first
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
         [testChild1.id],
       );
@@ -898,17 +982,21 @@ describe('InvoiceGenerationService', () => {
 
   describe('Error Handling', () => {
     it('should record errors for already-invoiced children without failing', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       // Generate invoices first
       await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
       // Try again - should get errors for duplicates
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 
@@ -921,9 +1009,13 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should aggregate total amount correctly across all invoices', async () => {
+      // Use current year to match issueDate (which is set to today's date)
+      const currentYear = new Date().getFullYear();
+      const billingMonth = `${currentYear}-06`;
+
       const result = await service.generateMonthlyInvoices(
         testTenant.id,
-        '2025-06',
+        billingMonth,
         testUser.id,
       );
 

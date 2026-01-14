@@ -11,7 +11,7 @@ import { PdfParser } from '../../../src/database/parsers/pdf-parser';
 
 describe('PdfParser - Confidence Scoring', () => {
   let parser: PdfParser;
-  const bankStatementsDir = path.join(process.cwd(), 'bank-statements');
+  const bankStatementsDir = path.join(process.cwd(), '../../bank-statements');
 
   beforeAll(() => {
     parser = new PdfParser();

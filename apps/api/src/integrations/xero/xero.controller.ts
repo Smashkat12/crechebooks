@@ -20,6 +20,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Param,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -37,6 +38,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { TokenManager, TokenSet } from '../../mcp/xero-mcp/auth/token-manager';
 import { BankFeedService } from './bank-feed.service';
 import { XeroSyncGateway } from './xero.gateway';
+import { XeroSyncService } from '../../database/services/xero-sync.service';
 import { CurrentUser } from '../../api/auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../api/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../api/auth/guards/roles.guard';
@@ -52,7 +54,19 @@ import {
   CallbackQueryDto,
   DisconnectResponseDto,
   OAuthStatePayload,
+  PushCategorizationsRequestDto,
+  PushCategorizationsResponseDto,
+  XeroSetupGuideDto,
+  TransactionsNeedingReviewDto,
 } from './dto/xero.dto';
+import {
+  SyncAccountsRequestDto,
+  SyncAccountsResponseDto,
+  XeroAccountFilterDto,
+  ListAccountsResponseDto,
+  ValidateAccountCodeResponseDto,
+} from '../../database/dto/xero-account.dto';
+import { XeroAccountStatus } from '../../database/entities/xero-account.entity';
 
 // State encryption key (should be in environment)
 const STATE_ENCRYPTION_KEY =
@@ -74,6 +88,7 @@ export class XeroController {
     private readonly prisma: PrismaService,
     private readonly bankFeedService: BankFeedService,
     private readonly syncGateway: XeroSyncGateway,
+    private readonly xeroSyncService: XeroSyncService,
   ) {
     this.tokenManager = new TokenManager(this.prisma);
   }
@@ -135,21 +150,19 @@ export class XeroController {
       );
     }
 
-    // Create Xero client
+    // Create Xero client with minimal required scopes
+    // Note: 'profile' and 'email' require separate enablement in Xero Developer Portal
+    // 'finance.bankstatementsplus.read' requires Bank Feeds API access
     const xeroClient = new XeroClient({
       clientId,
       clientSecret,
       redirectUris: [redirectUri],
       scopes: [
         'openid',
-        'profile',
-        'email',
         'offline_access',
         'accounting.transactions',
         'accounting.contacts',
         'accounting.settings',
-        // 'finance.bankstatementsplus.read', // Requires Xero partner approval
-        // 'bankfeeds', // Requires special Xero approval
       ],
     });
 
@@ -249,21 +262,17 @@ export class XeroController {
         );
       }
 
-      // Create Xero client
+      // Create Xero client with minimal required scopes
       const xeroClient = new XeroClient({
         clientId,
         clientSecret,
         redirectUris: [redirectUri],
         scopes: [
           'openid',
-          'profile',
-          'email',
           'offline_access',
           'accounting.transactions',
           'accounting.contacts',
           'accounting.settings',
-          // 'finance.bankstatementsplus.read', // Requires Xero partner approval
-          // 'bankfeeds', // Requires special Xero approval
         ],
       });
 
@@ -739,6 +748,252 @@ export class XeroController {
   }
 
   /**
+   * Push transaction categorizations to Xero
+   * POST /xero/push-categorizations
+   * TASK-XERO-004: Push Categorizations to Xero API Endpoint
+   */
+  @Post('push-categorizations')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Push transaction categorizations to Xero',
+    description:
+      'Pushes local categorizations to update Xero transactions. If no IDs provided, pushes all categorized but unsynced.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Push operation completed',
+    type: PushCategorizationsResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async pushCategorizations(
+    @Body() body: PushCategorizationsRequestDto,
+    @CurrentUser() user: IUser,
+  ): Promise<PushCategorizationsResponseDto> {
+    const tenantId = user.tenantId;
+
+    // Check connection
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException(
+        'No valid Xero connection. Please connect to Xero first.',
+        'XERO_NOT_CONNECTED',
+      );
+    }
+
+    let transactionIds = body.transactionIds ?? [];
+
+    // If no specific IDs, get all categorized but unsynced
+    if (transactionIds.length === 0) {
+      const unsynced = await this.prisma.transaction.findMany({
+        where: {
+          tenantId,
+          status: { in: ['CATEGORIZED', 'REVIEW_REQUIRED'] },
+          xeroTransactionId: { not: null },
+        },
+        include: {
+          categorizations: {
+            take: 1,
+          },
+        },
+      });
+      transactionIds = unsynced
+        .filter((tx) => tx.categorizations.length > 0)
+        .map((tx) => tx.id);
+    }
+
+    if (transactionIds.length === 0) {
+      return { synced: 0, failed: 0, skipped: 0, errors: [] };
+    }
+
+    this.logger.log(
+      `Pushing ${transactionIds.length} categorizations to Xero for tenant ${tenantId}`,
+    );
+
+    const result = await this.xeroSyncService.syncTransactions(
+      transactionIds,
+      tenantId,
+    );
+
+    return {
+      synced: result.synced,
+      failed: result.failed,
+      skipped: result.skipped,
+      errors: result.errors.map((e) => ({
+        transactionId: e.transactionId,
+        error: e.error,
+        code: e.code ?? 'SYNC_ERROR',
+      })),
+    };
+  }
+
+  /**
+   * Sync Chart of Accounts from Xero to database
+   * POST /xero/sync-accounts
+   * TASK-XERO-006: Chart of Accounts Database Sync
+   */
+  @Post('sync-accounts')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Sync Chart of Accounts from Xero',
+    description:
+      'Fetches the Chart of Accounts from Xero and stores them locally for validation.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync completed',
+    type: SyncAccountsResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async syncAccounts(
+    @Body() body: SyncAccountsRequestDto,
+    @CurrentUser() user: IUser,
+  ): Promise<SyncAccountsResponseDto> {
+    const tenantId = user.tenantId;
+    this.logger.log(`Syncing Chart of Accounts for tenant ${tenantId}`);
+
+    // Check connection
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException(
+        'No valid Xero connection. Please connect to Xero first.',
+        'XERO_NOT_CONNECTED',
+      );
+    }
+
+    const result = await this.xeroSyncService.syncChartOfAccountsToDb(
+      tenantId,
+      body.forceSync ?? false,
+    );
+
+    return {
+      accountsFetched: result.accountsFetched,
+      accountsCreated: result.accountsCreated,
+      accountsUpdated: result.accountsUpdated,
+      accountsArchived: result.accountsArchived,
+      errors: result.errors,
+      syncedAt: result.syncedAt,
+    };
+  }
+
+  /**
+   * Get synced Chart of Accounts
+   * GET /xero/accounts
+   * TASK-XERO-006: List accounts from local database
+   */
+  @Get('accounts')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'List synced Chart of Accounts',
+    description: 'Returns the locally synced Chart of Accounts for the tenant.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Accounts retrieved',
+    type: ListAccountsResponseDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAccounts(
+    @Query() filter: XeroAccountFilterDto,
+    @CurrentUser() user: IUser,
+  ): Promise<ListAccountsResponseDto> {
+    const tenantId = user.tenantId;
+
+    const result = await this.xeroSyncService.getSyncedAccounts(tenantId, {
+      status: filter.status,
+      type: filter.type,
+      codePrefix: filter.codePrefix,
+      nameSearch: filter.nameSearch,
+      limit: filter.limit ?? 100,
+      offset: filter.offset ?? 0,
+    });
+
+    return {
+      accounts: result.accounts.map((a) => ({
+        id: a.id,
+        tenantId,
+        accountCode: a.accountCode,
+        name: a.name,
+        type: a.type,
+        taxType: a.taxType,
+        status: a.status,
+        xeroAccountId: null,
+        lastSyncedAt: result.lastSyncedAt ?? new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })),
+      total: result.total,
+      lastSyncedAt: result.lastSyncedAt ?? undefined,
+    };
+  }
+
+  /**
+   * Validate an account code
+   * GET /xero/validate-account/:code
+   * TASK-XERO-006: Validate account code before pushing categorizations
+   */
+  @Get('validate-account/:code')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Validate an account code',
+    description:
+      'Checks if an account code exists and is active in the synced Chart of Accounts.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Validation result',
+    type: ValidateAccountCodeResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async validateAccountCode(
+    @Param('code') code: string,
+    @CurrentUser() user: IUser,
+  ): Promise<ValidateAccountCodeResponseDto> {
+    const tenantId = user.tenantId;
+
+    if (!code) {
+      return {
+        isValid: false,
+        error: 'Account code is required',
+      };
+    }
+
+    const result = await this.xeroSyncService.validateAccountCode(
+      tenantId,
+      code,
+    );
+
+    return {
+      isValid: result.isValid,
+      account: result.account
+        ? {
+            id: result.account.id,
+            tenantId: result.account.tenantId,
+            accountCode: result.account.accountCode,
+            name: result.account.name,
+            type: result.account.type,
+            taxType: result.account.taxType,
+            status: result.account.status,
+            xeroAccountId: result.account.xeroAccountId,
+            lastSyncedAt: result.account.lastSyncedAt,
+            createdAt: result.account.createdAt,
+            updatedAt: result.account.updatedAt,
+          }
+        : undefined,
+      error: result.error,
+      suggestions: result.suggestions,
+    };
+  }
+
+  /**
    * Execute sync operation asynchronously
    */
   private async executeSyncAsync(
@@ -760,7 +1015,38 @@ export class XeroController {
         percentage: 0,
       });
 
-      // Sync bank transactions (if pulling)
+      // Step 1: Always sync Chart of Accounts first
+      this.logger.log(`Syncing Chart of Accounts for tenant ${tenantId}`);
+      this.syncGateway.emitProgress(tenantId, {
+        entity: 'accounts',
+        total: 100,
+        processed: 0,
+        percentage: 0,
+      });
+
+      try {
+        const accountsResult = await this.xeroSyncService.syncChartOfAccountsToDb(
+          tenantId,
+          false, // Don't force sync every time
+        );
+        this.logger.log(
+          `Chart of Accounts sync: ${accountsResult.accountsFetched} fetched, ` +
+            `${accountsResult.accountsCreated} created, ${accountsResult.accountsUpdated} updated`,
+        );
+        this.syncGateway.emitProgress(tenantId, {
+          entity: 'accounts',
+          total: accountsResult.accountsFetched,
+          processed: accountsResult.accountsCreated + accountsResult.accountsUpdated,
+          percentage: 100,
+        });
+      } catch (accountsError) {
+        this.logger.warn(
+          `Chart of Accounts sync failed, continuing with transaction sync`,
+          accountsError instanceof Error ? accountsError.message : String(accountsError),
+        );
+      }
+
+      // Step 2: Sync bank transactions (if pulling)
       if (
         options.direction === 'pull' ||
         options.direction === 'bidirectional'
@@ -772,11 +1058,25 @@ export class XeroController {
           percentage: 25,
         });
 
+        // Check if this is first sync (no transactions exist)
+        // If so, force a full historical sync to import all data
+        const existingTransactionCount = await this.prisma.transaction.count({
+          where: { tenantId },
+        });
+        const shouldForceFullSync =
+          options.fullSync ?? existingTransactionCount === 0;
+
+        if (shouldForceFullSync && existingTransactionCount === 0) {
+          this.logger.log(
+            `First sync detected for tenant ${tenantId} - performing full historical import`,
+          );
+        }
+
         const syncResult = await this.bankFeedService.syncTransactions(
           tenantId,
           {
             fromDate: options.fromDate ? new Date(options.fromDate) : undefined,
-            forceFullSync: options.fullSync ?? false,
+            forceFullSync: shouldForceFullSync,
           },
         );
 
@@ -788,8 +1088,8 @@ export class XeroController {
           percentage: 75,
         });
 
-        // Sync unreconciled bank statement lines if requested
-        if (options.includeUnreconciled) {
+        // Sync unreconciled bank statement lines (default: true for complete bank feed data)
+        if (options.includeUnreconciled !== false) {
           this.logger.log(
             `Fetching unreconciled statement lines for tenant ${tenantId}`,
           );
@@ -831,6 +1131,73 @@ export class XeroController {
         });
       }
 
+      // TASK-XERO-004: Handle PUSH direction
+      if (
+        options.direction === 'push' ||
+        options.direction === 'bidirectional'
+      ) {
+        this.logger.log(
+          `Pushing categorizations to Xero for tenant ${tenantId}`,
+        );
+
+        this.syncGateway.emitProgress(tenantId, {
+          entity: 'categorizations',
+          total: 100,
+          processed: 0,
+          percentage: 0,
+        });
+
+        // Find transactions that are categorized but not synced
+        const unsyncedTransactions = await this.prisma.transaction.findMany({
+          where: {
+            tenantId,
+            status: { not: 'SYNCED' },
+            xeroTransactionId: { not: null }, // Must have Xero ID
+          },
+          include: {
+            categorizations: {
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        });
+
+        // Filter to only those with categorizations
+        const toSync = unsyncedTransactions.filter(
+          (tx) => tx.categorizations.length > 0,
+        );
+
+        if (toSync.length > 0) {
+          this.logger.log(
+            `Found ${toSync.length} transactions to push to Xero`,
+          );
+
+          const pushResult = await this.xeroSyncService.syncTransactions(
+            toSync.map((tx) => tx.id),
+            tenantId,
+          );
+
+          this.syncGateway.emitProgress(tenantId, {
+            entity: 'categorizations',
+            total: toSync.length,
+            processed: pushResult.synced + pushResult.skipped,
+            percentage: 100,
+          });
+
+          this.logger.log(
+            `Push complete: ${pushResult.synced} synced, ${pushResult.skipped} skipped, ${pushResult.failed} failed`,
+          );
+        } else {
+          this.logger.log('No categorized transactions to push');
+          this.syncGateway.emitProgress(tenantId, {
+            entity: 'categorizations',
+            total: 0,
+            processed: 0,
+            percentage: 100,
+          });
+        }
+      }
+
       // Mark job complete
       job.status = 'completed';
 
@@ -857,6 +1224,163 @@ export class XeroController {
 
       throw error;
     }
+  }
+
+  /**
+   * Get setup guide for Xero bank rule configuration
+   * Provides step-by-step instructions to create catch-all rules
+   */
+  @Get('setup-guide')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Get Xero bank rule setup guide',
+    description:
+      'Returns step-by-step instructions for setting up catch-all bank rules in Xero to auto-reconcile all transactions',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Setup guide retrieved',
+    type: XeroSetupGuideDto,
+  })
+  getSetupGuide(): XeroSetupGuideDto {
+    return {
+      title: 'Auto-Reconcile Bank Transactions in Xero',
+      description:
+        'Create a catch-all bank rule in Xero to automatically reconcile all bank feed transactions. ' +
+        'This allows CrecheBooks to import all transactions from your FNB bank feed, even those not yet categorized in Xero.',
+      recommendedAccountCode: '9999',
+      recommendedAccountName: 'To Be Categorized',
+      steps: [
+        {
+          step: 1,
+          title: 'Create a "To Be Categorized" Account',
+          description:
+            'Go to Accounting → Chart of Accounts → Add Account. ' +
+            'Create a new Expense account with code "9999" and name "To Be Categorized". ' +
+            'This will be your catch-all account for unmatched transactions.',
+          xeroPath: 'Accounting > Chart of Accounts > Add Account',
+        },
+        {
+          step: 2,
+          title: 'Navigate to Bank Rules',
+          description:
+            'Go to Accounting → Bank Accounts, then click on your FNB Business Account. ' +
+            'Click the "Bank Rules" button at the top.',
+          xeroPath: 'Accounting > Bank Accounts > [Your Account] > Bank Rules',
+        },
+        {
+          step: 3,
+          title: 'Create a New Bank Rule',
+          description:
+            'Click "New Rule". This will be your catch-all rule that matches all remaining transactions.',
+          xeroPath: 'Bank Rules > New Rule',
+        },
+        {
+          step: 4,
+          title: 'Configure the Rule',
+          description:
+            'Set the following:\n' +
+            '• Rule Type: "Spend Money" (create a second rule for "Receive Money")\n' +
+            '• Conditions: Select "ANY" and add a condition like "Payee contains ." (period matches almost anything)\n' +
+            '• Allocate to: Select your "9999 - To Be Categorized" account\n' +
+            '• Set as lowest priority so specific rules run first',
+          xeroPath: 'Bank Rules > Edit Rule',
+        },
+        {
+          step: 5,
+          title: 'Create Rule for Receive Money',
+          description:
+            'Repeat steps 3-4 to create a second rule for "Receive Money" transactions.',
+          xeroPath: 'Bank Rules > New Rule',
+        },
+        {
+          step: 6,
+          title: 'Enable Automatic Reconciliation (Optional)',
+          description:
+            'If you have Xero Growing plan or above, enable JAX-powered automatic reconciliation: ' +
+            'Go to your bank account page and turn on "Automation". ' +
+            'This will auto-apply your bank rules to incoming transactions.',
+          xeroPath: 'Bank Accounts > [Your Account] > Automation',
+        },
+        {
+          step: 7,
+          title: 'Sync with CrecheBooks',
+          description:
+            'After setting up the rules, trigger a sync in CrecheBooks. ' +
+            'Transactions with the "9999" account code will be flagged for review and categorization.',
+          xeroPath: 'CrecheBooks > Settings > Xero > Sync',
+        },
+      ],
+      notes: [
+        'Transactions categorized to "9999 - To Be Categorized" will appear in CrecheBooks with status "Review Required".',
+        'You can properly categorize these transactions in CrecheBooks, and the categorization will sync back to Xero.',
+        'Make sure your specific bank rules (for known payees) have higher priority than the catch-all rule.',
+        'The catch-all rule should be the LAST rule to match, only catching transactions not matched by other rules.',
+        'Consider reviewing and creating specific rules for recurring transactions over time.',
+      ],
+    };
+  }
+
+  /**
+   * Get count of transactions needing review
+   */
+  @Get('transactions-needing-review')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Get transactions needing review',
+    description:
+      'Returns count and details of transactions imported from catch-all accounts',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Review summary retrieved',
+    type: TransactionsNeedingReviewDto,
+  })
+  async getTransactionsNeedingReview(
+    @CurrentUser() user: IUser,
+  ): Promise<TransactionsNeedingReviewDto> {
+    const tenantId = user.tenantId;
+
+    // Get transactions with REVIEW_REQUIRED status
+    const reviewRequired = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        status: 'REVIEW_REQUIRED',
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+        date: true,
+        xeroAccountCode: true,
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // Extract unique catch-all account codes
+    const catchAllCodes = [
+      ...new Set(
+        reviewRequired
+          .map((tx) => tx.xeroAccountCode)
+          .filter((code): code is string => code !== null),
+      ),
+    ];
+
+    // Get date range
+    const dates = reviewRequired.map((tx) => tx.date);
+    const earliest = dates.length > 0 ? dates[0] : null;
+    const latest = dates.length > 0 ? dates[dates.length - 1] : null;
+
+    return {
+      total: reviewRequired.length,
+      fromCatchAllAccounts: reviewRequired.filter(
+        (tx) => tx.xeroAccountCode !== null,
+      ).length,
+      dateRange: {
+        earliest: earliest?.toISOString().split('T')[0] ?? null,
+        latest: latest?.toISOString().split('T')[0] ?? null,
+      },
+      catchAllAccountCodes: catchAllCodes,
+    };
   }
 
   /**

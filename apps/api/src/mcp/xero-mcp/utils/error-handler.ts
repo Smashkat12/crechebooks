@@ -78,6 +78,45 @@ export class EncryptionError extends XeroMCPError {
 }
 
 /**
+ * Extract validation error messages from Xero API response
+ */
+function extractXeroValidationError(error: unknown): string | null {
+  try {
+    // Handle xero-node library error structure
+    const xeroError = error as {
+      response?: {
+        body?: {
+          Message?: string;
+          Elements?: Array<{
+            ValidationErrors?: Array<{ Message?: string }>;
+          }>;
+        };
+      };
+      body?: {
+        Message?: string;
+        Elements?: Array<{
+          ValidationErrors?: Array<{ Message?: string }>;
+        }>;
+      };
+    };
+
+    // Check response.body first (xero-node structure)
+    const body = xeroError.response?.body ?? xeroError.body;
+
+    if (body?.Elements && body.Elements.length > 0) {
+      const element = body.Elements[0];
+      if (element.ValidationErrors && element.ValidationErrors.length > 0) {
+        return element.ValidationErrors[0].Message ?? null;
+      }
+    }
+
+    return body?.Message ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Handle errors from Xero API and convert to typed XeroMCPError
  */
 export function handleXeroError(error: unknown): never {
@@ -85,9 +124,15 @@ export function handleXeroError(error: unknown): never {
     throw error;
   }
 
+  // Try to extract validation error message first
+  const validationMessage = extractXeroValidationError(error);
+
   if (error instanceof Error) {
-    const statusCode = (error as { statusCode?: number }).statusCode;
-    const body = (error as { body?: { Message?: string } }).body;
+    const xeroError = error as {
+      statusCode?: number;
+      response?: { statusCode?: number };
+    };
+    const statusCode = xeroError.statusCode ?? xeroError.response?.statusCode;
 
     if (statusCode === 401) {
       throw new XeroAPIError('Unauthorized - invalid or expired token', 401);
@@ -109,17 +154,23 @@ export function handleXeroError(error: unknown): never {
       throw new XeroAPIError('Xero API server error', statusCode);
     }
 
+    // Use validation message if available, otherwise use error message
+    const message = validationMessage ?? error.message;
+
     throw new XeroMCPError(
-      body?.Message ?? error.message,
+      message,
       'XERO_API_ERROR',
-      statusCode,
+      statusCode ?? 400,
       { originalError: error.message },
     );
   }
 
-  throw new XeroMCPError('Unknown error occurred', 'UNKNOWN_ERROR', 500, {
-    originalError: String(error),
-  });
+  throw new XeroMCPError(
+    validationMessage ?? 'Unknown error occurred',
+    'UNKNOWN_ERROR',
+    500,
+    { originalError: String(error) },
+  );
 }
 
 /**

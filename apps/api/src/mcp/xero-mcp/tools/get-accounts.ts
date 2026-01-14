@@ -22,10 +22,12 @@ export async function getAccounts(
 
     const accounts: XeroAccount[] = (response.body.accounts ?? []).map(
       (account) => ({
+        accountId: account.accountID,
         code: account.code ?? '',
         name: account.name ?? '',
         type: account.type?.toString() ?? '',
         taxType: account.taxType ?? null,
+        status: account.status?.toString(),
         enablePaymentsToAccount: account.enablePaymentsToAccount ?? false,
       }),
     );

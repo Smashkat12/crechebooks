@@ -106,6 +106,12 @@ export const queryKeys = {
     tenantUsers: (tenantId: string) => [...queryKeys.users.all, 'tenant', tenantId] as const,
     invitations: (tenantId: string) => [...queryKeys.users.all, 'invitations', tenantId] as const,
   },
+  // Tenant (Organization)
+  tenant: {
+    all: ['tenant'] as const,
+    me: () => [...queryKeys.tenant.all, 'me'] as const,
+    detail: (id: string) => [...queryKeys.tenant.all, 'detail', id] as const,
+  },
   // Xero Integration
   xero: {
     all: ['xero'] as const,

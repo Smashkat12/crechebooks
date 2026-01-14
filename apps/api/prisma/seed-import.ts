@@ -124,16 +124,24 @@ async function ensureTenant() {
     where: { id: DEMO_TENANT_ID },
     create: {
       id: DEMO_TENANT_ID,
-      name: 'Demo Creche',
-      email: 'demo@creche.example',
-      addressLine1: '123 Demo Street',
-      city: 'Johannesburg',
+      name: 'Elle Elephant',
+      email: 'katlego@elleelephant.co.za',
+      addressLine1: '3215 H Swala',
+      city: 'Mabopane',
       province: 'Gauteng',
-      postalCode: '2000',
-      phone: '0110000000',
+      postalCode: '0190',
+      phone: '+27739356753',
       subscriptionStatus: 'TRIAL',
     },
-    update: {},
+    update: {
+      name: 'Elle Elephant',
+      email: 'katlego@elleelephant.co.za',
+      addressLine1: '3215 H Swala',
+      city: 'Mabopane',
+      province: 'Gauteng',
+      postalCode: '0190',
+      phone: '+27739356753',
+    },
   });
 
   console.log(`✅ Tenant: ${tenant.name} (${tenant.id})`);

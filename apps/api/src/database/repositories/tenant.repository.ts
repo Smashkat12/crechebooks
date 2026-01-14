@@ -16,8 +16,13 @@ export class TenantRepository {
 
   async create(dto: CreateTenantDto): Promise<Tenant> {
     try {
+      // Convert closureDates to JSON-compatible format for Prisma
+      const { closureDates, ...rest } = dto;
       return await this.prisma.tenant.create({
-        data: dto,
+        data: {
+          ...rest,
+          closureDates: closureDates ? JSON.parse(JSON.stringify(closureDates)) : [],
+        },
       });
     } catch (error) {
       this.logger.error(
@@ -106,9 +111,16 @@ export class TenantRepository {
       // First verify tenant exists
       await this.findByIdOrThrow(id);
 
+      // Convert closureDates to JSON-compatible format for Prisma
+      const { closureDates, ...rest } = dto;
+      const data: Record<string, unknown> = { ...rest };
+      if (closureDates !== undefined) {
+        data.closureDates = JSON.parse(JSON.stringify(closureDates));
+      }
+
       return await this.prisma.tenant.update({
         where: { id },
-        data: dto,
+        data,
       });
     } catch (error) {
       if (error instanceof NotFoundException) {

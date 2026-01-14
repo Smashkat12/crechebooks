@@ -9,6 +9,7 @@ export const endpoints = {
     list: '/transactions',
     detail: (id: string) => `/transactions/${id}`,
     import: '/transactions/import',
+    export: '/transactions/export',
     categorize: (id: string) => `/transactions/${id}/categorize`,
     batchCategorize: '/transactions/categorize/batch',
     suggestions: (id: string) => `/transactions/${id}/suggestions`,
@@ -89,6 +90,11 @@ export const endpoints = {
     resendInvitation: (tenantId: string, invitationId: string) => `/tenants/${tenantId}/invitations/${invitationId}/resend`,
     revokeInvitation: (tenantId: string, invitationId: string) => `/tenants/${tenantId}/invitations/${invitationId}`,
   },
+  tenants: {
+    me: '/tenants/me',
+    detail: (id: string) => `/tenants/${id}`,
+    update: (id: string) => `/tenants/${id}`,
+  },
   xero: {
     status: '/xero/status',
     sync: '/xero/sync',
@@ -98,6 +104,8 @@ export const endpoints = {
     bankConnections: '/xero/bank-connections',
     connectBankAccount: '/xero/bank-accounts/connect',
     disconnectBankAccount: '/xero/bank-accounts/disconnect',
+    accounts: '/xero/accounts',
+    syncAccounts: '/xero/sync-accounts',
   },
   statements: {
     list: '/statements',

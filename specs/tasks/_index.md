@@ -52,10 +52,12 @@ graph TD
     end
 
     subgraph Agents["Claude Code Agents (TASK-AGENT-*)"]
-        A1[TASK-AGENT-001<br/>Orchestrator]
+        A1[TASK-AGENT-001<br/>Configuration]
         A2[TASK-AGENT-002<br/>Categorizer Agent]
         A3[TASK-AGENT-003<br/>Payment Agent]
         A4[TASK-AGENT-004<br/>SARS Agent]
+        A5[TASK-AGENT-005<br/>Orchestrator]
+        A6[TASK-AGENT-006<br/>Extraction Validator]
     end
 
     F1 --> F2
@@ -158,6 +160,7 @@ graph TD
 | 39 | TASK-AGENT-003 | Payment Matcher Agent | agent | TASK-PAY-011, TASK-AGENT-001 | ✅ Complete |
 | 40 | TASK-AGENT-004 | SARS Calculation Agent | agent | TASK-SARS-011, TASK-AGENT-001 | ✅ Complete |
 | 41 | TASK-AGENT-005 | Orchestrator Agent Setup | agent | TASK-AGENT-002, TASK-AGENT-003, TASK-AGENT-004 | ✅ Complete |
+| 42 | TASK-AGENT-006 | PDF Extraction Validation Agent | agent | TASK-TRANS-015, TASK-AGENT-001 | ✅ Complete |
 
 ### Phase 4: Surface Layer (API)
 
@@ -245,7 +248,7 @@ graph TD
 |-------|-------|-----------|------------|
 | Foundation (API) | 15 | 15 | 100% |
 | Logic (API) | 22 | 22 | 100% |
-| Agents | 5 | 5 | 100% |
+| Agents | 6 | 6 | 100% |
 | Surface (API) | 16 | 16 | 100% |
 | Integration | 5 | 5 | 100% |
 | Web Foundation | 10 | 10 | 100% |
@@ -269,9 +272,9 @@ graph TD
 | PRD Compliance - Billing | 4 | 4 | 100% |
 | PRD Compliance - Payment | 3 | 3 | 100% |
 | PRD Compliance - Notifications | 2 | 2 | 100% |
-| PRD Compliance - SARS | 1 | 0 | 0% |
-| PRD Compliance - Reports | 2 | 0 | 0% |
-| PRD Compliance - Xero | 1 | 0 | 0% |
+| PRD Compliance - SARS | 1 | 1 | 100% |
+| PRD Compliance - Reports | 2 | 2 | 100% |
+| PRD Compliance - Xero | 1 | 1 | 100% |
 | PRD Compliance - Foundation | 2 | 2 | 100% |
 | **Subtotal (Phase 9)** | **15** | **15** | **100%** |
 | E2E Bug Fixes - Foundation | 1 | 1 | 100% |
@@ -279,25 +282,38 @@ graph TD
 | E2E Bug Fixes - Surface | 3 | 3 | 100% |
 | **Subtotal (Phase 10)** | **5** | **5** | **100%** |
 | **Subtotal (Phase 11)** | **4** | **4** | **100%** |
-| Statement - Foundation | 1 | 0 | 0% |
-| Statement - Logic | 5 | 0 | 0% |
-| Statement - Surface | 2 | 0 | 0% |
-| **Subtotal (Phase 12)** | **8** | **0** | **0%** |
-| Staff - Onboarding/Offboarding | 2 | 1 | 50% |
-| Staff - Integrations | 2 | 0 | 0% |
+| Statement - Foundation | 1 | 1 | 100% |
+| Statement - Logic | 5 | 5 | 100% |
+| Statement - Surface | 2 | 2 | 100% |
+| **Subtotal (Phase 12)** | **8** | **8** | **100%** |
+| Staff - Onboarding/Offboarding | 2 | 2 | 100% |
+| Staff - Integrations | 2 | 2 | 100% |
 | **Subtotal (Phase 13)** | **4** | **4** | **100%** |
-| **Grand Total** | **170** | **162** | **95%** |
+| SimplePay Comprehensive - Leave | 1 | 1 | 100% |
+| SimplePay Comprehensive - Pay Runs | 1 | 1 | 100% |
+| SimplePay Comprehensive - Calculations | 1 | 1 | 100% |
+| SimplePay Comprehensive - Service Periods | 1 | 1 | 100% |
+| SimplePay Comprehensive - Reports | 1 | 1 | 100% |
+| SimplePay Comprehensive - Profiles | 1 | 1 | 100% |
+| SimplePay Comprehensive - Bulk Ops | 1 | 1 | 100% |
+| SimplePay Comprehensive - Auto-Setup | 1 | 1 | 100% |
+| **Subtotal (Phase 14)** | **8** | **8** | **100%** |
+| VAT Compliance - Invoice Generation | 1 | 0 | 0% |
+| **Subtotal (Phase 15)** | **1** | **0** | **0%** |
+| **Grand Total** | **179** | **178** | **99.4%** |
 
-**Last Updated**: 2026-01-08
+**Last Updated**: 2026-01-13
 - Phases 1-6 (Core): 93/93 tasks complete (100%) ✅
 - Phase 7 (Remediation): 28/28 tasks complete (100%) ✅
 - Phase 8 (Gap Remediation): 13/13 tasks complete (100%) ✅
 - Phase 9 (PRD Compliance): 15/15 tasks complete (100%) ✅
 - Phase 10 (E2E Bug Fixes): 5/5 tasks complete (100%) ✅
 - Phase 11 (E2E Bug Fixes R2): 4/4 tasks complete (100%) ✅
-- Phase 12 (Account Statements): 0/8 tasks pending (0%) ⭕
+- Phase 12 (Account Statements): 8/8 tasks complete (100%) ✅
 - Phase 13 (Staff Management & Integrations): 4/4 tasks complete (100%) ✅
-- Overall Progress: 159/170 tasks (94%)
+- Phase 14 (Comprehensive SimplePay Integration): 8/8 tasks complete (100%) ✅
+- Phase 15 (VAT Compliance Enhancement): 0/1 tasks complete (0%) ⭕
+- Overall Progress: 178/179 tasks (99.4%)
 
 ---
 
@@ -458,20 +474,29 @@ These tasks address critical PRD violations discovered during comprehensive gap 
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 148 | TASK-SARS-019 | SARS eFiling API Real Integration (Replace Mock) | logic | TASK-SARS-018 | P1-CRITICAL | ⭕ Pending |
+| 148 | TASK-SARS-019 | SARS eFiling API Real Integration (Replace Mock) | logic | TASK-SARS-018 | P1-CRITICAL | ✅ Complete |
 
 ### 9.5 Financial Reports
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 149 | TASK-RECON-017 | Income Statement PDF/Excel Export | logic | TASK-RECON-013 | P1-CRITICAL | ⭕ Pending |
-| 150 | TASK-RECON-018 | Balance Sheet PDF/Excel Export | logic | TASK-RECON-013 | P1-CRITICAL | ⭕ Pending |
+| 149 | TASK-RECON-017 | Income Statement PDF/Excel Export | logic | TASK-RECON-013 | P1-CRITICAL | ✅ Complete |
+| 150 | TASK-RECON-018 | Balance Sheet PDF/Excel Export | logic | TASK-RECON-013 | P1-CRITICAL | ✅ Complete |
 
 ### 9.6 Xero Integration
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 151 | TASK-XERO-003 | Payment Sync to Xero (Replace Stub) | logic | TASK-PAY-012, TASK-MCP-001 | P1-CRITICAL | ⭕ Pending |
+| 151 | TASK-XERO-003 | Payment Sync to Xero (Replace Stub) | logic | TASK-PAY-012, TASK-MCP-001 | P1-CRITICAL | ✅ Complete |
+| 180 | TASK-XERO-004 | Push Categorizations to Xero API Endpoint | logic | TASK-XERO-001, TASK-TRANS-014 | P1-CRITICAL | ⭕ Pending |
+| 181 | TASK-XERO-005 | Auto-Push Categorization on User Review | logic | TASK-XERO-004 | P2-HIGH | ⭕ Pending |
+| 182 | TASK-XERO-006 | Chart of Accounts Database Sync | logic | TASK-XERO-001 | P3-MEDIUM | ⭕ Pending |
+
+### 9.8 Bank Statement Reconciliation
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 183 | TASK-RECON-019 | Bank Statement to Xero Transaction Reconciliation | logic | TASK-RECON-011, TASK-TRANS-015, TASK-XERO-001 | P1-CRITICAL | ⭕ Pending |
 
 ### 9.7 Foundation (Testing Infrastructure)
 
@@ -585,24 +610,24 @@ These tasks implement parent account statements, payment allocation, and periodi
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 163 | TASK-STMT-001 | Statement Entity and Data Model | foundation | TASK-BILL-003, TASK-PAY-001 | P1-CRITICAL | ⭕ Pending |
+| 163 | TASK-STMT-001 | Statement Entity and Data Model | foundation | TASK-BILL-003, TASK-PAY-001 | P1-CRITICAL | ✅ Complete |
 
 ### 12.2 Logic Layer
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 164 | TASK-STMT-002 | Payment Allocation to Invoices Service | logic | TASK-STMT-001, TASK-PAY-012 | P1-CRITICAL | ⭕ Pending |
-| 165 | TASK-STMT-003 | Statement Generation Service | logic | TASK-STMT-001, TASK-STMT-002 | P1-CRITICAL | ⭕ Pending |
-| 166 | TASK-STMT-005 | Statement PDF Generation Service | logic | TASK-STMT-003 | P2-HIGH | ⭕ Pending |
-| 167 | TASK-STMT-007 | Statement Delivery Service | logic | TASK-STMT-005, TASK-BILL-015, TASK-NOTIF-002 | P2-HIGH | ⭕ Pending |
-| 168 | TASK-STMT-008 | Scheduled Monthly Statement Generation | logic | TASK-STMT-003, TASK-STMT-007, TASK-INFRA-011 | P2-HIGH | ⭕ Pending |
+| 164 | TASK-STMT-002 | Payment Allocation to Invoices Service | logic | TASK-STMT-001, TASK-PAY-012 | P1-CRITICAL | ✅ Complete |
+| 165 | TASK-STMT-003 | Statement Generation Service | logic | TASK-STMT-001, TASK-STMT-002 | P1-CRITICAL | ✅ Complete |
+| 166 | TASK-STMT-005 | Statement PDF Generation Service | logic | TASK-STMT-003 | P2-HIGH | ✅ Complete |
+| 167 | TASK-STMT-007 | Statement Delivery Service | logic | TASK-STMT-005, TASK-BILL-015, TASK-NOTIF-002 | P2-HIGH | ✅ Complete |
+| 168 | TASK-STMT-008 | Scheduled Monthly Statement Generation | logic | TASK-STMT-003, TASK-STMT-007, TASK-INFRA-011 | P2-HIGH | ✅ Complete |
 
 ### 12.3 Surface Layer
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 169 | TASK-STMT-004 | Statement API Endpoints | surface | TASK-STMT-003 | P1-CRITICAL | ⭕ Pending |
-| 170 | TASK-STMT-006 | Statement UI Components | surface | TASK-STMT-004 | P1-CRITICAL | ⭕ Pending |
+| 169 | TASK-STMT-004 | Statement API Endpoints | surface | TASK-STMT-003 | P1-CRITICAL | ✅ Complete |
+| 170 | TASK-STMT-006 | Statement UI Components | surface | TASK-STMT-004 | P1-CRITICAL | ✅ Complete |
 
 ---
 
@@ -610,9 +635,9 @@ These tasks implement parent account statements, payment allocation, and periodi
 
 | Priority | Tasks | Complete | Pending | Percentage |
 |----------|-------|----------|---------|------------|
-| P1-CRITICAL | 5 | 0 | 5 | 0% |
-| P2-HIGH | 3 | 0 | 3 | 0% |
-| **Total Phase 12** | **8** | **0** | **8** | **0%** |
+| P1-CRITICAL | 5 | 5 | 0 | 100% |
+| P2-HIGH | 3 | 3 | 0 | 100% |
+| **Total Phase 12** | **8** | **8** | **0** | **100%** |
 
 ---
 
@@ -699,10 +724,10 @@ These tasks implement comprehensive staff onboarding/offboarding workflows with 
 
 | Priority | Tasks | Complete | Pending | Percentage |
 |----------|-------|----------|---------|------------|
-| P0-BLOCKER | 4 | 3 | 1 | 75% |
-| P1-CRITICAL | 8 | 5 | 3 | 63% |
-| P2-HIGH | 3 | 1 | 2 | 33% |
-| **Total Phase 9** | **15** | **9** | **6** | **60%** |
+| P0-BLOCKER | 4 | 4 | 0 | 100% |
+| P1-CRITICAL | 8 | 8 | 0 | 100% |
+| P2-HIGH | 3 | 3 | 0 | 100% |
+| **Total Phase 9** | **15** | **15** | **0** | **100%** |
 
 ### Critical Gaps Summary
 
@@ -755,3 +780,189 @@ Before Phase 6 (Web Frontend) Complete:
 - [x] All surface layer pages (TASK-WEB-031-040)
 - [x] TypeScript compiles with no errors
 - [x] ESLint passes with no critical errors
+
+---
+
+## Phase 14: Comprehensive SimplePay Integration
+
+Analysis Date: 2026-01-08
+These tasks extend the basic SimplePay integration (TASK-STAFF-004) to leverage the full SimplePay API capabilities, making CrecheBooks the primary point of interaction for all payroll operations.
+
+### 14.1 Leave Management
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 175 | TASK-SPAY-001 | SimplePay Leave Management Service | logic | TASK-STAFF-004 | P2-HIGH | ✅ Complete |
+
+### 14.2 Pay Run & Accounting
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 176 | TASK-SPAY-002 | SimplePay Pay Run Service | logic | TASK-STAFF-004 | P2-HIGH | ✅ Complete |
+
+### 14.3 Calculations Management
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 177 | TASK-SPAY-003 | SimplePay Calculations Service | logic | TASK-STAFF-004, TASK-SPAY-002 | P2-HIGH | ✅ Complete |
+
+### 14.4 Service Period Management
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 178 | TASK-SPAY-004 | SimplePay Service Period Management | logic | TASK-STAFF-004, TASK-STAFF-002 | P1-CRITICAL | ✅ Complete |
+
+### 14.5 Payroll Reports
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 179 | TASK-SPAY-005 | SimplePay Reports Service | logic | TASK-STAFF-004, TASK-SPAY-002 | P2-HIGH | ✅ Complete |
+
+### 14.6 Profile/Template Management
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 180 | TASK-SPAY-006 | SimplePay Profile Mappings Service | logic | TASK-STAFF-004, TASK-SPAY-003 | P3-MEDIUM | ✅ Complete |
+
+### 14.7 Bulk Operations
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 181 | TASK-SPAY-007 | SimplePay Bulk Operations Service | logic | TASK-STAFF-004, TASK-SPAY-003 | P3-MEDIUM | ✅ Complete |
+
+### 14.8 Auto-Setup Pipeline
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 182 | TASK-SPAY-008 | SimplePay Auto-Setup on Employee Creation | logic | TASK-SPAY-001, TASK-SPAY-003, TASK-SPAY-006 | P1-CRITICAL | ✅ Complete |
+
+---
+
+## Phase 14 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 2 | 2 | 0 | 100% |
+| P2-HIGH | 4 | 4 | 0 | 100% |
+| P3-MEDIUM | 2 | 2 | 0 | 100% |
+| **Total Phase 14** | **8** | **8** | **0** | **100%** |
+
+### Phase 14 Key Features
+
+**Leave Management (TASK-SPAY-001)**:
+- Leave type caching from SimplePay
+- Leave balance retrieval per employee
+- Leave day CRUD operations
+- Leave request workflow with approval
+- BCEA-compliant leave entitlements (Annual: 15 days, Sick: 30/3yr, Family: 3/yr)
+
+**Pay Run Service (TASK-SPAY-002)**:
+- Pay run listing and filtering
+- Payslips per pay run
+- Accounting journal extraction
+- Xero journal posting with configurable account codes
+
+**Calculations Service (TASK-SPAY-003)**:
+- Calculation items caching
+- Recurring employee calculations
+- One-time payslip additions
+- Inherited calculation updates (salary changes)
+- SA payroll item support (PAYE, UIF, SDL, etc.)
+
+**Service Period Management (TASK-SPAY-004)**:
+- Employment period tracking
+- Termination with SA termination codes (UI-19)
+- Employee reinstatement
+- Integration with staff offboarding workflow
+
+**Reports Service (TASK-SPAY-005)**:
+- ETI (Employment Tax Incentive) report
+- Transaction history report
+- Variance analysis report
+- Leave comparison report
+- Leave liability report
+- Tracked balances report (loans, garnishees)
+- Async report handling for large datasets
+
+**Profile Mappings (TASK-SPAY-006)**:
+- Profile/template assignment
+- Calculation toggles per employee
+- Bulk profile assignment
+- Integration with onboarding workflow
+
+**Bulk Operations (TASK-SPAY-007)**:
+- Generic bulk input processing
+- Bulk salary adjustments
+- Bulk bonus distribution (13th cheque)
+- Bulk deduction setup
+- Bulk employee updates
+
+**Auto-Setup Pipeline (TASK-SPAY-008)**:
+- Comprehensive employee setup on creation
+- Profile auto-selection by role
+- Leave balance initialization (pro-rata)
+- Tax configuration
+- Additional calculations setup
+- Setup verification and notification
+- Retry mechanism for failures
+
+### SimplePay API Integration Summary
+
+| API Resource | Implemented (TASK-STAFF-004) | Phase 14 Extension |
+|--------------|------------------------------|-------------------|
+| Clients | ✅ | — |
+| Employees | ✅ Create, Update | TASK-SPAY-004: Terminate, Reinstate |
+| Waves | ✅ | TASK-SPAY-002: Full integration |
+| Payslips | ✅ Import, PDF | TASK-SPAY-002: Per pay run |
+| Tax Certificates | ✅ IRP5, EMP201 | — |
+| Leave | ❌ | TASK-SPAY-001: Full CRUD |
+| Calculations | ❌ | TASK-SPAY-003: Full CRUD |
+| Pay Runs | ❌ | TASK-SPAY-002: List, Accounting |
+| Reports | ❌ | TASK-SPAY-005: All reports |
+| Profile Mappings | ❌ | TASK-SPAY-006: Full CRUD |
+| Bulk Input | ❌ | TASK-SPAY-007: All operations |
+| Service Periods | ❌ | TASK-SPAY-004: Full CRUD |
+
+---
+
+## Phase 15: VAT Compliance Enhancement
+
+Analysis Date: 2026-01-13
+These tasks ensure proper VAT application according to South African VAT Act No. 89 of 1991, Section 12(h).
+
+### 15.1 Invoice Generation VAT Compliance
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 183 | TASK-BILL-038 | South African VAT Compliance for Invoice Generation | logic | TASK-BILL-012, TASK-SARS-011 | P1-CRITICAL | ✅ Complete |
+
+---
+
+## Phase 15 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 1 | 1 | 0 | 100% |
+| **Total Phase 15** | **1** | **1** | **0** | **100%** |
+
+### Phase 15 Key Features
+
+**SA VAT Compliance (TASK-BILL-038)**:
+- Add new LineTypes: MEALS, TRANSPORT, LATE_PICKUP, DAMAGED_EQUIPMENT, RE_REGISTRATION, EXTRA_MURAL
+- Update `isVatApplicable()` function with legal references to VAT Act Section 12(h)
+- Add configurable VAT exemption for ad-hoc charges
+- Ensure childcare/educational fees are VAT exempt
+- Ensure goods and non-educational services have 15% VAT applied
+- Support for VAT-registered and non-VAT-registered tenants
+
+### SA VAT Rules for Creches
+
+| Category | VAT Treatment | Legal Basis |
+|----------|--------------|-------------|
+| Childcare fees | EXEMPT | VAT Act s.12(h)(iii) |
+| Registration fees | EXEMPT | VAT Act s.12(h)(ii) |
+| Extra-mural (educational) | EXEMPT | VAT Act s.12(h)(ii) |
+| Uniforms, books, stationery | 15% APPLICABLE | Goods - not exempt |
+| Prepared meals | 15% APPLICABLE | Not zero-rated when ready to eat |
+| Transport fees | 15% APPLICABLE | Service - not educational |
+| Late pickup penalties | 15% APPLICABLE | Penalty - not educational |

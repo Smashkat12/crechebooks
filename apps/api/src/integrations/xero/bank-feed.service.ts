@@ -20,7 +20,10 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { TransactionRepository } from '../../database/repositories/transaction.repository';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
-import { ImportSource } from '../../database/entities/transaction.entity';
+import {
+  ImportSource,
+  TransactionStatus,
+} from '../../database/entities/transaction.entity';
 import {
   NotFoundException,
   BusinessException,
@@ -42,6 +45,36 @@ import {
 // Rate limiting: 60 calls/minute per Xero constraints
 const RATE_LIMIT_CALLS = 60;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+
+/**
+ * Catch-all account codes used for auto-reconciliation in Xero.
+ * Transactions with these codes should be flagged for review in CrecheBooks.
+ * Common patterns: 9999, SUSPENSE, CLEARING, TO_BE_CATEGORIZED
+ */
+const CATCH_ALL_ACCOUNT_CODES = [
+  '9999',
+  '9998',
+  '999',
+  'SUSPENSE',
+  'CLEARING',
+  'UNCATEGORIZED',
+  'TO_CATEGORIZE',
+  'TBC',
+  'UNKNOWN',
+];
+
+/**
+ * Account name patterns that indicate catch-all/suspense accounts
+ */
+const CATCH_ALL_ACCOUNT_PATTERNS = [
+  /suspense/i,
+  /clearing/i,
+  /to.?be.?categor/i,
+  /uncategor/i,
+  /unknown/i,
+  /unallocated/i,
+  /ask.?me.?later/i,
+];
 
 @Injectable()
 export class BankFeedService {
@@ -242,25 +275,59 @@ export class BankFeedService {
 
     for (const connection of connections) {
       try {
-        await this.checkRateLimit(tenantId);
+        // Fetch ALL bank transactions from Xero with pagination
+        // Xero API returns max 100 records per page
+        const allXeroTransactions: XeroBankTransaction[] = [];
+        let page = 1;
+        let hasMorePages = true;
 
-        // Fetch bank transactions from Xero for this account
-        // Note: Xero API requires GUID values wrapped in Guid() function
-        const bankTransactionsResponse =
-          await client.accountingApi.getBankTransactions(
-            xeroTenantId,
-            undefined, // ifModifiedSince
-            `BankAccount.AccountID==Guid("${connection.xeroAccountId}")`, // where
-            undefined, // order
-            undefined, // page
-            undefined, // unitdp
+        while (hasMorePages) {
+          await this.checkRateLimit(tenantId);
+
+          // Fetch bank transactions from Xero for this account
+          // Note: Xero API requires GUID values wrapped in Guid() function
+          const bankTransactionsResponse =
+            await client.accountingApi.getBankTransactions(
+              xeroTenantId,
+              undefined, // ifModifiedSince
+              `BankAccount.AccountID==Guid("${connection.xeroAccountId}")`, // where
+              undefined, // order
+              page, // page number (1-indexed)
+              undefined, // unitdp
+            );
+
+          const pageTransactions =
+            bankTransactionsResponse.body.bankTransactions ?? [];
+
+          this.logger.log(
+            `Fetched page ${page}: ${pageTransactions.length} transactions from Xero for account ${connection.accountName}`,
           );
 
-        const xeroTransactions =
-          bankTransactionsResponse.body.bankTransactions ?? [];
+          // Cast to our internal type for processing
+          allXeroTransactions.push(
+            ...(pageTransactions as unknown as XeroBankTransaction[]),
+          );
+
+          // Xero returns empty array or less than 100 when no more pages
+          // Note: Xero page size is typically 100 for bank transactions
+          if (pageTransactions.length < 100) {
+            hasMorePages = false;
+          } else {
+            page++;
+            // Safety limit to prevent infinite loops
+            if (page > 100) {
+              this.logger.warn(
+                `Reached page limit (100) for account ${connection.accountName}, stopping pagination`,
+              );
+              hasMorePages = false;
+            }
+          }
+        }
+
+        const xeroTransactions = allXeroTransactions;
 
         this.logger.log(
-          `Fetched ${xeroTransactions.length} transactions from Xero for account ${connection.accountName}`,
+          `Fetched total ${xeroTransactions.length} transactions from Xero for account ${connection.accountName} (${page} pages)`,
         );
 
         // Debug: Log first transaction structure to understand available fields
@@ -286,18 +353,21 @@ export class BankFeedService {
 
         result.transactionsFound += filteredTransactions.length;
 
+        let skippedCount = 0;
         for (const xeroTx of filteredTransactions) {
           try {
             const importResult = await this.importTransaction(
               tenantId,
               connection,
-              xeroTx as unknown as XeroBankTransaction,
+              xeroTx,
             );
 
             if (importResult === 'created') {
               result.transactionsCreated++;
             } else if (importResult === 'duplicate') {
               result.duplicatesSkipped++;
+            } else if (importResult === 'skipped') {
+              skippedCount++;
             }
           } catch (error) {
             result.errors.push({
@@ -306,6 +376,12 @@ export class BankFeedService {
               code: 'IMPORT_ERROR',
             });
           }
+        }
+
+        if (skippedCount > 0) {
+          this.logger.log(
+            `Skipped ${skippedCount} DELETED transactions for account ${connection.accountName}`,
+          );
         }
 
         // Update last sync timestamp
@@ -490,16 +566,46 @@ export class BankFeedService {
       xeroTx.type === 'RECEIVE-OVERPAYMENT' ||
       xeroTx.type === 'RECEIVE-PREPAYMENT';
 
+    // Extract Xero account code from line items
+    const xeroAccountCode = xeroTx.lineItems?.[0]?.accountCode ?? undefined;
+    const lineItemDescription = xeroTx.lineItems?.[0]?.description?.trim();
+
+    // Detect catch-all/suspense accounts that need review
+    const isCatchAllAccount = this.isCatchAllAccount(
+      xeroAccountCode,
+      lineItemDescription,
+    );
+
     // Build description from available fields (priority order):
-    // 1. Line item description (often contains bank statement narrative)
-    // 2. Reference field (contains bank reference/narrative)
-    // 3. Contact name (payee/payer name)
-    // 4. Fallback to transaction type
-    const description =
-      xeroTx.lineItems?.[0]?.description?.trim() ||
-      xeroTx.reference?.trim() ||
-      xeroTx.contact?.name?.trim() ||
-      `${xeroTx.type} Transaction`;
+    // For catch-all accounts, the line item description IS the account name (e.g., "To Be Categorized")
+    // so we prioritize contact name/reference which contain the original bank narrative
+    let description: string;
+    if (isCatchAllAccount) {
+      // For catch-all: use contact name or reference (original bank narrative)
+      description =
+        xeroTx.contact?.name?.trim() ||
+        xeroTx.reference?.trim() ||
+        lineItemDescription ||
+        `${xeroTx.type} Transaction`;
+    } else {
+      // For regular transactions: use line item description first
+      description =
+        lineItemDescription ||
+        xeroTx.reference?.trim() ||
+        xeroTx.contact?.name?.trim() ||
+        `${xeroTx.type} Transaction`;
+    }
+
+    // Set status based on account type
+    const status = isCatchAllAccount
+      ? TransactionStatus.REVIEW_REQUIRED
+      : TransactionStatus.PENDING;
+
+    if (isCatchAllAccount) {
+      this.logger.log(
+        `Transaction ${xeroTx.bankTransactionID} flagged for review (catch-all account: ${xeroAccountCode})`,
+      );
+    }
 
     // Create transaction
     await this.transactionRepo.create({
@@ -513,9 +619,42 @@ export class BankFeedService {
       amountCents: Math.abs(amountCents),
       isCredit,
       source: ImportSource.BANK_FEED,
+      status,
+      xeroAccountCode,
     });
 
     return 'created';
+  }
+
+  /**
+   * Check if an account is a catch-all/suspense account that needs review
+   */
+  private isCatchAllAccount(
+    accountCode?: string,
+    accountName?: string,
+  ): boolean {
+    // Check account code against known catch-all codes
+    if (accountCode) {
+      const upperCode = accountCode.toUpperCase();
+      if (
+        CATCH_ALL_ACCOUNT_CODES.some(
+          (code) => upperCode === code || upperCode.startsWith(code),
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // Check account name against patterns
+    if (accountName) {
+      if (
+        CATCH_ALL_ACCOUNT_PATTERNS.some((pattern) => pattern.test(accountName))
+      ) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -577,6 +716,7 @@ export class BankFeedService {
         'email',
         'accounting.transactions',
         'accounting.settings',
+        'finance.bankstatementsplus.read', // For unreconciled bank feed data
       ],
     });
 
@@ -626,9 +766,9 @@ export class BankFeedService {
    */
   private getDefaultFromDate(forceFullSync?: boolean): Date {
     if (forceFullSync) {
-      // Full sync: last 2 years (covers most historical data)
+      // Full sync: last 10 years (covers all historical data)
       const date = new Date();
-      date.setFullYear(date.getFullYear() - 2);
+      date.setFullYear(date.getFullYear() - 10);
       return date;
     }
     // Incremental sync: last 7 days

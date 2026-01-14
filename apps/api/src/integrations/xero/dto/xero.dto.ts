@@ -13,6 +13,7 @@ import {
   IsDateString,
   IsArray,
   ArrayMinSize,
+  IsUUID,
 } from 'class-validator';
 
 /**
@@ -64,8 +65,8 @@ export class SyncRequestDto {
 
   @ApiPropertyOptional({
     description:
-      'If true, includes unreconciled bank statement lines from bank feeds (uses Finance API)',
-    default: false,
+      'Include unreconciled bank statement lines from bank feeds. Defaults to true to ensure all bank feed data is synced.',
+    default: true,
   })
   @IsOptional()
   includeUnreconciled?: boolean;
@@ -199,4 +200,96 @@ export class DisconnectResponseDto {
 
   @ApiPropertyOptional({ description: 'Message' })
   message?: string;
+}
+
+/**
+ * TASK-XERO-004: Push Categorizations to Xero
+ */
+
+/**
+ * Request DTO for pushing categorizations to Xero
+ */
+export class PushCategorizationsRequestDto {
+  @ApiPropertyOptional({
+    description:
+      'Specific transaction IDs to push. If empty, pushes all categorized but unsynced.',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  transactionIds?: string[];
+}
+
+/**
+ * Response DTO for push categorizations operation
+ */
+export class PushCategorizationsResponseDto {
+  @ApiProperty({ description: 'Number of transactions synced' })
+  synced!: number;
+
+  @ApiProperty({ description: 'Number of transactions that failed' })
+  failed!: number;
+
+  @ApiProperty({
+    description:
+      'Number of transactions skipped (already synced or no Xero ID)',
+  })
+  skipped!: number;
+
+  @ApiProperty({ description: 'Error details for failed transactions' })
+  errors!: Array<{
+    transactionId: string;
+    error: string;
+    code: string;
+  }>;
+}
+
+/**
+ * Setup guide for Xero bank rule configuration
+ * Helps users create catch-all rules to auto-reconcile transactions
+ */
+export class XeroSetupGuideDto {
+  @ApiProperty({ description: 'Setup guide title' })
+  title!: string;
+
+  @ApiProperty({ description: 'Setup guide description' })
+  description!: string;
+
+  @ApiProperty({ description: 'Recommended catch-all account code' })
+  recommendedAccountCode!: string;
+
+  @ApiProperty({ description: 'Recommended catch-all account name' })
+  recommendedAccountName!: string;
+
+  @ApiProperty({ description: 'Step-by-step setup instructions' })
+  steps!: Array<{
+    step: number;
+    title: string;
+    description: string;
+    xeroPath?: string;
+  }>;
+
+  @ApiProperty({ description: 'Important notes and warnings' })
+  notes!: string[];
+}
+
+/**
+ * Response for transactions needing review
+ */
+export class TransactionsNeedingReviewDto {
+  @ApiProperty({ description: 'Total transactions needing review' })
+  total!: number;
+
+  @ApiProperty({ description: 'Transactions from catch-all accounts' })
+  fromCatchAllAccounts!: number;
+
+  @ApiProperty({ description: 'Date range of transactions needing review' })
+  dateRange!: {
+    earliest: string | null;
+    latest: string | null;
+  };
+
+  @ApiProperty({ description: 'Account codes detected as catch-all' })
+  catchAllAccountCodes!: string[];
 }

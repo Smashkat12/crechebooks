@@ -4,10 +4,12 @@
  */
 
 export interface XeroAccount {
+  accountId?: string;
   code: string;
   name: string;
   type: string;
   taxType: string | null;
+  status?: string;
   enablePaymentsToAccount: boolean;
 }
 

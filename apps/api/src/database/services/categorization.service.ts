@@ -20,6 +20,7 @@ import { CategorizationRepository } from '../repositories/categorization.reposit
 import { PayeePatternRepository } from '../repositories/payee-pattern.repository';
 import { AuditLogService } from './audit-log.service';
 import { PatternLearningService } from './pattern-learning.service';
+import { XeroSyncService } from './xero-sync.service';
 import {
   CategorizationBatchResult,
   CategorizationItemResult,
@@ -42,6 +43,28 @@ import { AccuracyMetricsService } from './accuracy-metrics.service';
 import { PayeeAliasService } from './payee-alias.service';
 import { RecurringDetectionService } from './recurring-detection.service';
 
+/**
+ * Xero sync status for categorization operations
+ * TASK-XERO-005: Auto-push categorization on user review
+ *
+ * Note: Using distinct name to avoid conflict with XeroSyncStatus enum in payment-allocation.dto
+ */
+export type CategorizationXeroSyncStatus =
+  | 'synced'
+  | 'skipped'
+  | 'failed'
+  | 'not_attempted';
+
+/**
+ * Result type for categorizeAndSync operation
+ * TASK-XERO-005
+ */
+export interface CategorizeAndSyncResult {
+  transaction: Transaction;
+  xeroSyncStatus: CategorizationXeroSyncStatus;
+  xeroSyncError?: string;
+}
+
 @Injectable()
 export class CategorizationService {
   private readonly logger = new Logger(CategorizationService.name);
@@ -60,6 +83,8 @@ export class CategorizationService {
     private readonly categorizerAgent?: TransactionCategorizerAgent,
     @Optional()
     private readonly accuracyMetricsService?: AccuracyMetricsService,
+    @Optional()
+    private readonly xeroSyncService?: XeroSyncService,
   ) {}
 
   /**
@@ -457,6 +482,218 @@ export class CategorizationService {
       throw new NotFoundException('Transaction', transactionId);
     }
     return updated;
+  }
+
+  /**
+   * Categorize transaction and auto-push to Xero
+   * TASK-XERO-005: Auto-push categorization on user review
+   *
+   * CRITICAL: Categorization ALWAYS succeeds locally. Xero sync is non-blocking.
+   *
+   * @param transactionId - Transaction ID
+   * @param dto - User categorization data
+   * @param userId - User performing the override
+   * @param tenantId - Tenant ID for isolation
+   * @returns Updated transaction with Xero sync status
+   */
+  async categorizeAndSync(
+    transactionId: string,
+    dto: UserCategorizationDto,
+    userId: string,
+    tenantId: string,
+  ): Promise<CategorizeAndSyncResult> {
+    // STEP 1: Always save categorization locally first (never fails due to Xero)
+    const transaction = await this.updateCategorization(
+      transactionId,
+      dto,
+      userId,
+      tenantId,
+    );
+
+    // STEP 2: Attempt Xero sync if conditions are met (non-blocking)
+    let xeroSyncStatus: CategorizationXeroSyncStatus = 'not_attempted';
+    let xeroSyncError: string | undefined;
+
+    // Check if we should attempt Xero sync
+    if (!this.xeroSyncService) {
+      this.logger.debug(
+        `Xero sync skipped: XeroSyncService not available for transaction ${transactionId}`,
+      );
+      xeroSyncStatus = 'skipped';
+    } else if (!transaction.xeroTransactionId) {
+      this.logger.debug(
+        `Xero sync skipped: Transaction ${transactionId} has no xeroTransactionId`,
+      );
+      xeroSyncStatus = 'skipped';
+    } else {
+      // Check if tenant has valid Xero connection
+      try {
+        const hasConnection =
+          await this.xeroSyncService.hasValidConnection(tenantId);
+
+        if (!hasConnection) {
+          this.logger.debug(
+            `Xero sync skipped: Tenant ${tenantId} has no valid Xero connection`,
+          );
+          xeroSyncStatus = 'skipped';
+        } else {
+          // Attempt to push to Xero (non-blocking)
+          try {
+            const synced = await this.xeroSyncService.pushToXero(
+              transactionId,
+              tenantId,
+            );
+
+            if (synced) {
+              xeroSyncStatus = 'synced';
+              this.logger.log(
+                `Successfully synced categorization to Xero for transaction ${transactionId}`,
+              );
+            } else {
+              // pushToXero returns false for skipped (already synced)
+              xeroSyncStatus = 'skipped';
+              this.logger.debug(
+                `Xero sync skipped (already synced or no changes) for transaction ${transactionId}`,
+              );
+            }
+          } catch (syncError) {
+            const syncErrorMessage =
+              syncError instanceof Error
+                ? syncError.message
+                : String(syncError);
+
+            // TASK-XERO-007: Check if error is due to reconciled transaction
+            if (this.xeroSyncService.isReconciledTransactionError(syncError)) {
+              this.logger.log(
+                `Transaction ${transactionId} is reconciled in Xero, using journal approach`,
+              );
+
+              try {
+                // Create a journal entry to move from suspense to correct account
+                const journalResult =
+                  await this.xeroSyncService.createCategorizationJournal(
+                    transactionId,
+                    tenantId,
+                    dto.accountCode,
+                  );
+
+                if (journalResult.posted) {
+                  xeroSyncStatus = 'synced';
+                  this.logger.log(
+                    `Created categorization journal ${journalResult.journalId} for reconciled transaction ${transactionId}`,
+                  );
+
+                  // Log audit trail for successful journal creation
+                  await this.auditLogService.logAction({
+                    tenantId,
+                    userId,
+                    entityType: 'Transaction',
+                    entityId: transactionId,
+                    action: 'UPDATE' as any,
+                    afterValue: {
+                      xeroSyncStatus: 'synced',
+                      syncMethod: 'journal',
+                      journalId: journalResult.journalId,
+                      xeroJournalId: journalResult.xeroJournalId,
+                      syncedAt: new Date().toISOString(),
+                    },
+                    changeSummary: `Categorization synced via journal entry for reconciled transaction`,
+                  });
+                } else {
+                  xeroSyncStatus = 'failed';
+                  xeroSyncError = journalResult.error || 'Journal creation failed';
+
+                  this.logger.warn(
+                    `Journal creation failed for transaction ${transactionId}: ${xeroSyncError}`,
+                  );
+
+                  // Log audit trail for journal failure
+                  await this.auditLogService.logAction({
+                    tenantId,
+                    userId,
+                    entityType: 'Transaction',
+                    entityId: transactionId,
+                    action: 'UPDATE' as any,
+                    afterValue: {
+                      xeroSyncStatus: 'failed',
+                      syncMethod: 'journal',
+                      journalId: journalResult.journalId,
+                      xeroSyncError,
+                      attemptedAt: new Date().toISOString(),
+                    },
+                    changeSummary: `Categorization journal creation failed: ${xeroSyncError}`,
+                  });
+                }
+              } catch (journalError) {
+                // Journal creation failed - log and continue
+                xeroSyncStatus = 'failed';
+                xeroSyncError =
+                  journalError instanceof Error
+                    ? journalError.message
+                    : String(journalError);
+
+                this.logger.error(
+                  `Failed to create categorization journal for transaction ${transactionId}: ${xeroSyncError}`,
+                  journalError instanceof Error ? journalError.stack : undefined,
+                );
+
+                // Log audit trail for journal error
+                await this.auditLogService.logAction({
+                  tenantId,
+                  userId,
+                  entityType: 'Transaction',
+                  entityId: transactionId,
+                  action: 'UPDATE' as any,
+                  afterValue: {
+                    xeroSyncStatus: 'failed',
+                    syncMethod: 'journal',
+                    xeroSyncError,
+                    attemptedAt: new Date().toISOString(),
+                  },
+                  changeSummary: `Categorization journal error: ${xeroSyncError}`,
+                });
+              }
+            } else {
+              // Regular Xero sync failure (not reconciled transaction)
+              xeroSyncStatus = 'failed';
+              xeroSyncError = syncErrorMessage;
+
+              this.logger.warn(
+                `Xero sync failed for transaction ${transactionId}: ${xeroSyncError}`,
+                syncError instanceof Error ? syncError.stack : undefined,
+              );
+
+              // Log audit trail for sync failure
+              await this.auditLogService.logAction({
+                tenantId,
+                userId,
+                entityType: 'Transaction',
+                entityId: transactionId,
+                action: 'UPDATE' as any,
+                afterValue: {
+                  xeroSyncStatus: 'failed',
+                  xeroSyncError,
+                  attemptedAt: new Date().toISOString(),
+                },
+                changeSummary: `Xero sync failed after categorization: ${xeroSyncError}`,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        // Error checking connection - treat as skipped
+        xeroSyncStatus = 'skipped';
+        this.logger.warn(
+          `Could not check Xero connection for tenant ${tenantId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return {
+      transaction,
+      xeroSyncStatus,
+      xeroSyncError,
+    };
   }
 
   /**

@@ -46,6 +46,7 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
   }, [filters, year]);
 
   // Build query parameters from filters
+  // year=0 means "All Years" - don't filter by year
   const queryParams = React.useMemo(() => ({
     tenantId,
     page,
@@ -55,7 +56,7 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
     status: filters.status !== 'all' ? filters.status : undefined,
     categoryCode: filters.categoryCode,
     search: filters.search,
-    year: !filters.dateRange?.from && !filters.dateRange?.to ? year : undefined, // Only use year if no date range filter
+    year: !filters.dateRange?.from && !filters.dateRange?.to && year && year > 0 ? year : undefined,
   }), [tenantId, page, filters, year]);
 
   const { data, isLoading, isError, error, refetch } = useTransactionsList(queryParams);

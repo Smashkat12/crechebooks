@@ -11,7 +11,10 @@ import {
   UploadedFile,
   BadRequestException,
   ParseUUIDPipe,
+  Res,
+  Header,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -24,6 +27,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { TransactionRepository } from '../../database/repositories/transaction.repository';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import { CategorizationRepository } from '../../database/repositories/categorization.repository';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import {
@@ -51,6 +55,7 @@ import {
 import {
   UpdateCategorizationRequestDto,
   UpdateCategorizationResponseDto,
+  XeroSyncStatusEnum,
 } from './dto/update-categorization.dto';
 import {
   BatchCategorizeRequestDto,
@@ -74,6 +79,7 @@ export class TransactionController {
     private readonly importService: TransactionImportService,
     private readonly categorizationService: CategorizationService,
     private readonly paymentAllocationService: PaymentAllocationService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get()
@@ -188,6 +194,115 @@ export class TransactionController {
         totalPages: result.totalPages,
       },
     };
+  }
+
+  @Get('export')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="transactions.csv"')
+  @ApiOperation({
+    summary: 'Export transactions to CSV',
+    description:
+      'Export all transactions for the tenant as a CSV file. Optimized for large datasets.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'CSV file download',
+    content: { 'text/csv': {} },
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async exportTransactions(
+    @Query() query: ListTransactionsQueryDto,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    const tenantId = user.tenantId;
+
+    this.logger.debug(`Exporting transactions for tenant=${tenantId}`);
+
+    // Build date filter
+    let dateFrom: Date | undefined;
+    let dateTo: Date | undefined;
+
+    if (query.year) {
+      dateFrom = new Date(Date.UTC(query.year, 0, 1, 0, 0, 0, 0));
+      dateTo = new Date(Date.UTC(query.year, 11, 31, 23, 59, 59, 999));
+    } else if (query.date_from || query.date_to) {
+      dateFrom = query.date_from ? new Date(query.date_from) : undefined;
+      dateTo = query.date_to ? new Date(query.date_to) : undefined;
+    }
+
+    // Fetch transactions with categorizations in a single optimized query
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        isDeleted: false,
+        ...(query.status && { status: query.status }),
+        ...(dateFrom || dateTo
+          ? {
+              date: {
+                ...(dateFrom && { gte: dateFrom }),
+                ...(dateTo && { lte: dateTo }),
+              },
+            }
+          : {}),
+      },
+      include: {
+        categorizations: {
+          where: { isSplit: false },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { date: 'desc' },
+    });
+
+    // Generate CSV
+    const headers = [
+      'Date',
+      'Description',
+      'Payee',
+      'Reference',
+      'Amount',
+      'Type',
+      'Status',
+      'Category Code',
+      'Category Name',
+      'Reconciled',
+    ];
+
+    const escapeCSV = (val: string | null | undefined): string => {
+      if (val == null) return '';
+      const str = String(val);
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = transactions.map((tx) => {
+      const cat = tx.categorizations[0];
+      return [
+        tx.date.toISOString().split('T')[0],
+        escapeCSV(tx.description),
+        escapeCSV(tx.payeeName),
+        escapeCSV(tx.reference),
+        (tx.amountCents / 100).toFixed(2),
+        tx.isCredit ? 'Credit' : 'Debit',
+        tx.status,
+        cat?.accountCode || '',
+        escapeCSV(cat?.accountName),
+        tx.isReconciled ? 'Yes' : 'No',
+      ].join(',');
+    });
+
+    const csv = [headers.join(','), ...rows].join('\n');
+
+    // Set filename with date
+    const filename = `transactions-${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    this.logger.debug(`Exported ${transactions.length} transactions`);
+    res.send(csv);
   }
 
   @Post('import')
@@ -343,14 +458,17 @@ export class TransactionController {
       createPattern: dto.create_pattern,
     };
 
-    const transaction = await this.categorizationService.updateCategorization(
+    // TASK-XERO-005: Use categorizeAndSync to auto-push to Xero
+    const result = await this.categorizationService.categorizeAndSync(
       id,
       serviceDto,
       user.id,
       user.tenantId,
     );
 
-    // Base response
+    const transaction = result.transaction;
+
+    // Base response with Xero sync status
     const response: UpdateCategorizationResponseDto = {
       success: true,
       data: {
@@ -360,6 +478,8 @@ export class TransactionController {
         account_name: dto.account_name,
         source: 'USER_OVERRIDE',
         pattern_created: dto.create_pattern !== false && !dto.is_split,
+        xero_sync_status: result.xeroSyncStatus as XeroSyncStatusEnum,
+        xero_sync_error: result.xeroSyncError,
       },
     };
 

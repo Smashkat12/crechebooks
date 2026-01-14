@@ -24,7 +24,8 @@ export default function TransactionsPage() {
   const { user } = useAuth();
   const tenantId = user?.tenantId ?? '';
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  // Use 0 to represent "All Years"
+  const [selectedYear, setSelectedYear] = useState<number>(0);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -54,31 +55,14 @@ export default function TransactionsPage() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const { data } = await apiClient.get(endpoints.transactions.list, {
-        params: { limit: 10000 },
+      // Use optimized export endpoint that returns CSV directly
+      const response = await apiClient.get(endpoints.transactions.export, {
+        params: selectedYear > 0 ? { year: selectedYear } : {},
+        responseType: 'blob',
       });
 
-      const transactions = data.data || [];
-      if (transactions.length === 0) {
-        alert('No transactions to export');
-        return;
-      }
-
-      // Create CSV content
-      const headers = ['Date', 'Description', 'Amount', 'Type', 'Status', 'Category'];
-      const rows = transactions.map((tx: Record<string, unknown>) => [
-        tx.date,
-        `"${(tx.description as string || '').replace(/"/g, '""')}"`,
-        ((tx.amount_cents as number) / 100).toFixed(2),
-        tx.is_credit ? 'Credit' : 'Debit',
-        tx.status,
-        (tx.categorization as { account_name?: string } | null)?.account_name || 'Uncategorized',
-      ]);
-
-      const csv = [headers.join(','), ...rows.map((r: string[]) => r.join(','))].join('\n');
-
-      // Download file
-      const blob = new Blob([csv], { type: 'text/csv' });
+      // Download the CSV file
+      const blob = new Blob([response.data], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -87,6 +71,7 @@ export default function TransactionsPage() {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Export failed:', err);
+      alert('Export failed. Please try again.');
     } finally {
       setIsExporting(false);
     }
@@ -106,8 +91,9 @@ export default function TransactionsPage() {
             <YearSelector
               value={selectedYear}
               onChange={setSelectedYear}
-              startYear={2024}
+              startYear={2020}
               endYear={currentYear}
+              includeAllYears
             />
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleExport} disabled={isExporting}>

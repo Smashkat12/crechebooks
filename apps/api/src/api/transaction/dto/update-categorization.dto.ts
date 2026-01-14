@@ -128,6 +128,17 @@ export class PaymentAllocationInfoDto {
 }
 
 /**
+ * Xero sync status enum for API responses
+ * TASK-XERO-005: Auto-push categorization on user review
+ */
+export enum XeroSyncStatusEnum {
+  SYNCED = 'synced',
+  SKIPPED = 'skipped',
+  FAILED = 'failed',
+  NOT_ATTEMPTED = 'not_attempted',
+}
+
+/**
  * Response DTO for categorization update
  */
 export class UpdateCategorizationResponseDto {
@@ -146,5 +157,15 @@ export class UpdateCategorizationResponseDto {
     payment_allocations?: PaymentAllocationInfoDto[];
     /** Unallocated amount in cents (if transaction exceeds outstanding invoices) */
     unallocated_cents?: number;
+    /**
+     * TASK-XERO-005: Xero sync status after categorization
+     * - 'synced': Successfully pushed to Xero
+     * - 'skipped': Not pushed (no Xero ID, no connection, or already synced)
+     * - 'failed': Push attempted but failed (categorization still saved locally)
+     * - 'not_attempted': Xero sync not configured
+     */
+    xero_sync_status?: XeroSyncStatusEnum;
+    /** Error message if xero_sync_status is 'failed' */
+    xero_sync_error?: string;
   };
 }

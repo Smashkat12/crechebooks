@@ -171,6 +171,12 @@ export function useTransactionSuggestions(id: string, enabled = true) {
   });
 }
 
+/**
+ * Xero sync status enum
+ * TASK-XERO-005: Auto-push categorization on user review
+ */
+export type XeroSyncStatus = 'synced' | 'skipped' | 'failed' | 'not_attempted';
+
 // API response type for categorization update
 interface UpdateCategorizationResponse {
   success: boolean;
@@ -181,14 +187,27 @@ interface UpdateCategorizationResponse {
     account_name: string;
     source: string;
     pattern_created: boolean;
+    /** TASK-XERO-005: Xero sync status after categorization */
+    xero_sync_status?: XeroSyncStatus;
+    /** Error message if xero_sync_status is 'failed' */
+    xero_sync_error?: string;
   };
+}
+
+/**
+ * Result type for categorize transaction mutation
+ * TASK-XERO-005: Includes Xero sync status
+ */
+export interface CategorizeTransactionResult extends TransactionWithCategorization {
+  xeroSyncStatus?: XeroSyncStatus;
+  xeroSyncError?: string;
 }
 
 // Categorize a single transaction
 export function useCategorizeTransaction() {
   const queryClient = useQueryClient();
 
-  return useMutation<TransactionWithCategorization, AxiosError, CategorizeTransactionParams>({
+  return useMutation<CategorizeTransactionResult, AxiosError, CategorizeTransactionParams>({
     mutationFn: async ({ transactionId, categoryId, parentId }) => {
       // categoryId is actually an account_code (e.g., '5100')
       const accountName = ACCOUNT_CODE_TO_NAME[categoryId] || 'Unknown Category';
@@ -207,7 +226,7 @@ export function useCategorizeTransaction() {
         }
       );
 
-      // Transform response to match expected type
+      // Transform response to match expected type with Xero sync status
       return {
         id: data.data.id,
         tenantId: '',
@@ -219,6 +238,9 @@ export function useCategorizeTransaction() {
         accountCode: data.data.account_code,
         reconciled: false,
         needsReview: false,
+        // TASK-XERO-005: Include Xero sync status in result
+        xeroSyncStatus: data.data.xero_sync_status,
+        xeroSyncError: data.data.xero_sync_error,
       };
     },
     onSuccess: (data) => {

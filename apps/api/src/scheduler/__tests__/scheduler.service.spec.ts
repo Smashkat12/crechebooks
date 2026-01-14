@@ -13,6 +13,7 @@ describe('SchedulerService', () => {
   let mockPaymentQueue: any;
   let mockSarsQueue: any;
   let mockBankQueue: any;
+  let mockStatementQueue: any;
 
   beforeEach(async () => {
     const createMockQueue = () => ({
@@ -29,6 +30,7 @@ describe('SchedulerService', () => {
     mockPaymentQueue = createMockQueue();
     mockSarsQueue = createMockQueue();
     mockBankQueue = createMockQueue();
+    mockStatementQueue = createMockQueue();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,6 +50,10 @@ describe('SchedulerService', () => {
         {
           provide: getQueueToken(QUEUE_NAMES.BANK_SYNC),
           useValue: mockBankQueue,
+        },
+        {
+          provide: getQueueToken(QUEUE_NAMES.STATEMENT_GENERATION),
+          useValue: mockStatementQueue,
         },
       ],
     }).compile();

@@ -4,13 +4,29 @@ import {
   IsOptional,
   IsEnum,
   IsInt,
+  IsArray,
+  IsDateString,
   Min,
   Max,
   MinLength,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
+import { Type } from 'class-transformer';
 import { TaxStatus, SubscriptionStatus } from '../entities/tenant.entity';
+
+/**
+ * DTO for closure date entries
+ */
+export class ClosureDateDto {
+  @IsDateString()
+  date!: string;
+
+  @IsString()
+  @MaxLength(200)
+  description!: string;
+}
 
 export class CreateTenantDto {
   @IsString()
@@ -90,6 +106,12 @@ export class CreateTenantDto {
   @IsInt()
   @Min(1)
   invoiceDueDays?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ClosureDateDto)
+  closureDates?: ClosureDateDto[];
 }
 
 export class UpdateTenantDto extends PartialType(CreateTenantDto) {}

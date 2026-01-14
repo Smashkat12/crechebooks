@@ -107,7 +107,11 @@ export const staffOnboardingEndpoints = {
   checklist: (onboardingId: string) => `/staff/onboarding/${onboardingId}/checklist`,
   checklistItem: (_staffId: string, itemId: string) =>
     `/staff/onboarding/checklist/${itemId}/complete`,
-  documents: (staffId: string) => `/staff/onboarding/documents/staff/${staffId}`,
+  // Document endpoints use different paths for GET vs POST
+  documentsUpload: (staffId: string) => `/staff/onboarding/documents/staff/${staffId}`,
+  documentsList: (staffId: string) => `/documents/staff/${staffId}`,
+  // Keep 'documents' for backwards compatibility, but use specific methods
+  documents: (staffId: string) => `/documents/staff/${staffId}`,
   welcomePack: (onboardingId: string) => `/staff/onboarding/${onboardingId}/welcome-pack`,
   // Generated Documents endpoints (TASK-STAFF-001)
   generatedDocuments: (staffId: string) => `/staff/onboarding/staff/${staffId}/generated-documents`,
@@ -319,6 +323,7 @@ export async function getStaffDocuments(staffId: string): Promise<StaffDocument[
 
 /**
  * Upload a document for staff onboarding
+ * Uses the upload-specific endpoint path
  */
 export async function uploadStaffDocument(
   staffId: string,
@@ -329,7 +334,7 @@ export async function uploadStaffDocument(
   formData.append('documentType', params.documentType);
 
   const { data } = await apiClient.post<{ success: boolean; data: StaffDocument }>(
-    staffOnboardingEndpoints.documents(staffId),
+    staffOnboardingEndpoints.documentsUpload(staffId),
     formData,
     {
       headers: { 'Content-Type': 'multipart/form-data' },

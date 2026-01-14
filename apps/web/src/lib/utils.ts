@@ -8,11 +8,16 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Format currency in South African Rand (ZAR)
+ * Handles null, undefined, and NaN values gracefully
  */
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | null | undefined): string {
+  if (amount == null || isNaN(amount)) {
+    return 'R 0.00';
+  }
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
     currency: 'ZAR',
+    minimumFractionDigits: 2,
   }).format(amount);
 }
 

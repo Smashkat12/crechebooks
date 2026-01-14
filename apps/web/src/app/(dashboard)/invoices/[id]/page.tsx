@@ -1,13 +1,14 @@
 'use client';
 
-import { use } from 'react';
-import { ArrowLeft, Send, Download, Printer } from 'lucide-react';
+import { use, useState } from 'react';
+import { ArrowLeft, Send, Download, Printer, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { InvoicePreview } from '@/components/invoices';
+import { AddChargeDialog } from '@/components/invoices/add-charge-dialog';
 import { useInvoice } from '@/hooks/use-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Invoice } from '@/types/invoice';
+import type { Invoice, LineType } from '@/types/invoice';
 
 interface InvoiceDetailPageProps {
   params: Promise<{ id: string }>;
@@ -16,6 +17,8 @@ interface InvoiceDetailPageProps {
 export default function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
   const { id } = use(params);
   const { data: invoiceData, isLoading, error } = useInvoice(id);
+  // TASK-BILL-038: State for add charge dialog
+  const [addChargeOpen, setAddChargeOpen] = useState(false);
 
   if (error) {
     throw new Error(`Failed to load invoice: ${error.message}`);
@@ -62,6 +65,9 @@ export default function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
       unitPrice: line.unitAmount / 100,
       amount: line.lineAmount / 100,
       vatAmount: line.vatAmount / 100, // Add VAT amount per line
+      // TASK-BILL-038: VAT compliance fields
+      lineType: (line as { lineType?: string }).lineType as LineType | undefined,
+      isVatExempt: (line as { isVatExempt?: boolean }).isVatExempt,
     })),
     vatRate: 15,
     // Use backend-calculated amounts (convert from cents to Rand)
@@ -104,6 +110,13 @@ export default function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
+          {/* TASK-BILL-038: Add Charge button for ad-hoc charges */}
+          {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+            <Button variant="outline" onClick={() => setAddChargeOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Charge
+            </Button>
+          )}
           {invoice.status !== 'paid' && (
             <Button>
               <Send className="h-4 w-4 mr-2" />
@@ -114,6 +127,14 @@ export default function InvoiceDetailPage({ params }: InvoiceDetailPageProps) {
       </div>
 
       <InvoicePreview invoice={invoice} />
+
+      {/* TASK-BILL-038: Add Charge Dialog with VAT compliance fields */}
+      <AddChargeDialog
+        invoiceId={invoice.id}
+        invoiceNumber={invoice.invoiceNumber}
+        open={addChargeOpen}
+        onOpenChange={setAddChargeOpen}
+      />
     </div>
   );
 }

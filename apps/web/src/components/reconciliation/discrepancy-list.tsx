@@ -94,7 +94,7 @@ export function DiscrepancyList({ items, onResolve }: DiscrepancyListProps) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Discrepancies ({discrepancies.length})</CardTitle>
-        <Badge variant="destructive">Total: {formatCurrency(totalDiscrepancy)}</Badge>
+        <Badge variant="destructive">Total: {formatCurrency(totalDiscrepancy / 100)}</Badge>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -134,7 +134,7 @@ export function DiscrepancyList({ items, onResolve }: DiscrepancyListProps) {
 
                 <div className="text-right">
                   <p className="font-mono font-medium text-destructive">
-                    {formatCurrency(Math.abs(discrepancy.amount))}
+                    {formatCurrency(Math.abs(discrepancy.amount) / 100)}
                   </p>
                   {onResolve && (
                     <Button

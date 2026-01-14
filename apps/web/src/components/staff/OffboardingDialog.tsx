@@ -45,14 +45,17 @@ interface OffboardingDialogProps {
   onComplete?: () => void;
 }
 
+// Match backend OffboardingReason enum values exactly
 const OFFBOARDING_REASONS = [
   { value: 'RESIGNATION', label: 'Resignation' },
   { value: 'TERMINATION', label: 'Termination' },
   { value: 'RETRENCHMENT', label: 'Retrenchment' },
   { value: 'RETIREMENT', label: 'Retirement' },
-  { value: 'END_OF_CONTRACT', label: 'End of Contract' },
+  { value: 'CONTRACT_END', label: 'End of Contract' },
   { value: 'MUTUAL_AGREEMENT', label: 'Mutual Agreement' },
   { value: 'DEATH', label: 'Death' },
+  { value: 'DISMISSAL', label: 'Dismissal' },
+  { value: 'ABSCONDED', label: 'Absconded' },
 ] as const;
 
 export function OffboardingDialog({
@@ -184,13 +187,13 @@ export function OffboardingDialog({
                       Calculating settlement...
                     </span>
                   </div>
-                ) : settlement ? (
+                ) : settlement?.finalPay ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
                       <span>
-                        Notice Period: {settlement.noticePeriodDays} days
-                        {settlement.bceanCompliant && ' (BCEA compliant)'}
+                        Notice Period: {settlement.noticePeriodDays} days (BCEA compliant)
+                        {settlement.tenure && ` • Tenure: ${settlement.tenure.years}y ${settlement.tenure.months}m`}
                       </span>
                     </div>
 
@@ -200,37 +203,37 @@ export function OffboardingDialog({
                         <h4 className="font-medium mb-2">Earnings</h4>
                         <div className="space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <span>Basic Salary</span>
+                            <span>Outstanding Salary</span>
                             <span>
-                              {formatCurrency(settlement.finalPay.basicSalary / 100)}
+                              {formatCurrency(settlement.finalPay.outstandingSalaryCents / 100)}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Pro-rata</span>
+                            <span>Leave Payout ({settlement.finalPay.leaveBalanceDays} days)</span>
                             <span>
-                              {formatCurrency(settlement.finalPay.proRataAmount / 100)}
+                              {formatCurrency(settlement.finalPay.leavePayoutCents / 100)}
                             </span>
                           </div>
-                          <div className="flex justify-between">
-                            <span>Leave Encashment</span>
-                            <span>
-                              {formatCurrency(settlement.finalPay.leaveEncashment / 100)}
-                            </span>
-                          </div>
-                          {settlement.finalPay.otherEarnings > 0 && (
+                          {settlement.finalPay.noticePayCents > 0 && (
+                            <div className="flex justify-between">
+                              <span>Notice Pay</span>
+                              <span>
+                                {formatCurrency(settlement.finalPay.noticePayCents / 100)}
+                              </span>
+                            </div>
+                          )}
+                          {settlement.finalPay.otherEarningsCents > 0 && (
                             <div className="flex justify-between">
                               <span>Other Earnings</span>
                               <span>
-                                {formatCurrency(
-                                  settlement.finalPay.otherEarnings / 100
-                                )}
+                                {formatCurrency(settlement.finalPay.otherEarningsCents / 100)}
                               </span>
                             </div>
                           )}
                           <div className="flex justify-between font-medium border-t pt-1 mt-1">
                             <span>Total Gross</span>
                             <span>
-                              {formatCurrency(settlement.finalPay.totalGross / 100)}
+                              {formatCurrency(settlement.finalPay.grossEarningsCents / 100)}
                             </span>
                           </div>
                         </div>
@@ -243,41 +246,38 @@ export function OffboardingDialog({
                           <div className="flex justify-between">
                             <span>PAYE</span>
                             <span className="text-red-500">
-                              -{formatCurrency(settlement.finalPay.deductions.paye / 100)}
+                              -{formatCurrency(settlement.finalPay.payeCents / 100)}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span>UIF</span>
                             <span className="text-red-500">
-                              -{formatCurrency(settlement.finalPay.deductions.uif / 100)}
+                              -{formatCurrency(settlement.finalPay.uifEmployeeCents / 100)}
                             </span>
                           </div>
-                          {settlement.finalPay.deductions.other > 0 && (
+                          {settlement.finalPay.deductionsCents > 0 && (
                             <div className="flex justify-between">
                               <span>Other</span>
                               <span className="text-red-500">
-                                -
-                                {formatCurrency(
-                                  settlement.finalPay.deductions.other / 100
-                                )}
+                                -{formatCurrency(settlement.finalPay.deductionsCents / 100)}
                               </span>
                             </div>
                           )}
                           <div className="flex justify-between font-medium border-t pt-1 mt-1 text-green-600">
                             <span>Net Pay</span>
                             <span>
-                              {formatCurrency(settlement.finalPay.netPay / 100)}
+                              {formatCurrency(settlement.finalPay.netPayCents / 100)}
                             </span>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {settlement.documents.length > 0 && (
+                    {settlement.documentsRequired && settlement.documentsRequired.length > 0 && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t">
                         <FileText className="h-4 w-4" />
                         <span>
-                          Documents to generate: {settlement.documents.join(', ')}
+                          Documents to generate: {settlement.documentsRequired.join(', ')}
                         </span>
                       </div>
                     )}

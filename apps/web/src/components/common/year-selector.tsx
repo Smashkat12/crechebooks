@@ -16,18 +16,22 @@ interface YearSelectorProps {
   startYear?: number;
   /** End year for the range (default: current year) */
   endYear?: number;
+  /** Include "All Years" option (value: 0) */
+  includeAllYears?: boolean;
   className?: string;
 }
 
 /**
  * Year selector dropdown component for filtering data by calendar year.
  * Shows available years in descending order (newest first).
+ * When includeAllYears is true, adds "All Years" option with value 0.
  */
 export function YearSelector({
   value,
   onChange,
   startYear = 2020,
   endYear = new Date().getFullYear(),
+  includeAllYears = false,
   className,
 }: YearSelectorProps) {
   // Generate years array in descending order
@@ -43,9 +47,12 @@ export function YearSelector({
     >
       <SelectTrigger className={className ?? 'w-[140px]'}>
         <Calendar className="mr-2 h-4 w-4" />
-        <SelectValue placeholder="Select year" />
+        <SelectValue placeholder="Select year">{value === 0 ? 'All Years' : value}</SelectValue>
       </SelectTrigger>
       <SelectContent>
+        {includeAllYears && (
+          <SelectItem value="0">All Years</SelectItem>
+        )}
         {years.map((year) => (
           <SelectItem key={year} value={year.toString()}>
             {year}

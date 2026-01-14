@@ -20,7 +20,10 @@ import {
   UseGuards,
   Res,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -29,6 +32,8 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
   ApiParam,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
@@ -36,6 +41,7 @@ import { ReconciliationService } from '../../database/services/reconciliation.se
 import { FinancialReportService } from '../../database/services/financial-report.service';
 import { BalanceSheetService } from '../../database/services/balance-sheet.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
+import { BankStatementReconciliationService } from '../../database/services/bank-statement-reconciliation.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -63,6 +69,12 @@ import {
   PaginatedAuditLogResponseDto,
   AuditLogResponseDto,
 } from '../../database/dto/audit-log.dto';
+import {
+  ReconcileBankStatementDto,
+  BankStatementReconciliationResponseDto,
+  BankStatementMatchResponseDto,
+  BankStatementMatchFilterDto,
+} from '../../database/dto/bank-statement-reconciliation.dto';
 
 @Controller('reconciliation')
 @ApiTags('Reconciliation')
@@ -76,6 +88,7 @@ export class ReconciliationController {
     private readonly balanceSheetService: BalanceSheetService,
     private readonly auditLogService: AuditLogService,
     private readonly discrepancyService: DiscrepancyService,
+    private readonly bankStatementReconciliationService: BankStatementReconciliationService,
   ) {}
 
   @Post()
@@ -198,9 +211,9 @@ export class ReconciliationController {
       filtered = filtered.filter((r) => r.status === filter.status);
     }
 
-    // Calculate pagination
+    // Calculate pagination - default to 100 to show full history
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 100;
     const total = filtered.length;
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
@@ -351,15 +364,38 @@ export class ReconciliationController {
       );
 
     // Calculate summary statistics from real data
+    // Bank balance should be the LATEST reconciled period's closing balance, not the sum
+    // This is because each period's closing balance already includes previous periods
     let totalReconciledCents = 0;
     let totalUnreconciledCents = 0;
     let totalDiscrepancyCents = 0;
     let lastReconciliationDate: Date | null = null;
     let reconciledCount = 0;
 
+    // Sort reconciliations by period end date to find the latest
+    const sortedReconciliations = [...reconciliations].sort(
+      (a, b) => b.periodEnd.getTime() - a.periodEnd.getTime(),
+    );
+
+    // Find latest reconciled period for bank balance
+    const latestReconciled = sortedReconciliations.find(
+      (r) => r.status === 'RECONCILED',
+    );
+    if (latestReconciled) {
+      // Use only the latest closing balance (not cumulative sum)
+      totalReconciledCents = Math.abs(latestReconciled.closingBalanceCents);
+    }
+
+    // Find latest unreconciled period for unreconciled balance
+    const latestUnreconciled = sortedReconciliations.find(
+      (r) => r.status !== 'RECONCILED',
+    );
+    if (latestUnreconciled) {
+      totalUnreconciledCents = Math.abs(latestUnreconciled.closingBalanceCents);
+    }
+
     for (const recon of reconciliations) {
       if (recon.status === 'RECONCILED') {
-        totalReconciledCents += Math.abs(recon.closingBalanceCents);
         reconciledCount++;
         if (
           recon.reconciledAt &&
@@ -368,8 +404,6 @@ export class ReconciliationController {
         ) {
           lastReconciliationDate = recon.reconciledAt;
         }
-      } else {
-        totalUnreconciledCents += Math.abs(recon.closingBalanceCents);
       }
       totalDiscrepancyCents += Math.abs(recon.discrepancyCents);
     }
@@ -971,6 +1005,365 @@ export class ReconciliationController {
   }
 
   // ============================================
+  // TASK-RECON-019: Bank Statement Reconciliation
+  // ============================================
+
+  @Post('bank-statement')
+  @HttpCode(201)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({
+    summary: 'Reconcile bank statement PDF with Xero transactions',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        bank_account: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    type: BankStatementReconciliationResponseDto,
+    description: 'Bank statement reconciled successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid PDF or could not extract statement data',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Period already reconciled',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async reconcileBankStatement(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: ReconcileBankStatementDto,
+    @CurrentUser() user: IUser,
+  ): Promise<BankStatementReconciliationResponseDto> {
+    if (!file) {
+      throw new BadRequestException('Bank statement PDF file is required');
+    }
+
+    this.logger.log(
+      `Bank statement reconciliation: tenant=${user.tenantId}, file=${file.originalname}, size=${file.size}`,
+    );
+
+    const result =
+      await this.bankStatementReconciliationService.reconcileStatement(
+        user.tenantId,
+        dto.bank_account,
+        file.buffer,
+        user.id,
+      );
+
+    // Get all matches for response
+    const matches =
+      await this.bankStatementReconciliationService.getMatchesByReconciliationId(
+        user.tenantId,
+        result.reconciliationId,
+      );
+
+    return {
+      success: true,
+      data: {
+        reconciliation_id: result.reconciliationId,
+        period_start: result.statementPeriod.start.toISOString().split('T')[0],
+        period_end: result.statementPeriod.end.toISOString().split('T')[0],
+        opening_balance: result.openingBalanceCents / 100,
+        closing_balance: result.closingBalanceCents / 100,
+        calculated_balance: result.calculatedBalanceCents / 100,
+        discrepancy: result.discrepancyCents / 100,
+        match_summary: {
+          matched: result.matchSummary.matched,
+          in_bank_only: result.matchSummary.inBankOnly,
+          in_xero_only: result.matchSummary.inXeroOnly,
+          amount_mismatch: result.matchSummary.amountMismatch,
+          date_mismatch: result.matchSummary.dateMismatch,
+          total: result.matchSummary.total,
+        },
+        status: result.status,
+        matches: matches.map((m) => ({
+          id: m.id,
+          bank_date: m.bankDate.toISOString().split('T')[0],
+          bank_description: m.bankDescription,
+          bank_amount: m.bankAmountCents / 100,
+          bank_is_credit: m.bankIsCredit,
+          transaction_id: m.transactionId,
+          xero_date: m.xeroDate?.toISOString().split('T')[0] ?? null,
+          xero_description: m.xeroDescription,
+          xero_amount: m.xeroAmountCents ? m.xeroAmountCents / 100 : null,
+          xero_is_credit: m.xeroIsCredit,
+          status: m.status,
+          match_confidence: m.matchConfidence
+            ? Number(m.matchConfidence)
+            : null,
+          discrepancy_reason: m.discrepancyReason,
+        })),
+      },
+    };
+  }
+
+  @Get(':id/matches')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get bank statement matches for a reconciliation' })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bank statement matches',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getReconciliationMatches(
+    @Param('id') reconciliationId: string,
+    @Query() query: BankStatementMatchFilterDto,
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: BankStatementMatchResponseDto[];
+    total: number;
+  }> {
+    const matches =
+      await this.bankStatementReconciliationService.getMatchesByReconciliationId(
+        user.tenantId,
+        reconciliationId,
+      );
+
+    // Apply status filter if provided
+    let filtered = matches;
+    if (query.status) {
+      filtered = filtered.filter((m) => m.status === query.status);
+    }
+
+    // Apply pagination
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 100;
+    const startIndex = (page - 1) * limit;
+    const paginatedMatches = filtered.slice(startIndex, startIndex + limit);
+
+    return {
+      success: true,
+      data: paginatedMatches.map((m) => ({
+        id: m.id,
+        bank_date: m.bankDate.toISOString().split('T')[0],
+        bank_description: m.bankDescription,
+        bank_amount: m.bankAmountCents / 100,
+        bank_is_credit: m.bankIsCredit,
+        transaction_id: m.transactionId,
+        xero_date: m.xeroDate?.toISOString().split('T')[0] ?? null,
+        xero_description: m.xeroDescription,
+        xero_amount: m.xeroAmountCents ? m.xeroAmountCents / 100 : null,
+        xero_is_credit: m.xeroIsCredit,
+        status: m.status,
+        match_confidence: m.matchConfidence ? Number(m.matchConfidence) : null,
+        discrepancy_reason: m.discrepancyReason,
+      })),
+      total: filtered.length,
+    };
+  }
+
+  @Get(':id/unmatched')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get unmatched transactions for a reconciliation' })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getUnmatchedTransactions(
+    @Param('id') reconciliationId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: {
+      in_bank_only: Array<{
+        date: string;
+        description: string;
+        amount: number;
+      }>;
+      in_xero_only: Array<{
+        date: string;
+        description: string;
+        amount: number;
+        transaction_id: string;
+      }>;
+    };
+  }> {
+    const unmatched =
+      await this.bankStatementReconciliationService.getUnmatchedSummary(
+        user.tenantId,
+        reconciliationId,
+      );
+
+    return {
+      success: true,
+      data: {
+        in_bank_only: unmatched.inBankOnly.map((t) => ({
+          date: t.date.toISOString().split('T')[0],
+          description: t.description,
+          amount: t.amount,
+        })),
+        in_xero_only: unmatched.inXeroOnly.map((t) => ({
+          date: t.date.toISOString().split('T')[0],
+          description: t.description,
+          amount: t.amount,
+          transaction_id: t.transactionId,
+        })),
+      },
+    };
+  }
+
+  @Post(':id/matches/:matchId/manual-match')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Manually match a bank statement record with a transaction' })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  @ApiParam({ name: 'matchId', description: 'Bank statement match ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Match updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Match or transaction not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async manualMatch(
+    @Param('id') reconciliationId: string,
+    @Param('matchId') matchId: string,
+    @Body() body: { transaction_id: string },
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      status: string;
+      match_confidence: number | null;
+    };
+  }> {
+    this.logger.log(
+      `Manual match: reconciliation=${reconciliationId}, match=${matchId}, transaction=${body.transaction_id}`,
+    );
+
+    const result = await this.bankStatementReconciliationService.manualMatch(
+      user.tenantId,
+      matchId,
+      body.transaction_id,
+    );
+
+    return {
+      success: true,
+      data: {
+        id: result.id,
+        status: result.status,
+        match_confidence: result.matchConfidence,
+      },
+    };
+  }
+
+  @Post(':id/matches/:matchId/unmatch')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Unmatch a previously matched bank statement record' })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  @ApiParam({ name: 'matchId', description: 'Bank statement match ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Match unlinked successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Match not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async unmatch(
+    @Param('id') reconciliationId: string,
+    @Param('matchId') matchId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      status: string;
+    };
+  }> {
+    this.logger.log(
+      `Unmatch: reconciliation=${reconciliationId}, match=${matchId}`,
+    );
+
+    const result = await this.bankStatementReconciliationService.unmatch(
+      user.tenantId,
+      matchId,
+    );
+
+    return {
+      success: true,
+      data: {
+        id: result.id,
+        status: result.status,
+      },
+    };
+  }
+
+  @Get(':id/available-transactions')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get available transactions for manual matching' })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAvailableTransactions(
+    @Param('id') reconciliationId: string,
+    @Query('search') searchTerm: string | undefined,
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      date: string;
+      description: string;
+      amount: number;
+      is_credit: boolean;
+    }>;
+  }> {
+    const transactions =
+      await this.bankStatementReconciliationService.getAvailableTransactionsForMatching(
+        user.tenantId,
+        reconciliationId,
+        { searchTerm },
+      );
+
+    return {
+      success: true,
+      data: transactions.map((t) => ({
+        id: t.id,
+        date: t.date.toISOString().split('T')[0],
+        description: t.description,
+        amount: t.amountCents / 100,
+        is_credit: t.isCredit,
+      })),
+    };
+  }
+
+  // ============================================
   // TASK-RECON-UI: Get Reconciliation by ID
   // NOTE: This must be LAST to avoid matching specific routes like 'summary', 'discrepancies'
   // ============================================
@@ -1016,8 +1409,25 @@ export class ReconciliationController {
       throw new NotFoundException('Reconciliation', id);
     }
 
+    // Get matches to compute summary counts
+    const matches =
+      await this.bankStatementReconciliationService.getMatchesByReconciliationId(
+        user.tenantId,
+        id,
+      );
+
+    // Compute match summary from actual match data
+    const matchSummary = {
+      matched: matches.filter((m) => m.status === 'MATCHED').length,
+      inBankOnly: matches.filter((m) => m.status === 'IN_BANK_ONLY').length,
+      inXeroOnly: matches.filter((m) => m.status === 'IN_XERO_ONLY').length,
+      amountMismatch: matches.filter((m) => m.status === 'AMOUNT_MISMATCH')
+        .length,
+      dateMismatch: matches.filter((m) => m.status === 'DATE_MISMATCH').length,
+      total: matches.length,
+    };
+
     // Transform to API response (cents to Rands, camelCase to snake_case)
-    // Note: matchedCount/unmatchedCount are computed during reconciliation but not stored in DB
     return {
       success: true,
       data: {
@@ -1030,8 +1440,20 @@ export class ReconciliationController {
         closing_balance: reconciliation.closingBalanceCents / 100,
         calculated_balance: reconciliation.calculatedBalanceCents / 100,
         discrepancy: reconciliation.discrepancyCents / 100,
-        matched_count: 0, // Not stored in DB, computed during reconciliation
-        unmatched_count: 0, // Not stored in DB, computed during reconciliation
+        matched_count: matchSummary.matched,
+        unmatched_count:
+          matchSummary.inBankOnly +
+          matchSummary.inXeroOnly +
+          matchSummary.amountMismatch +
+          matchSummary.dateMismatch,
+        match_summary: {
+          matched: matchSummary.matched,
+          in_bank_only: matchSummary.inBankOnly,
+          in_xero_only: matchSummary.inXeroOnly,
+          amount_mismatch: matchSummary.amountMismatch,
+          date_mismatch: matchSummary.dateMismatch,
+          total: matchSummary.total,
+        },
       },
     };
   }

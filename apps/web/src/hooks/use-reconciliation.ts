@@ -33,18 +33,14 @@ interface ApiDiscrepancyItem {
   id: string;
   reconciliation_id: string;
   type: 'in_bank_not_xero' | 'in_xero_not_bank' | 'amount_mismatch' | 'date_mismatch';
-  bank_transaction_id: string | null;
-  xero_transaction_id: string | null;
   description: string;
-  bank_amount: number | null;
-  xero_amount: number | null;
-  discrepancy_amount: number;
-  transaction_date: string;
-  status: 'pending' | 'resolved' | 'ignored';
-  resolution_notes: string | null;
-  resolved_at: string | null;
-  resolved_by: string | null;
-  created_at: string;
+  amount: number;  // Amount in Rands
+  severity: 'low' | 'medium' | 'high';
+  period_start: string;
+  period_end: string;
+  bank_account: string;
+  transaction_date: string | null;
+  xero_transaction_id: string | null;
 }
 
 interface ApiDiscrepanciesResponse {
@@ -68,13 +64,13 @@ function transformDiscrepancyToItem(item: ApiDiscrepancyItem): IReconciliationIt
   return {
     id: item.id,
     reconciliationId: item.reconciliation_id,
-    transactionId: item.bank_transaction_id || item.xero_transaction_id || item.id,
+    transactionId: item.xero_transaction_id || item.id,
     xeroTransactionId: item.xero_transaction_id || undefined,
     description: item.description,
-    amount: item.bank_amount ?? item.xero_amount ?? item.discrepancy_amount,
-    date: new Date(item.transaction_date),
+    amount: item.amount * 100, // Convert Rands to cents for IReconciliationItem
+    date: item.transaction_date ? new Date(item.transaction_date) : new Date(),
     matched: false, // Discrepancies are unmatched by definition
-    discrepancy: item.discrepancy_amount !== 0 ? item.discrepancy_amount : undefined,
+    discrepancy: item.amount !== 0 ? item.amount * 100 : undefined, // Convert Rands to cents
   };
 }
 
@@ -281,4 +277,383 @@ export function useReconcile() {
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });
+}
+
+// API response types for bank statement reconciliation
+interface ApiBankStatementMatch {
+  id: string;
+  bank_date: string;
+  bank_description: string;
+  bank_amount: number;
+  bank_is_credit: boolean;
+  transaction_id: string | null;
+  xero_date: string | null;
+  xero_description: string | null;
+  xero_amount: number | null;
+  xero_is_credit: boolean | null;
+  status: 'MATCHED' | 'IN_BANK_ONLY' | 'IN_XERO_ONLY' | 'AMOUNT_MISMATCH' | 'DATE_MISMATCH';
+  match_confidence: number | null;
+  discrepancy_reason: string | null;
+}
+
+interface ApiBankStatementReconciliationResponse {
+  success: boolean;
+  data: {
+    reconciliation_id: string;
+    period_start: string;
+    period_end: string;
+    opening_balance: number;
+    closing_balance: number;
+    calculated_balance: number;
+    discrepancy: number;
+    match_summary: {
+      matched: number;
+      in_bank_only: number;
+      in_xero_only: number;
+      amount_mismatch: number;
+      date_mismatch: number;
+      total: number;
+    };
+    status: string;
+    matches: ApiBankStatementMatch[];
+  };
+}
+
+// Frontend types for bank statement matching
+export interface BankStatementMatch {
+  id: string;
+  bankDate: string;
+  bankDescription: string;
+  bankAmount: number;
+  bankIsCredit: boolean;
+  transactionId: string | null;
+  xeroDate: string | null;
+  xeroDescription: string | null;
+  xeroAmount: number | null;
+  xeroIsCredit: boolean | null;
+  status: 'MATCHED' | 'IN_BANK_ONLY' | 'IN_XERO_ONLY' | 'AMOUNT_MISMATCH' | 'DATE_MISMATCH';
+  matchConfidence: number | null;
+  discrepancyReason: string | null;
+}
+
+export interface BankStatementReconciliationResult {
+  reconciliationId: string;
+  periodStart: string;
+  periodEnd: string;
+  openingBalance: number;
+  closingBalance: number;
+  calculatedBalance: number;
+  discrepancy: number;
+  matchSummary: {
+    matched: number;
+    inBankOnly: number;
+    inXeroOnly: number;
+    amountMismatch: number;
+    dateMismatch: number;
+    total: number;
+  };
+  status: string;
+  matches: BankStatementMatch[];
+}
+
+// Transform API match to frontend format
+function transformBankStatementMatch(api: ApiBankStatementMatch): BankStatementMatch {
+  return {
+    id: api.id,
+    bankDate: api.bank_date,
+    bankDescription: api.bank_description,
+    bankAmount: api.bank_amount,
+    bankIsCredit: api.bank_is_credit,
+    transactionId: api.transaction_id,
+    xeroDate: api.xero_date,
+    xeroDescription: api.xero_description,
+    xeroAmount: api.xero_amount,
+    xeroIsCredit: api.xero_is_credit,
+    status: api.status,
+    matchConfidence: api.match_confidence,
+    discrepancyReason: api.discrepancy_reason,
+  };
+}
+
+// Bank statement PDF reconciliation mutation
+export interface ReconcileBankStatementParams {
+  file: File;
+  bankAccount: string;
+}
+
+export function useReconcileBankStatement() {
+  const queryClient = useQueryClient();
+
+  return useMutation<BankStatementReconciliationResult, AxiosError, ReconcileBankStatementParams>({
+    mutationFn: async ({ file, bankAccount }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bank_account', bankAccount);
+
+      const { data } = await apiClient.post<ApiBankStatementReconciliationResponse>(
+        '/reconciliation/bank-statement',
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 120000, // 2 minutes for PDF processing
+        }
+      );
+
+      // Transform API response to frontend format
+      return {
+        reconciliationId: data.data.reconciliation_id,
+        periodStart: data.data.period_start,
+        periodEnd: data.data.period_end,
+        openingBalance: data.data.opening_balance,
+        closingBalance: data.data.closing_balance,
+        calculatedBalance: data.data.calculated_balance,
+        discrepancy: data.data.discrepancy,
+        matchSummary: {
+          matched: data.data.match_summary.matched,
+          inBankOnly: data.data.match_summary.in_bank_only,
+          inXeroOnly: data.data.match_summary.in_xero_only,
+          amountMismatch: data.data.match_summary.amount_mismatch,
+          dateMismatch: data.data.match_summary.date_mismatch,
+          total: data.data.match_summary.total,
+        },
+        status: data.data.status,
+        matches: data.data.matches.map(transformBankStatementMatch),
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    },
+  });
+}
+
+// Available transaction type for manual matching
+export interface AvailableTransaction {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  isCredit: boolean;
+}
+
+// API response for available transactions
+interface ApiAvailableTransactionResponse {
+  success: boolean;
+  data: Array<{
+    id: string;
+    date: string;
+    description: string;
+    amount: number;
+    is_credit: boolean;
+  }>;
+}
+
+// Get available transactions for manual matching
+export function useAvailableTransactions(reconciliationId: string, searchTerm?: string) {
+  return useQuery<AvailableTransaction[], AxiosError>({
+    queryKey: ['reconciliation', reconciliationId, 'available-transactions', searchTerm],
+    queryFn: async () => {
+      const params = searchTerm ? { search: searchTerm } : {};
+      const { data } = await apiClient.get<ApiAvailableTransactionResponse>(
+        `/reconciliation/${reconciliationId}/available-transactions`,
+        { params }
+      );
+      return data.data.map((t) => ({
+        id: t.id,
+        date: t.date,
+        description: t.description,
+        amount: t.amount,
+        isCredit: t.is_credit,
+      }));
+    },
+    enabled: !!reconciliationId,
+    staleTime: 0, // Always fetch fresh data for available transactions
+    refetchOnWindowFocus: true, // Refetch when user returns to window
+  });
+}
+
+// Manual match mutation
+interface ManualMatchParams {
+  reconciliationId: string;
+  matchId: string;
+  transactionId: string;
+}
+
+export function useManualMatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ id: string; status: string; matchConfidence: number | null }, AxiosError, ManualMatchParams>({
+    mutationFn: async ({ reconciliationId, matchId, transactionId }) => {
+      const { data } = await apiClient.post<{
+        success: boolean;
+        data: { id: string; status: string; match_confidence: number | null };
+      }>(
+        `/reconciliation/${reconciliationId}/matches/${matchId}/manual-match`,
+        { transaction_id: transactionId }
+      );
+      return {
+        id: data.data.id,
+        status: data.data.status,
+        matchConfidence: data.data.match_confidence,
+      };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
+      queryClient.invalidateQueries({ queryKey: ['reconciliation', variables.reconciliationId] });
+    },
+  });
+}
+
+// Unmatch mutation
+interface UnmatchParams {
+  reconciliationId: string;
+  matchId: string;
+}
+
+export function useUnmatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ id: string; status: string }, AxiosError, UnmatchParams>({
+    mutationFn: async ({ reconciliationId, matchId }) => {
+      const { data } = await apiClient.post<{
+        success: boolean;
+        data: { id: string; status: string };
+      }>(
+        `/reconciliation/${reconciliationId}/matches/${matchId}/unmatch`
+      );
+      return {
+        id: data.data.id,
+        status: data.data.status,
+      };
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
+      queryClient.invalidateQueries({ queryKey: ['reconciliation', variables.reconciliationId] });
+    },
+  });
+}
+
+// Hook to fetch reconciliation details with match summary by ID
+interface ReconciliationDetailsResponse {
+  success: boolean;
+  data: {
+    id: string;
+    status: string;
+    bank_account: string;
+    period_start: string;
+    period_end: string;
+    opening_balance: number;
+    closing_balance: number;
+    calculated_balance: number;
+    discrepancy: number;
+    matched_count: number;
+    unmatched_count: number;
+    match_summary?: {
+      matched: number;
+      in_bank_only: number;
+      in_xero_only: number;
+      amount_mismatch: number;
+      date_mismatch: number;
+      total: number;
+    };
+  };
+}
+
+export function useReconciliationById(reconciliationId: string | null) {
+  return useQuery<ReconciliationDetailsResponse, AxiosError>({
+    queryKey: ['reconciliation', reconciliationId],
+    queryFn: async () => {
+      if (!reconciliationId) throw new Error('No reconciliation ID');
+      const { data } = await apiClient.get<ReconciliationDetailsResponse>(
+        `/reconciliation/${reconciliationId}`
+      );
+      return data;
+    },
+    enabled: !!reconciliationId,
+  });
+}
+
+// Hook to refresh match results for a reconciliation
+export function useRefreshMatchResults(reconciliationId: string | null) {
+  const queryClient = useQueryClient();
+
+  const refreshMatches = async (): Promise<BankStatementReconciliationResult | null> => {
+    if (!reconciliationId) return null;
+
+    // Fetch reconciliation details (includes match_summary)
+    const { data: reconData } = await apiClient.get<ReconciliationDetailsResponse>(
+      `/reconciliation/${reconciliationId}`
+    );
+
+    // Fetch all matches
+    const { data: matchData } = await apiClient.get<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        bank_date: string;
+        bank_description: string;
+        bank_amount: number;
+        bank_is_credit: boolean;
+        transaction_id: string | null;
+        xero_date: string | null;
+        xero_description: string | null;
+        xero_amount: number | null;
+        xero_is_credit: boolean | null;
+        status: BankStatementMatch['status'];
+        match_confidence: number | null;
+        discrepancy_reason: string | null;
+      }>;
+      total: number;
+    }>(`/reconciliation/${reconciliationId}/matches`);
+
+    // Transform to BankStatementReconciliationResult format
+    const result: BankStatementReconciliationResult = {
+      reconciliationId,
+      periodStart: reconData.data.period_start,
+      periodEnd: reconData.data.period_end,
+      openingBalance: reconData.data.opening_balance,
+      closingBalance: reconData.data.closing_balance,
+      calculatedBalance: reconData.data.calculated_balance,
+      discrepancy: reconData.data.discrepancy,
+      matchSummary: reconData.data.match_summary ? {
+        matched: reconData.data.match_summary.matched,
+        inBankOnly: reconData.data.match_summary.in_bank_only,
+        inXeroOnly: reconData.data.match_summary.in_xero_only,
+        amountMismatch: reconData.data.match_summary.amount_mismatch,
+        dateMismatch: reconData.data.match_summary.date_mismatch,
+        total: reconData.data.match_summary.total,
+      } : {
+        matched: reconData.data.matched_count,
+        inBankOnly: reconData.data.unmatched_count,
+        inXeroOnly: 0,
+        amountMismatch: 0,
+        dateMismatch: 0,
+        total: reconData.data.matched_count + reconData.data.unmatched_count,
+      },
+      status: reconData.data.status,
+      matches: matchData.data.map((m) => ({
+        id: m.id,
+        bankDate: m.bank_date,
+        bankDescription: m.bank_description,
+        bankAmount: m.bank_amount,
+        bankIsCredit: m.bank_is_credit,
+        transactionId: m.transaction_id,
+        xeroDate: m.xero_date,
+        xeroDescription: m.xero_description,
+        xeroAmount: m.xero_amount,
+        xeroIsCredit: m.xero_is_credit,
+        status: m.status,
+        matchConfidence: m.match_confidence,
+        discrepancyReason: m.discrepancy_reason,
+      })),
+    };
+
+    // Invalidate queries to ensure consistency
+    queryClient.invalidateQueries({ queryKey: ['reconciliation', reconciliationId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
+
+    return result;
+  };
+
+  return { refreshMatches };
 }

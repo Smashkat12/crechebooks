@@ -46,15 +46,15 @@ export class ReconciliationListQueryDto {
 
   @ApiPropertyOptional({
     description: 'Number of items per page',
-    example: 20,
-    default: 20,
+    example: 100,
+    default: 100,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
-  limit?: number = 20;
+  @Max(500)
+  limit?: number = 100;
 }
 
 export class ReconciliationListItemDto {

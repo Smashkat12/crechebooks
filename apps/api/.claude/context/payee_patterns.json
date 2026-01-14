@@ -4,74 +4,86 @@
   "autoApplyConfidenceThreshold": 0.85,
   "patterns": [
     {
-      "payeePattern": "^WOOLWORTHS",
-      "category": "GROCERIES",
+      "id": "grocery-woolworths",
+      "regex": "^WOOLWORTHS",
       "accountCode": "5100",
-      "accountName": "Cost of Sales - Groceries",
-      "confidence": 0.95
+      "accountName": "Food & Catering",
+      "confidence": 0.95,
+      "vatType": "STANDARD"
     },
     {
-      "payeePattern": "^PICK N PAY",
-      "category": "GROCERIES",
+      "id": "grocery-pnp",
+      "regex": "^PICK N PAY",
       "accountCode": "5100",
-      "accountName": "Cost of Sales - Groceries",
-      "confidence": 0.95
+      "accountName": "Food & Catering",
+      "confidence": 0.95,
+      "vatType": "STANDARD"
     },
     {
-      "payeePattern": "^CHECKERS",
-      "category": "GROCERIES",
+      "id": "grocery-checkers",
+      "regex": "^CHECKERS",
       "accountCode": "5100",
-      "accountName": "Cost of Sales - Groceries",
-      "confidence": 0.95
+      "accountName": "Food & Catering",
+      "confidence": 0.95,
+      "vatType": "STANDARD"
     },
     {
-      "payeePattern": "^ESKOM|^CITY POWER|^ELECTRICITY",
-      "category": "UTILITIES",
+      "id": "utility-electricity",
+      "regex": "^ESKOM|^CITY POWER|ELECTRICITY",
       "accountCode": "6100",
       "accountName": "Utilities - Electricity",
-      "confidence": 0.92
+      "confidence": 0.92,
+      "vatType": "STANDARD"
     },
     {
-      "payeePattern": "^WATER|^MUNICIPALITY.*WATER",
-      "category": "UTILITIES",
+      "id": "utility-water",
+      "regex": "^WATER|MUNICIPALITY.*WATER",
       "accountCode": "6110",
       "accountName": "Utilities - Water",
-      "confidence": 0.90
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
     },
     {
-      "payeePattern": "^TELKOM|^MTN|^VODACOM|^CELL C",
-      "category": "TELECOMMUNICATIONS",
+      "id": "telecom",
+      "regex": "^TELKOM|^MTN|^VODACOM|^CELL C",
       "accountCode": "6200",
       "accountName": "Telecommunications",
-      "confidence": 0.90
+      "confidence": 0.90,
+      "vatType": "STANDARD"
     },
     {
-      "payeePattern": "SALARY|^PAYROLL|WAGES",
-      "category": "PAYROLL",
-      "accountCode": "4100",
-      "accountName": "Tuition Fee Income",
-      "confidence": 0.88
-    },
-    {
-      "payeePattern": "^SARS|TAX",
-      "category": "TAX",
+      "id": "tax-sars",
+      "regex": "^SARS",
       "accountCode": "2100",
-      "accountName": "SARS Liabilities",
-      "confidence": 0.92
+      "accountName": "SARS - PAYE Payable",
+      "confidence": 0.92,
+      "vatType": "EXEMPT",
+      "flagForReview": true,
+      "reviewReason": "Tax payment requires verification"
     },
     {
-      "payeePattern": "^RENT|^LEASE",
-      "category": "RENT",
+      "id": "rent",
+      "regex": "^RENT|^LEASE",
       "accountCode": "6300",
       "accountName": "Rent Expense",
-      "confidence": 0.88
+      "confidence": 0.88,
+      "vatType": "EXEMPT"
     },
     {
-      "payeePattern": "^INSURANCE|^OLD MUTUAL|^SANLAM|^DISCOVERY",
-      "category": "INSURANCE",
+      "id": "insurance",
+      "regex": "^INSURANCE|^OLD MUTUAL|^SANLAM|^DISCOVERY",
       "accountCode": "6400",
       "accountName": "Insurance",
-      "confidence": 0.88
+      "confidence": 0.88,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "bank-charges",
+      "regex": "SERVICE FEE|BANK FEE|BANK CHARGE|MONTHLY FEE",
+      "accountCode": "6900",
+      "accountName": "Bank Charges",
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
     }
   ]
 }

@@ -162,5 +162,200 @@
     "checksum": "ff51f42b0d72a48d02616660209a44743cc89bc089d60525ac321e19b23ec409",
     "references": [],
     "dependencies": []
+  },
+  {
+    "id": "entry_mk5x4wd5_cc0so4nl0",
+    "key": "spay/001/status",
+    "value": {
+      "completed": true,
+      "files": [
+        "leave-request.entity.ts",
+        "leave.dto.ts",
+        "leave-request.repository.ts",
+        "simplepay-leave.service.ts"
+      ],
+      "models": [
+        "LeaveRequest",
+        "LeaveRequestStatus"
+      ],
+      "testsPassing": true,
+      "nextAgent": "SPAY-002"
+    },
+    "type": "object",
+    "namespace": "crechebooks/simplepay",
+    "tags": [],
+    "metadata": {},
+    "owner": "system",
+    "accessLevel": "shared",
+    "createdAt": "2026-01-08T20:47:23.609Z",
+    "updatedAt": "2026-01-08T20:47:23.609Z",
+    "lastAccessedAt": "2026-01-08T20:47:23.609Z",
+    "version": 1,
+    "size": 247,
+    "compressed": false,
+    "checksum": "2ee637e1277a1cb08589d133e9c75ed276ee8c45371fad044039f8eb3a51f57b",
+    "references": [],
+    "dependencies": []
+  },
+  {
+    "id": "entry_mk5y56ld_e4tsti051",
+    "key": "spay/002/status",
+    "value": {
+      "completed": true,
+      "files": [
+        "payrun-sync.entity.ts",
+        "payrun.dto.ts",
+        "payrun-sync.repository.ts",
+        "simplepay-payrun.service.ts"
+      ],
+      "models": [
+        "PayRunSync",
+        "PayRunSyncStatus"
+      ],
+      "testsPassing": true,
+      "nextAgent": "SPAY-003"
+    },
+    "type": "object",
+    "namespace": "crechebooks/simplepay",
+    "tags": [],
+    "metadata": {},
+    "owner": "system",
+    "accessLevel": "shared",
+    "createdAt": "2026-01-08T21:15:36.481Z",
+    "updatedAt": "2026-01-08T21:15:36.481Z",
+    "lastAccessedAt": "2026-01-08T21:15:36.481Z",
+    "version": 1,
+    "size": 241,
+    "compressed": false,
+    "checksum": "34052105b144568a5c56e0d8085a368082bb29b0e28419dc0357f593e17bcfc8",
+    "references": [],
+    "dependencies": []
+  },
+  {
+    "id": "entry_mk5zv2lp_b5sf7f8ym",
+    "key": "spay/003/status",
+    "value": {
+      "completed": true,
+      "files": [
+        "calculation.entity.ts",
+        "calculations.dto.ts",
+        "calculation-cache.repository.ts",
+        "payroll-adjustment.repository.ts",
+        "simplepay-calculations.service.ts"
+      ],
+      "models": [
+        "CalculationItemCache",
+        "PayrollAdjustment",
+        "CalculationType"
+      ],
+      "testsPassing": true,
+      "nextAgent": "SPAY-004"
+    },
+    "type": "object",
+    "namespace": "crechebooks/simplepay",
+    "tags": [],
+    "metadata": {},
+    "owner": "system",
+    "accessLevel": "shared",
+    "createdAt": "2026-01-08T22:03:43.981Z",
+    "updatedAt": "2026-01-08T22:03:43.981Z",
+    "lastAccessedAt": "2026-01-08T22:04:48.506Z",
+    "version": 1,
+    "size": 323,
+    "compressed": false,
+    "checksum": "1ef6c01c16881c7e6f167e4e06d7a1a1360cd51bea365830d8811254429827d3",
+    "references": [],
+    "dependencies": []
+  },
+  {
+    "id": "entry_mk62tugm_wg59v1rlp",
+    "key": "spay/006/completed",
+    "value": {
+      "files": [
+        "profile-mapping.entity.ts",
+        "profile.dto.ts",
+        "profile-mapping-sync.repository.ts",
+        "simplepay-profile.service.ts"
+      ],
+      "models": [
+        "ProfileMappingSync"
+      ],
+      "apiEndpoints": [
+        "getProfileMappings",
+        "assignProfile",
+        "updateProfileMapping",
+        "bulkAssign"
+      ],
+      "testsPassing": true
+    },
+    "type": "object",
+    "namespace": "crechebooks/simplepay",
+    "tags": [],
+    "metadata": {},
+    "owner": "system",
+    "accessLevel": "shared",
+    "createdAt": "2026-01-08T23:26:45.622Z",
+    "updatedAt": "2026-01-08T23:26:45.622Z",
+    "lastAccessedAt": "2026-01-08T23:26:45.622Z",
+    "version": 1,
+    "size": 295,
+    "compressed": false,
+    "checksum": "fc48889c0d026076691911d82e9908cfec9689939090125505b49dcbe941ee44",
+    "references": [],
+    "dependencies": []
+  },
+  {
+    "id": "entry_mk66jsru_457zo2d64",
+    "key": "spay/all-complete",
+    "value": {
+      "tasks": [
+        "SPAY-001",
+        "SPAY-002",
+        "SPAY-003",
+        "SPAY-004",
+        "SPAY-005",
+        "SPAY-006",
+        "SPAY-007",
+        "SPAY-008"
+      ],
+      "status": "ALL_COMPLETED",
+      "models": [
+        "LeaveRequest",
+        "PayRunSync",
+        "CalculationItemCache",
+        "PayrollAdjustment",
+        "ServicePeriodSync",
+        "ReportRequest",
+        "ProfileMappingSync",
+        "BulkOperationLog",
+        "EmployeeSetupLog"
+      ],
+      "services": [
+        "SimplePayLeaveService",
+        "SimplePayPayRunService",
+        "SimplePayCalculationsService",
+        "SimplePayServicePeriodService",
+        "SimplePayReportsService",
+        "SimplePayProfileService",
+        "SimplePayBulkService",
+        "SimplePayEmployeeSetupService"
+      ],
+      "completedAt": "2026-01-09T00:00:00Z"
+    },
+    "type": "object",
+    "namespace": "crechebooks/simplepay",
+    "tags": [],
+    "metadata": {},
+    "owner": "system",
+    "accessLevel": "shared",
+    "createdAt": "2026-01-09T01:10:55.338Z",
+    "updatedAt": "2026-01-09T01:10:55.338Z",
+    "lastAccessedAt": "2026-01-09T01:10:55.338Z",
+    "version": 1,
+    "size": 599,
+    "compressed": false,
+    "checksum": "8f82309ce897b07738f2f0438895bcfcca74cb3e3ffc124d6e37eec18d2bef46",
+    "references": [],
+    "dependencies": []
   }
 ]

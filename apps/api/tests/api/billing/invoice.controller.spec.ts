@@ -7,7 +7,18 @@ import { InvoiceGenerationService } from '../../../src/database/services/invoice
 import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
 import { AdhocChargeService } from '../../../src/database/services/adhoc-charge.service';
 import { InvoicePdfService } from '../../../src/database/services/invoice-pdf.service';
-import { IUser, UserRole } from '../../../src/database/entities/user.entity';
+import type { IUser } from '../../../src/database/entities/user.entity';
+import { UserRole } from '@prisma/client';
+import {
+  Parent,
+  Child,
+  Invoice,
+  InvoiceStatus as PrismaInvoiceStatus,
+  DeliveryMethod,
+  DeliveryStatus,
+  PreferredContact,
+  Gender,
+} from '@prisma/client';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 
 describe('InvoiceController', () => {
@@ -25,11 +36,12 @@ describe('InvoiceController', () => {
     role: UserRole.OWNER,
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: 'tenant-456',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  const mockParent = {
+  const mockParent: Parent = {
     id: 'parent-001',
     tenantId: 'tenant-456',
     xeroContactId: null,
@@ -38,7 +50,9 @@ describe('InvoiceController', () => {
     email: 'john.smith@example.com',
     phone: null,
     whatsapp: null,
-    preferredContact: 'EMAIL',
+    preferredContact: PreferredContact.EMAIL,
+    whatsappOptIn: false,
+    smsOptIn: false,
     idNumber: null,
     address: null,
     notes: null,
@@ -47,14 +61,14 @@ describe('InvoiceController', () => {
     updatedAt: new Date(),
   };
 
-  const mockChild = {
+  const mockChild: Child = {
     id: 'child-001',
     tenantId: 'tenant-456',
     parentId: 'parent-001',
     firstName: 'Emma',
     lastName: 'Smith',
     dateOfBirth: new Date('2020-05-15'),
-    gender: 'FEMALE',
+    gender: Gender.FEMALE,
     medicalNotes: null,
     emergencyContact: null,
     emergencyPhone: null,
@@ -76,17 +90,20 @@ describe('InvoiceController', () => {
     dueDate: new Date('2025-02-15'),
     subtotalCents: 500000,
     vatCents: 75000,
+    vatRate: 15,
     totalCents: 575000,
     amountPaidCents: 200000,
-    status: 'SENT',
-    deliveryMethod: 'EMAIL',
-    deliveryStatus: 'DELIVERED',
+    status: PrismaInvoiceStatus.SENT,
+    deliveryMethod: DeliveryMethod.EMAIL,
+    deliveryStatus: DeliveryStatus.DELIVERED,
+    deliveryRetryCount: 0,
     deliveredAt: new Date('2025-02-01T10:00:00Z'),
+    pdfUrl: null,
     notes: null,
     isDeleted: false,
     createdAt: new Date('2025-02-01T08:00:00Z'),
     updatedAt: new Date('2025-02-01T08:00:00Z'),
-  };
+  } as unknown as Invoice;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

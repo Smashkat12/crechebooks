@@ -1,16 +1,93 @@
 import { z } from 'zod';
 
+// Re-export from the new validation module for backward compatibility
+// and access to comprehensive South African validations
+export {
+  VALIDATION_MESSAGES,
+  EMAIL_MESSAGES,
+  PASSWORD_MESSAGES,
+  SA_ID_NUMBER_MESSAGES,
+  SA_PHONE_MESSAGES,
+  SA_TAX_NUMBER_MESSAGES,
+  BANK_ACCOUNT_MESSAGES,
+  CURRENCY_MESSAGES,
+  DATE_MESSAGES,
+  NAME_MESSAGES,
+  ADDRESS_MESSAGES,
+  FORM_MESSAGES,
+} from '@/lib/validation/messages';
+
+export {
+  // SA ID Number
+  saIdNumberSchema as saIdSchema,
+  optionalSaIdNumberSchema,
+  validateSaIdLuhn,
+  extractDobFromSaId,
+  extractGenderFromSaId,
+  isSaCitizen,
+  // SA Phone
+  saPhoneSchema as saPhone,
+  saMobileSchema,
+  optionalSaPhoneSchema,
+  optionalSaMobileSchema,
+  validateSaPhone,
+  validateSaMobile,
+  formatSaPhone,
+  // SA Tax Number
+  saTaxNumberSchema,
+  optionalSaTaxNumberSchema,
+  validateSaTaxNumber,
+  // Email
+  emailSchema as email,
+  optionalEmailSchema,
+  // Password
+  passwordSchema,
+  simplePasswordSchema,
+  // Names
+  firstNameSchema,
+  lastNameSchema,
+  fullNameSchema,
+  // Currency
+  currencySchema as currency,
+  optionalCurrencySchema as optionalCurrency,
+  positiveCurrencySchema,
+  parseCurrencyValue,
+  // Dates
+  dateSchema as date,
+  optionalDateSchema as optionalDate,
+  pastDateSchema,
+  futureDateSchema,
+  dateRangeSchema as dateRange,
+  // Bank Account
+  bankAccountNumberSchema,
+  bankBranchCodeSchema,
+  optionalBankAccountNumberSchema,
+  optionalBankBranchCodeSchema,
+  // Address
+  SA_PROVINCES,
+  saPostalCodeSchema,
+  saProvinceSchema,
+  optionalSaPostalCodeSchema,
+  // Schema builders
+  requiredString,
+  optionalString,
+  requiredNumber,
+  optionalNumber,
+} from '@/lib/validation/schemas';
+
 /**
  * Email validation schema
+ * @deprecated Use emailSchema from @/lib/validation/schemas instead
  */
 export const emailSchema = z
   .string()
   .min(1, 'Email is required')
-  .email('Invalid email address');
+  .email('Please enter a valid email address (e.g., name@example.com)');
 
 /**
  * South African phone number validation
  * Accepts formats: +27 XX XXX XXXX, 0XX XXX XXXX, +27XXXXXXXXX, 0XXXXXXXXX
+ * @deprecated Use saPhoneSchema from @/lib/validation/schemas instead
  */
 export const phoneSchema = z
   .string()
@@ -33,7 +110,7 @@ export const phoneSchema = z
       return false;
     },
     {
-      message: 'Invalid South African phone number. Use format: +27 XX XXX XXXX or 0XX XXX XXXX',
+      message: 'Please enter a valid South African phone number (e.g., 082 123 4567 or +27 82 123 4567)',
     }
   );
 
@@ -45,12 +122,13 @@ export const phoneSchema = z
  * - C: Citizenship (0 = SA, 1 = other)
  * - A: Usually 8 or 9
  * - Z: Checksum digit
+ * @deprecated Use saIdNumberSchema from @/lib/validation/schemas instead
  */
 export const saIdNumberSchema = z
   .string()
-  .min(1, 'ID number is required')
-  .length(13, 'ID number must be exactly 13 digits')
-  .regex(/^\d{13}$/, 'ID number must contain only digits')
+  .min(1, 'South African ID number is required')
+  .length(13, 'SA ID number must be exactly 13 digits')
+  .regex(/^\d{13}$/, 'SA ID number must contain only digits (0-9)')
   .refine(
     (value) => {
       // Basic date validation (first 6 digits)
@@ -82,13 +160,14 @@ export const saIdNumberSchema = z
       return sum % 10 === 0;
     },
     {
-      message: 'Invalid South African ID number',
+      message: 'Please enter a valid South African ID number',
     }
   );
 
 /**
  * Currency validation schema (ZAR)
  * Accepts numbers with up to 2 decimal places
+ * @deprecated Use currencySchema from @/lib/validation/schemas instead
  */
 export const currencySchema = z
   .string()
@@ -101,7 +180,7 @@ export const currencySchema = z
       return !isNaN(num) && num >= 0 && /^\d+(\.\d{1,2})?$/.test(cleaned);
     },
     {
-      message: 'Invalid currency amount. Must be a positive number with up to 2 decimal places',
+      message: 'Please enter a valid amount (e.g., 1500.00)',
     }
   )
   .transform((value) => {
@@ -112,6 +191,7 @@ export const currencySchema = z
 
 /**
  * Optional currency schema (allows empty values)
+ * @deprecated Use optionalCurrencySchema from @/lib/validation/schemas instead
  */
 export const optionalCurrencySchema = z
   .string()
@@ -124,7 +204,7 @@ export const optionalCurrencySchema = z
       return !isNaN(num) && num >= 0 && /^\d+(\.\d{1,2})?$/.test(cleaned);
     },
     {
-      message: 'Invalid currency amount. Must be a positive number with up to 2 decimal places',
+      message: 'Please enter a valid amount (e.g., 1500.00)',
     }
   )
   .transform((value) => {
@@ -135,6 +215,7 @@ export const optionalCurrencySchema = z
 
 /**
  * Date validation schema
+ * @deprecated Use dateSchema from @/lib/validation/schemas instead
  */
 export const dateSchema = z
   .string()
@@ -145,12 +226,13 @@ export const dateSchema = z
       return !isNaN(date.getTime());
     },
     {
-      message: 'Invalid date',
+      message: 'Please enter a valid date',
     }
   );
 
 /**
  * Optional date schema
+ * @deprecated Use optionalDateSchema from @/lib/validation/schemas instead
  */
 export const optionalDateSchema = z
   .string()
@@ -162,12 +244,13 @@ export const optionalDateSchema = z
       return !isNaN(date.getTime());
     },
     {
-      message: 'Invalid date',
+      message: 'Please enter a valid date',
     }
   );
 
 /**
  * Date range validation schema
+ * @deprecated Use dateRangeSchema from @/lib/validation/schemas instead
  */
 export const dateRangeSchema = z
   .object({
@@ -188,6 +271,7 @@ export const dateRangeSchema = z
 
 /**
  * Optional date range schema
+ * @deprecated Use optionalDateRangeSchema from @/lib/validation/schemas instead
  */
 export const optionalDateRangeSchema = z
   .object({

@@ -183,7 +183,7 @@ describe('FeeStructureRepository', () => {
   describe('findById', () => {
     it('should find fee structure by id', async () => {
       const created = await repository.create(testFeeStructureData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -193,6 +193,7 @@ describe('FeeStructureRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -357,7 +358,7 @@ describe('FeeStructureRepository', () => {
     it('should update fee structure fields', async () => {
       const created = await repository.create(testFeeStructureData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         name: 'Updated Package',
         amountCents: 500000,
         siblingDiscountPercent: 15,
@@ -371,9 +372,13 @@ describe('FeeStructureRepository', () => {
 
     it('should throw NotFoundException for non-existent fee structure', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          name: 'Test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            name: 'Test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -383,14 +388,20 @@ describe('FeeStructureRepository', () => {
       const created = await repository.create(testFeeStructureData);
       expect(created.isActive).toBe(true);
 
-      const deactivated = await repository.deactivate(created.id);
+      const deactivated = await repository.deactivate(
+        created.id,
+        testTenant.id,
+      );
 
       expect(deactivated.isActive).toBe(false);
     });
 
     it('should throw NotFoundException for non-existent fee structure', async () => {
       await expect(
-        repository.deactivate('00000000-0000-0000-0000-000000000000'),
+        repository.deactivate(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -399,15 +410,18 @@ describe('FeeStructureRepository', () => {
     it('should delete existing fee structure', async () => {
       const created = await repository.create(testFeeStructureData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent fee structure', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -445,9 +459,9 @@ describe('FeeStructureRepository', () => {
       });
 
       // Now try to delete fee structure - should fail
-      await expect(repository.delete(feeStructure.id)).rejects.toThrow(
-        DatabaseException,
-      );
+      await expect(
+        repository.delete(feeStructure.id, testTenant.id),
+      ).rejects.toThrow(DatabaseException);
     });
   });
 

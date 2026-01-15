@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { logger } from '@/lib/logger';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  console.log('[Middleware] Processing:', pathname);
+  // Debug logging only in development (filtered by logger)
+  logger.debug('Middleware processing', { pathname });
 
   // Get the JWT token from the request
   const token = await getToken({
@@ -14,7 +16,7 @@ export async function middleware(request: NextRequest) {
   });
 
   const isLoggedIn = !!token;
-  console.log('[Middleware] isLoggedIn:', isLoggedIn);
+  logger.debug('Auth check', { isLoggedIn, pathname });
 
   // Define protected routes
   const protectedRoutes = [

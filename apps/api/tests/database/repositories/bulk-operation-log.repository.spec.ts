@@ -302,7 +302,7 @@ describe('BulkOperationLogRepository', () => {
   });
 
   describe('findById', () => {
-    it('should find bulk operation log by id', async () => {
+    it('should find bulk operation log by id with matching tenant', async () => {
       const log = await repository.create({
         tenantId: tenant.id,
         operationType: BulkOperationType.SALARY_ADJUSTMENT,
@@ -311,20 +311,35 @@ describe('BulkOperationLogRepository', () => {
         executedBy: 'admin@test.com',
       });
 
-      const found = await repository.findById(log.id);
+      const found = await repository.findById(log.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(log.id);
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('non-existent-id');
+      const found = await repository.findById('non-existent-id', tenant.id);
+      expect(found).toBeNull();
+    });
+
+    it('should return null for valid ID but wrong tenant (tenant isolation)', async () => {
+      const log = await repository.create({
+        tenantId: tenant.id,
+        operationType: BulkOperationType.SALARY_ADJUSTMENT,
+        totalEntities: 1,
+        requestData: {},
+        executedBy: 'admin@test.com',
+      });
+
+      // Try to access bulk operation log with different tenant ID
+      const found = await repository.findById(log.id, otherTenant.id);
+
       expect(found).toBeNull();
     });
   });
 
   describe('findByIdOrThrow', () => {
-    it('should find bulk operation log by id', async () => {
+    it('should find bulk operation log by id with matching tenant', async () => {
       const log = await repository.create({
         tenantId: tenant.id,
         operationType: BulkOperationType.DEDUCTION_SETUP,
@@ -333,14 +348,28 @@ describe('BulkOperationLogRepository', () => {
         executedBy: 'admin@test.com',
       });
 
-      const found = await repository.findByIdOrThrow(log.id);
+      const found = await repository.findByIdOrThrow(log.id, tenant.id);
 
       expect(found.id).toBe(log.id);
     });
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.findByIdOrThrow('non-existent-id'),
+        repository.findByIdOrThrow('non-existent-id', tenant.id),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException for valid ID but wrong tenant (tenant isolation)', async () => {
+      const log = await repository.create({
+        tenantId: tenant.id,
+        operationType: BulkOperationType.DEDUCTION_SETUP,
+        totalEntities: 2,
+        requestData: {},
+        executedBy: 'admin@test.com',
+      });
+
+      await expect(
+        repository.findByIdOrThrow(log.id, otherTenant.id),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -574,7 +603,7 @@ describe('BulkOperationLogRepository', () => {
 
       expect(deleted).toBe(1);
 
-      const found = await repository.findById(log.id);
+      const found = await repository.findById(log.id, tenant.id);
       expect(found).toBeNull();
     });
 
@@ -600,7 +629,7 @@ describe('BulkOperationLogRepository', () => {
 
       expect(deleted).toBe(0);
 
-      const found = await repository.findById(log.id);
+      const found = await repository.findById(log.id, tenant.id);
       expect(found).toBeDefined();
     });
   });

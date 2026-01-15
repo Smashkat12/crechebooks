@@ -91,26 +91,34 @@ export class ParentController {
     total: number;
     page: number;
     limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
   }> {
-    const filter: ParentFilterDto = {};
+    // TASK-DATA-004: Pass pagination to repository for efficient querying
+    const pageNum = parseInt(page || '1', 10);
+    const limitNum = parseInt(limit || '20', 10);
+
+    const filter: ParentFilterDto = {
+      page: pageNum,
+      limit: limitNum,
+    };
     if (search) filter.search = search;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
 
-    const parents = await this.parentRepository.findByTenant(
+    const result = await this.parentRepository.findByTenant(
       user.tenantId,
       filter,
     );
 
-    const pageNum = parseInt(page || '1', 10);
-    const limitNum = parseInt(limit || '20', 10);
-    const startIndex = (pageNum - 1) * limitNum;
-    const paginatedParents = parents.slice(startIndex, startIndex + limitNum);
-
     return {
-      parents: paginatedParents.map(toResponse),
-      total: parents.length,
-      page: pageNum,
-      limit: limitNum,
+      parents: result.data.map(toResponse),
+      total: result.meta.total,
+      page: result.meta.page,
+      limit: result.meta.limit,
+      totalPages: result.meta.totalPages,
+      hasNext: result.meta.hasNext,
+      hasPrev: result.meta.hasPrev,
     };
   }
 
@@ -124,8 +132,8 @@ export class ParentController {
     @CurrentUser() user: IUser,
     @Param('id') id: string,
   ): Promise<Record<string, unknown>> {
-    const parent = await this.parentRepository.findById(id);
-    if (!parent || parent.tenantId !== user.tenantId) {
+    const parent = await this.parentRepository.findById(id, user.tenantId);
+    if (!parent) {
       throw new NotFoundException('Parent not found');
     }
     return toResponse(parent);
@@ -141,8 +149,8 @@ export class ParentController {
     @CurrentUser() user: IUser,
     @Param('id') id: string,
   ): Promise<Record<string, unknown>[]> {
-    const parent = await this.parentRepository.findById(id);
-    if (!parent || parent.tenantId !== user.tenantId) {
+    const parent = await this.parentRepository.findById(id, user.tenantId);
+    if (!parent) {
       throw new NotFoundException('Parent not found');
     }
     // Transform children to camelCase response
@@ -244,11 +252,11 @@ export class ParentController {
     @Body() dto: UpdateParentDto,
   ): Promise<Record<string, unknown>> {
     // Verify parent belongs to tenant
-    const existing = await this.parentRepository.findById(id);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const existing = await this.parentRepository.findById(id, user.tenantId);
+    if (!existing) {
       throw new NotFoundException('Parent not found');
     }
-    const parent = await this.parentRepository.update(id, dto);
+    const parent = await this.parentRepository.update(id, user.tenantId, dto);
     return toResponse(parent);
   }
 
@@ -264,10 +272,10 @@ export class ParentController {
     @Param('id') id: string,
   ): Promise<void> {
     // Verify parent belongs to tenant
-    const existing = await this.parentRepository.findById(id);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const existing = await this.parentRepository.findById(id, user.tenantId);
+    if (!existing) {
       throw new NotFoundException('Parent not found');
     }
-    await this.parentRepository.delete(id);
+    await this.parentRepository.delete(id, user.tenantId);
   }
 }

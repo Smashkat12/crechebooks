@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './fixtures/auth.fixture';
 
 /**
  * Transactions E2E Tests
@@ -7,17 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Transactions', () => {
   test.beforeEach(async ({ page }) => {
-    // Login
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-    await expect(page).toHaveURL(/.*dashboard/);
-
-    // Navigate to transactions
+    await login(page);
     await page.goto('/transactions');
   });
 

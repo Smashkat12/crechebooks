@@ -81,18 +81,20 @@ export class PayrollRepository {
   }
 
   /**
-   * Find payroll by ID
+   * Find payroll by ID with tenant isolation
+   * @param id - Payroll ID
+   * @param tenantId - Tenant ID for isolation
    * @returns Payroll or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<Payroll | null> {
+  async findById(id: string, tenantId: string): Promise<Payroll | null> {
     try {
-      return await this.prisma.payroll.findUnique({
-        where: { id },
+      return await this.prisma.payroll.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find payroll by id: ${id}`,
+        `Failed to find payroll by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -255,9 +257,13 @@ export class PayrollRepository {
    * @throws ConflictException if payroll is already PAID
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdatePayrollDto): Promise<Payroll> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdatePayrollDto,
+  ): Promise<Payroll> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Payroll', id);
       }
@@ -356,9 +362,9 @@ export class PayrollRepository {
    * @throws ValidationException if payroll is not in DRAFT status
    * @throws DatabaseException for database errors
    */
-  async approve(id: string): Promise<Payroll> {
+  async approve(id: string, tenantId: string): Promise<Payroll> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Payroll', id);
       }
@@ -403,9 +409,13 @@ export class PayrollRepository {
    * @throws ValidationException if payroll is not in APPROVED status
    * @throws DatabaseException for database errors
    */
-  async markAsPaid(id: string, paymentDate: Date): Promise<Payroll> {
+  async markAsPaid(
+    id: string,
+    tenantId: string,
+    paymentDate: Date,
+  ): Promise<Payroll> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Payroll', id);
       }
@@ -450,9 +460,9 @@ export class PayrollRepository {
    * @throws ConflictException if payroll is PAID
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Payroll', id);
       }

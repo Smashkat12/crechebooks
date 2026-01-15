@@ -157,12 +157,9 @@ export function handleXeroError(error: unknown): never {
     // Use validation message if available, otherwise use error message
     const message = validationMessage ?? error.message;
 
-    throw new XeroMCPError(
-      message,
-      'XERO_API_ERROR',
-      statusCode ?? 400,
-      { originalError: error.message },
-    );
+    throw new XeroMCPError(message, 'XERO_API_ERROR', statusCode ?? 400, {
+      originalError: error.message,
+    });
   }
 
   throw new XeroMCPError(

@@ -246,7 +246,7 @@ describe('StaffRepository', () => {
       const data = createTestStaffData();
       const created = await repository.create(data);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(created.id);
@@ -257,6 +257,7 @@ describe('StaffRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        tenant.id,
       );
 
       expect(found).toBeNull();
@@ -328,7 +329,7 @@ describe('StaffRepository', () => {
         email: 'nomsa@littlestars.co.za',
         employmentType: EmploymentType.CONTRACT,
       });
-      await repository.deactivate(inactive.id);
+      await repository.deactivate(inactive.id, tenant.id);
     });
 
     it('should return all staff for tenant', async () => {
@@ -487,7 +488,7 @@ describe('StaffRepository', () => {
         idNumber: '7809157890123',
         email: 'inactive@littlestars.co.za',
       });
-      await repository.deactivate(inactive.id);
+      await repository.deactivate(inactive.id, tenant.id);
 
       const activeStaff = await repository.findActiveByTenantId(tenant.id);
 
@@ -500,7 +501,7 @@ describe('StaffRepository', () => {
 
     it('should return empty array when no active staff', async () => {
       const staff = await repository.create(createTestStaffData());
-      await repository.deactivate(staff.id);
+      await repository.deactivate(staff.id, tenant.id);
 
       const activeStaff = await repository.findActiveByTenantId(tenant.id);
 
@@ -512,7 +513,7 @@ describe('StaffRepository', () => {
     it('should update staff fields', async () => {
       const staff = await repository.create(createTestStaffData());
 
-      const updated = await repository.update(staff.id, {
+      const updated = await repository.update(staff.id, tenant.id, {
         firstName: 'Thabo Updated',
         phone: '+27829999999',
         basicSalaryCents: 2000000,
@@ -530,7 +531,7 @@ describe('StaffRepository', () => {
         employmentType: EmploymentType.CONTRACT,
       });
 
-      const updated = await repository.update(staff.id, {
+      const updated = await repository.update(staff.id, tenant.id, {
         employmentType: EmploymentType.PERMANENT,
       });
 
@@ -540,7 +541,7 @@ describe('StaffRepository', () => {
     it('should update salary', async () => {
       const staff = await repository.create(createTestStaffData());
 
-      const updated = await repository.update(staff.id, {
+      const updated = await repository.update(staff.id, tenant.id, {
         basicSalaryCents: 2500000,
       });
 
@@ -549,7 +550,7 @@ describe('StaffRepository', () => {
 
     it('should throw NotFoundException for non-existent staff', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
+        repository.update('00000000-0000-0000-0000-000000000000', tenant.id, {
           firstName: 'Test',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -571,7 +572,7 @@ describe('StaffRepository', () => {
       });
 
       await expect(
-        repository.update(staff2.id, {
+        repository.update(staff2.id, tenant.id, {
           idNumber: '8501015800084', // Duplicate of staff1
         }),
       ).rejects.toThrow(ConflictException);
@@ -582,7 +583,7 @@ describe('StaffRepository', () => {
     it('should set isActive to false', async () => {
       const staff = await repository.create(createTestStaffData());
 
-      const deactivated = await repository.deactivate(staff.id);
+      const deactivated = await repository.deactivate(staff.id, tenant.id);
 
       expect(deactivated.isActive).toBe(false);
     });
@@ -591,7 +592,7 @@ describe('StaffRepository', () => {
       const staff = await repository.create(createTestStaffData());
       const today = new Date();
 
-      const deactivated = await repository.deactivate(staff.id);
+      const deactivated = await repository.deactivate(staff.id, tenant.id);
 
       expect(deactivated.endDate).toBeDefined();
       // Compare UTC components to avoid timezone conversion issues
@@ -603,7 +604,10 @@ describe('StaffRepository', () => {
 
     it('should throw NotFoundException for non-existent staff', async () => {
       await expect(
-        repository.deactivate('00000000-0000-0000-0000-000000000000'),
+        repository.deactivate(
+          '00000000-0000-0000-0000-000000000000',
+          tenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -612,15 +616,15 @@ describe('StaffRepository', () => {
     it('should delete existing staff', async () => {
       const staff = await repository.create(createTestStaffData());
 
-      await repository.delete(staff.id);
+      await repository.delete(staff.id, tenant.id);
 
-      const found = await repository.findById(staff.id);
+      const found = await repository.findById(staff.id, tenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent staff', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete('00000000-0000-0000-0000-000000000000', tenant.id),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -643,7 +647,7 @@ describe('StaffRepository', () => {
         },
       });
 
-      await expect(repository.delete(staff.id)).rejects.toThrow(
+      await expect(repository.delete(staff.id, tenant.id)).rejects.toThrow(
         ConflictException,
       );
     });
@@ -697,7 +701,7 @@ describe('StaffRepository', () => {
       expect(staff.startDate).toEqual(startDate);
       expect(staff.endDate).toBeNull();
 
-      const deactivated = await repository.deactivate(staff.id);
+      const deactivated = await repository.deactivate(staff.id, tenant.id);
       expect(deactivated.endDate).toBeDefined();
       expect(deactivated.endDate).toBeInstanceOf(Date);
     });

@@ -22,10 +22,26 @@ import { LineType, isVatApplicable } from '../../entities/invoice-line.entity';
 describe('SA VAT Compliance - isVatApplicable (TASK-BILL-038)', () => {
   describe('VAT EXEMPT items - Section 12(h) Educational Services', () => {
     it.each([
-      ['MONTHLY_FEE', LineType.MONTHLY_FEE, 'Section 12(h)(iii) - Childcare services'],
-      ['REGISTRATION', LineType.REGISTRATION, 'Section 12(h)(ii) - School fees'],
-      ['RE_REGISTRATION', LineType.RE_REGISTRATION, 'Section 12(h)(ii) - School fees'],
-      ['EXTRA_MURAL', LineType.EXTRA_MURAL, 'Section 12(h)(ii) - Subordinate to education'],
+      [
+        'MONTHLY_FEE',
+        LineType.MONTHLY_FEE,
+        'Section 12(h)(iii) - Childcare services',
+      ],
+      [
+        'REGISTRATION',
+        LineType.REGISTRATION,
+        'Section 12(h)(ii) - School fees',
+      ],
+      [
+        'RE_REGISTRATION',
+        LineType.RE_REGISTRATION,
+        'Section 12(h)(ii) - School fees',
+      ],
+      [
+        'EXTRA_MURAL',
+        LineType.EXTRA_MURAL,
+        'Section 12(h)(ii) - Subordinate to education',
+      ],
     ])('%s should be VAT EXEMPT per %s', (name, lineType, _legalBasis) => {
       const result = isVatApplicable(lineType);
       expect(result).toBe(false);
@@ -153,7 +169,9 @@ describe('SA VAT Compliance - Business Scenarios', () => {
       };
 
       for (const item of invoiceItems) {
-        expect(isVatApplicable(item.type)).toBe(expectedVatTreatment[item.type]);
+        expect(isVatApplicable(item.type)).toBe(
+          expectedVatTreatment[item.type],
+        );
       }
     });
   });
@@ -167,7 +185,9 @@ describe('SA VAT Compliance - Business Scenarios', () => {
         isVatExempt: true, // Override: mark as exempt
       };
 
-      expect(isVatApplicable(swimLessons.type, swimLessons.isVatExempt)).toBe(false);
+      expect(isVatApplicable(swimLessons.type, swimLessons.isVatExempt)).toBe(
+        false,
+      );
     });
 
     it('should apply VAT for non-educational ad-hoc charges', () => {
@@ -178,7 +198,9 @@ describe('SA VAT Compliance - Business Scenarios', () => {
         isVatExempt: false, // Not exempt
       };
 
-      expect(isVatApplicable(partySupplies.type, partySupplies.isVatExempt)).toBe(true);
+      expect(
+        isVatApplicable(partySupplies.type, partySupplies.isVatExempt),
+      ).toBe(true);
     });
   });
 

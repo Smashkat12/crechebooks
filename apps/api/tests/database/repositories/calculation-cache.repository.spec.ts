@@ -163,7 +163,7 @@ describe('CalculationCacheRepository', () => {
   describe('findById', () => {
     it('should find cache entry by id', async () => {
       const created = await repository.create(createTestCacheDto());
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(created.id);
@@ -173,6 +173,7 @@ describe('CalculationCacheRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        tenant.id,
       );
       expect(found).toBeNull();
     });
@@ -306,7 +307,7 @@ describe('CalculationCacheRepository', () => {
   describe('update', () => {
     it('should update cache entry fields', async () => {
       const created = await repository.create(createTestCacheDto());
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, tenant.id, {
         name: 'Updated Name',
         taxable: false,
       });
@@ -318,7 +319,7 @@ describe('CalculationCacheRepository', () => {
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
+        repository.update('00000000-0000-0000-0000-000000000000', tenant.id, {
           name: 'Test',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -393,15 +394,15 @@ describe('CalculationCacheRepository', () => {
   describe('delete', () => {
     it('should delete cache entry', async () => {
       const created = await repository.create(createTestCacheDto());
-      await repository.delete(created.id);
+      await repository.delete(created.id, tenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete('00000000-0000-0000-0000-000000000000', tenant.id),
       ).rejects.toThrow(NotFoundException);
     });
   });

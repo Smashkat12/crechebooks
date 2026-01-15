@@ -246,7 +246,10 @@ export class CategorizationService {
       source = CategorizationSource.RULE_BASED;
 
       // Increment pattern match count
-      await this.payeePatternRepo.incrementMatchCount(patternMatch.pattern.id);
+      await this.payeePatternRepo.incrementMatchCount(
+        patternMatch.pattern.id,
+        tenantId,
+      );
     }
 
     // Determine if auto-apply or review required
@@ -357,7 +360,7 @@ export class CategorizationService {
     if (dto.isSplit && dto.splits) {
       // Delete existing categorizations for split
       for (const cat of existingCats) {
-        await this.categorizationRepo.delete(cat.id);
+        await this.categorizationRepo.delete(cat.id, tenantId);
       }
 
       // Create split categorizations
@@ -382,7 +385,7 @@ export class CategorizationService {
     } else {
       if (existingCats.length > 0) {
         // Update existing
-        await this.categorizationRepo.review(existingCats[0].id, {
+        await this.categorizationRepo.review(existingCats[0].id, tenantId, {
           reviewedBy: userId,
           accountCode: dto.accountCode,
           accountName: dto.accountName,
@@ -601,7 +604,8 @@ export class CategorizationService {
                   });
                 } else {
                   xeroSyncStatus = 'failed';
-                  xeroSyncError = journalResult.error || 'Journal creation failed';
+                  xeroSyncError =
+                    journalResult.error || 'Journal creation failed';
 
                   this.logger.warn(
                     `Journal creation failed for transaction ${transactionId}: ${xeroSyncError}`,
@@ -634,7 +638,9 @@ export class CategorizationService {
 
                 this.logger.error(
                   `Failed to create categorization journal for transaction ${transactionId}: ${xeroSyncError}`,
-                  journalError instanceof Error ? journalError.stack : undefined,
+                  journalError instanceof Error
+                    ? journalError.stack
+                    : undefined,
                 );
 
                 // Log audit trail for journal error
@@ -1031,19 +1037,53 @@ export class CategorizationService {
   }
 
   /**
-   * Validate split amounts equal transaction total
+   * Validate split transaction parts
+   * TASK-TXN-001: Enhanced validation for split transaction amounts
+   *
+   * Validates:
+   * 1. Minimum 2 split parts required
+   * 2. Each split amount is a valid finite positive number
+   * 3. Sum of splits equals transaction total (with tolerance)
+   *
    * @param splits - Array of split items
    * @param totalCents - Transaction total in cents
-   * @throws BusinessException if amounts don't match
+   * @throws BusinessException if validation fails
    */
   private validateSplits(splits: SplitItemDto[], totalCents: number): void {
-    if (splits.length === 0) {
+    // TASK-TXN-001: Require minimum 2 splits for a split transaction
+    if (splits.length < 2) {
       throw new BusinessException(
-        'Split transaction must have at least one split',
-        'SPLITS_REQUIRED',
+        'Split transaction requires at least 2 parts',
+        'SPLITS_MINIMUM_REQUIRED',
+        { received: splits.length, minimum: 2 },
       );
     }
 
+    // TASK-TXN-001: Validate each split part has a valid positive amount
+    for (let i = 0; i < splits.length; i++) {
+      const split = splits[i];
+      const amount = split.amountCents;
+
+      // Check for NaN or Infinity
+      if (!Number.isFinite(amount)) {
+        throw new BusinessException(
+          `Split part ${i + 1} amount must be a valid finite number`,
+          'SPLIT_AMOUNT_INVALID',
+          { partIndex: i, amount, accountCode: split.accountCode },
+        );
+      }
+
+      // Check for zero or negative amounts
+      if (amount <= 0) {
+        throw new BusinessException(
+          `Split part ${i + 1} amount must be positive: received ${amount} cents`,
+          'SPLIT_AMOUNT_NOT_POSITIVE',
+          { partIndex: i, amount, accountCode: split.accountCode },
+        );
+      }
+    }
+
+    // Validate sum equals transaction total (with floating point tolerance)
     const splitTotal = splits.reduce((sum, s) => sum + s.amountCents, 0);
     const difference = Math.abs(splitTotal - totalCents);
 
@@ -1051,6 +1091,7 @@ export class CategorizationService {
       throw new BusinessException(
         `Split amounts (${splitTotal}) don't equal transaction total (${totalCents}). Difference: ${difference} cents`,
         'SPLIT_AMOUNT_MISMATCH',
+        { splitTotal, transactionTotal: totalCents, difference },
       );
     }
   }

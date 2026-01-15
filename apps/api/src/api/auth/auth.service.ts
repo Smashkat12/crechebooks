@@ -7,8 +7,19 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { IUser } from '../../database/entities/user.entity';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { CsrfStoreService } from './csrf-store.service';
+import { RateLimitService } from '../../common/rate-limit/rate-limit.service';
+import { TooManyRequestsException } from '../../shared/exceptions';
+import { JWT_EXPIRATION_DEFAULT } from './auth.module';
+
+interface DevUserConfig {
+  passwordHash: string;
+  name: string;
+  role: string;
+}
 
 export interface AuthTokens {
   accessToken: string;
@@ -35,12 +46,6 @@ interface Auth0UserInfo {
   picture?: string;
 }
 
-// State storage for CSRF protection (in production, use Redis)
-const stateStore = new Map<
-  string,
-  { redirectUri: string; expiresAt: number }
->();
-
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -54,6 +59,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
+    private readonly csrfStore: CsrfStoreService,
+    private readonly rateLimitService: RateLimitService,
   ) {
     this.auth0Domain = this.configService.get<string>('AUTH0_DOMAIN') || '';
     this.auth0ClientId =
@@ -61,8 +68,10 @@ export class AuthService {
     this.auth0ClientSecret =
       this.configService.get<string>('AUTH0_CLIENT_SECRET') || '';
     this.auth0Audience = this.configService.get<string>('AUTH0_AUDIENCE') || '';
+    // TASK-SEC-001: Reduced default from 86400 (24h) to 3600 (1h) for security
     this.jwtExpiration =
-      this.configService.get<number>('JWT_EXPIRATION') || 86400;
+      this.configService.get<number>('JWT_EXPIRATION') ||
+      JWT_EXPIRATION_DEFAULT;
 
     if (!this.auth0Domain) {
       this.logger.error('AUTH0_DOMAIN environment variable is required');
@@ -75,7 +84,7 @@ export class AuthService {
   /**
    * Generate Auth0 authorization URL for OAuth login flow
    */
-  getAuthorizationUrl(redirectUri: string): string {
+  async getAuthorizationUrl(redirectUri: string): Promise<string> {
     this.logger.debug(
       `Generating authorization URL for redirect: ${redirectUri}`,
     );
@@ -90,14 +99,18 @@ export class AuthService {
     // Generate CSRF state token
     const state = crypto.randomBytes(32).toString('hex');
 
-    // Store state with expiration (5 minutes)
-    stateStore.set(state, {
-      redirectUri,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    });
-
-    // Clean up expired states
-    this.cleanupExpiredStates();
+    // Store state in Redis with 5 minute TTL
+    // NO FALLBACK - if Redis is unavailable, this will throw
+    try {
+      await this.csrfStore.storeState(state, redirectUri, 300);
+    } catch (error) {
+      this.logger.error(
+        `Failed to store CSRF state in Redis: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new InternalServerErrorException(
+        'Authentication service temporarily unavailable. Please try again.',
+      );
+    }
 
     const params = new URLSearchParams({
       response_type: 'code',
@@ -120,21 +133,31 @@ export class AuthService {
   async handleCallback(code: string, state: string): Promise<AuthResult> {
     this.logger.debug('Processing OAuth callback');
 
-    // Validate state
-    const storedState = stateStore.get(state);
+    // Validate and consume state from Redis (atomic get + delete)
+    // NO FALLBACK - if Redis is unavailable, this will throw
+    let storedState;
+    try {
+      storedState = await this.csrfStore.validateAndConsume(state);
+    } catch (error) {
+      this.logger.error(
+        `Failed to validate CSRF state from Redis: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new InternalServerErrorException(
+        'Authentication service temporarily unavailable. Please try again.',
+      );
+    }
+
     if (!storedState) {
-      this.logger.warn('OAuth callback with invalid state');
+      this.logger.warn('OAuth callback with invalid or expired state');
       throw new UnauthorizedException('OAuth state expired or invalid');
     }
 
     if (storedState.expiresAt < Date.now()) {
-      stateStore.delete(state);
       this.logger.warn('OAuth callback with expired state');
       throw new UnauthorizedException('OAuth state expired or invalid');
     }
 
     const redirectUri = storedState.redirectUri;
-    stateStore.delete(state);
 
     // Exchange code for tokens
     let tokenResponse: Auth0TokenResponse;
@@ -302,40 +325,98 @@ export class AuthService {
   /**
    * Dev login - for local development only
    * Generates a JWT token for test users without Auth0
+   * Credentials are sourced from environment variables, never hardcoded
+   *
+   * @param email - User email
+   * @param password - User password
+   * @param clientIp - Client IP address for rate limiting (optional)
    */
-  async devLogin(email: string, password: string): Promise<AuthResult> {
+  async devLogin(
+    email: string,
+    password: string,
+    clientIp?: string,
+  ): Promise<AuthResult> {
     const nodeEnv = this.configService.get<string>('NODE_ENV');
     const jwtSecret = this.configService.get<string>('JWT_SECRET');
+    const devAuthEnabled = this.configService.get<string>('DEV_AUTH_ENABLED');
 
-    if (nodeEnv !== 'development' || !jwtSecret) {
-      this.logger.error('Dev login attempted in non-development environment');
+    if (nodeEnv !== 'development' || !jwtSecret || devAuthEnabled !== 'true') {
+      this.logger.error(
+        'Dev login attempted in non-development environment or dev auth disabled',
+      );
       throw new UnauthorizedException(
-        'Dev login is only available in development mode',
+        'Dev login is only available in development mode with DEV_AUTH_ENABLED=true',
       );
     }
 
-    // Validate test credentials
-    const validDevUsers: Record<
-      string,
-      { password: string; name: string; role: string }
-    > = {
-      'admin@crechebooks.co.za': {
-        password: 'admin123',
-        name: 'Admin User',
-        role: 'OWNER',
-      },
-      'viewer@crechebooks.co.za': {
-        password: 'viewer123',
-        name: 'Viewer User',
-        role: 'VIEWER',
-      },
-    };
+    // Rate limiting identifiers
+    const ipKey = clientIp ? `ip:${clientIp}` : null;
+    const emailKey = `email:${email}`;
 
-    const devUser = validDevUsers[email];
-    if (!devUser || devUser.password !== password) {
-      this.logger.warn(`Invalid dev login attempt for: ${email}`);
+    // Check if account is locked (by email or IP)
+    try {
+      if (ipKey) {
+        const ipLocked = await this.rateLimitService.isAccountLocked(ipKey);
+        if (ipLocked) {
+          const remaining =
+            await this.rateLimitService.getLockoutRemaining(ipKey);
+          this.logger.warn(`Dev login blocked - IP locked: ${clientIp}`);
+          throw new TooManyRequestsException(
+            'Too many failed attempts. Account temporarily locked.',
+            remaining,
+            { reason: 'ip_locked' },
+          );
+        }
+      }
+
+      const emailLocked = await this.rateLimitService.isAccountLocked(emailKey);
+      if (emailLocked) {
+        const remaining =
+          await this.rateLimitService.getLockoutRemaining(emailKey);
+        this.logger.warn(`Dev login blocked - email locked: ${email}`);
+        throw new TooManyRequestsException(
+          'Too many failed attempts. Account temporarily locked.',
+          remaining,
+          { reason: 'email_locked' },
+        );
+      }
+    } catch (error) {
+      if (error instanceof TooManyRequestsException) {
+        throw error;
+      }
+      this.logger.error(
+        `Rate limit check failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new InternalServerErrorException(
+        'Authentication service temporarily unavailable',
+      );
+    }
+
+    // Validate credentials from environment variables (never hardcoded)
+    const validDevUsers = this.getDevUsersFromEnv();
+
+    const devUser = validDevUsers.get(email);
+    if (!devUser) {
+      this.logger.warn(`Invalid dev login attempt for unknown email: ${email}`);
+      await this.handleFailedAttempt(ipKey, emailKey);
       throw new UnauthorizedException('Invalid email or password');
     }
+
+    // Compare password using bcrypt
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      devUser.passwordHash,
+    );
+    if (!isPasswordValid) {
+      this.logger.warn(
+        `Invalid dev login attempt - wrong password for: ${email}`,
+      );
+      await this.handleFailedAttempt(ipKey, emailKey);
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Clear failed attempts on successful login
+    await this.clearFailedAttemptsOnSuccess(ipKey, emailKey);
 
     // Find or create the dev user in database
     let user = await this.prisma.user.findFirst({
@@ -426,14 +507,120 @@ export class AuthService {
   }
 
   /**
-   * Clean up expired state tokens
+   * Get dev users from environment variables
+   * Each dev user is configured via DEV_USER_{N}_EMAIL, DEV_USER_{N}_PASSWORD_HASH, etc.
    */
-  private cleanupExpiredStates(): void {
-    const now = Date.now();
-    for (const [key, value] of stateStore.entries()) {
-      if (value.expiresAt < now) {
-        stateStore.delete(key);
+  private getDevUsersFromEnv(): Map<string, DevUserConfig> {
+    const devUsers = new Map<string, DevUserConfig>();
+
+    // Support up to 10 dev users (configurable via environment)
+    for (let i = 1; i <= 10; i++) {
+      const email = this.configService.get<string>(`DEV_USER_${i}_EMAIL`);
+      const passwordHash = this.configService.get<string>(
+        `DEV_USER_${i}_PASSWORD_HASH`,
+      );
+      const name = this.configService.get<string>(`DEV_USER_${i}_NAME`);
+      const role = this.configService.get<string>(`DEV_USER_${i}_ROLE`);
+
+      if (email && passwordHash && name && role) {
+        devUsers.set(email, { passwordHash, name, role });
       }
     }
+
+    if (devUsers.size === 0) {
+      this.logger.error(
+        'FATAL: No dev users configured but dev auth is enabled. ' +
+          'Set DEV_USER_1_EMAIL, DEV_USER_1_PASSWORD_HASH, DEV_USER_1_NAME, DEV_USER_1_ROLE in .env',
+      );
+      throw new InternalServerErrorException(
+        'Dev auth is enabled but no dev users are configured. Check server logs.',
+      );
+    }
+
+    return devUsers;
+  }
+
+  /**
+   * Handle a failed login attempt by tracking it and applying exponential backoff.
+   *
+   * @param ipKey - IP-based rate limit key (optional)
+   * @param emailKey - Email-based rate limit key
+   */
+  private async handleFailedAttempt(
+    ipKey: string | null,
+    emailKey: string,
+  ): Promise<void> {
+    try {
+      // Track failed attempt for both IP and email
+      const results = await Promise.all([
+        ipKey ? this.rateLimitService.trackFailedAttempt(ipKey) : null,
+        this.rateLimitService.trackFailedAttempt(emailKey),
+      ]);
+
+      // Get the highest backoff from both keys
+      const ipResult = results[0];
+      const emailResult = results[1];
+
+      const maxBackoff = Math.max(
+        ipResult?.backoffSeconds || 0,
+        emailResult?.backoffSeconds || 0,
+      );
+
+      // Apply exponential backoff delay if needed
+      if (maxBackoff > 0) {
+        this.logger.debug(`Applying exponential backoff: ${maxBackoff}s`);
+        await this.delay(maxBackoff * 1000);
+      }
+
+      // Log lockout status
+      if (ipResult?.isLocked) {
+        this.logger.warn(
+          `IP locked after ${ipResult.attempts} failed attempts`,
+        );
+      }
+      if (emailResult?.isLocked) {
+        this.logger.warn(
+          `Email locked after ${emailResult.attempts} failed attempts`,
+        );
+      }
+    } catch (error) {
+      // Log but don't fail the request if rate limit tracking fails
+      this.logger.error(
+        `Failed to track failed attempt: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Clear failed attempts on successful login.
+   *
+   * @param ipKey - IP-based rate limit key (optional)
+   * @param emailKey - Email-based rate limit key
+   */
+  private async clearFailedAttemptsOnSuccess(
+    ipKey: string | null,
+    emailKey: string,
+  ): Promise<void> {
+    try {
+      await Promise.all([
+        ipKey ? this.rateLimitService.clearFailedAttempts(ipKey) : null,
+        this.rateLimitService.clearFailedAttempts(emailKey),
+      ]);
+      this.logger.debug(`Cleared failed attempts for ${emailKey}`);
+    } catch (error) {
+      // Log but don't fail the request if clearing fails
+      this.logger.error(
+        `Failed to clear failed attempts: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Delay execution for exponential backoff.
+   *
+   * @param ms - Milliseconds to delay
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -359,7 +359,7 @@ describe('PaymentRepository', () => {
   describe('findById', () => {
     it('should find payment by id', async () => {
       const created = await repository.create(testPaymentData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -369,6 +369,7 @@ describe('PaymentRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -586,7 +587,9 @@ describe('PaymentRepository', () => {
 
     it('should filter by isReversed', async () => {
       const payment = await repository.create(testPaymentData);
-      await repository.reverse(payment.id, { reversalReason: 'Test reversal' });
+      await repository.reverse(payment.id, testTenant.id, {
+        reversalReason: 'Test reversal',
+      });
 
       const activePayments = await repository.findByTenantId(testTenant.id, {
         isReversed: false,
@@ -640,7 +643,7 @@ describe('PaymentRepository', () => {
     it('should update payment fields', async () => {
       const created = await repository.create(testPaymentData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         reference: 'UPDATED-REF',
         matchConfidence: 99.9,
       });
@@ -652,9 +655,13 @@ describe('PaymentRepository', () => {
 
     it('should throw NotFoundException for non-existent payment', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          reference: 'Test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            reference: 'Test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -690,11 +697,13 @@ describe('PaymentRepository', () => {
       });
 
       await expect(
-        repository.update(payment2.id, { xeroPaymentId: 'xero-1' }),
+        repository.update(payment2.id, testTenant.id, {
+          xeroPaymentId: 'xero-1',
+        }),
       ).rejects.toThrow(ConflictException);
 
       // Verify original payment unchanged
-      const original = await repository.findById(payment1.id);
+      const original = await repository.findById(payment1.id, testTenant.id);
       expect(original?.xeroPaymentId).toBe('xero-1');
     });
   });
@@ -704,7 +713,7 @@ describe('PaymentRepository', () => {
       const created = await repository.create(testPaymentData);
       expect(created.isReversed).toBe(false);
 
-      const reversed = await repository.reverse(created.id, {
+      const reversed = await repository.reverse(created.id, testTenant.id, {
         reversalReason: 'Incorrect match detected',
       });
 
@@ -715,20 +724,26 @@ describe('PaymentRepository', () => {
 
     it('should throw NotFoundException for non-existent payment', async () => {
       await expect(
-        repository.reverse('00000000-0000-0000-0000-000000000000', {
-          reversalReason: 'Test',
-        }),
+        repository.reverse(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            reversalReason: 'Test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ConflictException for already reversed payment', async () => {
       const created = await repository.create(testPaymentData);
-      await repository.reverse(created.id, {
+      await repository.reverse(created.id, testTenant.id, {
         reversalReason: 'First reversal',
       });
 
       await expect(
-        repository.reverse(created.id, { reversalReason: 'Second reversal' }),
+        repository.reverse(created.id, testTenant.id, {
+          reversalReason: 'Second reversal',
+        }),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -737,15 +752,18 @@ describe('PaymentRepository', () => {
     it('should delete existing payment', async () => {
       const created = await repository.create(testPaymentData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent payment', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -811,7 +829,9 @@ describe('PaymentRepository', () => {
       });
 
       // Reverse first payment
-      await repository.reverse(payment1.id, { reversalReason: 'Test' });
+      await repository.reverse(payment1.id, testTenant.id, {
+        reversalReason: 'Test',
+      });
 
       const total = await repository.calculateTotalPaidForInvoice(
         testInvoice.id,
@@ -857,7 +877,9 @@ describe('PaymentRepository', () => {
       });
 
       // Reverse first payment
-      await repository.reverse(payment1.id, { reversalReason: 'Test' });
+      await repository.reverse(payment1.id, testTenant.id, {
+        reversalReason: 'Test',
+      });
 
       const activePayments = await repository.findActiveByTenantId(
         testTenant.id,

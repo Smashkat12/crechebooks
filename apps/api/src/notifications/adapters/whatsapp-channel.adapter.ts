@@ -184,9 +184,7 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
   /**
    * Get delivery status for WhatsApp message
    */
-  async getDeliveryStatus(
-    messageId: string,
-  ): Promise<NotificationDeliveryStatus> {
+  async getDeliveryStatus(_messageId: string): Promise<NotificationDeliveryStatus> {
     // WhatsApp status is updated via webhooks
     // For now, we return SENT status
     // In a production system, this would query the audit log or a message tracking table
@@ -196,7 +194,7 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
   /**
    * Check if WhatsApp API is configured
    */
-  private async checkWhatsAppConfigured(): Promise<boolean> {
+  private checkWhatsAppConfigured(): boolean {
     try {
       // Try to check opt-in for a dummy number (won't fail if API is configured)
       // This is a lightweight check to see if WhatsApp service is initialized

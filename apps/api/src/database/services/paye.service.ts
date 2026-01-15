@@ -22,7 +22,7 @@ import {
   MEDICAL_CREDITS_2025,
   TAX_THRESHOLDS_2025,
   PAY_FREQUENCY_MULTIPLIERS,
-  TaxBracket,
+  PayeTaxBracket,
 } from '../constants/paye.constants';
 
 // Configure Decimal.js for banker's rounding
@@ -142,7 +142,7 @@ export class PayeService {
    * @returns Tax bracket and index
    */
   getTaxBracket(annualIncomeCents: number): {
-    bracket: TaxBracket;
+    bracket: PayeTaxBracket;
     bracketIndex: number;
   } {
     for (let i = TAX_BRACKETS_2025.length - 1; i >= 0; i--) {
@@ -290,7 +290,7 @@ export class PayeService {
    */
   private calculateTaxOnIncome(
     annualIncomeCents: number,
-    bracket: TaxBracket,
+    bracket: PayeTaxBracket,
   ): number {
     if (annualIncomeCents <= 0) {
       return 0;

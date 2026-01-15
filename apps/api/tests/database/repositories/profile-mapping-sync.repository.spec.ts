@@ -180,11 +180,11 @@ describe('ProfileMappingSyncRepository', () => {
   });
 
   describe('findById', () => {
-    it('should find a profile mapping sync by ID', async () => {
+    it('should find a profile mapping sync by ID with matching tenant', async () => {
       const data = createTestProfileMappingData();
       const created = await repository.create(data);
 
-      const result = await repository.findById(created.id);
+      const result = await repository.findById(created.id, tenant.id);
 
       expect(result).toBeDefined();
       expect(result?.id).toBe(created.id);
@@ -193,17 +193,41 @@ describe('ProfileMappingSyncRepository', () => {
     it('should return null for non-existent ID', async () => {
       const result = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        tenant.id,
       );
+      expect(result).toBeNull();
+    });
+
+    it('should return null for valid ID but wrong tenant (tenant isolation)', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      // Create another tenant
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Other Daycare',
+          addressLine1: '456 Other Street',
+          city: 'Cape Town',
+          province: 'Western Cape',
+          postalCode: '8001',
+          phone: '+27217654321',
+          email: `other${Date.now()}@otherdaycare.co.za`,
+        },
+      });
+
+      // Try to access profile mapping with different tenant ID
+      const result = await repository.findById(created.id, otherTenant.id);
+
       expect(result).toBeNull();
     });
   });
 
   describe('findByIdOrThrow', () => {
-    it('should find a profile mapping sync by ID', async () => {
+    it('should find a profile mapping sync by ID with matching tenant', async () => {
       const data = createTestProfileMappingData();
       const created = await repository.create(data);
 
-      const result = await repository.findByIdOrThrow(created.id);
+      const result = await repository.findByIdOrThrow(created.id, tenant.id);
 
       expect(result).toBeDefined();
       expect(result.id).toBe(created.id);
@@ -211,7 +235,32 @@ describe('ProfileMappingSyncRepository', () => {
 
     it('should throw NotFoundException for non-existent ID', async () => {
       await expect(
-        repository.findByIdOrThrow('00000000-0000-0000-0000-000000000000'),
+        repository.findByIdOrThrow(
+          '00000000-0000-0000-0000-000000000000',
+          tenant.id,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException for valid ID but wrong tenant (tenant isolation)', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      // Create another tenant
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Other Daycare 2',
+          addressLine1: '789 Other Street',
+          city: 'Durban',
+          province: 'KwaZulu-Natal',
+          postalCode: '4001',
+          phone: '+27317654321',
+          email: `other2-${Date.now()}@otherdaycare.co.za`,
+        },
+      });
+
+      await expect(
+        repository.findByIdOrThrow(created.id, otherTenant.id),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -363,20 +412,75 @@ describe('ProfileMappingSyncRepository', () => {
   });
 
   describe('delete', () => {
-    it('should delete a profile mapping sync', async () => {
+    it('TC-002: should delete a profile mapping sync with correct tenant', async () => {
       const data = createTestProfileMappingData();
       const created = await repository.create(data);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, tenant.id);
 
-      const result = await repository.findById(created.id);
+      const result = await repository.findById(created.id, tenant.id);
       expect(result).toBeNull();
     });
 
-    it('should throw NotFoundException for non-existent ID', async () => {
+    it('TC-001: should throw NotFoundException when deleting with wrong tenant (cross-tenant deletion blocked)', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      // Create another tenant
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Other Daycare Delete',
+          addressLine1: '456 Delete Street',
+          city: 'Cape Town',
+          province: 'Western Cape',
+          postalCode: '8001',
+          phone: '+27217654321',
+          email: `other-delete-${Date.now()}@otherdaycare.co.za`,
+        },
+      });
+
+      // Attempt cross-tenant deletion - should fail
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(created.id, otherTenant.id),
       ).rejects.toThrow(NotFoundException);
+
+      // Verify original record still exists
+      const result = await repository.findById(created.id, tenant.id);
+      expect(result).not.toBeNull();
+    });
+
+    it('TC-003: should throw NotFoundException for non-existent ID', async () => {
+      await expect(
+        repository.delete('00000000-0000-0000-0000-000000000000', tenant.id),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('TC-004: error message should not leak tenant information', async () => {
+      const data = createTestProfileMappingData();
+      const created = await repository.create(data);
+
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Leak Test Daycare',
+          addressLine1: '789 Test Street',
+          city: 'Durban',
+          province: 'KwaZulu-Natal',
+          postalCode: '4001',
+          phone: '+27317654321',
+          email: `leak-test-${Date.now()}@daycare.co.za`,
+        },
+      });
+
+      try {
+        await repository.delete(created.id, otherTenant.id);
+        fail('Expected NotFoundException to be thrown');
+      } catch (error) {
+        // Error message should be generic "not found" - not reveal tenant ownership
+        expect(error.message).not.toContain(tenant.id);
+        expect(error.message).not.toContain(otherTenant.id);
+        expect(error.message).not.toContain('wrong tenant');
+        expect(error.message).not.toContain('different tenant');
+      }
     });
   });
 

@@ -14,10 +14,7 @@ import {
   CategorizationJournalStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  NotFoundException,
-  DatabaseException,
-} from '../../shared/exceptions';
+import { NotFoundException, DatabaseException } from '../../shared/exceptions';
 import {
   CreateCategorizationJournalInput,
   CategorizationJournalWithTransaction,
@@ -77,11 +74,16 @@ export class CategorizationJournalRepository {
   }
 
   /**
-   * Find journal by ID
+   * Find journal by ID with tenant isolation
+   * @param id - Journal ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findById(id: string): Promise<CategorizationJournal | null> {
-    return this.prisma.categorizationJournal.findUnique({
-      where: { id },
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<CategorizationJournal | null> {
+    return this.prisma.categorizationJournal.findFirst({
+      where: { id, tenantId },
     });
   }
 
@@ -97,13 +99,16 @@ export class CategorizationJournalRepository {
   }
 
   /**
-   * Find journal by ID with transaction relation
+   * Find journal by ID with transaction relation and tenant isolation
+   * @param id - Journal ID
+   * @param tenantId - Tenant ID for isolation
    */
   async findByIdWithTransaction(
     id: string,
+    tenantId: string,
   ): Promise<CategorizationJournalWithTransaction | null> {
-    const result = await this.prisma.categorizationJournal.findUnique({
-      where: { id },
+    const result = await this.prisma.categorizationJournal.findFirst({
+      where: { id, tenantId },
       include: {
         transaction: {
           select: {
@@ -163,7 +168,10 @@ export class CategorizationJournalRepository {
       limit?: number;
       offset?: number;
     },
-  ): Promise<{ journals: CategorizationJournalWithTransaction[]; total: number }> {
+  ): Promise<{
+    journals: CategorizationJournalWithTransaction[];
+    total: number;
+  }> {
     const where: Prisma.CategorizationJournalWhereInput = {
       tenantId,
       ...(options?.status && { status: options.status }),
@@ -317,12 +325,18 @@ export class CategorizationJournalRepository {
   }
 
   /**
-   * Delete a journal (only if not posted)
+   * Delete a journal (only if not posted) with tenant isolation
+   * Uses atomic deleteMany with tenant filter for cross-tenant protection
+   * @param id - Journal ID
+   * @param tenantId - Tenant ID for isolation
+   * @throws NotFoundException if journal not found or tenant mismatch (same error to prevent enumeration)
+   * @throws DatabaseException if journal is posted and cannot be deleted
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const journal = await this.prisma.categorizationJournal.findUnique({
-        where: { id },
+      // First check if journal exists and is not posted - with tenant isolation
+      const journal = await this.prisma.categorizationJournal.findFirst({
+        where: { id, tenantId },
         select: { status: true },
       });
 
@@ -331,17 +345,25 @@ export class CategorizationJournalRepository {
       }
 
       if (journal.status === CategorizationJournalStatus.POSTED) {
-        throw new DatabaseException(
-          'delete',
-          'Cannot delete a posted journal',
-        );
+        throw new DatabaseException('delete', 'Cannot delete a posted journal');
       }
 
-      await this.prisma.categorizationJournal.delete({
-        where: { id },
+      // Use deleteMany with tenant filter for atomic operation
+      const result = await this.prisma.categorizationJournal.deleteMany({
+        where: {
+          id,
+          tenantId,
+        },
       });
+
+      if (result.count === 0) {
+        throw new NotFoundException('CategorizationJournal', id);
+      }
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof DatabaseException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof DatabaseException
+      ) {
         throw error;
       }
       throw new DatabaseException(

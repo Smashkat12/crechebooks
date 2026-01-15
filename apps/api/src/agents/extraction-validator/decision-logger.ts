@@ -68,7 +68,10 @@ export class ExtractionDecisionLogger {
   /**
    * Append a line to a JSONL file
    */
-  private async appendToJsonl(filename: string, data: ValidationDecision | EscalationRecord): Promise<void> {
+  private async appendToJsonl(
+    filename: string,
+    data: ValidationDecision | EscalationRecord,
+  ): Promise<void> {
     await this.ensureLogsDir();
     const filepath = path.join(this.logsDir, filename);
     const line = JSON.stringify(data) + '\n';
@@ -118,7 +121,7 @@ export class ExtractionDecisionLogger {
 
     this.logger.log(
       `Logged validation: decision=${decision}, confidence=${result.confidence}, ` +
-      `reconciled=${result.balanceReconciled}, flags=${result.flags.length}`
+        `reconciled=${result.balanceReconciled}, flags=${result.flags.length}`,
     );
   }
 
@@ -131,8 +134,8 @@ export class ExtractionDecisionLogger {
     result: ValidationResult,
   ): Promise<void> {
     const errorCodes = result.flags
-      .filter(f => f.severity === 'ERROR')
-      .map(f => f.code);
+      .filter((f) => f.severity === 'ERROR')
+      .map((f) => f.code);
 
     const record: EscalationRecord = {
       timestamp: new Date().toISOString(),
@@ -153,7 +156,7 @@ export class ExtractionDecisionLogger {
 
     this.logger.warn(
       `Logged escalation: tenant=${tenantId}, confidence=${result.confidence}, ` +
-      `errors=${errorCodes.join(', ')}`
+        `errors=${errorCodes.join(', ')}`,
     );
   }
 }

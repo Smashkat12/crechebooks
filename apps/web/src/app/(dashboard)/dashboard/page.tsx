@@ -1,61 +1,108 @@
 'use client';
 
-import { useState } from 'react';
-import { DollarSign, Receipt, AlertTriangle, Users } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { DollarSign, Receipt, AlertTriangle, Users, RefreshCw } from 'lucide-react';
 import {
   MetricCard,
   IncomeExpenseChart,
   TopArrearsWidget,
   XeroStatusWidget,
-  LearningModeIndicator
+  LearningModeIndicator,
+  DashboardErrorBoundary,
+  DashboardWidgetSkeleton,
+  MetricCardsGridSkeleton,
 } from '@/components/dashboard';
 import { useDashboardMetrics, useDashboardTrends } from '@/hooks/use-dashboard';
+import { useDashboardData, useInvalidateDashboardCache } from '@/hooks/use-dashboard-data';
 import { useLearningMode } from '@/hooks/useLearningMode';
-import { Skeleton } from '@/components/ui/skeleton';
 import { YearSelector } from '@/components/common/year-selector';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+/**
+ * Dashboard Page with Enhanced Data Loading
+ *
+ * UI-002 Features:
+ * - Parallel data fetching with useQueries
+ * - Stale-while-revalidate caching strategy
+ * - Partial data loading (some widgets load while others fail)
+ * - Error boundaries for individual widgets
+ * - Skeleton loaders during loading states
+ * - Retry logic for failed requests
+ */
 export default function DashboardPage() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
 
-  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useDashboardMetrics(undefined, selectedYear);
-  const { data: trends, isLoading: trendsLoading } = useDashboardTrends(undefined, selectedYear);
+  // Use the enhanced dashboard data hook with parallel queries and SWR
+  const {
+    metrics,
+    trends,
+    xeroStatus,
+    isLoading,
+    isInitialLoading,
+    hasError,
+    partialDataLoaded,
+    totalQueries,
+    refetchAll,
+    refetchFailed,
+  } = useDashboardData(undefined, selectedYear);
+
+  // Learning mode state
   const { progress, isLoading: learningModeLoading, isDismissed, dismissIndicator } = useLearningMode();
 
-  if (metricsError) {
-    throw new Error(`Failed to load dashboard: ${metricsError.message}`);
-  }
+  // Cache invalidation
+  const { invalidateAll } = useInvalidateDashboardCache();
 
-  if (metricsLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-lg" />
-          ))}
-        </div>
-        <Skeleton className="h-[400px] rounded-lg" />
-      </div>
-    );
-  }
+  // Handle manual refresh
+  const handleRefresh = useCallback(() => {
+    invalidateAll();
+    refetchAll();
+  }, [invalidateAll, refetchAll]);
 
   // Transform trends data to match chart format
-  const chartData = trends?.data.map(d => ({
+  const chartData = trends.data?.data.map(d => ({
     month: d.date,
     income: d.revenue,
     expenses: d.expenses,
   })) ?? [];
 
   // Transform arrears data for widget
-  const arrearsData = metrics?.arrears ? [{
+  const arrearsData = metrics.data?.arrears ? [{
     id: '1',
     parentName: 'Accounts in arrears',
-    amount: metrics.arrears.total,
+    amount: metrics.data.arrears.total,
     daysOverdue: 30,
   }] : [];
 
+  // Show skeleton during initial load
+  if (isInitialLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-9 w-48 bg-muted animate-pulse rounded" />
+            <div className="h-5 w-64 mt-2 bg-muted animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-32 bg-muted animate-pulse rounded" />
+        </div>
+        <MetricCardsGridSkeleton count={4} />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="md:col-span-2">
+            <DashboardWidgetSkeleton type="chart" height="350px" />
+          </div>
+          <DashboardWidgetSkeleton type="status" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <DashboardWidgetSkeleton type="list" listItems={5} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Header with year selector and refresh button */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
@@ -63,40 +110,85 @@ export default function DashboardPage() {
             Overview of your creche finances
           </p>
         </div>
-        <YearSelector
-          value={selectedYear}
-          onChange={setSelectedYear}
-          startYear={2024}
-          endYear={currentYear}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isLoading}
+            title="Refresh dashboard"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+          <YearSelector
+            value={selectedYear}
+            onChange={setSelectedYear}
+            startYear={2024}
+            endYear={currentYear}
+          />
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Total Revenue"
-          value={metrics?.revenue.total ?? 0}
-          icon={DollarSign}
-          format="currency"
-        />
-        <MetricCard
-          title="Outstanding"
-          value={metrics?.revenue.outstanding ?? 0}
-          icon={Receipt}
-          format="currency"
-        />
-        <MetricCard
-          title="Total Arrears"
-          value={metrics?.arrears.total ?? 0}
-          icon={AlertTriangle}
-          format="currency"
-        />
-        <MetricCard
-          title="Active Children"
-          value={metrics?.enrollment.active ?? 0}
-          icon={Users}
-          format="number"
-        />
-      </div>
+      {/* Partial loading indicator */}
+      {hasError && partialDataLoaded > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Some data failed to load</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              {partialDataLoaded} of {totalQueries} widgets loaded successfully.
+            </span>
+            <Button variant="outline" size="sm" onClick={refetchFailed}>
+              <RefreshCw className="mr-2 h-3 w-3" />
+              Retry Failed
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Metric Cards with error boundaries */}
+      <DashboardErrorBoundary compact widgetName="Metrics Summary">
+        {metrics.isLoading ? (
+          <MetricCardsGridSkeleton count={4} />
+        ) : metrics.isError ? (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Failed to load metrics</AlertTitle>
+            <AlertDescription>
+              <Button variant="outline" size="sm" onClick={() => metrics.refetch()}>
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <MetricCard
+              title="Total Revenue"
+              value={metrics.data?.revenue.total ?? 0}
+              icon={DollarSign}
+              format="currency"
+            />
+            <MetricCard
+              title="Outstanding"
+              value={metrics.data?.revenue.outstanding ?? 0}
+              icon={Receipt}
+              format="currency"
+            />
+            <MetricCard
+              title="Total Arrears"
+              value={metrics.data?.arrears.total ?? 0}
+              icon={AlertTriangle}
+              format="currency"
+            />
+            <MetricCard
+              title="Active Children"
+              value={metrics.data?.enrollment.active ?? 0}
+              icon={Users}
+              format="number"
+            />
+          </div>
+        )}
+      </DashboardErrorBoundary>
 
       {/* Learning Mode Indicator - Show if in learning mode and not dismissed */}
       {progress && progress.isLearningMode && !isDismissed && !learningModeLoading && (
@@ -106,15 +198,34 @@ export default function DashboardPage() {
         />
       )}
 
+      {/* Charts section with error boundaries */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <div className="md:col-span-2">
-          <IncomeExpenseChart data={chartData} isLoading={trendsLoading} />
-        </div>
-        <XeroStatusWidget />
+        <DashboardErrorBoundary compact widgetName="Revenue Chart" className="md:col-span-2">
+          {trends.isLoading ? (
+            <DashboardWidgetSkeleton type="chart" height="350px" />
+          ) : (
+            <IncomeExpenseChart data={chartData} isLoading={trends.isLoading} />
+          )}
+        </DashboardErrorBoundary>
+
+        <DashboardErrorBoundary compact widgetName="Xero Status">
+          {xeroStatus.isLoading ? (
+            <DashboardWidgetSkeleton type="status" />
+          ) : (
+            <XeroStatusWidget />
+          )}
+        </DashboardErrorBoundary>
       </div>
 
+      {/* Bottom section with error boundary */}
       <div className="grid gap-4 md:grid-cols-2">
-        <TopArrearsWidget arrears={arrearsData} />
+        <DashboardErrorBoundary compact widgetName="Arrears">
+          {metrics.isLoading ? (
+            <DashboardWidgetSkeleton type="list" listItems={5} />
+          ) : (
+            <TopArrearsWidget arrears={arrearsData} />
+          )}
+        </DashboardErrorBoundary>
       </div>
     </div>
   );

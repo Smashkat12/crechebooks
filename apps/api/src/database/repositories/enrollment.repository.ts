@@ -66,18 +66,20 @@ export class EnrollmentRepository {
   }
 
   /**
-   * Find enrollment by ID
+   * Find enrollment by ID with tenant isolation
+   * @param id - Enrollment ID
+   * @param tenantId - Tenant ID for isolation
    * @returns Enrollment or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<Enrollment | null> {
+  async findById(id: string, tenantId: string): Promise<Enrollment | null> {
     try {
-      return await this.prisma.enrollment.findUnique({
-        where: { id },
+      return await this.prisma.enrollment.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find enrollment by id: ${id}`,
+        `Failed to find enrollment by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -290,9 +292,13 @@ export class EnrollmentRepository {
    * @throws NotFoundException if new childId or feeStructureId doesn't exist
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdateEnrollmentDto): Promise<Enrollment> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateEnrollmentDto,
+  ): Promise<Enrollment> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Enrollment', id);
       }
@@ -374,9 +380,9 @@ export class EnrollmentRepository {
    * @throws NotFoundException if enrollment doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Enrollment', id);
       }
@@ -405,9 +411,9 @@ export class EnrollmentRepository {
    * @throws NotFoundException if enrollment doesn't exist
    * @throws DatabaseException for database errors
    */
-  async withdraw(id: string): Promise<Enrollment> {
+  async withdraw(id: string, tenantId: string): Promise<Enrollment> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Enrollment', id);
       }

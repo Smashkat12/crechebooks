@@ -217,7 +217,10 @@ describe('CategorizationService', () => {
 
       await service.categorizeTransaction(transaction.id, testTenant.id);
 
-      const updatedPattern = await payeePatternRepo.findById(pattern.id);
+      const updatedPattern = await payeePatternRepo.findById(
+        pattern.id,
+        testTenant.id,
+      );
       expect(updatedPattern?.matchCount).toBe(1);
     });
   });
@@ -439,6 +442,185 @@ describe('CategorizationService', () => {
           testTenant.id,
         ),
       ).rejects.toThrow(BusinessException);
+    });
+
+    // TASK-TXN-001: Split transaction validation tests
+    it('should reject split with zero amount part', async () => {
+      const transaction = await createTransaction({
+        description: 'ZERO AMOUNT SPLIT',
+        amountCents: 100000,
+      });
+
+      await expect(
+        service.updateCategorization(
+          transaction.id,
+          {
+            accountCode: '5100',
+            accountName: 'Primary',
+            isSplit: true,
+            splits: [
+              {
+                accountCode: '5100',
+                accountName: 'Groceries',
+                amountCents: 100000,
+                vatType: VatType.STANDARD,
+              },
+              {
+                accountCode: '5200',
+                accountName: 'Utilities',
+                amountCents: 0, // Zero amount - should be rejected
+                vatType: VatType.STANDARD,
+              },
+            ],
+            vatType: VatType.STANDARD,
+          },
+          testUser.id,
+          testTenant.id,
+        ),
+      ).rejects.toThrow(BusinessException);
+    });
+
+    it('should reject split with negative amount part', async () => {
+      const transaction = await createTransaction({
+        description: 'NEGATIVE AMOUNT SPLIT',
+        amountCents: 100000,
+      });
+
+      await expect(
+        service.updateCategorization(
+          transaction.id,
+          {
+            accountCode: '5100',
+            accountName: 'Primary',
+            isSplit: true,
+            splits: [
+              {
+                accountCode: '5100',
+                accountName: 'Groceries',
+                amountCents: 150000,
+                vatType: VatType.STANDARD,
+              },
+              {
+                accountCode: '5200',
+                accountName: 'Utilities',
+                amountCents: -50000, // Negative amount - should be rejected
+                vatType: VatType.STANDARD,
+              },
+            ],
+            vatType: VatType.STANDARD,
+          },
+          testUser.id,
+          testTenant.id,
+        ),
+      ).rejects.toThrow(BusinessException);
+    });
+
+    it('should reject split with only 1 part', async () => {
+      const transaction = await createTransaction({
+        description: 'SINGLE SPLIT',
+        amountCents: 100000,
+      });
+
+      await expect(
+        service.updateCategorization(
+          transaction.id,
+          {
+            accountCode: '5100',
+            accountName: 'Primary',
+            isSplit: true,
+            splits: [
+              {
+                accountCode: '5100',
+                accountName: 'Groceries',
+                amountCents: 100000, // Only 1 split - should be rejected
+                vatType: VatType.STANDARD,
+              },
+            ],
+            vatType: VatType.STANDARD,
+          },
+          testUser.id,
+          testTenant.id,
+        ),
+      ).rejects.toThrow(BusinessException);
+    });
+
+    it('should accept valid split with all positive amounts', async () => {
+      const transaction = await createTransaction({
+        description: 'VALID SPLIT',
+        amountCents: 100000,
+      });
+
+      // Should not throw
+      await service.updateCategorization(
+        transaction.id,
+        {
+          accountCode: '5100',
+          accountName: 'Primary',
+          isSplit: true,
+          splits: [
+            {
+              accountCode: '5100',
+              accountName: 'Groceries',
+              amountCents: 60000,
+              vatType: VatType.STANDARD,
+            },
+            {
+              accountCode: '5200',
+              accountName: 'Utilities',
+              amountCents: 40000,
+              vatType: VatType.STANDARD,
+            },
+          ],
+          vatType: VatType.STANDARD,
+        },
+        testUser.id,
+        testTenant.id,
+      );
+
+      // Verify splits created
+      const cats = await categorizationRepo.findByTransaction(transaction.id);
+      expect(cats).toHaveLength(2);
+      expect(cats.every((c) => c.isSplit)).toBe(true);
+      expect(cats.map((c) => c.splitAmountCents).sort()).toEqual([
+        40000, 60000,
+      ]);
+    });
+
+    it('should handle floating point precision correctly', async () => {
+      const transaction = await createTransaction({
+        description: 'PRECISION SPLIT',
+        amountCents: 99999, // Odd number to test rounding
+      });
+
+      // Should accept splits with 1 cent tolerance
+      await service.updateCategorization(
+        transaction.id,
+        {
+          accountCode: '5100',
+          accountName: 'Primary',
+          isSplit: true,
+          splits: [
+            {
+              accountCode: '5100',
+              accountName: 'Groceries',
+              amountCents: 49999,
+              vatType: VatType.STANDARD,
+            },
+            {
+              accountCode: '5200',
+              accountName: 'Utilities',
+              amountCents: 50000,
+              vatType: VatType.STANDARD,
+            },
+          ],
+          vatType: VatType.STANDARD,
+        },
+        testUser.id,
+        testTenant.id,
+      );
+
+      const cats = await categorizationRepo.findByTransaction(transaction.id);
+      expect(cats).toHaveLength(2);
     });
 
     it('should throw NotFoundException for non-existent transaction', async () => {

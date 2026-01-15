@@ -77,18 +77,20 @@ export class InvoiceRepository {
   }
 
   /**
-   * Find invoice by ID
+   * Find invoice by ID with tenant isolation
+   * @param id - Invoice ID
+   * @param tenantId - Tenant ID for isolation
    * @returns Invoice or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<Invoice | null> {
+  async findById(id: string, tenantId: string): Promise<Invoice | null> {
     try {
-      return await this.prisma.invoice.findUnique({
-        where: { id },
+      return await this.prisma.invoice.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find invoice by id: ${id}`,
+        `Failed to find invoice by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -100,23 +102,26 @@ export class InvoiceRepository {
   }
 
   /**
-   * Find invoice by ID with lines included
+   * Find invoice by ID with lines included and tenant isolation
+   * @param id - Invoice ID
+   * @param tenantId - Tenant ID for isolation
    * @returns Invoice with lines or null if not found
    * @throws DatabaseException for database errors
    */
   async findByIdWithLines(
     id: string,
+    tenantId: string,
   ): Promise<
     (Invoice & { lines: Prisma.InvoiceLineGetPayload<object>[] }) | null
   > {
     try {
-      return await this.prisma.invoice.findUnique({
-        where: { id },
+      return await this.prisma.invoice.findFirst({
+        where: { id, tenantId },
         include: { lines: { orderBy: { sortOrder: 'asc' } } },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find invoice with lines by id: ${id}`,
+        `Failed to find invoice with lines by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -327,9 +332,13 @@ export class InvoiceRepository {
    * @throws ConflictException if updating to a duplicate invoice number
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdateInvoiceDto): Promise<Invoice> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateInvoiceDto,
+  ): Promise<Invoice> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Invoice', id);
       }
@@ -419,9 +428,9 @@ export class InvoiceRepository {
    * @throws NotFoundException if invoice doesn't exist
    * @throws DatabaseException for database errors
    */
-  async softDelete(id: string): Promise<Invoice> {
+  async softDelete(id: string, tenantId: string): Promise<Invoice> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Invoice', id);
       }
@@ -451,9 +460,9 @@ export class InvoiceRepository {
    * @throws NotFoundException if invoice doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Invoice', id);
       }
@@ -556,11 +565,12 @@ export class InvoiceRepository {
    */
   async updateDeliveryStatus(
     id: string,
+    tenantId: string,
     deliveryStatus: 'PENDING' | 'SENT' | 'DELIVERED' | 'OPENED' | 'FAILED',
     deliveredAt?: Date,
   ): Promise<Invoice> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Invoice', id);
       }
@@ -593,9 +603,13 @@ export class InvoiceRepository {
    * @throws NotFoundException if invoice doesn't exist
    * @throws DatabaseException for database errors
    */
-  async recordPayment(id: string, amountCents: number): Promise<Invoice> {
+  async recordPayment(
+    id: string,
+    tenantId: string,
+    amountCents: number,
+  ): Promise<Invoice> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Invoice', id);
       }
@@ -677,9 +691,12 @@ export class InvoiceRepository {
    * @throws NotFoundException if invoice doesn't exist
    * @throws DatabaseException for database errors
    */
-  async incrementDeliveryRetryCount(id: string): Promise<Invoice> {
+  async incrementDeliveryRetryCount(
+    id: string,
+    tenantId: string,
+  ): Promise<Invoice> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Invoice', id);
       }

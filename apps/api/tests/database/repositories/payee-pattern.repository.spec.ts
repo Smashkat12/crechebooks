@@ -240,7 +240,7 @@ describe('PayeePatternRepository', () => {
   describe('findById', () => {
     it('should find pattern by id', async () => {
       const created = await repository.create(testPatternData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -250,6 +250,7 @@ describe('PayeePatternRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -327,9 +328,9 @@ describe('PayeePatternRepository', () => {
       });
 
       // Increment p2's match count multiple times
-      await repository.incrementMatchCount(p2.id);
-      await repository.incrementMatchCount(p2.id);
-      await repository.incrementMatchCount(p2.id);
+      await repository.incrementMatchCount(p2.id, testTenant.id);
+      await repository.incrementMatchCount(p2.id, testTenant.id);
+      await repository.incrementMatchCount(p2.id, testTenant.id);
 
       const patterns = await repository.findByTenant(testTenant.id, {});
 
@@ -409,7 +410,10 @@ describe('PayeePatternRepository', () => {
       const created = await repository.create(testPatternData);
       expect(created.matchCount).toBe(0);
 
-      const incremented = await repository.incrementMatchCount(created.id);
+      const incremented = await repository.incrementMatchCount(
+        created.id,
+        testTenant.id,
+      );
 
       expect(incremented.matchCount).toBe(1);
     });
@@ -417,16 +421,22 @@ describe('PayeePatternRepository', () => {
     it('should increment multiple times correctly', async () => {
       const created = await repository.create(testPatternData);
 
-      await repository.incrementMatchCount(created.id);
-      await repository.incrementMatchCount(created.id);
-      const final = await repository.incrementMatchCount(created.id);
+      await repository.incrementMatchCount(created.id, testTenant.id);
+      await repository.incrementMatchCount(created.id, testTenant.id);
+      const final = await repository.incrementMatchCount(
+        created.id,
+        testTenant.id,
+      );
 
       expect(final.matchCount).toBe(3);
     });
 
     it('should throw NotFoundException for non-existent pattern', async () => {
       await expect(
-        repository.incrementMatchCount('00000000-0000-0000-0000-000000000000'),
+        repository.incrementMatchCount(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -435,7 +445,7 @@ describe('PayeePatternRepository', () => {
     it('should update pattern fields', async () => {
       const created = await repository.create(testPatternData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         defaultAccountCode: '4200',
         defaultAccountName: 'Updated Income',
         confidenceBoost: 25,
@@ -450,7 +460,7 @@ describe('PayeePatternRepository', () => {
     it('should update payeeAliases', async () => {
       const created = await repository.create(testPatternData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         payeeAliases: ['NEW ALIAS 1', 'NEW ALIAS 2'],
       });
 
@@ -459,9 +469,13 @@ describe('PayeePatternRepository', () => {
 
     it('should throw NotFoundException for non-existent pattern', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          defaultAccountCode: '5000',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            defaultAccountCode: '5000',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -469,7 +483,7 @@ describe('PayeePatternRepository', () => {
       const created = await repository.create(testPatternData);
 
       await expect(
-        repository.update(created.id, {
+        repository.update(created.id, testTenant.id, {
           isRecurring: true,
           // expectedAmountCents is missing!
         }),
@@ -479,7 +493,7 @@ describe('PayeePatternRepository', () => {
     it('should allow updating to recurring with expectedAmountCents', async () => {
       const created = await repository.create(testPatternData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         isRecurring: true,
         expectedAmountCents: 100000,
         amountVariancePercent: 5,
@@ -495,15 +509,18 @@ describe('PayeePatternRepository', () => {
     it('should delete pattern', async () => {
       const created = await repository.create(testPatternData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent pattern', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });

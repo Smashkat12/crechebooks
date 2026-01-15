@@ -145,3 +145,72 @@ export class BusinessException extends AppException {
     this.name = 'BusinessException';
   }
 }
+
+/**
+ * Too Many Requests error - thrown when rate limit is exceeded
+ * HTTP Status: 429
+ */
+export class TooManyRequestsException extends AppException {
+  constructor(
+    message: string = 'Too many requests. Please try again later.',
+    public readonly retryAfter: number = 60,
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 'TOO_MANY_REQUESTS', 429, {
+      ...details,
+      retryAfter,
+    });
+    this.name = 'TooManyRequestsException';
+  }
+
+  /**
+   * Get the Retry-After header value in seconds.
+   */
+  getRetryAfterSeconds(): number {
+    return this.retryAfter;
+  }
+}
+
+/**
+ * Service Unavailable error - thrown when a required service is down
+ * HTTP Status: 503
+ */
+export class ServiceUnavailableException extends AppException {
+  constructor(
+    service: string,
+    message: string = 'Service temporarily unavailable',
+    retryAfter?: number,
+  ) {
+    super(`${service}: ${message}`, 'SERVICE_UNAVAILABLE', 503, {
+      service,
+      retryAfter,
+    });
+    this.name = 'ServiceUnavailableException';
+  }
+}
+
+/**
+ * Payload Too Large error - thrown when request body exceeds size limit
+ * HTTP Status: 413
+ * TASK-INFRA-008: Request payload size limits
+ */
+export class PayloadTooLargeException extends AppException {
+  constructor(
+    message: string = 'Request payload is too large',
+    public readonly maxSize?: string,
+    public readonly actualSize?: number,
+  ) {
+    super(message, 'PAYLOAD_TOO_LARGE', 413, {
+      maxSize,
+      actualSize,
+    });
+    this.name = 'PayloadTooLargeException';
+  }
+
+  /**
+   * Get the maximum allowed size as a human-readable string.
+   */
+  getMaxSize(): string | undefined {
+    return this.maxSize;
+  }
+}

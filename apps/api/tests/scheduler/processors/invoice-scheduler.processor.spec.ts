@@ -171,7 +171,7 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
         city: 'Johannesburg',
         province: 'Gauteng',
         postalCode: '2000',
-        taxStatus: TaxStatus.NOT_VAT_REGISTERED,
+        taxStatus: TaxStatus.NOT_REGISTERED,
         invoiceDueDays: 7,
       },
     });
@@ -374,7 +374,7 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
           city: 'Durban',
           province: 'KwaZulu-Natal',
           postalCode: '4000',
-          taxStatus: TaxStatus.NOT_VAT_REGISTERED,
+          taxStatus: TaxStatus.NOT_REGISTERED,
         },
       });
 

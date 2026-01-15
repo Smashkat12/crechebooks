@@ -161,5 +161,12 @@ export interface WhatsAppConfig {
   accessToken: string;
   phoneNumberId: string;
   businessAccountId: string;
+  /** Verify Token for webhook URL verification challenge (custom token YOU set) */
   webhookVerifyToken: string;
+  /**
+   * TASK-INT-005: App Secret for HMAC-SHA256 webhook signature verification
+   * Get from: Meta Developer Console > App > Settings > Basic > App Secret
+   * This is DIFFERENT from webhookVerifyToken - used for X-Hub-Signature-256 validation
+   */
+  appSecret: string;
 }

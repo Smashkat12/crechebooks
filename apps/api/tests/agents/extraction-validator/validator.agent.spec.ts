@@ -34,19 +34,31 @@ describe('ExtractionValidatorAgent', () => {
     agent = module.get<ExtractionValidatorAgent>(ExtractionValidatorAgent);
     balanceReconciler = module.get<BalanceReconciler>(BalanceReconciler);
     sanityChecker = module.get<AmountSanityChecker>(AmountSanityChecker);
-    decisionLogger = module.get<ExtractionDecisionLogger>(ExtractionDecisionLogger);
+    decisionLogger = module.get<ExtractionDecisionLogger>(
+      ExtractionDecisionLogger,
+    );
   });
 
   /**
    * Helper to create a test statement
    */
-  function createStatement(overrides: Partial<{
-    openingBalance: number;
-    closingBalance: number;
-    transactions: Array<{ amountCents: number; isCredit: boolean; description?: string }>;
-  }> = {}): ParsedBankStatement {
-    const defaultTransactions = [
-      { amountCents: 10000, isCredit: true },  // R 100.00 credit
+  function createStatement(
+    overrides: Partial<{
+      openingBalance: number;
+      closingBalance: number;
+      transactions: Array<{
+        amountCents: number;
+        isCredit: boolean;
+        description?: string;
+      }>;
+    }> = {},
+  ): ParsedBankStatement {
+    const defaultTransactions: Array<{
+      amountCents: number;
+      isCredit: boolean;
+      description?: string;
+    }> = [
+      { amountCents: 10000, isCredit: true, description: 'Test transaction' }, // R 100.00 credit
     ];
 
     return {
@@ -57,12 +69,14 @@ describe('ExtractionValidatorAgent', () => {
       accountNumber: '63061274808',
       openingBalanceCents: overrides.openingBalance ?? 0,
       closingBalanceCents: overrides.closingBalance ?? 10000,
-      transactions: (overrides.transactions ?? defaultTransactions).map(t => ({
-        date: new Date('2023-07-20'),
-        description: t.description ?? 'Test transaction',
-        amountCents: t.amountCents,
-        isCredit: t.isCredit,
-      })),
+      transactions: (overrides.transactions ?? defaultTransactions).map(
+        (t) => ({
+          date: new Date('2023-07-20'),
+          description: (t as any).description ?? 'Test transaction',
+          amountCents: t.amountCents,
+          isCredit: t.isCredit,
+        }),
+      ),
     };
   }
 
@@ -100,7 +114,7 @@ describe('ExtractionValidatorAgent', () => {
       expect(result.isValid).toBe(false);
       expect(result.balanceReconciled).toBe(false);
       expect(result.flags).toContainEqual(
-        expect.objectContaining({ code: 'BALANCE_MISMATCH' })
+        expect.objectContaining({ code: 'BALANCE_MISMATCH' }),
       );
     });
 
@@ -108,7 +122,7 @@ describe('ExtractionValidatorAgent', () => {
       // Opening: R 1,000.00, Debit: R 100.00, Closing: R 900.00
       const statement = createStatement({
         openingBalance: 100000, // R 1,000.00
-        closingBalance: 90000,  // R 900.00
+        closingBalance: 90000, // R 900.00
         transactions: [
           { amountCents: 10000, isCredit: false }, // R 100 debit
         ],
@@ -123,11 +137,11 @@ describe('ExtractionValidatorAgent', () => {
     it('should handle mixed credits and debits', async () => {
       // Opening: R 1,000, Credit: R 500, Debit: R 200, Closing: R 1,300
       const statement = createStatement({
-        openingBalance: 100000,  // R 1,000.00
-        closingBalance: 130000,  // R 1,300.00
+        openingBalance: 100000, // R 1,000.00
+        closingBalance: 130000, // R 1,300.00
         transactions: [
-          { amountCents: 50000, isCredit: true },   // R 500 credit
-          { amountCents: 20000, isCredit: false },  // R 200 debit
+          { amountCents: 50000, isCredit: true }, // R 500 credit
+          { amountCents: 20000, isCredit: false }, // R 200 debit
         ],
       });
 
@@ -151,7 +165,7 @@ describe('ExtractionValidatorAgent', () => {
 
       expect(result.isValid).toBe(false);
       expect(result.flags).toContainEqual(
-        expect.objectContaining({ code: 'AMOUNT_EXCEEDS_MAX' })
+        expect.objectContaining({ code: 'AMOUNT_EXCEEDS_MAX' }),
       );
     });
 
@@ -169,9 +183,13 @@ describe('ExtractionValidatorAgent', () => {
 
       expect(result.balanceReconciled).toBe(true);
       // Large amounts trigger OCR pattern detection warning
-      expect(result.flags.some(f =>
-        f.code === 'AMOUNT_SUSPICIOUS' || f.code === 'POSSIBLE_DECIMAL_ERROR'
-      )).toBe(true);
+      expect(
+        result.flags.some(
+          (f) =>
+            f.code === 'AMOUNT_SUSPICIOUS' ||
+            f.code === 'POSSIBLE_DECIMAL_ERROR',
+        ),
+      ).toBe(true);
     });
 
     it('should pass empty statement where opening equals closing', async () => {
@@ -195,8 +213,8 @@ describe('ExtractionValidatorAgent', () => {
           openingBalance: 0,
           closingBalance: 35310, // R 353.10
           transactions: [
-            { amountCents: 10000, isCredit: true },  // R 100.00
-            { amountCents: 25310, isCredit: true },  // R 253.10
+            { amountCents: 10000, isCredit: true }, // R 100.00
+            { amountCents: 25310, isCredit: true }, // R 253.10
           ],
         });
 
@@ -210,7 +228,7 @@ describe('ExtractionValidatorAgent', () => {
       it('should calculate correct balance with debits', () => {
         const statement = createStatement({
           openingBalance: 100000, // R 1,000.00
-          closingBalance: 70000,  // R 700.00
+          closingBalance: 70000, // R 700.00
           transactions: [
             { amountCents: 10000, isCredit: false }, // R 100 debit
             { amountCents: 20000, isCredit: false }, // R 200 debit
@@ -228,9 +246,7 @@ describe('ExtractionValidatorAgent', () => {
         const statement = createStatement({
           openingBalance: 0,
           closingBalance: 94450000, // Wrong - OCR error
-          transactions: [
-            { amountCents: 10000, isCredit: true },
-          ],
+          transactions: [{ amountCents: 10000, isCredit: true }],
         });
 
         const result = balanceReconciler.reconcile(statement);
@@ -255,10 +271,15 @@ describe('ExtractionValidatorAgent', () => {
         });
 
         const reconciliation = balanceReconciler.reconcile(statement);
-        const corrections = balanceReconciler.suggestCorrections(statement, reconciliation);
+        const corrections = balanceReconciler.suggestCorrections(
+          statement,
+          reconciliation,
+        );
 
         expect(corrections.length).toBeGreaterThan(0);
-        const closingCorrection = corrections.find(c => c.field === 'closingBalance');
+        const closingCorrection = corrections.find(
+          (c) => c.field === 'closingBalance',
+        );
         expect(closingCorrection).toBeDefined();
         expect(closingCorrection?.corrected).toBe(10000);
       });
@@ -274,7 +295,10 @@ describe('ExtractionValidatorAgent', () => {
         });
 
         const reconciliation = balanceReconciler.reconcile(statement);
-        const corrections = balanceReconciler.suggestCorrections(statement, reconciliation);
+        const corrections = balanceReconciler.suggestCorrections(
+          statement,
+          reconciliation,
+        );
 
         // Note: This specific case might not have a clean fix
         // The test verifies the mechanism works
@@ -327,7 +351,10 @@ describe('ExtractionValidatorAgent', () => {
         // R 9,445,000.00 (OCR error for R 9,445.00)
         // The sanity checker tries divisors in order: 100, 1000, 10000, 10
         // 944500000 / 100 = 9445000 (within limit)
-        const suggestion = sanityChecker.suggestCorrection(944500000, 100000000);
+        const suggestion = sanityChecker.suggestCorrection(
+          944500000,
+          100000000,
+        );
         expect(suggestion).toBe(9445000); // First valid suggestion: R 94,450.00
       });
     });
@@ -352,16 +379,18 @@ describe('ExtractionValidatorAgent', () => {
       expect(result.balanceReconciled).toBe(false);
       // Confidence is 60 (date check + OCR pattern check pass, balance fails)
       expect(result.confidence).toBeLessThan(90); // Not auto-approved
-      expect(result.flags.some(f => f.code === 'BALANCE_MISMATCH')).toBe(true);
-      expect(result.flags.some(f => f.severity === 'ERROR')).toBe(true);
+      expect(result.flags.some((f) => f.code === 'BALANCE_MISMATCH')).toBe(
+        true,
+      );
+      expect(result.flags.some((f) => f.severity === 'ERROR')).toBe(true);
     });
 
     it('should detect August 2023 statement OCR error: R 3,531.00 read as R 374,730.00', async () => {
       // Real: Opening R 100.00, Closing R 3,531.00
       // OCR:  Opening R ???, Closing R 374,730.00
       const statement = createStatement({
-        openingBalance: 10000,     // R 100.00
-        closingBalance: 37473000,  // R 374,730.00 - OCR ERROR
+        openingBalance: 10000, // R 100.00
+        closingBalance: 37473000, // R 374,730.00 - OCR ERROR
         transactions: [
           { amountCents: 343100, isCredit: true }, // R 3,431.00 of credits (example)
         ],
@@ -372,9 +401,12 @@ describe('ExtractionValidatorAgent', () => {
       expect(result.isValid).toBe(false);
       expect(result.balanceReconciled).toBe(false);
       // The closing balance should be flagged as suspicious
-      expect(result.flags.some(f =>
-        f.code === 'BALANCE_MISMATCH' || f.code === 'AMOUNT_SUSPICIOUS'
-      )).toBe(true);
+      expect(
+        result.flags.some(
+          (f) =>
+            f.code === 'BALANCE_MISMATCH' || f.code === 'AMOUNT_SUSPICIOUS',
+        ),
+      ).toBe(true);
     });
 
     it('should pass correctly extracted statement', async () => {

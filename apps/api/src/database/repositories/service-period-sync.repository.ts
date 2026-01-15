@@ -88,13 +88,18 @@ export class ServicePeriodSyncRepository {
   }
 
   /**
-   * Find service period sync by ID
-   * @returns ServicePeriodSync or null if not found
+   * Find service period sync by ID with tenant isolation
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @returns ServicePeriodSync or null if not found or tenant mismatch
    */
-  async findById(id: string): Promise<ServicePeriodSync | null> {
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<ServicePeriodSync | null> {
     try {
-      return await this.prisma.servicePeriodSync.findUnique({
-        where: { id },
+      return await this.prisma.servicePeriodSync.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
@@ -111,9 +116,14 @@ export class ServicePeriodSyncRepository {
 
   /**
    * Find service period sync by ID or throw NotFoundException
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findByIdOrThrow(id: string): Promise<ServicePeriodSync> {
-    const sync = await this.findById(id);
+  async findByIdOrThrow(
+    id: string,
+    tenantId: string,
+  ): Promise<ServicePeriodSync> {
+    const sync = await this.findById(id, tenantId);
     if (!sync) {
       throw new NotFoundException('ServicePeriodSync', id);
     }
@@ -386,11 +396,16 @@ export class ServicePeriodSyncRepository {
   /**
    * Undo termination - clear termination fields and reactivate
    * Only allowed if final pay has not been processed
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async undoTermination(id: string): Promise<ServicePeriodSync> {
+  async undoTermination(
+    id: string,
+    tenantId: string,
+  ): Promise<ServicePeriodSync> {
     try {
       // First check if we can undo (final payslip not processed)
-      const existing = await this.findByIdOrThrow(id);
+      const existing = await this.findByIdOrThrow(id, tenantId);
 
       if (existing.finalPayslipId) {
         throw new ConflictException(
@@ -437,19 +452,27 @@ export class ServicePeriodSyncRepository {
   }
 
   /**
-   * Delete a service period sync record
-   * @throws NotFoundException if record doesn't exist
+   * Delete a service period sync record with tenant isolation
+   * Uses deleteMany with tenant filter for atomic cross-tenant protection
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @throws NotFoundException if record not found or tenant mismatch (same error to prevent enumeration)
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      await this.prisma.servicePeriodSync.delete({
-        where: { id },
+      const result = await this.prisma.servicePeriodSync.deleteMany({
+        where: {
+          id,
+          tenantId,
+        },
       });
+
+      if (result.count === 0) {
+        throw new NotFoundException('ServicePeriodSync', id);
+      }
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2025') {
-          throw new NotFoundException('ServicePeriodSync', id);
-        }
+      if (error instanceof NotFoundException) {
+        throw error;
       }
       this.logger.error(
         `Failed to delete service period sync ${id}`,

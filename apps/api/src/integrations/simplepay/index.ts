@@ -6,6 +6,7 @@
  * TASK-SPAY-003: SimplePay Calculations Management
  * TASK-SPAY-004: SimplePay Service Period Management
  * TASK-SPAY-006: SimplePay Profile Mapping Management
+ * TASK-STAFF-003 / TASK-STAFF-010: SimplePay Sync Retry Queue
  */
 
 export * from './simplepay.module';
@@ -19,3 +20,7 @@ export * from './simplepay-payrun.service';
 export * from './simplepay-calculations.service';
 export * from './simplepay-service-period.service';
 export * from './simplepay-profile.service';
+// Sync Queue (TASK-STAFF-003 / TASK-STAFF-010)
+export * from './simplepay-sync.processor';
+export * from './simplepay-sync.service';
+export * from './dto/sync-job.dto';

@@ -1,6 +1,7 @@
 /**
  * Payment Matching Service
  * TASK-PAY-011: Payment Matching Service
+ * TASK-RECON-001: Enhanced with Amount Tolerance Matching
  *
  * @module database/services/payment-matching
  * @description Confidence-based payment matching service that matches
@@ -8,8 +9,14 @@
  *
  * Confidence Scoring Algorithm (0-100 points):
  * - Reference Match: 0-40 points (exact=40, contains=30, suffix=15)
- * - Amount Match: 0-40 points (exact=40, 1%=35, 5%=25, 10%=15, partial=10)
+ * - Amount Match: 0-40 points (exact=40, within tolerance=35-38, 1%=35, 5%=25, 10%=15, partial=10)
  * - Name Similarity: 0-20 points (exact=20, >0.8=15, >0.6=10, >0.4=5)
+ *
+ * Amount Tolerance (TASK-RECON-001):
+ * - Default tolerance: 1 cent
+ * - Bank fee tolerance: R5 (500 cents)
+ * - Percentage tolerance: 0.5% for large amounts
+ * - Confidence adjusted based on deviation amount
  *
  * Auto-apply rules:
  * - Single match with confidence >= 80%: auto-apply
@@ -42,6 +49,12 @@ import {
   MatchDecision,
   InvoiceCandidate,
 } from '../../agents/payment-matcher/interfaces/matcher.interface';
+import {
+  isAmountWithinTolerance,
+  AmountToleranceConfig,
+  createBankFeeTolerance,
+} from './amount-tolerance.util';
+import { TOLERANCE_DEFAULTS } from '../constants/tolerance.constants';
 
 /** Confidence threshold for auto-apply (single high-confidence match) */
 const AUTO_APPLY_THRESHOLD = 80;
@@ -235,12 +248,20 @@ export class PaymentMatchingService {
 
   /**
    * Find exact matches for a transaction
-   * Exact = reference matches invoice number AND amounts match
+   * Exact = reference matches invoice number AND amounts match (within tolerance)
+   * @param transaction - Bank transaction to match
+   * @param outstandingInvoices - List of outstanding invoices to match against
+   * @param toleranceConfig - Optional tolerance configuration for amount matching
    * @returns Array of exact match candidates (should be 0 or 1)
+   *
+   * TASK-RECON-001: Enhanced with amount tolerance matching
+   * - Uses 1 cent default tolerance for rounding differences
+   * - Adjusts confidence score based on amount deviation
    */
   findExactMatches(
     transaction: Transaction,
     outstandingInvoices: InvoiceWithRelations[],
+    toleranceConfig?: AmountToleranceConfig,
   ): MatchCandidate[] {
     const candidates: MatchCandidate[] = [];
 
@@ -251,23 +272,58 @@ export class PaymentMatchingService {
     const normalizedRef = this.normalizeString(transaction.reference);
     const transactionAmount = Math.abs(transaction.amountCents);
 
+    // Default tolerance for exact matching: 1 cent
+    const config = toleranceConfig ?? {
+      absoluteTolerance: TOLERANCE_DEFAULTS.DEFAULT_AMOUNT_TOLERANCE_CENTS,
+      percentageTolerance: 0, // No percentage tolerance for "exact" matches
+      useHigherTolerance: false,
+    };
+
     for (const invoice of outstandingInvoices) {
       const normalizedInvoice = this.normalizeString(invoice.invoiceNumber);
       const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
 
-      // Check for exact reference match AND exact amount match
-      if (
-        normalizedRef === normalizedInvoice &&
-        transactionAmount === outstandingAmount
-      ) {
+      // Check for exact reference match
+      if (normalizedRef !== normalizedInvoice) {
+        continue;
+      }
+
+      // Check amount match with tolerance (TASK-RECON-001)
+      const toleranceResult = isAmountWithinTolerance(
+        transactionAmount,
+        outstandingAmount,
+        config,
+      );
+
+      if (toleranceResult.matches) {
         const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+
+        // Adjust confidence based on deviation (100 for exact, 98-99 for tolerance match)
+        const baseConfidence = toleranceResult.deviation === 0 ? 100 : 98;
+        const confidenceScore = Math.max(
+          95,
+          Math.round(
+            baseConfidence + toleranceResult.confidenceAdjustment * 100,
+          ),
+        );
+
+        const matchReasons = ['Exact reference match'];
+        if (toleranceResult.deviation === 0) {
+          matchReasons.push('Exact amount match');
+        } else {
+          matchReasons.push(toleranceResult.matchDescription);
+        }
+
         candidates.push({
           transactionId: transaction.id,
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
-          confidenceLevel: MatchConfidenceLevel.EXACT,
-          confidenceScore: 100,
-          matchReasons: ['Exact reference match', 'Exact amount match'],
+          confidenceLevel:
+            toleranceResult.deviation === 0
+              ? MatchConfidenceLevel.EXACT
+              : MatchConfidenceLevel.HIGH,
+          confidenceScore,
+          matchReasons,
           parentId: invoice.parentId,
           parentName,
           childName: invoice.child.firstName,
@@ -321,11 +377,13 @@ export class PaymentMatchingService {
 
   /**
    * Calculate confidence score for a transaction-invoice pair
+   * TASK-RECON-001: Enhanced with tolerance-based amount matching
    * @returns Score 0-100 with reasons
    */
   calculateConfidence(
     transaction: Transaction,
     invoice: InvoiceWithRelations,
+    toleranceConfig?: AmountToleranceConfig,
   ): ConfidenceResult {
     let score = 0;
     const reasons: string[] = [];
@@ -354,13 +412,32 @@ export class PaymentMatchingService {
     }
 
     // 2. AMOUNT MATCH (0-40 points)
+    // TASK-RECON-001: Use tolerance-based matching for bank fees and rounding
     const amountDiff = Math.abs(transactionAmount - outstandingAmount);
     const percentDiff =
       outstandingAmount > 0 ? amountDiff / outstandingAmount : 1;
 
+    // Use bank fee tolerance config for amount matching
+    const bankFeeConfig = toleranceConfig ?? createBankFeeTolerance();
+    const toleranceResult = isAmountWithinTolerance(
+      transactionAmount,
+      outstandingAmount,
+      bankFeeConfig,
+    );
+
     if (amountDiff === 0) {
       score += 40;
       reasons.push('Exact amount match');
+    } else if (
+      toleranceResult.matches &&
+      amountDiff <= TOLERANCE_DEFAULTS.BANK_FEE_TOLERANCE_CENTS
+    ) {
+      // TASK-RECON-001: Bank fee tolerance match (R5 or less)
+      // Score between 35-38 based on deviation
+      const bankFeeScore =
+        38 + Math.round(toleranceResult.confidenceAdjustment * 15);
+      score += Math.max(35, bankFeeScore);
+      reasons.push(toleranceResult.matchDescription);
     } else if (percentDiff <= 0.01 || amountDiff <= 100) {
       // Within 1% or R1 (100 cents)
       score += 35;
@@ -663,6 +740,7 @@ export class PaymentMatchingService {
     // Update invoice with payment
     await this.invoiceRepo.recordPayment(
       candidate.invoiceId,
+      tenantId,
       candidate.transactionAmountCents,
     );
 
@@ -767,7 +845,11 @@ export class PaymentMatchingService {
     });
 
     // Update invoice with payment
-    await this.invoiceRepo.recordPayment(dto.invoiceId, amountCents);
+    await this.invoiceRepo.recordPayment(
+      dto.invoiceId,
+      dto.tenantId,
+      amountCents,
+    );
 
     // Create audit log
     await this.auditLogService.logAction({

@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Auto-Push Categorization on User Review</title>
-  <status>pending</status>
+  <status>DONE</status>
   <phase>9</phase>
   <layer>logic</layer>
   <sequence>181</sequence>

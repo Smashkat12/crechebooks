@@ -966,3 +966,175 @@ These tasks ensure proper VAT application according to South African VAT Act No.
 | Prepared meals | 15% APPLICABLE | Not zero-rated when ready to eat |
 | Transport fees | 15% APPLICABLE | Service - not educational |
 | Late pickup penalties | 15% APPLICABLE | Penalty - not educational |
+
+---
+
+## Phase 16: Code Review Remediation
+
+Analysis Date: 2026-01-15
+Source: Coordinated multi-agent code review using claude-flow with unified memory.
+
+These tasks address security vulnerabilities, data integrity issues, and code quality findings from the comprehensive codebase review.
+
+### 16.1 Security Remediation (CRITICAL)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 184 | TASK-SEC-001 | Remove Hardcoded Dev Credentials | security | - | P1-CRITICAL | ✅ Complete |
+| 185 | TASK-SEC-002 | Remove Dev Login UI Credentials Display | security | TASK-SEC-001 | P1-CRITICAL | ✅ Complete |
+| 186 | TASK-SEC-003 | Migrate CSRF State to Redis | security | - | P1-CRITICAL | ✅ Complete |
+| 187 | TASK-SEC-004 | Implement Auth Rate Limiting | security | - | P1-CRITICAL | ✅ Complete |
+| 188 | TASK-SEC-005 | Configure Restrictive CORS | security | - | P1-CRITICAL | ✅ Complete |
+| 189 | TASK-SEC-006 | Remove Webhook Signature Bypass | security | - | P1-CRITICAL | ✅ Complete |
+
+### 16.2 Database & Data Integrity (CRITICAL/HIGH)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 190 | TASK-DATA-001 | Fix Tenant Isolation in findById | data | - | P1-CRITICAL | ✅ Complete |
+| 191 | TASK-DATA-002 | Fix Cross-Tenant Deletion | data | TASK-DATA-001 | P1-CRITICAL | ✅ Complete |
+| 192 | TASK-DATA-003 | Add Audit Logging to Deletes | data | - | P2-HIGH | ✅ Complete |
+| 193 | TASK-DATA-004 | Add Pagination to findByTenant | data | - | P2-HIGH | ⭕ Pending |
+| 194 | TASK-DATA-005 | Add AuditLog Action Index | data | - | P3-MEDIUM | ⭕ Pending |
+
+### 16.3 Billing & Invoicing (CRITICAL/HIGH)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 195 | TASK-BILL-039 | Fix Frontend VAT Calculation Mismatch | logic | TASK-BILL-038 | P1-CRITICAL | ✅ Complete |
+| 196 | TASK-BILL-040 | Add Transaction Isolation to Batch Invoice | logic | - | P1-CRITICAL | ✅ Complete |
+| 197 | TASK-BILL-041 | Fix Invoice Number Race Condition | logic | - | P2-HIGH | ⭕ Pending |
+| 198 | TASK-BILL-042 | Fix Credit Balance VAT Recalculation | logic | TASK-BILL-039 | P2-HIGH | ⭕ Pending |
+| 199 | TASK-BILL-043 | Fix Payment Matching Threshold | logic | - | P2-HIGH | ⭕ Pending |
+| 200 | TASK-BILL-044 | Remove Hardcoded Xero Account Codes | logic | - | P3-MEDIUM | ⭕ Pending |
+
+### 16.4 Integration Security (CRITICAL/HIGH)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 201 | TASK-INT-001 | Remove Default Encryption Key Fallback | security | - | P1-CRITICAL | ✅ Complete |
+| 202 | TASK-INT-002 | Remove Default OAuth State Key | security | TASK-INT-001 | P1-CRITICAL | ✅ Complete |
+| 203 | TASK-INT-003 | Standardize Encryption Implementation | security | TASK-INT-001 | P2-HIGH | ⭕ Pending |
+| 204 | TASK-INT-004 | Fix Static Salt in Key Derivation | security | TASK-INT-003 | P2-HIGH | ⭕ Pending |
+| 205 | TASK-INT-005 | Fix WhatsApp Webhook Signature Key | security | - | P2-HIGH | ⭕ Pending |
+| 206 | TASK-INT-006 | Add Input Validation Before DB Query | security | - | P2-HIGH | ⭕ Pending |
+| 207 | TASK-INT-007 | Implement OAuth2 PKCE | security | - | P3-MEDIUM | ⭕ Pending |
+
+### 16.5 Staff & Payroll (CRITICAL/HIGH)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 208 | TASK-STAFF-008 | Implement Xero Journal Posting | logic | - | P1-CRITICAL | ✅ Complete |
+| 209 | TASK-STAFF-009 | Add Class-Validator to Staff DTOs | logic | - | P1-CRITICAL | ✅ Complete |
+| 210 | TASK-STAFF-010 | Add SimplePay Sync Retry Queue | logic | - | P2-HIGH | ⭕ Pending |
+| 211 | TASK-STAFF-011 | Complete Leave Type Mapping | logic | - | P2-HIGH | ⭕ Pending |
+| 212 | TASK-STAFF-012 | Make Tax Tables Configurable | logic | - | P2-HIGH | ⭕ Pending |
+| 213 | TASK-STAFF-013 | Enforce UI-19 14-Day Deadline | logic | - | P3-MEDIUM | ⭕ Pending |
+| 214 | TASK-STAFF-014 | Integrate SA Public Holiday Calendar | logic | - | P3-MEDIUM | ⭕ Pending |
+
+### 16.6 Infrastructure (HIGH/MEDIUM)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 215 | TASK-INFRA-001 | Add Database Health Check | infra | - | P2-HIGH | ⭕ Pending |
+| 216 | TASK-INFRA-002 | Add Redis Health Check | infra | - | P2-HIGH | ⭕ Pending |
+| 217 | TASK-INFRA-003 | Add Global Rate Limiting | infra | - | P2-HIGH | ⭕ Pending |
+| 218 | TASK-INFRA-004 | Add Helmet Security Headers | infra | - | P2-HIGH | ⭕ Pending |
+| 219 | TASK-INFRA-005 | Implement Structured JSON Logging | infra | - | P2-HIGH | ⭕ Pending |
+| 220 | TASK-INFRA-006 | Add Webhook Idempotency Deduplication | infra | - | P2-HIGH | ⭕ Pending |
+| 221 | TASK-INFRA-007 | Add Bull Queue Graceful Shutdown | infra | - | P3-MEDIUM | ⭕ Pending |
+| 222 | TASK-INFRA-008 | Add Request Payload Size Limit | infra | - | P3-MEDIUM | ⭕ Pending |
+
+### 16.7 Reconciliation (CRITICAL/HIGH)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 223 | TASK-RECON-002 | Add Amount Tolerance to Matching | logic | - | P1-CRITICAL | ✅ Complete |
+| 224 | TASK-RECON-003 | Add Reconciliation Service Unit Tests | test | - | P2-HIGH | ⭕ Pending |
+| 225 | TASK-RECON-004 | Standardize Balance Tolerance | logic | TASK-RECON-002 | P3-MEDIUM | ⭕ Pending |
+| 226 | TASK-RECON-005 | Improve Multiple Match Ambiguity | logic | - | P3-MEDIUM | ⭕ Pending |
+| 227 | TASK-RECON-006 | Align Discrepancy Service Logic | logic | - | P3-MEDIUM | ⭕ Pending |
+
+### 16.8 Frontend UI (HIGH/MEDIUM/LOW)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 228 | TASK-UI-001 | Migrate Auth Token to HttpOnly Cookie | security | TASK-SEC-001 | P2-HIGH | ⭕ Pending |
+| 229 | TASK-UI-002 | Add Frontend Unit Tests | test | - | P2-HIGH | ⭕ Pending |
+| 230 | TASK-UI-003 | Add Error Boundaries | surface | - | P2-HIGH | ⭕ Pending |
+| 231 | TASK-UI-004 | Add Suspense Boundaries | surface | - | P3-MEDIUM | ⭕ Pending |
+| 232 | TASK-UI-005 | Configure CSP Headers | security | - | P3-MEDIUM | ⭕ Pending |
+| 233 | TASK-UI-006 | Remove Console Logging from Middleware | surface | - | P3-MEDIUM | ⭕ Pending |
+| 234 | TASK-UI-007 | Add Accessibility Skip Links | surface | - | P4-LOW | ⭕ Pending |
+| 235 | TASK-UI-008 | Remove Backup Files | cleanup | - | P4-LOW | ⭕ Pending |
+
+### 16.9 Transaction Processing (HIGH/MEDIUM/LOW)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 236 | TASK-TXN-007 | Fix Split Transaction Validation | logic | - | P2-HIGH | ⭕ Pending |
+| 237 | TASK-TXN-008 | Make Bank Fee Amounts Configurable | logic | - | P3-MEDIUM | ⭕ Pending |
+| 238 | TASK-TXN-009 | Improve AI Categorization | logic | - | P3-MEDIUM | ⭕ Pending |
+| 239 | TASK-TXN-010 | Fix VAT Integer Division | logic | - | P3-MEDIUM | ⭕ Pending |
+| 240 | TASK-TXN-011 | Optimize Duplicate Detection Memory | logic | - | P3-MEDIUM | ⭕ Pending |
+| 241 | TASK-TXN-012 | Improve Transaction Hash Algorithm | logic | - | P4-LOW | ⭕ Pending |
+
+### 16.10 SARS Tax Compliance (MEDIUM/LOW)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 242 | TASK-SARS-020 | Use Typed NestJS Exceptions | logic | - | P3-MEDIUM | ⭕ Pending |
+| 243 | TASK-SARS-021 | Implement VAT201 Adjustment Fields | logic | - | P3-MEDIUM | ⭕ Pending |
+| 244 | TASK-SARS-022 | Share UIF Cap Constant | logic | - | P4-LOW | ⭕ Pending |
+| 245 | TASK-SARS-023 | Add Public Holiday Deadline Handling | logic | TASK-STAFF-014 | P4-LOW | ⭕ Pending |
+| 246 | TASK-SARS-024 | Complete Period Format Validation Tests | test | - | P4-LOW | ⭕ Pending |
+
+---
+
+## Phase 16 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 15 | 15 | 0 | 100% |
+| P2-HIGH | 22 | 0 | 22 | 0% |
+| P3-MEDIUM | 18 | 0 | 18 | 0% |
+| P4-LOW | 8 | 0 | 8 | 0% |
+| **Total Phase 16** | **63** | **15** | **48** | **24%** |
+
+### Phase 16 Execution Order
+
+**Sprint 1: Critical Security (Tasks 184-191, 195-196, 201-202, 208-209, 223)**
+- All CRITICAL security and data integrity issues
+- Estimated: 15 tasks
+
+**Sprint 2: High Priority (Tasks 192-194, 197-199, 203-206, 210-212, 215-220, 224, 228-230, 236)**
+- All HIGH priority fixes
+- Estimated: 22 tasks
+
+**Sprint 3: Medium & Low (Remaining tasks)**
+- All MEDIUM and LOW priority improvements
+- Estimated: 26 tasks
+
+### Critical Dependencies
+
+```mermaid
+graph TD
+    SEC001[TASK-SEC-001<br/>Remove Credentials] --> SEC002[TASK-SEC-002<br/>Remove UI Display]
+    SEC001 --> UI001[TASK-UI-001<br/>HttpOnly Cookie]
+    DATA001[TASK-DATA-001<br/>Tenant findById] --> DATA002[TASK-DATA-002<br/>Tenant Delete]
+    INT001[TASK-INT-001<br/>Encryption Key] --> INT002[TASK-INT-002<br/>OAuth Key]
+    INT001 --> INT003[TASK-INT-003<br/>Standardize Encryption]
+    INT003 --> INT004[TASK-INT-004<br/>Fix Salt]
+    BILL038[TASK-BILL-038<br/>VAT Compliance] --> BILL039[TASK-BILL-039<br/>Frontend VAT]
+    BILL039 --> BILL042[TASK-BILL-042<br/>Credit VAT]
+    RECON002[TASK-RECON-002<br/>Amount Tolerance] --> RECON004[TASK-RECON-004<br/>Balance Tolerance]
+    STAFF014[TASK-STAFF-014<br/>Public Holidays] --> SARS023[TASK-SARS-023<br/>Deadline Holidays]
+```
+
+### Review Source Data
+
+All findings stored in claude-flow unified memory:
+- `codebase-review/meta/session` - Review session metadata
+- `codebase-review/meta/summary` - Executive summary
+- `codebase-review/domains/*` - Domain-specific findings
+- `codebase-review/tasks/phase-16-manifest` - Task manifest

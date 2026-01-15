@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Chart of Accounts Database Sync</title>
-  <status>pending</status>
+  <status>DONE</status>
   <phase>9</phase>
   <layer>logic</layer>
   <sequence>182</sequence>

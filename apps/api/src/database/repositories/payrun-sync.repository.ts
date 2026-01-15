@@ -84,13 +84,15 @@ export class PayRunSyncRepository {
   }
 
   /**
-   * Find pay run sync by ID
-   * @returns PayRunSync or null if not found
+   * Find pay run sync by ID with tenant isolation
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @returns PayRunSync or null if not found or tenant mismatch
    */
-  async findById(id: string): Promise<PayRunSync | null> {
+  async findById(id: string, tenantId: string): Promise<PayRunSync | null> {
     try {
-      return await this.prisma.payRunSync.findUnique({
-        where: { id },
+      return await this.prisma.payRunSync.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
@@ -107,9 +109,11 @@ export class PayRunSyncRepository {
 
   /**
    * Find pay run sync by ID or throw NotFoundException
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findByIdOrThrow(id: string): Promise<PayRunSync> {
-    const payRunSync = await this.findById(id);
+  async findByIdOrThrow(id: string, tenantId: string): Promise<PayRunSync> {
+    const payRunSync = await this.findById(id, tenantId);
     if (!payRunSync) {
       throw new NotFoundException('PayRunSync', id);
     }
@@ -437,13 +441,15 @@ export class PayRunSyncRepository {
   }
 
   /**
-   * Delete a pay run sync record
-   * @throws NotFoundException if pay run sync doesn't exist
+   * Delete a pay run sync record with tenant isolation
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @throws NotFoundException if pay run sync doesn't exist or tenant mismatch
    * @throws ConflictException if pay run is already posted to Xero
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findByIdOrThrow(id);
+      const existing = await this.findByIdOrThrow(id, tenantId);
 
       if (existing.xeroJournalId) {
         throw new ConflictException(

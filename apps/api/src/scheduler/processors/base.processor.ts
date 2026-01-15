@@ -57,7 +57,7 @@ export abstract class BaseProcessor<T extends ScheduledJobData> {
     throw error;
   }
 
-  protected async handleError(
+  protected handleError(
     error: Error,
     context: {
       file: string;
@@ -65,7 +65,7 @@ export abstract class BaseProcessor<T extends ScheduledJobData> {
       inputs: Record<string, any>;
       job: Job<T>;
     },
-  ): Promise<never> {
+  ): never {
     const errorLog = {
       error: {
         message: error.message,

@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SarsSubmission, Prisma, SubmissionStatus } from '@prisma/client';
+import {
+  SarsSubmission,
+  Prisma,
+  SubmissionStatus as PrismaSubmissionStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateSarsSubmissionDto,
@@ -8,13 +12,37 @@ import {
   AcknowledgeSarsSubmissionDto,
   SarsSubmissionFilterDto,
 } from '../dto/sars-submission.dto';
-import { SubmissionType } from '../entities/sars-submission.entity';
+import {
+  SubmissionType,
+  SubmissionStatus,
+} from '../entities/sars-submission.entity';
 import {
   NotFoundException,
   ConflictException,
   DatabaseException,
   BusinessException,
 } from '../../shared/exceptions';
+
+/**
+ * TASK-SARS-005: Status mapping for backward compatibility
+ * Maps entity SubmissionStatus to Prisma SubmissionStatus
+ * This allows using new statuses (ACCEPTED, REJECTED) while Prisma schema is updated
+ */
+const mapToPrismaStatus = (
+  status: SubmissionStatus,
+): PrismaSubmissionStatus => {
+  switch (status) {
+    case SubmissionStatus.ACCEPTED:
+      // Map ACCEPTED to ACKNOWLEDGED in Prisma until migration is run
+      return PrismaSubmissionStatus.ACKNOWLEDGED;
+    case SubmissionStatus.REJECTED:
+      // REJECTED doesn't exist in old Prisma - use DRAFT as fallback
+      // This is temporary until the migration is run
+      return PrismaSubmissionStatus.DRAFT;
+    default:
+      return status as PrismaSubmissionStatus;
+  }
+};
 
 @Injectable()
 export class SarsSubmissionRepository {
@@ -77,18 +105,20 @@ export class SarsSubmissionRepository {
   }
 
   /**
-   * Find SARS submission by ID
+   * Find SARS submission by ID with tenant isolation
+   * @param id - Submission ID
+   * @param tenantId - Tenant ID for isolation
    * @returns SarsSubmission or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<SarsSubmission | null> {
+  async findById(id: string, tenantId: string): Promise<SarsSubmission | null> {
     try {
-      return await this.prisma.sarsSubmission.findUnique({
-        where: { id },
+      return await this.prisma.sarsSubmission.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find SARS submission by id: ${id}`,
+        `Failed to find SARS submission by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -148,7 +178,7 @@ export class SarsSubmissionRepository {
         where.submissionType = filter.submissionType;
       }
       if (filter?.status !== undefined) {
-        where.status = filter.status;
+        where.status = mapToPrismaStatus(filter.status);
       }
       if (filter?.periodStart !== undefined) {
         where.periodStart = { gte: filter.periodStart };
@@ -196,7 +226,7 @@ export class SarsSubmissionRepository {
             lte: futureDate,
           },
           status: {
-            in: [SubmissionStatus.DRAFT, SubmissionStatus.READY],
+            in: [PrismaSubmissionStatus.DRAFT, PrismaSubmissionStatus.READY],
           },
           isFinalized: false,
         },
@@ -223,10 +253,11 @@ export class SarsSubmissionRepository {
    */
   async update(
     id: string,
+    tenantId: string,
     dto: UpdateSarsSubmissionDto,
   ): Promise<SarsSubmission> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('SarsSubmission', id);
       }
@@ -275,7 +306,7 @@ export class SarsSubmissionRepository {
         updateData.notes = dto.notes;
       }
       if (dto.status !== undefined) {
-        updateData.status = dto.status;
+        updateData.status = mapToPrismaStatus(dto.status);
       }
 
       return await this.prisma.sarsSubmission.update({
@@ -317,9 +348,9 @@ export class SarsSubmissionRepository {
    * @throws BusinessException if submission is not in DRAFT status or is finalized
    * @throws DatabaseException for database errors
    */
-  async markAsReady(id: string): Promise<SarsSubmission> {
+  async markAsReady(id: string, tenantId: string): Promise<SarsSubmission> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('SarsSubmission', id);
       }
@@ -332,7 +363,7 @@ export class SarsSubmissionRepository {
         );
       }
 
-      if (existing.status !== SubmissionStatus.DRAFT) {
+      if (existing.status !== PrismaSubmissionStatus.DRAFT) {
         throw new BusinessException(
           `Cannot mark SARS submission '${id}' as ready - current status is '${existing.status}', expected 'DRAFT'`,
           'INVALID_STATUS',
@@ -343,7 +374,7 @@ export class SarsSubmissionRepository {
       return await this.prisma.sarsSubmission.update({
         where: { id },
         data: {
-          status: SubmissionStatus.READY,
+          status: PrismaSubmissionStatus.READY,
         },
       });
     } catch (error) {
@@ -375,10 +406,11 @@ export class SarsSubmissionRepository {
    */
   async submit(
     id: string,
+    tenantId: string,
     dto: SubmitSarsSubmissionDto,
   ): Promise<SarsSubmission> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('SarsSubmission', id);
       }
@@ -391,7 +423,7 @@ export class SarsSubmissionRepository {
         );
       }
 
-      if (existing.status !== SubmissionStatus.READY) {
+      if (existing.status !== PrismaSubmissionStatus.READY) {
         throw new BusinessException(
           `Cannot submit SARS submission '${id}' - current status is '${existing.status}', expected 'READY'`,
           'INVALID_STATUS',
@@ -402,7 +434,7 @@ export class SarsSubmissionRepository {
       return await this.prisma.sarsSubmission.update({
         where: { id },
         data: {
-          status: SubmissionStatus.SUBMITTED,
+          status: PrismaSubmissionStatus.SUBMITTED,
           submittedAt: new Date(),
           submittedBy: dto.submittedBy,
           sarsReference: dto.sarsReference ?? null,
@@ -445,15 +477,16 @@ export class SarsSubmissionRepository {
    */
   async acknowledge(
     id: string,
+    tenantId: string,
     dto: AcknowledgeSarsSubmissionDto,
   ): Promise<SarsSubmission> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('SarsSubmission', id);
       }
 
-      if (existing.status !== SubmissionStatus.SUBMITTED) {
+      if (existing.status !== PrismaSubmissionStatus.SUBMITTED) {
         throw new BusinessException(
           `Cannot acknowledge SARS submission '${id}' - current status is '${existing.status}', expected 'SUBMITTED'`,
           'INVALID_STATUS',
@@ -464,7 +497,7 @@ export class SarsSubmissionRepository {
       return await this.prisma.sarsSubmission.update({
         where: { id },
         data: {
-          status: SubmissionStatus.ACKNOWLEDGED,
+          status: PrismaSubmissionStatus.ACKNOWLEDGED,
           sarsReference: dto.sarsReference,
         },
       });
@@ -494,9 +527,9 @@ export class SarsSubmissionRepository {
    * @throws BusinessException if submission is not in ACKNOWLEDGED status
    * @throws DatabaseException for database errors
    */
-  async finalize(id: string): Promise<SarsSubmission> {
+  async finalize(id: string, tenantId: string): Promise<SarsSubmission> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('SarsSubmission', id);
       }
@@ -509,7 +542,9 @@ export class SarsSubmissionRepository {
         );
       }
 
-      if (existing.status !== SubmissionStatus.ACKNOWLEDGED) {
+      // TASK-SARS-005: Accept ACKNOWLEDGED status (ACCEPTED maps to ACKNOWLEDGED in DB)
+      // Once Prisma migration is run, both ACCEPTED and ACKNOWLEDGED will be valid
+      if (existing.status !== PrismaSubmissionStatus.ACKNOWLEDGED) {
         throw new BusinessException(
           `Cannot finalize SARS submission '${id}' - current status is '${existing.status}', expected 'ACKNOWLEDGED'`,
           'INVALID_STATUS',
@@ -549,9 +584,9 @@ export class SarsSubmissionRepository {
    * @throws BusinessException if submission is not DRAFT or is finalized
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('SarsSubmission', id);
       }
@@ -564,7 +599,7 @@ export class SarsSubmissionRepository {
         );
       }
 
-      if (existing.status !== SubmissionStatus.DRAFT) {
+      if (existing.status !== PrismaSubmissionStatus.DRAFT) {
         throw new BusinessException(
           `Cannot delete SARS submission '${id}' - only DRAFT submissions can be deleted, current status is '${existing.status}'`,
           'INVALID_STATUS',
@@ -595,6 +630,287 @@ export class SarsSubmissionRepository {
   }
 
   /**
+   * TASK-SARS-005: Accept a SARS submission
+   * Transitions from SUBMITTED to ACCEPTED and records SARS reference
+   * @throws NotFoundException if submission doesn't exist
+   * @throws BusinessException if submission is not in SUBMITTED status
+   * @throws DatabaseException for database errors
+   */
+  async accept(
+    id: string,
+    tenantId: string,
+    sarsReference: string,
+  ): Promise<SarsSubmission> {
+    try {
+      const existing = await this.findById(id, tenantId);
+      if (!existing) {
+        throw new NotFoundException('SarsSubmission', id);
+      }
+
+      if (existing.status !== PrismaSubmissionStatus.SUBMITTED) {
+        throw new BusinessException(
+          `Cannot accept SARS submission '${id}' - current status is '${existing.status}', expected 'SUBMITTED'`,
+          'INVALID_STATUS',
+          { submissionId: id, currentStatus: existing.status },
+        );
+      }
+
+      // TASK-SARS-005: Map ACCEPTED to ACKNOWLEDGED for DB compatibility
+      // Once migration is run, this will use ACCEPTED directly
+      return await this.prisma.sarsSubmission.update({
+        where: { id },
+        data: {
+          status: mapToPrismaStatus(SubmissionStatus.ACCEPTED),
+          sarsReference,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BusinessException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to accept SARS submission: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'accept',
+        'Failed to accept SARS submission',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TASK-SARS-005: Reject a SARS submission
+   * Transitions from SUBMITTED to REJECTED and records rejection details
+   * @throws NotFoundException if submission doesn't exist
+   * @throws BusinessException if submission is not in SUBMITTED status
+   * @throws DatabaseException for database errors
+   */
+  async reject(
+    id: string,
+    tenantId: string,
+    rejectionReason: string,
+    rejectionCode?: string,
+  ): Promise<SarsSubmission> {
+    try {
+      const existing = await this.findById(id, tenantId);
+      if (!existing) {
+        throw new NotFoundException('SarsSubmission', id);
+      }
+
+      if (existing.status !== PrismaSubmissionStatus.SUBMITTED) {
+        throw new BusinessException(
+          `Cannot reject SARS submission '${id}' - current status is '${existing.status}', expected 'SUBMITTED'`,
+          'INVALID_STATUS',
+          { submissionId: id, currentStatus: existing.status },
+        );
+      }
+
+      // Get current document data and add rejection to history
+      const documentData =
+        (existing.documentData as Record<string, unknown>) ?? {};
+      const retryHistory = (documentData.retryHistory as Array<unknown>) ?? [];
+      const retryCount = (documentData.retryCount as number) ?? 0;
+
+      // Add current attempt to retry history
+      retryHistory.push({
+        attemptNumber: retryCount + 1,
+        submittedAt: existing.submittedAt,
+        rejectedAt: new Date(),
+        rejectionReason,
+        rejectionCode,
+      });
+
+      // TASK-SARS-005: Map REJECTED to DRAFT for DB compatibility (stores rejection in documentData)
+      // Once migration is run, this will use REJECTED directly
+      return await this.prisma.sarsSubmission.update({
+        where: { id },
+        data: {
+          status: mapToPrismaStatus(SubmissionStatus.REJECTED),
+          documentData: {
+            ...documentData,
+            retryCount: retryCount + 1,
+            lastRetryAt: new Date(),
+            retryHistory,
+            rejectionReason,
+            rejectionCode,
+            // TASK-SARS-005: Store logical status in documentData until migration
+            logicalStatus: SubmissionStatus.REJECTED,
+          } as Prisma.InputJsonValue,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BusinessException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to reject SARS submission: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'reject',
+        'Failed to reject SARS submission',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TASK-SARS-005: Retry a rejected SARS submission
+   * Transitions from REJECTED back to SUBMITTED for a new attempt
+   * @throws NotFoundException if submission doesn't exist
+   * @throws BusinessException if submission is not in REJECTED status or exceeds max retries
+   * @throws DatabaseException for database errors
+   */
+  async retry(
+    id: string,
+    tenantId: string,
+    submittedBy: string,
+    maxRetries: number = 3,
+  ): Promise<SarsSubmission> {
+    try {
+      const existing = await this.findById(id, tenantId);
+      if (!existing) {
+        throw new NotFoundException('SarsSubmission', id);
+      }
+
+      // TASK-SARS-005: Check for logical status in documentData (until migration is run)
+      const documentData =
+        (existing.documentData as Record<string, unknown>) ?? {};
+      const logicalStatus = documentData.logicalStatus as string | undefined;
+
+      // Check if submission is in REJECTED state (either in DB or documentData)
+      const isRejected =
+        logicalStatus === SubmissionStatus.REJECTED ||
+        existing.status === mapToPrismaStatus(SubmissionStatus.REJECTED);
+
+      if (!isRejected && logicalStatus !== SubmissionStatus.REJECTED) {
+        throw new BusinessException(
+          `Cannot retry SARS submission '${id}' - current status is '${existing.status}', expected 'REJECTED'`,
+          'INVALID_STATUS',
+          { submissionId: id, currentStatus: existing.status },
+        );
+      }
+      const retryCount = (documentData.retryCount as number) ?? 0;
+
+      if (retryCount >= maxRetries) {
+        throw new BusinessException(
+          `Cannot retry SARS submission '${id}' - maximum retry attempts (${maxRetries}) exceeded`,
+          'MAX_RETRIES_EXCEEDED',
+          { submissionId: id, retryCount, maxRetries },
+        );
+      }
+
+      // Clear logical status when retrying (moving back to SUBMITTED)
+      const { logicalStatus: _, ...cleanDocumentData } = documentData;
+
+      return await this.prisma.sarsSubmission.update({
+        where: { id },
+        data: {
+          status: PrismaSubmissionStatus.SUBMITTED,
+          submittedAt: new Date(),
+          submittedBy,
+          documentData: {
+            ...cleanDocumentData,
+            lastRetryAt: new Date(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BusinessException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to retry SARS submission: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'retry',
+        'Failed to retry SARS submission',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TASK-SARS-005: Get retry history for a submission
+   * @returns Array of retry attempts with details
+   * @throws NotFoundException if submission doesn't exist
+   * @throws DatabaseException for database errors
+   */
+  async getRetryHistory(
+    id: string,
+    tenantId: string,
+  ): Promise<{
+    retryCount: number;
+    lastRetryAt: Date | null;
+    history: Array<{
+      attemptNumber: number;
+      submittedAt: Date;
+      rejectedAt?: Date;
+      rejectionReason?: string;
+      rejectionCode?: string;
+    }>;
+  }> {
+    try {
+      const existing = await this.findById(id, tenantId);
+      if (!existing) {
+        throw new NotFoundException('SarsSubmission', id);
+      }
+
+      const documentData =
+        (existing.documentData as Record<string, unknown>) ?? {};
+      const retryCount = (documentData.retryCount as number) ?? 0;
+      const lastRetryAt = documentData.lastRetryAt
+        ? new Date(documentData.lastRetryAt as string)
+        : null;
+      const retryHistory =
+        (documentData.retryHistory as Array<{
+          attemptNumber: number;
+          submittedAt: string;
+          rejectedAt?: string;
+          rejectionReason?: string;
+          rejectionCode?: string;
+        }>) ?? [];
+
+      return {
+        retryCount,
+        lastRetryAt,
+        history: retryHistory.map((r) => ({
+          attemptNumber: r.attemptNumber,
+          submittedAt: new Date(r.submittedAt),
+          rejectedAt: r.rejectedAt ? new Date(r.rejectedAt) : undefined,
+          rejectionReason: r.rejectionReason,
+          rejectionCode: r.rejectionCode,
+        })),
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to get retry history for SARS submission: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'getRetryHistory',
+        'Failed to get retry history',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Calculate VAT totals for a period
    * @returns Object with VAT amounts for the period
    * @throws DatabaseException for database errors
@@ -615,7 +931,7 @@ export class SarsSubmissionRepository {
           submissionType: 'VAT201',
           periodStart: { gte: periodStart },
           periodEnd: { lte: periodEnd },
-          status: { not: SubmissionStatus.DRAFT },
+          status: { not: PrismaSubmissionStatus.DRAFT },
         },
         _sum: {
           outputVatCents: true,
@@ -663,7 +979,7 @@ export class SarsSubmissionRepository {
           submissionType: 'EMP201',
           periodStart: { gte: periodStart },
           periodEnd: { lte: periodEnd },
-          status: { not: SubmissionStatus.DRAFT },
+          status: { not: PrismaSubmissionStatus.DRAFT },
         },
         _sum: {
           totalPayeCents: true,

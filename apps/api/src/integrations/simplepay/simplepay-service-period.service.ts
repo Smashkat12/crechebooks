@@ -148,8 +148,8 @@ export class SimplePayServicePeriodService {
     await this.apiClient.initializeForTenant(tenantId);
 
     // Validate staff exists
-    const staff = await this.staffRepo.findById(dto.staffId);
-    if (!staff || staff.tenantId !== tenantId) {
+    const staff = await this.staffRepo.findById(dto.staffId, tenantId);
+    if (!staff) {
       return {
         success: false,
         servicePeriodId: null,
@@ -247,7 +247,7 @@ export class SimplePayServicePeriodService {
       }
 
       // Deactivate staff record with end date
-      await this.staffRepo.deactivate(dto.staffId, dto.endDate);
+      await this.staffRepo.deactivate(dto.staffId, tenantId, dto.endDate);
 
       const uifInfo = UIF_ELIGIBILITY[dto.terminationCode];
 
@@ -298,8 +298,8 @@ export class SimplePayServicePeriodService {
     await this.apiClient.initializeForTenant(tenantId);
 
     // Validate staff exists
-    const staff = await this.staffRepo.findById(dto.staffId);
-    if (!staff || staff.tenantId !== tenantId) {
+    const staff = await this.staffRepo.findById(dto.staffId, tenantId);
+    if (!staff) {
       return {
         success: false,
         servicePeriodId: null,
@@ -350,7 +350,7 @@ export class SimplePayServicePeriodService {
 
       // Update staff record start date if not preserving history
       if (dto.preserveHistory === false) {
-        await this.staffRepo.update(dto.staffId, {
+        await this.staffRepo.update(dto.staffId, tenantId, {
           startDate: dto.effectiveDate,
         });
       }
@@ -433,7 +433,7 @@ export class SimplePayServicePeriodService {
 
     try {
       // Undo in repository (clears termination fields)
-      await this.servicePeriodRepo.undoTermination(syncToUndo.id);
+      await this.servicePeriodRepo.undoTermination(syncToUndo.id, tenantId);
 
       // Get SimplePay mapping and clear termination in SimplePay
       const mapping = await this.simplePayRepo.findEmployeeMapping(staffId);

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 import { ValidationWarnings } from './validation-warnings';
+import { UIF_CONSTANTS } from '@crechebooks/types';
 
 interface EMP201Data {
   period: string;
@@ -51,14 +52,14 @@ export function EMP201Preview({ data, period }: EMP201PreviewProps) {
       }
     });
 
-    // UIF cap check (based on 2024/2025 rates)
-    const UIF_CAP = 177.12; // Monthly cap per person
+    // UIF cap check using shared constants from @crechebooks/types
+    // Reference: SARS 2024/2025 rates - UI Act No. 63 of 2001
     data.employees.forEach((emp) => {
-      if (emp.uif > UIF_CAP) {
+      if (emp.uif > UIF_CONSTANTS.UIF_CAP_MONTHLY) {
         result.push({
           type: 'warning',
           field: emp.name,
-          message: `UIF exceeds monthly cap of ${formatCurrency(UIF_CAP)}`,
+          message: `UIF exceeds monthly cap of ${formatCurrency(UIF_CONSTANTS.UIF_CAP_MONTHLY)}`,
         });
       }
     });

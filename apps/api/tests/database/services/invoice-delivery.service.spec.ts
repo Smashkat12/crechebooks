@@ -425,7 +425,10 @@ describe('InvoiceDeliveryService', () => {
       );
 
       // Verify invoice was updated
-      const updatedInvoice = await invoiceRepo.findById(testInvoice1.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        testInvoice1.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.deliveryStatus).toBe(DeliveryStatus.SENT);
       expect(updatedInvoice?.deliveredAt).toBeTruthy();
     });
@@ -445,7 +448,10 @@ describe('InvoiceDeliveryService', () => {
         expect.stringContaining('INV-2025-002'),
       );
 
-      const updatedInvoice = await invoiceRepo.findById(testInvoice2.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        testInvoice2.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.deliveryStatus).toBe(DeliveryStatus.SENT);
     });
 
@@ -573,7 +579,10 @@ describe('InvoiceDeliveryService', () => {
         service.deliverInvoice(testTenant.id, testInvoice1.id),
       ).rejects.toThrow(BusinessException);
 
-      const updatedInvoice = await invoiceRepo.findById(testInvoice1.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        testInvoice1.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.deliveryStatus).toBe(DeliveryStatus.FAILED);
     });
 
@@ -585,7 +594,10 @@ describe('InvoiceDeliveryService', () => {
 
       await service.deliverInvoice(testTenant.id, testInvoice3.id);
 
-      const updatedInvoice = await invoiceRepo.findById(testInvoice3.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        testInvoice3.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.deliveryStatus).toBe(DeliveryStatus.SENT);
     });
   });
@@ -600,7 +612,10 @@ describe('InvoiceDeliveryService', () => {
       expect(result.sent).toBe(1);
       expect(result.failed).toBe(0);
 
-      const updatedInvoice = await invoiceRepo.findById(testInvoiceFailed.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        testInvoiceFailed.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.deliveryStatus).toBe(DeliveryStatus.SENT);
       expect(updatedInvoice?.deliveryRetryCount).toBe(1);
     });
@@ -624,7 +639,10 @@ describe('InvoiceDeliveryService', () => {
     it('should increment retry count on each attempt', async () => {
       await service.retryFailed({ tenantId: testTenant.id });
 
-      let updatedInvoice = await invoiceRepo.findById(testInvoiceFailed.id);
+      let updatedInvoice = await invoiceRepo.findById(
+        testInvoiceFailed.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.deliveryRetryCount).toBe(1);
 
       // Fail the invoice again
@@ -635,7 +653,10 @@ describe('InvoiceDeliveryService', () => {
 
       await service.retryFailed({ tenantId: testTenant.id });
 
-      updatedInvoice = await invoiceRepo.findById(testInvoiceFailed.id);
+      updatedInvoice = await invoiceRepo.findById(
+        testInvoiceFailed.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.deliveryRetryCount).toBe(2);
     });
 

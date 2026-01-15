@@ -101,18 +101,23 @@ export class InvoiceLineRepository {
   }
 
   /**
-   * Find invoice line by ID
+   * Find invoice line by ID with tenant isolation via invoice
+   * @param id - Invoice line ID
+   * @param tenantId - Tenant ID for isolation (via invoice)
    * @returns InvoiceLine or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<InvoiceLine | null> {
+  async findById(id: string, tenantId: string): Promise<InvoiceLine | null> {
     try {
-      return await this.prisma.invoiceLine.findUnique({
-        where: { id },
+      return await this.prisma.invoiceLine.findFirst({
+        where: {
+          id,
+          invoice: { tenantId },
+        },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find invoice line by id: ${id}`,
+        `Failed to find invoice line by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -149,12 +154,19 @@ export class InvoiceLineRepository {
 
   /**
    * Update an invoice line
+   * @param id - Invoice line ID
+   * @param tenantId - Tenant ID for isolation (via invoice)
+   * @param dto - Update data
    * @throws NotFoundException if invoice line doesn't exist
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdateInvoiceLineDto): Promise<InvoiceLine> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateInvoiceLineDto,
+  ): Promise<InvoiceLine> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('InvoiceLine', id);
       }
@@ -214,12 +226,14 @@ export class InvoiceLineRepository {
 
   /**
    * Delete an invoice line
+   * @param id - Invoice line ID
+   * @param tenantId - Tenant ID for isolation (via invoice)
    * @throws NotFoundException if invoice line doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('InvoiceLine', id);
       }

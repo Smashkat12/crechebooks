@@ -80,18 +80,23 @@ export class CategorizationRepository {
   }
 
   /**
-   * Find categorization by ID
+   * Find categorization by ID with tenant isolation via transaction
+   * @param id - Categorization ID
+   * @param tenantId - Tenant ID for isolation (via transaction)
    * @returns Categorization or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<Categorization | null> {
+  async findById(id: string, tenantId: string): Promise<Categorization | null> {
     try {
-      return await this.prisma.categorization.findUnique({
-        where: { id },
+      return await this.prisma.categorization.findFirst({
+        where: {
+          id,
+          transaction: { tenantId },
+        },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find categorization by id: ${id}`,
+        `Failed to find categorization by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -232,16 +237,20 @@ export class CategorizationRepository {
 
   /**
    * Review a categorization (mark as reviewed, optionally override values)
+   * @param id - Categorization ID
+   * @param tenantId - Tenant ID for isolation (via transaction)
+   * @param dto - Review data
    * @throws NotFoundException if categorization doesn't exist
    * @throws NotFoundException if reviewer (user) doesn't exist
    * @throws DatabaseException for other database errors
    */
   async review(
     id: string,
+    tenantId: string,
     dto: ReviewCategorizationDto,
   ): Promise<Categorization> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Categorization', id);
       }
@@ -300,16 +309,20 @@ export class CategorizationRepository {
 
   /**
    * Update a categorization
+   * @param id - Categorization ID
+   * @param tenantId - Tenant ID for isolation (via transaction)
+   * @param dto - Update data
    * @throws NotFoundException if categorization doesn't exist
    * @throws BusinessException if validation fails
    * @throws DatabaseException for other database errors
    */
   async update(
     id: string,
+    tenantId: string,
     dto: UpdateCategorizationDto,
   ): Promise<Categorization> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Categorization', id);
       }
@@ -391,12 +404,14 @@ export class CategorizationRepository {
 
   /**
    * Delete a categorization
+   * @param id - Categorization ID
+   * @param tenantId - Tenant ID for isolation (via transaction)
    * @throws NotFoundException if categorization doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Categorization', id);
       }

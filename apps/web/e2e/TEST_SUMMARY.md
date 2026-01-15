@@ -118,12 +118,13 @@ All tests follow the critical constraint:
 
 **1. Authentication Pattern:**
 ```typescript
+// Import the centralized login fixture
+import { login } from './fixtures/auth.fixture';
+
+// Credentials are sourced from environment variables (E2E_TEST_EMAIL, E2E_TEST_PASSWORD)
 test.beforeEach(async ({ page }) => {
-  await page.goto('/login');
-  await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-  await page.getByLabel(/password/i).fill('admin123');
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/.*dashboard/, { timeout: 15000 });
+  await login(page);
+  await page.goto('/target-page');
 });
 ```
 
@@ -213,8 +214,9 @@ pnpm exec playwright test -g "should calculate VAT correctly"
 - At least one DRAFT invoice required for adhoc charge tests
 
 **Test Credentials:**
-- Email: `admin@crechebooks.co.za`
-- Password: `admin123`
+- Email: Set via `E2E_TEST_EMAIL` environment variable (default: `admin@crechebooks.co.za`)
+- Password: Set via `E2E_TEST_PASSWORD` environment variable (required)
+- Configure in `.env.test` file
 - Required for all authenticated tests
 
 **Frontend:**

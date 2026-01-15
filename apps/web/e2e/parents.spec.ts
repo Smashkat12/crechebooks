@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './fixtures/auth.fixture';
 
 /**
  * Parents & Children E2E Tests
@@ -7,13 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Parents Management', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
+    await login(page);
     await page.goto('/parents');
   });
 
@@ -76,13 +71,7 @@ test.describe('Parents Management', () => {
 
 test.describe('Add Parent Form', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
+    await login(page);
     await page.goto('/parents/new');
   });
 
@@ -126,13 +115,7 @@ test.describe('Add Parent Form', () => {
 
 test.describe('Parent Details', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
+    await login(page);
   });
 
   test('should display parent detail page structure', async ({ page }) => {

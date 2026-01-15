@@ -110,17 +110,9 @@ export class ParentAccountService {
     this.logger.debug(`Getting account summary for parent ${parentId}`);
 
     // 1. Get parent info
-    const parent = await this.parentRepo.findById(parentId);
+    const parent = await this.parentRepo.findById(parentId, tenantId);
     if (!parent) {
       throw new NotFoundException('Parent', parentId);
-    }
-
-    if (parent.tenantId !== tenantId) {
-      throw new BusinessException(
-        'Parent does not belong to the specified tenant',
-        'TENANT_MISMATCH',
-        { parentTenantId: parent.tenantId, requestTenantId: tenantId },
-      );
     }
 
     // 2. Get outstanding invoices

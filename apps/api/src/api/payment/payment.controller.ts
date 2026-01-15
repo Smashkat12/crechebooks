@@ -219,7 +219,10 @@ export class PaymentController {
     // Enrich payments with invoice details
     const enrichedPayments: PaymentListItemDto[] = await Promise.all(
       paginatedPayments.map(async (p) => {
-        const invoice = await this.invoiceRepo.findById(p.invoiceId);
+        const invoice = await this.invoiceRepo.findById(
+          p.invoiceId,
+          user.tenantId,
+        );
         return {
           id: p.id,
           invoice_id: p.invoiceId,
@@ -536,7 +539,7 @@ export class PaymentController {
     );
 
     // Check if receipt exists, generate if not
-    let receipt = await this.paymentReceiptService.findReceiptByPaymentId(
+    let receipt = this.paymentReceiptService.findReceiptByPaymentId(
       user.tenantId,
       paymentId,
     );

@@ -491,9 +491,7 @@ export class LLMWhispererParser {
             }
 
             // Clean up description - remove excessive whitespace
-            const cleanDescription = description
-              .replace(/\s{2,}/g, ' ')
-              .trim();
+            const cleanDescription = description.replace(/\s{2,}/g, ' ').trim();
 
             const transaction: ParsedTransaction = {
               date,

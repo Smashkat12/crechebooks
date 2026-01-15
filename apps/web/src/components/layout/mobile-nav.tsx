@@ -31,10 +31,14 @@ function MobileNavLink({ link, isActive, onClick }: MobileNavLinkProps) {
         variant={isActive ? 'secondary' : 'ghost'}
         className={cn(
           'w-full justify-start',
-          isActive && 'bg-secondary font-semibold'
+          // TASK-UI-008: Touch-friendly tap target (min 44px)
+          'min-h-[44px]',
+          isActive && 'bg-secondary font-semibold',
+          // Active state feedback for touch
+          'active:scale-[0.98] transition-transform'
         )}
       >
-        <Icon className="h-4 w-4 mr-2" />
+        <Icon className="h-5 w-5 mr-3" />
         <span>{link.title}</span>
         {link.badge !== undefined && (
           <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
@@ -82,12 +86,21 @@ export function MobileNav() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" className="lg:hidden">
-          <Menu className="h-5 w-5" />
+        {/* TASK-UI-008: Touch-friendly tap target (min 44px) */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden min-h-[44px] min-w-[44px]"
+        >
+          <Menu className="h-6 w-6" />
           <span className="sr-only">Toggle navigation menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-64 p-0">
+      {/* TASK-UI-008: Wider drawer on larger phones, safe area padding */}
+      <SheetContent
+        side="left"
+        className="w-[280px] sm:w-[320px] p-0 pt-safe-area-inset-top pb-safe-area-inset-bottom"
+      >
         <SheetHeader className="border-b p-4">
           <SheetTitle>
             <Link href="/dashboard" className="flex items-center space-x-2" onClick={handleLinkClick}>

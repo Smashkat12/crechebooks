@@ -92,8 +92,8 @@ export class SimplePayEmployeeSetupService implements OnModuleInit {
     );
 
     // Get staff details
-    const staff = await this.staffRepo.findById(request.staffId);
-    if (!staff || staff.tenantId !== tenantId) {
+    const staff = await this.staffRepo.findById(request.staffId, tenantId);
+    if (!staff) {
       throw new Error(
         `Staff ${request.staffId} not found in tenant ${tenantId}`,
       );
@@ -110,7 +110,7 @@ export class SimplePayEmployeeSetupService implements OnModuleInit {
         );
       }
       // Delete incomplete setup to start fresh
-      await this.setupLogRepo.delete(existingSetup.id);
+      await this.setupLogRepo.delete(existingSetup.id, tenantId);
     }
 
     // Create setup log
@@ -274,9 +274,9 @@ export class SimplePayEmployeeSetupService implements OnModuleInit {
   ): Promise<EmployeeSetupResult> {
     const startTime = Date.now();
 
-    // Get existing setup log
-    const setupLog = await this.setupLogRepo.findById(setupLogId);
-    if (!setupLog || setupLog.tenantId !== tenantId) {
+    // Get existing setup log with tenant isolation
+    const setupLog = await this.setupLogRepo.findById(setupLogId, tenantId);
+    if (!setupLog) {
       throw new Error(`Setup log ${setupLogId} not found`);
     }
 
@@ -288,7 +288,7 @@ export class SimplePayEmployeeSetupService implements OnModuleInit {
     }
 
     // Get staff
-    const staff = await this.staffRepo.findById(setupLog.staffId);
+    const staff = await this.staffRepo.findById(setupLog.staffId, tenantId);
     if (!staff) {
       throw new Error(`Staff ${setupLog.staffId} not found`);
     }
@@ -408,7 +408,7 @@ export class SimplePayEmployeeSetupService implements OnModuleInit {
       return null;
     }
 
-    const staff = await this.staffRepo.findById(staffId);
+    const staff = await this.staffRepo.findById(staffId, tenantId);
     const staffName = staff
       ? `${staff.firstName} ${staff.lastName}`
       : 'Unknown';

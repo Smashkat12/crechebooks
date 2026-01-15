@@ -112,9 +112,7 @@ export class TenantController {
 
     // For now, allow any authenticated user to update their tenant
     // In production, you might want to check for OWNER/ADMIN role
-    this.logger.debug(
-      `Updating tenant ${tenantId}: ${JSON.stringify(dto)}`,
-    );
+    this.logger.debug(`Updating tenant ${tenantId}: ${JSON.stringify(dto)}`);
 
     return this.tenantRepository.update(tenantId, dto);
   }

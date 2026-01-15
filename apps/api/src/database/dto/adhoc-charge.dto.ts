@@ -85,7 +85,9 @@ export class CreateAdhocChargeDto {
    * @default "OTHER"
    */
   @IsOptional()
-  @IsEnum(AdHocChargeType, { message: 'chargeType must be a valid AdHocChargeType' })
+  @IsEnum(AdHocChargeType, {
+    message: 'chargeType must be a valid AdHocChargeType',
+  })
   chargeType?: AdHocChargeType;
 
   /**

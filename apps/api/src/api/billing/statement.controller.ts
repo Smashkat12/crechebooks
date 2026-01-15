@@ -162,7 +162,7 @@ export class StatementController {
     const parentMap = new Map<string, StatementParentDto>();
 
     for (const parentId of parentIds) {
-      const parent = await this.parentRepository.findById(parentId);
+      const parent = await this.parentRepository.findById(parentId, tenantId);
       if (parent) {
         parentMap.set(parentId, {
           id: parent.id,
@@ -196,6 +196,10 @@ export class StatementController {
       };
     });
 
+    // TASK-DATA-004: Include hasNext/hasPrev in pagination metadata
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
     return {
       success: true,
       data,
@@ -204,6 +208,8 @@ export class StatementController {
         limit,
         total,
         totalPages,
+        hasNext,
+        hasPrev,
       },
     };
   }
@@ -240,7 +246,10 @@ export class StatementController {
         );
 
       // Get parent data
-      const parent = await this.parentRepository.findById(statement.parentId);
+      const parent = await this.parentRepository.findById(
+        statement.parentId,
+        tenantId,
+      );
       if (!parent) {
         throw new Error(`Parent not found for statement ${id}`);
       }
@@ -412,7 +421,10 @@ export class StatementController {
       );
 
       // Get parent data
-      const parent = await this.parentRepository.findById(statement.parentId);
+      const parent = await this.parentRepository.findById(
+        statement.parentId,
+        tenantId,
+      );
       if (!parent) {
         throw new Error(`Parent not found for statement ${statement.id}`);
       }
@@ -573,7 +585,10 @@ export class StatementController {
       );
 
       // Get parent data
-      const parent = await this.parentRepository.findById(statement.parentId);
+      const parent = await this.parentRepository.findById(
+        statement.parentId,
+        tenantId,
+      );
       if (!parent) {
         throw new Error(`Parent not found for statement ${id}`);
       }
@@ -643,7 +658,7 @@ export class StatementController {
     );
 
     // Verify parent exists and belongs to tenant
-    const parent = await this.parentRepository.findById(parentId);
+    const parent = await this.parentRepository.findById(parentId, tenantId);
     if (!parent || parent.tenantId !== tenantId) {
       throw new NestNotFoundException(`Parent with ID ${parentId} not found`);
     }

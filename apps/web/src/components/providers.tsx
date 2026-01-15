@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from 'next-auth/react';
 import { ThemeProvider } from 'next-themes';
 import { useState, type ReactNode } from 'react';
+import { ErrorBoundaryProvider } from './error-boundary-provider';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -23,17 +24,19 @@ export function Providers({ children }: ProvidersProps) {
   );
 
   return (
-    <SessionProvider>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
-      </QueryClientProvider>
-    </SessionProvider>
+    <ErrorBoundaryProvider>
+      <SessionProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </QueryClientProvider>
+      </SessionProvider>
+    </ErrorBoundaryProvider>
   );
 }

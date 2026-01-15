@@ -14,9 +14,17 @@ Decimal.set({
 });
 
 /**
- * Tax bracket structure
+ * Tax bracket structure for PAYE service calculations
+ *
+ * @deprecated Consider migrating to TaxTableService which uses the configurable
+ * TaxBracket interface from tax-tables.constants.ts. The TaxTableService provides:
+ * - Multiple tax year support with date-based lookup
+ * - CRUD operations for admin configuration
+ * - Caching for performance
+ *
+ * TODO: Consolidate PayeService to use TaxTableService internally (TASK-STAFF-005 integration)
  */
-export interface TaxBracket {
+export interface PayeTaxBracket {
   /** Minimum annual income in cents */
   minIncomeCents: number;
   /** Maximum annual income in cents (null for top bracket) */
@@ -30,8 +38,10 @@ export interface TaxBracket {
 /**
  * 2025 SARS Tax Brackets
  * Effective 1 March 2024 - 28 February 2025
+ *
+ * @deprecated Use TaxTableService.getTaxYearByCode('2024/2025') instead
  */
-export const TAX_BRACKETS_2025: TaxBracket[] = [
+export const TAX_BRACKETS_2025: PayeTaxBracket[] = [
   {
     minIncomeCents: 0,
     maxIncomeCents: 23710000, // R237,100

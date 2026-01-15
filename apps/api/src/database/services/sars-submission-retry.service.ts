@@ -255,7 +255,7 @@ export class SarsSubmissionRetryService {
    * @param error - The SARS API error to classify
    * @returns Promise<ErrorType> - Classification of the error
    */
-  async classifyError(error: SarsApiError): Promise<ErrorType> {
+  classifyError(error: SarsApiError): ErrorType {
     // Check explicit transient flag
     if (error.isTransient === true) {
       return ErrorType.TRANSIENT;

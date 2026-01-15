@@ -71,16 +71,21 @@ export class CalculationCacheRepository {
   }
 
   /**
-   * Find calculation item cache by ID
+   * Find calculation item cache by ID with tenant isolation
+   * @param id - Calculation item cache ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findById(id: string): Promise<CalculationItemCache | null> {
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<CalculationItemCache | null> {
     try {
-      return await this.prisma.calculationItemCache.findUnique({
-        where: { id },
+      return await this.prisma.calculationItemCache.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find calculation cache by id: ${id}`,
+        `Failed to find calculation cache by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -197,10 +202,11 @@ export class CalculationCacheRepository {
    */
   async update(
     id: string,
+    tenantId: string,
     dto: UpdateCalculationItemCacheDto,
   ): Promise<CalculationItemCache> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('CalculationItemCache', id);
       }
@@ -317,9 +323,9 @@ export class CalculationCacheRepository {
   /**
    * Delete a calculation item cache entry
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('CalculationItemCache', id);
       }

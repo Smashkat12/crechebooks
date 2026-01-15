@@ -27,23 +27,37 @@ export class ArrearsFiltersDto {
 
 /**
  * Aging bucket type for categorizing overdue invoices
+ *
+ * STANDARDIZED aging categories (TASK-BILL-006):
+ * - current: 1-30 days overdue (due but within grace period)
+ * - 30: 31-60 days overdue
+ * - 60: 61-90 days overdue
+ * - 90+: >90 days overdue
  */
 export type AgingBucketType = 'current' | '30' | '60' | '90+';
 
 /**
  * Aging buckets for arrears report (all amounts in cents)
+ *
+ * STANDARDIZED aging buckets (TASK-BILL-006):
+ * - current: 1-30 days overdue (due but within grace period)
+ * - days30: 31-60 days overdue
+ * - days60: 61-90 days overdue
+ * - days90Plus: >90 days overdue
+ *
+ * NOTE: Invoices not yet due (daysOverdue <= 0) are NOT included in arrears.
  */
 export interface AgingBuckets {
-  /** Amount overdue 0-7 days (cents) */
+  /** Amount overdue 1-30 days (cents) */
   currentCents: number;
 
-  /** Amount overdue 8-30 days (cents) */
+  /** Amount overdue 31-60 days (cents) */
   days30Cents: number;
 
-  /** Amount overdue 31-60 days (cents) */
+  /** Amount overdue 61-90 days (cents) */
   days60Cents: number;
 
-  /** Amount overdue 61+ days (cents) */
+  /** Amount overdue >90 days (cents) */
   days90PlusCents: number;
 }
 

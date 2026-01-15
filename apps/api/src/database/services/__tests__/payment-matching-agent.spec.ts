@@ -31,7 +31,8 @@ describe('PaymentMatchingService - Agent Integration', () => {
   const mockTransaction: Transaction = {
     id: mockTransactionId,
     tenantId: mockTenantId,
-    accountId: 'acc-123',
+    bankAccount: 'acc-123',
+    xeroTransactionId: null,
     date: new Date('2024-01-15'),
     amountCents: 100000, // R1000
     description: 'Payment from John Smith',
@@ -39,6 +40,18 @@ describe('PaymentMatchingService - Agent Integration', () => {
     payeeName: 'John Smith',
     isCredit: true,
     isDeleted: false,
+    deletedAt: null,
+    source: 'BANK_FEED',
+    importBatchId: null,
+    status: 'PENDING',
+    isReconciled: false,
+    reconciledAt: null,
+    transactionHash: null,
+    duplicateOfId: null,
+    duplicateStatus: 'NONE',
+    reversesTransactionId: null,
+    isReversal: false,
+    xeroAccountCode: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -210,7 +223,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
       jest
         .spyOn(service['invoiceRepo'], 'recordPayment')
-        .mockResolvedValue(undefined);
+        .mockResolvedValue({} as any);
 
       // Act
       const result = await service.matchPayments({
@@ -356,7 +369,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
       jest
         .spyOn(service['invoiceRepo'], 'recordPayment')
-        .mockResolvedValue(undefined);
+        .mockResolvedValue({} as any);
 
       // Act
       const result = await service.matchPayments({
@@ -452,7 +465,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
       jest
         .spyOn(service['invoiceRepo'], 'recordPayment')
-        .mockResolvedValue(undefined);
+        .mockResolvedValue({} as any);
 
       // Act
       await service.matchPayments({
@@ -502,7 +515,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         .mockResolvedValue(createPaymentMock(mockInvoiceId1) as any);
       jest
         .spyOn(service['invoiceRepo'], 'recordPayment')
-        .mockResolvedValue(undefined);
+        .mockResolvedValue({} as any);
 
       // Act
       const result = await service.matchPayments({

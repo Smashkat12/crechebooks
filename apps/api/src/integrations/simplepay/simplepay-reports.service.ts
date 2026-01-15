@@ -574,7 +574,10 @@ export class SimplePayReportsService {
         response.uuid,
       );
 
-      return await this.reportRequestRepo.findByIdOrThrow(reportRequest.id);
+      return await this.reportRequestRepo.findByIdOrThrow(
+        reportRequest.id,
+        tenantId,
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to queue async report';
@@ -664,10 +667,15 @@ export class SimplePayReportsService {
   // ============================================
 
   /**
-   * Get a report request by ID
+   * Get a report request by ID with tenant isolation
+   * @param tenantId - Tenant ID for isolation
+   * @param reportRequestId - Report request ID
    */
-  async getReportRequest(reportRequestId: string): Promise<ReportRequest> {
-    return this.reportRequestRepo.findByIdOrThrow(reportRequestId);
+  async getReportRequest(
+    tenantId: string,
+    reportRequestId: string,
+  ): Promise<ReportRequest> {
+    return this.reportRequestRepo.findByIdOrThrow(reportRequestId, tenantId);
   }
 
   /**

@@ -1,3 +1,23 @@
+/**
+ * Staff DTOs
+ * TASK-STAFF-002: Added SA-specific validation decorators
+ * SEC-006: Added input sanitization decorators
+ *
+ * Validates:
+ * - SA ID Number (13 digits with Luhn checksum)
+ * - SA Phone Number (+27 or 0 prefix, mobile only)
+ * - SA Tax Number (10 digits)
+ * - SA Bank Branch Code (6 digits)
+ * - SA Bank Account Number (6-16 digits)
+ *
+ * Sanitizes:
+ * - Names: Strips HTML, normalizes whitespace
+ * - Email: Converts to lowercase, trims
+ * - Phone: Normalizes to +27 format
+ * - ID/Tax Numbers: Removes non-digit characters
+ * - Bank Details: Removes non-digit characters
+ */
+
 import {
   IsUUID,
   IsString,
@@ -10,11 +30,27 @@ import {
   Min,
   MinLength,
   MaxLength,
-  Length,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
 import { EmploymentType, PayFrequency } from '../entities/staff.entity';
+import {
+  IsSAIDNumber,
+  IsSAPhoneNumber,
+  IsSATaxNumber,
+  IsSABranchCode,
+  IsSABankAccount,
+} from '../../shared/validators';
+import {
+  SanitizeName,
+  SanitizeEmail,
+  SanitizePhone,
+  SanitizeIdNumber,
+  SanitizeTaxNumber,
+  SanitizeBankAccount,
+  SanitizeBranchCode,
+  SanitizeHtml,
+} from '../../common/utils/sanitize.utils';
 
 /**
  * DTO for creating a new staff member
@@ -25,36 +61,51 @@ export class CreateStaffDto {
   tenantId!: string;
 
   @IsOptional()
+  @SanitizeHtml()
   @IsString()
   @MaxLength(50)
   employeeNumber?: string;
 
+  @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   firstName!: string;
 
+  @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   lastName!: string;
 
-  @IsString()
-  @Length(13, 13) // South African ID number is exactly 13 digits
+  @SanitizeIdNumber()
+  @IsString({ message: 'ID number must be a string' })
+  @IsSAIDNumber({
+    message:
+      'ID number must be a valid 13-digit South African ID number (Luhn checksum validated)',
+  })
   idNumber!: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
+  @SanitizeTaxNumber()
+  @IsString({ message: 'Tax number must be a string' })
+  @IsSATaxNumber({
+    message: 'Tax number must be a valid 10-digit South African tax number',
+  })
   taxNumber?: string;
 
   @IsOptional()
-  @IsEmail()
+  @SanitizeEmail()
+  @IsEmail({}, { message: 'Email must be a valid email address' })
   email?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
+  @SanitizePhone()
+  @IsString({ message: 'Phone must be a string' })
+  @IsSAPhoneNumber({
+    message:
+      'Phone must be a valid South African mobile number (format: +27XXXXXXXXX or 0XXXXXXXXX)',
+  })
   phone?: string;
 
   @Type(() => Date)
@@ -77,28 +128,39 @@ export class CreateStaffDto {
   @IsEnum(PayFrequency)
   payFrequency?: PayFrequency;
 
-  @IsInt()
-  @Min(0)
+  @Type(() => Number)
+  @IsInt({ message: 'Basic salary must be an integer (cents)' })
+  @Min(0, { message: 'Basic salary cannot be negative' })
   basicSalaryCents!: number;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(100)
+  @SanitizeName()
+  @IsString({ message: 'Bank name must be a string' })
+  @MaxLength(100, { message: 'Bank name must not exceed 100 characters' })
   bankName?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
+  @SanitizeBankAccount()
+  @IsString({ message: 'Bank account must be a string' })
+  @IsSABankAccount({
+    message:
+      'Bank account must be a valid South African bank account number (6-16 digits)',
+  })
   bankAccount?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(10)
+  @SanitizeBranchCode()
+  @IsString({ message: 'Bank branch code must be a string' })
+  @IsSABranchCode({
+    message:
+      'Bank branch code must be a valid 6-digit South African branch code',
+  })
   bankBranchCode?: string;
 
   @IsOptional()
-  @IsInt()
-  @Min(0)
+  @Type(() => Number)
+  @IsInt({ message: 'Medical aid members must be an integer' })
+  @Min(0, { message: 'Medical aid members cannot be negative' })
   medicalAidMembers?: number;
 }
 

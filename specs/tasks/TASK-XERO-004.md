@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Push Categorizations to Xero API Endpoint</title>
-  <status>pending</status>
+  <status>DONE</status>
   <phase>9</phase>
   <layer>logic</layer>
   <sequence>180</sequence>

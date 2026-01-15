@@ -49,7 +49,7 @@ export class WhatsAppService {
     if (!this.config) {
       this.logger.warn(
         'WhatsApp API not configured. Set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, ' +
-          'WHATSAPP_BUSINESS_ACCOUNT_ID, and WHATSAPP_WEBHOOK_VERIFY_TOKEN environment variables.',
+          'WHATSAPP_BUSINESS_ACCOUNT_ID, WHATSAPP_WEBHOOK_VERIFY_TOKEN, and WHATSAPP_APP_SECRET environment variables.',
       );
     } else {
       this.logger.log('WhatsApp Business API service initialized');
@@ -58,18 +58,21 @@ export class WhatsAppService {
 
   /**
    * Load WhatsApp configuration from environment
+   * TASK-INT-005: Added appSecret for webhook signature verification
    */
   private loadConfig(): WhatsAppConfig | null {
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
     const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
     const webhookVerifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN;
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
 
     if (
       !accessToken ||
       !phoneNumberId ||
       !businessAccountId ||
-      !webhookVerifyToken
+      !webhookVerifyToken ||
+      !appSecret
     ) {
       return null;
     }
@@ -80,6 +83,7 @@ export class WhatsAppService {
       phoneNumberId,
       businessAccountId,
       webhookVerifyToken,
+      appSecret,
     };
   }
 
@@ -99,7 +103,7 @@ export class WhatsAppService {
       });
       throw new BusinessException(
         'WhatsApp integration not configured. Set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, ' +
-          'WHATSAPP_BUSINESS_ACCOUNT_ID, and WHATSAPP_WEBHOOK_VERIFY_TOKEN environment variables.',
+          'WHATSAPP_BUSINESS_ACCOUNT_ID, WHATSAPP_WEBHOOK_VERIFY_TOKEN, and WHATSAPP_APP_SECRET environment variables.',
         'WHATSAPP_NOT_CONFIGURED',
       );
     }
@@ -661,23 +665,41 @@ export class WhatsAppService {
 
   /**
    * Verify webhook signature from Meta
+   *
+   * TASK-INT-005: SECURITY FIX - Use App Secret for HMAC signature verification
+   *
+   * Meta's webhook signature verification requires the App Secret (NOT the Verify Token):
+   * - App Secret: Used for HMAC-SHA256 signature verification of webhook payloads (X-Hub-Signature-256)
+   * - Verify Token: Used ONLY for the initial webhook URL verification challenge
+   *
+   * @see https://developers.facebook.com/docs/graph-api/webhooks/getting-started#verification-requests
    */
   private verifyWebhookSignature(
     payload: string,
     signature: string,
     config: WhatsAppConfig,
   ): boolean {
+    // TASK-INT-005: Use appSecret for webhook signature verification (NOT webhookVerifyToken)
+    // webhookVerifyToken is ONLY for the initial challenge/response handshake
     const expectedSignature =
       'sha256=' +
       crypto
-        .createHmac('sha256', config.webhookVerifyToken)
+        .createHmac('sha256', config.appSecret)
         .update(payload)
         .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature),
-    );
+    // Use timing-safe comparison to prevent timing attacks
+    // Wrap in try-catch to handle different buffer lengths gracefully
+    try {
+      return crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expectedSignature),
+      );
+    } catch {
+      // timingSafeEqual throws if buffers have different lengths
+      // This indicates signature mismatch (wrong format or tampered)
+      return false;
+    }
   }
 
   /**

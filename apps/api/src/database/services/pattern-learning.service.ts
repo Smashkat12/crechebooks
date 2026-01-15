@@ -137,7 +137,7 @@ export class PatternLearningService {
         this.logger.log(
           `Updating pattern ${existing.id} with new account code ${accountCode}`,
         );
-        return await this.patternRepo.update(existing.id, {
+        return await this.patternRepo.update(existing.id, tenantId, {
           defaultAccountCode: accountCode,
           defaultAccountName: accountName,
           confidenceBoost: PATTERN_LEARNING_CONSTANTS.BASE_CONFIDENCE_BOOST,
@@ -150,7 +150,7 @@ export class PatternLearningService {
         this.logger.log(
           `Incrementing pattern ${existing.id} match count to ${newMatchCount}`,
         );
-        return await this.patternRepo.update(existing.id, {
+        return await this.patternRepo.update(existing.id, tenantId, {
           confidenceBoost: newConfidence,
         });
       }
@@ -184,8 +184,8 @@ export class PatternLearningService {
     matchSuccess: boolean,
     tenantId: string,
   ): Promise<PayeePattern> {
-    const pattern = await this.patternRepo.findById(patternId);
-    if (!pattern || pattern.tenantId !== tenantId) {
+    const pattern = await this.patternRepo.findById(patternId, tenantId);
+    if (!pattern) {
       throw new NotFoundException('PayeePattern', patternId);
     }
 
@@ -194,8 +194,8 @@ export class PatternLearningService {
       const newMatchCount = pattern.matchCount + 1;
       const newConfidence = this.calculateConfidenceBoost(newMatchCount);
 
-      await this.patternRepo.incrementMatchCount(patternId);
-      return await this.patternRepo.update(patternId, {
+      await this.patternRepo.incrementMatchCount(patternId, tenantId);
+      return await this.patternRepo.update(patternId, tenantId, {
         confidenceBoost: newConfidence,
       });
     } else {
@@ -206,7 +206,7 @@ export class PatternLearningService {
           PATTERN_LEARNING_CONSTANTS.CONFIDENCE_PENALTY,
       );
 
-      return await this.patternRepo.update(patternId, {
+      return await this.patternRepo.update(patternId, tenantId, {
         confidenceBoost: newConfidence,
       });
     }

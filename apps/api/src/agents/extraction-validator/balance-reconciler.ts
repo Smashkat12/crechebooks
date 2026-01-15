@@ -7,7 +7,11 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { ParsedBankStatement } from '../../database/entities/bank-statement-match.entity';
-import { ReconciliationResult, ValidationFlag, Correction } from './interfaces/validator.interface';
+import {
+  ReconciliationResult,
+  ValidationFlag,
+  Correction,
+} from './interfaces/validator.interface';
 
 @Injectable()
 export class BalanceReconciler {
@@ -17,7 +21,8 @@ export class BalanceReconciler {
    * Reconcile statement: opening + transactions should equal closing
    */
   reconcile(statement: ParsedBankStatement): ReconciliationResult {
-    const { openingBalanceCents, closingBalanceCents, transactions } = statement;
+    const { openingBalanceCents, closingBalanceCents, transactions } =
+      statement;
 
     // Sum credits (positive) and debits (negative to balance)
     let credits = 0;
@@ -48,7 +53,7 @@ export class BalanceReconciler {
 
     this.logger.log(
       `Balance reconciliation: opening=${openingBalanceCents}c, credits=${credits}c, debits=${debits}c, ` +
-      `calculated=${calculatedBalance}c, expected=${closingBalanceCents}c, diff=${difference}c (${percentDifference.toFixed(2)}%), reconciled=${reconciled}`
+        `calculated=${calculatedBalance}c, expected=${closingBalanceCents}c, diff=${difference}c (${percentDifference.toFixed(2)}%), reconciled=${reconciled}`,
     );
 
     return {
@@ -75,15 +80,18 @@ export class BalanceReconciler {
       return corrections;
     }
 
-    const { openingBalanceCents, closingBalanceCents, transactions } = statement;
-    const diff = reconciliation.calculatedBalance - reconciliation.expectedBalance;
+    const { openingBalanceCents, closingBalanceCents, transactions } =
+      statement;
+    const diff =
+      reconciliation.calculatedBalance - reconciliation.expectedBalance;
 
     // Strategy 1: Check if opening/closing balance has decimal point error
     // Common OCR error: 100.00 → 10000 (missing decimal) or 100.00 → 10000.00
     for (const divisor of [100, 1000, 10]) {
       // Try correcting opening balance
       const correctedOpening = Math.round(openingBalanceCents / divisor);
-      const newCalcWithCorrectedOpening = correctedOpening + reconciliation.credits - reconciliation.debits;
+      const newCalcWithCorrectedOpening =
+        correctedOpening + reconciliation.credits - reconciliation.debits;
       if (newCalcWithCorrectedOpening === closingBalanceCents) {
         corrections.push({
           type: 'BALANCE',

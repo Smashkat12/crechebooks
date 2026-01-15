@@ -34,6 +34,7 @@ describe('ReconciliationController - getIncomeStatement', () => {
     name: 'School Owner',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -47,6 +48,7 @@ describe('ReconciliationController - getIncomeStatement', () => {
     name: 'School Admin',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -60,6 +62,7 @@ describe('ReconciliationController - getIncomeStatement', () => {
     name: 'School Accountant',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -73,6 +76,7 @@ describe('ReconciliationController - getIncomeStatement', () => {
     name: 'Report Viewer',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

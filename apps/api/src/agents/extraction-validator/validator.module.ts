@@ -17,10 +17,6 @@ import { ExtractionDecisionLogger } from './decision-logger';
     AmountSanityChecker,
     ExtractionDecisionLogger,
   ],
-  exports: [
-    ExtractionValidatorAgent,
-    BalanceReconciler,
-    AmountSanityChecker,
-  ],
+  exports: [ExtractionValidatorAgent, BalanceReconciler, AmountSanityChecker],
 })
 export class ExtractionValidatorModule {}

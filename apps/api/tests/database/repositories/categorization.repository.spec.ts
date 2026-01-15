@@ -268,7 +268,7 @@ describe('CategorizationRepository', () => {
   describe('findById', () => {
     it('should find categorization by id', async () => {
       const created = await repository.create(testCategorizationData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -278,6 +278,7 @@ describe('CategorizationRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -340,7 +341,9 @@ describe('CategorizationRepository', () => {
         ...testCategorizationData,
         source: CategorizationSource.AI_SUGGESTED,
       });
-      await repository.review(created.id, { reviewedBy: testUser.id });
+      await repository.review(created.id, testTenant.id, {
+        reviewedBy: testUser.id,
+      });
 
       const pending = await repository.findPendingReview(testTenant.id);
 
@@ -438,7 +441,7 @@ describe('CategorizationRepository', () => {
       });
 
       const beforeReview = new Date();
-      const reviewed = await repository.review(created.id, {
+      const reviewed = await repository.review(created.id, testTenant.id, {
         reviewedBy: testUser.id,
       });
 
@@ -456,7 +459,7 @@ describe('CategorizationRepository', () => {
         source: CategorizationSource.AI_SUGGESTED,
       });
 
-      const reviewed = await repository.review(created.id, {
+      const reviewed = await repository.review(created.id, testTenant.id, {
         reviewedBy: testUser.id,
         accountCode: '4200',
         accountName: 'Other Income',
@@ -473,7 +476,7 @@ describe('CategorizationRepository', () => {
         vatType: VatType.EXEMPT,
       });
 
-      const reviewed = await repository.review(created.id, {
+      const reviewed = await repository.review(created.id, testTenant.id, {
         reviewedBy: testUser.id,
         vatType: VatType.STANDARD,
         vatAmountCents: 3750, // 15% VAT on R25
@@ -489,7 +492,11 @@ describe('CategorizationRepository', () => {
       };
 
       await expect(
-        repository.review('00000000-0000-0000-0000-000000000000', reviewDto),
+        repository.review(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          reviewDto,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -500,7 +507,7 @@ describe('CategorizationRepository', () => {
       });
 
       await expect(
-        repository.review(created.id, {
+        repository.review(created.id, testTenant.id, {
           reviewedBy: '00000000-0000-0000-0000-000000000000',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -511,7 +518,7 @@ describe('CategorizationRepository', () => {
     it('should update categorization fields', async () => {
       const created = await repository.create(testCategorizationData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         accountCode: '4200',
         accountName: 'Updated Account',
         confidenceScore: 99,
@@ -525,9 +532,13 @@ describe('CategorizationRepository', () => {
 
     it('should throw NotFoundException for non-existent categorization', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          accountCode: '4200',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            accountCode: '4200',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -535,7 +546,7 @@ describe('CategorizationRepository', () => {
       const created = await repository.create(testCategorizationData);
 
       await expect(
-        repository.update(created.id, {
+        repository.update(created.id, testTenant.id, {
           isSplit: true,
           // splitAmountCents is missing!
         }),
@@ -547,15 +558,18 @@ describe('CategorizationRepository', () => {
     it('should delete categorization', async () => {
       const created = await repository.create(testCategorizationData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent categorization', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });

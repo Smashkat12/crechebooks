@@ -611,7 +611,7 @@ describe('SimplePayPayRunService', () => {
         totalUifEmployerCents: 250000, // R2,500 (employer portion - adds to both debit and credit)
         totalSdlCents: 250000, // R2,500 (adds to both debit and credit)
         totalEtiCents: 0,
-        accountingData: mockAccounting,
+        accountingData: mockAccounting as unknown as Record<string, unknown>,
       });
       await payRunSyncRepo.updateSyncStatus(sync.id, PayRunSyncStatus.SYNCED);
       syncId = sync.id;
@@ -629,7 +629,7 @@ describe('SimplePayPayRunService', () => {
     it('should update pay run sync status to XERO_POSTED', async () => {
       await service.postPayRunToXero(tenant.id, syncId);
 
-      const updated = await payRunSyncRepo.findById(syncId);
+      const updated = await payRunSyncRepo.findById(syncId, tenant.id);
       expect(updated?.syncStatus).toBe(PayRunSyncStatus.XERO_POSTED);
       expect(updated?.xeroJournalId).toBeDefined();
       expect(updated?.xeroSyncedAt).toBeDefined();

@@ -216,7 +216,7 @@ export class CorrectionConflictService {
     );
 
     // Update pattern to new category
-    await this.patternRepo.update(conflict.patternId, {
+    await this.patternRepo.update(conflict.patternId, tenantId, {
       defaultAccountCode: conflict.newCategoryCode,
       defaultAccountName: conflict.newCategory,
     });
@@ -231,7 +231,7 @@ export class CorrectionConflictService {
         if (existing.length > 0) {
           // Update most recent categorization
           const mostRecent = existing[0];
-          await this.categorizationRepo.update(mostRecent.id, {
+          await this.categorizationRepo.update(mostRecent.id, tenantId, {
             accountCode: conflict.newCategoryCode,
             accountName: conflict.newCategory,
             source: 'USER_OVERRIDE' as any,
@@ -280,7 +280,7 @@ export class CorrectionConflictService {
 
     if (existing.length > 0) {
       const mostRecent = existing[0];
-      await this.categorizationRepo.update(mostRecent.id, {
+      await this.categorizationRepo.update(mostRecent.id, tenantId, {
         accountCode: conflict.newCategoryCode,
         accountName: conflict.newCategory,
         source: 'USER_OVERRIDE' as any, // User explicitly confirmed this exception
@@ -308,11 +308,11 @@ export class CorrectionConflictService {
   /**
    * Resolution: Split by amount threshold (future enhancement)
    */
-  private async resolveSplitByAmount(
-    tenantId: string,
-    conflict: CorrectionConflict,
+  private resolveSplitByAmount(
+    _tenantId: string,
+    _conflict: CorrectionConflict,
     threshold: number,
-  ): Promise<void> {
+  ): void {
     this.logger.log(
       `Creating split rule by amount: threshold=${threshold} cents`,
     );
@@ -332,11 +332,11 @@ export class CorrectionConflictService {
   /**
    * Resolution: Split by description pattern (future enhancement)
    */
-  private async resolveSplitByDescription(
-    tenantId: string,
-    conflict: CorrectionConflict,
+  private resolveSplitByDescription(
+    _tenantId: string,
+    _conflict: CorrectionConflict,
     pattern: string,
-  ): Promise<void> {
+  ): void {
     this.logger.log(`Creating split rule by description pattern: ${pattern}`);
 
     // Future enhancement: Create conditional pattern

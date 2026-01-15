@@ -112,20 +112,12 @@ export class PaymentAllocationService {
 
     // 5. For single allocation: determine if exact, partial, or overpayment
     const allocation = dto.allocations[0];
-    const invoice = await this.invoiceRepo.findById(allocation.invoiceId);
+    const invoice = await this.invoiceRepo.findById(
+      allocation.invoiceId,
+      dto.tenantId,
+    );
     if (!invoice) {
       throw new NotFoundException('Invoice', allocation.invoiceId);
-    }
-
-    if (invoice.tenantId !== dto.tenantId) {
-      throw new BusinessException(
-        'Invoice does not belong to the specified tenant',
-        'TENANT_MISMATCH',
-        {
-          invoiceTenantId: invoice.tenantId,
-          requestTenantId: dto.tenantId,
-        },
-      );
     }
 
     // Check if invoice is already fully paid
@@ -182,6 +174,7 @@ export class PaymentAllocationService {
       // 7. Update invoice via invoiceRepo.recordPayment() - status auto-set
       await this.invoiceRepo.recordPayment(
         allocation.invoiceId,
+        dto.tenantId,
         allocation.amountCents,
       );
     }
@@ -378,7 +371,10 @@ export class PaymentAllocationService {
     // Sync all payments to Xero (TASK-XERO-003: Real implementation)
     let xeroSyncStatus = XeroSyncStatus.SKIPPED;
     for (const payment of createdPayments) {
-      const invoice = await this.invoiceRepo.findById(payment.invoiceId);
+      const invoice = await this.invoiceRepo.findById(
+        payment.invoiceId,
+        dto.tenantId,
+      );
       if (invoice) {
         const status = await this.syncToXero(payment, invoice);
         // Use the most significant status (SUCCESS > FAILED > SKIPPED)
@@ -444,7 +440,7 @@ export class PaymentAllocationService {
     );
 
     // 1. Get invoice, calculate outstanding
-    const invoice = await this.invoiceRepo.findById(invoiceId);
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
     if (!invoice) {
       throw new NotFoundException('Invoice', invoiceId);
     }
@@ -504,7 +500,7 @@ export class PaymentAllocationService {
     }
 
     // 5. Update invoice to PAID via recordPayment()
-    await this.invoiceRepo.recordPayment(invoiceId, outstandingCents);
+    await this.invoiceRepo.recordPayment(invoiceId, tenantId, outstandingCents);
 
     return payment;
   }
@@ -531,7 +527,7 @@ export class PaymentAllocationService {
       `Handling partial payment for invoice ${invoiceId}: ${partialAmountCents} cents`,
     );
 
-    const invoice = await this.invoiceRepo.findById(invoiceId);
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
     if (!invoice) {
       throw new NotFoundException('Invoice', invoiceId);
     }
@@ -572,7 +568,11 @@ export class PaymentAllocationService {
     });
 
     // 4. Update invoice via recordPayment() - status auto-set to PARTIALLY_PAID
-    await this.invoiceRepo.recordPayment(invoiceId, partialAmountCents);
+    await this.invoiceRepo.recordPayment(
+      invoiceId,
+      tenantId,
+      partialAmountCents,
+    );
 
     return payment;
   }
@@ -589,20 +589,12 @@ export class PaymentAllocationService {
     this.logger.log(`Reversing payment allocation ${dto.paymentId}`);
 
     // 1. Get payment by ID with tenant validation
-    const payment = await this.paymentRepo.findById(dto.paymentId);
+    const payment = await this.paymentRepo.findById(
+      dto.paymentId,
+      dto.tenantId,
+    );
     if (!payment) {
       throw new NotFoundException('Payment', dto.paymentId);
-    }
-
-    if (payment.tenantId !== dto.tenantId) {
-      throw new BusinessException(
-        'Payment does not belong to the specified tenant',
-        'TENANT_MISMATCH',
-        {
-          paymentTenantId: payment.tenantId,
-          requestTenantId: dto.tenantId,
-        },
-      );
     }
 
     // 2. Validate payment.isReversed === false
@@ -621,13 +613,18 @@ export class PaymentAllocationService {
     const beforeValue = { ...payment };
 
     // 3. Reverse payment using PaymentRepository.reverse() method
-    const reversedPayment = await this.paymentRepo.reverse(dto.paymentId, {
-      reversalReason: dto.reason,
-    });
+    const reversedPayment = await this.paymentRepo.reverse(
+      dto.paymentId,
+      dto.tenantId,
+      {
+        reversalReason: dto.reason,
+      },
+    );
 
     // 4. Revert invoice amount: invoiceRepo.recordPayment(id, -payment.amountCents)
     await this.invoiceRepo.recordPayment(
       payment.invoiceId,
+      dto.tenantId,
       -payment.amountCents,
     );
 
@@ -654,7 +651,10 @@ export class PaymentAllocationService {
     // 6. Sync reversal to Xero (TASK-XERO-003: Real implementation)
     // Note: Xero handles payment deletions differently - we log the reversal but don't delete in Xero
     // The payment reversal is tracked in CrecheBooks; Xero sync would require payment deletion API
-    const invoice = await this.invoiceRepo.findById(payment.invoiceId);
+    const invoice = await this.invoiceRepo.findById(
+      payment.invoiceId,
+      dto.tenantId,
+    );
     if (invoice) {
       // Log the reversal attempt - actual Xero payment deletion is out of scope for TASK-XERO-003
       this.logger.log(
@@ -842,7 +842,10 @@ export class PaymentAllocationService {
 
     // Validate all invoices belong to the specified parent
     for (const allocation of input.allocations) {
-      const invoice = await this.invoiceRepo.findById(allocation.invoiceId);
+      const invoice = await this.invoiceRepo.findById(
+        allocation.invoiceId,
+        input.tenantId,
+      );
       if (!invoice) {
         throw new NotFoundException('Invoice', allocation.invoiceId);
       }
@@ -898,7 +901,10 @@ export class PaymentAllocationService {
   ): Promise<XeroSyncStatus> {
     try {
       // Get parent for contact info
-      const parent = await this.parentRepo.findById(invoice.parentId);
+      const parent = await this.parentRepo.findById(
+        invoice.parentId,
+        invoice.tenantId,
+      );
       if (!parent) {
         this.logger.warn(
           `Cannot sync payment: Parent ${invoice.parentId} not found`,

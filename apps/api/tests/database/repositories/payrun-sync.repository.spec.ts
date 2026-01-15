@@ -205,11 +205,11 @@ describe('PayRunSyncRepository', () => {
   });
 
   describe('findById', () => {
-    it('should find pay run sync by id', async () => {
+    it('should find pay run sync by id with matching tenant', async () => {
       const data = { ...createTestPayRunSyncData(), tenantId: tenant.id };
       const created = await repository.create(data);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(created.id);
@@ -219,18 +219,29 @@ describe('PayRunSyncRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        tenant.id,
       );
+
+      expect(found).toBeNull();
+    });
+
+    it('should return null for valid ID but wrong tenant (tenant isolation)', async () => {
+      const data = { ...createTestPayRunSyncData(), tenantId: tenant.id };
+      const created = await repository.create(data);
+
+      // Try to access pay run sync with different tenant ID
+      const found = await repository.findById(created.id, otherTenant.id);
 
       expect(found).toBeNull();
     });
   });
 
   describe('findByIdOrThrow', () => {
-    it('should find pay run sync by id', async () => {
+    it('should find pay run sync by id with matching tenant', async () => {
       const data = { ...createTestPayRunSyncData(), tenantId: tenant.id };
       const created = await repository.create(data);
 
-      const found = await repository.findByIdOrThrow(created.id);
+      const found = await repository.findByIdOrThrow(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found.id).toBe(created.id);
@@ -238,7 +249,19 @@ describe('PayRunSyncRepository', () => {
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.findByIdOrThrow('00000000-0000-0000-0000-000000000000'),
+        repository.findByIdOrThrow(
+          '00000000-0000-0000-0000-000000000000',
+          tenant.id,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException for valid ID but wrong tenant (tenant isolation)', async () => {
+      const data = { ...createTestPayRunSyncData(), tenantId: tenant.id };
+      const created = await repository.create(data);
+
+      await expect(
+        repository.findByIdOrThrow(created.id, otherTenant.id),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -542,19 +565,19 @@ describe('PayRunSyncRepository', () => {
   });
 
   describe('delete', () => {
-    it('should delete existing pay run sync', async () => {
+    it('should delete existing pay run sync with matching tenant', async () => {
       const data = { ...createTestPayRunSyncData(), tenantId: tenant.id };
       const created = await repository.create(data);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, tenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent pay run sync', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete('00000000-0000-0000-0000-000000000000', tenant.id),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -564,9 +587,18 @@ describe('PayRunSyncRepository', () => {
       await repository.updateSyncStatus(created.id, PayRunSyncStatus.SYNCED);
       await repository.markXeroPosted(created.id, 'MJ-12345');
 
-      await expect(repository.delete(created.id)).rejects.toThrow(
+      await expect(repository.delete(created.id, tenant.id)).rejects.toThrow(
         ConflictException,
       );
+    });
+
+    it('should throw NotFoundException for valid ID but wrong tenant (tenant isolation)', async () => {
+      const data = { ...createTestPayRunSyncData(), tenantId: tenant.id };
+      const created = await repository.create(data);
+
+      await expect(
+        repository.delete(created.id, otherTenant.id),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

@@ -225,6 +225,7 @@ describe('SimplePayReportsService', () => {
 
       const storedRequest = await reportRequestRepo.findById(
         result.reportRequestId,
+        tenant.id,
       );
       expect(storedRequest).toBeDefined();
       expect(storedRequest!.status).toBe(ReportStatus.COMPLETED);
@@ -520,6 +521,7 @@ describe('SimplePayReportsService', () => {
       const result = await service.generateEtiReport(tenant.id, {});
 
       const reportRequest = await service.getReportRequest(
+        tenant.id,
         result.reportRequestId,
       );
 

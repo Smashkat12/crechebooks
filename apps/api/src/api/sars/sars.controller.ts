@@ -79,7 +79,7 @@ export class SarsController {
     );
 
     // Transform API snake_case to service camelCase
-    const submission = await this.sarsSubmissionRepo.submit(id, {
+    const submission = await this.sarsSubmissionRepo.submit(id, user.tenantId, {
       submittedBy: user.id,
       sarsReference: dto.sars_reference, // snake_case -> camelCase
     });

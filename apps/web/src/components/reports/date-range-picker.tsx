@@ -1,7 +1,14 @@
 'use client';
 
+/**
+ * Reports Date Range Picker Component
+ * Uses SA timezone utilities for proper timezone handling
+ *
+ * This is a specialized version for the reports section that maintains
+ * the original API while using the new timezone-aware utilities.
+ */
+
 import { useState } from 'react';
-import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -18,6 +25,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import {
+  formatSADate,
+  startOfMonthSA,
+  endOfMonthSA,
+  startOfYearSA,
+  endOfYearSA,
+  startOfDaySA,
+  endOfDaySA,
+  nowSA,
+} from '@/lib/date-utils';
+import { subMonths, subYears } from 'date-fns';
 
 export interface DateRange {
   from: Date;
@@ -36,42 +54,58 @@ const presets: { key: PresetKey; label: string; getRange: () => DateRange }[] = 
   {
     key: 'this_month',
     label: 'This Month',
-    getRange: () => ({
-      from: startOfMonth(new Date()),
-      to: endOfMonth(new Date()),
-    }),
+    getRange: () => {
+      const now = nowSA();
+      return {
+        from: startOfMonthSA(now),
+        to: endOfMonthSA(now),
+      };
+    },
   },
   {
     key: 'last_month',
     label: 'Last Month',
-    getRange: () => ({
-      from: startOfMonth(subMonths(new Date(), 1)),
-      to: endOfMonth(subMonths(new Date(), 1)),
-    }),
+    getRange: () => {
+      const lastMonth = subMonths(nowSA(), 1);
+      return {
+        from: startOfMonthSA(lastMonth),
+        to: endOfMonthSA(lastMonth),
+      };
+    },
   },
   {
     key: 'last_3_months',
     label: 'Last 3 Months',
-    getRange: () => ({
-      from: startOfMonth(subMonths(new Date(), 2)),
-      to: endOfMonth(new Date()),
-    }),
+    getRange: () => {
+      const now = nowSA();
+      const threeMonthsAgo = subMonths(now, 2);
+      return {
+        from: startOfMonthSA(threeMonthsAgo),
+        to: endOfMonthSA(now),
+      };
+    },
   },
   {
     key: 'this_year',
     label: 'This Year',
-    getRange: () => ({
-      from: startOfYear(new Date()),
-      to: endOfYear(new Date()),
-    }),
+    getRange: () => {
+      const now = nowSA();
+      return {
+        from: startOfYearSA(now),
+        to: endOfYearSA(now),
+      };
+    },
   },
   {
     key: 'last_year',
     label: 'Last Year',
-    getRange: () => ({
-      from: startOfYear(subYears(new Date(), 1)),
-      to: endOfYear(subYears(new Date(), 1)),
-    }),
+    getRange: () => {
+      const lastYear = subYears(nowSA(), 1);
+      return {
+        from: startOfYearSA(lastYear),
+        to: endOfYearSA(lastYear),
+      };
+    },
   },
 ];
 
@@ -92,7 +126,11 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
   const handleCalendarSelect = (range: { from?: Date; to?: Date } | undefined) => {
     if (range?.from && range?.to) {
       setSelectedPreset('custom');
-      onChange({ from: range.from, to: range.to });
+      // Convert to SA timezone boundaries
+      onChange({
+        from: startOfDaySA(range.from),
+        to: endOfDaySA(range.to),
+      });
     }
   };
 
@@ -118,7 +156,7 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
             <CalendarIcon className="mr-2 h-4 w-4" />
             {value.from && value.to ? (
               <>
-                {format(value.from, 'dd MMM yyyy')} - {format(value.to, 'dd MMM yyyy')}
+                {formatSADate(value.from, 'dd MMM yyyy')} - {formatSADate(value.to, 'dd MMM yyyy')}
               </>
             ) : (
               <span>Select date range</span>

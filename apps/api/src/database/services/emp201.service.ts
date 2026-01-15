@@ -8,7 +8,7 @@
  * All monetary values in CENTS (integers)
  * Uses Decimal.js with banker's rounding (ROUND_HALF_EVEN)
  */
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -30,6 +30,11 @@ import {
   EMP201_CONSTANTS,
   EMP201_VALIDATION,
 } from '../constants/emp201.constants';
+import {
+  SarsPeriodException,
+  SarsTenantNotFoundException,
+  SarsNoPayrollException,
+} from '../../api/sars/exceptions';
 
 // Configure Decimal.js for banker's rounding
 Decimal.set({
@@ -62,8 +67,9 @@ export class Emp201Service {
 
     // Step 1: Validate period format
     if (!EMP201_CONSTANTS.PERIOD_FORMAT_REGEX.test(periodMonth)) {
-      throw new Error(
-        `EMP201 generation failed: Invalid period format "${periodMonth}" (expected YYYY-MM)`,
+      throw new SarsPeriodException(
+        `Invalid period format "${periodMonth}" (expected YYYY-MM)`,
+        periodMonth,
       );
     }
 
@@ -73,7 +79,7 @@ export class Emp201Service {
     });
 
     if (!tenant) {
-      throw new Error(`EMP201 generation failed: Tenant ${tenantId} not found`);
+      throw new SarsTenantNotFoundException(tenantId);
     }
 
     // Step 3: Parse period dates
@@ -104,9 +110,7 @@ export class Emp201Service {
     });
 
     if (payrolls.length === 0) {
-      throw new BadRequestException(
-        `No approved payroll records for period ${periodMonth}`,
-      );
+      throw new SarsNoPayrollException(periodMonth);
     }
 
     // Step 5: Validate employee data and build employee records
@@ -265,6 +269,8 @@ export class Emp201Service {
   /**
    * Aggregate payroll data for a period
    * Returns summary totals without creating a submission
+   *
+   * @throws SarsPeriodException if period format is invalid
    */
   async aggregatePayroll(
     tenantId: string,
@@ -272,8 +278,9 @@ export class Emp201Service {
   ): Promise<Emp201Summary> {
     // Validate period format
     if (!EMP201_CONSTANTS.PERIOD_FORMAT_REGEX.test(periodMonth)) {
-      throw new Error(
+      throw new SarsPeriodException(
         `Invalid period format "${periodMonth}" (expected YYYY-MM)`,
+        periodMonth,
       );
     }
 

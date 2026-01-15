@@ -11,6 +11,7 @@ import { PayrollBreakdown } from './payroll-breakdown';
 import { PayslipPreview } from './payslip-preview';
 import { formatCurrency } from '@/lib/utils/format';
 import type { IStaff, IPayrollEntry } from '@crechebooks/types';
+import { UIF_CONSTANTS } from '@crechebooks/types';
 
 interface PayrollWizardProps {
   month: number;
@@ -49,14 +50,20 @@ function calculatePAYE(annualIncome: number): number {
   return Math.round(tax / 12); // Monthly PAYE
 }
 
-// UIF calculation (1% each, capped at R17,712 annual remuneration)
-const UIF_RATE = 0.01;
-const UIF_MONTHLY_CAP = 17712 / 12;
-
+// UIF calculation using shared constants from @crechebooks/types
+// Reference: SARS 2024/2025 rates - UI Act No. 63 of 2001
 function calculateUIF(monthlyGross: number): { employee: number; employer: number } {
-  const cappedGross = Math.min(monthlyGross, UIF_MONTHLY_CAP);
-  const contribution = Math.round(cappedGross * UIF_RATE * 100) / 100;
-  return { employee: contribution, employer: contribution };
+  // UIF is calculated on gross salary, capped at the monthly ceiling
+  const cappedGross = Math.min(monthlyGross, UIF_CONSTANTS.UIF_CEILING_MONTHLY);
+  const employeeContribution = Math.min(
+    Math.round(cappedGross * UIF_CONSTANTS.UIF_RATE_EMPLOYEE * 100) / 100,
+    UIF_CONSTANTS.UIF_CAP_MONTHLY
+  );
+  const employerContribution = Math.min(
+    Math.round(cappedGross * UIF_CONSTANTS.UIF_RATE_EMPLOYER * 100) / 100,
+    UIF_CONSTANTS.UIF_CAP_MONTHLY
+  );
+  return { employee: employeeContribution, employer: employerContribution };
 }
 
 export function PayrollWizard({

@@ -82,13 +82,18 @@ export class ProfileMappingSyncRepository {
   }
 
   /**
-   * Find profile mapping sync by ID
-   * @returns ProfileMappingSync or null if not found
+   * Find profile mapping sync by ID with tenant isolation
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @returns ProfileMappingSync or null if not found or tenant mismatch
    */
-  async findById(id: string): Promise<ProfileMappingSync | null> {
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<ProfileMappingSync | null> {
     try {
-      return await this.prisma.profileMappingSync.findUnique({
-        where: { id },
+      return await this.prisma.profileMappingSync.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
@@ -105,9 +110,14 @@ export class ProfileMappingSyncRepository {
 
   /**
    * Find profile mapping sync by ID or throw NotFoundException
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findByIdOrThrow(id: string): Promise<ProfileMappingSync> {
-    const sync = await this.findById(id);
+  async findByIdOrThrow(
+    id: string,
+    tenantId: string,
+  ): Promise<ProfileMappingSync> {
+    const sync = await this.findById(id, tenantId);
     if (!sync) {
       throw new NotFoundException('ProfileMappingSync', id);
     }
@@ -377,19 +387,27 @@ export class ProfileMappingSyncRepository {
   }
 
   /**
-   * Delete a profile mapping sync record by ID
-   * @throws NotFoundException if record doesn't exist
+   * Delete a profile mapping sync record by ID with tenant isolation
+   * Uses deleteMany with tenant filter for atomic cross-tenant protection
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @throws NotFoundException if record not found or tenant mismatch (same error to prevent enumeration)
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      await this.prisma.profileMappingSync.delete({
-        where: { id },
+      const result = await this.prisma.profileMappingSync.deleteMany({
+        where: {
+          id,
+          tenantId,
+        },
       });
+
+      if (result.count === 0) {
+        throw new NotFoundException('ProfileMappingSync', id);
+      }
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2025') {
-          throw new NotFoundException('ProfileMappingSync', id);
-        }
+      if (error instanceof NotFoundException) {
+        throw error;
       }
       this.logger.error(
         `Failed to delete profile mapping sync ${id}`,

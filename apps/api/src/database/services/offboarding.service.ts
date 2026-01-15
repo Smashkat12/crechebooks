@@ -66,19 +66,22 @@ export class OffboardingService {
     endDate: Date,
   ): Promise<AccountSettlement> {
     // 1. Get enrollment and validate
-    const enrollment = await this.enrollmentRepo.findById(enrollmentId);
-    if (!enrollment || enrollment.tenantId !== tenantId) {
+    const enrollment = await this.enrollmentRepo.findById(
+      enrollmentId,
+      tenantId,
+    );
+    if (!enrollment) {
       throw new NotFoundException('Enrollment', enrollmentId);
     }
 
     // 2. Get child info
-    const child = await this.childRepo.findById(enrollment.childId);
+    const child = await this.childRepo.findById(enrollment.childId, tenantId);
     if (!child) {
       throw new NotFoundException('Child', enrollment.childId);
     }
 
     // 3. Get parent info
-    const parent = await this.parentRepo.findById(child.parentId);
+    const parent = await this.parentRepo.findById(child.parentId, tenantId);
     if (!parent) {
       throw new NotFoundException('Parent', child.parentId);
     }
@@ -86,6 +89,7 @@ export class OffboardingService {
     // 4. Get fee structure for pro-rata calculation
     const feeStructure = await this.feeStructureRepo.findById(
       enrollment.feeStructureId,
+      tenantId,
     );
 
     // 5. Calculate outstanding balance from invoices
@@ -191,8 +195,11 @@ export class OffboardingService {
     );
 
     // 1. Validate enrollment exists and is ACTIVE
-    const enrollment = await this.enrollmentRepo.findById(enrollmentId);
-    if (!enrollment || enrollment.tenantId !== tenantId) {
+    const enrollment = await this.enrollmentRepo.findById(
+      enrollmentId,
+      tenantId,
+    );
+    if (!enrollment) {
       throw new NotFoundException('Enrollment', enrollmentId);
     }
 
@@ -233,9 +240,11 @@ export class OffboardingService {
         );
       }
 
-      const siblingEnrollment =
-        await this.enrollmentRepo.findById(siblingEnrollmentId);
-      if (!siblingEnrollment || siblingEnrollment.tenantId !== tenantId) {
+      const siblingEnrollment = await this.enrollmentRepo.findById(
+        siblingEnrollmentId,
+        tenantId,
+      );
+      if (!siblingEnrollment) {
         throw new NotFoundException('Sibling Enrollment', siblingEnrollmentId);
       }
 
@@ -317,11 +326,14 @@ export class OffboardingService {
           // Transfer credit to sibling's parent account
           if (siblingEnrollmentId) {
             try {
-              const siblingEnrollment =
-                await this.enrollmentRepo.findById(siblingEnrollmentId);
+              const siblingEnrollment = await this.enrollmentRepo.findById(
+                siblingEnrollmentId,
+                tenantId,
+              );
               if (siblingEnrollment) {
                 const siblingChild = await this.childRepo.findById(
                   siblingEnrollment.childId,
+                  tenantId,
                 );
                 if (siblingChild) {
                   // Create credit balance for sibling's parent (using ADJUSTMENT type for transfers)

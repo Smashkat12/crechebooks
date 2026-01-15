@@ -633,7 +633,7 @@ describe('SimplePayLeaveService', () => {
         totalHours: 24,
         reason: 'Vacation',
       });
-      await leaveRequestRepo.approve(leaveRequest.id, 'manager-id');
+      await leaveRequestRepo.approve(leaveRequest.id, tenant.id, 'manager-id');
     });
 
     it('should sync approved leave request to SimplePay', async () => {
@@ -673,7 +673,10 @@ describe('SimplePayLeaveService', () => {
       expect(result.errors).toHaveLength(0);
 
       // Verify leave request was marked as synced
-      const updatedRequest = await leaveRequestRepo.findById(leaveRequest.id);
+      const updatedRequest = await leaveRequestRepo.findById(
+        leaveRequest.id,
+        tenant.id,
+      );
       expect(updatedRequest?.simplePaySynced).toBe(true);
       expect(updatedRequest?.simplePayIds).toEqual(['1', '2', '3']);
     });
@@ -741,7 +744,11 @@ describe('SimplePayLeaveService', () => {
         totalDays: 5,
         totalHours: 40,
       });
-      await leaveRequestRepo.approve(unmappedRequest.id, 'manager-id');
+      await leaveRequestRepo.approve(
+        unmappedRequest.id,
+        tenant.id,
+        'manager-id',
+      );
 
       const result = await service.syncLeaveRequestToSimplePay(
         tenant.id,
@@ -766,7 +773,11 @@ describe('SimplePayLeaveService', () => {
         totalDays: 2,
         totalHours: 16,
       });
-      await leaveRequestRepo.approve(fridayToMondayRequest.id, 'manager-id');
+      await leaveRequestRepo.approve(
+        fridayToMondayRequest.id,
+        tenant.id,
+        'manager-id',
+      );
 
       const mockCreatedLeaveDay = (
         id: number,
@@ -835,7 +846,7 @@ describe('SimplePayLeaveService', () => {
         totalDays: 1,
         totalHours: 8,
       });
-      await leaveRequestRepo.approve(lr1.id, 'manager-id');
+      await leaveRequestRepo.approve(lr1.id, tenant.id, 'manager-id');
 
       const lr2 = await leaveRequestRepo.create({
         tenantId: tenant.id,
@@ -847,7 +858,7 @@ describe('SimplePayLeaveService', () => {
         totalDays: 1,
         totalHours: 8,
       });
-      await leaveRequestRepo.approve(lr2.id, 'manager-id');
+      await leaveRequestRepo.approve(lr2.id, tenant.id, 'manager-id');
 
       // Pending request (should not be synced)
       await leaveRequestRepo.create({

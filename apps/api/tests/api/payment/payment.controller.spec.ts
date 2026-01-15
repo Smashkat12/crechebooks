@@ -22,6 +22,9 @@ import {
 } from '../../../src/database/entities/payment.entity';
 import type { AllocationResult } from '../../../src/database/dto/payment-allocation.dto';
 import { XeroSyncStatus } from '../../../src/database/dto/payment-allocation.dto';
+import { InvoiceStatus } from '../../../src/shared/constants';
+import { DeliveryMethod } from '../../../src/database/entities/invoice.entity';
+import { Decimal } from 'decimal.js';
 
 describe('PaymentController', () => {
   let controller: PaymentController;
@@ -41,6 +44,7 @@ describe('PaymentController', () => {
     name: 'School Owner',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -493,18 +497,21 @@ describe('PaymentController', () => {
         dueDate: new Date(),
         subtotalCents: 345000,
         vatCents: 51750,
+        vatRate: new Decimal('15'),
         totalCents: 396750,
         amountPaidCents: 345000,
-        status: 'PARTIALLY_PAID',
-        deliveryMethod: 'EMAIL',
+        status: InvoiceStatus.PARTIALLY_PAID,
+        deliveryMethod: DeliveryMethod.EMAIL,
         deliveryStatus: null,
+        deliveryRetryCount: 0,
         deliveredAt: null,
+        pdfUrl: null,
         notes: null,
         isDeleted: false,
         xeroInvoiceId: null,
         createdAt,
         updatedAt: createdAt,
-      };
+      } as any;
 
       jest.spyOn(paymentRepo, 'findByTenantId').mockResolvedValue(payments);
       jest.spyOn(invoiceRepo, 'findById').mockResolvedValue(invoice);

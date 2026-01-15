@@ -117,7 +117,10 @@ export class StatementDeliveryService {
     }
 
     // 3. Get parent
-    const parent = await this.parentRepository.findById(statement.parentId);
+    const parent = await this.parentRepository.findById(
+      statement.parentId,
+      tenantId,
+    );
     if (!parent) {
       throw new NotFoundException('Parent', statement.parentId);
     }

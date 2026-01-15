@@ -7,14 +7,21 @@
  */
 import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { ReconciliationService } from '../../../src/database/services/reconciliation.service';
 import { ReconciliationRepository } from '../../../src/database/repositories/reconciliation.repository';
+import { ToleranceConfigService } from '../../../src/database/services/tolerance-config.service';
 import { ReconciliationStatus, Tenant, User } from '@prisma/client';
 import {
   ConflictException,
   BusinessException,
 } from '../../../src/shared/exceptions';
+
+// Mock ConfigService for tolerance config
+const mockConfigService = {
+  get: jest.fn(() => undefined), // Return undefined to use defaults
+};
 
 describe('ReconciliationService', () => {
   let service: ReconciliationService;
@@ -28,6 +35,11 @@ describe('ReconciliationService', () => {
         PrismaService,
         ReconciliationService,
         ReconciliationRepository,
+        ToleranceConfigService,
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
+        },
       ],
     }).compile();
 
@@ -245,7 +257,8 @@ describe('ReconciliationService', () => {
       ).rejects.toThrow(BusinessException);
     });
 
-    it('should accept discrepancy within 1 cent tolerance', async () => {
+    it('should accept discrepancy within R1 tolerance', async () => {
+      // TASK-RECON-003: Default balance tolerance is 100 cents (R1)
       await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
@@ -259,7 +272,7 @@ describe('ReconciliationService', () => {
         },
       });
 
-      // 1 cent discrepancy should still be RECONCILED
+      // 100 cents (R1) discrepancy should still be RECONCILED (at tolerance limit)
       const result = await service.reconcile(
         {
           tenantId: testTenant.id,
@@ -267,17 +280,18 @@ describe('ReconciliationService', () => {
           periodStart: '2025-01-01',
           periodEnd: '2025-01-31',
           openingBalanceCents: 50000,
-          closingBalanceCents: 60001, // 1 cent over
+          closingBalanceCents: 60100, // R1 over (at tolerance limit)
         },
         testUser.id,
       );
 
       expect(result.status).toBe(ReconciliationStatus.RECONCILED);
-      expect(result.discrepancyCents).toBe(1);
+      expect(result.discrepancyCents).toBe(100);
       expect(result.matchedCount).toBe(1);
     });
 
-    it('should reject discrepancy over 1 cent', async () => {
+    it('should reject discrepancy over tolerance (R1)', async () => {
+      // TASK-RECON-003: Default balance tolerance is 100 cents (R1)
       await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
@@ -291,7 +305,7 @@ describe('ReconciliationService', () => {
         },
       });
 
-      // 2 cents discrepancy should be DISCREPANCY
+      // 101 cents discrepancy should be DISCREPANCY (exceeds R1 tolerance)
       const result = await service.reconcile(
         {
           tenantId: testTenant.id,
@@ -299,13 +313,13 @@ describe('ReconciliationService', () => {
           periodStart: '2025-01-01',
           periodEnd: '2025-01-31',
           openingBalanceCents: 50000,
-          closingBalanceCents: 60002, // 2 cents over
+          closingBalanceCents: 60101, // 101 cents over (exceeds R1 tolerance)
         },
         testUser.id,
       );
 
       expect(result.status).toBe(ReconciliationStatus.DISCREPANCY);
-      expect(result.discrepancyCents).toBe(2);
+      expect(result.discrepancyCents).toBe(101);
       expect(result.matchedCount).toBe(0);
     });
 

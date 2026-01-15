@@ -409,8 +409,10 @@ export class SimplePayPayRunService {
     };
 
     try {
-      const payRunSync =
-        await this.payRunSyncRepo.findByIdOrThrow(payRunSyncId);
+      const payRunSync = await this.payRunSyncRepo.findByIdOrThrow(
+        payRunSyncId,
+        tenantId,
+      );
       result.simplePayPayRunId = payRunSync.simplePayPayRunId;
 
       // Validate status

@@ -10,7 +10,7 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { PayeService } from '../../../src/database/services/paye.service';
 import { Irp5Service } from '../../../src/database/services/irp5.service';
 import { PayrollStatus, EmploymentType, PayFrequency } from '@prisma/client';
-import { Tenant, Staff } from '@prisma/client';
+import { Tenant, Staff, Prisma } from '@prisma/client';
 
 describe('Irp5Service', () => {
   let service: Irp5Service;
@@ -115,7 +115,7 @@ describe('Irp5Service', () => {
   describe('generateIrp5', () => {
     it('should generate IRP5 for full year employment', async () => {
       // Create 12 months of payroll (March 2024 - Feb 2025 for tax year 2025)
-      const payrolls = [];
+      const payrolls: Prisma.PayrollCreateManyInput[] = [];
       for (let i = 0; i < 12; i++) {
         const month = (2 + i) % 12; // Start from March (month 2)
         const year = i < 10 ? 2024 : 2025; // March-Dec 2024, Jan-Feb 2025
@@ -162,7 +162,7 @@ describe('Irp5Service', () => {
 
     it('should generate IRP5 for mid-year start', async () => {
       // Create 8 months of payroll (July 2024 - Feb 2025)
-      const payrolls = [];
+      const payrolls: Prisma.PayrollCreateManyInput[] = [];
       for (let i = 0; i < 8; i++) {
         const month = (6 + i) % 12; // Start from July (month 6)
         const year = i < 6 ? 2024 : 2025; // July-Dec 2024, Jan-Feb 2025

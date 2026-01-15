@@ -8,9 +8,24 @@ import { XeroAccountStatus } from '@prisma/client';
 import { XeroAccountRepository } from '../../../src/database/repositories/xero-account.repository';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 
+// Define mock types for Prisma xeroAccount methods
+interface MockXeroAccountMethods {
+  create: jest.Mock;
+  findUnique: jest.Mock;
+  findFirst: jest.Mock;
+  findMany: jest.Mock;
+  count: jest.Mock;
+  update: jest.Mock;
+  updateMany: jest.Mock;
+}
+
+interface MockPrismaService {
+  xeroAccount: MockXeroAccountMethods;
+}
+
 describe('XeroAccountRepository', () => {
   let repository: XeroAccountRepository;
-  let prismaService: jest.Mocked<PrismaService>;
+  let prismaService: MockPrismaService;
 
   const mockTenantId = 'test-tenant-id';
   const mockAccountId = 'test-account-id';
@@ -30,7 +45,7 @@ describe('XeroAccountRepository', () => {
   };
 
   beforeEach(async () => {
-    const mockPrismaService = {
+    const mockPrismaService: MockPrismaService = {
       xeroAccount: {
         create: jest.fn(),
         findUnique: jest.fn(),

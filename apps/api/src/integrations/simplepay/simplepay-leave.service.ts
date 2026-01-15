@@ -299,8 +299,10 @@ export class SimplePayLeaveService {
 
     try {
       // Get the leave request
-      const leaveRequest =
-        await this.leaveRequestRepo.findByIdOrThrow(leaveRequestId);
+      const leaveRequest = await this.leaveRequestRepo.findByIdOrThrow(
+        leaveRequestId,
+        tenantId,
+      );
 
       // Verify it's approved
       if (leaveRequest.status !== LeaveRequestStatus.APPROVED) {

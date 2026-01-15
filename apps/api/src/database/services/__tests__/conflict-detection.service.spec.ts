@@ -60,7 +60,7 @@ describe('ConflictDetectionService', () => {
         Total: 100,
       };
 
-      const result = await service.detectConflicts(
+      const result = service.detectConflicts(
         tenantId,
         entityType,
         entityId,
@@ -85,7 +85,7 @@ describe('ConflictDetectionService', () => {
         AccountCode: '4000',
       };
 
-      const result = await service.detectConflicts(
+      const result = service.detectConflicts(
         tenantId,
         entityType,
         entityId,
@@ -109,7 +109,7 @@ describe('ConflictDetectionService', () => {
         AccountCode: '4000',
       };
 
-      const result = await service.detectConflicts(
+      const result = service.detectConflicts(
         tenantId,
         entityType,
         entityId,
@@ -133,7 +133,7 @@ describe('ConflictDetectionService', () => {
         Status: 'ACTIVE',
       };
 
-      const result = await service.detectConflicts(
+      const result = service.detectConflicts(
         tenantId,
         entityType,
         entityId,
@@ -158,7 +158,7 @@ describe('ConflictDetectionService', () => {
         Status: 'DELETED',
       };
 
-      const result = await service.detectConflicts(
+      const result = service.detectConflicts(
         tenantId,
         entityType,
         entityId,
@@ -176,7 +176,7 @@ describe('ConflictDetectionService', () => {
       const localData = { accountCode: '4000' };
       const xeroData = { AccountCode: '4000' };
 
-      const result = await service.detectConflicts(
+      const result = service.detectConflicts(
         tenantId,
         entityType,
         entityId,
@@ -198,7 +198,7 @@ describe('ConflictDetectionService', () => {
         AccountCode: '5000',
       };
 
-      const result = await service.detectConflicts(
+      const result = service.detectConflicts(
         tenantId,
         entityType,
         entityId,
@@ -218,7 +218,7 @@ describe('ConflictDetectionService', () => {
       };
       const lastSyncedAt = new Date('2024-01-01T10:00:00Z');
 
-      const result = await service.hasModifications(entityData, lastSyncedAt);
+      const result = service.hasModifications(entityData, lastSyncedAt);
 
       expect(result).toBe(true);
     });
@@ -229,7 +229,7 @@ describe('ConflictDetectionService', () => {
       };
       const lastSyncedAt = new Date('2024-01-01T10:00:00Z');
 
-      const result = await service.hasModifications(entityData, lastSyncedAt);
+      const result = service.hasModifications(entityData, lastSyncedAt);
 
       expect(result).toBe(false);
     });
@@ -239,7 +239,7 @@ describe('ConflictDetectionService', () => {
         updatedAt: new Date('2024-01-02T10:00:00Z'),
       };
 
-      const result = await service.hasModifications(entityData);
+      const result = service.hasModifications(entityData);
 
       expect(result).toBe(true);
     });
@@ -260,7 +260,7 @@ describe('ConflictDetectionService', () => {
         Status: 'PENDING',
       };
 
-      const result = await service.getConflictingFields(localData, xeroData);
+      const result = service.getConflictingFields(localData, xeroData);
 
       expect(result).toContain('description');
       expect(result).toContain('accountCode');
@@ -276,7 +276,7 @@ describe('ConflictDetectionService', () => {
         Total: 100.5, // $100.50
       };
 
-      const result = await service.getConflictingFields(localData, xeroData);
+      const result = service.getConflictingFields(localData, xeroData);
 
       expect(result).not.toContain('amountCents');
     });
@@ -289,7 +289,7 @@ describe('ConflictDetectionService', () => {
         Total: 100.0, // $100.00 - different!
       };
 
-      const result = await service.getConflictingFields(localData, xeroData);
+      const result = service.getConflictingFields(localData, xeroData);
 
       expect(result).toContain('amountCents');
     });

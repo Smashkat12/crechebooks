@@ -172,10 +172,10 @@ export class SarsDeadlineService {
    * @param tenantId - Tenant ID
    * @param prefs - Preferences to update
    */
-  async updateReminderPreferences(
+  updateReminderPreferences(
     tenantId: string,
     prefs: Partial<DeadlineReminderPrefs>,
-  ): Promise<void> {
+  ): void {
     this.logger.log(
       `Updating reminder preferences for tenant ${tenantId}`,
       prefs,

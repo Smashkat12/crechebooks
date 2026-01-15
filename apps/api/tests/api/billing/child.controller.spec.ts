@@ -14,7 +14,17 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { FeeStructureRepository } from '../../../src/database/repositories/fee-structure.repository';
 import { EnrollmentRepository } from '../../../src/database/repositories/enrollment.repository';
 import { EnrollmentService } from '../../../src/database/services/enrollment.service';
-import { UserRole } from '@prisma/client';
+import {
+  UserRole,
+  Parent,
+  Child,
+  FeeStructure,
+  Enrollment,
+  Gender as PrismaGender,
+  EnrollmentStatus as PrismaEnrollmentStatus,
+  PreferredContact,
+  FeeType,
+} from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import { Gender } from '../../../src/database/entities/child.entity';
 import { EnrollmentStatus } from '../../../src/database/entities/enrollment.entity';
@@ -40,11 +50,12 @@ describe('ChildController', () => {
     name: 'School Owner',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  const mockParent = {
+  const mockParent: Parent = {
     id: 'parent-001',
     tenantId: mockTenantId,
     xeroContactId: null,
@@ -53,7 +64,9 @@ describe('ChildController', () => {
     email: 'john.smith@example.com',
     phone: null,
     whatsapp: null,
-    preferredContact: 'EMAIL',
+    preferredContact: PreferredContact.EMAIL,
+    whatsappOptIn: false,
+    smsOptIn: false,
     idNumber: null,
     address: null,
     notes: null,
@@ -67,8 +80,10 @@ describe('ChildController', () => {
     tenantId: mockTenantId,
     name: 'Toddler Full Day',
     description: 'Full day care for toddlers',
-    feeType: 'MONTHLY',
+    feeType: FeeType.FULL_DAY,
     amountCents: 345000, // R3450
+    registrationFeeCents: 50000,
+    reRegistrationFeeCents: 25000,
     vatInclusive: true,
     siblingDiscountPercent: 10,
     effectiveFrom: new Date('2025-01-01'),
@@ -76,16 +91,16 @@ describe('ChildController', () => {
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
+  } as unknown as FeeStructure;
 
-  const mockChild = {
+  const mockChild: Child = {
     id: 'child-001',
     tenantId: mockTenantId,
     parentId: 'parent-001',
     firstName: 'Emma',
     lastName: 'Smith',
     dateOfBirth: new Date('2020-05-15'),
-    gender: 'FEMALE',
+    gender: PrismaGender.FEMALE,
     medicalNotes: 'Allergic to peanuts',
     emergencyContact: 'Jane Smith',
     emergencyPhone: '+27821234567',
@@ -94,14 +109,14 @@ describe('ChildController', () => {
     updatedAt: new Date(),
   };
 
-  const mockEnrollment = {
+  const mockEnrollment: Enrollment = {
     id: 'enroll-001',
     tenantId: mockTenantId,
     childId: 'child-001',
     feeStructureId: 'fee-001',
     startDate: new Date('2025-02-01'),
     endDate: null,
-    status: 'ACTIVE',
+    status: PrismaEnrollmentStatus.ACTIVE,
     siblingDiscountApplied: false,
     customFeeOverrideCents: null,
     notes: null,
@@ -151,7 +166,7 @@ describe('ChildController', () => {
                 feeStructureId: 'fee-001',
                 startDate: new Date('2025-02-01'),
                 endDate: null,
-                status: 'ACTIVE',
+                status: PrismaEnrollmentStatus.ACTIVE,
                 siblingDiscountApplied: false,
                 customFeeOverrideCents: null,
                 notes: null,
@@ -208,7 +223,7 @@ describe('ChildController', () => {
           feeStructureId: mockFeeStructure.id,
           startDate: new Date('2025-02-01'),
           endDate: null,
-          status: EnrollmentStatus.ACTIVE,
+          status: 'ACTIVE' as any,
           siblingDiscountApplied: false,
           customFeeOverrideCents: null,
           notes: null,
@@ -322,7 +337,7 @@ describe('ChildController', () => {
           feeStructureId: mockEnrollment.feeStructureId,
           startDate: mockEnrollment.startDate,
           endDate: mockEnrollment.endDate,
-          status: mockEnrollment.status as EnrollmentStatus,
+          status: EnrollmentStatus.ACTIVE,
           siblingDiscountApplied: mockEnrollment.siblingDiscountApplied,
           customFeeOverrideCents: mockEnrollment.customFeeOverrideCents,
           notes: mockEnrollment.notes,
@@ -492,10 +507,9 @@ describe('ChildController', () => {
     });
 
     it('should enforce tenant isolation', async () => {
-      // Arrange - child belongs to different tenant
-      jest
-        .spyOn(childRepo, 'findById')
-        .mockResolvedValue({ ...mockChild, tenantId: 'other-tenant' });
+      // Arrange - findById returns null when queried with user's tenantId
+      // because the child belongs to a different tenant and won't match the query
+      jest.spyOn(childRepo, 'findById').mockResolvedValue(null);
 
       // Act & Assert
       await expect(
@@ -558,8 +572,10 @@ describe('ChildController', () => {
       await controller.updateChild('child-001', dto, mockOwnerUser);
 
       // Assert - verify camelCase was used for repository
+      // Repository update method takes (id, tenantId, dto)
       expect(updateSpy).toHaveBeenCalledWith(
         'child-001',
+        mockTenantId,
         expect.objectContaining({
           firstName: 'Emily',
           lastName: 'Johnson',

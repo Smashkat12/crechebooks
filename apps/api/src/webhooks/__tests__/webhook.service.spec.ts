@@ -209,17 +209,14 @@ describe('WebhookService', () => {
   });
 
   describe('Signature Verification', () => {
-    it('should allow processing when webhook keys are not configured', () => {
-      // In development, signatures are not verified if keys are not set
-      const result = service.verifyEmailSignature(
-        'test payload',
-        'test-sig',
-        '12345',
-      );
-      expect(result).toBe(true); // No key configured, should allow
+    it('should throw when email webhook key is not configured (FAIL FAST)', () => {
+      // SECURITY: Webhooks MUST fail fast when secrets not configured
+      expect(() =>
+        service.verifyEmailSignature('test payload', 'test-sig', '12345'),
+      ).toThrow('SENDGRID_WEBHOOK_KEY not configured');
     });
 
-    it('should return false for missing signature headers', () => {
+    it('should return false for missing signature headers when key configured', () => {
       // Set a temporary key to test validation
       (service as any).sendgridWebhookKey = 'test-key';
       const result = service.verifyEmailSignature('test payload', '', '12345');
@@ -228,19 +225,80 @@ describe('WebhookService', () => {
       (service as any).sendgridWebhookKey = undefined;
     });
 
-    it('should allow WhatsApp processing when app secret is not configured', () => {
-      const result = service.verifyWhatsAppSignature(
-        'test payload',
-        'test-sig',
-      );
-      expect(result).toBe(true); // No key configured, should allow
+    it('should return false for missing timestamp when key configured', () => {
+      (service as any).sendgridWebhookKey = 'test-key';
+      const result = service.verifyEmailSignature('test payload', 'sig', '');
+      expect(result).toBe(false);
+      (service as any).sendgridWebhookKey = undefined;
     });
 
-    it('should return false for missing WhatsApp signature header', () => {
+    it('should return false for invalid email signature', () => {
+      (service as any).sendgridWebhookKey = 'test-key';
+      const result = service.verifyEmailSignature(
+        'test payload',
+        'invalid-signature',
+        '12345',
+      );
+      expect(result).toBe(false);
+      (service as any).sendgridWebhookKey = undefined;
+    });
+
+    it('should throw when WhatsApp app secret is not configured (FAIL FAST)', () => {
+      // SECURITY: Webhooks MUST fail fast when secrets not configured
+      expect(() =>
+        service.verifyWhatsAppSignature('test payload', 'test-sig'),
+      ).toThrow('WHATSAPP_APP_SECRET not configured');
+    });
+
+    it('should return false for missing WhatsApp signature header when secret configured', () => {
       (service as any).whatsappAppSecret = 'test-secret';
       const result = service.verifyWhatsAppSignature('test payload', '');
       expect(result).toBe(false);
       (service as any).whatsappAppSecret = undefined;
+    });
+
+    it('should return false for invalid WhatsApp signature', () => {
+      (service as any).whatsappAppSecret = 'test-secret';
+      const result = service.verifyWhatsAppSignature(
+        'test payload',
+        'sha256=invalid',
+      );
+      expect(result).toBe(false);
+      (service as any).whatsappAppSecret = undefined;
+    });
+
+    it('should verify valid WhatsApp signature', () => {
+      const secret = 'test-secret';
+      const payload = 'test payload';
+      const crypto = require('crypto');
+      const expectedSig =
+        'sha256=' +
+        crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+      (service as any).whatsappAppSecret = secret;
+      const result = service.verifyWhatsAppSignature(payload, expectedSig);
+      expect(result).toBe(true);
+      (service as any).whatsappAppSecret = undefined;
+    });
+
+    it('should verify valid email signature', () => {
+      const key = 'test-key';
+      const payload = 'test payload';
+      const timestamp = '12345';
+      const crypto = require('crypto');
+      const expectedSig = crypto
+        .createHmac('sha256', key)
+        .update(timestamp + payload)
+        .digest('base64');
+
+      (service as any).sendgridWebhookKey = key;
+      const result = service.verifyEmailSignature(
+        payload,
+        expectedSig,
+        timestamp,
+      );
+      expect(result).toBe(true);
+      (service as any).sendgridWebhookKey = undefined;
     });
   });
 

@@ -266,7 +266,7 @@ describe('SarsSubmissionRepository', () => {
   describe('findById', () => {
     it('should find submission by id', async () => {
       const created = await repository.create(testVat201Data);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -276,6 +276,7 @@ describe('SarsSubmissionRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -350,7 +351,7 @@ describe('SarsSubmissionRepository', () => {
 
     it('should filter by status', async () => {
       const submission = await repository.create(testVat201Data);
-      await repository.markAsReady(submission.id);
+      await repository.markAsReady(submission.id, testTenant.id);
       await repository.create(testEmp201Data);
 
       const ready = await repository.findByTenantId(testTenant.id, {
@@ -363,12 +364,14 @@ describe('SarsSubmissionRepository', () => {
 
     it('should filter by isFinalized', async () => {
       const submission = await repository.create(testVat201Data);
-      await repository.markAsReady(submission.id);
-      await repository.submit(submission.id, { submittedBy: testUser.id });
-      await repository.acknowledge(submission.id, {
+      await repository.markAsReady(submission.id, testTenant.id);
+      await repository.submit(submission.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(submission.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(submission.id);
+      await repository.finalize(submission.id, testTenant.id);
 
       await repository.create(testEmp201Data);
 
@@ -422,12 +425,14 @@ describe('SarsSubmissionRepository', () => {
         ...testVat201Data,
         deadline: upcomingDeadline,
       });
-      await repository.markAsReady(submission.id);
-      await repository.submit(submission.id, { submittedBy: testUser.id });
-      await repository.acknowledge(submission.id, {
+      await repository.markAsReady(submission.id, testTenant.id);
+      await repository.submit(submission.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(submission.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(submission.id);
+      await repository.finalize(submission.id, testTenant.id);
 
       const upcoming = await repository.findUpcomingDeadlines(7);
 
@@ -443,8 +448,10 @@ describe('SarsSubmissionRepository', () => {
         ...testVat201Data,
         deadline: upcomingDeadline,
       });
-      await repository.markAsReady(submission.id);
-      await repository.submit(submission.id, { submittedBy: testUser.id });
+      await repository.markAsReady(submission.id, testTenant.id);
+      await repository.submit(submission.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
 
       const upcoming = await repository.findUpcomingDeadlines(7);
 
@@ -481,7 +488,7 @@ describe('SarsSubmissionRepository', () => {
     it('should update submission fields', async () => {
       const created = await repository.create(testVat201Data);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         outputVatCents: 500000,
         notes: 'Updated notes',
       });
@@ -495,7 +502,7 @@ describe('SarsSubmissionRepository', () => {
       const created = await repository.create(testVat201Data);
 
       const newDocumentData = { updated: true, items: [] };
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         documentData: newDocumentData,
       });
 
@@ -504,23 +511,29 @@ describe('SarsSubmissionRepository', () => {
 
     it('should throw NotFoundException for non-existent submission', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          notes: 'test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            notes: 'test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if submission is finalized', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
       await expect(
-        repository.update(created.id, { notes: 'test' }),
+        repository.update(created.id, testTenant.id, { notes: 'test' }),
       ).rejects.toThrow(BusinessException);
     });
   });
@@ -530,34 +543,39 @@ describe('SarsSubmissionRepository', () => {
       const created = await repository.create(testVat201Data);
       expect(created.status).toBe(SubmissionStatus.DRAFT);
 
-      const ready = await repository.markAsReady(created.id);
+      const ready = await repository.markAsReady(created.id, testTenant.id);
 
       expect(ready.status).toBe(SubmissionStatus.READY);
     });
 
     it('should throw NotFoundException for non-existent submission', async () => {
       await expect(
-        repository.markAsReady('00000000-0000-0000-0000-000000000000'),
+        repository.markAsReady(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if not DRAFT', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
+      await repository.markAsReady(created.id, testTenant.id);
 
-      await expect(repository.markAsReady(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.markAsReady(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
 
     it('should throw BusinessException if finalized', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
       // Create new draft to try marking as ready on finalized
       const newDraft = await repository.create({
@@ -573,18 +591,18 @@ describe('SarsSubmissionRepository', () => {
         data: { isFinalized: true },
       });
 
-      await expect(repository.markAsReady(newDraft.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.markAsReady(newDraft.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
   });
 
   describe('submit', () => {
     it('should transition READY to SUBMITTED and set submitter', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
+      await repository.markAsReady(created.id, testTenant.id);
 
-      const submitted = await repository.submit(created.id, {
+      const submitted = await repository.submit(created.id, testTenant.id, {
         submittedBy: testUser.id,
       });
 
@@ -595,9 +613,9 @@ describe('SarsSubmissionRepository', () => {
 
     it('should set sarsReference if provided', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
+      await repository.markAsReady(created.id, testTenant.id);
 
-      const submitted = await repository.submit(created.id, {
+      const submitted = await repository.submit(created.id, testTenant.id, {
         submittedBy: testUser.id,
         sarsReference: 'INITIAL-REF-001',
       });
@@ -607,9 +625,13 @@ describe('SarsSubmissionRepository', () => {
 
     it('should throw NotFoundException for non-existent submission', async () => {
       await expect(
-        repository.submit('00000000-0000-0000-0000-000000000000', {
-          submittedBy: testUser.id,
-        }),
+        repository.submit(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            submittedBy: testUser.id,
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -618,16 +640,18 @@ describe('SarsSubmissionRepository', () => {
       // Still DRAFT
 
       await expect(
-        repository.submit(created.id, { submittedBy: testUser.id }),
+        repository.submit(created.id, testTenant.id, {
+          submittedBy: testUser.id,
+        }),
       ).rejects.toThrow(BusinessException);
     });
 
     it('should throw NotFoundException for non-existent submitter', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
+      await repository.markAsReady(created.id, testTenant.id);
 
       await expect(
-        repository.submit(created.id, {
+        repository.submit(created.id, testTenant.id, {
           submittedBy: '00000000-0000-0000-0000-000000000000',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -635,15 +659,19 @@ describe('SarsSubmissionRepository', () => {
 
     it('should throw BusinessException if finalized', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
       await expect(
-        repository.submit(created.id, { submittedBy: testUser.id }),
+        repository.submit(created.id, testTenant.id, {
+          submittedBy: testUser.id,
+        }),
       ).rejects.toThrow(BusinessException);
     });
   });
@@ -651,12 +679,18 @@ describe('SarsSubmissionRepository', () => {
   describe('acknowledge', () => {
     it('should transition SUBMITTED to ACKNOWLEDGED and set sarsReference', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-
-      const acknowledged = await repository.acknowledge(created.id, {
-        sarsReference: 'SARS-2025-VAT-00001',
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
       });
+
+      const acknowledged = await repository.acknowledge(
+        created.id,
+        testTenant.id,
+        {
+          sarsReference: 'SARS-2025-VAT-00001',
+        },
+      );
 
       expect(acknowledged.status).toBe(SubmissionStatus.ACKNOWLEDGED);
       expect(acknowledged.sarsReference).toBe('SARS-2025-VAT-00001');
@@ -664,19 +698,25 @@ describe('SarsSubmissionRepository', () => {
 
     it('should throw NotFoundException for non-existent submission', async () => {
       await expect(
-        repository.acknowledge('00000000-0000-0000-0000-000000000000', {
-          sarsReference: 'REF',
-        }),
+        repository.acknowledge(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            sarsReference: 'REF',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if not SUBMITTED', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
+      await repository.markAsReady(created.id, testTenant.id);
       // Still READY, not SUBMITTED
 
       await expect(
-        repository.acknowledge(created.id, { sarsReference: 'REF' }),
+        repository.acknowledge(created.id, testTenant.id, {
+          sarsReference: 'REF',
+        }),
       ).rejects.toThrow(BusinessException);
     });
   });
@@ -684,46 +724,55 @@ describe('SarsSubmissionRepository', () => {
   describe('finalize', () => {
     it('should set isFinalized to true', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
 
-      const finalized = await repository.finalize(created.id);
+      const finalized = await repository.finalize(created.id, testTenant.id);
 
       expect(finalized.isFinalized).toBe(true);
     });
 
     it('should throw NotFoundException for non-existent submission', async () => {
       await expect(
-        repository.finalize('00000000-0000-0000-0000-000000000000'),
+        repository.finalize(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if not ACKNOWLEDGED', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
       // Still SUBMITTED, not ACKNOWLEDGED
 
-      await expect(repository.finalize(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.finalize(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
 
     it('should throw BusinessException if already finalized', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
-      await expect(repository.finalize(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.finalize(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
   });
 
@@ -731,46 +780,51 @@ describe('SarsSubmissionRepository', () => {
     it('should delete existing DRAFT submission', async () => {
       const created = await repository.create(testVat201Data);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent submission', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if not DRAFT', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
+      await repository.markAsReady(created.id, testTenant.id);
 
-      await expect(repository.delete(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.delete(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
 
     it('should throw BusinessException if finalized', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
-      await expect(repository.delete(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.delete(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
   });
 
   describe('calculateVatTotals', () => {
     it('should calculate VAT totals for period', async () => {
       const submission1 = await repository.create(testVat201Data);
-      await repository.markAsReady(submission1.id);
+      await repository.markAsReady(submission1.id, testTenant.id);
 
       const submission2 = await repository.create({
         ...testVat201Data,
@@ -781,7 +835,7 @@ describe('SarsSubmissionRepository', () => {
         inputVatCents: 80000,
         netVatCents: 120000,
       });
-      await repository.markAsReady(submission2.id);
+      await repository.markAsReady(submission2.id, testTenant.id);
 
       const totals = await repository.calculateVatTotals(
         testTenant.id,
@@ -806,7 +860,7 @@ describe('SarsSubmissionRepository', () => {
         inputVatCents: 80000,
         netVatCents: 120000,
       });
-      await repository.markAsReady(readySubmission.id);
+      await repository.markAsReady(readySubmission.id, testTenant.id);
 
       const totals = await repository.calculateVatTotals(
         testTenant.id,
@@ -836,7 +890,7 @@ describe('SarsSubmissionRepository', () => {
   describe('calculatePayrollTaxTotals', () => {
     it('should calculate payroll tax totals for period', async () => {
       const submission1 = await repository.create(testEmp201Data);
-      await repository.markAsReady(submission1.id);
+      await repository.markAsReady(submission1.id, testTenant.id);
 
       const totals = await repository.calculatePayrollTaxTotals(
         testTenant.id,
@@ -904,32 +958,38 @@ describe('SarsSubmissionRepository', () => {
       const created = await repository.create(testVat201Data);
       expect(created.status).toBe(SubmissionStatus.DRAFT);
 
-      const ready = await repository.markAsReady(created.id);
+      const ready = await repository.markAsReady(created.id, testTenant.id);
       expect(ready.status).toBe(SubmissionStatus.READY);
 
-      const submitted = await repository.submit(created.id, {
+      const submitted = await repository.submit(created.id, testTenant.id, {
         submittedBy: testUser.id,
       });
       expect(submitted.status).toBe(SubmissionStatus.SUBMITTED);
       expect(submitted.submittedAt).toBeInstanceOf(Date);
       expect(submitted.submittedBy).toBe(testUser.id);
 
-      const acknowledged = await repository.acknowledge(created.id, {
-        sarsReference: 'SARS-2025-VAT-00001',
-      });
+      const acknowledged = await repository.acknowledge(
+        created.id,
+        testTenant.id,
+        {
+          sarsReference: 'SARS-2025-VAT-00001',
+        },
+      );
       expect(acknowledged.status).toBe(SubmissionStatus.ACKNOWLEDGED);
       expect(acknowledged.sarsReference).toBe('SARS-2025-VAT-00001');
     });
 
     it('should allow finalization after acknowledgment', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
 
-      const finalized = await repository.finalize(created.id);
+      const finalized = await repository.finalize(created.id, testTenant.id);
       expect(finalized.isFinalized).toBe(true);
     });
   });
@@ -953,10 +1013,10 @@ describe('SarsSubmissionRepository', () => {
 
     it('should store submittedAt correctly', async () => {
       const submission = await repository.create(testVat201Data);
-      await repository.markAsReady(submission.id);
+      await repository.markAsReady(submission.id, testTenant.id);
 
       const beforeSubmit = new Date();
-      const submitted = await repository.submit(submission.id, {
+      const submitted = await repository.submit(submission.id, testTenant.id, {
         submittedBy: testUser.id,
       });
       const afterSubmit = new Date();
@@ -1014,7 +1074,7 @@ describe('SarsSubmissionRepository', () => {
         newField: 'added',
       };
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         documentData: updatedData,
       });
 
@@ -1025,43 +1085,53 @@ describe('SarsSubmissionRepository', () => {
   describe('immutability after finalization', () => {
     it('should prevent updates after finalization', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
       await expect(
-        repository.update(created.id, { notes: 'Changed after finalized' }),
+        repository.update(created.id, testTenant.id, {
+          notes: 'Changed after finalized',
+        }),
       ).rejects.toThrow(BusinessException);
     });
 
     it('should prevent deletion after finalization', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
-      await expect(repository.delete(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.delete(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
 
     it('should prevent re-submission after finalization', async () => {
       const created = await repository.create(testVat201Data);
-      await repository.markAsReady(created.id);
-      await repository.submit(created.id, { submittedBy: testUser.id });
-      await repository.acknowledge(created.id, {
+      await repository.markAsReady(created.id, testTenant.id);
+      await repository.submit(created.id, testTenant.id, {
+        submittedBy: testUser.id,
+      });
+      await repository.acknowledge(created.id, testTenant.id, {
         sarsReference: 'SARS-2025-001',
       });
-      await repository.finalize(created.id);
+      await repository.finalize(created.id, testTenant.id);
 
       await expect(
-        repository.submit(created.id, { submittedBy: testUser.id }),
+        repository.submit(created.id, testTenant.id, {
+          submittedBy: testUser.id,
+        }),
       ).rejects.toThrow(BusinessException);
     });
   });

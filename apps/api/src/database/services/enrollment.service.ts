@@ -20,6 +20,7 @@ import { TenantRepository } from '../repositories/tenant.repository';
 import { AuditLogService } from './audit-log.service';
 import { ProRataService } from './pro-rata.service';
 import { CreditNoteService } from './credit-note.service';
+import { InvoiceNumberService } from './invoice-number.service';
 import { EnrollmentStatus, IEnrollment } from '../entities/enrollment.entity';
 import { LineType } from '../entities/invoice-line.entity';
 import {
@@ -62,6 +63,7 @@ export class EnrollmentService {
     private readonly proRataService: ProRataService,
     private readonly creditNoteService: CreditNoteService,
     private readonly auditLogService: AuditLogService,
+    private readonly invoiceNumberService: InvoiceNumberService,
   ) {}
 
   /**
@@ -86,8 +88,8 @@ export class EnrollmentService {
     allowHistoricDates = false,
   ): Promise<EnrollChildResult> {
     // 1. Validate child exists and belongs to tenant
-    const child = await this.childRepo.findById(childId);
-    if (!child || child.tenantId !== tenantId) {
+    const child = await this.childRepo.findById(childId, tenantId);
+    if (!child) {
       this.logger.error(
         `Child not found or tenant mismatch: ${childId} for tenant ${tenantId}`,
       );
@@ -95,8 +97,11 @@ export class EnrollmentService {
     }
 
     // 2. Validate fee structure exists and belongs to tenant
-    const feeStructure = await this.feeStructureRepo.findById(feeStructureId);
-    if (!feeStructure || feeStructure.tenantId !== tenantId) {
+    const feeStructure = await this.feeStructureRepo.findById(
+      feeStructureId,
+      tenantId,
+    );
+    if (!feeStructure) {
       this.logger.error(
         `Fee structure not found or tenant mismatch: ${feeStructureId} for tenant ${tenantId}`,
       );
@@ -207,8 +212,11 @@ export class EnrollmentService {
     userId: string,
   ): Promise<IEnrollment> {
     // Fetch enrollment and validate tenant
-    const enrollment = await this.enrollmentRepo.findById(enrollmentId);
-    if (!enrollment || enrollment.tenantId !== tenantId) {
+    const enrollment = await this.enrollmentRepo.findById(
+      enrollmentId,
+      tenantId,
+    );
+    if (!enrollment) {
       this.logger.error(
         `Enrollment not found or tenant mismatch: ${enrollmentId} for tenant ${tenantId}`,
       );
@@ -222,8 +230,9 @@ export class EnrollmentService {
     if (updates.feeStructureId) {
       const feeStructure = await this.feeStructureRepo.findById(
         updates.feeStructureId,
+        tenantId,
       );
-      if (!feeStructure || feeStructure.tenantId !== tenantId) {
+      if (!feeStructure) {
         this.logger.error(
           `Fee structure not found or tenant mismatch: ${updates.feeStructureId} for tenant ${tenantId}`,
         );
@@ -249,7 +258,11 @@ export class EnrollmentService {
     }
 
     // Update enrollment
-    const updated = await this.enrollmentRepo.update(enrollmentId, updates);
+    const updated = await this.enrollmentRepo.update(
+      enrollmentId,
+      tenantId,
+      updates,
+    );
 
     // Audit log
     await this.auditLogService.logUpdate({
@@ -287,8 +300,11 @@ export class EnrollmentService {
     userId: string,
   ): Promise<IEnrollment> {
     // Fetch enrollment and validate tenant
-    const enrollment = await this.enrollmentRepo.findById(enrollmentId);
-    if (!enrollment || enrollment.tenantId !== tenantId) {
+    const enrollment = await this.enrollmentRepo.findById(
+      enrollmentId,
+      tenantId,
+    );
+    if (!enrollment) {
       this.logger.error(
         `Enrollment not found or tenant mismatch: ${enrollmentId} for tenant ${tenantId}`,
       );
@@ -324,7 +340,7 @@ export class EnrollmentService {
     const beforeValue = { ...enrollment };
 
     // Update with withdrawn status
-    const updated = await this.enrollmentRepo.update(enrollmentId, {
+    const updated = await this.enrollmentRepo.update(enrollmentId, tenantId, {
       status: EnrollmentStatus.WITHDRAWN,
       endDate,
     });
@@ -481,8 +497,11 @@ export class EnrollmentService {
     userId: string,
   ): Promise<IEnrollment> {
     // Fetch enrollment and validate tenant
-    const enrollment = await this.enrollmentRepo.findById(enrollmentId);
-    if (!enrollment || enrollment.tenantId !== tenantId) {
+    const enrollment = await this.enrollmentRepo.findById(
+      enrollmentId,
+      tenantId,
+    );
+    if (!enrollment) {
       this.logger.error(
         `Enrollment not found or tenant mismatch: ${enrollmentId} for tenant ${tenantId}`,
       );
@@ -534,7 +553,7 @@ export class EnrollmentService {
     const beforeValue = { ...enrollment };
 
     // Update with graduated status
-    const updated = await this.enrollmentRepo.update(enrollmentId, {
+    const updated = await this.enrollmentRepo.update(enrollmentId, tenantId, {
       status: EnrollmentStatus.GRADUATED,
       endDate,
     });
@@ -692,7 +711,7 @@ export class EnrollmentService {
     userId: string,
   ): Promise<Invoice> {
     // 1. Get child info for parent reference
-    const child = await this.childRepo.findById(enrollment.childId);
+    const child = await this.childRepo.findById(enrollment.childId, tenantId);
     if (!child) {
       throw new NotFoundException('Child', enrollment.childId);
     }
@@ -726,9 +745,12 @@ export class EnrollmentService {
       );
     }
 
-    // 4. Generate invoice number (INV-YYYY-NNNNN format)
+    // 4. Generate invoice number atomically (TASK-BILL-003: Use InvoiceNumberService)
     const year = startDate.getFullYear();
-    const invoiceNumber = await this.generateInvoiceNumber(tenantId, year);
+    const invoiceNumber = await this.invoiceNumberService.generateNextNumber(
+      tenantId,
+      year,
+    );
 
     // 5. Create invoice with DRAFT status
     const today = new Date();
@@ -836,7 +858,7 @@ export class EnrollmentService {
       .toNumber();
 
     // 8. Update invoice totals
-    await this.invoiceRepo.update(invoice.id, {
+    await this.invoiceRepo.update(invoice.id, tenantId, {
       subtotalCents,
       totalCents: subtotalCents, // VAT calculated separately if tenant is VAT registered
     });
@@ -918,7 +940,7 @@ export class EnrollmentService {
 
     for (const enrollment of activeEnrollments) {
       // Get child info
-      const child = await this.childRepo.findById(enrollment.childId);
+      const child = await this.childRepo.findById(enrollment.childId, tenantId);
       if (!child) {
         this.logger.warn(
           `Child not found for enrollment ${enrollment.id}, skipping`,
@@ -928,7 +950,9 @@ export class EnrollmentService {
 
       // Get parent info
       const parent = child.parentId
-        ? await this.parentRepo.findById(child.parentId).catch(() => null)
+        ? await this.parentRepo
+            .findById(child.parentId, tenantId)
+            .catch(() => null)
         : null;
       const parentName = parent
         ? `${parent.firstName || ''} ${parent.lastName || ''}`.trim()
@@ -959,6 +983,7 @@ export class EnrollmentService {
       // Get fee structure info
       const feeStructure = await this.feeStructureRepo.findById(
         enrollment.feeStructureId,
+        tenantId,
       );
 
       // Calculate account balance from outstanding invoices
@@ -1027,62 +1052,7 @@ export class EnrollmentService {
     return result;
   }
 
-  /**
-   * Generate unique invoice number in format INV-YYYY-NNN
-   * Uses 3-digit padding to match InvoiceGenerationService format
-   * @param tenantId - Tenant ID for tenant-specific numbering
-   * @param year - Year for the invoice
-   * @returns Generated invoice number
-   */
-  private async generateInvoiceNumber(
-    tenantId: string,
-    year: number,
-  ): Promise<string> {
-    // Find the last invoice for this tenant in this year
-    const lastInvoice = await this.invoiceRepo.findLastInvoiceForYear(
-      tenantId,
-      year,
-    );
-
-    let maxSequence = 0;
-    if (lastInvoice && lastInvoice.invoiceNumber) {
-      // Extract sequence number from INV-YYYY-NNN or INV-YYYY-NNNNN format
-      const match = lastInvoice.invoiceNumber.match(/^INV-\d{4}-(\d+)$/);
-      if (match) {
-        maxSequence = parseInt(match[1], 10);
-      }
-    }
-
-    // Also check if there are any invoices with the next sequence to avoid duplicates
-    // This handles cases where there are mixed format invoices (3-digit vs 5-digit)
-    const nextSequence = maxSequence + 1;
-    const candidateNumber = `INV-${year}-${nextSequence.toString().padStart(3, '0')}`;
-    const existing = await this.invoiceRepo.findByInvoiceNumber(
-      tenantId,
-      candidateNumber,
-    );
-
-    if (existing) {
-      // If the candidate already exists, find a higher sequence
-      // Query all invoices for this year and find the max
-      const allInvoices = await this.invoiceRepo.findByTenant(tenantId, {});
-      let highestSeq = maxSequence;
-      for (const inv of allInvoices) {
-        const m = inv.invoiceNumber.match(/^INV-(\d{4})-(\d+)$/);
-        if (m && parseInt(m[1], 10) === year) {
-          const seq = parseInt(m[2], 10);
-          if (seq > highestSeq) {
-            highestSeq = seq;
-          }
-        }
-      }
-      // Format with 3-digit padding to match InvoiceGenerationService
-      const paddedSequence = (highestSeq + 1).toString().padStart(3, '0');
-      return `INV-${year}-${paddedSequence}`;
-    }
-
-    // Format with 3-digit padding to match InvoiceGenerationService
-    const paddedSequence = nextSequence.toString().padStart(3, '0');
-    return `INV-${year}-${paddedSequence}`;
-  }
+  // TASK-BILL-003: Removed legacy generateInvoiceNumber method
+  // Invoice number generation is now handled by InvoiceNumberService
+  // which uses atomic PostgreSQL operations to prevent race conditions
 }

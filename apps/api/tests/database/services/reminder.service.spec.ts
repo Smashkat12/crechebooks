@@ -269,7 +269,7 @@ describe('ReminderService', () => {
         vatCents: 0,
         totalCents: 500000,
         amountPaidCents: 0,
-        status: InvoiceStatus.ISSUED,
+        status: InvoiceStatus.OVERDUE,
       },
     });
 
@@ -306,7 +306,7 @@ describe('ReminderService', () => {
         vatCents: 0,
         totalCents: 450000,
         amountPaidCents: 0,
-        status: InvoiceStatus.ISSUED,
+        status: InvoiceStatus.OVERDUE,
       },
     });
 
@@ -343,7 +343,7 @@ describe('ReminderService', () => {
         vatCents: 0,
         totalCents: 400000,
         amountPaidCents: 0,
-        status: InvoiceStatus.ISSUED,
+        status: InvoiceStatus.OVERDUE,
       },
     });
 
@@ -380,7 +380,7 @@ describe('ReminderService', () => {
         vatCents: 0,
         totalCents: 350000,
         amountPaidCents: 0,
-        status: InvoiceStatus.ISSUED,
+        status: InvoiceStatus.OVERDUE,
       },
     });
 
@@ -451,7 +451,7 @@ describe('ReminderService', () => {
         vatCents: 0,
         totalCents: 500000,
         amountPaidCents: 0,
-        status: InvoiceStatus.ISSUED,
+        status: InvoiceStatus.OVERDUE,
       },
     });
 
@@ -1075,7 +1075,7 @@ describe('ReminderService', () => {
           vatCents: 0,
           totalCents: 100000,
           amountPaidCents: 0,
-          status: InvoiceStatus.ISSUED,
+          status: InvoiceStatus.OVERDUE,
         },
       });
 

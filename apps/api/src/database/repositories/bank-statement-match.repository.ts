@@ -74,18 +74,23 @@ export class BankStatementMatchRepository {
   }
 
   /**
-   * Find bank statement match by ID
+   * Find bank statement match by ID with tenant isolation
+   * @param id - Bank statement match ID
+   * @param tenantId - Tenant ID for isolation
    * @returns BankStatementMatch or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<BankStatementMatch | null> {
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<BankStatementMatch | null> {
     try {
-      return await this.prisma.bankStatementMatch.findUnique({
-        where: { id },
+      return await this.prisma.bankStatementMatch.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find bank statement match by id: ${id}`,
+        `Failed to find bank statement match by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -236,7 +241,7 @@ export class BankStatementMatchRepository {
 
       // Populate with actual counts
       for (const item of counts) {
-        const status = item.status as BankStatementMatchStatus;
+        const status = item.status;
         result[status] = item._count.status;
       }
 

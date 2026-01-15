@@ -136,7 +136,7 @@ export class EnrollmentController {
     const enrichedEnrollments: EnrollmentResponse[] = [];
 
     for (const enrollment of allEnrollments) {
-      const child = await this.childRepo.findById(enrollment.childId);
+      const child = await this.childRepo.findById(enrollment.childId, tenantId);
       if (!child) continue;
 
       // Apply search filter if provided
@@ -148,9 +148,10 @@ export class EnrollmentController {
         }
       }
 
-      const parent = await this.parentRepo.findById(child.parentId);
+      const parent = await this.parentRepo.findById(child.parentId, tenantId);
       const feeStructure = await this.feeStructureRepo.findById(
         enrollment.feeStructureId,
+        tenantId,
       );
 
       enrichedEnrollments.push({
@@ -200,17 +201,24 @@ export class EnrollmentController {
     @CurrentUser() user: IUser,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ success: boolean; data: EnrollmentResponse }> {
-    const enrollment = await this.enrollmentRepo.findById(id);
-    if (!enrollment || enrollment.tenantId !== user.tenantId) {
+    const enrollment = await this.enrollmentRepo.findById(id, user.tenantId);
+    if (!enrollment) {
       throw new NotFoundException('Enrollment', id);
     }
 
-    const child = await this.childRepo.findById(enrollment.childId);
+    const child = await this.childRepo.findById(
+      enrollment.childId,
+      user.tenantId,
+    );
     if (!child) throw new NotFoundException('Child', enrollment.childId);
 
-    const parent = await this.parentRepo.findById(child.parentId);
+    const parent = await this.parentRepo.findById(
+      child.parentId,
+      user.tenantId,
+    );
     const feeStructure = await this.feeStructureRepo.findById(
       enrollment.feeStructureId,
+      user.tenantId,
     );
 
     return {
@@ -250,8 +258,8 @@ export class EnrollmentController {
   ): Promise<{ success: boolean; data: EnrollmentResponse }> {
     this.logger.log(`Update enrollment status: ${id} -> ${body.status}`);
 
-    const enrollment = await this.enrollmentRepo.findById(id);
-    if (!enrollment || enrollment.tenantId !== user.tenantId) {
+    const enrollment = await this.enrollmentRepo.findById(id, user.tenantId);
+    if (!enrollment) {
       throw new NotFoundException('Enrollment', id);
     }
 
@@ -264,16 +272,20 @@ export class EnrollmentController {
       );
     }
 
-    const updated = await this.enrollmentRepo.update(id, {
+    const updated = await this.enrollmentRepo.update(id, user.tenantId, {
       status: upperStatus as EnrollmentStatus,
     });
 
-    const child = await this.childRepo.findById(updated.childId);
+    const child = await this.childRepo.findById(updated.childId, user.tenantId);
     if (!child) throw new NotFoundException('Child', updated.childId);
 
-    const parent = await this.parentRepo.findById(child.parentId);
+    const parent = await this.parentRepo.findById(
+      child.parentId,
+      user.tenantId,
+    );
     const feeStructure = await this.feeStructureRepo.findById(
       updated.feeStructureId,
+      user.tenantId,
     );
 
     return {
@@ -324,9 +336,9 @@ export class EnrollmentController {
 
     let count = 0;
     for (const id of body.enrollment_ids) {
-      const enrollment = await this.enrollmentRepo.findById(id);
-      if (enrollment && enrollment.tenantId === user.tenantId) {
-        await this.enrollmentRepo.update(id, {
+      const enrollment = await this.enrollmentRepo.findById(id, user.tenantId);
+      if (enrollment) {
+        await this.enrollmentRepo.update(id, user.tenantId, {
           status: upperStatus as EnrollmentStatus,
         });
         count++;

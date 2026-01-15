@@ -171,7 +171,7 @@ async function createTestInvoice(
       vatCents,
       totalCents,
       amountPaidCents: opts.amountPaidCents || 0,
-      status: opts.status || 'SENT',
+      status: (opts.status || 'SENT') as any,
       deliveryStatus: 'SENT',
     },
   });
@@ -235,7 +235,7 @@ async function cleanupPaymentTestData(
   // Delete in order respecting foreign keys
   await prisma.payment.deleteMany({ where: { tenantId } });
   await prisma.categorizationJournal.deleteMany({ where: { tenantId } });
-    await prisma.transaction.deleteMany({ where: { tenantId } });
+  await prisma.transaction.deleteMany({ where: { tenantId } });
   await prisma.invoiceLine.deleteMany({ where: { invoice: { tenantId } } });
   await prisma.invoice.deleteMany({ where: { tenantId } });
   await prisma.child.deleteMany({ where: { tenantId } });

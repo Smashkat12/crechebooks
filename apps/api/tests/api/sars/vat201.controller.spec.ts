@@ -8,13 +8,17 @@
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import {
+  UserRole,
+  SarsSubmission,
+  SubmissionType,
+  SubmissionStatus,
+} from '@prisma/client';
 import { SarsController } from '../../../src/api/sars/sars.controller';
 import { Vat201Service } from '../../../src/database/services/vat201.service';
 import { Emp201Service } from '../../../src/database/services/emp201.service';
 import { SarsSubmissionRepository } from '../../../src/database/repositories/sars-submission.repository';
 import type { IUser } from '../../../src/database/entities/user.entity';
-import type { SarsSubmission } from '../../../src/database/entities/sars-submission.entity';
 import type { ApiGenerateVat201Dto } from '../../../src/api/sars/dto/vat201.dto';
 
 describe('SarsController - POST /sars/vat201', () => {
@@ -24,25 +28,30 @@ describe('SarsController - POST /sars/vat201', () => {
   const mockUser: IUser = {
     id: 'user-uuid',
     tenantId: 'tenant-uuid',
+    auth0Id: 'auth0|owner123',
     email: 'owner@test.com',
+    name: 'Test Owner',
     role: UserRole.OWNER,
-    firstName: 'Test',
-    lastName: 'Owner',
     isActive: true,
+    lastLoginAt: null,
+    currentTenantId: 'tenant-uuid',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  const mockSubmission: SarsSubmission = {
+  const mockSubmission = {
     id: 'sub-uuid',
     tenantId: 'tenant-uuid',
-    submissionType: 'VAT201',
+    submissionType: SubmissionType.VAT201,
     periodStart: new Date('2025-01-01'),
     periodEnd: new Date('2025-01-31'),
-    status: 'DRAFT',
+    status: SubmissionStatus.DRAFT,
     outputVatCents: 2317500, // 23175.00 Rands
     inputVatCents: 845000, // 8450.00 Rands
     netVatCents: 1472500, // 14725.00 Rands
+    totalPayeCents: null,
+    totalUifCents: null,
+    totalSdlCents: null,
     deadline: new Date('2025-02-25T00:00:00.000Z'),
     isFinalized: false,
     documentData: {
@@ -54,12 +63,13 @@ describe('SarsController - POST /sars/vat201', () => {
         },
       ],
     },
+    notes: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     submittedAt: null,
     sarsReference: null,
     submittedBy: null,
-  };
+  } as SarsSubmission;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({

@@ -143,7 +143,7 @@ export class StatementPdfService {
     }
 
     // 3. Load parent data with children
-    const parent = await this.parentRepo.findById(statement.parentId);
+    const parent = await this.parentRepo.findById(statement.parentId, tenantId);
     if (!parent) {
       throw new NotFoundException('Parent', statement.parentId);
     }

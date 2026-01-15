@@ -24,7 +24,10 @@ import {
   ImportError,
 } from '../dto/import.dto';
 import { ImportSource } from '../entities/transaction.entity';
-import { ValidationException, BusinessException } from '../../shared/exceptions';
+import {
+  ValidationException,
+  BusinessException,
+} from '../../shared/exceptions';
 import { ExtractionValidatorAgent } from '../../agents/extraction-validator';
 
 // File constraints
@@ -44,7 +47,11 @@ const BANK_CHARGE_DESCRIPTION_PATTERNS = [
 // Patterns in payee/reference that indicate the original transaction type
 // Fee amounts based on actual FNB bank statement analysis
 const DEPOSIT_REFERENCE_PATTERNS = [
-  { pattern: /ADT\s*Cash\s*Deposit/i, type: 'ADT_CASH_DEPOSIT', feeAmountCents: 1470 }, // R14.70 (FNB ADT deposit fee)
+  {
+    pattern: /ADT\s*Cash\s*Deposit/i,
+    type: 'ADT_CASH_DEPOSIT',
+    feeAmountCents: 1470,
+  }, // R14.70 (FNB ADT deposit fee)
   { pattern: /Cash\s*Deposit/i, type: 'CASH_DEPOSIT', feeAmountCents: 1470 }, // R14.70
   { pattern: /ATM\s*Deposit/i, type: 'ATM_DEPOSIT', feeAmountCents: 500 }, // R5.00
 ];
@@ -348,9 +355,10 @@ export class TransactionImportService {
    * Attempt to detect if a transaction is a combined deposit + bank charge
    * and split it into two separate transactions.
    */
-  private tryDetectAndSplitBankCharge(
-    tx: ParsedTransaction,
-  ): { mainTransaction: ParsedTransaction; feeTransaction: ParsedTransaction } | null {
+  private tryDetectAndSplitBankCharge(tx: ParsedTransaction): {
+    mainTransaction: ParsedTransaction;
+    feeTransaction: ParsedTransaction;
+  } | null {
     // Check if description matches bank charge pattern
     const isBankChargeDescription = BANK_CHARGE_DESCRIPTION_PATTERNS.some(
       (pattern) => pattern.test(tx.description),

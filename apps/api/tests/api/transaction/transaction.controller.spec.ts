@@ -1,4 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Decimal } from 'decimal.js';
+import {
+  Transaction,
+  Categorization,
+  DuplicateStatus,
+  VatType,
+  ImportSource,
+  TransactionStatus as PrismaTransactionStatus,
+  CategorizationSource as PrismaCategorizationSource,
+} from '@prisma/client';
 import { TransactionController } from '../../../src/api/transaction/transaction.controller';
 import { TransactionRepository } from '../../../src/database/repositories/transaction.repository';
 import { CategorizationRepository } from '../../../src/database/repositories/categorization.repository';
@@ -8,7 +18,6 @@ import { CategorizationService } from '../../../src/database/services/categoriza
 import { PaymentAllocationService } from '../../../src/database/services/payment-allocation.service';
 import { IUser, UserRole } from '../../../src/database/entities/user.entity';
 import { TransactionStatus } from '../../../src/database/entities/transaction.entity';
-import { CategorizationSource } from '../../../src/database/entities/categorization.entity';
 
 describe('TransactionController', () => {
   let controller: TransactionController;
@@ -24,11 +33,12 @@ describe('TransactionController', () => {
     role: UserRole.OWNER,
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: 'tenant-456',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  const mockTransaction = {
+  const mockTransaction: Transaction = {
     id: 'tx-001',
     tenantId: 'tenant-456',
     xeroTransactionId: null,
@@ -39,29 +49,35 @@ describe('TransactionController', () => {
     reference: 'REF123',
     amountCents: -15000,
     isCredit: false,
-    source: 'CSV_IMPORT',
+    source: ImportSource.CSV_IMPORT,
     importBatchId: 'batch-001',
-    status: TransactionStatus.CATEGORIZED,
+    status: PrismaTransactionStatus.CATEGORIZED,
     isReconciled: false,
     reconciledAt: null,
     isDeleted: false,
     deletedAt: null,
+    transactionHash: null,
+    duplicateOfId: null,
+    duplicateStatus: DuplicateStatus.NONE,
+    reversesTransactionId: null,
+    isReversal: false,
+    xeroAccountCode: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  const mockCategorization = {
+  const mockCategorization: Categorization = {
     id: 'cat-001',
     transactionId: 'tx-001',
     accountCode: '5100',
     accountName: 'Groceries',
-    confidenceScore: 92,
+    confidenceScore: new Decimal(92),
     reasoning: 'Matched grocery store',
-    source: CategorizationSource.AI_AUTO,
+    source: PrismaCategorizationSource.AI_AUTO,
     isSplit: false,
     splitAmountCents: null,
     vatAmountCents: 1957,
-    vatType: 'STANDARD',
+    vatType: VatType.STANDARD,
     reviewedBy: null,
     reviewedAt: null,
     createdAt: new Date(),
@@ -271,7 +287,7 @@ describe('TransactionController', () => {
     it('should handle transaction without categorization', async () => {
       const uncategorizedTx = {
         ...mockTransaction,
-        status: TransactionStatus.PENDING,
+        status: PrismaTransactionStatus.PENDING,
       };
       const paginatedResult = {
         data: [uncategorizedTx],

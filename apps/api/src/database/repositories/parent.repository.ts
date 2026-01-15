@@ -5,7 +5,11 @@ import {
   CreateParentDto,
   UpdateParentDto,
   ParentFilterDto,
+  DEFAULT_PAGE,
+  DEFAULT_LIMIT,
+  MAX_LIMIT,
 } from '../dto/parent.dto';
+import { PaginatedResult } from '../../shared/interfaces';
 import {
   NotFoundException,
   ConflictException,
@@ -75,21 +79,33 @@ export class ParentRepository {
   }
 
   /**
-   * Find parent by ID
+   * Find parent by ID with tenant isolation
+   * TASK-DATA-003: Added includeDeleted option for soft delete support
+   * @param id - Parent ID
+   * @param tenantId - Tenant ID for isolation
+   * @param includeDeleted - Whether to include soft-deleted records (default: false)
    * @returns Parent or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<Parent | null> {
+  async findById(
+    id: string,
+    tenantId: string,
+    includeDeleted = false,
+  ): Promise<Parent | null> {
     try {
-      return await this.prisma.parent.findUnique({
-        where: { id },
+      return await this.prisma.parent.findFirst({
+        where: {
+          id,
+          tenantId,
+          ...(includeDeleted ? {} : { deletedAt: null }),
+        },
         include: {
           children: true, // Include children for the parent
         },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find parent by id: ${id}`,
+        `Failed to find parent by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -101,17 +117,30 @@ export class ParentRepository {
   }
 
   /**
-   * Find all parents for a tenant with optional filters
-   * @returns Array of parents
+   * Find all parents for a tenant with optional filters and pagination
+   * TASK-DATA-004: Added pagination support for memory efficiency
+   * TASK-DATA-003: Added includeDeleted option for soft delete support
+   * @param tenantId - Tenant ID for isolation
+   * @param filter - Filter options including search, isActive, pagination
+   * @param includeDeleted - Whether to include soft-deleted records (default: false)
+   * @returns Paginated array of parents
    * @throws DatabaseException for database errors
    */
   async findByTenant(
     tenantId: string,
     filter: ParentFilterDto,
-  ): Promise<Parent[]> {
+    includeDeleted = false,
+  ): Promise<PaginatedResult<Parent>> {
     try {
+      // TASK-DATA-004: Pagination with sensible defaults
+      const page = filter.page ?? DEFAULT_PAGE;
+      const limit = Math.min(filter.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
+      const skip = (page - 1) * limit;
+
       const where: Prisma.ParentWhereInput = {
         tenantId,
+        // TASK-DATA-003: Exclude soft-deleted records by default
+        ...(includeDeleted ? {} : { deletedAt: null }),
       };
 
       if (filter.isActive !== undefined) {
@@ -126,13 +155,39 @@ export class ParentRepository {
         ];
       }
 
-      return await this.prisma.parent.findMany({
-        where,
-        include: {
-          children: true, // Include children for each parent
+      // Execute count and find in parallel for performance
+      const [total, data] = await Promise.all([
+        this.prisma.parent.count({ where }),
+        this.prisma.parent.findMany({
+          where,
+          include: {
+            children: true, // Include children for each parent
+          },
+          orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+          skip,
+          take: limit,
+        }),
+      ]);
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+
+      this.logger.debug(
+        `TASK-DATA-004: Fetched ${data.length} of ${total} parents (page ${page}/${totalPages}, hasNext=${hasNext}, hasPrev=${hasPrev})`,
+      );
+
+      return {
+        data,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext,
+          hasPrev,
         },
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-      });
+      };
     } catch (error) {
       this.logger.error(
         `Failed to find parents for tenant: ${tenantId}`,
@@ -148,17 +203,25 @@ export class ParentRepository {
 
   /**
    * Find parent by email within a tenant
+   * TASK-DATA-003: Added includeDeleted option for soft delete support
+   * @param tenantId - Tenant ID for isolation
+   * @param email - Email address to search
+   * @param includeDeleted - Whether to include soft-deleted records (default: false)
    * @returns Parent or null if not found
    * @throws DatabaseException for database errors
    */
-  async findByEmail(tenantId: string, email: string): Promise<Parent | null> {
+  async findByEmail(
+    tenantId: string,
+    email: string,
+    includeDeleted = false,
+  ): Promise<Parent | null> {
     try {
-      return await this.prisma.parent.findUnique({
+      // Use findFirst to support the deletedAt filter
+      return await this.prisma.parent.findFirst({
         where: {
-          tenantId_email: {
-            tenantId,
-            email,
-          },
+          tenantId,
+          email,
+          ...(includeDeleted ? {} : { deletedAt: null }),
         },
       });
     } catch (error) {
@@ -198,14 +261,21 @@ export class ParentRepository {
   }
 
   /**
-   * Update a parent
+   * Update a parent with tenant isolation
+   * @param id - Parent ID
+   * @param tenantId - Tenant ID for isolation
+   * @param dto - Update data
    * @throws NotFoundException if parent doesn't exist
    * @throws ConflictException if update causes duplicate email
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdateParentDto): Promise<Parent> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateParentDto,
+  ): Promise<Parent> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Parent', id);
       }
@@ -269,19 +339,190 @@ export class ParentRepository {
   }
 
   /**
-   * Delete a parent (hard delete - cascades to children)
+   * Soft delete a parent (set deletedAt timestamp) with tenant isolation
+   * TASK-DATA-003: Soft delete implementation for data retention
+   * @param id - Parent ID
+   * @param tenantId - Tenant ID for isolation
+   * @param userId - Optional user ID for audit trail
+   * @throws NotFoundException if parent doesn't exist or is already deleted
+   * @throws DatabaseException for database errors
+   */
+  async softDelete(
+    id: string,
+    tenantId: string,
+    userId?: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Step 1: Fetch entity data (excluding already deleted)
+        const existing = await tx.parent.findFirst({
+          where: { id, tenantId, deletedAt: null },
+          include: { children: { select: { id: true } } },
+        });
+
+        if (!existing) {
+          throw new NotFoundException('Parent', id);
+        }
+
+        // Step 2: Create audit log entry
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: userId ?? null,
+            entityType: 'Parent',
+            entityId: id,
+            action: 'DELETE',
+            beforeValue: existing as unknown as Prisma.InputJsonValue,
+            afterValue: {
+              ...existing,
+              deletedAt: new Date(),
+            } as unknown as Prisma.InputJsonValue,
+            changeSummary: `Parent soft-deleted: ${existing.firstName} ${existing.lastName} (${existing.email}), ${existing.children.length} children`,
+          },
+        });
+
+        // Step 3: Set deletedAt timestamp (soft delete)
+        await tx.parent.update({
+          where: { id },
+          data: { deletedAt: new Date() },
+        });
+
+        this.logger.debug(
+          `TASK-DATA-003: Parent ${id} soft-deleted with audit trail`,
+        );
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to soft delete parent: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'softDelete',
+        'Failed to soft delete parent',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Restore a soft-deleted parent
+   * TASK-DATA-003: Restore functionality for accidentally deleted records
+   * @param id - Parent ID
+   * @param tenantId - Tenant ID for isolation
+   * @param userId - Optional user ID for audit trail
+   * @returns Restored parent
+   * @throws NotFoundException if parent doesn't exist or is not deleted
+   * @throws DatabaseException for database errors
+   */
+  async restore(
+    id: string,
+    tenantId: string,
+    userId?: string,
+  ): Promise<Parent> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Step 1: Fetch soft-deleted entity
+        const existing = await tx.parent.findFirst({
+          where: { id, tenantId, deletedAt: { not: null } },
+        });
+
+        if (!existing) {
+          throw new NotFoundException('Parent', id);
+        }
+
+        // Step 2: Create audit log entry
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: userId ?? null,
+            entityType: 'Parent',
+            entityId: id,
+            action: 'UPDATE',
+            beforeValue: existing as unknown as Prisma.InputJsonValue,
+            afterValue: {
+              ...existing,
+              deletedAt: null,
+            } as unknown as Prisma.InputJsonValue,
+            changeSummary: `Parent restored: ${existing.firstName} ${existing.lastName} (${existing.email})`,
+          },
+        });
+
+        // Step 3: Clear deletedAt timestamp (restore)
+        const restored = await tx.parent.update({
+          where: { id },
+          data: { deletedAt: null },
+        });
+
+        this.logger.debug(
+          `TASK-DATA-003: Parent ${id} restored with audit trail`,
+        );
+
+        return restored;
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to restore parent: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'restore',
+        'Failed to restore parent',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Hard delete a parent (permanent deletion - cascades to children) with tenant isolation
+   * TASK-DATA-003: Kept as option for permanent deletion when needed
+   * @param id - Parent ID
+   * @param tenantId - Tenant ID for isolation
+   * @param userId - Optional user ID for audit trail
    * @throws NotFoundException if parent doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string, userId?: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
-      if (!existing) {
-        throw new NotFoundException('Parent', id);
-      }
+      // Use transaction to ensure audit log and delete succeed together
+      await this.prisma.$transaction(async (tx) => {
+        // Step 1: Fetch entity data with children count for audit snapshot (include soft-deleted)
+        const existing = await tx.parent.findFirst({
+          where: { id, tenantId },
+          include: { children: { select: { id: true } } },
+        });
 
-      await this.prisma.parent.delete({
-        where: { id },
+        if (!existing) {
+          throw new NotFoundException('Parent', id);
+        }
+
+        // Step 2: Create audit log entry (transactional)
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: userId ?? null,
+            entityType: 'Parent',
+            entityId: id,
+            action: 'DELETE',
+            beforeValue: existing as unknown as Prisma.InputJsonValue,
+            afterValue: Prisma.DbNull,
+            changeSummary: `Parent permanently deleted: ${existing.firstName} ${existing.lastName} (${existing.email}), ${existing.children.length} children`,
+          },
+        });
+
+        // Step 3: Execute delete (cascades to children)
+        await tx.parent.delete({
+          where: { id },
+        });
+
+        this.logger.debug(
+          `TASK-DATA-003: Parent ${id} permanently deleted with audit trail`,
+        );
       });
     } catch (error) {
       if (error instanceof NotFoundException) {

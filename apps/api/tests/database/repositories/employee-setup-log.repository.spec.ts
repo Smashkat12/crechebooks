@@ -7,7 +7,11 @@ import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { EmployeeSetupLogRepository } from '../../../src/database/repositories/employee-setup-log.repository';
-import { SetupStatus } from '../../../src/database/entities/employee-setup-log.entity';
+import {
+  SetupStatus,
+  PipelineStep,
+  SetupStepStatus,
+} from '../../../src/database/entities/employee-setup-log.entity';
 import { Tenant, Staff } from '@prisma/client';
 
 describe('EmployeeSetupLogRepository', () => {
@@ -182,14 +186,14 @@ describe('EmployeeSetupLogRepository', () => {
   });
 
   describe('findById', () => {
-    it('should find setup log by id', async () => {
+    it('should find setup log by id with matching tenant', async () => {
       const created = await repository.create({
         tenantId: tenant.id,
         staffId: staff.id,
         triggeredBy: 'system',
       });
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(created.id);
@@ -197,7 +201,33 @@ describe('EmployeeSetupLogRepository', () => {
     });
 
     it('should return null for non-existent id', async () => {
-      const found = await repository.findById('non-existent-id');
+      const found = await repository.findById('non-existent-id', tenant.id);
+      expect(found).toBeNull();
+    });
+
+    it('should return null for valid ID but wrong tenant (tenant isolation)', async () => {
+      const created = await repository.create({
+        tenantId: tenant.id,
+        staffId: staff.id,
+        triggeredBy: 'system',
+      });
+
+      // Create another tenant
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Other Creche',
+          addressLine1: '456 Other Street',
+          city: 'Cape Town',
+          province: 'Western Cape',
+          postalCode: '8001',
+          phone: '+27217654321',
+          email: `other${Date.now()}@othercreche.co.za`,
+        },
+      });
+
+      // Try to access setup log with different tenant ID
+      const found = await repository.findById(created.id, otherTenant.id);
+
       expect(found).toBeNull();
     });
   });
@@ -316,7 +346,7 @@ describe('EmployeeSetupLogRepository', () => {
       await repository.markFailed(log.id, {
         errors: [
           {
-            step: 'CREATE_EMPLOYEE',
+            step: PipelineStep.CREATE_EMPLOYEE,
             code: 'ERROR',
             message: 'Failed',
             details: {},
@@ -383,7 +413,7 @@ describe('EmployeeSetupLogRepository', () => {
       const updated = await repository.markFailed(log.id, {
         errors: [
           {
-            step: 'CREATE_EMPLOYEE',
+            step: PipelineStep.CREATE_EMPLOYEE,
             code: 'API_ERROR',
             message: 'Connection failed',
             details: {},
@@ -406,16 +436,26 @@ describe('EmployeeSetupLogRepository', () => {
       const updated = await repository.markFailed(log.id, {
         setupSteps: [
           {
-            step: 'CREATE_EMPLOYEE',
-            status: 'completed',
+            step: PipelineStep.CREATE_EMPLOYEE,
+            status: SetupStepStatus.COMPLETED,
             startedAt: new Date().toISOString(),
             completedAt: new Date().toISOString(),
+            durationMs: 100,
+            error: null,
+            details: {},
+            canRollback: true,
+            rollbackData: null,
           },
           {
-            step: 'ASSIGN_PROFILE',
-            status: 'failed',
+            step: PipelineStep.ASSIGN_PROFILE,
+            status: SetupStepStatus.FAILED,
             startedAt: new Date().toISOString(),
+            completedAt: null,
+            durationMs: null,
             error: 'Failed',
+            details: {},
+            canRollback: false,
+            rollbackData: null,
           },
         ],
         errors: [],
@@ -438,7 +478,7 @@ describe('EmployeeSetupLogRepository', () => {
         [],
         [
           {
-            step: 'CREATE_EMPLOYEE',
+            step: PipelineStep.CREATE_EMPLOYEE,
             code: 'ROLLBACK',
             message: 'Rolled back employee creation',
             details: {},
@@ -470,32 +510,124 @@ describe('EmployeeSetupLogRepository', () => {
   });
 
   describe('delete', () => {
-    it('should delete setup log', async () => {
+    it('should delete setup log with correct tenant', async () => {
       const log = await repository.create({
         tenantId: tenant.id,
         staffId: staff.id,
         triggeredBy: 'system',
       });
 
-      await repository.delete(log.id);
+      await repository.delete(log.id, tenant.id);
 
-      const found = await repository.findById(log.id);
+      const found = await repository.findById(log.id, tenant.id);
       expect(found).toBeNull();
+    });
+
+    it('TC-001: should throw NotFoundException when deleting with wrong tenant (cross-tenant deletion blocked)', async () => {
+      const log = await repository.create({
+        tenantId: tenant.id,
+        staffId: staff.id,
+        triggeredBy: 'system',
+      });
+
+      // Create another tenant
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Other Creche Delete',
+          addressLine1: '456 Other Street',
+          city: 'Cape Town',
+          province: 'Western Cape',
+          postalCode: '8001',
+          phone: '+27217654321',
+          email: `other-delete-${Date.now()}@othercreche.co.za`,
+        },
+      });
+
+      // Attempt cross-tenant deletion - should fail
+      await expect(repository.delete(log.id, otherTenant.id)).rejects.toThrow();
+
+      // Verify original record still exists
+      const found = await repository.findById(log.id, tenant.id);
+      expect(found).not.toBeNull();
+    });
+
+    it('TC-003: should throw NotFoundException for non-existent ID', async () => {
+      await expect(
+        repository.delete('non-existent-id', tenant.id),
+      ).rejects.toThrow();
+    });
+
+    it('TC-004: error message should not leak tenant information', async () => {
+      const log = await repository.create({
+        tenantId: tenant.id,
+        staffId: staff.id,
+        triggeredBy: 'system',
+      });
+
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Leak Test Creche',
+          addressLine1: '789 Test Street',
+          city: 'Durban',
+          province: 'KwaZulu-Natal',
+          postalCode: '4001',
+          phone: '+27317654321',
+          email: `leak-test-${Date.now()}@creche.co.za`,
+        },
+      });
+
+      try {
+        await repository.delete(log.id, otherTenant.id);
+        fail('Expected NotFoundException to be thrown');
+      } catch (error) {
+        // Error message should be generic "not found" - not reveal tenant ownership
+        expect(error.message).not.toContain(tenant.id);
+        expect(error.message).not.toContain(otherTenant.id);
+        expect(error.message).not.toContain('wrong tenant');
+        expect(error.message).not.toContain('different tenant');
+      }
     });
   });
 
   describe('deleteByStaffId', () => {
-    it('should delete setup log by staff id', async () => {
+    it('should delete setup log by staff id with correct tenant', async () => {
       await repository.create({
         tenantId: tenant.id,
         staffId: staff.id,
         triggeredBy: 'system',
       });
 
-      await repository.deleteByStaffId(staff.id);
+      await repository.deleteByStaffId(staff.id, tenant.id);
 
       const found = await repository.findByStaffId(staff.id);
       expect(found).toBeNull();
+    });
+
+    it('should not delete setup logs from other tenants', async () => {
+      await repository.create({
+        tenantId: tenant.id,
+        staffId: staff.id,
+        triggeredBy: 'system',
+      });
+
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Other Staff Delete Creche',
+          addressLine1: '999 Test Street',
+          city: 'Pretoria',
+          province: 'Gauteng',
+          postalCode: '0001',
+          phone: '+27127654321',
+          email: `other-staff-delete-${Date.now()}@creche.co.za`,
+        },
+      });
+
+      // Try to delete with wrong tenant - should not delete the record
+      await repository.deleteByStaffId(staff.id, otherTenant.id);
+
+      // Original record should still exist
+      const found = await repository.findByStaffId(staff.id);
+      expect(found).not.toBeNull();
     });
   });
 

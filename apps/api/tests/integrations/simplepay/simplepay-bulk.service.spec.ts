@@ -205,7 +205,10 @@ describe('SimplePayBulkService', () => {
 
       const result = await service.processBulkInput(tenant.id, request);
 
-      const log = await bulkOperationRepo.findById(result.operationId);
+      const log = await bulkOperationRepo.findById(
+        result.operationId,
+        tenant.id,
+      );
       expect(log).toBeDefined();
       expect(log?.operationType).toBe(BulkOperationType.GENERIC_INPUT);
       expect(log?.status).toBe(BulkOperationStatus.COMPLETED);
@@ -770,7 +773,7 @@ describe('SimplePayBulkService', () => {
         executedBy: 'admin@test.com',
       });
 
-      const log = await service.getOperationLog(result.operationId);
+      const log = await service.getOperationLog(tenant.id, result.operationId);
 
       expect(log).toBeDefined();
       expect(log.id).toBe(result.operationId);

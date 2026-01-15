@@ -96,10 +96,10 @@ export class ChildController {
     );
 
     // 1. Validate parent exists and belongs to tenant
-    const parent = await this.parentRepo.findById(dto.parent_id);
-    if (!parent || parent.tenantId !== user.tenantId) {
+    const parent = await this.parentRepo.findById(dto.parent_id, user.tenantId);
+    if (!parent) {
       this.logger.error(
-        `Parent not found or tenant mismatch: ${dto.parent_id} for tenant ${user.tenantId}`,
+        `Parent not found: ${dto.parent_id} for tenant ${user.tenantId}`,
       );
       throw new NotFoundException('Parent', dto.parent_id);
     }
@@ -107,10 +107,11 @@ export class ChildController {
     // 2. Validate fee structure exists and belongs to tenant
     const feeStructure = await this.feeStructureRepo.findById(
       dto.fee_structure_id,
+      user.tenantId,
     );
-    if (!feeStructure || feeStructure.tenantId !== user.tenantId) {
+    if (!feeStructure) {
       this.logger.error(
-        `Fee structure not found or tenant mismatch: ${dto.fee_structure_id} for tenant ${user.tenantId}`,
+        `Fee structure not found: ${dto.fee_structure_id} for tenant ${user.tenantId}`,
       );
       throw new NotFoundException('FeeStructure', dto.fee_structure_id);
     }
@@ -244,7 +245,7 @@ export class ChildController {
       { id: string; name: string; email: string }
     >();
     for (const parentId of parentIds) {
-      const parent = await this.parentRepo.findById(parentId);
+      const parent = await this.parentRepo.findById(parentId, tenantId);
       if (parent) {
         parentMap.set(parentId, {
           id: parent.id,
@@ -271,6 +272,7 @@ export class ChildController {
       if (activeEnrollment) {
         const feeStructure = await this.feeStructureRepo.findById(
           activeEnrollment.feeStructureId,
+          tenantId,
         );
         if (feeStructure) {
           enrollmentDetailsMap.set(child.id, {
@@ -311,6 +313,10 @@ export class ChildController {
       };
     });
 
+    // TASK-DATA-004: Include hasNext/hasPrev in pagination metadata
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
     return {
       success: true,
       data,
@@ -319,6 +325,8 @@ export class ChildController {
         limit,
         total,
         totalPages,
+        hasNext,
+        hasPrev,
       },
     };
   }
@@ -339,16 +347,17 @@ export class ChildController {
     this.logger.debug(`Getting child: ${id} for tenant ${user.tenantId}`);
 
     // 1. Find child and verify tenant isolation
-    const child = await this.childRepo.findById(id);
-    if (!child || child.tenantId !== user.tenantId) {
-      this.logger.error(
-        `Child not found or tenant mismatch: ${id} for tenant ${user.tenantId}`,
-      );
+    const child = await this.childRepo.findById(id, user.tenantId);
+    if (!child) {
+      this.logger.error(`Child not found: ${id} for tenant ${user.tenantId}`);
       throw new NotFoundException('Child', id);
     }
 
     // 2. Find parent
-    const parent = await this.parentRepo.findById(child.parentId);
+    const parent = await this.parentRepo.findById(
+      child.parentId,
+      user.tenantId,
+    );
     if (!parent) {
       this.logger.error(`Parent ${child.parentId} not found for child ${id}`);
       throw new Error(`Failed to load parent for child ${id}`);
@@ -371,6 +380,7 @@ export class ChildController {
     if (activeEnrollment) {
       const feeStructure = await this.feeStructureRepo.findById(
         activeEnrollment.feeStructureId,
+        user.tenantId,
       );
       if (!feeStructure) {
         this.logger.error(
@@ -442,16 +452,14 @@ export class ChildController {
     this.logger.log(`Update child: ${id} for tenant ${user.tenantId}`);
 
     // 1. Find child and verify tenant isolation
-    const child = await this.childRepo.findById(id);
-    if (!child || child.tenantId !== user.tenantId) {
-      this.logger.error(
-        `Child not found or tenant mismatch: ${id} for tenant ${user.tenantId}`,
-      );
+    const child = await this.childRepo.findById(id, user.tenantId);
+    if (!child) {
+      this.logger.error(`Child not found: ${id} for tenant ${user.tenantId}`);
       throw new NotFoundException('Child', id);
     }
 
     // 2. Update child (API snake_case -> Repository camelCase)
-    const updated = await this.childRepo.update(id, {
+    const updated = await this.childRepo.update(id, user.tenantId, {
       firstName: dto.first_name,
       lastName: dto.last_name,
       gender: dto.gender,

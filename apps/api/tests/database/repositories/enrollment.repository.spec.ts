@@ -250,7 +250,7 @@ describe('EnrollmentRepository', () => {
   describe('findById', () => {
     it('should find enrollment by id', async () => {
       const created = await repository.create(testEnrollmentData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -261,6 +261,7 @@ describe('EnrollmentRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -448,7 +449,7 @@ describe('EnrollmentRepository', () => {
     it('should update enrollment fields', async () => {
       const created = await repository.create(testEnrollmentData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         status: EnrollmentStatus.WITHDRAWN,
         endDate: new Date('2025-06-30'),
         notes: 'Updated notes',
@@ -462,16 +463,20 @@ describe('EnrollmentRepository', () => {
 
     it('should throw NotFoundException for non-existent enrollment', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          status: EnrollmentStatus.WITHDRAWN,
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            status: EnrollmentStatus.WITHDRAWN,
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should allow changing fee structure', async () => {
       const created = await repository.create(testEnrollmentData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         feeStructureId: otherFeeStructure.id,
       });
 
@@ -482,7 +487,7 @@ describe('EnrollmentRepository', () => {
       const created = await repository.create(testEnrollmentData);
 
       await expect(
-        repository.update(created.id, {
+        repository.update(created.id, testTenant.id, {
           feeStructureId: '00000000-0000-0000-0000-000000000000',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -491,7 +496,7 @@ describe('EnrollmentRepository', () => {
     it('should allow adding custom fee override', async () => {
       const created = await repository.create(testEnrollmentData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         siblingDiscountApplied: true,
         customFeeOverrideCents: 380000,
       });
@@ -505,15 +510,18 @@ describe('EnrollmentRepository', () => {
     it('should delete existing enrollment', async () => {
       const created = await repository.create(testEnrollmentData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent enrollment', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -522,7 +530,7 @@ describe('EnrollmentRepository', () => {
     it('should withdraw enrollment', async () => {
       const created = await repository.create(testEnrollmentData);
 
-      const withdrawn = await repository.withdraw(created.id);
+      const withdrawn = await repository.withdraw(created.id, testTenant.id);
 
       expect(withdrawn.status).toBe('WITHDRAWN');
       expect(withdrawn.endDate).toBeInstanceOf(Date);
@@ -536,7 +544,10 @@ describe('EnrollmentRepository', () => {
 
     it('should throw NotFoundException for non-existent enrollment', async () => {
       await expect(
-        repository.withdraw('00000000-0000-0000-0000-000000000000'),
+        repository.withdraw(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -546,7 +557,10 @@ describe('EnrollmentRepository', () => {
       const enrollment = await repository.create(testEnrollmentData);
 
       // Verify enrollment exists
-      const enrollmentBefore = await repository.findById(enrollment.id);
+      const enrollmentBefore = await repository.findById(
+        enrollment.id,
+        testTenant.id,
+      );
       expect(enrollmentBefore).not.toBeNull();
 
       // Delete child (parent of enrollment)
@@ -555,7 +569,10 @@ describe('EnrollmentRepository', () => {
       });
 
       // Verify enrollment is also deleted (cascade)
-      const enrollmentAfter = await repository.findById(enrollment.id);
+      const enrollmentAfter = await repository.findById(
+        enrollment.id,
+        testTenant.id,
+      );
       expect(enrollmentAfter).toBeNull();
     });
 
@@ -597,7 +614,10 @@ describe('EnrollmentRepository', () => {
       const enrollment = await repository.create(testEnrollmentData);
 
       // Verify enrollment exists
-      const enrollmentBefore = await repository.findById(enrollment.id);
+      const enrollmentBefore = await repository.findById(
+        enrollment.id,
+        testTenant.id,
+      );
       expect(enrollmentBefore).not.toBeNull();
 
       // Delete parent (cascades to child, then to enrollment)
@@ -606,7 +626,10 @@ describe('EnrollmentRepository', () => {
       });
 
       // Verify enrollment is also deleted (double cascade)
-      const enrollmentAfter = await repository.findById(enrollment.id);
+      const enrollmentAfter = await repository.findById(
+        enrollment.id,
+        testTenant.id,
+      );
       expect(enrollmentAfter).toBeNull();
     });
   });
@@ -643,13 +666,13 @@ describe('EnrollmentRepository', () => {
       expect(pending.status).toBe(EnrollmentStatus.PENDING);
 
       // Update to ACTIVE
-      const active = await repository.update(pending.id, {
+      const active = await repository.update(pending.id, testTenant.id, {
         status: EnrollmentStatus.ACTIVE,
       });
       expect(active.status).toBe(EnrollmentStatus.ACTIVE);
 
       // Update to GRADUATED
-      const graduated = await repository.update(pending.id, {
+      const graduated = await repository.update(pending.id, testTenant.id, {
         status: EnrollmentStatus.GRADUATED,
         endDate: new Date('2025-12-15'),
       });

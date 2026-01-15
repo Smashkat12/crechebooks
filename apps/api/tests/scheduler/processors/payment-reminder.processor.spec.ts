@@ -155,7 +155,7 @@ describe('PaymentReminderProcessor Integration Tests', () => {
         city: 'Cape Town',
         province: 'Western Cape',
         postalCode: '8000',
-        taxStatus: TaxStatus.NOT_VAT_REGISTERED,
+        taxStatus: TaxStatus.NOT_REGISTERED,
       },
     });
 

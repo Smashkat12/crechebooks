@@ -372,8 +372,8 @@ export class SimplePayProfileService {
     staffId: string,
   ): Promise<SuggestedProfileDto[]> {
     // Get staff details
-    const staff = await this.staffRepo.findById(staffId);
-    if (!staff || staff.tenantId !== tenantId) {
+    const staff = await this.staffRepo.findById(staffId, tenantId);
+    if (!staff) {
       throw new Error(`Staff ${staffId} not found`);
     }
 
@@ -446,7 +446,7 @@ export class SimplePayProfileService {
     const summaries: StaffProfileSummary[] = [];
 
     for (const staffId of staffIds) {
-      const staff = await this.staffRepo.findById(staffId);
+      const staff = await this.staffRepo.findById(staffId, tenantId);
       if (!staff) continue;
 
       const employeeMapping =
@@ -524,7 +524,7 @@ export class SimplePayProfileService {
     const remoteMappingIds = new Set(remoteMappings.map((m) => m.id));
     for (const local of localMappings) {
       if (!remoteMappingIds.has(local.simplePayMappingId)) {
-        await this.profileMappingRepo.delete(local.id);
+        await this.profileMappingRepo.delete(local.id, tenantId);
         removed++;
       }
     }

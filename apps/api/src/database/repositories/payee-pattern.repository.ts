@@ -72,18 +72,20 @@ export class PayeePatternRepository {
   }
 
   /**
-   * Find payee pattern by ID
+   * Find payee pattern by ID with tenant isolation
+   * @param id - Payee pattern ID
+   * @param tenantId - Tenant ID for isolation
    * @returns PayeePattern or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<PayeePattern | null> {
+  async findById(id: string, tenantId: string): Promise<PayeePattern | null> {
     try {
-      return await this.prisma.payeePattern.findUnique({
-        where: { id },
+      return await this.prisma.payeePattern.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find payee pattern by id: ${id}`,
+        `Failed to find payee pattern by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -205,9 +207,12 @@ export class PayeePatternRepository {
    * @throws NotFoundException if pattern doesn't exist
    * @throws DatabaseException for database errors
    */
-  async incrementMatchCount(id: string): Promise<PayeePattern> {
+  async incrementMatchCount(
+    id: string,
+    tenantId: string,
+  ): Promise<PayeePattern> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('PayeePattern', id);
       }
@@ -241,9 +246,13 @@ export class PayeePatternRepository {
    * @throws ConflictException if update causes duplicate
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdatePayeePatternDto): Promise<PayeePattern> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdatePayeePatternDto,
+  ): Promise<PayeePattern> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('PayeePattern', id);
       }
@@ -325,9 +334,9 @@ export class PayeePatternRepository {
    * @throws NotFoundException if pattern doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('PayeePattern', id);
       }

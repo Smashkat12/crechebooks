@@ -1,3 +1,15 @@
+/**
+ * Authentication Hook
+ * TASK-UI-001: Removed localStorage token storage for XSS protection
+ *
+ * Authentication is now handled via:
+ * - NextAuth session cookies (managed by NextAuth)
+ * - HttpOnly cookies for API authentication (set by backend)
+ *
+ * No localStorage is used for tokens - this prevents XSS attacks from
+ * stealing authentication credentials.
+ */
+
 'use client';
 
 import { useSession, signIn, signOut } from 'next-auth/react';
@@ -9,15 +21,13 @@ export function useAuth() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Sync token to localStorage when session changes
+  // TASK-UI-001: Reset auth state when session is authenticated
+  // No localStorage storage - cookies handle authentication automatically
   useEffect(() => {
-    if (status === 'authenticated' && session?.accessToken) {
-      localStorage.setItem('token', session.accessToken);
+    if (status === 'authenticated') {
       resetAuthState(); // Reset 401 handling flag on successful auth
-    } else if (status === 'unauthenticated') {
-      localStorage.removeItem('token');
     }
-  }, [session, status]);
+  }, [status]);
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -39,7 +49,16 @@ export function useAuth() {
   );
 
   const logout = useCallback(async () => {
-    localStorage.removeItem('token');
+    // TASK-UI-001: Call backend logout to clear HttpOnly cookie
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/v1/auth/logout`, {
+        method: 'POST',
+        credentials: 'include', // Send HttpOnly cookie
+      });
+    } catch {
+      // Continue with signOut even if backend call fails
+    }
+    // Sign out from NextAuth session
     await signOut({ redirect: false });
     router.push('/login');
     router.refresh();
@@ -47,6 +66,8 @@ export function useAuth() {
 
   return {
     user: session?.user ?? null,
+    // TASK-UI-001: accessToken is still available from session for backward compatibility
+    // but should not be stored in localStorage or exposed to JavaScript
     accessToken: session?.accessToken,
     isAuthenticated: !!session?.user,
     isLoading: status === 'loading',

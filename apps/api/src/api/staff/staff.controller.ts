@@ -134,8 +134,8 @@ export class StaffController {
     @CurrentUser() user: IUser,
     @Param('id') id: string,
   ): Promise<Record<string, unknown>> {
-    const staff = await this.staffRepository.findById(id);
-    if (!staff || staff.tenantId !== user.tenantId) {
+    const staff = await this.staffRepository.findById(id, user.tenantId);
+    if (!staff) {
       throw new NotFoundException('Staff member not found');
     }
     return toSnakeCase(staff);
@@ -237,11 +237,11 @@ export class StaffController {
     @Body() dto: UpdateStaffDto,
   ): Promise<Record<string, unknown>> {
     // Verify staff belongs to tenant
-    const existing = await this.staffRepository.findById(id);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const existing = await this.staffRepository.findById(id, user.tenantId);
+    if (!existing) {
       throw new NotFoundException('Staff member not found');
     }
-    const staff = await this.staffRepository.update(id, dto);
+    const staff = await this.staffRepository.update(id, user.tenantId, dto);
     return toSnakeCase(staff);
   }
 
@@ -257,11 +257,11 @@ export class StaffController {
     @Param('id') id: string,
   ): Promise<void> {
     // Verify staff belongs to tenant
-    const existing = await this.staffRepository.findById(id);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const existing = await this.staffRepository.findById(id, user.tenantId);
+    if (!existing) {
       throw new NotFoundException('Staff member not found');
     }
     // Use deactivate instead of hard delete to preserve payroll history
-    await this.staffRepository.deactivate(id);
+    await this.staffRepository.deactivate(id, user.tenantId);
   }
 }

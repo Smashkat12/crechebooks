@@ -102,14 +102,14 @@ export class StaffCreatedHandler {
    * Handle employee.setup.completed event for logging/notification
    */
   @OnEvent('employee.setup.completed', { async: true })
-  async handleSetupCompleted(event: {
+  handleSetupCompleted(event: {
     tenantId: string;
     staffId: string;
     simplePayEmployeeId: string | null;
     profileAssigned: string | null;
     setupLogId: string;
     triggeredBy: string;
-  }): Promise<void> {
+  }): void {
     this.logger.log(
       `Employee setup completed: staffId=${event.staffId}, ` +
         `simplePayId=${event.simplePayEmployeeId}, profile=${event.profileAssigned}`,
@@ -123,13 +123,13 @@ export class StaffCreatedHandler {
    * Handle employee.setup.failed event for alerting
    */
   @OnEvent('employee.setup.failed', { async: true })
-  async handleSetupFailed(event: {
+  handleSetupFailed(event: {
     tenantId: string;
     staffId: string;
     setupLogId: string;
     triggeredBy: string;
     errors: Array<{ step: string; code: string; message: string }>;
-  }): Promise<void> {
+  }): void {
     this.logger.warn(
       `Employee setup failed: staffId=${event.staffId}, ` +
         `errors: ${event.errors.map((e) => `${e.step}: ${e.message}`).join('; ')}`,

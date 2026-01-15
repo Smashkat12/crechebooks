@@ -330,7 +330,7 @@ describe('InvoiceLineRepository', () => {
   describe('findById', () => {
     it('should find line by id', async () => {
       const created = await repository.create(testLineData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -340,6 +340,7 @@ describe('InvoiceLineRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -382,7 +383,7 @@ describe('InvoiceLineRepository', () => {
     it('should update line fields', async () => {
       const created = await repository.create(testLineData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         description: 'Updated Description',
         unitPriceCents: 500000,
         discountCents: 50000,
@@ -400,16 +401,20 @@ describe('InvoiceLineRepository', () => {
 
     it('should throw NotFoundException for non-existent line', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          description: 'Test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            description: 'Test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should allow changing line type', async () => {
       const created = await repository.create(testLineData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         lineType: LineType.EXTRA,
       });
 
@@ -419,7 +424,7 @@ describe('InvoiceLineRepository', () => {
     it('should allow updating sortOrder', async () => {
       const created = await repository.create(testLineData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         sortOrder: 5,
       });
 
@@ -431,15 +436,18 @@ describe('InvoiceLineRepository', () => {
     it('should delete existing line', async () => {
       const created = await repository.create(testLineData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent line', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -522,7 +530,7 @@ describe('InvoiceLineRepository', () => {
       const line = await repository.create(testLineData);
 
       // Verify line exists
-      const lineBefore = await repository.findById(line.id);
+      const lineBefore = await repository.findById(line.id, testTenant.id);
       expect(lineBefore).not.toBeNull();
 
       // Delete invoice
@@ -531,7 +539,7 @@ describe('InvoiceLineRepository', () => {
       });
 
       // Verify line is also deleted (cascade)
-      const lineAfter = await repository.findById(line.id);
+      const lineAfter = await repository.findById(line.id, testTenant.id);
       expect(lineAfter).toBeNull();
     });
 

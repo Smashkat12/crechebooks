@@ -25,9 +25,13 @@ describe('SarsController - EMP201 Endpoint', () => {
   const ownerUser: IUser = {
     id: 'user-owner-id',
     tenantId: 'tenant-123',
+    auth0Id: 'auth0|owner123',
     email: 'owner@example.com',
+    name: 'Owner User',
     role: UserRole.OWNER,
     isActive: true,
+    lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -35,9 +39,13 @@ describe('SarsController - EMP201 Endpoint', () => {
   const adminUser: IUser = {
     id: 'user-admin-id',
     tenantId: 'tenant-123',
+    auth0Id: 'auth0|admin456',
     email: 'admin@example.com',
+    name: 'Admin User',
     role: UserRole.ADMIN,
     isActive: true,
+    lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -45,9 +53,13 @@ describe('SarsController - EMP201 Endpoint', () => {
   const accountantUser: IUser = {
     id: 'user-accountant-id',
     tenantId: 'tenant-123',
+    auth0Id: 'auth0|accountant789',
     email: 'accountant@example.com',
+    name: 'Accountant User',
     role: UserRole.ACCOUNTANT,
     isActive: true,
+    lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -115,7 +127,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           ],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -125,6 +137,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       // Use jest.spyOn() to verify service call
@@ -198,7 +213,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           employees: [],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -208,6 +223,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       const spy = jest
@@ -248,7 +266,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           employees: [],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -258,6 +276,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       jest
@@ -299,7 +320,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           employees: [],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -309,6 +330,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       jest
@@ -371,7 +395,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           ],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -381,6 +405,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       jest
@@ -434,7 +461,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           employees: [],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -444,6 +471,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       jest
@@ -491,7 +521,7 @@ describe('SarsController - EMP201 Endpoint', () => {
             'Invalid UIF calculation for staff-456',
           ],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -501,6 +531,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       jest
@@ -541,7 +574,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           employees: [],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -551,6 +584,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       const spy = jest
@@ -593,7 +629,7 @@ describe('SarsController - EMP201 Endpoint', () => {
           employees: [],
           validationIssues: [],
         },
-        documentUrl: null,
+        notes: null,
         submittedBy: null,
         submittedAt: null,
         sarsReference: null,
@@ -603,6 +639,9 @@ describe('SarsController - EMP201 Endpoint', () => {
         outputVatCents: null,
         inputVatCents: null,
         netVatCents: null,
+        totalPayeCents: null,
+        totalUifCents: null,
+        totalSdlCents: null,
       };
 
       const spy = jest

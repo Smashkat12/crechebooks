@@ -37,6 +37,7 @@ describe('InvoiceController - Send Invoices', () => {
     name: 'School Owner',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

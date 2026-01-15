@@ -250,7 +250,7 @@ export class RecurringDetectionService {
 
     if (existing) {
       // Update existing pattern
-      pattern = await this.payeePatternRepo.update(existing.id, {
+      pattern = await this.payeePatternRepo.update(existing.id, tenantId, {
         isRecurring: true,
         expectedAmountCents: dto.expectedAmountCents,
         amountVariancePercent: dto.amountVariancePercent,
@@ -303,7 +303,10 @@ export class RecurringDetectionService {
     }
 
     // Increment match count on the pattern
-    await this.payeePatternRepo.incrementMatchCount(recurringMatch.patternId);
+    await this.payeePatternRepo.incrementMatchCount(
+      recurringMatch.patternId,
+      tenantId,
+    );
 
     this.logger.log(
       `Applied recurring category to transaction ${transactionId}`,

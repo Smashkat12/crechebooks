@@ -95,7 +95,7 @@ export class PaymentReceiptService {
 
     // 4. Generate receipt number
     const year = new Date(payment.paymentDate).getFullYear();
-    const receiptNumber = await this.generateReceiptNumber(tenantId, year);
+    const receiptNumber = this.generateReceiptNumber(tenantId, year);
     receiptData.receiptNumber = receiptNumber;
 
     // 5. Create PDF
@@ -120,7 +120,7 @@ export class PaymentReceiptService {
    * @param year - Year for receipt number
    * @returns Sequential receipt number
    */
-  async generateReceiptNumber(tenantId: string, year: number): Promise<string> {
+  generateReceiptNumber(tenantId: string, year: number): string {
     // Find highest existing receipt number for this tenant and year
     // Receipts are stored in filesystem, so we track sequence separately
     const yearPrefix = `REC-${year}-`;
@@ -410,10 +410,7 @@ export class PaymentReceiptService {
    * @param receiptNumber - Receipt number
    * @returns File path or null if not found
    */
-  async getReceiptFilePath(
-    tenantId: string,
-    receiptNumber: string,
-  ): Promise<string | null> {
+  getReceiptFilePath(tenantId: string, receiptNumber: string): string | null {
     const filePath = path.join(
       this.uploadDir,
       tenantId,
@@ -428,10 +425,10 @@ export class PaymentReceiptService {
    * @param paymentId - Payment ID
    * @returns Receipt info or null if not found
    */
-  async findReceiptByPaymentId(
+  findReceiptByPaymentId(
     tenantId: string,
-    paymentId: string,
-  ): Promise<ReceiptResult | null> {
+    _paymentId: string,
+  ): ReceiptResult | null {
     const tenantDir = path.join(this.uploadDir, tenantId);
     if (!fs.existsSync(tenantDir)) {
       return null;

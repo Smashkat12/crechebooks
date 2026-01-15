@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import { ConfigModule } from './config/config.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './database/prisma';
@@ -8,10 +10,41 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';
+import { CustomThrottlerGuard } from './common/guards/throttle.guard';
+import { LoggerModule } from './common/logger';
 
 @Module({
   imports: [
     ConfigModule,
+    // TASK-INFRA-005: Structured JSON logging with correlation ID
+    LoggerModule,
+    // TASK-INFRA-003: Global rate limiting with configurable throttlers
+    ThrottlerModule.forRootAsync({
+      imports: [],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [
+          {
+            name: 'short',
+            ttl: config.get<number>('THROTTLE_SHORT_TTL', 1000), // 1 second
+            limit: config.get<number>('THROTTLE_SHORT_LIMIT', 10), // 10 per second
+          },
+          {
+            name: 'medium',
+            ttl: config.get<number>('THROTTLE_MEDIUM_TTL', 60000), // 1 minute
+            limit: config.get<number>('THROTTLE_MEDIUM_LIMIT', 100), // 100 per minute
+          },
+          {
+            name: 'long',
+            ttl: config.get<number>('THROTTLE_LONG_TTL', 3600000), // 1 hour
+            limit: config.get<number>('THROTTLE_LONG_LIMIT', 1000), // 1000 per hour
+          },
+        ],
+        // Note: Redis storage can be enabled in production via env config
+        // To enable Redis storage, install @nestjs/throttler-redis and configure:
+        // storage: new ThrottlerStorageRedisService(redisConfig),
+      }),
+    }),
     PrismaModule,
     HealthModule,
     ApiModule,
@@ -20,6 +53,11 @@ import { RolesGuard } from './api/auth/guards/roles.guard';
   ],
   controllers: [],
   providers: [
+    // TASK-INFRA-003: Apply throttler guard globally (first to block abusive traffic early)
+    {
+      provide: APP_GUARD,
+      useClass: CustomThrottlerGuard,
+    },
     // Apply JwtAuthGuard globally - use @Public() to skip
     {
       provide: APP_GUARD,

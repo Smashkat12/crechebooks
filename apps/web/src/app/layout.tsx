@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import { Providers } from '@/components/providers';
 import { Toaster } from '@/components/ui/toaster';
+import { DefaultSkipLinks } from '@/components/ui/skip-link';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -20,6 +21,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        {/* TASK-UI-007: Skip links for keyboard/screen reader accessibility */}
+        <DefaultSkipLinks />
         <Providers>{children}</Providers>
         <Toaster />
       </body>

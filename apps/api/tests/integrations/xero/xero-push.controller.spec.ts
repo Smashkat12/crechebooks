@@ -26,10 +26,42 @@ jest.mock('../../../src/mcp/xero-mcp/auth/token-manager', () => ({
   })),
 }));
 
+// Define mock types for Prisma methods
+interface MockTransactionMethods {
+  findMany: jest.Mock;
+}
+
+interface MockTenantMethods {
+  findUnique: jest.Mock;
+  update: jest.Mock;
+}
+
+interface MockBankConnectionMethods {
+  findFirst: jest.Mock;
+}
+
+interface MockXeroTokenMethods {
+  findUnique: jest.Mock;
+}
+
+interface MockXeroOAuthStateMethods {
+  upsert: jest.Mock;
+  findUnique: jest.Mock;
+  delete: jest.Mock;
+}
+
+interface MockPrismaService {
+  transaction: MockTransactionMethods;
+  tenant: MockTenantMethods;
+  bankConnection: MockBankConnectionMethods;
+  xeroToken: MockXeroTokenMethods;
+  xeroOAuthState: MockXeroOAuthStateMethods;
+}
+
 describe('XeroController - Push Categorizations', () => {
   let controller: XeroController;
   let xeroSyncService: jest.Mocked<XeroSyncService>;
-  let prisma: jest.Mocked<PrismaService>;
+  let prisma: MockPrismaService;
   let syncGateway: jest.Mocked<XeroSyncGateway>;
   let mockTokenManager: { hasValidConnection: jest.Mock };
 
@@ -42,6 +74,7 @@ describe('XeroController - Push Categorizations', () => {
     role: UserRole.OWNER,
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: 'tenant-456',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -94,31 +127,33 @@ describe('XeroController - Push Categorizations', () => {
     };
     (TokenManager as jest.Mock).mockImplementation(() => mockTokenManager);
 
+    const mockPrismaService: MockPrismaService = {
+      transaction: {
+        findMany: jest.fn(),
+      },
+      tenant: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      bankConnection: {
+        findFirst: jest.fn(),
+      },
+      xeroToken: {
+        findUnique: jest.fn(),
+      },
+      xeroOAuthState: {
+        upsert: jest.fn(),
+        findUnique: jest.fn(),
+        delete: jest.fn(),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [XeroController],
       providers: [
         {
           provide: PrismaService,
-          useValue: {
-            transaction: {
-              findMany: jest.fn(),
-            },
-            tenant: {
-              findUnique: jest.fn(),
-              update: jest.fn(),
-            },
-            bankConnection: {
-              findFirst: jest.fn(),
-            },
-            xeroToken: {
-              findUnique: jest.fn(),
-            },
-            xeroOAuthState: {
-              upsert: jest.fn(),
-              findUnique: jest.fn(),
-              delete: jest.fn(),
-            },
-          },
+          useValue: mockPrismaService,
         },
         {
           provide: BankFeedService,

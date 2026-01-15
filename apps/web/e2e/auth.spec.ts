@@ -1,8 +1,15 @@
 import { test, expect } from '@playwright/test';
+import { login } from './fixtures/auth.fixture';
+
+// E2E test credentials - sourced from environment variables only
+// SECURITY: No fallback values - credentials must come from environment
+const E2E_TEST_EMAIL = process.env.E2E_TEST_EMAIL;
+const E2E_TEST_PASSWORD = process.env.E2E_TEST_PASSWORD;
 
 /**
  * Authentication E2E Tests
  * Tests login, logout, and authentication protection
+ * Credentials are sourced from environment variables (E2E_TEST_EMAIL, E2E_TEST_PASSWORD)
  */
 
 test.describe('Authentication', () => {
@@ -18,27 +25,11 @@ test.describe('Authentication', () => {
     await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
   });
 
-  test('should show dev mode hint in development', async ({ page }) => {
-    await page.goto('/login');
-
-    // Dev mode should show test credentials hint
-    await expect(page.getByText(/admin@crechebooks.co.za/)).toBeVisible();
-  });
-
   test('should login with valid dev credentials', async ({ page }) => {
-    await page.goto('/login');
+    // This test uses the centralized login function which reads credentials from env
+    await login(page);
 
-    // Fill in credentials
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-
-    // Submit form
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for navigation to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-
-    // Should be on dashboard
+    // Should be on dashboard after login
     await expect(page).toHaveURL(/.*dashboard/);
   });
 
@@ -75,14 +66,8 @@ test.describe('Authentication', () => {
   });
 
   test('should logout successfully', async ({ page }) => {
-    // First login
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for navigation to dashboard
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
+    // Use centralized login function
+    await login(page);
     await expect(page).toHaveURL(/.*dashboard/);
 
     // Find and click logout - may be in dropdown menu

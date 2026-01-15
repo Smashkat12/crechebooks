@@ -37,6 +37,7 @@ describe('ReconciliationController - reconcile', () => {
     name: 'School Owner',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -50,6 +51,7 @@ describe('ReconciliationController - reconcile', () => {
     name: 'School Admin',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -63,6 +65,7 @@ describe('ReconciliationController - reconcile', () => {
     name: 'School Accountant',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

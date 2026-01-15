@@ -21,7 +21,9 @@ export class TenantRepository {
       return await this.prisma.tenant.create({
         data: {
           ...rest,
-          closureDates: closureDates ? JSON.parse(JSON.stringify(closureDates)) : [],
+          closureDates: closureDates
+            ? JSON.parse(JSON.stringify(closureDates))
+            : [],
         },
       });
     } catch (error) {

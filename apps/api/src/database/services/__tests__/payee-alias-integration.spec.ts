@@ -20,11 +20,12 @@ import { CategorizationRepository } from '../../repositories/categorization.repo
 import { AuditLogService } from '../audit-log.service';
 import { PayeeVariationDetectorService } from '../payee-variation-detector.service';
 import { CorrectionConflictService } from '../correction-conflict.service';
-import { Transaction, PayeePattern } from '@prisma/client';
+import { Transaction, PayeePattern, DuplicateStatus } from '@prisma/client';
 import {
   ImportSource,
   TransactionStatus,
 } from '../../entities/transaction.entity';
+import { Decimal } from 'decimal.js';
 
 describe('PayeeAlias Integration', () => {
   let payeeAliasService: PayeeAliasService;
@@ -46,7 +47,7 @@ describe('PayeeAlias Integration', () => {
     payeeAliases: [],
     defaultAccountCode: '5100',
     defaultAccountName: 'Groceries',
-    confidenceBoost: 10,
+    confidenceBoost: new Decimal(10),
     matchCount: 5,
     isRecurring: false,
     expectedAmountCents: null,
@@ -73,6 +74,12 @@ describe('PayeeAlias Integration', () => {
     reconciledAt: null,
     isDeleted: false,
     deletedAt: null,
+    transactionHash: null,
+    duplicateOfId: null,
+    duplicateStatus: DuplicateStatus.NONE,
+    reversesTransactionId: null,
+    isReversal: false,
+    xeroAccountCode: null,
     createdAt: new Date('2024-01-15'),
     updatedAt: new Date('2024-01-15'),
   };
@@ -181,7 +188,7 @@ describe('PayeeAlias Integration', () => {
         })
         .mockResolvedValueOnce({
           ...mockPattern,
-          confidenceBoost: 15,
+          confidenceBoost: new Decimal(15),
         });
 
       // Act: User corrects transaction with alias payee

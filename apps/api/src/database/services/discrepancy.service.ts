@@ -49,11 +49,8 @@ export class DiscrepancyService {
     );
 
     // Get reconciliation with tenant validation
-    const recon = await this.reconciliationRepo.findById(reconId);
+    const recon = await this.reconciliationRepo.findById(reconId, tenantId);
     if (!recon) {
-      throw new NotFoundException('Reconciliation', reconId);
-    }
-    if (recon.tenantId !== tenantId) {
       throw new NotFoundException('Reconciliation', reconId);
     }
 

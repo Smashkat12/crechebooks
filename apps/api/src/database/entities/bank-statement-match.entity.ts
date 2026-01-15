@@ -1,14 +1,101 @@
 /**
  * Bank Statement Match Entity Types
  * TASK-RECON-019: Bank Statement to Xero Reconciliation
+ * TASK-RECON-004: Duplicate Detection
+ * TASK-RECON-005: Manual Match Override
  */
 
-export enum BankStatementMatchStatus {
-  MATCHED = 'MATCHED',
-  IN_BANK_ONLY = 'IN_BANK_ONLY',
-  IN_XERO_ONLY = 'IN_XERO_ONLY',
-  AMOUNT_MISMATCH = 'AMOUNT_MISMATCH',
-  DATE_MISMATCH = 'DATE_MISMATCH',
+// Re-export Prisma-generated enum for type consistency
+// Using import/export pattern to make it available both as a type and value
+import { BankStatementMatchStatus } from '@prisma/client';
+export { BankStatementMatchStatus };
+
+/**
+ * TASK-RECON-005: Match type - how the bank statement match was established
+ * Renamed to BankMatchType to avoid conflict with payment.entity MatchType
+ */
+export enum BankMatchType {
+  /** Automatic match by the reconciliation algorithm */
+  AUTOMATIC = 'AUTOMATIC',
+  /** Manual match by a user */
+  MANUAL = 'MANUAL',
+}
+
+/**
+ * TASK-RECON-004: Duplicate detection result
+ */
+export interface DuplicateDetectionResult {
+  /** The new entry being imported */
+  newEntry: ParsedBankTransaction;
+  /** The existing entry that may be a duplicate */
+  existingEntry: {
+    id: string;
+    bankDate: Date;
+    bankDescription: string;
+    bankAmountCents: number;
+    bankIsCredit: boolean;
+    reconciliationId: string;
+  };
+  /** Confidence that this is a duplicate (0-1) */
+  confidence: number;
+  /** Composite key used for matching */
+  compositeKey: string;
+}
+
+/**
+ * TASK-RECON-004: Duplicate resolution status
+ */
+export enum DuplicateResolutionStatus {
+  /** Duplicate detected, awaiting user decision */
+  PENDING = 'PENDING',
+  /** Confirmed as duplicate, entry skipped */
+  CONFIRMED_DUPLICATE = 'CONFIRMED_DUPLICATE',
+  /** Marked as false positive, entry imported */
+  FALSE_POSITIVE = 'FALSE_POSITIVE',
+}
+
+/**
+ * TASK-RECON-004: Duplicate resolution history record
+ */
+export interface DuplicateResolution {
+  id: string;
+  tenantId: string;
+  /** Composite key: date|amount|reference */
+  compositeKey: string;
+  /** ID of the existing entry */
+  existingEntryId: string;
+  /** Resolution status */
+  status: DuplicateResolutionStatus;
+  /** User who resolved the duplicate */
+  resolvedBy: string | null;
+  /** When the duplicate was resolved */
+  resolvedAt: Date | null;
+  /** Notes about the resolution */
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * TASK-RECON-005: Manual match history record
+ */
+export interface ManualMatchHistory {
+  id: string;
+  tenantId: string;
+  /** The bank statement match ID */
+  matchId: string;
+  /** Previous transaction ID (null if was unmatched) */
+  previousTransactionId: string | null;
+  /** New transaction ID (null if unmatching) */
+  newTransactionId: string | null;
+  /** User who performed the action */
+  performedBy: string;
+  /** When the action was performed */
+  performedAt: Date;
+  /** Action type: 'MATCH' or 'UNMATCH' */
+  action: 'MATCH' | 'UNMATCH';
+  /** Reason for the manual match/unmatch */
+  reason: string | null;
 }
 
 export interface IBankStatementMatch {

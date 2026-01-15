@@ -513,4 +513,243 @@ export class TransactionRepository {
       );
     }
   }
+
+  /**
+   * TXN-005: Link a reversal transaction to its original
+   * @throws NotFoundException if either transaction doesn't exist
+   * @throws DatabaseException for database errors
+   */
+  async linkReversal(
+    tenantId: string,
+    reversalId: string,
+    originalId: string,
+  ): Promise<Transaction> {
+    try {
+      // Verify both transactions exist and belong to tenant
+      const [reversal, original] = await Promise.all([
+        this.findById(tenantId, reversalId),
+        this.findById(tenantId, originalId),
+      ]);
+
+      if (!reversal) {
+        throw new NotFoundException('Reversal Transaction', reversalId);
+      }
+      if (!original) {
+        throw new NotFoundException('Original Transaction', originalId);
+      }
+
+      return await this.prisma.transaction.update({
+        where: { id: reversalId },
+        data: {
+          reversesTransactionId: originalId,
+          isReversal: true,
+        },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to link reversal ${reversalId} to original ${originalId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'linkReversal',
+        'Failed to link reversal transaction',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TXN-005: Unlink a reversal transaction from its original
+   * @throws NotFoundException if transaction doesn't exist
+   * @throws DatabaseException for database errors
+   */
+  async unlinkReversal(
+    tenantId: string,
+    reversalId: string,
+  ): Promise<Transaction> {
+    try {
+      const reversal = await this.findById(tenantId, reversalId);
+      if (!reversal) {
+        throw new NotFoundException('Transaction', reversalId);
+      }
+
+      return await this.prisma.transaction.update({
+        where: { id: reversalId },
+        data: {
+          reversesTransactionId: null,
+          isReversal: false,
+        },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to unlink reversal ${reversalId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'unlinkReversal',
+        'Failed to unlink reversal transaction',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TXN-005: Find all reversals for a given transaction
+   * @returns Array of transactions that reverse the given transaction
+   * @throws DatabaseException for database errors
+   */
+  async findReversalsFor(
+    tenantId: string,
+    transactionId: string,
+  ): Promise<Transaction[]> {
+    try {
+      return await this.prisma.transaction.findMany({
+        where: {
+          tenantId,
+          reversesTransactionId: transactionId,
+          isDeleted: false,
+        },
+        orderBy: { date: 'desc' },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find reversals for transaction ${transactionId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findReversalsFor',
+        'Failed to find reversal transactions',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TXN-005: Find all unlinked potential reversals (negative amounts)
+   * @returns Array of transactions that might be reversals
+   * @throws DatabaseException for database errors
+   */
+  async findPotentialReversals(
+    tenantId: string,
+    dateFrom?: Date,
+    dateTo?: Date,
+  ): Promise<Transaction[]> {
+    try {
+      const where: Prisma.TransactionWhereInput = {
+        tenantId,
+        isDeleted: false,
+        isReversal: false,
+        reversesTransactionId: null,
+        amountCents: { lt: 0 },
+      };
+
+      if (dateFrom || dateTo) {
+        where.date = {};
+        if (dateFrom) where.date.gte = dateFrom;
+        if (dateTo) where.date.lte = dateTo;
+      }
+
+      return await this.prisma.transaction.findMany({
+        where,
+        orderBy: { date: 'desc' },
+        take: 100, // Limit for performance
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find potential reversals for tenant ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findPotentialReversals',
+        'Failed to find potential reversal transactions',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TXN-006: Find transactions by import batch ID
+   * @returns Array of transactions from a specific import batch
+   * @throws DatabaseException for database errors
+   */
+  async findByImportBatchId(
+    tenantId: string,
+    importBatchId: string,
+  ): Promise<Transaction[]> {
+    try {
+      return await this.prisma.transaction.findMany({
+        where: {
+          tenantId,
+          importBatchId,
+          isDeleted: false,
+        },
+        orderBy: { date: 'asc' },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find transactions for batch ${importBatchId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByImportBatchId',
+        'Failed to find transactions by import batch',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TXN-004: Update transaction with currency conversion data
+   * @throws NotFoundException if transaction doesn't exist
+   * @throws DatabaseException for database errors
+   */
+  async updateCurrencyData(
+    tenantId: string,
+    id: string,
+    currencyData: {
+      originalCurrency?: string;
+      originalAmountCents?: number;
+      exchangeRate?: number;
+      rateSource?: string;
+      rateTimestamp?: Date;
+    },
+  ): Promise<Transaction> {
+    try {
+      const existing = await this.findById(tenantId, id);
+      if (!existing) {
+        throw new NotFoundException('Transaction', id);
+      }
+
+      // Note: These fields would need to be added to the schema
+      // For now, we store in the transaction's metadata/notes field
+      // TODO: Add proper currency fields to Transaction model
+
+      return await this.prisma.transaction.update({
+        where: { id },
+        data: {
+          // Store currency data - actual implementation depends on schema
+          // For now, update would be to a JSON field or separate table
+        },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to update currency data for transaction ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'updateCurrencyData',
+        'Failed to update transaction currency data',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
 }

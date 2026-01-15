@@ -28,6 +28,7 @@ import {
   NotFoundException,
   BusinessException,
 } from '../../shared/exceptions';
+import { ToleranceConfigService } from './tolerance-config.service';
 
 // Configure Decimal.js for banker's rounding
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_EVEN });
@@ -39,12 +40,14 @@ export class ReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly reconciliationRepo: ReconciliationRepository,
+    private readonly toleranceConfig: ToleranceConfigService,
   ) {}
 
   /**
    * Reconcile a bank account for a period
    * Formula: opening + credits - debits = calculated closing
-   * Status = RECONCILED if |discrepancy| <= 1 cent, else DISCREPANCY
+   * Status = RECONCILED if discrepancy is within configured tolerance (default R1)
+   * TASK-RECON-003: Uses ToleranceConfigService for configurable tolerance
    *
    * @param dto - Reconciliation parameters
    * @param userId - User performing the reconciliation
@@ -93,12 +96,14 @@ export class ReconciliationService {
     );
 
     // Determine discrepancy and status
+    // TASK-RECON-003: Use centralized tolerance configuration
     const discrepancyCents =
       dto.closingBalanceCents - calculation.calculatedBalanceCents;
-    const status =
-      Math.abs(discrepancyCents) <= 1
-        ? ReconciliationStatus.RECONCILED
-        : ReconciliationStatus.DISCREPANCY;
+    const status = this.toleranceConfig.isBalanceWithinTolerance(
+      discrepancyCents,
+    )
+      ? ReconciliationStatus.RECONCILED
+      : ReconciliationStatus.DISCREPANCY;
 
     // Transactional: create record and mark transactions
     return await this.prisma.$transaction(
@@ -286,11 +291,8 @@ export class ReconciliationService {
       return { matchedCount: 0, unmatchedCount: 0, matchedTransactionIds: [] };
     }
 
-    const recon = await this.reconciliationRepo.findById(reconId);
+    const recon = await this.reconciliationRepo.findById(reconId, tenantId);
     if (!recon) {
-      throw new NotFoundException('Reconciliation', reconId);
-    }
-    if (recon.tenantId !== tenantId) {
       throw new NotFoundException('Reconciliation', reconId);
     }
     if (recon.status === ReconciliationStatus.RECONCILED) {

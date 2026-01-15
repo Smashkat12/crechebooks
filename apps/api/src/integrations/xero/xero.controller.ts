@@ -32,7 +32,7 @@ import {
   ApiForbiddenResponse,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
-import { randomBytes, createCipheriv, createDecipheriv } from 'crypto';
+import { randomBytes } from 'crypto';
 import { XeroClient } from 'xero-node';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { TokenManager, TokenSet } from '../../mcp/xero-mcp/auth/token-manager';
@@ -67,10 +67,7 @@ import {
   ValidateAccountCodeResponseDto,
 } from '../../database/dto/xero-account.dto';
 import { XeroAccountStatus } from '../../database/entities/xero-account.entity';
-
-// State encryption key (should be in environment)
-const STATE_ENCRYPTION_KEY =
-  process.env.XERO_STATE_KEY ?? 'default-key-32-chars-long-here!!';
+import { XeroAuthService } from './xero-auth.service';
 
 @Controller('xero')
 @ApiTags('Xero Integration')
@@ -89,6 +86,7 @@ export class XeroController {
     private readonly bankFeedService: BankFeedService,
     private readonly syncGateway: XeroSyncGateway,
     private readonly xeroSyncService: XeroSyncService,
+    private readonly xeroAuthService: XeroAuthService,
   ) {
     this.tokenManager = new TokenManager(this.prisma);
   }
@@ -174,7 +172,7 @@ export class XeroController {
       nonce: randomBytes(16).toString('hex'),
     };
 
-    const state = this.encryptState(statePayload);
+    const state = this.xeroAuthService.generateState(statePayload);
 
     // Store state temporarily (expires in 10 minutes)
     await this.prisma.xeroOAuthState.upsert({
@@ -222,17 +220,8 @@ export class XeroController {
     this.logger.log('Handling Xero OAuth callback');
 
     try {
-      // Decrypt and validate state
-      const statePayload = this.decryptState(query.state);
-
-      // Check state expiry (10 minutes)
-      if (Date.now() - statePayload.createdAt > 10 * 60 * 1000) {
-        throw new BusinessException(
-          'OAuth state expired. Please try connecting again.',
-          'OAUTH_STATE_EXPIRED',
-        );
-      }
-
+      // Decrypt and validate state (includes expiry check)
+      const statePayload = this.xeroAuthService.validateState(query.state);
       const tenantId = statePayload.tenantId;
 
       // Get stored code verifier
@@ -1025,10 +1014,11 @@ export class XeroController {
       });
 
       try {
-        const accountsResult = await this.xeroSyncService.syncChartOfAccountsToDb(
-          tenantId,
-          false, // Don't force sync every time
-        );
+        const accountsResult =
+          await this.xeroSyncService.syncChartOfAccountsToDb(
+            tenantId,
+            false, // Don't force sync every time
+          );
         this.logger.log(
           `Chart of Accounts sync: ${accountsResult.accountsFetched} fetched, ` +
             `${accountsResult.accountsCreated} created, ${accountsResult.accountsUpdated} updated`,
@@ -1036,13 +1026,16 @@ export class XeroController {
         this.syncGateway.emitProgress(tenantId, {
           entity: 'accounts',
           total: accountsResult.accountsFetched,
-          processed: accountsResult.accountsCreated + accountsResult.accountsUpdated,
+          processed:
+            accountsResult.accountsCreated + accountsResult.accountsUpdated,
           percentage: 100,
         });
       } catch (accountsError) {
         this.logger.warn(
           `Chart of Accounts sync failed, continuing with transaction sync`,
-          accountsError instanceof Error ? accountsError.message : String(accountsError),
+          accountsError instanceof Error
+            ? accountsError.message
+            : String(accountsError),
         );
       }
 
@@ -1381,38 +1374,5 @@ export class XeroController {
       },
       catchAllAccountCodes: catchAllCodes,
     };
-  }
-
-  /**
-   * Encrypt state payload for OAuth
-   */
-  private encryptState(payload: OAuthStatePayload): string {
-    const key = Buffer.from(STATE_ENCRYPTION_KEY.padEnd(32).slice(0, 32));
-    const iv = randomBytes(16);
-    const cipher = createCipheriv('aes-256-cbc', key, iv);
-
-    let encrypted = cipher.update(JSON.stringify(payload), 'utf8', 'base64');
-    encrypted += cipher.final('base64');
-
-    return `${iv.toString('base64')}.${encrypted}`;
-  }
-
-  /**
-   * Decrypt state payload from OAuth
-   */
-  private decryptState(state: string): OAuthStatePayload {
-    try {
-      const [ivB64, encrypted] = state.split('.');
-      const key = Buffer.from(STATE_ENCRYPTION_KEY.padEnd(32).slice(0, 32));
-      const iv = Buffer.from(ivB64, 'base64');
-      const decipher = createDecipheriv('aes-256-cbc', key, iv);
-
-      let decrypted = decipher.update(encrypted, 'base64', 'utf8');
-      decrypted += decipher.final('utf8');
-
-      return JSON.parse(decrypted) as OAuthStatePayload;
-    } catch (error) {
-      throw new BusinessException('Invalid OAuth state', 'OAUTH_STATE_INVALID');
-    }
   }
 }

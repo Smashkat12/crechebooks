@@ -146,7 +146,7 @@ export class InvoiceController {
     const childMap = new Map<string, ChildSummaryDto>();
 
     for (const parentId of parentIds) {
-      const parent = await this.parentRepo.findById(parentId);
+      const parent = await this.parentRepo.findById(parentId, tenantId);
       if (parent) {
         parentMap.set(parentId, {
           id: parent.id,
@@ -157,7 +157,7 @@ export class InvoiceController {
     }
 
     for (const childId of childIds) {
-      const child = await this.childRepo.findById(childId);
+      const child = await this.childRepo.findById(childId, tenantId);
       if (child) {
         childMap.set(childId, {
           id: child.id,
@@ -198,6 +198,10 @@ export class InvoiceController {
       };
     });
 
+    // TASK-DATA-004: Include hasNext/hasPrev in pagination metadata
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
     return {
       success: true,
       data,
@@ -206,6 +210,8 @@ export class InvoiceController {
         limit,
         total,
         totalPages,
+        hasNext,
+        hasPrev,
       },
     };
   }
@@ -235,7 +241,10 @@ export class InvoiceController {
     );
 
     // Fetch invoice with lines
-    const invoice = await this.invoiceRepo.findByIdWithLines(invoiceId);
+    const invoice = await this.invoiceRepo.findByIdWithLines(
+      invoiceId,
+      user.tenantId,
+    );
 
     if (!invoice) {
       this.logger.error(`Invoice ${invoiceId} not found`);
@@ -251,8 +260,11 @@ export class InvoiceController {
     }
 
     // Fetch parent and child data
-    const parent = await this.parentRepo.findById(invoice.parentId);
-    const child = await this.childRepo.findById(invoice.childId);
+    const parent = await this.parentRepo.findById(
+      invoice.parentId,
+      user.tenantId,
+    );
+    const child = await this.childRepo.findById(invoice.childId, user.tenantId);
 
     if (!parent || !child) {
       this.logger.error(
@@ -607,7 +619,7 @@ export class InvoiceController {
 
     try {
       // Get invoice to retrieve invoice number for filename
-      const invoice = await this.invoiceRepo.findById(invoiceId);
+      const invoice = await this.invoiceRepo.findById(invoiceId, user.tenantId);
 
       if (!invoice) {
         this.logger.error(`Invoice ${invoiceId} not found`);

@@ -76,18 +76,20 @@ export class ReconciliationRepository {
   }
 
   /**
-   * Find reconciliation by ID
+   * Find reconciliation by ID with tenant isolation
+   * @param id - Reconciliation ID
+   * @param tenantId - Tenant ID for isolation
    * @returns Reconciliation or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<Reconciliation | null> {
+  async findById(id: string, tenantId: string): Promise<Reconciliation | null> {
     try {
-      return await this.prisma.reconciliation.findUnique({
-        where: { id },
+      return await this.prisma.reconciliation.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find reconciliation by id: ${id}`,
+        `Failed to find reconciliation by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -209,10 +211,11 @@ export class ReconciliationRepository {
    */
   async update(
     id: string,
+    tenantId: string,
     dto: UpdateReconciliationDto,
   ): Promise<Reconciliation> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Reconciliation', id);
       }
@@ -289,10 +292,11 @@ export class ReconciliationRepository {
    */
   async complete(
     id: string,
+    tenantId: string,
     dto: CompleteReconciliationDto,
   ): Promise<Reconciliation> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Reconciliation', id);
       }
@@ -362,9 +366,12 @@ export class ReconciliationRepository {
    * @throws BusinessException if reconciliation is already RECONCILED
    * @throws DatabaseException for database errors
    */
-  async calculateDiscrepancy(id: string): Promise<Reconciliation> {
+  async calculateDiscrepancy(
+    id: string,
+    tenantId: string,
+  ): Promise<Reconciliation> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Reconciliation', id);
       }
@@ -461,13 +468,15 @@ export class ReconciliationRepository {
   /**
    * Delete a reconciliation (hard delete)
    * Can only delete IN_PROGRESS reconciliations
+   * @param id - Reconciliation ID
+   * @param tenantId - Tenant ID for isolation
    * @throws NotFoundException if reconciliation doesn't exist
    * @throws BusinessException if reconciliation is not IN_PROGRESS
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Reconciliation', id);
       }

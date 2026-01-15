@@ -25,9 +25,9 @@ import {
 
 // Confidence thresholds
 const THRESHOLDS = {
-  AUTO_ACCEPT: 90,      // >= 90% = auto-accept
-  REVIEW_REQUIRED: 50,  // 50-89% = needs review but usable
-  REJECT: 50,           // < 50% = reject completely
+  AUTO_ACCEPT: 90, // >= 90% = auto-accept
+  REVIEW_REQUIRED: 50, // 50-89% = needs review but usable
+  REJECT: 50, // < 50% = reject completely
 };
 
 @Injectable()
@@ -50,8 +50,8 @@ export class ExtractionValidatorAgent {
   ): Promise<ValidationResult> {
     this.logger.log(
       `Validating statement: account=${statement.accountNumber}, ` +
-      `opening=${statement.openingBalanceCents}c, closing=${statement.closingBalanceCents}c, ` +
-      `transactions=${statement.transactions.length}`
+        `opening=${statement.openingBalanceCents}c, closing=${statement.closingBalanceCents}c, ` +
+        `transactions=${statement.transactions.length}`,
     );
 
     const flags: ValidationFlag[] = [];
@@ -76,7 +76,7 @@ export class ExtractionValidatorAgent {
 
       this.logger.warn(
         `Balance reconciliation: FAILED - off by R ${(reconciliation.difference / 100).toFixed(2)} ` +
-        `(${reconciliation.percentDifference.toFixed(1)}%), ${suggestedCorrections.length} corrections suggested`
+          `(${reconciliation.percentDifference.toFixed(1)}%), ${suggestedCorrections.length} corrections suggested`,
       );
     }
 
@@ -87,14 +87,14 @@ export class ExtractionValidatorAgent {
       statement.transactions,
     );
 
-    const errorFlags = sanityFlags.filter(f => f.severity === 'ERROR');
+    const errorFlags = sanityFlags.filter((f) => f.severity === 'ERROR');
     if (errorFlags.length === 0) {
       confidence += 20;
       this.logger.log('Amount sanity check: PASSED (+20 points)');
     } else {
       flags.push(...sanityFlags);
       this.logger.warn(
-        `Amount sanity check: ${errorFlags.length} errors, ${sanityFlags.length - errorFlags.length} warnings`
+        `Amount sanity check: ${errorFlags.length} errors, ${sanityFlags.length - errorFlags.length} warnings`,
       );
     }
 
@@ -118,13 +118,21 @@ export class ExtractionValidatorAgent {
       this.logger.log('OCR pattern check: PASSED (+15 points)');
     } else {
       flags.push(...ocrPatterns);
-      this.logger.warn(`OCR pattern check: ${ocrPatterns.length} patterns detected`);
+      this.logger.warn(
+        `OCR pattern check: ${ocrPatterns.length} patterns detected`,
+      );
     }
 
     // 5. Transaction count reasonableness (10 points max)
-    if (statement.transactions.length >= 0 && statement.transactions.length <= 500) {
+    if (
+      statement.transactions.length >= 0 &&
+      statement.transactions.length <= 500
+    ) {
       confidence += 10;
-    } else if (statement.transactions.length === 0 && reconciliation.difference === 0) {
+    } else if (
+      statement.transactions.length === 0 &&
+      reconciliation.difference === 0
+    ) {
       // Zero transactions but balance reconciles (opening = closing) is valid
       confidence += 10;
     } else {
@@ -136,8 +144,14 @@ export class ExtractionValidatorAgent {
     }
 
     // Determine validity
-    const isValid = confidence >= THRESHOLDS.AUTO_ACCEPT && reconciliation.reconciled;
-    const reasoning = this.generateReasoning(reconciliation, flags, corrections, confidence);
+    const isValid =
+      confidence >= THRESHOLDS.AUTO_ACCEPT && reconciliation.reconciled;
+    const reasoning = this.generateReasoning(
+      reconciliation,
+      flags,
+      corrections,
+      confidence,
+    );
 
     const result: ValidationResult = {
       isValid,
@@ -160,7 +174,7 @@ export class ExtractionValidatorAgent {
 
     this.logger.log(
       `Validation complete: valid=${isValid}, confidence=${confidence}%, ` +
-      `flags=${flags.length}, corrections=${corrections.length}`
+        `flags=${flags.length}, corrections=${corrections.length}`,
     );
 
     return result;
@@ -188,14 +202,22 @@ export class ExtractionValidatorAgent {
         if (correction.confidence >= 80) {
           this.logger.log(
             `Applying correction: ${correction.field} ${correction.original} → ${correction.corrected} ` +
-            `(confidence ${correction.confidence}%)`
+              `(confidence ${correction.confidence}%)`,
           );
 
-          if (correction.field === 'openingBalance' && typeof correction.corrected === 'number') {
-            validatedStatement.originalOpeningBalanceCents = statement.openingBalanceCents;
+          if (
+            correction.field === 'openingBalance' &&
+            typeof correction.corrected === 'number'
+          ) {
+            validatedStatement.originalOpeningBalanceCents =
+              statement.openingBalanceCents;
             validatedStatement.openingBalanceCents = correction.corrected;
-          } else if (correction.field === 'closingBalance' && typeof correction.corrected === 'number') {
-            validatedStatement.originalClosingBalanceCents = statement.closingBalanceCents;
+          } else if (
+            correction.field === 'closingBalance' &&
+            typeof correction.corrected === 'number'
+          ) {
+            validatedStatement.originalClosingBalanceCents =
+              statement.closingBalanceCents;
             validatedStatement.closingBalanceCents = correction.corrected;
           }
           // Transaction corrections would require modifying the transactions array
@@ -230,7 +252,7 @@ export class ExtractionValidatorAgent {
       if (txTime < startTime - bufferMs || txTime > endTime + bufferMs) {
         this.logger.debug(
           `Transaction date ${tx.date.toISOString()} outside period ` +
-          `${start.toISOString()} to ${end.toISOString()}`
+            `${start.toISOString()} to ${end.toISOString()}`,
         );
         return false;
       }
@@ -264,10 +286,12 @@ export class ExtractionValidatorAgent {
     }
 
     // Pattern 2: Opening balance that's exactly 100x or 1000x the closing balance
-    const openingClosingRatio = statement.openingBalanceCents / statement.closingBalanceCents;
+    const openingClosingRatio =
+      statement.openingBalanceCents / statement.closingBalanceCents;
     if (
       statement.closingBalanceCents !== 0 &&
-      (Math.abs(openingClosingRatio - 100) < 0.01 || Math.abs(openingClosingRatio - 1000) < 0.01)
+      (Math.abs(openingClosingRatio - 100) < 0.01 ||
+        Math.abs(openingClosingRatio - 1000) < 0.01)
     ) {
       flags.push({
         severity: 'ERROR',
@@ -279,7 +303,8 @@ export class ExtractionValidatorAgent {
     // Pattern 3: Reversed ratio (closing is 100x or 1000x opening)
     if (
       statement.openingBalanceCents !== 0 &&
-      (Math.abs(1 / openingClosingRatio - 100) < 0.01 || Math.abs(1 / openingClosingRatio - 1000) < 0.01)
+      (Math.abs(1 / openingClosingRatio - 100) < 0.01 ||
+        Math.abs(1 / openingClosingRatio - 1000) < 0.01)
     ) {
       flags.push({
         severity: 'ERROR',
@@ -310,7 +335,11 @@ export class ExtractionValidatorAgent {
    * Generate human-readable reasoning for the validation result
    */
   private generateReasoning(
-    reconciliation: { reconciled: boolean; difference: number; percentDifference: number },
+    reconciliation: {
+      reconciled: boolean;
+      difference: number;
+      percentDifference: number;
+    },
     flags: ValidationFlag[],
     corrections: Correction[],
     confidence: number,
@@ -319,9 +348,13 @@ export class ExtractionValidatorAgent {
 
     // Confidence summary
     if (confidence >= THRESHOLDS.AUTO_ACCEPT) {
-      parts.push(`High confidence (${confidence}%) - extraction appears valid.`);
+      parts.push(
+        `High confidence (${confidence}%) - extraction appears valid.`,
+      );
     } else if (confidence >= THRESHOLDS.REVIEW_REQUIRED) {
-      parts.push(`Medium confidence (${confidence}%) - manual review recommended.`);
+      parts.push(
+        `Medium confidence (${confidence}%) - manual review recommended.`,
+      );
     } else {
       parts.push(`Low confidence (${confidence}%) - extraction likely failed.`);
     }
@@ -332,28 +365,32 @@ export class ExtractionValidatorAgent {
     } else {
       parts.push(
         `Balance mismatch: off by R ${(reconciliation.difference / 100).toFixed(2)} ` +
-        `(${reconciliation.percentDifference.toFixed(1)}%).`
+          `(${reconciliation.percentDifference.toFixed(1)}%).`,
       );
     }
 
     // Errors
-    const errors = flags.filter(f => f.severity === 'ERROR');
+    const errors = flags.filter((f) => f.severity === 'ERROR');
     if (errors.length > 0) {
-      parts.push(`${errors.length} error(s) detected: ${errors.map(e => e.code).join(', ')}.`);
+      parts.push(
+        `${errors.length} error(s) detected: ${errors.map((e) => e.code).join(', ')}.`,
+      );
     }
 
     // Warnings
-    const warnings = flags.filter(f => f.severity === 'WARNING');
+    const warnings = flags.filter((f) => f.severity === 'WARNING');
     if (warnings.length > 0) {
-      parts.push(`${warnings.length} warning(s): ${warnings.map(w => w.code).join(', ')}.`);
+      parts.push(
+        `${warnings.length} warning(s): ${warnings.map((w) => w.code).join(', ')}.`,
+      );
     }
 
     // Corrections
     if (corrections.length > 0) {
-      const highConfidence = corrections.filter(c => c.confidence >= 80);
+      const highConfidence = corrections.filter((c) => c.confidence >= 80);
       if (highConfidence.length > 0) {
         parts.push(
-          `${highConfidence.length} high-confidence correction(s) available that may fix the issues.`
+          `${highConfidence.length} high-confidence correction(s) available that may fix the issues.`,
         );
       }
     }

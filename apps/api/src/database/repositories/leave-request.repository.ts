@@ -74,18 +74,20 @@ export class LeaveRequestRepository {
   }
 
   /**
-   * Find leave request by ID
+   * Find leave request by ID with tenant isolation
+   * @param id - Leave request ID
+   * @param tenantId - Tenant ID for isolation
    * @returns LeaveRequest or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<LeaveRequest | null> {
+  async findById(id: string, tenantId: string): Promise<LeaveRequest | null> {
     try {
-      return await this.prisma.leaveRequest.findUnique({
-        where: { id },
+      return await this.prisma.leaveRequest.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find leave request by id: ${id}`,
+        `Failed to find leave request by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -99,8 +101,8 @@ export class LeaveRequestRepository {
   /**
    * Find leave request by ID or throw NotFoundException
    */
-  async findByIdOrThrow(id: string): Promise<LeaveRequest> {
-    const leaveRequest = await this.findById(id);
+  async findByIdOrThrow(id: string, tenantId: string): Promise<LeaveRequest> {
+    const leaveRequest = await this.findById(id, tenantId);
     if (!leaveRequest) {
       throw new NotFoundException('LeaveRequest', id);
     }
@@ -241,9 +243,13 @@ export class LeaveRequestRepository {
    * @throws NotFoundException if leave request doesn't exist
    * @throws ConflictException if leave request is not in PENDING status
    */
-  async update(id: string, dto: UpdateLeaveRequestDto): Promise<LeaveRequest> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateLeaveRequestDto,
+  ): Promise<LeaveRequest> {
     try {
-      const existing = await this.findByIdOrThrow(id);
+      const existing = await this.findByIdOrThrow(id, tenantId);
 
       if (existing.status !== LeaveRequestStatus.PENDING) {
         throw new ConflictException(
@@ -304,9 +310,13 @@ export class LeaveRequestRepository {
    * @throws NotFoundException if leave request doesn't exist
    * @throws ConflictException if leave request is not in PENDING status
    */
-  async approve(id: string, approvedBy: string): Promise<LeaveRequest> {
+  async approve(
+    id: string,
+    tenantId: string,
+    approvedBy: string,
+  ): Promise<LeaveRequest> {
     try {
-      const existing = await this.findByIdOrThrow(id);
+      const existing = await this.findByIdOrThrow(id, tenantId);
 
       if (existing.status !== LeaveRequestStatus.PENDING) {
         throw new ConflictException(
@@ -349,11 +359,12 @@ export class LeaveRequestRepository {
    */
   async reject(
     id: string,
+    tenantId: string,
     rejectedBy: string,
     rejectedReason: string,
   ): Promise<LeaveRequest> {
     try {
-      const existing = await this.findByIdOrThrow(id);
+      const existing = await this.findByIdOrThrow(id, tenantId);
 
       if (existing.status !== LeaveRequestStatus.PENDING) {
         throw new ConflictException(
@@ -394,9 +405,9 @@ export class LeaveRequestRepository {
    * @throws NotFoundException if leave request doesn't exist
    * @throws ConflictException if leave request is already REJECTED or CANCELLED
    */
-  async cancel(id: string): Promise<LeaveRequest> {
+  async cancel(id: string, tenantId: string): Promise<LeaveRequest> {
     try {
-      const existing = await this.findByIdOrThrow(id);
+      const existing = await this.findByIdOrThrow(id, tenantId);
 
       if (
         existing.status === LeaveRequestStatus.REJECTED ||
@@ -463,9 +474,9 @@ export class LeaveRequestRepository {
    * @throws NotFoundException if leave request doesn't exist
    * @throws ConflictException if leave request is synced to SimplePay
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findByIdOrThrow(id);
+      const existing = await this.findByIdOrThrow(id, tenantId);
 
       if (existing.simplePaySynced) {
         throw new ConflictException(

@@ -184,6 +184,10 @@ export class TransactionController {
       };
     });
 
+    // TASK-DATA-004: Include hasNext/hasPrev in pagination metadata
+    const hasNext = result.page < result.totalPages;
+    const hasPrev = result.page > 1;
+
     return {
       success: true,
       data,
@@ -192,6 +196,8 @@ export class TransactionController {
         limit: result.limit,
         total: result.total,
         totalPages: result.totalPages,
+        hasNext,
+        hasPrev,
       },
     };
   }
@@ -525,6 +531,7 @@ export class TransactionController {
             for (const payment of allocationResult.payments) {
               const invoice = await this.invoiceRepo.findById(
                 payment.invoiceId,
+                user.tenantId,
               );
               response.data.payment_allocations.push({
                 payment_id: payment.id,

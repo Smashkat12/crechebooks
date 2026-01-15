@@ -247,7 +247,7 @@ describe('ReconciliationRepository', () => {
   describe('findById', () => {
     it('should find reconciliation by id', async () => {
       const created = await repository.create(testReconciliationData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -257,6 +257,7 @@ describe('ReconciliationRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -340,7 +341,7 @@ describe('ReconciliationRepository', () => {
 
     it('should filter by status', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
@@ -402,7 +403,7 @@ describe('ReconciliationRepository', () => {
     it('should update reconciliation fields', async () => {
       const created = await repository.create(testReconciliationData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         closingBalanceCents: 13000000, // R130,000.00
         notes: 'Updated notes',
       });
@@ -416,7 +417,7 @@ describe('ReconciliationRepository', () => {
     it('should recalculate discrepancy when calculatedBalanceCents is updated', async () => {
       const created = await repository.create(testReconciliationData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         calculatedBalanceCents: 12500000, // Now matches closing
       });
 
@@ -425,21 +426,25 @@ describe('ReconciliationRepository', () => {
 
     it('should throw NotFoundException for non-existent reconciliation', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          notes: 'test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            notes: 'test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if reconciliation is RECONCILED', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
 
       await expect(
-        repository.update(created.id, { notes: 'test' }),
+        repository.update(created.id, testTenant.id, { notes: 'test' }),
       ).rejects.toThrow(BusinessException);
     });
   });
@@ -449,7 +454,7 @@ describe('ReconciliationRepository', () => {
       const created = await repository.create(testReconciliationData);
       expect(created.status).toBe(ReconciliationStatus.IN_PROGRESS);
 
-      const completed = await repository.complete(created.id, {
+      const completed = await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
@@ -462,7 +467,7 @@ describe('ReconciliationRepository', () => {
     it('should transition IN_PROGRESS to DISCREPANCY without setting reconciler fields', async () => {
       const created = await repository.create(testReconciliationData);
 
-      const completed = await repository.complete(created.id, {
+      const completed = await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.DISCREPANCY,
       });
@@ -475,22 +480,26 @@ describe('ReconciliationRepository', () => {
 
     it('should throw NotFoundException for non-existent reconciliation', async () => {
       await expect(
-        repository.complete('00000000-0000-0000-0000-000000000000', {
-          reconciledBy: testUser.id,
-          status: ReconciliationStatus.RECONCILED,
-        }),
+        repository.complete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            reconciledBy: testUser.id,
+            status: ReconciliationStatus.RECONCILED,
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if already RECONCILED', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
 
       await expect(
-        repository.complete(created.id, {
+        repository.complete(created.id, testTenant.id, {
           reconciledBy: testUser.id,
           status: ReconciliationStatus.RECONCILED,
         }),
@@ -499,13 +508,13 @@ describe('ReconciliationRepository', () => {
 
     it('should throw BusinessException if not IN_PROGRESS', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.DISCREPANCY,
       });
 
       await expect(
-        repository.complete(created.id, {
+        repository.complete(created.id, testTenant.id, {
           reconciledBy: testUser.id,
           status: ReconciliationStatus.RECONCILED,
         }),
@@ -527,27 +536,33 @@ describe('ReconciliationRepository', () => {
         },
       });
 
-      const recalculated = await repository.calculateDiscrepancy(created.id);
+      const recalculated = await repository.calculateDiscrepancy(
+        created.id,
+        testTenant.id,
+      );
 
       expect(recalculated.discrepancyCents).toBe(500000); // 20000000 - 19500000
     });
 
     it('should throw NotFoundException for non-existent reconciliation', async () => {
       await expect(
-        repository.calculateDiscrepancy('00000000-0000-0000-0000-000000000000'),
+        repository.calculateDiscrepancy(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if RECONCILED', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
 
-      await expect(repository.calculateDiscrepancy(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.calculateDiscrepancy(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
   });
 
@@ -574,7 +589,7 @@ describe('ReconciliationRepository', () => {
 
     it('should not include RECONCILED reconciliations', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
@@ -590,7 +605,7 @@ describe('ReconciliationRepository', () => {
   describe('findInProgress', () => {
     it('should find only IN_PROGRESS reconciliations', async () => {
       const created1 = await repository.create(testReconciliationData);
-      await repository.complete(created1.id, {
+      await repository.complete(created1.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
@@ -611,40 +626,43 @@ describe('ReconciliationRepository', () => {
     it('should delete existing IN_PROGRESS reconciliation', async () => {
       const created = await repository.create(testReconciliationData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent reconciliation', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if not IN_PROGRESS', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
 
-      await expect(repository.delete(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.delete(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
 
     it('should throw BusinessException if status is DISCREPANCY', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.DISCREPANCY,
       });
 
-      await expect(repository.delete(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.delete(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
   });
 
@@ -677,13 +695,13 @@ describe('ReconciliationRepository', () => {
       expect(created.status).toBe(ReconciliationStatus.IN_PROGRESS);
 
       // Make some updates while in progress
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         notes: 'Verified all transactions',
       });
       expect(updated.status).toBe(ReconciliationStatus.IN_PROGRESS);
 
       // Complete the reconciliation
-      const completed = await repository.complete(created.id, {
+      const completed = await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
@@ -697,7 +715,7 @@ describe('ReconciliationRepository', () => {
       expect(created.status).toBe(ReconciliationStatus.IN_PROGRESS);
 
       // Mark as having discrepancy
-      const discrepancy = await repository.complete(created.id, {
+      const discrepancy = await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.DISCREPANCY,
       });
@@ -725,7 +743,7 @@ describe('ReconciliationRepository', () => {
       const created = await repository.create(testReconciliationData);
 
       const beforeComplete = new Date();
-      const completed = await repository.complete(created.id, {
+      const completed = await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
@@ -744,37 +762,39 @@ describe('ReconciliationRepository', () => {
   describe('immutability after RECONCILED', () => {
     it('should prevent updates after RECONCILED', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
 
       await expect(
-        repository.update(created.id, { notes: 'Changed after reconciled' }),
+        repository.update(created.id, testTenant.id, {
+          notes: 'Changed after reconciled',
+        }),
       ).rejects.toThrow(BusinessException);
     });
 
     it('should prevent deletion after RECONCILED', async () => {
       const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
-        reconciledBy: testUser.id,
-        status: ReconciliationStatus.RECONCILED,
-      });
-
-      await expect(repository.delete(created.id)).rejects.toThrow(
-        BusinessException,
-      );
-    });
-
-    it('should prevent re-completion after RECONCILED', async () => {
-      const created = await repository.create(testReconciliationData);
-      await repository.complete(created.id, {
+      await repository.complete(created.id, testTenant.id, {
         reconciledBy: testUser.id,
         status: ReconciliationStatus.RECONCILED,
       });
 
       await expect(
-        repository.complete(created.id, {
+        repository.delete(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
+    });
+
+    it('should prevent re-completion after RECONCILED', async () => {
+      const created = await repository.create(testReconciliationData);
+      await repository.complete(created.id, testTenant.id, {
+        reconciledBy: testUser.id,
+        status: ReconciliationStatus.RECONCILED,
+      });
+
+      await expect(
+        repository.complete(created.id, testTenant.id, {
           reconciledBy: testUser.id,
           status: ReconciliationStatus.DISCREPANCY,
         }),

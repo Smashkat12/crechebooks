@@ -176,7 +176,10 @@ describe('PatternLearningService', () => {
       });
 
       // Increment match count to simulate prior matches
-      await payeePatternRepo.incrementMatchCount(initialPattern.id);
+      await payeePatternRepo.incrementMatchCount(
+        initialPattern.id,
+        testTenant.id,
+      );
 
       const transaction = await createTransaction({
         description: 'POS CHECKERS EASTGATE',
@@ -682,10 +685,10 @@ describe('PatternLearningService', () => {
       });
 
       // Increment match counts
-      await payeePatternRepo.incrementMatchCount(pattern1.id);
-      await payeePatternRepo.incrementMatchCount(pattern1.id);
-      await payeePatternRepo.incrementMatchCount(pattern1.id);
-      await payeePatternRepo.incrementMatchCount(pattern2.id);
+      await payeePatternRepo.incrementMatchCount(pattern1.id, testTenant.id);
+      await payeePatternRepo.incrementMatchCount(pattern1.id, testTenant.id);
+      await payeePatternRepo.incrementMatchCount(pattern1.id, testTenant.id);
+      await payeePatternRepo.incrementMatchCount(pattern2.id, testTenant.id);
 
       const stats = await service.getPatternStats(testTenant.id);
 

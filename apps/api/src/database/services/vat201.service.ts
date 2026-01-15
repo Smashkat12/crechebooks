@@ -1,9 +1,10 @@
 /**
  * Vat201Service - VAT201 Generation Service
- * TASK-SARS-014
+ * TASK-SARS-014, TASK-SARS-002
  *
  * Generates South African VAT201 return documents.
  * Uses VatService for output and input VAT calculations.
+ * Uses VatAdjustmentService for fields 7-13 (adjustment fields).
  *
  * All monetary values in CENTS (integers)
  * Uses Decimal.js with banker's rounding (ROUND_HALF_EVEN)
@@ -20,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { SubmissionType, SubmissionStatus, TaxStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { VatService } from './vat.service';
+import { VatAdjustmentService } from './vat-adjustment.service';
 import {
   Vat201Document,
   Vat201Fields,
@@ -27,6 +29,7 @@ import {
   GenerateVat201Dto,
 } from '../dto/vat201.dto';
 import { VatCalculationResult, VatFlaggedItem } from '../dto/vat.dto';
+import { VatAdjustmentAggregation } from '../dto/vat-adjustment.dto';
 import { VAT_CONSTANTS } from '../constants/vat.constants';
 
 // Configure Decimal.js for banker's rounding
@@ -42,6 +45,7 @@ export class Vat201Service {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vatService: VatService,
+    private readonly vatAdjustmentService: VatAdjustmentService,
   ) {}
 
   /**
@@ -92,17 +96,26 @@ export class Vat201Service {
       periodEnd,
     );
 
-    // Step 4: Get flagged items
+    // Step 4: Get VAT adjustments for fields 7-13 (TASK-SARS-002)
+    const adjustments = await this.vatAdjustmentService.getAdjustmentsForPeriod(
+      {
+        tenantId,
+        periodStart,
+        periodEnd,
+      },
+    );
+
+    // Step 5: Get flagged items
     const flaggedItems = await this.vatService.getFlaggedItems(
       tenantId,
       periodStart,
       periodEnd,
     );
 
-    // Step 5: Populate VAT201 fields
-    const fields = this.populateFields(outputVat, inputVat);
+    // Step 6: Populate VAT201 fields with adjustments
+    const fields = this.populateFields(outputVat, inputVat, adjustments);
 
-    // Step 6: Generate document structure
+    // Step 7: Generate document structure
     const document = this.generateDocument(
       tenantId,
       tenant.vatNumber,
@@ -112,7 +125,7 @@ export class Vat201Service {
       flaggedItems,
     );
 
-    // Step 7: Validate document
+    // Step 8: Validate document
     const validationResult = this.validateSubmission(document);
     if (!validationResult.isValid) {
       this.logger.warn(
@@ -125,10 +138,10 @@ export class Vat201Service {
       );
     }
 
-    // Step 8: Calculate deadline (last business day of month following period end)
+    // Step 9: Calculate deadline (last business day of month following period end)
     const deadline = this.calculateDeadline(periodEnd);
 
-    // Step 9: Check for existing submission and upsert
+    // Step 10: Check for existing submission and upsert
     const existing = await this.prisma.sarsSubmission.findFirst({
       where: {
         tenantId,
@@ -183,35 +196,75 @@ export class Vat201Service {
   }
 
   /**
-   * Populate VAT201 fields from calculation results
+   * Populate VAT201 fields from calculation results and adjustments
+   * TASK-SARS-002: Now includes real adjustment data for fields 7-13
+   *
+   * @param outputVat - Output VAT calculation result
+   * @param inputVat - Input VAT calculation result
+   * @param adjustments - Aggregated adjustments for fields 7-13
+   * @returns Populated VAT201 fields
    */
   populateFields(
     outputVat: VatCalculationResult,
     inputVat: VatCalculationResult,
+    adjustments: VatAdjustmentAggregation,
   ): Vat201Fields {
+    // Base output and input VAT
     const field4TotalOutput = outputVat.vatAmountCents;
     const field5Input = inputVat.vatAmountCents;
-    const netVat = field4TotalOutput - field5Input;
+
+    // TASK-SARS-002: Calculate adjusted totals
+    // Output adjustments: Fields 7, 9, 12 increase output; Field 11 decreases output
+    const outputAdjustments =
+      adjustments.field7ChangeInUseOutputCents +
+      adjustments.field9OtherOutputCents +
+      adjustments.field12BadDebtsRecoveredCents -
+      adjustments.field11BadDebtsWrittenOffCents;
+
+    // Input adjustments: Fields 8, 10 reduce claimable input VAT
+    const inputAdjustments =
+      adjustments.field8ChangeInUseInputCents +
+      adjustments.field10OtherInputCents;
+
+    // Capital goods scheme: Can be positive (increase) or negative (decrease)
+    const capitalGoodsAdjustment = adjustments.field13CapitalGoodsSchemeCents;
+
+    // Calculate adjusted totals
+    const adjustedOutputTotal =
+      field4TotalOutput + outputAdjustments + capitalGoodsAdjustment;
+    const adjustedInputDeductible = Math.max(0, field5Input - inputAdjustments);
+
+    // Net VAT = Adjusted Output - Adjusted Deductible Input
+    const netVat = adjustedOutputTotal - adjustedInputDeductible;
 
     return {
+      // Fields 1-3: Output tax breakdown
       field1OutputStandardCents: outputVat.standardRatedCents,
       field2OutputZeroRatedCents: 0, // Zero-rated = 0 VAT
       field3OutputExemptCents: 0, // Exempt = 0 VAT
+
+      // Field 4: Total output tax (before adjustments)
       field4TotalOutputCents: field4TotalOutput,
+
+      // Fields 5-6: Input tax
       field5InputTaxCents: field5Input,
-      field6DeductibleInputCents: field5Input,
-      field7AdjustmentsCents: 0,
-      field8ImportedServicesCents: 0,
-      field9BadDebtsCents: 0,
-      field10ReverseAdjustmentsCents: 0,
-      field11CreditTransferCents: 0,
-      field12VendorCents: 0,
-      field13ProvisionalCents: 0,
-      field14TotalCents: field4TotalOutput,
+      field6DeductibleInputCents: adjustedInputDeductible,
+
+      // Fields 7-13: TASK-SARS-002 - Real adjustment data
+      field7AdjustmentsCents: adjustments.field7ChangeInUseOutputCents,
+      field8ImportedServicesCents: adjustments.field8ChangeInUseInputCents,
+      field9BadDebtsCents: adjustments.field9OtherOutputCents,
+      field10ReverseAdjustmentsCents: adjustments.field10OtherInputCents,
+      field11CreditTransferCents: adjustments.field11BadDebtsWrittenOffCents,
+      field12VendorCents: adjustments.field12BadDebtsRecoveredCents,
+      field13ProvisionalCents: adjustments.field13CapitalGoodsSchemeCents,
+
+      // Fields 14-19: Totals
+      field14TotalCents: adjustedOutputTotal,
       field15NetVatCents: netVat,
-      field16PaymentsCents: 0,
-      field17InterestCents: 0,
-      field18PenaltyCents: 0,
+      field16PaymentsCents: 0, // Future: Track payments made
+      field17InterestCents: 0, // Future: Calculate interest if late
+      field18PenaltyCents: 0, // Future: Calculate penalties if applicable
       field19TotalDueCents: netVat,
     };
   }

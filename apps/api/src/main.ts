@@ -1,16 +1,154 @@
+/**
+ * CrecheBooks API Application Bootstrap
+ * TASK-UI-001: Added cookie-parser for HttpOnly cookie authentication
+ * TASK-INFRA-004: Added helmet security headers
+ * TASK-INFRA-005: Added structured JSON logging with Pino
+ * TASK-INFRA-007: Added shutdown hooks for graceful Bull queue shutdown
+ * TASK-INFRA-008: Added request payload size limits
+ */
+
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { json, urlencoded } from 'express';
+import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { Configuration } from './config';
+import { createCorsConfig } from './config/cors.config';
+import { StructuredLoggerService } from './common/logger';
+import { PayloadTooLargeFilter } from './common/filters/payload-too-large.filter';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
-  const logger = new Logger('Bootstrap');
+  // TASK-INFRA-008: Disable default body parser to use custom config with size limits
+  // TASK-INFRA-005: Create app with buffered logs, then replace with structured logger
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: false,
+    bufferLogs: true,
+  });
+
+  // Get the structured logger and use it as the app logger
+  const logger = app.get(StructuredLoggerService);
+  logger.setContext('Bootstrap');
+  app.useLogger(logger);
+
+  // TASK-INFRA-007: Enable shutdown hooks for graceful Bull queue shutdown
+  // This allows the ShutdownService.onApplicationShutdown() to be called
+  // when the process receives SIGTERM or SIGINT signals
+  app.enableShutdownHooks();
 
   const configService = app.get(ConfigService<Configuration>);
   const port = configService.get('port', { infer: true }) || 3000;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // TASK-INFRA-008: Configure body-parser with size limits
+  // Body parsers must be applied BEFORE other middleware (helmet, cookie-parser)
+  // Order matters: body-parser -> helmet -> cookie-parser -> other middleware
+  const jsonLimit = process.env.BODY_LIMIT_JSON || '10mb';
+  const urlencodedLimit = process.env.BODY_LIMIT_URLENCODED || '10mb';
+
+  // Webhook signature headers that require raw body preservation
+  const webhookSignatureHeaders = [
+    'stripe-signature',
+    'x-hub-signature-256',
+    'x-signature',
+    'x-whatsapp-signature',
+    'x-xero-signature',
+  ];
+
+  // JSON body parser with limit and raw body preservation for webhook signature verification
+  app.use(
+    json({
+      limit: jsonLimit,
+      verify: (req, _res, buf) => {
+        // Store raw body for webhook signature verification
+        // Only store if request has a webhook signature header
+        const request = req as {
+          headers: Record<string, string | undefined>;
+          rawBody?: Buffer;
+        };
+        const hasSignature = webhookSignatureHeaders.some(
+          (header) => request.headers[header],
+        );
+        if (hasSignature) {
+          request.rawBody = buf;
+        }
+      },
+    }),
+  );
+
+  // URL-encoded body parser with limit
+  app.use(
+    urlencoded({
+      limit: urlencodedLimit,
+      extended: true,
+    }),
+  );
+
+  logger.log(
+    `Body parser limits configured: JSON=${jsonLimit}, URL-encoded=${urlencodedLimit}`,
+  );
+
+  // TASK-INFRA-008: Global exception filter for payload too large errors
+  app.useGlobalFilters(new PayloadTooLargeFilter(logger));
+
+  // TASK-INFRA-004: Security headers with helmet
+  // Applied first in middleware chain for maximum protection
+  app.use(
+    helmet({
+      // Content Security Policy - restrictive for API
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for Swagger UI
+          imgSrc: ["'self'", 'data:', 'https:'],
+          scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for Swagger UI
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"], // Prevent framing
+          formAction: ["'self'"],
+          upgradeInsecureRequests: isProduction ? [] : null,
+        },
+      },
+      // Cross-Origin policies
+      crossOriginEmbedderPolicy: false, // Disabled to allow Swagger UI resources
+      crossOriginOpenerPolicy: { policy: 'same-origin' },
+      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin for API
+      // DNS Prefetch Control
+      dnsPrefetchControl: { allow: false },
+      // X-Frame-Options: DENY
+      frameguard: { action: 'deny' },
+      // Hide X-Powered-By header
+      hidePoweredBy: true,
+      // HTTP Strict Transport Security - 1 year in production
+      hsts: isProduction
+        ? {
+            maxAge: 31536000, // 1 year in seconds
+            includeSubDomains: true,
+            preload: true,
+          }
+        : false, // Disable in development to avoid HTTPS issues
+      // X-Download-Options for IE
+      ieNoOpen: true,
+      // X-Content-Type-Options: nosniff
+      noSniff: true,
+      // Origin-Agent-Cluster header
+      originAgentCluster: true,
+      // X-Permitted-Cross-Domain-Policies
+      permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+      // Referrer-Policy
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      // X-XSS-Protection (legacy but still useful)
+      xssFilter: true,
+    }),
+  );
+
+  logger.log(
+    `Helmet security headers enabled (production mode: ${isProduction})`,
+  );
+
+  // TASK-UI-001: Enable cookie parser for HttpOnly cookie authentication
+  app.use(cookieParser());
 
   // Global validation pipe - strict validation, no fallbacks
   app.useGlobalPipes(
@@ -25,8 +163,10 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Enable CORS
-  app.enableCors();
+  // Configure CORS with explicit, restrictive settings
+  // FAILS FAST if CORS_ALLOWED_ORIGINS not set in production
+  const corsConfig = createCorsConfig();
+  app.enableCors(corsConfig);
 
   // Global prefix for API
   app.setGlobalPrefix('api/v1', {

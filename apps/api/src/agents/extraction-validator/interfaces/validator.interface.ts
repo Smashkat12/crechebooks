@@ -11,12 +11,12 @@ import { ParsedBankStatement } from '../../../database/entities/bank-statement-m
  */
 export interface ReconciliationResult {
   reconciled: boolean;
-  calculatedBalance: number;  // In cents
-  expectedBalance: number;    // In cents (closing balance from statement)
-  difference: number;         // Absolute difference in cents
-  percentDifference: number;  // Percentage difference
-  credits: number;            // Total credits in cents
-  debits: number;             // Total debits in cents
+  calculatedBalance: number; // In cents
+  expectedBalance: number; // In cents (closing balance from statement)
+  difference: number; // Absolute difference in cents
+  percentDifference: number; // Percentage difference
+  credits: number; // Total credits in cents
+  debits: number; // Total debits in cents
 }
 
 /**
@@ -27,7 +27,7 @@ export interface Correction {
   field: string;
   original: string | number;
   corrected: string | number;
-  confidence: number;  // 0-100
+  confidence: number; // 0-100
   reason: string;
 }
 
@@ -58,12 +58,12 @@ export interface SanityResult {
  */
 export interface ValidationResult {
   isValid: boolean;
-  confidence: number;           // 0-100
+  confidence: number; // 0-100
   balanceReconciled: boolean;
-  balanceDifference: number;    // In cents
+  balanceDifference: number; // In cents
   corrections: Correction[];
   flags: ValidationFlag[];
-  reasoning: string;            // Human-readable explanation
+  reasoning: string; // Human-readable explanation
   reconciliation?: ReconciliationResult;
 }
 
@@ -72,8 +72,8 @@ export interface ValidationResult {
  */
 export interface ValidatedBankStatement extends ParsedBankStatement {
   validation: ValidationResult;
-  originalOpeningBalanceCents?: number;  // Original before correction
-  originalClosingBalanceCents?: number;  // Original before correction
+  originalOpeningBalanceCents?: number; // Original before correction
+  originalClosingBalanceCents?: number; // Original before correction
 }
 
 /**

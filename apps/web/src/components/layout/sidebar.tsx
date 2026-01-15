@@ -8,6 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUIStore } from '@/stores/ui-store';
+import { useDashboardPrefetchOnHover } from '@/hooks/use-dashboard-data';
 import {
   mainNavLinks,
   managementNavLinks,
@@ -20,13 +21,15 @@ interface NavItemProps {
   link: NavLink;
   collapsed: boolean;
   isActive: boolean;
+  /** Optional mouse enter handler for prefetching */
+  onMouseEnter?: () => void;
 }
 
-function NavItem({ link, collapsed, isActive }: NavItemProps) {
+function NavItem({ link, collapsed, isActive, onMouseEnter }: NavItemProps) {
   const Icon = link.icon;
 
   const content = (
-    <Link href={link.href} className="w-full">
+    <Link href={link.href} className="w-full" onMouseEnter={onMouseEnter}>
       <Button
         variant={isActive ? 'secondary' : 'ghost'}
         className={cn(
@@ -67,9 +70,11 @@ interface NavSectionProps {
   links: NavLink[];
   collapsed: boolean;
   pathname: string;
+  /** Map of link href to prefetch handlers */
+  prefetchHandlers?: Record<string, () => void>;
 }
 
-function NavSection({ title, links, collapsed, pathname }: NavSectionProps) {
+function NavSection({ title, links, collapsed, pathname, prefetchHandlers }: NavSectionProps) {
   return (
     <div className="space-y-1">
       {!collapsed && (
@@ -83,6 +88,7 @@ function NavSection({ title, links, collapsed, pathname }: NavSectionProps) {
           link={link}
           collapsed={collapsed}
           isActive={pathname === link.href || pathname.startsWith(`${link.href}/`)}
+          onMouseEnter={prefetchHandlers?.[link.href]}
         />
       ))}
     </div>
@@ -93,8 +99,19 @@ export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, setSidebarCollapsed } = useUIStore();
 
+  // UI-002: Prefetch dashboard data on hover for faster navigation
+  const { onMouseEnter: prefetchDashboard } = useDashboardPrefetchOnHover();
+
+  // Map of route paths to their prefetch handlers
+  const prefetchHandlers: Record<string, () => void> = {
+    '/dashboard': prefetchDashboard,
+  };
+
   return (
     <aside
+      id="main-navigation"
+      role="navigation"
+      aria-label="Main navigation"
       className={cn(
         'fixed left-0 top-0 z-40 h-screen border-r bg-background transition-all duration-300',
         'hidden lg:block', // Hide on mobile, show on desktop
@@ -109,7 +126,7 @@ export function Sidebar() {
               C
             </div>
           ) : (
-            <Link href="/dashboard" className="flex items-center space-x-2">
+            <Link href="/dashboard" className="flex items-center space-x-2" onMouseEnter={prefetchDashboard}>
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold">
                 C
               </div>
@@ -125,6 +142,7 @@ export function Sidebar() {
             links={mainNavLinks}
             collapsed={sidebarCollapsed}
             pathname={pathname}
+            prefetchHandlers={prefetchHandlers}
           />
           <Separator />
           <NavSection

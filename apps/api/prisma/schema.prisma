@@ -184,11 +184,16 @@ enum SubmissionType {
   IRP5
 }
 
+// TASK-SARS-005: Enhanced submission status tracking
+// Status flow: DRAFT -> READY -> SUBMITTED -> ACCEPTED/REJECTED
+// If REJECTED, can retry: REJECTED -> SUBMITTED -> ACCEPTED/REJECTED
 enum SubmissionStatus {
   DRAFT
   READY
   SUBMITTED
-  ACKNOWLEDGED
+  ACCEPTED
+  REJECTED
+  ACKNOWLEDGED // Legacy status, kept for backward compatibility (maps to ACCEPTED)
 }
 
 enum ReconciliationStatus {
@@ -299,6 +304,19 @@ enum AssetReturnStatus {
   WRITE_OFF
 }
 
+// TASK-STAFF-006: UI-19 Deadline Tracking
+enum UI19Type {
+  COMMENCEMENT
+  TERMINATION
+}
+
+enum UI19Status {
+  PENDING
+  SUBMITTED
+  LATE_SUBMITTED
+  OVERDUE
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -324,6 +342,8 @@ model Tenant {
   invoiceDayOfMonth       Int                @default(1) @map("invoice_day_of_month")
   invoiceDueDays          Int                @default(7) @map("invoice_due_days")
   closureDates            Json               @default("[]") @map("closure_dates")
+  // TASK-RECON-002: Amount tolerance for transaction matching (in cents, default 0 = exact match)
+  matchingToleranceCents  Int                @default(0) @map("matching_tolerance_cents")
   xeroConnectedAt         DateTime?          @map("xero_connected_at")
   xeroTenantName          String?            @map("xero_tenant_name") @db.VarChar(200)
   createdAt               DateTime           @default(now()) @map("created_at")
@@ -398,6 +418,21 @@ model Tenant {
   // TASK-XERO-007: Categorization Journals for Reconciled Transactions
   categorizationJournals CategorizationJournal[]
 
+  // TASK-BILL-041: Atomic Invoice Number Counters
+  invoiceNumberCounters InvoiceNumberCounter[]
+
+  // TASK-SARS-002: VAT201 Adjustment Fields
+  vatAdjustments VatAdjustment[]
+
+  // TASK-RECON-004: Duplicate Resolution tracking
+  duplicateResolutions DuplicateResolution[]
+
+  // TASK-RECON-005: Manual Match History tracking
+  manualMatchHistory ManualMatchHistory[]
+
+  // TASK-STAFF-006: UI-19 Deadline Tracking
+  ui19Submissions UI19Submission[]
+
   @@map("tenants")
 }
 
@@ -420,6 +455,12 @@ model User {
   reviewedCategorizations Categorization[] @relation("ReviewedCategorizations")
   sarsSubmissions         SarsSubmission[]
   reconciliations         Reconciliation[] @relation("ReconciliationReconciler")
+
+  // TASK-RECON-004: Duplicate Resolution tracking
+  duplicateResolutions DuplicateResolution[] @relation("DuplicateResolutionResolver")
+
+  // TASK-RECON-005: Manual Match History tracking
+  manualMatchHistory ManualMatchHistory[] @relation("ManualMatchPerformer")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -449,6 +490,7 @@ model AuditLog {
   @@index([tenantId, entityType, entityId])
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
+  @@index([action])
   @@map("audit_logs")
 }
 
@@ -495,6 +537,10 @@ model Transaction {
   categorizationMetrics  CategorizationMetric[]
   bankStatementMatches   BankStatementMatch[]
   categorizationJournal  CategorizationJournal?
+
+  // TASK-RECON-005: Manual Match History tracking
+  previousMatchHistory ManualMatchHistory[] @relation("PreviousMatchedTransaction")
+  newMatchHistory      ManualMatchHistory[] @relation("NewMatchedTransaction")
 
   @@index([tenantId, date])
   @@index([tenantId, status])
@@ -618,6 +664,8 @@ model Parent {
   address          String?
   notes            String?
   isActive         Boolean          @default(true) @map("is_active")
+  // TASK-DATA-003: Soft delete support
+  deletedAt        DateTime?        @map("deleted_at")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
@@ -631,6 +679,7 @@ model Parent {
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([tenantId, lastName, firstName])
+  @@index([tenantId, deletedAt])
   @@map("parents")
 }
 
@@ -677,6 +726,8 @@ model Child {
   emergencyContact String?  @map("emergency_contact") @db.VarChar(200)
   emergencyPhone   String?  @map("emergency_phone") @db.VarChar(20)
   isActive         Boolean  @default(true) @map("is_active")
+  // TASK-DATA-003: Soft delete support
+  deletedAt        DateTime? @map("deleted_at")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -688,6 +739,7 @@ model Child {
   @@index([tenantId])
   @@index([tenantId, parentId])
   @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
   @@map("children")
 }
 
@@ -782,6 +834,20 @@ model InvoiceDeliveryLog {
   @@map("invoice_delivery_logs")
 }
 
+// TASK-BILL-041: Atomic invoice number counter for race condition prevention
+model InvoiceNumberCounter {
+  tenantId     String   @map("tenant_id")
+  year         Int
+  currentValue Int      @default(0) @map("current_value")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, year])
+  @@map("invoice_number_counters")
+}
+
 model Payment {
   id              String    @id @default(uuid())
   tenantId        String    @map("tenant_id")
@@ -797,6 +863,8 @@ model Payment {
   isReversed      Boolean   @default(false) @map("is_reversed")
   reversedAt      DateTime? @map("reversed_at")
   reversalReason  String?   @map("reversal_reason") @db.Text
+  // TASK-DATA-003: Soft delete support
+  deletedAt       DateTime? @map("deleted_at")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -807,6 +875,7 @@ model Payment {
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
   @@index([xeroPaymentId])
+  @@index([tenantId, deletedAt])
   @@map("payments")
 }
 
@@ -857,6 +926,9 @@ model Staff {
   taxStatus     String? @map("tax_status") @db.VarChar(50)
   paymentMethod String? @map("payment_method") @db.VarChar(50)
 
+  // TASK-DATA-003: Soft delete support
+  deletedAt DateTime? @map("deleted_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -885,8 +957,12 @@ model Staff {
   // TASK-SPAY-008: Employee Setup Pipeline
   employeeSetupLog EmployeeSetupLog?
 
+  // TASK-STAFF-006: UI-19 Deadline Tracking
+  ui19Submissions UI19Submission[]
+
   @@unique([tenantId, idNumber])
   @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
   @@map("staff")
 }
 
@@ -1011,11 +1087,68 @@ model BankStatementMatch {
   reconciliation Reconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
   transaction    Transaction?   @relation(fields: [transactionId], references: [id])
 
+  // TASK-RECON-005: Manual Match History tracking
+  manualMatchHistory ManualMatchHistory[]
+
   @@index([tenantId])
   @@index([reconciliationId])
   @@index([transactionId])
   @@index([tenantId, status])
   @@map("bank_statement_matches")
+}
+
+// ============================================
+// TASK-RECON-004: Duplicate Detection
+// Tracks duplicate resolution decisions for bank statement imports
+// ============================================
+
+model DuplicateResolution {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  compositeKey String    @map("composite_key") @db.VarChar(255)
+  status       String    @default("PENDING") @db.VarChar(50)
+  resolvedBy   String?   @map("resolved_by")
+  resolvedAt   DateTime? @map("resolved_at")
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  resolver User?  @relation("DuplicateResolutionResolver", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, compositeKey], name: "tenantId_compositeKey")
+  @@index([tenantId])
+  @@index([status])
+  @@map("duplicate_resolutions")
+}
+
+// ============================================
+// TASK-RECON-005: Manual Match History
+// Tracks manual match/unmatch operations for audit and undo
+// ============================================
+
+model ManualMatchHistory {
+  id                    String   @id @default(uuid())
+  tenantId              String   @map("tenant_id")
+  matchId               String   @map("match_id")
+  previousTransactionId String?  @map("previous_transaction_id")
+  newTransactionId      String?  @map("new_transaction_id")
+  performedBy           String   @map("performed_by")
+  performedAt           DateTime @default(now()) @map("performed_at")
+  action                String   @db.VarChar(20)
+  reason                String?  @db.Text
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  match               BankStatementMatch  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  performer           User                @relation("ManualMatchPerformer", fields: [performedBy], references: [id])
+  previousTransaction Transaction?        @relation("PreviousMatchedTransaction", fields: [previousTransactionId], references: [id], onDelete: SetNull)
+  newTransaction      Transaction?        @relation("NewMatchedTransaction", fields: [newTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([matchId])
+  @@index([performedBy])
+  @@index([performedAt(sort: Desc)])
+  @@map("manual_match_history")
 }
 
 model XeroToken {
@@ -1681,6 +1814,36 @@ model AssetReturn {
 }
 
 // ============================================
+// TASK-STAFF-006: UI-19 Deadline Tracking
+// ============================================
+
+model UI19Submission {
+  id              String     @id @default(uuid())
+  tenantId        String     @map("tenant_id")
+  staffId         String     @map("staff_id")
+  type            UI19Type
+  eventDate       DateTime   @map("event_date") @db.Date
+  dueDate         DateTime   @map("due_date") @db.Date
+  status          UI19Status @default(PENDING)
+  submittedAt     DateTime?  @map("submitted_at")
+  submittedBy     String?    @map("submitted_by")
+  referenceNumber String?    @map("reference_number") @db.VarChar(50)
+  lateReason      String?    @map("late_reason") @db.VarChar(500)
+  notes           String?
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  staff  Staff  @relation(fields: [staffId], references: [id])
+
+  @@unique([staffId, type, eventDate])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([dueDate])
+  @@map("ui19_submissions")
+}
+
+// ============================================
 // TASK-STAFF-004: SimplePay Integration
 // ============================================
 
@@ -2061,6 +2224,18 @@ enum SetupStatus {
   ROLLED_BACK
 }
 
+// TASK-SARS-002: VAT201 Adjustment Fields (Fields 7-13)
+// South African VAT201 form adjustment types per SARS specification
+enum VatAdjustmentType {
+  CHANGE_IN_USE_OUTPUT    // Field 7: Change in use adjustments (Output)
+  CHANGE_IN_USE_INPUT     // Field 8: Change in use adjustments (Input)
+  OTHER_OUTPUT            // Field 9: Other adjustments to output tax
+  OTHER_INPUT             // Field 10: Other adjustments to input tax
+  BAD_DEBTS_WRITTEN_OFF   // Field 11: Bad debts written off
+  BAD_DEBTS_RECOVERED     // Field 12: Bad debts recovered
+  CAPITAL_GOODS_SCHEME    // Field 13: Capital goods scheme adjustments
+}
+
 model EmployeeSetupLog {
   id                  String       @id @default(cuid())
   tenantId            String       @map("tenant_id")
@@ -2084,4 +2259,37 @@ model EmployeeSetupLog {
   @@index([tenantId])
   @@index([status])
   @@map("employee_setup_logs")
+}
+
+// ============================================
+// TASK-SARS-002: VAT201 Adjustment Fields (7-13)
+// Stores VAT adjustments for VAT201 return generation
+// ============================================
+
+model VatAdjustment {
+  id             String            @id @default(uuid())
+  tenantId       String            @map("tenant_id")
+  adjustmentType VatAdjustmentType @map("adjustment_type")
+  amountCents    Int               @map("amount_cents") // Always positive, sign determined by type
+  adjustmentDate DateTime          @map("adjustment_date") @db.Date
+  description    String            @db.VarChar(500)
+  reference      String?           @db.VarChar(100) // Invoice/transaction reference if applicable
+  invoiceId      String?           @map("invoice_id") // Link to invoice for bad debts
+  transactionId  String?           @map("transaction_id") // Link to transaction if applicable
+  notes          String?           @db.Text
+  isVoided       Boolean           @default(false) @map("is_voided")
+  voidedAt       DateTime?         @map("voided_at")
+  voidedBy       String?           @map("voided_by")
+  voidReason     String?           @map("void_reason") @db.Text
+  createdBy      String            @map("created_by")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, adjustmentType])
+  @@index([tenantId, adjustmentDate])
+  @@index([tenantId, isVoided])
+  @@map("vat_adjustments")
 }

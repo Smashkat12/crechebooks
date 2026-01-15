@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './fixtures/auth.fixture';
 
 /**
  * SARS Compliance E2E Tests
@@ -7,14 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('SARS Compliance', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-
+    await login(page);
     await page.goto('/sars');
   });
 
@@ -53,14 +47,7 @@ test.describe('SARS Compliance', () => {
 
 test.describe('VAT201 Submission', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-
+    await login(page);
     await page.goto('/sars/vat201');
   });
 
@@ -106,14 +93,7 @@ test.describe('VAT201 Submission', () => {
 
 test.describe('EMP201 Submission', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-
+    await login(page);
     await page.goto('/sars/emp201');
   });
 

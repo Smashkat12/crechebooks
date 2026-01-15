@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './fixtures/auth.fixture';
 
 /**
  * Payments E2E Tests
@@ -7,13 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Payments', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
+    await login(page);
     await page.goto('/payments');
   });
 
@@ -79,13 +74,7 @@ test.describe('Payments', () => {
 
 test.describe('Arrears', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
+    await login(page);
     await page.goto('/arrears');
   });
 

@@ -40,6 +40,14 @@ prisma/*.db-journal
 tmp/
 temp/
 *.tmp
+*.temp
+
+# Backup files - NEVER COMMIT
+*.bak
+*.backup
+*.orig
+\#*\#
+.#*
 
 # Test data - bank statements contain sensitive financial data
 bank-statements/

@@ -62,16 +62,21 @@ export class PayrollAdjustmentRepository {
   }
 
   /**
-   * Find payroll adjustment by ID
+   * Find payroll adjustment by ID with tenant isolation
+   * @param id - Payroll adjustment ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findById(id: string): Promise<PayrollAdjustment | null> {
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<PayrollAdjustment | null> {
     try {
-      return await this.prisma.payrollAdjustment.findUnique({
-        where: { id },
+      return await this.prisma.payrollAdjustment.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find payroll adjustment by id: ${id}`,
+        `Failed to find payroll adjustment by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -264,10 +269,11 @@ export class PayrollAdjustmentRepository {
    */
   async update(
     id: string,
+    tenantId: string,
     dto: UpdatePayrollAdjustmentDto,
   ): Promise<PayrollAdjustment> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('PayrollAdjustment', id);
       }
@@ -356,9 +362,13 @@ export class PayrollAdjustmentRepository {
   /**
    * End a payroll adjustment
    */
-  async end(id: string, endDate?: Date): Promise<PayrollAdjustment> {
+  async end(
+    id: string,
+    tenantId: string,
+    endDate?: Date,
+  ): Promise<PayrollAdjustment> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('PayrollAdjustment', id);
       }
@@ -388,9 +398,9 @@ export class PayrollAdjustmentRepository {
   /**
    * Delete a payroll adjustment
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('PayrollAdjustment', id);
       }

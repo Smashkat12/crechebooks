@@ -12,6 +12,7 @@ import {
   NotFoundException,
 } from '../../../shared/exceptions';
 import { PayeePattern } from '@prisma/client';
+import { Decimal } from 'decimal.js';
 
 describe('PayeeAliasService', () => {
   let service: PayeeAliasService;
@@ -26,7 +27,7 @@ describe('PayeeAliasService', () => {
     payeeAliases: ['WOOLWORTHS SANDTON', 'W/WORTHS'],
     defaultAccountCode: '5100',
     defaultAccountName: 'Groceries',
-    confidenceBoost: 10,
+    confidenceBoost: new Decimal(10),
     matchCount: 5,
     isRecurring: false,
     expectedAmountCents: null,

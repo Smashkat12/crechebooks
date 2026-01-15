@@ -148,7 +148,7 @@ describe('PayrollAdjustmentRepository', () => {
   describe('findById', () => {
     it('should find adjustment by id', async () => {
       const created = await repository.create(createTestAdjustmentDto());
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(created.id);
@@ -157,6 +157,7 @@ describe('PayrollAdjustmentRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        tenant.id,
       );
       expect(found).toBeNull();
     });
@@ -294,7 +295,7 @@ describe('PayrollAdjustmentRepository', () => {
   describe('update', () => {
     it('should update adjustment fields', async () => {
       const created = await repository.create(createTestAdjustmentDto());
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, tenant.id, {
         amountCents: 150000,
         itemName: 'Updated Name',
       });
@@ -305,7 +306,7 @@ describe('PayrollAdjustmentRepository', () => {
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
+        repository.update('00000000-0000-0000-0000-000000000000', tenant.id, {
           amountCents: 150000,
         }),
       ).rejects.toThrow(NotFoundException);
@@ -326,21 +327,21 @@ describe('PayrollAdjustmentRepository', () => {
     it('should set endDate', async () => {
       const created = await repository.create(createTestAdjustmentDto());
       const endDate = new Date('2024-12-31');
-      const ended = await repository.end(created.id, endDate);
+      const ended = await repository.end(created.id, tenant.id, endDate);
 
       expect(ended.endDate).toEqual(endDate);
     });
 
     it('should use current date if not provided', async () => {
       const created = await repository.create(createTestAdjustmentDto());
-      const ended = await repository.end(created.id);
+      const ended = await repository.end(created.id, tenant.id);
 
       expect(ended.endDate).toBeDefined();
     });
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.end('00000000-0000-0000-0000-000000000000'),
+        repository.end('00000000-0000-0000-0000-000000000000', tenant.id),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -348,15 +349,15 @@ describe('PayrollAdjustmentRepository', () => {
   describe('delete', () => {
     it('should delete adjustment', async () => {
       const created = await repository.create(createTestAdjustmentDto());
-      await repository.delete(created.id);
+      await repository.delete(created.id, tenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete('00000000-0000-0000-0000-000000000000', tenant.id),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -378,7 +379,7 @@ describe('PayrollAdjustmentRepository', () => {
     it('should count only active adjustments', async () => {
       const adj1 = await repository.create(createTestAdjustmentDto());
       await repository.create(createTestAdjustmentDto({ amountCents: 50000 }));
-      await repository.end(adj1.id, new Date('2020-01-01'));
+      await repository.end(adj1.id, tenant.id);
 
       const count = await repository.countActiveByStaffId(staff.id);
       expect(count).toBe(1);

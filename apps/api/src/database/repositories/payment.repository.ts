@@ -77,18 +77,30 @@ export class PaymentRepository {
   }
 
   /**
-   * Find payment by ID
+   * Find payment by ID with tenant isolation
+   * TASK-DATA-003: Added includeDeleted option for soft delete support
+   * @param id - Payment ID
+   * @param tenantId - Tenant ID for isolation
+   * @param includeDeleted - Whether to include soft-deleted records (default: false)
    * @returns Payment or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<Payment | null> {
+  async findById(
+    id: string,
+    tenantId: string,
+    includeDeleted = false,
+  ): Promise<Payment | null> {
     try {
-      return await this.prisma.payment.findUnique({
-        where: { id },
+      return await this.prisma.payment.findFirst({
+        where: {
+          id,
+          tenantId,
+          ...(includeDeleted ? {} : { deletedAt: null }),
+        },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find payment by id: ${id}`,
+        `Failed to find payment by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -172,15 +184,24 @@ export class PaymentRepository {
 
   /**
    * Find all payments for a tenant with optional filters
+   * TASK-DATA-003: Added includeDeleted option for soft delete support
+   * @param tenantId - Tenant ID for isolation
+   * @param filter - Filter options
+   * @param includeDeleted - Whether to include soft-deleted records (default: false)
    * @returns Array of payments
    * @throws DatabaseException for database errors
    */
   async findByTenantId(
     tenantId: string,
     filter?: PaymentFilterDto,
+    includeDeleted = false,
   ): Promise<Payment[]> {
     try {
-      const where: Prisma.PaymentWhereInput = { tenantId };
+      const where: Prisma.PaymentWhereInput = {
+        tenantId,
+        // TASK-DATA-003: Exclude soft-deleted records by default
+        ...(includeDeleted ? {} : { deletedAt: null }),
+      };
 
       if (filter?.transactionId !== undefined) {
         where.transactionId = filter.transactionId;
@@ -221,9 +242,13 @@ export class PaymentRepository {
    * @throws ConflictException if updating to a duplicate xeroPaymentId
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdatePaymentDto): Promise<Payment> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdatePaymentDto,
+  ): Promise<Payment> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Payment', id);
       }
@@ -308,9 +333,13 @@ export class PaymentRepository {
    * @throws ConflictException if payment is already reversed
    * @throws DatabaseException for database errors
    */
-  async reverse(id: string, dto: ReversePaymentDto): Promise<Payment> {
+  async reverse(
+    id: string,
+    tenantId: string,
+    dto: ReversePaymentDto,
+  ): Promise<Payment> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('Payment', id);
       }
@@ -350,19 +379,185 @@ export class PaymentRepository {
   }
 
   /**
-   * Delete a payment (hard delete)
+   * Soft delete a payment (set deletedAt timestamp) with tenant isolation
+   * TASK-DATA-003: Soft delete implementation for data retention
+   * @param id - Payment ID
+   * @param tenantId - Tenant ID for isolation
+   * @param userId - Optional user ID for audit trail
+   * @throws NotFoundException if payment doesn't exist or is already deleted
+   * @throws DatabaseException for database errors
+   */
+  async softDelete(
+    id: string,
+    tenantId: string,
+    userId?: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Step 1: Fetch entity data (excluding already deleted)
+        const existing = await tx.payment.findFirst({
+          where: { id, tenantId, deletedAt: null },
+        });
+
+        if (!existing) {
+          throw new NotFoundException('Payment', id);
+        }
+
+        // Step 2: Create audit log entry
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: userId ?? null,
+            entityType: 'Payment',
+            entityId: id,
+            action: 'DELETE',
+            beforeValue: existing as unknown as Prisma.InputJsonValue,
+            afterValue: {
+              ...existing,
+              deletedAt: new Date(),
+            } as unknown as Prisma.InputJsonValue,
+            changeSummary: `Payment soft-deleted: ${existing.amountCents}c for invoice ${existing.invoiceId}`,
+          },
+        });
+
+        // Step 3: Set deletedAt timestamp (soft delete)
+        await tx.payment.update({
+          where: { id },
+          data: { deletedAt: new Date() },
+        });
+
+        this.logger.debug(
+          `TASK-DATA-003: Payment ${id} soft-deleted with audit trail`,
+        );
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to soft delete payment: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'softDelete',
+        'Failed to soft delete payment',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Restore a soft-deleted payment
+   * TASK-DATA-003: Restore functionality for accidentally deleted records
+   * @param id - Payment ID
+   * @param tenantId - Tenant ID for isolation
+   * @param userId - Optional user ID for audit trail
+   * @returns Restored payment
+   * @throws NotFoundException if payment doesn't exist or is not deleted
+   * @throws DatabaseException for database errors
+   */
+  async restore(
+    id: string,
+    tenantId: string,
+    userId?: string,
+  ): Promise<Payment> {
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // Step 1: Fetch soft-deleted entity
+        const existing = await tx.payment.findFirst({
+          where: { id, tenantId, deletedAt: { not: null } },
+        });
+
+        if (!existing) {
+          throw new NotFoundException('Payment', id);
+        }
+
+        // Step 2: Create audit log entry
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: userId ?? null,
+            entityType: 'Payment',
+            entityId: id,
+            action: 'UPDATE',
+            beforeValue: existing as unknown as Prisma.InputJsonValue,
+            afterValue: {
+              ...existing,
+              deletedAt: null,
+            } as unknown as Prisma.InputJsonValue,
+            changeSummary: `Payment restored: ${existing.amountCents}c for invoice ${existing.invoiceId}`,
+          },
+        });
+
+        // Step 3: Clear deletedAt timestamp (restore)
+        const restored = await tx.payment.update({
+          where: { id },
+          data: { deletedAt: null },
+        });
+
+        this.logger.debug(
+          `TASK-DATA-003: Payment ${id} restored with audit trail`,
+        );
+
+        return restored;
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to restore payment: ${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'restore',
+        'Failed to restore payment',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * Hard delete a payment (permanent deletion with audit logging)
+   * TASK-DATA-003: Kept as option for permanent deletion when needed
    * @throws NotFoundException if payment doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string, userId?: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
-      if (!existing) {
-        throw new NotFoundException('Payment', id);
-      }
+      // Use transaction to ensure audit log and delete succeed together
+      await this.prisma.$transaction(async (tx) => {
+        // Step 1: Fetch entity data for audit snapshot (include soft-deleted)
+        const existing = await tx.payment.findFirst({
+          where: { id, tenantId },
+        });
 
-      await this.prisma.payment.delete({
-        where: { id },
+        if (!existing) {
+          throw new NotFoundException('Payment', id);
+        }
+
+        // Step 2: Create audit log entry (transactional)
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: userId ?? null,
+            entityType: 'Payment',
+            entityId: id,
+            action: 'DELETE',
+            beforeValue: existing as unknown as Prisma.InputJsonValue,
+            afterValue: Prisma.DbNull,
+            changeSummary: `Payment permanently deleted: ${existing.amountCents}c for invoice ${existing.invoiceId}`,
+          },
+        });
+
+        // Step 3: Execute delete
+        await tx.payment.delete({
+          where: { id },
+        });
+
+        this.logger.debug(
+          `TASK-DATA-003: Payment ${id} permanently deleted with audit trail`,
+        );
       });
     } catch (error) {
       if (error instanceof NotFoundException) {
@@ -381,7 +576,8 @@ export class PaymentRepository {
   }
 
   /**
-   * Calculate total paid amount for an invoice (excluding reversed payments)
+   * Calculate total paid amount for an invoice (excluding reversed and soft-deleted payments)
+   * TASK-DATA-003: Updated to exclude soft-deleted payments
    * @returns Total amount in cents
    * @throws DatabaseException for database errors
    */
@@ -391,6 +587,7 @@ export class PaymentRepository {
         where: {
           invoiceId,
           isReversed: false,
+          deletedAt: null, // TASK-DATA-003: Exclude soft-deleted
         },
         _sum: {
           amountCents: true,
@@ -413,7 +610,8 @@ export class PaymentRepository {
 
   /**
    * Find all non-reversed payments for a tenant
-   * @returns Array of active payments
+   * TASK-DATA-003: Updated to exclude soft-deleted payments
+   * @returns Array of active payments (not reversed, not soft-deleted)
    * @throws DatabaseException for database errors
    */
   async findActiveByTenantId(tenantId: string): Promise<Payment[]> {
@@ -422,6 +620,7 @@ export class PaymentRepository {
         where: {
           tenantId,
           isReversed: false,
+          deletedAt: null, // TASK-DATA-003: Exclude soft-deleted
         },
         orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
       });

@@ -225,7 +225,7 @@ describe('PayrollRepository', () => {
   describe('findById', () => {
     it('should find payroll by id', async () => {
       const created = await repository.create(testPayrollData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -235,6 +235,7 @@ describe('PayrollRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -289,7 +290,7 @@ describe('PayrollRepository', () => {
       });
 
       // Approve one
-      await repository.approve(payroll1.id);
+      await repository.approve(payroll1.id, testTenant.id);
 
       const approved = await repository.findByStaffId(testStaff.id, {
         status: PayrollStatus.APPROVED,
@@ -356,7 +357,7 @@ describe('PayrollRepository', () => {
 
     it('should filter by status', async () => {
       const payroll = await repository.create(testPayrollData);
-      await repository.approve(payroll.id);
+      await repository.approve(payroll.id, testTenant.id);
 
       const drafts = await repository.findByTenantId(testTenant.id, {
         status: PayrollStatus.DRAFT,
@@ -405,7 +406,7 @@ describe('PayrollRepository', () => {
     it('should update payroll fields', async () => {
       const created = await repository.create(testPayrollData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         overtimeCents: 100000, // R1000
       });
 
@@ -415,19 +416,27 @@ describe('PayrollRepository', () => {
 
     it('should throw NotFoundException for non-existent payroll', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          overtimeCents: 100000,
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            overtimeCents: 100000,
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ConflictException if status is PAID', async () => {
       const created = await repository.create(testPayrollData);
-      await repository.approve(created.id);
-      await repository.markAsPaid(created.id, new Date('2025-01-25'));
+      await repository.approve(created.id, testTenant.id);
+      await repository.markAsPaid(
+        created.id,
+        testTenant.id,
+        new Date('2025-01-25'),
+      );
 
       await expect(
-        repository.update(created.id, { overtimeCents: 100000 }),
+        repository.update(created.id, testTenant.id, { overtimeCents: 100000 }),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -437,34 +446,41 @@ describe('PayrollRepository', () => {
       const created = await repository.create(testPayrollData);
       expect(created.status).toBe(PayrollStatus.DRAFT);
 
-      const approved = await repository.approve(created.id);
+      const approved = await repository.approve(created.id, testTenant.id);
 
       expect(approved.status).toBe(PayrollStatus.APPROVED);
     });
 
     it('should throw NotFoundException for non-existent payroll', async () => {
       await expect(
-        repository.approve('00000000-0000-0000-0000-000000000000'),
+        repository.approve(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessException if not DRAFT', async () => {
       const created = await repository.create(testPayrollData);
-      await repository.approve(created.id);
+      await repository.approve(created.id, testTenant.id);
 
-      await expect(repository.approve(created.id)).rejects.toThrow(
-        BusinessException,
-      );
+      await expect(
+        repository.approve(created.id, testTenant.id),
+      ).rejects.toThrow(BusinessException);
     });
   });
 
   describe('markAsPaid', () => {
     it('should transition APPROVED to PAID and set paymentDate', async () => {
       const created = await repository.create(testPayrollData);
-      await repository.approve(created.id);
+      await repository.approve(created.id, testTenant.id);
 
       const paymentDate = new Date('2025-01-25');
-      const paid = await repository.markAsPaid(created.id, paymentDate);
+      const paid = await repository.markAsPaid(
+        created.id,
+        testTenant.id,
+        paymentDate,
+      );
 
       expect(paid.status).toBe(PayrollStatus.PAID);
       expect(paid.paymentDate).toEqual(paymentDate);
@@ -474,6 +490,7 @@ describe('PayrollRepository', () => {
       await expect(
         repository.markAsPaid(
           '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
           new Date(),
         ),
       ).rejects.toThrow(NotFoundException);
@@ -483,7 +500,7 @@ describe('PayrollRepository', () => {
       const created = await repository.create(testPayrollData);
 
       await expect(
-        repository.markAsPaid(created.id, new Date()),
+        repository.markAsPaid(created.id, testTenant.id, new Date()),
       ).rejects.toThrow(BusinessException);
     });
 
@@ -492,7 +509,7 @@ describe('PayrollRepository', () => {
       // Don't approve - stays DRAFT
 
       await expect(
-        repository.markAsPaid(created.id, new Date()),
+        repository.markAsPaid(created.id, testTenant.id, new Date()),
       ).rejects.toThrow(BusinessException);
     });
   });
@@ -501,33 +518,40 @@ describe('PayrollRepository', () => {
     it('should delete existing payroll', async () => {
       const created = await repository.create(testPayrollData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent payroll', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ConflictException if status is PAID', async () => {
       const created = await repository.create(testPayrollData);
-      await repository.approve(created.id);
-      await repository.markAsPaid(created.id, new Date('2025-01-25'));
-
-      await expect(repository.delete(created.id)).rejects.toThrow(
-        ConflictException,
+      await repository.approve(created.id, testTenant.id);
+      await repository.markAsPaid(
+        created.id,
+        testTenant.id,
+        new Date('2025-01-25'),
       );
+
+      await expect(
+        repository.delete(created.id, testTenant.id),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
   describe('calculatePeriodTotals', () => {
     it('should calculate totals for period', async () => {
       const payroll1 = await repository.create(testPayrollData);
-      await repository.approve(payroll1.id);
+      await repository.approve(payroll1.id, testTenant.id);
 
       const payroll2 = await repository.create({
         ...testPayrollData,
@@ -539,7 +563,7 @@ describe('PayrollRepository', () => {
         uifEmployerCents: 8000,
         netSalaryCents: 672000,
       });
-      await repository.approve(payroll2.id);
+      await repository.approve(payroll2.id, testTenant.id);
 
       // Create another staff to have a second payroll
       const otherStaff = await prisma.staff.create({
@@ -560,7 +584,7 @@ describe('PayrollRepository', () => {
         ...testPayrollData,
         staffId: otherStaff.id,
       });
-      await repository.approve(payroll3.id);
+      await repository.approve(payroll3.id, testTenant.id);
 
       const totals = await repository.calculatePeriodTotals(
         testTenant.id,
@@ -597,7 +621,7 @@ describe('PayrollRepository', () => {
         ...testPayrollData,
         staffId: otherStaff.id,
       });
-      await repository.approve(approvedPayroll.id);
+      await repository.approve(approvedPayroll.id, testTenant.id);
 
       const totals = await repository.calculatePeriodTotals(
         testTenant.id,
@@ -652,11 +676,12 @@ describe('PayrollRepository', () => {
       const created = await repository.create(testPayrollData);
       expect(created.status).toBe(PayrollStatus.DRAFT);
 
-      const approved = await repository.approve(created.id);
+      const approved = await repository.approve(created.id, testTenant.id);
       expect(approved.status).toBe(PayrollStatus.APPROVED);
 
       const paid = await repository.markAsPaid(
         created.id,
+        testTenant.id,
         new Date('2025-01-25'),
       );
       expect(paid.status).toBe(PayrollStatus.PAID);
@@ -675,10 +700,11 @@ describe('PayrollRepository', () => {
 
     it('should store paymentDate correctly', async () => {
       const payroll = await repository.create(testPayrollData);
-      await repository.approve(payroll.id);
+      await repository.approve(payroll.id, testTenant.id);
 
       const paid = await repository.markAsPaid(
         payroll.id,
+        testTenant.id,
         new Date('2025-01-25'),
       );
 

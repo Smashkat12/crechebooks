@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './fixtures/auth.fixture';
 
 /**
  * Ad-hoc Charges E2E Tests
@@ -10,14 +11,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Ad-hoc Charges', () => {
   test.beforeEach(async ({ page }) => {
     // Login before each test
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for navigation to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-    await expect(page).toHaveURL(/.*dashboard/);
+    await login(page);
 
     // Navigate to invoices page
     await page.goto('/invoices');

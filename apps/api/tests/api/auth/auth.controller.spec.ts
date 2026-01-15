@@ -1,22 +1,40 @@
+/**
+ * Auth Controller Tests
+ * TASK-UI-001: Added tests for HttpOnly cookie authentication
+ */
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException, BadRequestException } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthController } from '../../../src/api/auth/auth.controller';
 import { AuthService } from '../../../src/api/auth/auth.service';
 import { LoginRequestDto } from '../../../src/api/auth/dto/login.dto';
 import { CallbackRequestDto } from '../../../src/api/auth/dto/callback.dto';
 import { RefreshRequestDto } from '../../../src/api/auth/dto/refresh.dto';
+import { ACCESS_TOKEN_COOKIE } from '../../../src/api/auth/strategies/jwt.strategy';
 
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: AuthService;
+  let mockResponse: Response;
 
   const mockAuthService = {
     getAuthorizationUrl: jest.fn(),
     handleCallback: jest.fn(),
     refreshAccessToken: jest.fn(),
+    devLogin: jest.fn(),
   };
 
+  // Create fresh mock Response for each test
+  const createMockResponse = (): Response =>
+    ({
+      cookie: jest.fn(),
+      clearCookie: jest.fn(),
+    }) as unknown as Response;
+
   beforeEach(async () => {
+    // Create fresh mock response for each test
+    mockResponse = createMockResponse();
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
@@ -114,7 +132,7 @@ describe('AuthController', () => {
 
       mockAuthService.handleCallback.mockResolvedValue(expectedAuthResult);
 
-      const result = await controller.callback(callbackDto);
+      const result = await controller.callback(callbackDto, mockResponse);
 
       expect(result.access_token).toBe(expectedAuthResult.accessToken);
       expect(result.refresh_token).toBe(expectedAuthResult.refreshToken);
@@ -156,9 +174,9 @@ describe('AuthController', () => {
         new UnauthorizedException('Invalid authorization code'),
       );
 
-      await expect(controller.callback(callbackDto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        controller.callback(callbackDto, mockResponse),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should handle invalid state parameter', async () => {
@@ -171,9 +189,9 @@ describe('AuthController', () => {
         new UnauthorizedException('Invalid state parameter'),
       );
 
-      await expect(controller.callback(callbackDto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        controller.callback(callbackDto, mockResponse),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -192,7 +210,7 @@ describe('AuthController', () => {
         expectedRefreshResult,
       );
 
-      const result = await controller.refresh(refreshDto);
+      const result = await controller.refresh(refreshDto, mockResponse);
 
       expect(result.access_token).toBe(expectedRefreshResult.accessToken);
       expect(result.expires_in).toBe(expectedRefreshResult.expiresIn);
@@ -218,9 +236,9 @@ describe('AuthController', () => {
         new UnauthorizedException('Invalid refresh token'),
       );
 
-      await expect(controller.refresh(refreshDto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        controller.refresh(refreshDto, mockResponse),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should handle expired refresh token', async () => {
@@ -232,9 +250,280 @@ describe('AuthController', () => {
         new UnauthorizedException('Refresh token expired'),
       );
 
-      await expect(controller.refresh(refreshDto)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        controller.refresh(refreshDto, mockResponse),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  /**
+   * TASK-UI-001: HttpOnly Cookie Tests
+   * Verify that authentication endpoints properly set and clear HttpOnly cookies
+   */
+  describe('TASK-UI-001: HttpOnly Cookie Authentication', () => {
+    describe('POST /auth/callback - Cookie Setting', () => {
+      it('should set HttpOnly cookie on successful callback', async () => {
+        const callbackDto: CallbackRequestDto = {
+          code: 'auth-code-123',
+          state: 'random-state-456',
+        };
+
+        const authResult = {
+          accessToken: 'jwt-access-token',
+          refreshToken: 'jwt-refresh-token',
+          expiresIn: 3600,
+          user: {
+            id: 'user-123',
+            tenantId: 'tenant-123',
+            auth0Id: 'auth0|123',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'VIEWER' as any,
+            isActive: true,
+            lastLoginAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        };
+
+        mockAuthService.handleCallback.mockResolvedValue(authResult);
+
+        await controller.callback(callbackDto, mockResponse);
+
+        // Verify HttpOnly cookie was set
+        expect(mockResponse.cookie).toHaveBeenCalledWith(
+          ACCESS_TOKEN_COOKIE,
+          authResult.accessToken,
+          expect.objectContaining({
+            httpOnly: true,
+            path: '/',
+          }),
+        );
+      });
+
+      it('should set secure cookie in production', async () => {
+        const originalEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+
+        const callbackDto: CallbackRequestDto = {
+          code: 'auth-code-123',
+          state: 'random-state-456',
+        };
+
+        const authResult = {
+          accessToken: 'jwt-access-token',
+          refreshToken: 'jwt-refresh-token',
+          expiresIn: 3600,
+          user: {
+            id: 'user-123',
+            tenantId: 'tenant-123',
+            auth0Id: 'auth0|123',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'VIEWER' as any,
+            isActive: true,
+            lastLoginAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        };
+
+        mockAuthService.handleCallback.mockResolvedValue(authResult);
+
+        await controller.callback(callbackDto, mockResponse);
+
+        expect(mockResponse.cookie).toHaveBeenCalledWith(
+          ACCESS_TOKEN_COOKIE,
+          authResult.accessToken,
+          expect.objectContaining({
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+          }),
+        );
+
+        process.env.NODE_ENV = originalEnv;
+      });
+
+      it('should set SameSite=lax in development', async () => {
+        const originalEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'development';
+
+        const callbackDto: CallbackRequestDto = {
+          code: 'auth-code-123',
+          state: 'random-state-456',
+        };
+
+        const authResult = {
+          accessToken: 'jwt-access-token',
+          refreshToken: 'jwt-refresh-token',
+          expiresIn: 3600,
+          user: {
+            id: 'user-123',
+            tenantId: 'tenant-123',
+            auth0Id: 'auth0|123',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'VIEWER' as any,
+            isActive: true,
+            lastLoginAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        };
+
+        mockAuthService.handleCallback.mockResolvedValue(authResult);
+
+        await controller.callback(callbackDto, mockResponse);
+
+        expect(mockResponse.cookie).toHaveBeenCalledWith(
+          ACCESS_TOKEN_COOKIE,
+          authResult.accessToken,
+          expect.objectContaining({
+            httpOnly: true,
+            sameSite: 'lax',
+          }),
+        );
+
+        process.env.NODE_ENV = originalEnv;
+      });
+    });
+
+    describe('POST /auth/refresh - Cookie Update', () => {
+      it('should update HttpOnly cookie on token refresh', async () => {
+        const refreshDto: RefreshRequestDto = {
+          refresh_token: 'valid-refresh-token',
+        };
+
+        const refreshResult = {
+          accessToken: 'new-jwt-access-token',
+          expiresIn: 3600,
+        };
+
+        mockAuthService.refreshAccessToken.mockResolvedValue(refreshResult);
+
+        await controller.refresh(refreshDto, mockResponse);
+
+        expect(mockResponse.cookie).toHaveBeenCalledWith(
+          ACCESS_TOKEN_COOKIE,
+          refreshResult.accessToken,
+          expect.objectContaining({
+            httpOnly: true,
+            path: '/',
+          }),
+        );
+      });
+    });
+
+    describe('POST /auth/logout - Cookie Clearing', () => {
+      it('should clear HttpOnly cookie on logout', async () => {
+        const result = await controller.logout(mockResponse);
+
+        expect(result).toEqual({
+          success: true,
+          message: 'Logged out successfully',
+        });
+
+        expect(mockResponse.clearCookie).toHaveBeenCalledWith(
+          ACCESS_TOKEN_COOKIE,
+          expect.objectContaining({
+            httpOnly: true,
+            path: '/',
+          }),
+        );
+      });
+
+      it('should clear cookie with secure flag in production', async () => {
+        const originalEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+
+        await controller.logout(mockResponse);
+
+        expect(mockResponse.clearCookie).toHaveBeenCalledWith(
+          ACCESS_TOKEN_COOKIE,
+          expect.objectContaining({
+            httpOnly: true,
+            secure: true,
+            sameSite: 'strict',
+          }),
+        );
+
+        process.env.NODE_ENV = originalEnv;
+      });
+    });
+
+    describe('Cookie Security Attributes', () => {
+      it('cookie should not be accessible via JavaScript (httpOnly: true)', async () => {
+        const callbackDto: CallbackRequestDto = {
+          code: 'auth-code-123',
+          state: 'random-state-456',
+        };
+
+        const authResult = {
+          accessToken: 'jwt-access-token',
+          refreshToken: 'jwt-refresh-token',
+          expiresIn: 3600,
+          user: {
+            id: 'user-123',
+            tenantId: 'tenant-123',
+            auth0Id: 'auth0|123',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'VIEWER' as any,
+            isActive: true,
+            lastLoginAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        };
+
+        mockAuthService.handleCallback.mockResolvedValue(authResult);
+
+        await controller.callback(callbackDto, mockResponse);
+
+        // Verify httpOnly is always true - this is the critical XSS protection
+        const cookieCall = (mockResponse.cookie as jest.Mock).mock.calls[0];
+        expect(cookieCall[2].httpOnly).toBe(true);
+      });
+
+      it('cookie maxAge should be based on token expiresIn', async () => {
+        const callbackDto: CallbackRequestDto = {
+          code: 'auth-code-123',
+          state: 'random-state-456',
+        };
+
+        const expiresInSeconds = 7200; // 2 hours
+        const authResult = {
+          accessToken: 'jwt-access-token',
+          refreshToken: 'jwt-refresh-token',
+          expiresIn: expiresInSeconds,
+          user: {
+            id: 'user-123',
+            tenantId: 'tenant-123',
+            auth0Id: 'auth0|123',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'VIEWER' as any,
+            isActive: true,
+            lastLoginAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        };
+
+        mockAuthService.handleCallback.mockResolvedValue(authResult);
+
+        await controller.callback(callbackDto, mockResponse);
+
+        // maxAge should be in milliseconds
+        expect(mockResponse.cookie).toHaveBeenCalledWith(
+          ACCESS_TOKEN_COOKIE,
+          authResult.accessToken,
+          expect.objectContaining({
+            maxAge: expiresInSeconds * 1000,
+          }),
+        );
+      });
     });
   });
 });

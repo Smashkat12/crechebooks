@@ -19,6 +19,7 @@ import { PatternLearningService } from './services/pattern-learning.service';
 import { XeroSyncService } from './services/xero-sync.service';
 import { EnrollmentService } from './services/enrollment.service';
 import { InvoiceGenerationService } from './services/invoice-generation.service';
+import { InvoiceNumberService } from './services/invoice-number.service';
 import { InvoiceDeliveryService } from './services/invoice-delivery.service';
 import { InvoiceVatService } from './services/invoice-vat.service';
 import { ProRataService } from './services/pro-rata.service';
@@ -29,6 +30,7 @@ import { ArrearsService } from './services/arrears.service';
 import { ReminderRepository } from './repositories/reminder.repository';
 import { ReminderService } from './services/reminder.service';
 import { VatService } from './services/vat.service';
+import { VatAdjustmentService } from './services/vat-adjustment.service';
 import { PayeService } from './services/paye.service';
 import { UifService } from './services/uif.service';
 import { Vat201Service } from './services/vat201.service';
@@ -37,6 +39,7 @@ import { Irp5Service } from './services/irp5.service';
 import { ReconciliationRepository } from './repositories/reconciliation.repository';
 import { ReconciliationService } from './services/reconciliation.service';
 import { DiscrepancyService } from './services/discrepancy.service';
+import { ToleranceConfigService } from './services/tolerance-config.service';
 import { FinancialReportService } from './services/financial-report.service';
 import { PayeeAliasService } from './services/payee-alias.service';
 import { PayeeNormalizerService } from './services/payee-normalizer.service';
@@ -82,6 +85,10 @@ import { CertificateOfServiceService } from './services/certificate-of-service.s
 import { ExitPackPdfService } from './services/exit-pack-pdf.service';
 import { EmploymentContractPdfService } from './services/employment-contract-pdf.service';
 import { PopiaConsentPdfService } from './services/popia-consent-pdf.service';
+import { StaffTerminationService } from './services/staff-termination.service';
+import { TimeTrackingService } from './services/time-tracking.service';
+import { OvertimeService } from './services/overtime.service';
+import { CommissionService } from './services/commission.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
@@ -127,6 +134,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     XeroSyncService,
     EnrollmentService,
     InvoiceGenerationService,
+    InvoiceNumberService,
     InvoiceDeliveryService,
     InvoiceVatService,
     ProRataService,
@@ -137,6 +145,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     ReminderRepository,
     ReminderService,
     VatService,
+    VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,
     UifService,
     Vat201Service,
@@ -145,6 +154,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     ReconciliationRepository,
     ReconciliationService,
     DiscrepancyService,
+    ToleranceConfigService, // TASK-RECON-003: Centralized tolerance configuration
     FinancialReportService,
     PayeeAliasService,
     AccuracyMetricsService,
@@ -190,6 +200,11 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     EmployeeSetupLogRepository,
     XeroAccountRepository,
     CategorizationJournalRepository,
+    // TASK-STAFF-004 to TASK-STAFF-007: Staff Management Services
+    StaffTerminationService,
+    TimeTrackingService,
+    OvertimeService,
+    CommissionService,
   ],
   exports: [
     PrismaService,
@@ -212,6 +227,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     XeroSyncService,
     EnrollmentService,
     InvoiceGenerationService,
+    InvoiceNumberService,
     InvoiceDeliveryService,
     InvoiceVatService,
     ProRataService,
@@ -222,6 +238,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     ReminderRepository,
     ReminderService,
     VatService,
+    VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,
     UifService,
     Vat201Service,
@@ -230,6 +247,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     ReconciliationRepository,
     ReconciliationService,
     DiscrepancyService,
+    ToleranceConfigService, // TASK-RECON-003: Centralized tolerance configuration
     FinancialReportService,
     PayeeAliasService,
     PayeeNormalizerService,
@@ -275,6 +293,11 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     EmployeeSetupLogRepository,
     XeroAccountRepository,
     CategorizationJournalRepository,
+    // TASK-STAFF-004 to TASK-STAFF-007: Staff Management Services
+    StaffTerminationService,
+    TimeTrackingService,
+    OvertimeService,
+    CommissionService,
   ],
 })
 export class DatabaseModule {}

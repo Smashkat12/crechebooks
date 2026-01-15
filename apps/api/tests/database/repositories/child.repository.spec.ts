@@ -194,7 +194,7 @@ describe('ChildRepository', () => {
   describe('findById', () => {
     it('should find child by id', async () => {
       const created = await repository.create(testChildData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -205,6 +205,7 @@ describe('ChildRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -328,7 +329,7 @@ describe('ChildRepository', () => {
     it('should update child fields', async () => {
       const created = await repository.create(testChildData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         firstName: 'Updated',
         medicalNotes: 'Updated medical notes',
         gender: Gender.OTHER,
@@ -342,9 +343,13 @@ describe('ChildRepository', () => {
 
     it('should throw NotFoundException for non-existent child', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          firstName: 'Test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            firstName: 'Test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -352,7 +357,7 @@ describe('ChildRepository', () => {
       const created = await repository.create(testChildData);
       expect(created.parentId).toBe(testParent.id);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         parentId: otherParent.id,
       });
 
@@ -363,7 +368,7 @@ describe('ChildRepository', () => {
       const created = await repository.create(testChildData);
 
       await expect(
-        repository.update(created.id, {
+        repository.update(created.id, testTenant.id, {
           parentId: '00000000-0000-0000-0000-000000000000',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -374,15 +379,18 @@ describe('ChildRepository', () => {
     it('should delete existing child', async () => {
       const created = await repository.create(testChildData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent child', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -455,7 +463,7 @@ describe('ChildRepository', () => {
       const child = await repository.create(testChildData);
 
       // Verify child exists
-      const childBefore = await repository.findById(child.id);
+      const childBefore = await repository.findById(child.id, testTenant.id);
       expect(childBefore).not.toBeNull();
 
       // Delete parent
@@ -464,7 +472,7 @@ describe('ChildRepository', () => {
       });
 
       // Verify child is also deleted (cascade)
-      const childAfter = await repository.findById(child.id);
+      const childAfter = await repository.findById(child.id, testTenant.id);
       expect(childAfter).toBeNull();
     });
   });

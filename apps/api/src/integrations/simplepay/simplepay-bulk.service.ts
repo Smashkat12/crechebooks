@@ -755,10 +755,12 @@ export class SimplePayBulkService {
   }
 
   /**
-   * Get a specific operation log
+   * Get a specific operation log with tenant isolation
+   * @param tenantId - Tenant ID for isolation
+   * @param operationId - Operation log ID
    */
-  async getOperationLog(operationId: string) {
-    return this.bulkOperationRepo.findByIdOrThrow(operationId);
+  async getOperationLog(tenantId: string, operationId: string) {
+    return this.bulkOperationRepo.findByIdOrThrow(operationId, tenantId);
   }
 
   /**

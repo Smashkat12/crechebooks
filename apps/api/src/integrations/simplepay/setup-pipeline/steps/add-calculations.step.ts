@@ -131,6 +131,7 @@ export class AddCalculationsStep implements IPipelineStep {
         };
         stepResult.rollbackData = {
           adjustmentIds: addedCalculations.map((c) => c.adjustmentId),
+          tenantId: context.tenantId,
         };
         stepResult.canRollback = addedCalculations.length > 0;
       }
@@ -169,7 +170,10 @@ export class AddCalculationsStep implements IPipelineStep {
 
     for (const adjustmentId of adjustmentIds) {
       try {
-        await this.adjustmentRepo.delete(adjustmentId);
+        await this.adjustmentRepo.delete(
+          adjustmentId,
+          stepResult.rollbackData.tenantId as string,
+        );
         rolledBack++;
       } catch (error) {
         this.logger.warn(

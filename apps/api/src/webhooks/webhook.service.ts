@@ -55,25 +55,35 @@ export class WebhookService {
    * Verify SendGrid webhook signature
    * @see https://docs.sendgrid.com/for-developers/tracking-events/getting-started-event-webhook-security-features
    *
+   * CRITICAL: NEVER skip verification - FAIL FAST if secret not configured
+   *
    * @param payload - Raw request body as string
    * @param signature - x-twilio-email-event-webhook-signature header
    * @param timestamp - x-twilio-email-event-webhook-timestamp header
    * @returns true if signature is valid
+   * @throws Error if webhook secret not configured (FAIL FAST)
    */
   verifyEmailSignature(
     payload: string,
     signature: string,
     timestamp: string,
   ): boolean {
+    // SECURITY: FAIL FAST - Never process webhooks without verification
     if (!this.sendgridWebhookKey) {
-      this.logger.warn(
-        'SendGrid webhook key not configured, skipping verification',
+      this.logger.error(
+        'SECURITY: SendGrid webhook key (SENDGRID_WEBHOOK_KEY) not configured. ' +
+          'Webhook signature verification is REQUIRED in ALL environments. ' +
+          'Configure the webhook secret or disable email webhooks.',
       );
-      return true; // Allow in development
+      throw new Error(
+        'Webhook verification failed: SENDGRID_WEBHOOK_KEY not configured',
+      );
     }
 
     if (!signature || !timestamp) {
-      this.logger.warn('Missing signature or timestamp headers');
+      this.logger.warn(
+        'Missing signature or timestamp headers in email webhook request',
+      );
       return false;
     }
 
@@ -86,10 +96,17 @@ export class WebhookService {
         .update(payloadToSign)
         .digest('base64');
 
-      return crypto.timingSafeEqual(
+      // Use constant-time comparison to prevent timing attacks
+      const isValid = crypto.timingSafeEqual(
         Buffer.from(signature),
         Buffer.from(expectedSignature),
       );
+
+      if (!isValid) {
+        this.logger.warn('Email webhook signature verification failed');
+      }
+
+      return isValid;
     } catch (error) {
       this.logger.error('Error verifying email signature', error);
       return false;
@@ -100,20 +117,28 @@ export class WebhookService {
    * Verify WhatsApp/Meta webhook signature
    * @see https://developers.facebook.com/docs/graph-api/webhooks/getting-started#verification-requests
    *
+   * CRITICAL: NEVER skip verification - FAIL FAST if secret not configured
+   *
    * @param payload - Raw request body as string
    * @param signature - x-hub-signature-256 header
    * @returns true if signature is valid
+   * @throws Error if webhook secret not configured (FAIL FAST)
    */
   verifyWhatsAppSignature(payload: string, signature: string): boolean {
+    // SECURITY: FAIL FAST - Never process webhooks without verification
     if (!this.whatsappAppSecret) {
-      this.logger.warn(
-        'WhatsApp app secret not configured, skipping verification',
+      this.logger.error(
+        'SECURITY: WhatsApp app secret (WHATSAPP_APP_SECRET) not configured. ' +
+          'Webhook signature verification is REQUIRED in ALL environments. ' +
+          'Configure the app secret or disable WhatsApp webhooks.',
       );
-      return true; // Allow in development
+      throw new Error(
+        'Webhook verification failed: WHATSAPP_APP_SECRET not configured',
+      );
     }
 
     if (!signature) {
-      this.logger.warn('Missing WhatsApp signature header');
+      this.logger.warn('Missing WhatsApp signature header in webhook request');
       return false;
     }
 
@@ -126,10 +151,17 @@ export class WebhookService {
           .update(payload)
           .digest('hex');
 
-      return crypto.timingSafeEqual(
+      // Use constant-time comparison to prevent timing attacks
+      const isValid = crypto.timingSafeEqual(
         Buffer.from(signature),
         Buffer.from(expectedSignature),
       );
+
+      if (!isValid) {
+        this.logger.warn('WhatsApp webhook signature verification failed');
+      }
+
+      return isValid;
     } catch (error) {
       this.logger.error('Error verifying WhatsApp signature', error);
       return false;

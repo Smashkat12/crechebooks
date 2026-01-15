@@ -23,14 +23,14 @@ export class ConflictDetectionService {
    * Detect conflicts between local and Xero data
    * Checks if both sides have been modified since last sync
    */
-  async detectConflicts(
+  detectConflicts(
     tenantId: string,
     entityType: string,
     entityId: string,
     localData: Record<string, unknown>,
     xeroData: Record<string, unknown>,
     lastSyncedAt?: Date,
-  ): Promise<ConflictDetectionResult> {
+  ): ConflictDetectionResult {
     this.logger.debug(
       `Detecting conflicts for ${entityType} ${entityId} (tenant: ${tenantId})`,
     );
@@ -70,10 +70,7 @@ export class ConflictDetectionService {
     const xeroModifiedSinceSync = xeroModifiedAt > lastSyncedAt;
 
     if (localModifiedSinceSync && xeroModifiedSinceSync) {
-      const conflictingFields = await this.getConflictingFields(
-        localData,
-        xeroData,
-      );
+      const conflictingFields = this.getConflictingFields(localData, xeroData);
 
       return {
         hasConflict: true,
@@ -114,10 +111,10 @@ export class ConflictDetectionService {
   /**
    * Check if entity has been modified since last sync
    */
-  async hasModifications(
+  hasModifications(
     entityData: Record<string, unknown>,
     lastSyncedAt?: Date,
-  ): Promise<boolean> {
+  ): boolean {
     if (!lastSyncedAt) {
       return true; // No previous sync, treat as modified
     }
@@ -142,10 +139,10 @@ export class ConflictDetectionService {
   /**
    * Get list of fields that differ between local and Xero data
    */
-  async getConflictingFields(
+  getConflictingFields(
     localData: Record<string, unknown>,
     xeroData: Record<string, unknown>,
-  ): Promise<string[]> {
+  ): string[] {
     const conflictingFields: string[] = [];
 
     // Field mapping: local field -> Xero field

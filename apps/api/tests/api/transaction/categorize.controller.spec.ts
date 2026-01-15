@@ -24,15 +24,18 @@ describe('TransactionController Categorization Endpoints', () => {
   const mockUser: IUser = {
     id: 'user-001',
     tenantId: 'tenant-001',
+    auth0Id: 'auth0|test001',
     email: 'test@example.com',
     name: 'Test User',
-    role: 'ADMIN',
+    role: 'ADMIN' as any,
     isActive: true,
+    lastLoginAt: null,
+    currentTenantId: 'tenant-001',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
 
-  const mockTransaction: Transaction = {
+  const mockTransaction = {
     id: 'tx-001',
     tenantId: 'tenant-001',
     xeroTransactionId: null,
@@ -50,9 +53,15 @@ describe('TransactionController Categorization Endpoints', () => {
     reconciledAt: null,
     isDeleted: false,
     deletedAt: null,
+    transactionHash: 'abc123hash',
+    duplicateOfId: null,
+    duplicateStatus: null,
+    reversesTransactionId: null,
+    reversedByTransactionId: null,
+    xeroAccountCode: null,
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
+  } as unknown as Transaction;
 
   beforeEach(async () => {
     const mockCategorizationService = {

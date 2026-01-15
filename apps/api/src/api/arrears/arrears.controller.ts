@@ -161,12 +161,12 @@ export class ArrearsController {
     const arrearsItems: ArrearsItemDto[] = [];
 
     for (const entry of paginatedEntries) {
-      const parent = await this.parentRepo.findById(entry.parentId);
+      const parent = await this.parentRepo.findById(entry.parentId, tenantId);
       if (!parent) continue;
 
       // Get first child for display (or could aggregate multiple)
       const firstChildId = Array.from(entry.childIds)[0];
-      const child = await this.childRepo.findById(firstChildId);
+      const child = await this.childRepo.findById(firstChildId, tenantId);
       if (!child) continue;
 
       const daysPastDue = Math.floor(
@@ -224,11 +224,16 @@ export class ArrearsController {
     let totalOutstandingCents = 0;
     const parentIds = new Set<string>();
 
+    // STANDARDIZED aging buckets (TASK-BILL-006):
+    // - current: 1-30 days overdue (due but within grace period)
+    // - days30: 31-60 days overdue
+    // - days60: 61-90 days overdue
+    // - days90Plus: >90 days overdue
+    // NOTE: Invoices not yet due (daysPastDue <= 0) are NOT in arrears
     const ageBuckets = {
       current: 0,
       days30: 0,
       days60: 0,
-      days90: 0,
       days90Plus: 0,
     };
 
@@ -236,22 +241,27 @@ export class ArrearsController {
       const balanceDue = invoice.totalCents - invoice.amountPaidCents;
       if (balanceDue <= 0) continue;
 
-      totalOutstandingCents += balanceDue;
-      parentIds.add(invoice.parentId);
-
       const daysPastDue = Math.floor(
         (now.getTime() - invoice.dueDate.getTime()) / (1000 * 60 * 60 * 24),
       );
 
+      // Skip invoices not yet due (not in arrears)
+      if (daysPastDue <= 0) continue;
+
+      totalOutstandingCents += balanceDue;
+      parentIds.add(invoice.parentId);
+
       if (daysPastDue > 90) {
+        // >90 days overdue: 90+ bucket
         ageBuckets.days90Plus += balanceDue;
       } else if (daysPastDue > 60) {
-        ageBuckets.days90 += balanceDue;
-      } else if (daysPastDue > 30) {
+        // 61-90 days overdue: 60-day bucket
         ageBuckets.days60 += balanceDue;
-      } else if (daysPastDue > 0) {
+      } else if (daysPastDue > 30) {
+        // 31-60 days overdue: 30-day bucket
         ageBuckets.days30 += balanceDue;
       } else {
+        // 1-30 days overdue: current bucket
         ageBuckets.current += balanceDue;
       }
     }
@@ -264,7 +274,6 @@ export class ArrearsController {
         current: ageBuckets.current / 100,
         days30: ageBuckets.days30 / 100,
         days60: ageBuckets.days60 / 100,
-        days90: ageBuckets.days90 / 100,
         days90Plus: ageBuckets.days90Plus / 100,
       },
       trend: {

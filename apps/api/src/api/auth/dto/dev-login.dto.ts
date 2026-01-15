@@ -10,8 +10,8 @@ export class DevLoginRequestDto {
   email: string;
 
   @ApiProperty({
-    description: 'User password',
-    example: 'admin123',
+    description: 'User password (configured in environment variables)',
+    example: 'your_secure_password',
   })
   @IsString()
   @MinLength(6)

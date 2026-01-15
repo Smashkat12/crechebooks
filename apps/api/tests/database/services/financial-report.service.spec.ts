@@ -28,7 +28,10 @@ import {
   MatchType,
   MatchedBy,
 } from '../../../src/database/entities/payment.entity';
-import { CategorizationSource } from '../../../src/database/entities/categorization.entity';
+import {
+  CategorizationSource,
+  VatType,
+} from '../../../src/database/entities/categorization.entity';
 import { FeeType } from '../../../src/database/entities/fee-structure.entity';
 
 describe('FinancialReportService (Integration)', () => {
@@ -148,6 +151,7 @@ describe('FinancialReportService (Integration)', () => {
         confidenceScore: 100,
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
+        vatType: VatType.STANDARD,
       });
 
       // Generate income statement
@@ -295,6 +299,7 @@ describe('FinancialReportService (Integration)', () => {
         confidenceScore: 100,
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
+        vatType: VatType.STANDARD,
       });
 
       const debitTx = await transactionRepo.create({
@@ -314,6 +319,7 @@ describe('FinancialReportService (Integration)', () => {
         confidenceScore: 100,
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
+        vatType: VatType.STANDARD,
       });
 
       const asOfDate = new Date('2025-01-15');
@@ -346,6 +352,7 @@ describe('FinancialReportService (Integration)', () => {
         confidenceScore: 100,
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
+        vatType: VatType.STANDARD,
       });
 
       const asOfDate = new Date('2025-01-10');

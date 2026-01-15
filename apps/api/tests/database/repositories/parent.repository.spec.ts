@@ -205,7 +205,7 @@ describe('ParentRepository', () => {
   describe('findById', () => {
     it('should find parent by id', async () => {
       const created = await repository.create(testParentData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -216,13 +216,14 @@ describe('ParentRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
   });
 
   describe('findByTenant', () => {
-    it('should return all parents for tenant', async () => {
+    it('should return paginated results with metadata', async () => {
       await repository.create(testParentData);
       await repository.create({
         ...testParentData,
@@ -231,12 +232,120 @@ describe('ParentRepository', () => {
         email: 'zanele@family.co.za',
       });
 
-      const parents = await repository.findByTenant(testTenant.id, {});
+      const result = await repository.findByTenant(testTenant.id, {});
 
-      expect(parents).toHaveLength(2);
+      // TASK-DATA-004: Verify paginated response structure
+      expect(result.data).toHaveLength(2);
+      expect(result.meta).toBeDefined();
+      expect(result.meta.page).toBe(1);
+      expect(result.meta.limit).toBe(20); // DEFAULT_LIMIT
+      expect(result.meta.total).toBe(2);
+      expect(result.meta.totalPages).toBe(1);
+      expect(result.meta.hasNext).toBe(false);
+      expect(result.meta.hasPrev).toBe(false);
     });
 
-    it('should filter by isActive', async () => {
+    it('should apply default pagination when no params provided', async () => {
+      // Create 3 parents
+      await repository.create(testParentData);
+      await repository.create({
+        ...testParentData,
+        firstName: 'Zanele',
+        lastName: 'Dlamini',
+        email: 'zanele@family.co.za',
+      });
+      await repository.create({
+        ...testParentData,
+        firstName: 'Sipho',
+        lastName: 'Nkosi',
+        email: 'sipho@family.co.za',
+      });
+
+      const result = await repository.findByTenant(testTenant.id, {});
+
+      expect(result.meta.page).toBe(1);
+      expect(result.meta.limit).toBe(20);
+      expect(result.data).toHaveLength(3);
+    });
+
+    it('should respect custom pagination parameters', async () => {
+      // Create 5 parents for pagination test
+      for (let i = 0; i < 5; i++) {
+        await repository.create({
+          ...testParentData,
+          firstName: `Parent${i}`,
+          lastName: `Test${i}`,
+          email: `parent${i}@family.co.za`,
+        });
+      }
+
+      // Request page 2 with limit 2
+      const result = await repository.findByTenant(testTenant.id, {
+        page: 2,
+        limit: 2,
+      });
+
+      expect(result.data).toHaveLength(2);
+      expect(result.meta.page).toBe(2);
+      expect(result.meta.limit).toBe(2);
+      expect(result.meta.total).toBe(5);
+      expect(result.meta.totalPages).toBe(3);
+      expect(result.meta.hasNext).toBe(true);
+      expect(result.meta.hasPrev).toBe(true);
+    });
+
+    it('should enforce MAX_LIMIT when limit exceeds 100', async () => {
+      await repository.create(testParentData);
+
+      // Request limit of 500 - should be capped at MAX_LIMIT (100)
+      const result = await repository.findByTenant(testTenant.id, {
+        limit: 500,
+      });
+
+      expect(result.meta.limit).toBe(100);
+    });
+
+    it('should handle empty results correctly', async () => {
+      const result = await repository.findByTenant(testTenant.id, {});
+
+      expect(result.data).toHaveLength(0);
+      expect(result.meta.total).toBe(0);
+      expect(result.meta.totalPages).toBe(0);
+      expect(result.meta.hasNext).toBe(false);
+      expect(result.meta.hasPrev).toBe(false);
+    });
+
+    it('should return accurate total count across pages', async () => {
+      // Create 7 parents
+      for (let i = 0; i < 7; i++) {
+        await repository.create({
+          ...testParentData,
+          firstName: `Parent${i}`,
+          lastName: `Test${i}`,
+          email: `parent${i}@family.co.za`,
+        });
+      }
+
+      // Check page 1
+      const page1 = await repository.findByTenant(testTenant.id, {
+        page: 1,
+        limit: 3,
+      });
+      expect(page1.meta.total).toBe(7);
+      expect(page1.data).toHaveLength(3);
+
+      // Check page 3 (last page with 1 item)
+      const page3 = await repository.findByTenant(testTenant.id, {
+        page: 3,
+        limit: 3,
+      });
+      expect(page3.meta.total).toBe(7);
+      expect(page3.data).toHaveLength(1);
+      expect(page3.meta.hasNext).toBe(false);
+      expect(page3.meta.hasPrev).toBe(true);
+    });
+
+    it('should filter by isActive with pagination', async () => {
       const p1 = await repository.create(testParentData);
       await repository.create({
         ...testParentData,
@@ -255,11 +364,12 @@ describe('ParentRepository', () => {
         isActive: true,
       });
 
-      expect(activeParents).toHaveLength(1);
-      expect(activeParents[0].firstName).toBe('Inactive');
+      expect(activeParents.data).toHaveLength(1);
+      expect(activeParents.data[0].firstName).toBe('Inactive');
+      expect(activeParents.meta.total).toBe(1);
     });
 
-    it('should search by firstName, lastName, or email', async () => {
+    it('should search by firstName, lastName, or email with pagination', async () => {
       await repository.create(testParentData);
       await repository.create({
         ...testParentData,
@@ -272,11 +382,12 @@ describe('ParentRepository', () => {
         search: 'thabo',
       });
 
-      expect(searchResult).toHaveLength(1);
-      expect(searchResult[0].firstName).toBe('Thabo');
+      expect(searchResult.data).toHaveLength(1);
+      expect(searchResult.data[0].firstName).toBe('Thabo');
+      expect(searchResult.meta.total).toBe(1);
     });
 
-    it('should order by lastName, firstName ascending', async () => {
+    it('should order by lastName, firstName ascending with pagination', async () => {
       await repository.create({
         ...testParentData,
         firstName: 'Zanele',
@@ -285,10 +396,34 @@ describe('ParentRepository', () => {
       });
       await repository.create(testParentData); // Mbeki
 
-      const parents = await repository.findByTenant(testTenant.id, {});
+      const result = await repository.findByTenant(testTenant.id, {});
 
-      expect(parents[0].lastName).toBe('Dlamini');
-      expect(parents[1].lastName).toBe('Mbeki');
+      expect(result.data[0].lastName).toBe('Dlamini');
+      expect(result.data[1].lastName).toBe('Mbeki');
+    });
+
+    it('should handle last page with hasNext=false', async () => {
+      // Create exactly 10 parents
+      for (let i = 0; i < 10; i++) {
+        await repository.create({
+          ...testParentData,
+          firstName: `Parent${i}`,
+          lastName: `Test${String(i).padStart(2, '0')}`,
+          email: `parent${i}@family.co.za`,
+        });
+      }
+
+      // Request last page
+      const result = await repository.findByTenant(testTenant.id, {
+        page: 2,
+        limit: 5,
+      });
+
+      expect(result.data).toHaveLength(5);
+      expect(result.meta.page).toBe(2);
+      expect(result.meta.totalPages).toBe(2);
+      expect(result.meta.hasNext).toBe(false);
+      expect(result.meta.hasPrev).toBe(true);
     });
   });
 
@@ -352,7 +487,7 @@ describe('ParentRepository', () => {
     it('should update parent fields', async () => {
       const created = await repository.create(testParentData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         firstName: 'Updated',
         phone: '+27829999999',
         preferredContact: PreferredContact.EMAIL,
@@ -366,9 +501,13 @@ describe('ParentRepository', () => {
 
     it('should throw NotFoundException for non-existent parent', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          firstName: 'Test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            firstName: 'Test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -383,7 +522,7 @@ describe('ParentRepository', () => {
 
       // Try to update p2's email to p1's email
       await expect(
-        repository.update(p2.id, { email: p1.email! }),
+        repository.update(p2.id, testTenant.id, { email: p1.email! }),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -392,15 +531,18 @@ describe('ParentRepository', () => {
     it('should delete existing parent', async () => {
       const created = await repository.create(testParentData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent parent', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -425,7 +567,7 @@ describe('ParentRepository', () => {
       expect(childBefore).not.toBeNull();
 
       // Delete parent
-      await repository.delete(parent.id);
+      await repository.delete(parent.id, testTenant.id);
 
       // Verify child is also deleted (cascade)
       const childAfter = await prisma.child.findUnique({

@@ -105,8 +105,8 @@ export class SimplePayEmployeeService {
     const clientId = this.apiClient.getClientId();
 
     // Get staff member
-    const staff = await this.staffRepo.findById(staffId);
-    if (!staff || staff.tenantId !== tenantId) {
+    const staff = await this.staffRepo.findById(staffId, tenantId);
+    if (!staff) {
       throw new Error(`Staff ${staffId} not found`);
     }
 
@@ -401,7 +401,7 @@ export class SimplePayEmployeeService {
       throw new Error('Employee not synced to SimplePay');
     }
 
-    const staff = await this.staffRepo.findById(staffId);
+    const staff = await this.staffRepo.findById(staffId, tenantId);
     if (!staff) {
       throw new Error('Staff not found');
     }

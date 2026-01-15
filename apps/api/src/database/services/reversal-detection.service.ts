@@ -314,7 +314,7 @@ export class ReversalDetectionService {
   /**
    * Link a reversal transaction to its original
    */
-  async linkReversal(reversalId: string, originalId: string): Promise<void> {
+  linkReversal(_reversalId: string, _originalId: string): never {
     // Need to get tenantId first - we'll fetch from reversal
     // Since we don't know the tenant, we need to search
     // For now, we'll require tenantId as a parameter

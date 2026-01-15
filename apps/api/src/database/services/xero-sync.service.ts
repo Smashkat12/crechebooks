@@ -670,7 +670,9 @@ export class XeroSyncService {
 
       if (xeroPaymentId) {
         // Update payment with Xero ID
-        await this.paymentRepo.update(payment.id, { xeroPaymentId });
+        await this.paymentRepo.update(payment.id, payment.tenantId, {
+          xeroPaymentId,
+        });
 
         // Log audit trail
         await this.auditLogService.logAction({
@@ -1058,12 +1060,18 @@ export class XeroSyncService {
       originalError?: string;
     };
     if (errorWithDetails?.details?.originalError) {
-      if (errorWithDetails.details.originalError.includes(RECONCILED_TRANSACTION_ERROR)) {
+      if (
+        errorWithDetails.details.originalError.includes(
+          RECONCILED_TRANSACTION_ERROR,
+        )
+      ) {
         return true;
       }
     }
     if (errorWithDetails?.originalError) {
-      if (errorWithDetails.originalError.includes(RECONCILED_TRANSACTION_ERROR)) {
+      if (
+        errorWithDetails.originalError.includes(RECONCILED_TRANSACTION_ERROR)
+      ) {
         return true;
       }
     }
@@ -1196,12 +1204,11 @@ export class XeroSyncService {
     posted: boolean;
     error?: string;
   }> {
-    const journal = await this.categorizationJournalRepo.findById(journalId);
+    const journal = await this.categorizationJournalRepo.findById(
+      journalId,
+      tenantId,
+    );
     if (!journal) {
-      throw new NotFoundException('CategorizationJournal', journalId);
-    }
-
-    if (journal.tenantId !== tenantId) {
       throw new NotFoundException('CategorizationJournal', journalId);
     }
 
@@ -1290,7 +1297,10 @@ export class XeroSyncService {
       );
 
       // Mark as failed
-      await this.categorizationJournalRepo.markAsFailed(journalId, errorMessage);
+      await this.categorizationJournalRepo.markAsFailed(
+        journalId,
+        errorMessage,
+      );
 
       // Log audit trail
       await this.auditLogService.logAction({
@@ -1327,14 +1337,12 @@ export class XeroSyncService {
    * - Debit: Suspense account (9999)
    * - Credit: Target income account
    */
-  private buildCategorizationJournalLines(
-    journal: {
-      fromAccountCode: string;
-      toAccountCode: string;
-      amountCents: number;
-      isCredit: boolean;
-    },
-  ): Array<{
+  private buildCategorizationJournalLines(journal: {
+    fromAccountCode: string;
+    toAccountCode: string;
+    amountCents: number;
+    isCredit: boolean;
+  }): Array<{
     lineAmount: number;
     accountCode: string;
     description: string;

@@ -1,10 +1,27 @@
+/**
+ * JWT Strategy for Authentication
+ * TASK-UI-001: Support HttpOnly cookies for XSS protection
+ * TASK-SEC-001: Added explicit expiration validation with logging
+ *
+ * Token extraction priority:
+ * 1. HttpOnly cookie (access_token) - Most secure
+ * 2. Authorization header (Bearer token) - For API clients
+ */
+
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy, StrategyOptionsWithRequest } from 'passport-jwt';
 import { passportJwtSecret } from 'jwks-rsa';
 import { ConfigService } from '@nestjs/config';
+import { Request } from 'express';
 import { IUser, UserRole } from '../../../database/entities/user.entity';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+
+/**
+ * TASK-SEC-001: Token expiration warning threshold
+ * Warn when token has less than 5 minutes remaining
+ */
+const TOKEN_EXPIRY_WARNING_THRESHOLD_SECONDS = 300; // 5 minutes
 
 export interface JwtPayload {
   sub: string; // auth0Id or local userId
@@ -17,6 +34,30 @@ export interface JwtPayload {
   exp?: number;
   aud?: string | string[];
   iss?: string;
+}
+
+/**
+ * TASK-UI-001: Cookie name for HttpOnly access token
+ */
+export const ACCESS_TOKEN_COOKIE = 'access_token';
+
+/**
+ * TASK-UI-001: Custom JWT extractor that checks HttpOnly cookie first,
+ * then falls back to Authorization header for backward compatibility
+ */
+function extractJwtFromCookieOrHeader(req: Request): string | null {
+  // First, try to extract from HttpOnly cookie (most secure)
+  if (req.cookies && req.cookies[ACCESS_TOKEN_COOKIE]) {
+    return req.cookies[ACCESS_TOKEN_COOKIE];
+  }
+
+  // Fall back to Authorization header for API clients
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+
+  return null;
 }
 
 @Injectable()
@@ -42,14 +83,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
+    // TASK-UI-001: Use custom extractor for both cookie and header support
     const strategyOptions = isLocalDev
       ? {
-          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+          jwtFromRequest: extractJwtFromCookieOrHeader,
           secretOrKey: jwtSecret,
           algorithms: ['HS256'],
         }
       : {
-          jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+          jwtFromRequest: extractJwtFromCookieOrHeader,
           issuer: `https://${domain}/`,
           algorithms: ['RS256'],
           secretOrKeyProvider: passportJwtSecret({
@@ -68,6 +110,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         'Running in LOCAL DEVELOPMENT mode with JWT_SECRET. Do NOT use in production!',
       );
     }
+    this.logger.log(
+      'JWT Strategy initialized with HttpOnly cookie support (TASK-UI-001)',
+    );
   }
 
   async validate(payload: JwtPayload): Promise<IUser> {
@@ -77,6 +122,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       this.logger.warn('JWT validation failed: missing sub claim');
       throw new UnauthorizedException('Invalid token: missing subject');
     }
+
+    // TASK-SEC-001: Explicit expiration validation with logging
+    this.validateJwtExpiration(payload);
 
     // In local dev mode, try to find by ID first, then by auth0Id
     let user: {
@@ -150,5 +198,65 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  /**
+   * TASK-SEC-001: Validate JWT expiration with explicit logging
+   *
+   * - Throws UnauthorizedException if token is expired
+   * - Logs warning if token is near expiration (within 5 minutes)
+   * - Logs token lifetime info for debugging
+   *
+   * @param payload - The JWT payload containing iat and exp claims
+   * @throws UnauthorizedException if token is expired
+   */
+  private validateJwtExpiration(payload: JwtPayload): void {
+    const now = Math.floor(Date.now() / 1000); // Current time in seconds
+
+    // Check if exp claim exists
+    if (!payload.exp) {
+      this.logger.warn(`JWT missing exp claim for sub: ${payload.sub}`);
+      // Allow tokens without exp in development for backward compatibility
+      if (!this.isLocalDev) {
+        throw new UnauthorizedException('Invalid token: missing expiration');
+      }
+      return;
+    }
+
+    // Check if token is expired
+    if (payload.exp <= now) {
+      const expiredAgo = now - payload.exp;
+      this.logger.warn(
+        `JWT expired ${expiredAgo}s ago for sub: ${payload.sub}, ` +
+          `exp: ${new Date(payload.exp * 1000).toISOString()}`,
+      );
+      throw new UnauthorizedException('Token has expired');
+    }
+
+    // Calculate time remaining until expiration
+    const timeRemaining = payload.exp - now;
+
+    // Log warning for nearly-expired tokens
+    if (timeRemaining <= TOKEN_EXPIRY_WARNING_THRESHOLD_SECONDS) {
+      this.logger.warn(
+        `JWT nearly expired for sub: ${payload.sub}, ` +
+          `expires in ${timeRemaining}s (${Math.round(timeRemaining / 60)} minutes)`,
+      );
+    }
+
+    // Log token lifetime info at debug level
+    if (payload.iat) {
+      const tokenAge = now - payload.iat;
+      const totalLifetime = payload.exp - payload.iat;
+      this.logger.debug(
+        `JWT for sub: ${payload.sub} - age: ${tokenAge}s, ` +
+          `remaining: ${timeRemaining}s, total lifetime: ${totalLifetime}s`,
+      );
+    } else {
+      this.logger.debug(
+        `JWT for sub: ${payload.sub} - expires in ${timeRemaining}s ` +
+          `(${Math.round(timeRemaining / 60)} minutes)`,
+      );
+    }
   }
 }

@@ -134,19 +134,30 @@ export class BulkOperationLogRepository {
   }
 
   /**
-   * Find by ID
+   * Find by ID with tenant isolation
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @returns IBulkOperationLog or null if not found or tenant mismatch
    */
-  async findById(id: string): Promise<IBulkOperationLog | null> {
-    return this.prisma.bulkOperationLog.findUnique({
-      where: { id },
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<IBulkOperationLog | null> {
+    return this.prisma.bulkOperationLog.findFirst({
+      where: { id, tenantId },
     });
   }
 
   /**
    * Find by ID or throw
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findByIdOrThrow(id: string): Promise<IBulkOperationLog> {
-    const log = await this.findById(id);
+  async findByIdOrThrow(
+    id: string,
+    tenantId: string,
+  ): Promise<IBulkOperationLog> {
+    const log = await this.findById(id, tenantId);
     if (!log) {
       throw new NotFoundException('BulkOperationLog', id);
     }

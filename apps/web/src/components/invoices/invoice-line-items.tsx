@@ -1,9 +1,11 @@
 /**
  * Invoice Line Items Table
- * TASK-BILL-038: SA VAT Compliance Enhancement
+ * TASK-BILL-001: SA VAT Compliance Enhancement
  *
  * Displays invoice line items with VAT status indicators per South African
  * VAT Act No. 89 of 1991, Section 12(h).
+ *
+ * Uses centralized VAT utility from @/lib/vat for consistent status display.
  */
 
 import {
@@ -16,8 +18,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
+import { isItemVATExempt, DEFAULT_VAT_RATE } from "@/lib/vat";
 import type { InvoiceLine } from "@/types/invoice";
-import { LINE_TYPE_LABELS, VAT_EXEMPT_LINE_TYPES, type LineType } from "@/types/invoice";
+import { LINE_TYPE_LABELS, type LineType } from "@/types/invoice";
 
 interface InvoiceLineItemsProps {
   lines: InvoiceLine[];
@@ -38,18 +41,10 @@ export function InvoiceLineItems({
   const hasTypeData = lines.some(line => line.lineType !== undefined);
   const shouldShowType = showLineType && hasTypeData;
 
-  // TASK-BILL-038: Get VAT status display for a line
+  // TASK-BILL-001: Get VAT status display for a line using centralized utility
   const getVatStatusBadge = (line: InvoiceLine) => {
-    // Explicit isVatExempt flag takes precedence
-    if (line.isVatExempt === true) {
-      return (
-        <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 text-xs">
-          Exempt
-        </Badge>
-      );
-    }
-    // Check if line type is in exempt list
-    if (line.lineType && VAT_EXEMPT_LINE_TYPES.includes(line.lineType)) {
+    // Use centralized VAT utility to check exemption status
+    if (isItemVATExempt(line)) {
       return (
         <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 text-xs">
           Exempt
@@ -60,7 +55,7 @@ export function InvoiceLineItems({
     if (line.vatAmount !== undefined && line.vatAmount > 0) {
       return (
         <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 text-xs">
-          15%
+          {DEFAULT_VAT_RATE}%
         </Badge>
       );
     }

@@ -124,13 +124,8 @@ export class InvoiceDeliveryService {
     methodOverride?: DeliveryMethod,
   ): Promise<void> {
     // Load invoice
-    const invoice = await this.invoiceRepo.findById(invoiceId);
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
     if (!invoice) {
-      throw new NotFoundException('Invoice', invoiceId);
-    }
-
-    // Verify tenant isolation
-    if (invoice.tenantId !== tenantId) {
       throw new NotFoundException('Invoice', invoiceId);
     }
 
@@ -144,7 +139,7 @@ export class InvoiceDeliveryService {
     }
 
     // Load parent
-    const parent = await this.parentRepo.findById(invoice.parentId);
+    const parent = await this.parentRepo.findById(invoice.parentId, tenantId);
     if (!parent) {
       throw new NotFoundException('Parent', invoice.parentId);
     }
@@ -282,7 +277,10 @@ export class InvoiceDeliveryService {
       }
 
       // Increment retry count
-      await this.invoiceRepo.incrementDeliveryRetryCount(invoice.id);
+      await this.invoiceRepo.incrementDeliveryRetryCount(
+        invoice.id,
+        dto.tenantId,
+      );
 
       try {
         // Retry delivery using invoice's configured method
@@ -380,7 +378,7 @@ Please ensure payment is made by the due date.
     invoice: Invoice,
     channel: 'EMAIL' | 'WHATSAPP',
   ): Promise<void> {
-    await this.invoiceRepo.update(invoice.id, {
+    await this.invoiceRepo.update(invoice.id, invoice.tenantId, {
       status: InvoiceStatus.SENT, // Update invoice status from DRAFT to SENT
       deliveryStatus: DeliveryStatus.SENT,
       deliveryMethod:
@@ -410,7 +408,7 @@ Please ensure payment is made by the due date.
     channel: 'EMAIL' | 'WHATSAPP',
     errorMessage: string,
   ): Promise<void> {
-    await this.invoiceRepo.update(invoice.id, {
+    await this.invoiceRepo.update(invoice.id, invoice.tenantId, {
       deliveryStatus: DeliveryStatus.FAILED,
     });
 

@@ -182,11 +182,14 @@ export class ArrearsService {
   /**
    * Calculate aging buckets from invoices
    *
-   * Aging categories:
-   * - current: 0-7 days overdue
-   * - 30: 8-30 days overdue
-   * - 60: 31-60 days overdue
-   * - 90+: 61+ days overdue
+   * STANDARDIZED aging categories (TASK-BILL-006):
+   * - current: 1-30 days overdue (due but within grace period)
+   * - 30: 31-60 days overdue
+   * - 60: 61-90 days overdue
+   * - 90+: >90 days overdue
+   *
+   * NOTE: Invoices not yet due (daysOverdue <= 0) are NOT in arrears
+   * and should not be included in this calculation.
    *
    * @param invoices - Array of invoices with relations
    * @returns Aging buckets with amounts in cents
@@ -202,13 +205,22 @@ export class ArrearsService {
       const outstanding = new Decimal(outstandingCents);
       const daysOverdue = this.calculateDaysOverdue(invoice.dueDate);
 
-      if (daysOverdue <= 7) {
+      // Skip invoices not yet due (not in arrears)
+      if (daysOverdue <= 0) {
+        continue;
+      }
+
+      if (daysOverdue <= 30) {
+        // 1-30 days overdue: current bucket
         currentCents = currentCents.add(outstanding);
-      } else if (daysOverdue <= 30) {
-        days30Cents = days30Cents.add(outstanding);
       } else if (daysOverdue <= 60) {
+        // 31-60 days overdue: 30-day bucket
+        days30Cents = days30Cents.add(outstanding);
+      } else if (daysOverdue <= 90) {
+        // 61-90 days overdue: 60-day bucket
         days60Cents = days60Cents.add(outstanding);
       } else {
+        // >90 days overdue: 90+ bucket
         days90PlusCents = days90PlusCents.add(outstanding);
       }
     }
@@ -247,8 +259,8 @@ export class ArrearsService {
 
     try {
       // Verify parent exists
-      const parent = await this.parentRepo.findById(parentId);
-      if (!parent || parent.tenantId !== tenantId) {
+      const parent = await this.parentRepo.findById(parentId, tenantId);
+      if (!parent) {
         throw new NotFoundException('Parent', parentId);
       }
 
@@ -543,17 +555,30 @@ export class ArrearsService {
   /**
    * Categorize invoice by aging bucket based on days overdue
    *
+   * STANDARDIZED aging categories (TASK-BILL-006):
+   * - current: 1-30 days overdue (due but within grace period)
+   * - 30: 31-60 days overdue
+   * - 60: 61-90 days overdue
+   * - 90+: >90 days overdue
+   *
+   * NOTE: Invoices not yet due (daysOverdue <= 0) are still categorized
+   * as 'current' for display purposes, but should not be in arrears.
+   *
    * @param daysOverdue - Number of days overdue
    * @returns Aging bucket type
    */
   private categorizeByAgingBucket(daysOverdue: number): AgingBucketType {
-    if (daysOverdue <= 7) {
+    if (daysOverdue <= 30) {
+      // 0-30 days: current bucket (includes not yet due for categorization)
       return 'current';
-    } else if (daysOverdue <= 30) {
-      return '30';
     } else if (daysOverdue <= 60) {
+      // 31-60 days: 30-day bucket
+      return '30';
+    } else if (daysOverdue <= 90) {
+      // 61-90 days: 60-day bucket
       return '60';
     } else {
+      // >90 days: 90+ bucket
       return '90+';
     }
   }

@@ -1,6 +1,9 @@
 /**
  * Invoice Generation Service
  * TASK-BILL-012: Invoice Generation Service
+ * TASK-BILL-002: Batch Transaction Isolation with Advisory Locking
+ * TASK-BILL-040: Added Transaction Isolation for Atomic Invoice Creation
+ * TASK-BILL-041: Fixed Invoice Number Race Condition with Atomic Counter
  *
  * @module database/services/invoice-generation
  * @description Generates monthly invoices for enrolled children.
@@ -10,10 +13,16 @@
  * CRITICAL: All monetary values are in cents (integers).
  * CRITICAL: Uses Decimal.js with banker's rounding (ROUND_HALF_EVEN).
  * CRITICAL: All operations must filter by tenantId for multi-tenant isolation.
+ * CRITICAL: TASK-BILL-002 - Batch operations use advisory locking to prevent
+ *           concurrent batch runs for the same tenant/billing period.
+ * CRITICAL: TASK-BILL-040 - Each invoice creation is wrapped in a transaction
+ *           to ensure atomicity (invoice + lines + ad-hoc marking).
+ * CRITICAL: TASK-BILL-041 - Invoice numbers generated using atomic counter
+ *           to prevent race conditions in concurrent invoice creation.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { Invoice, InvoiceLine, AdHocCharge } from '@prisma/client';
+import { Invoice, InvoiceLine, AdHocCharge, Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { InvoiceRepository } from '../repositories/invoice.repository';
@@ -25,6 +34,7 @@ import { AuditLogService } from './audit-log.service';
 import { XeroSyncService } from './xero-sync.service';
 import { ProRataService } from './pro-rata.service';
 import { CreditBalanceService } from './credit-balance.service';
+import { InvoiceNumberService } from './invoice-number.service';
 import { InvoiceStatus } from '../entities/invoice.entity';
 import { LineType, isVatApplicable } from '../entities/invoice-line.entity';
 import {
@@ -38,6 +48,14 @@ import {
   ValidationException,
   ConflictException,
 } from '../../shared/exceptions';
+import { hashStringToInt } from '../../common/transaction';
+import {
+  getBillingPeriod,
+  parseBillingMonth,
+  isLeapYear,
+  getLastDayOfMonth,
+  toSATimezone,
+} from '../../common/utils/tax-period.utils';
 
 // Configure Decimal.js for banker's rounding
 Decimal.set({
@@ -69,6 +87,7 @@ export class InvoiceGenerationService {
     private readonly xeroSyncService: XeroSyncService,
     private readonly proRataService: ProRataService,
     private readonly creditBalanceService: CreditBalanceService,
+    private readonly invoiceNumberService: InvoiceNumberService,
   ) {}
 
   /**
@@ -93,37 +112,37 @@ export class InvoiceGenerationService {
       `Starting invoice generation for tenant ${tenantId}, month ${billingMonth}`,
     );
 
-    // Validate billing month format
-    const monthMatch = billingMonth.match(/^(\d{4})-(\d{2})$/);
-    if (!monthMatch) {
+    // TASK-BILL-005: Validate billing month format using centralized utility
+    const parsedMonth = parseBillingMonth(billingMonth);
+    if (!parsedMonth) {
       throw new ValidationException(
         'Invalid billing month format. Expected YYYY-MM',
         [
           {
             field: 'billingMonth',
-            message: 'Format must be YYYY-MM (e.g., 2025-01)',
+            message: 'Format must be YYYY-MM with valid month (01-12)',
             value: billingMonth,
           },
         ],
       );
     }
 
-    const year = parseInt(monthMatch[1], 10);
-    const month = parseInt(monthMatch[2], 10);
+    const { year, month } = parsedMonth;
 
-    if (month < 1 || month > 12) {
-      throw new ValidationException('Invalid month in billing period', [
-        {
-          field: 'billingMonth',
-          message: 'Month must be between 01 and 12',
-          value: billingMonth,
-        },
-      ]);
+    // TASK-BILL-005: Calculate billing period dates using utility that handles edge cases
+    // This correctly handles:
+    // - Leap year February (29 days)
+    // - Month boundary transitions (31st to 1st)
+    // - Varying month lengths (28, 29, 30, 31 days)
+    const { start: billingPeriodStart, end: billingPeriodEnd } =
+      getBillingPeriod(year, month);
+
+    // Log leap year handling for February
+    if (month === 2 && isLeapYear(year)) {
+      this.logger.log(
+        `TASK-BILL-005: February ${year} is a leap year - billing period ends on ${getLastDayOfMonth(year, month)}`,
+      );
     }
-
-    // Calculate billing period dates
-    const billingPeriodStart = new Date(year, month - 1, 1);
-    const billingPeriodEnd = new Date(year, month, 0); // Last day of month
 
     // Get tenant for VAT status
     const tenant = await this.tenantRepo.findById(tenantId);
@@ -153,6 +172,23 @@ export class InvoiceGenerationService {
       };
     }
 
+    // TASK-BILL-002: Acquire advisory lock to prevent concurrent batch runs
+    // Lock key includes tenant and billing month to allow different months to run in parallel
+    const lockAcquired = await this.acquireBatchLock(tenantId, billingMonth);
+
+    if (!lockAcquired) {
+      this.logger.warn(
+        `TASK-BILL-002: Could not acquire batch lock for tenant ${tenantId}, month ${billingMonth}. Another batch may be in progress.`,
+      );
+      throw new ConflictException(
+        `Invoice generation already in progress for billing period ${billingMonth}. Please wait and try again.`,
+      );
+    }
+
+    this.logger.log(
+      `TASK-BILL-002: Acquired batch lock for tenant ${tenantId}, month ${billingMonth}`,
+    );
+
     const result: InvoiceGenerationResult = {
       invoicesCreated: 0,
       totalAmountCents: 0,
@@ -160,331 +196,416 @@ export class InvoiceGenerationService {
       errors: [],
     };
 
-    // Pre-calculate starting sequential number to avoid race conditions
-    // when creating multiple invoices in the same batch
-    const batchYear = billingPeriodStart.getFullYear();
-    let currentSequential = await this.getNextInvoiceSequential(
-      tenantId,
-      batchYear,
-    );
+    try {
+      // TASK-BILL-041: Use atomic counter for invoice number generation
+      // Each invoice will get its number atomically to prevent race conditions
+      const batchYear = billingPeriodStart.getFullYear();
 
-    // Group enrollments by parent for sibling discount calculation
-    const enrollmentsByParent = new Map<string, EnrollmentWithRelations[]>();
-    for (const enrollment of filteredEnrollments) {
-      const parentId = enrollment.child.parentId;
-      if (!enrollmentsByParent.has(parentId)) {
-        enrollmentsByParent.set(parentId, []);
+      // Group enrollments by parent for sibling discount calculation
+      const enrollmentsByParent = new Map<string, EnrollmentWithRelations[]>();
+      for (const enrollment of filteredEnrollments) {
+        const parentId = enrollment.child.parentId;
+        if (!enrollmentsByParent.has(parentId)) {
+          enrollmentsByParent.set(parentId, []);
+        }
+        enrollmentsByParent.get(parentId)!.push(enrollment);
       }
-      enrollmentsByParent.get(parentId)!.push(enrollment);
-    }
 
-    // Process each parent's enrollments
-    for (const [parentId, parentEnrollments] of enrollmentsByParent) {
-      // Get sibling discounts for this parent
-      const siblingDiscounts =
-        await this.enrollmentService.applySiblingDiscount(tenantId, parentId);
+      // Process each parent's enrollments
+      for (const [parentId, parentEnrollments] of enrollmentsByParent) {
+        // Get sibling discounts for this parent
+        const siblingDiscounts =
+          await this.enrollmentService.applySiblingDiscount(tenantId, parentId);
 
-      // Create invoice for each child
-      for (const enrollment of parentEnrollments) {
-        try {
-          // Check for existing invoice for this period
-          const existingInvoice = await this.invoiceRepo.findByBillingPeriod(
-            tenantId,
-            enrollment.childId,
-            billingPeriodStart,
-            billingPeriodEnd,
-          );
+        // Create invoice for each child
+        for (const enrollment of parentEnrollments) {
+          try {
+            // Check for existing invoice for this period
+            const existingInvoice = await this.invoiceRepo.findByBillingPeriod(
+              tenantId,
+              enrollment.childId,
+              billingPeriodStart,
+              billingPeriodEnd,
+            );
 
-          if (existingInvoice) {
-            result.errors.push({
-              childId: enrollment.childId,
-              enrollmentId: enrollment.id,
-              error: `Invoice already exists for billing period ${billingMonth}`,
-              code: 'DUPLICATE_INVOICE',
+            if (existingInvoice) {
+              result.errors.push({
+                childId: enrollment.childId,
+                enrollmentId: enrollment.id,
+                error: `Invoice already exists for billing period ${billingMonth}`,
+                code: 'DUPLICATE_INVOICE',
+              });
+              continue;
+            }
+
+            // TASK-BILL-040: Build all data first, then create invoice atomically
+            // Build line items (before transaction - read-only operations)
+            const lineItems: LineItemInput[] = [];
+
+            // Get monthly fee (may have custom override)
+            const monthlyFeeCents =
+              enrollment.customFeeOverrideCents ??
+              enrollment.feeStructure.amountCents;
+
+            // TASK-BILL-036: Calculate pro-rata for mid-month enrollment/withdrawal
+            const proRataResult = await this.calculateMonthlyFeeWithProRata(
+              enrollment,
+              billingPeriodStart,
+              billingPeriodEnd,
+              tenantId,
+              monthlyFeeCents,
+            );
+
+            // Add monthly fee line (may be pro-rated)
+            lineItems.push({
+              description: proRataResult.description,
+              quantity: new Decimal(1),
+              unitPriceCents: proRataResult.amountCents,
+              discountCents: 0,
+              lineType: LineType.MONTHLY_FEE,
+              accountCode: this.SCHOOL_FEES_ACCOUNT,
             });
-            continue;
-          }
 
-          // Create invoice with pre-computed invoice number to avoid race conditions
-          const invoiceNumber = this.formatInvoiceNumber(
-            batchYear,
-            currentSequential++,
-          );
-          const invoice = await this.createInvoice(
-            tenantId,
-            enrollment,
-            billingPeriodStart,
-            billingPeriodEnd,
-            userId,
-            invoiceNumber,
-          );
+            // TASK-BILL-037: Add re-registration fee for January invoices (continuing students)
+            const reRegistrationFeeCents =
+              enrollment.feeStructure.reRegistrationFeeCents ?? 0;
+            if (reRegistrationFeeCents > 0) {
+              const isEligibleForReReg = await this.isEligibleForReRegistration(
+                tenantId,
+                enrollment.childId,
+                billingMonth,
+              );
 
-          // Build line items
-          const lineItems: LineItemInput[] = [];
+              if (isEligibleForReReg) {
+                lineItems.push({
+                  description: 'Annual Re-Registration Fee',
+                  quantity: new Decimal(1),
+                  unitPriceCents: reRegistrationFeeCents,
+                  discountCents: 0,
+                  lineType: LineType.REGISTRATION,
+                  accountCode: '4010', // Registration income account
+                });
+                this.logger.log(
+                  `Added re-registration fee (${reRegistrationFeeCents} cents) for child ${enrollment.childId} - January continuing student`,
+                );
+              }
+            }
 
-          // Get monthly fee (may have custom override)
-          const monthlyFeeCents =
-            enrollment.customFeeOverrideCents ??
-            enrollment.feeStructure.amountCents;
-
-          // TASK-BILL-036: Calculate pro-rata for mid-month enrollment/withdrawal
-          const proRataResult = await this.calculateMonthlyFeeWithProRata(
-            enrollment,
-            billingPeriodStart,
-            billingPeriodEnd,
-            tenantId,
-            monthlyFeeCents,
-          );
-
-          // Add monthly fee line (may be pro-rated)
-          lineItems.push({
-            description: proRataResult.description,
-            quantity: new Decimal(1),
-            unitPriceCents: proRataResult.amountCents,
-            discountCents: 0,
-            lineType: LineType.MONTHLY_FEE,
-            accountCode: this.SCHOOL_FEES_ACCOUNT,
-          });
-
-          // TASK-BILL-037: Add re-registration fee for January invoices (continuing students)
-          const reRegistrationFeeCents =
-            enrollment.feeStructure.reRegistrationFeeCents ?? 0;
-          if (reRegistrationFeeCents > 0) {
-            const isEligibleForReReg = await this.isEligibleForReRegistration(
+            // TASK-BILL-017: Get and include pending ad-hoc charges for this child
+            const adHocCharges = await this.getAdHocCharges(
               tenantId,
               enrollment.childId,
               billingMonth,
             );
 
-            if (isEligibleForReReg) {
+            // Collect ad-hoc charge IDs for atomic marking
+            const adHocChargeIds = adHocCharges.map((c) => c.id);
+
+            // TASK-BILL-038: Process ad-hoc charges with VAT exemption support
+            for (const charge of adHocCharges) {
               lineItems.push({
-                description: 'Annual Re-Registration Fee',
+                description: charge.description,
                 quantity: new Decimal(1),
-                unitPriceCents: reRegistrationFeeCents,
+                unitPriceCents: charge.amountCents,
                 discountCents: 0,
-                lineType: LineType.REGISTRATION,
-                accountCode: '4010', // Registration income account
-              });
-              this.logger.log(
-                `Added re-registration fee (${reRegistrationFeeCents} cents) for child ${enrollment.childId} - January continuing student`,
-              );
-            }
-          }
-
-          // TASK-BILL-017: Get and include pending ad-hoc charges for this child
-          const adHocCharges = await this.getAdHocCharges(
-            tenantId,
-            enrollment.childId,
-            billingMonth,
-          );
-
-          // TASK-BILL-038: Process ad-hoc charges with VAT exemption support
-          for (const charge of adHocCharges) {
-            lineItems.push({
-              description: charge.description,
-              quantity: new Decimal(1),
-              unitPriceCents: charge.amountCents,
-              discountCents: 0,
-              lineType: LineType.AD_HOC,
-              accountCode: this.SCHOOL_FEES_ACCOUNT,
-              adHocChargeId: charge.id, // Track which charge this came from
-              isVatExempt: charge.isVatExempt, // TASK-BILL-038: Pass VAT exemption override
-            });
-          }
-
-          // Apply sibling discount if applicable
-          // TASK-BILL-036: Apply discount to actual fee charged (may be pro-rated)
-          const discountPercentage =
-            siblingDiscounts.get(enrollment.childId) ?? new Decimal(0);
-
-          if (discountPercentage.greaterThan(0)) {
-            // Calculate discount amount based on actual fee charged (including pro-rata)
-            const discountAmount = new Decimal(proRataResult.amountCents)
-              .mul(discountPercentage)
-              .div(100);
-            const discountCents = discountAmount
-              .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
-              .toNumber();
-
-            if (discountCents > 0) {
-              // Add discount as negative line item
-              lineItems.push({
-                description: `Sibling Discount (${discountPercentage.toString()}%)`,
-                quantity: new Decimal(1),
-                unitPriceCents: -discountCents, // Negative for discount
-                discountCents: 0,
-                lineType: LineType.DISCOUNT,
+                lineType: LineType.AD_HOC,
                 accountCode: this.SCHOOL_FEES_ACCOUNT,
+                adHocChargeId: charge.id, // Track which charge this came from
+                isVatExempt: charge.isVatExempt, // TASK-BILL-038: Pass VAT exemption override
               });
             }
-          }
 
-          // Add line items and calculate totals
-          await this.addLineItems(invoice.id, lineItems, isVatRegistered);
+            // Apply sibling discount if applicable
+            // TASK-BILL-036: Apply discount to actual fee charged (may be pro-rated)
+            const discountPercentage =
+              siblingDiscounts.get(enrollment.childId) ?? new Decimal(0);
 
-          // TASK-BILL-017: Mark ad-hoc charges as invoiced
-          if (adHocCharges.length > 0) {
-            const chargeIds = adHocCharges.map((c) => c.id);
-            await this.markChargesInvoiced(chargeIds, invoice.id);
-            this.logger.log(
-              `Marked ${chargeIds.length} ad-hoc charges as invoiced for child ${enrollment.childId}`,
+            if (discountPercentage.greaterThan(0)) {
+              // Calculate discount amount based on actual fee charged (including pro-rata)
+              const discountAmount = new Decimal(proRataResult.amountCents)
+                .mul(discountPercentage)
+                .div(100);
+              const discountCents = discountAmount
+                .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+                .toNumber();
+
+              if (discountCents > 0) {
+                // Add discount as negative line item
+                lineItems.push({
+                  description: `Sibling Discount (${discountPercentage.toString()}%)`,
+                  quantity: new Decimal(1),
+                  unitPriceCents: -discountCents, // Negative for discount
+                  discountCents: 0,
+                  lineType: LineType.DISCOUNT,
+                  accountCode: this.SCHOOL_FEES_ACCOUNT,
+                });
+              }
+            }
+
+            // Get tenant due days
+            const dueDays = tenant?.invoiceDueDays ?? this.DEFAULT_DUE_DAYS;
+
+            // TASK-BILL-041: Generate invoice number atomically to prevent race conditions
+            const invoiceNumber = await this.generateInvoiceNumber(
+              tenantId,
+              batchYear,
             );
-          }
 
-          // Refresh invoice to get updated totals
-          let updatedInvoice = await this.invoiceRepo.findById(invoice.id);
-          if (!updatedInvoice) {
-            throw new Error('Invoice not found after creation');
-          }
+            // TASK-BILL-040: Create invoice atomically with all line items and ad-hoc marking
+            // This ensures either all operations succeed or all are rolled back - no partial invoices
+            const invoice = await this.createInvoiceAtomic(
+              tenantId,
+              enrollment,
+              billingPeriodStart,
+              billingPeriodEnd,
+              invoiceNumber,
+              lineItems,
+              isVatRegistered,
+              adHocChargeIds,
+              userId,
+              dueDays,
+            );
 
-          // TASK-PAY-020: Check and apply available credit balances
-          if (updatedInvoice.totalCents > 0) {
-            const availableCreditCents =
-              await this.creditBalanceService.getAvailableCredit(
-                tenantId,
-                enrollment.child.parentId,
+            if (adHocChargeIds.length > 0) {
+              this.logger.log(
+                `TASK-BILL-040: Atomically created invoice with ${adHocChargeIds.length} ad-hoc charges for child ${enrollment.childId}`,
               );
+            }
 
-            if (availableCreditCents > 0) {
-              const creditToApply = Math.min(
-                availableCreditCents,
-                updatedInvoice.totalCents,
-              );
+            // Refresh invoice to get updated totals
+            let updatedInvoice = await this.invoiceRepo.findById(
+              invoice.id,
+              tenantId,
+            );
+            if (!updatedInvoice) {
+              throw new Error('Invoice not found after creation');
+            }
 
-              if (creditToApply > 0) {
-                // Apply credit using CreditBalanceService
-                const appliedCredit =
-                  await this.creditBalanceService.applyCreditToInvoice(
-                    tenantId,
-                    enrollment.child.parentId,
-                    invoice.id,
-                    creditToApply,
-                    userId,
-                  );
+            // TASK-PAY-020: Check and apply available credit balances
+            if (updatedInvoice.totalCents > 0) {
+              const availableCreditCents =
+                await this.creditBalanceService.getAvailableCredit(
+                  tenantId,
+                  enrollment.child.parentId,
+                );
 
-                if (appliedCredit > 0) {
-                  // Add credit line item (negative amount)
-                  await this.invoiceLineRepo.create({
-                    invoiceId: invoice.id,
-                    description: 'Credit Applied',
-                    quantity: 1,
-                    unitPriceCents: -appliedCredit, // Negative for credit
-                    discountCents: 0,
-                    subtotalCents: -appliedCredit,
-                    vatCents: 0, // Credits don't have VAT
-                    totalCents: -appliedCredit,
-                    lineType: LineType.CREDIT,
-                    accountCode: this.SCHOOL_FEES_ACCOUNT,
-                    sortOrder: 99, // Place credit line last
-                  });
+              if (availableCreditCents > 0) {
+                const creditToApply = Math.min(
+                  availableCreditCents,
+                  updatedInvoice.totalCents,
+                );
 
-                  // Calculate new totals
-                  const newSubtotalCents =
-                    updatedInvoice.subtotalCents - appliedCredit;
-                  const newTotalCents =
-                    updatedInvoice.totalCents - appliedCredit;
-                  const newStatus: InvoiceStatus =
-                    newTotalCents <= 0
-                      ? InvoiceStatus.PAID
-                      : (updatedInvoice.status as InvoiceStatus);
-
-                  // Update invoice totals
-                  await this.invoiceRepo.update(invoice.id, {
-                    subtotalCents: newSubtotalCents,
-                    totalCents: newTotalCents,
-                    amountPaidCents: appliedCredit, // Credit counts as partial payment
-                    status: newStatus,
-                  });
-
-                  this.logger.log(
-                    `Applied R${(appliedCredit / 100).toFixed(2)} credit to invoice ${updatedInvoice.invoiceNumber}, ` +
-                      `new total: R${(newTotalCents / 100).toFixed(2)}, status: ${newStatus}`,
-                  );
-
-                  // Refresh invoice with updated totals
-                  updatedInvoice = await this.invoiceRepo.findById(invoice.id);
-                  if (!updatedInvoice) {
-                    throw new Error(
-                      'Invoice not found after credit application',
+                if (creditToApply > 0) {
+                  // Apply credit using CreditBalanceService
+                  const appliedCredit =
+                    await this.creditBalanceService.applyCreditToInvoice(
+                      tenantId,
+                      enrollment.child.parentId,
+                      invoice.id,
+                      creditToApply,
+                      userId,
                     );
+
+                  if (appliedCredit > 0) {
+                    // Add credit line item (negative amount)
+                    await this.invoiceLineRepo.create({
+                      invoiceId: invoice.id,
+                      description: 'Credit Applied',
+                      quantity: 1,
+                      unitPriceCents: -appliedCredit, // Negative for credit
+                      discountCents: 0,
+                      subtotalCents: -appliedCredit,
+                      vatCents: 0, // Credits don't have VAT
+                      totalCents: -appliedCredit,
+                      lineType: LineType.CREDIT,
+                      accountCode: this.SCHOOL_FEES_ACCOUNT,
+                      sortOrder: 99, // Place credit line last
+                    });
+
+                    // Calculate new totals
+                    const newSubtotalCents =
+                      updatedInvoice.subtotalCents - appliedCredit;
+                    const newTotalCents =
+                      updatedInvoice.totalCents - appliedCredit;
+                    const newStatus: InvoiceStatus =
+                      newTotalCents <= 0
+                        ? InvoiceStatus.PAID
+                        : (updatedInvoice.status as InvoiceStatus);
+
+                    // Update invoice totals
+                    await this.invoiceRepo.update(invoice.id, tenantId, {
+                      subtotalCents: newSubtotalCents,
+                      totalCents: newTotalCents,
+                      amountPaidCents: appliedCredit, // Credit counts as partial payment
+                      status: newStatus,
+                    });
+
+                    this.logger.log(
+                      `Applied R${(appliedCredit / 100).toFixed(2)} credit to invoice ${updatedInvoice.invoiceNumber}, ` +
+                        `new total: R${(newTotalCents / 100).toFixed(2)}, status: ${newStatus}`,
+                    );
+
+                    // Refresh invoice with updated totals
+                    updatedInvoice = await this.invoiceRepo.findById(
+                      invoice.id,
+                      tenantId,
+                    );
+                    if (!updatedInvoice) {
+                      throw new Error(
+                        'Invoice not found after credit application',
+                      );
+                    }
                   }
                 }
               }
             }
+
+            // Sync to Xero - errors are logged but don't fail invoice creation
+            const xeroInvoiceId = await this.syncToXero(updatedInvoice);
+            if (xeroInvoiceId) {
+              await this.invoiceRepo.update(updatedInvoice.id, tenantId, {
+                xeroInvoiceId,
+              });
+              updatedInvoice.xeroInvoiceId = xeroInvoiceId;
+            }
+
+            // Build child name
+            const childName = `${enrollment.child.firstName} ${enrollment.child.lastName}`;
+
+            // Add to result
+            result.invoicesCreated++;
+            result.totalAmountCents += updatedInvoice.totalCents;
+            result.invoices.push({
+              id: updatedInvoice.id,
+              invoiceNumber: updatedInvoice.invoiceNumber,
+              childId: enrollment.childId,
+              childName,
+              parentId: enrollment.child.parentId,
+              totalCents: updatedInvoice.totalCents,
+              status: updatedInvoice.status as InvoiceStatus,
+              xeroInvoiceId: updatedInvoice.xeroInvoiceId,
+            });
+
+            this.logger.log(
+              `Created invoice ${updatedInvoice.invoiceNumber} for child ${childName} (${enrollment.childId})`,
+            );
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            const errorCode =
+              error instanceof NotFoundException
+                ? 'NOT_FOUND'
+                : error instanceof ValidationException
+                  ? 'VALIDATION_ERROR'
+                  : error instanceof ConflictException
+                    ? 'CONFLICT'
+                    : 'GENERATION_ERROR';
+
+            result.errors.push({
+              childId: enrollment.childId,
+              enrollmentId: enrollment.id,
+              error: errorMessage,
+              code: errorCode,
+            });
+
+            this.logger.error(
+              `Failed to generate invoice for child ${enrollment.childId}: ${errorMessage}`,
+            );
           }
-
-          // Sync to Xero - errors are logged but don't fail invoice creation
-          const xeroInvoiceId = await this.syncToXero(updatedInvoice);
-          if (xeroInvoiceId) {
-            await this.invoiceRepo.update(updatedInvoice.id, { xeroInvoiceId });
-            updatedInvoice.xeroInvoiceId = xeroInvoiceId;
-          }
-
-          // Build child name
-          const childName = `${enrollment.child.firstName} ${enrollment.child.lastName}`;
-
-          // Add to result
-          result.invoicesCreated++;
-          result.totalAmountCents += updatedInvoice.totalCents;
-          result.invoices.push({
-            id: updatedInvoice.id,
-            invoiceNumber: updatedInvoice.invoiceNumber,
-            childId: enrollment.childId,
-            childName,
-            parentId: enrollment.child.parentId,
-            totalCents: updatedInvoice.totalCents,
-            status: updatedInvoice.status as InvoiceStatus,
-            xeroInvoiceId: updatedInvoice.xeroInvoiceId,
-          });
-
-          this.logger.log(
-            `Created invoice ${updatedInvoice.invoiceNumber} for child ${childName} (${enrollment.childId})`,
-          );
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          const errorCode =
-            error instanceof NotFoundException
-              ? 'NOT_FOUND'
-              : error instanceof ValidationException
-                ? 'VALIDATION_ERROR'
-                : error instanceof ConflictException
-                  ? 'CONFLICT'
-                  : 'GENERATION_ERROR';
-
-          result.errors.push({
-            childId: enrollment.childId,
-            enrollmentId: enrollment.id,
-            error: errorMessage,
-            code: errorCode,
-          });
-
-          this.logger.error(
-            `Failed to generate invoice for child ${enrollment.childId}: ${errorMessage}`,
-          );
         }
       }
-    }
 
-    this.logger.log(
-      `Invoice generation complete: ${result.invoicesCreated} created, ${result.errors.length} errors`,
+      this.logger.log(
+        `Invoice generation complete: ${result.invoicesCreated} created, ${result.errors.length} errors`,
+      );
+
+      // Audit log
+      await this.auditLogService.logCreate({
+        tenantId,
+        userId,
+        entityType: 'InvoiceBatch',
+        entityId: billingMonth,
+        afterValue: {
+          billingMonth,
+          invoicesCreated: result.invoicesCreated,
+          totalAmountCents: result.totalAmountCents,
+          errorCount: result.errors.length,
+        },
+      });
+
+      return result;
+    } finally {
+      // TASK-BILL-002: Always release the advisory lock, even if an error occurred
+      await this.releaseBatchLock(tenantId, billingMonth);
+      this.logger.log(
+        `TASK-BILL-002: Released batch lock for tenant ${tenantId}, month ${billingMonth}`,
+      );
+    }
+  }
+
+  /**
+   * TASK-BILL-002: Acquire advisory lock for batch invoice processing
+   *
+   * Uses PostgreSQL advisory locks to prevent concurrent batch runs for the
+   * same tenant and billing period combination. This prevents race conditions
+   * where multiple processes try to generate invoices simultaneously.
+   *
+   * @param tenantId - Tenant ID for lock scoping
+   * @param billingMonth - Billing month for lock scoping (YYYY-MM)
+   * @returns true if lock was acquired, false if already held by another process
+   */
+  async acquireBatchLock(
+    tenantId: string,
+    billingMonth: string,
+  ): Promise<boolean> {
+    const lockKey = `batch_invoice_${tenantId}_${billingMonth}`;
+    const lockId = hashStringToInt(lockKey);
+
+    this.logger.debug(
+      `TASK-BILL-002: Attempting to acquire advisory lock: ${lockKey} (id: ${lockId})`,
     );
 
-    // Audit log
-    await this.auditLogService.logCreate({
-      tenantId,
-      userId,
-      entityType: 'InvoiceBatch',
-      entityId: billingMonth,
-      afterValue: {
-        billingMonth,
-        invoicesCreated: result.invoicesCreated,
-        totalAmountCents: result.totalAmountCents,
-        errorCount: result.errors.length,
-      },
-    });
+    try {
+      const result = await this.prisma.$queryRaw<
+        [{ pg_try_advisory_lock: boolean }]
+      >`
+        SELECT pg_try_advisory_lock(${lockId})
+      `;
 
-    return result;
+      return result[0]?.pg_try_advisory_lock ?? false;
+    } catch (error) {
+      this.logger.error(
+        `TASK-BILL-002: Error acquiring advisory lock: ${(error as Error).message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * TASK-BILL-002: Release advisory lock for batch invoice processing
+   *
+   * @param tenantId - Tenant ID for lock scoping
+   * @param billingMonth - Billing month for lock scoping (YYYY-MM)
+   */
+  async releaseBatchLock(
+    tenantId: string,
+    billingMonth: string,
+  ): Promise<void> {
+    const lockKey = `batch_invoice_${tenantId}_${billingMonth}`;
+    const lockId = hashStringToInt(lockKey);
+
+    this.logger.debug(
+      `TASK-BILL-002: Releasing advisory lock: ${lockKey} (id: ${lockId})`,
+    );
+
+    try {
+      await this.prisma.$queryRaw`SELECT pg_advisory_unlock(${lockId})`;
+    } catch (error) {
+      // Log but don't throw - lock will be released when connection closes anyway
+      this.logger.error(
+        `TASK-BILL-002: Error releasing advisory lock: ${(error as Error).message}`,
+      );
+    }
   }
 
   /**
@@ -555,16 +676,20 @@ export class InvoiceGenerationService {
 
   /**
    * Add line items to invoice and calculate totals
+   * NOTE: This method is kept for backward compatibility but is superseded by
+   * createInvoiceAtomic() which provides transaction isolation (TASK-BILL-040)
    *
    * @param invoiceId - Invoice ID
    * @param lineItems - Array of line items to add
    * @param isVatRegistered - Whether tenant is VAT registered
+   * @param tenantId - Tenant ID for multi-tenant isolation
    * @returns Created invoice lines
    */
   async addLineItems(
     invoiceId: string,
     lineItems: LineItemInput[],
     isVatRegistered: boolean,
+    tenantId?: string,
   ): Promise<InvoiceLine[]> {
     const createdLines: InvoiceLine[] = [];
     let subtotal = new Decimal(0);
@@ -632,14 +757,212 @@ export class InvoiceGenerationService {
       .toNumber();
     const invoiceTotalCents = invoiceSubtotalCents + invoiceVatCents;
 
-    // Update invoice totals
-    await this.invoiceRepo.update(invoiceId, {
-      subtotalCents: invoiceSubtotalCents,
-      vatCents: invoiceVatCents,
-      totalCents: invoiceTotalCents,
-    });
+    // Update invoice totals (only if tenantId is provided)
+    if (tenantId) {
+      await this.invoiceRepo.update(invoiceId, tenantId, {
+        subtotalCents: invoiceSubtotalCents,
+        vatCents: invoiceVatCents,
+        totalCents: invoiceTotalCents,
+      });
+    } else {
+      // Fallback: update without tenant validation (legacy behavior)
+      this.logger.warn(
+        `addLineItems called without tenantId for invoice ${invoiceId} - consider using createInvoiceAtomic instead`,
+      );
+      await this.prisma.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          subtotalCents: invoiceSubtotalCents,
+          vatCents: invoiceVatCents,
+          totalCents: invoiceTotalCents,
+        },
+      });
+    }
 
     return createdLines;
+  }
+
+  /**
+   * TASK-BILL-040: Create invoice atomically with transaction isolation
+   *
+   * Wraps invoice header creation, line items, ad-hoc charge marking, and total
+   * updates in a single database transaction. If any operation fails, the entire
+   * invoice creation is rolled back - no partial invoices can exist.
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param enrollment - Enrollment with relations
+   * @param billingPeriodStart - Start of billing period
+   * @param billingPeriodEnd - End of billing period
+   * @param invoiceNumber - Pre-computed invoice number
+   * @param lineItems - Array of line items to create
+   * @param isVatRegistered - Whether tenant is VAT registered
+   * @param adHocChargeIds - IDs of ad-hoc charges to mark as invoiced
+   * @param userId - User performing the action
+   * @param dueDays - Days until due date
+   * @returns Created invoice with totals
+   *
+   * @throws Error if transaction fails (entire operation is rolled back)
+   */
+  private async createInvoiceAtomic(
+    tenantId: string,
+    enrollment: EnrollmentWithRelations,
+    billingPeriodStart: Date,
+    billingPeriodEnd: Date,
+    invoiceNumber: string,
+    lineItems: LineItemInput[],
+    isVatRegistered: boolean,
+    adHocChargeIds: string[],
+    userId: string,
+    dueDays: number,
+  ): Promise<Invoice> {
+    this.logger.debug(
+      `TASK-BILL-040: Creating invoice ${invoiceNumber} with transaction isolation`,
+    );
+
+    // Set dates (no time component)
+    const issueDate = new Date();
+    issueDate.setHours(0, 0, 0, 0);
+    const dueDate = new Date(issueDate);
+    dueDate.setDate(dueDate.getDate() + dueDays);
+
+    // Execute all database operations atomically
+    const invoice = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // 1. Create invoice header
+        const createdInvoice = await tx.invoice.create({
+          data: {
+            tenantId,
+            invoiceNumber,
+            parentId: enrollment.child.parentId,
+            childId: enrollment.childId,
+            billingPeriodStart,
+            billingPeriodEnd,
+            issueDate,
+            dueDate,
+            subtotalCents: 0,
+            vatCents: 0,
+            totalCents: 0,
+            status: 'DRAFT',
+          },
+        });
+
+        // 2. Create all line items and calculate totals
+        let subtotal = new Decimal(0);
+        let totalVat = new Decimal(0);
+
+        for (let i = 0; i < lineItems.length; i++) {
+          const item = lineItems[i];
+
+          // Calculate line subtotal
+          const lineSubtotal = new Decimal(item.unitPriceCents).mul(
+            item.quantity,
+          );
+
+          // Calculate VAT based on line type and VAT registration
+          let lineVatCents = 0;
+          if (
+            isVatRegistered &&
+            isVatApplicable(item.lineType, item.isVatExempt) &&
+            item.unitPriceCents > 0
+          ) {
+            lineVatCents = this.calculateVAT(
+              lineSubtotal
+                .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+                .toNumber(),
+            );
+          }
+
+          const lineTotal = lineSubtotal.add(lineVatCents);
+
+          // Create line item
+          await tx.invoiceLine.create({
+            data: {
+              invoiceId: createdInvoice.id,
+              description: item.description,
+              quantity: item.quantity.toNumber(),
+              unitPriceCents: item.unitPriceCents,
+              discountCents: item.discountCents,
+              subtotalCents: lineSubtotal
+                .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+                .toNumber(),
+              vatCents: lineVatCents,
+              totalCents: lineTotal
+                .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+                .toNumber(),
+              lineType: item.lineType,
+              accountCode: item.accountCode,
+              sortOrder: i,
+            },
+          });
+
+          // Accumulate totals
+          subtotal = subtotal.add(lineSubtotal);
+          totalVat = totalVat.add(lineVatCents);
+        }
+
+        // 3. Calculate final totals
+        const invoiceSubtotalCents = subtotal
+          .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+          .toNumber();
+        const invoiceVatCents = totalVat
+          .toDecimalPlaces(0, Decimal.ROUND_HALF_EVEN)
+          .toNumber();
+        const invoiceTotalCents = invoiceSubtotalCents + invoiceVatCents;
+
+        // 4. Update invoice with calculated totals
+        const updatedInvoice = await tx.invoice.update({
+          where: { id: createdInvoice.id },
+          data: {
+            subtotalCents: invoiceSubtotalCents,
+            vatCents: invoiceVatCents,
+            totalCents: invoiceTotalCents,
+          },
+        });
+
+        // 5. Mark ad-hoc charges as invoiced (within same transaction)
+        if (adHocChargeIds.length > 0) {
+          await tx.adHocCharge.updateMany({
+            where: { id: { in: adHocChargeIds } },
+            data: {
+              invoicedAt: new Date(),
+              invoiceId: createdInvoice.id,
+            },
+          });
+
+          this.logger.debug(
+            `TASK-BILL-040: Marked ${adHocChargeIds.length} ad-hoc charges as invoiced within transaction`,
+          );
+        }
+
+        return updatedInvoice;
+      },
+      {
+        // Transaction options for robustness
+        maxWait: 5000, // Max wait time to acquire lock (5s)
+        timeout: 30000, // Max transaction execution time (30s)
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable, // Strictest isolation
+      },
+    );
+
+    this.logger.log(
+      `TASK-BILL-040: Invoice ${invoiceNumber} created atomically with ${lineItems.length} line items`,
+    );
+
+    // Audit log (outside transaction - non-critical)
+    await this.auditLogService.logCreate({
+      tenantId,
+      userId,
+      entityType: 'Invoice',
+      entityId: invoice.id,
+      afterValue: {
+        invoiceNumber,
+        childId: enrollment.childId,
+        billingPeriod: `${billingPeriodStart.toISOString().split('T')[0]} to ${billingPeriodEnd.toISOString().split('T')[0]}`,
+        transactionIsolated: true,
+      },
+    });
+
+    return invoice;
   }
 
   /**
@@ -655,70 +978,77 @@ export class InvoiceGenerationService {
   }
 
   /**
-   * Generate next invoice number for tenant
+   * Generate next invoice number for tenant using atomic counter
+   * TASK-BILL-041: Prevents race conditions in concurrent invoice creation
+   *
    * Format: INV-{YYYY}-{sequential}
    * Example: INV-2025-001
    *
+   * TASK-BILL-003: Delegates to InvoiceNumberService for atomic counter operations.
+   * Uses PostgreSQL UPDATE...RETURNING to prevent race conditions.
+   *
    * @param tenantId - Tenant ID
    * @param year - Year for invoice
+   * @param tx - Optional transaction client for batch operations
    * @returns Generated invoice number
    */
-  async generateInvoiceNumber(tenantId: string, year: number): Promise<string> {
-    const lastInvoice = await this.invoiceRepo.findLastInvoiceForYear(
-      tenantId,
-      year,
-    );
-
-    let sequential = 1;
-
-    if (lastInvoice) {
-      // Extract sequential number from last invoice
-      // Format: INV-2025-001
-      const parts = lastInvoice.invoiceNumber.split('-');
-      if (parts.length === 3) {
-        const lastSequential = parseInt(parts[2], 10);
-        if (!isNaN(lastSequential)) {
-          sequential = lastSequential + 1;
-        }
-      }
-    }
-
-    // Format with leading zeros (001, 002, etc.)
-    const sequentialPadded = sequential.toString().padStart(3, '0');
-    return `INV-${year}-${sequentialPadded}`;
+  async generateInvoiceNumber(
+    tenantId: string,
+    year: number,
+    tx?: Prisma.TransactionClient,
+  ): Promise<string> {
+    // TASK-BILL-003: Delegate to InvoiceNumberService for atomic operations
+    return this.invoiceNumberService.generateNextNumber(tenantId, year, tx);
   }
 
   /**
-   * Get the next sequential number for batch invoice generation
-   * Used to pre-allocate numbers before creating invoices to avoid race conditions
+   * Reserve a batch of invoice numbers atomically
+   * TASK-BILL-003: Prevents race conditions in batch invoice generation
+   *
+   * Atomically increments counter by count and returns the starting sequential.
+   * This guarantees no other request can get overlapping numbers.
    *
    * @param tenantId - Tenant ID
    * @param year - Year for invoice numbering
-   * @returns Next sequential number (starting from 1)
+   * @param count - Number of invoice numbers to reserve
+   * @param tx - Optional transaction client for batch operations
+   * @returns Starting sequential number (the first reserved number)
+   *
+   * @example
+   * // Reserve 5 numbers
+   * const startSeq = await reserveInvoiceNumbers(tenantId, 2025, 5);
+   * // If startSeq is 10, you get numbers 10, 11, 12, 13, 14
    */
-  async getNextInvoiceSequential(
+  async reserveInvoiceNumbers(
+    tenantId: string,
+    year: number,
+    count: number,
+    tx?: Prisma.TransactionClient,
+  ): Promise<number> {
+    // TASK-BILL-003: Delegate to InvoiceNumberService for atomic operations
+    const reservation = await this.invoiceNumberService.reserveNumbers(
+      tenantId,
+      year,
+      count,
+      tx,
+    );
+    return reservation.startSequence;
+  }
+
+  /**
+   * Get the current counter value without incrementing (for preview only)
+   * TASK-BILL-003: Use reserveInvoiceNumbers for actual invoice creation
+   *
+   * @param tenantId - Tenant ID
+   * @param year - Year for invoice numbering
+   * @returns Current counter value (next invoice will be this + 1)
+   */
+  async peekNextInvoiceSequential(
     tenantId: string,
     year: number,
   ): Promise<number> {
-    const lastInvoice = await this.invoiceRepo.findLastInvoiceForYear(
-      tenantId,
-      year,
-    );
-
-    if (!lastInvoice) {
-      return 1;
-    }
-
-    // Extract sequential number from last invoice (Format: INV-2025-001)
-    const parts = lastInvoice.invoiceNumber.split('-');
-    if (parts.length === 3) {
-      const lastSequential = parseInt(parts[2], 10);
-      if (!isNaN(lastSequential)) {
-        return lastSequential + 1;
-      }
-    }
-
-    return 1;
+    // TASK-BILL-003: Delegate to InvoiceNumberService
+    return this.invoiceNumberService.peekNextSequential(tenantId, year);
   }
 
   /**
@@ -729,8 +1059,8 @@ export class InvoiceGenerationService {
    * @returns Formatted invoice number (e.g., INV-2025-001)
    */
   formatInvoiceNumber(year: number, sequential: number): string {
-    const sequentialPadded = sequential.toString().padStart(3, '0');
-    return `INV-${year}-${sequentialPadded}`;
+    // TASK-BILL-003: Delegate to InvoiceNumberService
+    return this.invoiceNumberService.formatInvoiceNumber(year, sequential);
   }
 
   /**
@@ -766,7 +1096,10 @@ export class InvoiceGenerationService {
 
     try {
       // Get parent to find Xero contact ID
-      const parent = await this.parentRepo.findById(invoice.parentId);
+      const parent = await this.parentRepo.findById(
+        invoice.parentId,
+        invoice.tenantId,
+      );
 
       if (!parent) {
         this.logger.warn(

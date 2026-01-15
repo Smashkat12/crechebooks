@@ -112,6 +112,13 @@ export class CreateTenantDto {
   @ValidateNested({ each: true })
   @Type(() => ClosureDateDto)
   closureDates?: ClosureDateDto[];
+
+  // TASK-RECON-002: Amount tolerance for transaction matching (in cents)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10000) // Maximum R100 tolerance
+  matchingToleranceCents?: number;
 }
 
 export class UpdateTenantDto extends PartialType(CreateTenantDto) {}

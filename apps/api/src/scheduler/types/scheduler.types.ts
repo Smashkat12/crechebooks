@@ -4,6 +4,7 @@ export const QUEUE_NAMES = {
   SARS_DEADLINE: 'sars-deadline',
   BANK_SYNC: 'bank-sync',
   STATEMENT_GENERATION: 'statement-generation',
+  SIMPLEPAY_SYNC: 'simplepay-sync',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

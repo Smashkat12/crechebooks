@@ -242,7 +242,7 @@ describe('InvoiceRepository', () => {
   describe('findById', () => {
     it('should find invoice by id', async () => {
       const created = await repository.create(testInvoiceData);
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
 
       expect(found).not.toBeNull();
       expect(found?.id).toBe(created.id);
@@ -252,6 +252,7 @@ describe('InvoiceRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        testTenant.id,
       );
       expect(found).toBeNull();
     });
@@ -287,7 +288,10 @@ describe('InvoiceRepository', () => {
         ],
       });
 
-      const found = await repository.findByIdWithLines(created.id);
+      const found = await repository.findByIdWithLines(
+        created.id,
+        testTenant.id,
+      );
 
       expect(found).not.toBeNull();
       expect(found?.lines).toHaveLength(2);
@@ -345,7 +349,9 @@ describe('InvoiceRepository', () => {
       });
 
       // Update one to SENT
-      await repository.update(invoice1.id, { status: InvoiceStatus.SENT });
+      await repository.update(invoice1.id, testTenant.id, {
+        status: InvoiceStatus.SENT,
+      });
 
       const sentInvoices = await repository.findByTenant(testTenant.id, {
         status: InvoiceStatus.SENT,
@@ -357,7 +363,7 @@ describe('InvoiceRepository', () => {
 
     it('should exclude deleted invoices by default', async () => {
       const invoice = await repository.create(testInvoiceData);
-      await repository.softDelete(invoice.id);
+      await repository.softDelete(invoice.id, testTenant.id);
 
       const invoices = await repository.findByTenant(testTenant.id, {});
 
@@ -366,7 +372,7 @@ describe('InvoiceRepository', () => {
 
     it('should include deleted invoices when explicitly requested', async () => {
       const invoice = await repository.create(testInvoiceData);
-      await repository.softDelete(invoice.id);
+      await repository.softDelete(invoice.id, testTenant.id);
 
       const invoices = await repository.findByTenant(testTenant.id, {
         isDeleted: true,
@@ -472,7 +478,9 @@ describe('InvoiceRepository', () => {
       });
 
       // Update one to PAID
-      await repository.update(invoice1.id, { status: InvoiceStatus.PAID });
+      await repository.update(invoice1.id, testTenant.id, {
+        status: InvoiceStatus.PAID,
+      });
 
       const paidInvoices = await repository.findByStatus(
         testTenant.id,
@@ -513,7 +521,9 @@ describe('InvoiceRepository', () => {
       });
 
       // Mark as paid
-      await repository.update(invoice.id, { status: InvoiceStatus.PAID });
+      await repository.update(invoice.id, testTenant.id, {
+        status: InvoiceStatus.PAID,
+      });
 
       const overdueInvoices = await repository.findOverdue(testTenant.id);
 
@@ -527,7 +537,9 @@ describe('InvoiceRepository', () => {
       });
 
       // Mark as void
-      await repository.update(invoice.id, { status: InvoiceStatus.VOID });
+      await repository.update(invoice.id, testTenant.id, {
+        status: InvoiceStatus.VOID,
+      });
 
       const overdueInvoices = await repository.findOverdue(testTenant.id);
 
@@ -539,7 +551,7 @@ describe('InvoiceRepository', () => {
     it('should update invoice fields', async () => {
       const created = await repository.create(testInvoiceData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         status: InvoiceStatus.SENT,
         notes: 'Updated notes',
         amountPaidCents: 100000,
@@ -553,9 +565,13 @@ describe('InvoiceRepository', () => {
 
     it('should throw NotFoundException for non-existent invoice', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
-          notes: 'Test',
-        }),
+        repository.update(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+          {
+            notes: 'Test',
+          },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -567,14 +583,16 @@ describe('InvoiceRepository', () => {
       });
 
       await expect(
-        repository.update(second.id, { invoiceNumber: 'INV-2025-001' }),
+        repository.update(second.id, testTenant.id, {
+          invoiceNumber: 'INV-2025-001',
+        }),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should allow setting xeroInvoiceId', async () => {
       const created = await repository.create(testInvoiceData);
 
-      const updated = await repository.update(created.id, {
+      const updated = await repository.update(created.id, testTenant.id, {
         xeroInvoiceId: 'xero-inv-12345',
       });
 
@@ -587,14 +605,17 @@ describe('InvoiceRepository', () => {
       const created = await repository.create(testInvoiceData);
       expect(created.isDeleted).toBe(false);
 
-      const deleted = await repository.softDelete(created.id);
+      const deleted = await repository.softDelete(created.id, testTenant.id);
 
       expect(deleted.isDeleted).toBe(true);
     });
 
     it('should throw NotFoundException for non-existent invoice', async () => {
       await expect(
-        repository.softDelete('00000000-0000-0000-0000-000000000000'),
+        repository.softDelete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -603,9 +624,9 @@ describe('InvoiceRepository', () => {
     it('should delete existing invoice', async () => {
       const created = await repository.create(testInvoiceData);
 
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, testTenant.id);
       expect(found).toBeNull();
     });
 
@@ -632,7 +653,7 @@ describe('InvoiceRepository', () => {
       expect(linesBefore).toHaveLength(1);
 
       // Delete invoice
-      await repository.delete(created.id);
+      await repository.delete(created.id, testTenant.id);
 
       // Verify lines are also deleted
       const linesAfter = await prisma.invoiceLine.findMany({
@@ -643,7 +664,10 @@ describe('InvoiceRepository', () => {
 
     it('should throw NotFoundException for non-existent invoice', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete(
+          '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -654,6 +678,7 @@ describe('InvoiceRepository', () => {
 
       const updated = await repository.updateDeliveryStatus(
         created.id,
+        testTenant.id,
         'SENT',
         new Date(),
       );
@@ -666,6 +691,7 @@ describe('InvoiceRepository', () => {
       await expect(
         repository.updateDeliveryStatus(
           '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
           'SENT',
         ),
       ).rejects.toThrow(NotFoundException);
@@ -676,7 +702,11 @@ describe('InvoiceRepository', () => {
     it('should record partial payment', async () => {
       const created = await repository.create(testInvoiceData);
 
-      const updated = await repository.recordPayment(created.id, 200000); // R2,000
+      const updated = await repository.recordPayment(
+        created.id,
+        testTenant.id,
+        200000,
+      ); // R2,000
 
       expect(updated.amountPaidCents).toBe(200000);
       expect(updated.status).toBe(InvoiceStatus.PARTIALLY_PAID);
@@ -685,7 +715,11 @@ describe('InvoiceRepository', () => {
     it('should mark as paid when full amount received', async () => {
       const created = await repository.create(testInvoiceData);
 
-      const updated = await repository.recordPayment(created.id, 450000); // Full amount
+      const updated = await repository.recordPayment(
+        created.id,
+        testTenant.id,
+        450000,
+      ); // Full amount
 
       expect(updated.amountPaidCents).toBe(450000);
       expect(updated.status).toBe(InvoiceStatus.PAID);
@@ -694,7 +728,11 @@ describe('InvoiceRepository', () => {
     it('should handle overpayment', async () => {
       const created = await repository.create(testInvoiceData);
 
-      const updated = await repository.recordPayment(created.id, 500000); // More than total
+      const updated = await repository.recordPayment(
+        created.id,
+        testTenant.id,
+        500000,
+      ); // More than total
 
       expect(updated.amountPaidCents).toBe(500000);
       expect(updated.status).toBe(InvoiceStatus.PAID);
@@ -704,6 +742,7 @@ describe('InvoiceRepository', () => {
       await expect(
         repository.recordPayment(
           '00000000-0000-0000-0000-000000000000',
+          testTenant.id,
           100000,
         ),
       ).rejects.toThrow(NotFoundException);
@@ -751,31 +790,31 @@ describe('InvoiceRepository', () => {
       expect(invoice.status).toBe(InvoiceStatus.DRAFT);
 
       // DRAFT -> SENT
-      const sent = await repository.update(invoice.id, {
+      const sent = await repository.update(invoice.id, testTenant.id, {
         status: InvoiceStatus.SENT,
       });
       expect(sent.status).toBe(InvoiceStatus.SENT);
 
       // SENT -> VIEWED
-      const viewed = await repository.update(invoice.id, {
+      const viewed = await repository.update(invoice.id, testTenant.id, {
         status: InvoiceStatus.VIEWED,
       });
       expect(viewed.status).toBe(InvoiceStatus.VIEWED);
 
       // VIEWED -> OVERDUE
-      const overdue = await repository.update(invoice.id, {
+      const overdue = await repository.update(invoice.id, testTenant.id, {
         status: InvoiceStatus.OVERDUE,
       });
       expect(overdue.status).toBe(InvoiceStatus.OVERDUE);
 
       // OVERDUE -> PARTIALLY_PAID
-      const partial = await repository.update(invoice.id, {
+      const partial = await repository.update(invoice.id, testTenant.id, {
         status: InvoiceStatus.PARTIALLY_PAID,
       });
       expect(partial.status).toBe(InvoiceStatus.PARTIALLY_PAID);
 
       // PARTIALLY_PAID -> PAID
-      const paid = await repository.update(invoice.id, {
+      const paid = await repository.update(invoice.id, testTenant.id, {
         status: InvoiceStatus.PAID,
       });
       expect(paid.status).toBe(InvoiceStatus.PAID);
@@ -784,7 +823,7 @@ describe('InvoiceRepository', () => {
     it('should allow VOID status', async () => {
       const invoice = await repository.create(testInvoiceData);
 
-      const voided = await repository.update(invoice.id, {
+      const voided = await repository.update(invoice.id, testTenant.id, {
         status: InvoiceStatus.VOID,
       });
 

@@ -11,19 +11,19 @@ import { SanityResult, ValidationFlag } from './interfaces/validator.interface';
 // Reasonable limits for a creche business account in cents
 const LIMITS = {
   // Transaction limits
-  MAX_TRANSACTION_CENTS: 100_000_000,     // R 1,000,000 - max single transaction
+  MAX_TRANSACTION_CENTS: 100_000_000, // R 1,000,000 - max single transaction
   SUSPICIOUS_TRANSACTION_CENTS: 10_000_000, // R 100,000 - flag for review
-  MIN_TRANSACTION_CENTS: 1,               // R 0.01 - minimum transaction
+  MIN_TRANSACTION_CENTS: 1, // R 0.01 - minimum transaction
 
   // Balance limits
-  MAX_BALANCE_CENTS: 1_000_000_000,       // R 10,000,000 - max account balance
-  SUSPICIOUS_BALANCE_CENTS: 50_000_000,   // R 500,000 - large balance for creche
+  MAX_BALANCE_CENTS: 1_000_000_000, // R 10,000,000 - max account balance
+  SUSPICIOUS_BALANCE_CENTS: 50_000_000, // R 500,000 - large balance for creche
 
   // Typical ranges for common creche transactions
-  TYPICAL_SCHOOL_FEE_MIN: 100_000,        // R 1,000
-  TYPICAL_SCHOOL_FEE_MAX: 1_000_000,      // R 10,000
-  TYPICAL_SALARY_MIN: 500_000,            // R 5,000
-  TYPICAL_SALARY_MAX: 5_000_000,          // R 50,000
+  TYPICAL_SCHOOL_FEE_MIN: 100_000, // R 1,000
+  TYPICAL_SCHOOL_FEE_MAX: 1_000_000, // R 10,000
+  TYPICAL_SALARY_MIN: 500_000, // R 5,000
+  TYPICAL_SALARY_MAX: 5_000_000, // R 50,000
 };
 
 @Injectable()
@@ -33,14 +33,19 @@ export class AmountSanityChecker {
   /**
    * Check if an amount is within reasonable bounds
    */
-  checkAmount(amountCents: number, type: 'TRANSACTION' | 'BALANCE'): SanityResult {
-    const maxAllowed = type === 'TRANSACTION'
-      ? LIMITS.MAX_TRANSACTION_CENTS
-      : LIMITS.MAX_BALANCE_CENTS;
+  checkAmount(
+    amountCents: number,
+    type: 'TRANSACTION' | 'BALANCE',
+  ): SanityResult {
+    const maxAllowed =
+      type === 'TRANSACTION'
+        ? LIMITS.MAX_TRANSACTION_CENTS
+        : LIMITS.MAX_BALANCE_CENTS;
 
-    const suspiciousThreshold = type === 'TRANSACTION'
-      ? LIMITS.SUSPICIOUS_TRANSACTION_CENTS
-      : LIMITS.SUSPICIOUS_BALANCE_CENTS;
+    const suspiciousThreshold =
+      type === 'TRANSACTION'
+        ? LIMITS.SUSPICIOUS_TRANSACTION_CENTS
+        : LIMITS.SUSPICIOUS_BALANCE_CENTS;
 
     // Check for negative amounts (invalid)
     if (amountCents < 0 && type === 'TRANSACTION') {
@@ -100,7 +105,7 @@ export class AmountSanityChecker {
         corrected <= maxAllowed
       ) {
         this.logger.debug(
-          `Suggested correction: ${amountCents} → ${corrected} (divided by ${divisor})`
+          `Suggested correction: ${amountCents} → ${corrected} (divided by ${divisor})`,
         );
         return corrected;
       }

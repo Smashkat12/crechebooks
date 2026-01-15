@@ -56,18 +56,20 @@ export class FeeStructureRepository {
   }
 
   /**
-   * Find fee structure by ID
+   * Find fee structure by ID with tenant isolation
+   * @param id - Fee structure ID
+   * @param tenantId - Tenant ID for isolation
    * @returns FeeStructure or null if not found
    * @throws DatabaseException for database errors
    */
-  async findById(id: string): Promise<FeeStructure | null> {
+  async findById(id: string, tenantId: string): Promise<FeeStructure | null> {
     try {
-      return await this.prisma.feeStructure.findUnique({
-        where: { id },
+      return await this.prisma.feeStructure.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
-        `Failed to find fee structure by id: ${id}`,
+        `Failed to find fee structure by id: ${id} for tenant: ${tenantId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new DatabaseException(
@@ -189,9 +191,13 @@ export class FeeStructureRepository {
    * @throws NotFoundException if fee structure doesn't exist
    * @throws DatabaseException for other database errors
    */
-  async update(id: string, dto: UpdateFeeStructureDto): Promise<FeeStructure> {
+  async update(
+    id: string,
+    tenantId: string,
+    dto: UpdateFeeStructureDto,
+  ): Promise<FeeStructure> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('FeeStructure', id);
       }
@@ -254,9 +260,9 @@ export class FeeStructureRepository {
    * @throws NotFoundException if fee structure doesn't exist
    * @throws DatabaseException for database errors
    */
-  async deactivate(id: string): Promise<FeeStructure> {
+  async deactivate(id: string, tenantId: string): Promise<FeeStructure> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('FeeStructure', id);
       }
@@ -287,9 +293,9 @@ export class FeeStructureRepository {
    * @throws NotFoundException if fee structure doesn't exist
    * @throws DatabaseException for database errors
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      const existing = await this.findById(id);
+      const existing = await this.findById(id, tenantId);
       if (!existing) {
         throw new NotFoundException('FeeStructure', id);
       }

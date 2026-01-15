@@ -372,8 +372,8 @@ export class ReminderService {
     tenantId: string,
   ): Promise<{ reminderId: string; scheduledFor: Date }> {
     try {
-      const invoice = await this.invoiceRepo.findById(dto.invoiceId);
-      if (!invoice || invoice.tenantId !== tenantId) {
+      const invoice = await this.invoiceRepo.findById(dto.invoiceId, tenantId);
+      if (!invoice) {
         this.logger.error(
           `Invoice ${dto.invoiceId} not found for scheduling reminder`,
         );
@@ -526,8 +526,8 @@ export class ReminderService {
     tenantId: string,
   ): Promise<ReminderHistoryEntry[]> {
     try {
-      const parent = await this.parentRepo.findById(parentId);
-      if (!parent || parent.tenantId !== tenantId) {
+      const parent = await this.parentRepo.findById(parentId, tenantId);
+      if (!parent) {
         this.logger.error(`Parent ${parentId} not found for reminder history`);
         throw new NotFoundException('Parent', parentId);
       }

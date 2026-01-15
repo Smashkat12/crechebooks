@@ -250,7 +250,10 @@ describe('PaymentMatchingService', () => {
       expect(Number(payments[0].matchConfidence)).toBe(100);
 
       // Verify invoice was updated
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.amountPaidCents).toBe(575000);
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
     });
@@ -517,7 +520,10 @@ describe('PaymentMatchingService', () => {
         });
       }
 
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PARTIALLY_PAID);
       expect(updatedInvoice?.amountPaidCents).toBe(200000);
     });
@@ -540,7 +546,10 @@ describe('PaymentMatchingService', () => {
         transactionIds: [transaction.id],
       });
 
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
       expect(updatedInvoice?.amountPaidCents).toBe(575000);
     });
@@ -606,7 +615,10 @@ describe('PaymentMatchingService', () => {
       expect(result.results[0].status).toBe('NO_MATCH');
 
       // Verify tenant 2's invoice was not updated
-      const unchangedInvoice = await invoiceRepo.findById(invoice2.id);
+      const unchangedInvoice = await invoiceRepo.findById(
+        invoice2.id,
+        testTenant2.id,
+      );
       expect(unchangedInvoice?.amountPaidCents).toBe(0);
     });
   });
@@ -659,7 +671,10 @@ describe('PaymentMatchingService', () => {
 
       expect(result.amountCents).toBe(250000);
 
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.amountPaidCents).toBe(250000);
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PARTIALLY_PAID);
     });
@@ -915,8 +930,14 @@ describe('PaymentMatchingService', () => {
         invoice,
       );
 
-      expect(score).toBe(95); // 40 (reference) + 35 (within 1%) + 20 (date proximity within billing period)
-      expect(reasons).toContain('Amount within 1% or R1');
+      // TASK-RECON-001: With bank fee tolerance, 50 cents difference scores 38 points
+      // (within R5 bank fee tolerance gets higher score than generic "within 1%")
+      expect(score).toBe(98); // 40 (reference) + 38 (bank fee tolerance) + 20 (date proximity within billing period)
+      expect(
+        reasons.some(
+          (r: string) => r.includes('tolerance') || r.includes('within 1%'),
+        ),
+      ).toBe(true);
     });
   });
 

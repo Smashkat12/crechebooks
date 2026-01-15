@@ -1,4 +1,12 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+/**
+ * API Client
+ * TASK-UI-001: Uses HttpOnly cookies for authentication (XSS protection)
+ *
+ * Authentication is handled via HttpOnly cookies automatically sent with requests.
+ * No localStorage token storage - cookies are managed by the browser.
+ */
+
+import axios, { AxiosError, AxiosInstance } from 'axios';
 import { signOut } from 'next-auth/react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -6,38 +14,28 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 // Track if we're currently handling a 401 to prevent multiple signouts
 let isHandling401 = false;
 
+/**
+ * TASK-UI-001: API client configured with withCredentials for HttpOnly cookie auth
+ * - Cookies are automatically sent with every request
+ * - No need for manual Authorization header management
+ */
 export const apiClient: AxiosInstance = axios.create({
   baseURL: `${API_URL}/api/v1`,
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 30000,
+  withCredentials: true, // TASK-UI-001: Send HttpOnly cookies with requests
 });
-
-// Request interceptor for auth token
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    // Token will be added by auth layer - just return config
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     if (error.response?.status === 401 && !isHandling401) {
-      // Handle unauthorized - clear everything and redirect
+      // Handle unauthorized - clear session and redirect
       if (typeof window !== 'undefined') {
         isHandling401 = true;
-        localStorage.removeItem('token');
 
         // Clear next-auth session properly
         try {

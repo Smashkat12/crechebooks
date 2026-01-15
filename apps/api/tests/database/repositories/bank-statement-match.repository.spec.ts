@@ -14,7 +14,10 @@ import {
   CreateBankStatementMatchDto,
 } from '../../../src/database/entities/bank-statement-match.entity';
 import { ReconciliationStatus } from '../../../src/database/entities/reconciliation.entity';
-import { NotFoundException, DatabaseException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  DatabaseException,
+} from '../../../src/shared/exceptions';
 import { Tenant, Reconciliation, Transaction } from '@prisma/client';
 
 describe('BankStatementMatchRepository', () => {
@@ -26,11 +29,17 @@ describe('BankStatementMatchRepository', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PrismaService, BankStatementMatchRepository, ReconciliationRepository],
+      providers: [
+        PrismaService,
+        BankStatementMatchRepository,
+        ReconciliationRepository,
+      ],
     }).compile();
 
     prisma = module.get<PrismaService>(PrismaService);
-    repository = module.get<BankStatementMatchRepository>(BankStatementMatchRepository);
+    repository = module.get<BankStatementMatchRepository>(
+      BankStatementMatchRepository,
+    );
 
     await prisma.onModuleInit();
   });
@@ -107,7 +116,7 @@ describe('BankStatementMatchRepository', () => {
         openingBalanceCents: 5000000, // R50,000.00
         closingBalanceCents: 7500000, // R75,000.00
         calculatedBalanceCents: 7450000, // R74,500.00
-        status: ReconciliationStatus.DRAFT,
+        status: ReconciliationStatus.IN_PROGRESS,
         notes: 'January 2025 reconciliation',
       },
     });
@@ -143,6 +152,7 @@ describe('BankStatementMatchRepository', () => {
         xeroIsCredit: false,
         status: BankStatementMatchStatus.MATCHED,
         matchConfidence: 95.5,
+        discrepancyReason: null,
       };
 
       const result = await repository.create(dto);
@@ -165,7 +175,13 @@ describe('BankStatementMatchRepository', () => {
         bankDescription: 'BANK FEE - ACCOUNT MAINTENANCE',
         bankAmountCents: 15000, // R150.00
         bankIsCredit: false,
+        transactionId: null,
+        xeroDate: null,
+        xeroDescription: null,
+        xeroAmountCents: null,
+        xeroIsCredit: null,
         status: BankStatementMatchStatus.IN_BANK_ONLY,
+        matchConfidence: null,
         discrepancyReason: 'Bank fee not recorded in Xero',
       };
 
@@ -191,13 +207,16 @@ describe('BankStatementMatchRepository', () => {
         xeroAmountCents: 250000,
         xeroIsCredit: true,
         status: BankStatementMatchStatus.IN_XERO_ONLY,
+        matchConfidence: null,
         discrepancyReason: 'Transaction not yet on bank statement',
       };
 
       const result = await repository.create(dto);
 
       expect(result.status).toBe(BankStatementMatchStatus.IN_XERO_ONLY);
-      expect(result.discrepancyReason).toBe('Transaction not yet on bank statement');
+      expect(result.discrepancyReason).toBe(
+        'Transaction not yet on bank statement',
+      );
     });
 
     it('should create an AMOUNT_MISMATCH match record', async () => {
@@ -234,7 +253,14 @@ describe('BankStatementMatchRepository', () => {
         bankDescription: 'TEST',
         bankAmountCents: 100000,
         bankIsCredit: false,
+        transactionId: null,
+        xeroDate: null,
+        xeroDescription: null,
+        xeroAmountCents: null,
+        xeroIsCredit: null,
         status: BankStatementMatchStatus.IN_BANK_ONLY,
+        matchConfidence: null,
+        discrepancyReason: null,
       };
 
       // Throws either NotFoundException or DatabaseException depending on error message
@@ -249,7 +275,14 @@ describe('BankStatementMatchRepository', () => {
         bankDescription: 'TEST',
         bankAmountCents: 100000,
         bankIsCredit: false,
+        transactionId: null,
+        xeroDate: null,
+        xeroDescription: null,
+        xeroAmountCents: null,
+        xeroIsCredit: null,
         status: BankStatementMatchStatus.IN_BANK_ONLY,
+        matchConfidence: null,
+        discrepancyReason: null,
       };
 
       await expect(repository.create(dto)).rejects.toThrow(NotFoundException);
@@ -270,7 +303,7 @@ describe('BankStatementMatchRepository', () => {
         },
       });
 
-      const result = await repository.findById(created.id);
+      const result = await repository.findById(created.id, testTenant.id);
 
       expect(result).not.toBeNull();
       expect(result!.id).toBe(created.id);
@@ -278,7 +311,10 @@ describe('BankStatementMatchRepository', () => {
     });
 
     it('should return null for non-existent ID', async () => {
-      const result = await repository.findById('non-existent-id');
+      const result = await repository.findById(
+        'non-existent-id',
+        testTenant.id,
+      );
       expect(result).toBeNull();
     });
   });
@@ -505,7 +541,10 @@ describe('BankStatementMatchRepository', () => {
         ],
       });
 
-      const counts = await repository.countByStatus(testTenant.id, testReconciliation.id);
+      const counts = await repository.countByStatus(
+        testTenant.id,
+        testReconciliation.id,
+      );
 
       expect(counts[BankStatementMatchStatus.MATCHED]).toBe(2);
       expect(counts[BankStatementMatchStatus.IN_BANK_ONLY]).toBe(1);
@@ -515,7 +554,10 @@ describe('BankStatementMatchRepository', () => {
     });
 
     it('should return all zeros for empty reconciliation', async () => {
-      const counts = await repository.countByStatus(testTenant.id, testReconciliation.id);
+      const counts = await repository.countByStatus(
+        testTenant.id,
+        testReconciliation.id,
+      );
 
       expect(counts[BankStatementMatchStatus.MATCHED]).toBe(0);
       expect(counts[BankStatementMatchStatus.IN_BANK_ONLY]).toBe(0);
@@ -632,7 +674,7 @@ describe('BankStatementMatchRepository', () => {
           openingBalanceCents: 1000000,
           closingBalanceCents: 1500000,
           calculatedBalanceCents: 1450000,
-          status: ReconciliationStatus.DRAFT,
+          status: ReconciliationStatus.IN_PROGRESS,
         },
       });
 

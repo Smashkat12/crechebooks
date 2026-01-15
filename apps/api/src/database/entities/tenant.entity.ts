@@ -45,6 +45,8 @@ export interface ITenant {
   invoiceDayOfMonth: number;
   invoiceDueDays: number;
   closureDates: string[];
+  // TASK-RECON-002: Amount tolerance for transaction matching (in cents)
+  matchingToleranceCents: number;
   createdAt: Date;
   updatedAt: Date;
 }

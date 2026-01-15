@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Bank Statement to Xero Transaction Reconciliation</title>
-  <status>ready</status>
+  <status>DONE</status>
   <layer>logic</layer>
   <sequence>183</sequence>
   <implements>

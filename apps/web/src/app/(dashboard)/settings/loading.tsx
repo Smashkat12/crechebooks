@@ -1,3 +1,4 @@
+import { SettingsFormSkeleton } from '@/components/loading';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function SettingsLoading() {
@@ -14,7 +15,9 @@ export default function SettingsLoading() {
           <Skeleton className="h-10 w-full mb-2" />
           <Skeleton className="h-10 w-full" />
         </div>
-        <Skeleton className="flex-1 h-[400px] rounded-lg" />
+        <div className="flex-1">
+          <SettingsFormSkeleton sections={2} />
+        </div>
       </div>
     </div>
   );

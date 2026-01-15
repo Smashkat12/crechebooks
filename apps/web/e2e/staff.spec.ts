@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { login } from './fixtures/auth.fixture';
 
 /**
  * Staff Management E2E Tests
@@ -7,14 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Staff Management', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-
+    await login(page);
     await page.goto('/staff');
   });
 
@@ -70,14 +64,7 @@ test.describe('Staff Management', () => {
 
 test.describe('Add Staff Form', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-
+    await login(page);
     await page.goto('/staff/new');
   });
 
@@ -119,14 +106,7 @@ test.describe('Add Staff Form', () => {
 
 test.describe('Payroll', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel(/email/i).fill('admin@crechebooks.co.za');
-    await page.getByLabel(/password/i).fill('admin123');
-    await page.getByRole('button', { name: /sign in/i }).click();
-
-    // Wait for login to complete
-    await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-
+    await login(page);
     await page.goto('/staff/payroll');
   });
 

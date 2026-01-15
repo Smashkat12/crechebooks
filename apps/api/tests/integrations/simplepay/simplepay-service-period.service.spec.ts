@@ -18,6 +18,10 @@ import {
   UIF_ELIGIBILITY,
 } from '../../../src/database/entities/service-period.entity';
 import { Tenant, Staff, TerminationCode } from '@prisma/client';
+import {
+  EmploymentType,
+  PayFrequency,
+} from '../../../src/database/entities/staff.entity';
 
 describe('SimplePayServicePeriodService', () => {
   let service: SimplePayServicePeriodService;
@@ -165,8 +169,8 @@ describe('SimplePayServicePeriodService', () => {
       phone: '+27821234567',
       dateOfBirth: new Date('1985-01-01'),
       startDate: new Date('2024-01-15'),
-      employmentType: 'PERMANENT',
-      payFrequency: 'MONTHLY',
+      employmentType: EmploymentType.PERMANENT,
+      payFrequency: PayFrequency.MONTHLY,
       basicSalaryCents: 2500000, // R25,000
     });
   });

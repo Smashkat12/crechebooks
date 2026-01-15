@@ -38,6 +38,7 @@ describe('PaymentController - getArrearsReport', () => {
     name: 'School Owner',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -51,6 +52,7 @@ describe('PaymentController - getArrearsReport', () => {
     name: 'School Admin',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -64,6 +66,7 @@ describe('PaymentController - getArrearsReport', () => {
     name: 'Accountant User',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

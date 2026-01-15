@@ -48,14 +48,6 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          {process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true' && (
-            <Alert>
-              <AlertDescription>
-                Development mode: Use admin@crechebooks.co.za / admin123
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input

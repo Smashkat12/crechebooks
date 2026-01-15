@@ -225,11 +225,11 @@ This is an automated reminder from CrecheBooks.
    * Send email reminder
    * Note: Uses placeholder until email service is integrated
    */
-  private async sendEmailReminder(
+  private sendEmailReminder(
     recipients: string[],
     subject: string,
     body: string,
-  ): Promise<void> {
+  ): void {
     // TODO: Integrate with email service when available
     this.logger.log({
       message: 'Email reminder queued',

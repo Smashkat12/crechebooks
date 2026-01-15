@@ -14,16 +14,19 @@ describe('TransactionController.importTransactions', () => {
   let controller: TransactionController;
   let importService: jest.Mocked<TransactionImportService>;
 
-  const mockUser: IUser = {
+  const mockUser = {
     id: 'user-001',
     tenantId: 'tenant-001',
+    auth0Id: 'auth0|test001',
     email: 'test@example.com',
     name: 'Test User',
-    role: 'ADMIN',
+    role: 'ADMIN' as any,
     isActive: true,
+    lastLoginAt: null,
+    currentTenantId: 'tenant-001',
     createdAt: new Date(),
     updatedAt: new Date(),
-  };
+  } as IUser;
 
   const mockImportResult: ImportResult = {
     importBatchId: 'batch-001',

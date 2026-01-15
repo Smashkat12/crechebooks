@@ -362,12 +362,67 @@ describe('Vat201Service', () => {
         itemCount: 1,
       };
 
-      const fields = service.populateFields(outputVat, inputVat);
+      // TASK-SARS-002: Add zero adjustments for fields 7-13
+      const adjustments = {
+        field7ChangeInUseOutputCents: 0,
+        field8ChangeInUseInputCents: 0,
+        field9OtherOutputCents: 0,
+        field10OtherInputCents: 0,
+        field11BadDebtsWrittenOffCents: 0,
+        field12BadDebtsRecoveredCents: 0,
+        field13CapitalGoodsSchemeCents: 0,
+        adjustmentCount: 0,
+      };
+
+      const fields = service.populateFields(outputVat, inputVat, adjustments);
 
       expect(fields.field1OutputStandardCents).toBe(1000000);
       expect(fields.field4TotalOutputCents).toBe(150000);
       expect(fields.field5InputTaxCents).toBe(75000);
       expect(fields.field19TotalDueCents).toBe(75000); // 150000 - 75000
+    });
+
+    it('should apply VAT adjustments correctly (TASK-SARS-002)', () => {
+      const outputVat = {
+        totalExcludingVatCents: 1000000,
+        vatAmountCents: 150000,
+        totalIncludingVatCents: 1150000,
+        standardRatedCents: 1000000,
+        zeroRatedCents: 0,
+        exemptCents: 0,
+        itemCount: 1,
+      };
+
+      const inputVat = {
+        totalExcludingVatCents: 500000,
+        vatAmountCents: 75000,
+        totalIncludingVatCents: 575000,
+        standardRatedCents: 500000,
+        zeroRatedCents: 0,
+        exemptCents: 0,
+        itemCount: 1,
+      };
+
+      // Adjustments: R100 bad debt written off, R50 bad debt recovered
+      const adjustments = {
+        field7ChangeInUseOutputCents: 0,
+        field8ChangeInUseInputCents: 0,
+        field9OtherOutputCents: 0,
+        field10OtherInputCents: 0,
+        field11BadDebtsWrittenOffCents: 10000, // R100 decreases output
+        field12BadDebtsRecoveredCents: 5000, // R50 increases output
+        field13CapitalGoodsSchemeCents: 0,
+        adjustmentCount: 2,
+      };
+
+      const fields = service.populateFields(outputVat, inputVat, adjustments);
+
+      // Output: 150000 - 10000 (bad debts off) + 5000 (bad debts recovered) = 145000
+      // Input: 75000 (no input adjustments)
+      // Net: 145000 - 75000 = 70000
+      expect(fields.field14TotalCents).toBe(145000);
+      expect(fields.field6DeductibleInputCents).toBe(75000);
+      expect(fields.field19TotalDueCents).toBe(70000);
     });
   });
 

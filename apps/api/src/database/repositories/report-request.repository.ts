@@ -60,13 +60,15 @@ export class ReportRequestRepository {
   }
 
   /**
-   * Find report request by ID
-   * @returns ReportRequest or null if not found
+   * Find report request by ID with tenant isolation
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @returns ReportRequest or null if not found or tenant mismatch
    */
-  async findById(id: string): Promise<ReportRequest | null> {
+  async findById(id: string, tenantId: string): Promise<ReportRequest | null> {
     try {
-      return await this.prisma.reportRequest.findUnique({
-        where: { id },
+      return await this.prisma.reportRequest.findFirst({
+        where: { id, tenantId },
       });
     } catch (error) {
       this.logger.error(
@@ -83,9 +85,11 @@ export class ReportRequestRepository {
 
   /**
    * Find report request by ID or throw NotFoundException
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async findByIdOrThrow(id: string): Promise<ReportRequest> {
-    const reportRequest = await this.findById(id);
+  async findByIdOrThrow(id: string, tenantId: string): Promise<ReportRequest> {
+    const reportRequest = await this.findById(id, tenantId);
     if (!reportRequest) {
       throw new NotFoundException('ReportRequest', id);
     }
@@ -282,19 +286,27 @@ export class ReportRequestRepository {
   }
 
   /**
-   * Delete a report request
+   * Delete a report request with tenant isolation
+   * Uses deleteMany with tenant filter for atomic cross-tenant protection
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @throws NotFoundException if record not found or tenant mismatch (same error to prevent enumeration)
    */
-  async delete(id: string): Promise<void> {
+  async delete(id: string, tenantId: string): Promise<void> {
     try {
-      await this.prisma.reportRequest.delete({
-        where: { id },
+      const result = await this.prisma.reportRequest.deleteMany({
+        where: {
+          id,
+          tenantId,
+        },
       });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
+
+      if (result.count === 0) {
         throw new NotFoundException('ReportRequest', id);
+      }
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
       }
       this.logger.error(
         `Failed to delete report request ${id}`,

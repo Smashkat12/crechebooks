@@ -2,7 +2,7 @@ import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from '../../../../src/api/auth/guards/roles.guard';
 import { ROLES_KEY } from '../../../../src/api/auth/decorators/roles.decorator';
-import { UserRole } from '../../../../src/database/entities/user.entity';
+import { UserRole, IUser } from '../../../../src/database/entities/user.entity';
 
 describe('RolesGuard', () => {
   let guard: RolesGuard;
@@ -17,12 +17,24 @@ describe('RolesGuard', () => {
     requiredRoles: UserRole[] | undefined,
     userRole: UserRole,
   ): ExecutionContext => {
+    const mockUser: IUser = {
+      id: '123',
+      tenantId: 'tenant-123',
+      auth0Id: 'auth0|test123',
+      email: 'test@example.com',
+      name: 'Test User',
+      role: userRole,
+      isActive: true,
+      lastLoginAt: null,
+      currentTenantId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
     const mockRequest = {
-      user: {
-        userId: '123',
-        email: 'test@example.com',
-        role: userRole,
-      },
+      user: mockUser,
+      url: '/test/endpoint',
+      method: 'GET',
     };
 
     return {
@@ -89,12 +101,12 @@ describe('RolesGuard', () => {
 
     it('should allow requests when user has one of multiple required roles', () => {
       const context = createMockExecutionContext(
-        [UserRole.ADMIN, UserRole.EDITOR],
-        UserRole.EDITOR,
+        [UserRole.ADMIN, UserRole.ACCOUNTANT],
+        UserRole.ACCOUNTANT,
       );
       jest
         .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.ADMIN, UserRole.EDITOR]);
+        .mockReturnValue([UserRole.ADMIN, UserRole.ACCOUNTANT]);
 
       const result = guard.canActivate(context);
 
@@ -103,12 +115,12 @@ describe('RolesGuard', () => {
 
     it('should block when user does not have any of required roles', () => {
       const context = createMockExecutionContext(
-        [UserRole.ADMIN, UserRole.EDITOR],
+        [UserRole.ADMIN, UserRole.ACCOUNTANT],
         UserRole.VIEWER,
       );
       jest
         .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.ADMIN, UserRole.EDITOR]);
+        .mockReturnValue([UserRole.ADMIN, UserRole.ACCOUNTANT]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
@@ -137,12 +149,12 @@ describe('RolesGuard', () => {
 
     it('should throw ForbiddenException with proper status code', () => {
       const context = createMockExecutionContext(
-        [UserRole.EDITOR],
+        [UserRole.ACCOUNTANT],
         UserRole.VIEWER,
       );
       jest
         .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.EDITOR]);
+        .mockReturnValue([UserRole.ACCOUNTANT]);
 
       try {
         guard.canActivate(context);
@@ -155,22 +167,22 @@ describe('RolesGuard', () => {
   });
 
   describe('Role-Based Access (No Hierarchy)', () => {
-    it('should block ADMIN from accessing EDITOR-only routes', () => {
+    it('should block ADMIN from accessing ACCOUNTANT-only routes', () => {
       const context = createMockExecutionContext(
-        [UserRole.EDITOR],
+        [UserRole.ACCOUNTANT],
         UserRole.ADMIN,
       );
       jest
         .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.EDITOR]);
+        .mockReturnValue([UserRole.ACCOUNTANT]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
 
-    it('should block EDITOR from accessing VIEWER-only routes', () => {
+    it('should block ACCOUNTANT from accessing VIEWER-only routes', () => {
       const context = createMockExecutionContext(
         [UserRole.VIEWER],
-        UserRole.EDITOR,
+        UserRole.ACCOUNTANT,
       );
       jest
         .spyOn(reflector, 'getAllAndOverride')
@@ -179,22 +191,22 @@ describe('RolesGuard', () => {
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
 
-    it('should block VIEWER from accessing EDITOR routes', () => {
+    it('should block VIEWER from accessing ACCOUNTANT routes', () => {
       const context = createMockExecutionContext(
-        [UserRole.EDITOR],
+        [UserRole.ACCOUNTANT],
         UserRole.VIEWER,
       );
       jest
         .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.EDITOR]);
+        .mockReturnValue([UserRole.ACCOUNTANT]);
 
       expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
 
-    it('should block EDITOR from accessing ADMIN routes', () => {
+    it('should block ACCOUNTANT from accessing ADMIN routes', () => {
       const context = createMockExecutionContext(
         [UserRole.ADMIN],
-        UserRole.EDITOR,
+        UserRole.ACCOUNTANT,
       );
       jest
         .spyOn(reflector, 'getAllAndOverride')

@@ -15,6 +15,7 @@ import {
   SetupWarning,
   createInitialStepResults,
 } from '../entities/employee-setup-log.entity';
+import { NotFoundException } from '../../shared/exceptions';
 
 /**
  * Create setup log input
@@ -145,11 +146,17 @@ export class EmployeeSetupLogRepository {
   }
 
   /**
-   * Find setup log by ID
+   * Find setup log by ID with tenant isolation
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @returns EmployeeSetupLog or null if not found or tenant mismatch
    */
-  async findById(id: string): Promise<EmployeeSetupLog | null> {
-    return this.prisma.employeeSetupLog.findUnique({
-      where: { id },
+  async findById(
+    id: string,
+    tenantId: string,
+  ): Promise<EmployeeSetupLog | null> {
+    return this.prisma.employeeSetupLog.findFirst({
+      where: { id, tenantId },
     });
   }
 
@@ -330,20 +337,33 @@ export class EmployeeSetupLogRepository {
   }
 
   /**
-   * Delete setup log
+   * Delete setup log with tenant isolation
+   * Uses deleteMany with tenant filter for atomic cross-tenant protection
+   * @param id - Record ID
+   * @param tenantId - Tenant ID for isolation
+   * @throws NotFoundException if record not found or tenant mismatch (same error to prevent enumeration)
    */
-  async delete(id: string): Promise<void> {
-    await this.prisma.employeeSetupLog.delete({
-      where: { id },
+  async delete(id: string, tenantId: string): Promise<void> {
+    const result = await this.prisma.employeeSetupLog.deleteMany({
+      where: {
+        id,
+        tenantId,
+      },
     });
+
+    if (result.count === 0) {
+      throw new NotFoundException('EmployeeSetupLog', id);
+    }
   }
 
   /**
-   * Delete setup log by staff ID
+   * Delete setup log by staff ID with tenant isolation
+   * @param staffId - Staff ID
+   * @param tenantId - Tenant ID for isolation
    */
-  async deleteByStaffId(staffId: string): Promise<void> {
+  async deleteByStaffId(staffId: string, tenantId: string): Promise<void> {
     await this.prisma.employeeSetupLog.deleteMany({
-      where: { staffId },
+      where: { staffId, tenantId },
     });
   }
 

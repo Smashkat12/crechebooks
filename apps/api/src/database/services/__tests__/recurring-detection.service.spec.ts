@@ -7,18 +7,19 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import Decimal from 'decimal.js';
+import { Decimal } from 'decimal.js';
 import { RecurringDetectionService } from '../recurring-detection.service';
 import { TransactionRepository } from '../../repositories/transaction.repository';
 import { PayeePatternRepository } from '../../repositories/payee-pattern.repository';
 import { AmountVariationService } from '../amount-variation.service';
-import { Transaction, PayeePattern } from '@prisma/client';
+import { Transaction, PayeePattern, DuplicateStatus } from '@prisma/client';
 import {
   ImportSource,
   TransactionStatus,
 } from '../../entities/transaction.entity';
 import { NotFoundException } from '../../../shared/exceptions';
 import { VatType } from '../../entities/categorization.entity';
+import { RecurringFrequency } from '../../dto/recurring-pattern.dto';
 
 describe('RecurringDetectionService', () => {
   let service: RecurringDetectionService;
@@ -392,7 +393,7 @@ describe('RecurringDetectionService', () => {
       // Arrange
       const dto = {
         payeeName: 'NEW SUBSCRIPTION',
-        frequency: 'MONTHLY' as const,
+        frequency: RecurringFrequency.MONTHLY,
         expectedAmountCents: 15000,
         amountVariancePercent: 10,
         accountCode: '5400',
@@ -431,7 +432,7 @@ describe('RecurringDetectionService', () => {
       // Arrange
       const dto = {
         payeeName: 'EXISTING PAYEE',
-        frequency: 'WEEKLY' as const,
+        frequency: RecurringFrequency.WEEKLY,
         expectedAmountCents: 5000,
         amountVariancePercent: 5,
         accountCode: '5500',
@@ -639,6 +640,17 @@ describe('RecurringDetectionService', () => {
       status: TransactionStatus.PENDING,
       isReconciled: false,
       isDeleted: false,
+      xeroTransactionId: null,
+      reference: null,
+      importBatchId: null,
+      reconciledAt: null,
+      deletedAt: null,
+      transactionHash: null,
+      duplicateOfId: null,
+      duplicateStatus: DuplicateStatus.NONE,
+      reversesTransactionId: null,
+      isReversal: false,
+      xeroAccountCode: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

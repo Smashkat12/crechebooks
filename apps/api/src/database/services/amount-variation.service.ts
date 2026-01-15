@@ -148,7 +148,7 @@ export class AmountVariationService {
         : 0;
 
     // Get threshold configuration (per-payee or tenant default)
-    const config = await this.getThresholdConfig(tenantId, payee);
+    const config = this.getThresholdConfig(tenantId, payee);
 
     // Check if threshold exceeded
     let exceedsThreshold = false;
@@ -211,10 +211,7 @@ export class AmountVariationService {
    * @param payee - Optional payee name for per-payee config
    * @returns AmountThresholdConfig
    */
-  async getThresholdConfig(
-    tenantId: string,
-    payee?: string,
-  ): Promise<AmountThresholdConfig> {
+  getThresholdConfig(tenantId: string, payee?: string): AmountThresholdConfig {
     // Try per-payee config first (if payee provided)
     if (payee) {
       const payeeCacheKey = `${tenantId}:${this.normalizePayeeName(payee)}`;

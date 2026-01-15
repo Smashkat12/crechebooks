@@ -49,8 +49,7 @@ export interface CreateCategorizationJournalInput {
 /**
  * Categorization journal with transaction relation
  */
-export interface CategorizationJournalWithTransaction
-  extends ICategorizationJournal {
+export interface CategorizationJournalWithTransaction extends ICategorizationJournal {
   transaction: {
     id: string;
     description: string;

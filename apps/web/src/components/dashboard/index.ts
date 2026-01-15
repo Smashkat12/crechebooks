@@ -8,3 +8,16 @@ export { XeroStatusWidget } from './XeroStatusWidget';
 export { XeroStatusIndicator } from './XeroStatusIndicator';
 export { LearningModeIndicator } from './LearningModeIndicator';
 export { AccuracyMilestone } from './AccuracyMilestone';
+
+// Loading and error handling
+export {
+  DashboardWidgetSkeleton,
+  MetricCardsGridSkeleton,
+  DashboardSkeleton,
+  type WidgetSkeletonType,
+} from './dashboard-widget-skeleton';
+export {
+  DashboardErrorBoundary,
+  withDashboardErrorBoundary,
+  type DashboardErrorType,
+} from './dashboard-error-boundary';

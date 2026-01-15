@@ -119,17 +119,9 @@ export class StatementGenerationService {
     );
 
     // 1. Validate parent exists and belongs to tenant
-    const parent = await this.parentRepo.findById(parentId);
+    const parent = await this.parentRepo.findById(parentId, tenantId);
     if (!parent) {
       throw new NotFoundException('Parent', parentId);
-    }
-
-    if (parent.tenantId !== tenantId) {
-      throw new BusinessException(
-        'Parent does not belong to the specified tenant',
-        'TENANT_MISMATCH',
-        { parentTenantId: parent.tenantId, requestTenantId: tenantId },
-      );
     }
 
     // 2. Validate period
@@ -269,14 +261,11 @@ export class StatementGenerationService {
     if (parentIds && parentIds.length > 0) {
       // Specific parents requested
       const parents = await Promise.all(
-        parentIds.map((id) => this.parentRepo.findById(id)),
+        parentIds.map((id) => this.parentRepo.findById(id, tenantId)),
       );
 
       parentsToProcess = parents
-        .filter(
-          (p): p is NonNullable<typeof p> =>
-            p !== null && p.tenantId === tenantId,
-        )
+        .filter((p): p is NonNullable<typeof p> => p !== null)
         .map((p) => ({
           id: p.id,
           firstName: p.firstName,
@@ -284,9 +273,17 @@ export class StatementGenerationService {
         }));
     } else {
       // All active parents for tenant
-      parentsToProcess = await this.parentRepo.findByTenant(tenantId, {
+      // TASK-DATA-004: Use high limit for bulk operations
+      // TODO: Implement proper pagination for very large tenant datasets
+      const parentsResult = await this.parentRepo.findByTenant(tenantId, {
         isActive: true,
+        limit: 1000, // High limit for bulk operations
       });
+      parentsToProcess = parentsResult.data.map((p) => ({
+        id: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
+      }));
     }
 
     const result: BulkGenerateResult = {

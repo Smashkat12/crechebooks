@@ -301,27 +301,26 @@ export function useSendInvoices() {
   });
 }
 
-// Download invoice PDF
+/**
+ * Download invoice PDF
+ * TASK-UI-001: Uses HttpOnly cookies for authentication (no localStorage)
+ */
 export function useDownloadInvoicePdf() {
   const downloadPdf = async (invoiceId: string, invoiceNumber: string): Promise<void> => {
-    // Get auth token from localStorage (same pattern as apiClient interceptor)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
-    if (!token) {
-      throw new Error('Authentication required. Please log in.');
-    }
-
+    // TASK-UI-001: Use credentials: 'include' to send HttpOnly cookies
+    // No localStorage token access - cookies are sent automatically
     const response = await fetch(
       `${apiClient.defaults.baseURL}${endpoints.invoices.pdf(invoiceId)}`,
       {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include', // TASK-UI-001: Send HttpOnly cookies
       }
     );
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Authentication required. Please log in.');
+      }
       let errorMessage = `Failed to download PDF: ${response.status}`;
       try {
         const error = await response.json();

@@ -189,11 +189,12 @@ describe('ArrearsService', () => {
 
   describe('getArrearsReport', () => {
     it('should return correct summary for multiple invoices', async () => {
-      // Create invoices in different aging buckets
-      const invoice1 = await createInvoice(5, InvoiceStatus.SENT, 100000, 0); // current (0-7 days)
-      const invoice2 = await createInvoice(20, InvoiceStatus.SENT, 50000, 0); // 30-day bucket (8-30 days)
-      const invoice3 = await createInvoice(45, InvoiceStatus.OVERDUE, 75000, 0); // 60-day bucket (31-60 days)
-      const invoice4 = await createInvoice(100, InvoiceStatus.SENT, 200000, 0); // 90+ bucket (61+ days)
+      // Create invoices in different aging buckets (TASK-BILL-006 standardized)
+      // current: 1-30 days, 30: 31-60 days, 60: 61-90 days, 90+: >90 days
+      const invoice1 = await createInvoice(5, InvoiceStatus.SENT, 100000, 0); // current (1-30 days)
+      const invoice2 = await createInvoice(45, InvoiceStatus.SENT, 50000, 0); // 30-day bucket (31-60 days)
+      const invoice3 = await createInvoice(75, InvoiceStatus.OVERDUE, 75000, 0); // 60-day bucket (61-90 days)
+      const invoice4 = await createInvoice(100, InvoiceStatus.SENT, 200000, 0); // 90+ bucket (>90 days)
 
       const report = await service.getArrearsReport(testTenant.id);
 
@@ -204,11 +205,12 @@ describe('ArrearsService', () => {
     });
 
     it('should categorize invoices into correct aging buckets', async () => {
-      // Create invoices with specific days overdue
-      await createInvoice(5, InvoiceStatus.SENT, 100000, 0); // current
-      await createInvoice(20, InvoiceStatus.SENT, 50000, 0); // 30-day
-      await createInvoice(45, InvoiceStatus.OVERDUE, 75000, 0); // 60-day
-      await createInvoice(100, InvoiceStatus.SENT, 200000, 0); // 90+
+      // Create invoices with specific days overdue (TASK-BILL-006 standardized)
+      // current: 1-30 days, 30: 31-60 days, 60: 61-90 days, 90+: >90 days
+      await createInvoice(5, InvoiceStatus.SENT, 100000, 0); // current (1-30 days)
+      await createInvoice(45, InvoiceStatus.SENT, 50000, 0); // 30-day bucket (31-60 days)
+      await createInvoice(75, InvoiceStatus.OVERDUE, 75000, 0); // 60-day bucket (61-90 days)
+      await createInvoice(100, InvoiceStatus.SENT, 200000, 0); // 90+ bucket (>90 days)
 
       const report = await service.getArrearsReport(testTenant.id);
 
@@ -366,10 +368,14 @@ describe('ArrearsService', () => {
   });
 
   describe('calculateAging', () => {
-    it('should bucket current (0-7 days) correctly', async () => {
+    // TASK-BILL-006: Standardized aging buckets
+    // current: 1-30 days, 30: 31-60 days, 60: 61-90 days, 90+: >90 days
+    // NOTE: Invoices not yet due (daysOverdue <= 0) are NOT in arrears
+
+    it('should bucket current (1-30 days) correctly', async () => {
       const invoice1 = await createInvoice(1, InvoiceStatus.SENT, 100000, 0); // 1 day overdue
-      const invoice2 = await createInvoice(3, InvoiceStatus.SENT, 50000, 0); // 3 days overdue
-      const invoice3 = await createInvoice(6, InvoiceStatus.SENT, 25000, 0); // 6 days overdue
+      const invoice2 = await createInvoice(15, InvoiceStatus.SENT, 50000, 0); // 15 days overdue
+      const invoice3 = await createInvoice(29, InvoiceStatus.SENT, 25000, 0); // 29 days overdue
 
       const invoices = await prisma.invoice.findMany({
         where: { id: { in: [invoice1.id, invoice2.id, invoice3.id] } },
@@ -384,25 +390,7 @@ describe('ArrearsService', () => {
       expect(aging.days90PlusCents).toBe(0);
     });
 
-    it('should bucket 30 days (8-30) correctly', async () => {
-      const invoice1 = await createInvoice(9, InvoiceStatus.SENT, 100000, 0); // 9 days
-      const invoice2 = await createInvoice(15, InvoiceStatus.SENT, 50000, 0); // 15 days
-      const invoice3 = await createInvoice(29, InvoiceStatus.SENT, 25000, 0); // 29 days
-
-      const invoices = await prisma.invoice.findMany({
-        where: { id: { in: [invoice1.id, invoice2.id, invoice3.id] } },
-        include: { parent: true, child: true },
-      });
-
-      const aging = service.calculateAging(invoices as any);
-
-      expect(aging.currentCents).toBe(0);
-      expect(aging.days30Cents).toBe(175000);
-      expect(aging.days60Cents).toBe(0);
-      expect(aging.days90PlusCents).toBe(0);
-    });
-
-    it('should bucket 60 days (31-60) correctly', async () => {
+    it('should bucket 30 days (31-60) correctly', async () => {
       const invoice1 = await createInvoice(32, InvoiceStatus.SENT, 100000, 0); // 32 days
       const invoice2 = await createInvoice(45, InvoiceStatus.SENT, 50000, 0); // 45 days
       const invoice3 = await createInvoice(59, InvoiceStatus.SENT, 25000, 0); // 59 days
@@ -415,14 +403,32 @@ describe('ArrearsService', () => {
       const aging = service.calculateAging(invoices as any);
 
       expect(aging.currentCents).toBe(0);
-      expect(aging.days30Cents).toBe(0);
-      expect(aging.days60Cents).toBe(175000);
+      expect(aging.days30Cents).toBe(175000); // 100000 + 50000 + 25000
+      expect(aging.days60Cents).toBe(0);
       expect(aging.days90PlusCents).toBe(0);
     });
 
-    it('should bucket 90+ days (61+) correctly', async () => {
-      const invoice1 = await createInvoice(61, InvoiceStatus.SENT, 100000, 0); // 61 days
-      const invoice2 = await createInvoice(90, InvoiceStatus.SENT, 50000, 0); // 90 days
+    it('should bucket 60 days (61-90) correctly', async () => {
+      const invoice1 = await createInvoice(62, InvoiceStatus.SENT, 100000, 0); // 62 days
+      const invoice2 = await createInvoice(75, InvoiceStatus.SENT, 50000, 0); // 75 days
+      const invoice3 = await createInvoice(89, InvoiceStatus.SENT, 25000, 0); // 89 days
+
+      const invoices = await prisma.invoice.findMany({
+        where: { id: { in: [invoice1.id, invoice2.id, invoice3.id] } },
+        include: { parent: true, child: true },
+      });
+
+      const aging = service.calculateAging(invoices as any);
+
+      expect(aging.currentCents).toBe(0);
+      expect(aging.days30Cents).toBe(0);
+      expect(aging.days60Cents).toBe(175000); // 100000 + 50000 + 25000
+      expect(aging.days90PlusCents).toBe(0);
+    });
+
+    it('should bucket 90+ days (>90) correctly', async () => {
+      const invoice1 = await createInvoice(91, InvoiceStatus.SENT, 100000, 0); // 91 days
+      const invoice2 = await createInvoice(120, InvoiceStatus.SENT, 50000, 0); // 120 days
       const invoice3 = await createInvoice(150, InvoiceStatus.SENT, 25000, 0); // 150 days
 
       const invoices = await prisma.invoice.findMany({
@@ -435,14 +441,15 @@ describe('ArrearsService', () => {
       expect(aging.currentCents).toBe(0);
       expect(aging.days30Cents).toBe(0);
       expect(aging.days60Cents).toBe(0);
-      expect(aging.days90PlusCents).toBe(175000);
+      expect(aging.days90PlusCents).toBe(175000); // 100000 + 50000 + 25000
     });
 
     it('should handle mixed buckets correctly', async () => {
-      const invoice1 = await createInvoice(5, InvoiceStatus.SENT, 100000, 0); // current
-      const invoice2 = await createInvoice(20, InvoiceStatus.SENT, 50000, 0); // 30-day
-      const invoice3 = await createInvoice(45, InvoiceStatus.SENT, 75000, 0); // 60-day
-      const invoice4 = await createInvoice(100, InvoiceStatus.SENT, 200000, 0); // 90+
+      // TASK-BILL-006: current: 1-30, 30: 31-60, 60: 61-90, 90+: >90
+      const invoice1 = await createInvoice(5, InvoiceStatus.SENT, 100000, 0); // current (1-30)
+      const invoice2 = await createInvoice(45, InvoiceStatus.SENT, 50000, 0); // 30-day (31-60)
+      const invoice3 = await createInvoice(75, InvoiceStatus.SENT, 75000, 0); // 60-day (61-90)
+      const invoice4 = await createInvoice(100, InvoiceStatus.SENT, 200000, 0); // 90+ (>90)
 
       const invoices = await prisma.invoice.findMany({
         where: {
@@ -469,7 +476,7 @@ describe('ArrearsService', () => {
         30000,
       );
       const invoice2 = await createInvoice(
-        20,
+        45,
         InvoiceStatus.PARTIALLY_PAID,
         50000,
         10000,
@@ -482,8 +489,87 @@ describe('ArrearsService', () => {
 
       const aging = service.calculateAging(invoices as any);
 
-      expect(aging.currentCents).toBe(70000); // 100000 - 30000
-      expect(aging.days30Cents).toBe(40000); // 50000 - 10000
+      expect(aging.currentCents).toBe(70000); // 100000 - 30000 (1-30 days)
+      expect(aging.days30Cents).toBe(40000); // 50000 - 10000 (31-60 days)
+    });
+
+    it('should exclude invoices not yet due from aging calculation', async () => {
+      // Create invoice due in the future (not yet overdue)
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+
+      const futureInvoice = await prisma.invoice.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceNumber: `INV-FUTURE-${Date.now()}`,
+          parentId: testParent.id,
+          childId: testChild.id,
+          billingPeriodStart: new Date('2025-01-01'),
+          billingPeriodEnd: new Date('2025-01-31'),
+          issueDate: new Date(),
+          dueDate: futureDate,
+          subtotalCents: 86956,
+          vatCents: 13044,
+          totalCents: 100000,
+          amountPaidCents: 0,
+          status: InvoiceStatus.SENT,
+        },
+      });
+      testInvoiceIds.push(futureInvoice.id);
+
+      // Create invoice that IS overdue
+      const overdueInvoice = await createInvoice(
+        5,
+        InvoiceStatus.SENT,
+        50000,
+        0,
+      );
+
+      const invoices = await prisma.invoice.findMany({
+        where: { id: { in: [futureInvoice.id, overdueInvoice.id] } },
+        include: { parent: true, child: true },
+      });
+
+      const aging = service.calculateAging(invoices as any);
+
+      // Only the overdue invoice should be counted (50000 cents)
+      expect(aging.currentCents).toBe(50000);
+      expect(aging.days30Cents).toBe(0);
+      expect(aging.days60Cents).toBe(0);
+      expect(aging.days90PlusCents).toBe(0);
+    });
+
+    it('should handle exact boundary values correctly', async () => {
+      // Test exact boundaries: 30, 60, 90 days
+      const invoice30 = await createInvoice(30, InvoiceStatus.SENT, 100000, 0); // Exactly 30 days -> current
+      const invoice31 = await createInvoice(31, InvoiceStatus.SENT, 50000, 0); // Exactly 31 days -> 30-day
+      const invoice60 = await createInvoice(60, InvoiceStatus.SENT, 75000, 0); // Exactly 60 days -> 30-day
+      const invoice61 = await createInvoice(61, InvoiceStatus.SENT, 25000, 0); // Exactly 61 days -> 60-day
+      const invoice90 = await createInvoice(90, InvoiceStatus.SENT, 30000, 0); // Exactly 90 days -> 60-day
+      const invoice91 = await createInvoice(91, InvoiceStatus.SENT, 20000, 0); // Exactly 91 days -> 90+
+
+      const invoices = await prisma.invoice.findMany({
+        where: {
+          id: {
+            in: [
+              invoice30.id,
+              invoice31.id,
+              invoice60.id,
+              invoice61.id,
+              invoice90.id,
+              invoice91.id,
+            ],
+          },
+        },
+        include: { parent: true, child: true },
+      });
+
+      const aging = service.calculateAging(invoices as any);
+
+      expect(aging.currentCents).toBe(100000); // 30 days exactly -> current
+      expect(aging.days30Cents).toBe(125000); // 31 + 60 days -> 30-day bucket
+      expect(aging.days60Cents).toBe(55000); // 61 + 90 days -> 60-day bucket
+      expect(aging.days90PlusCents).toBe(20000); // 91 days -> 90+ bucket
     });
   });
 
@@ -1183,20 +1269,22 @@ describe('ArrearsService', () => {
       expect(report.invoices[0].outstandingCents).toBe(100000000);
     });
 
-    it('should handle invoice with exact boundary days (7, 30, 60)', async () => {
-      const invoice6 = await createInvoice(6, InvoiceStatus.SENT, 100000, 0); // Safely in current bucket
-      const invoice29 = await createInvoice(29, InvoiceStatus.SENT, 50000, 0); // Safely in 30-day bucket
-      const invoice59 = await createInvoice(59, InvoiceStatus.SENT, 25000, 0); // Safely in 60-day bucket
+    it('should handle invoice with exact boundary days (30, 60, 90)', async () => {
+      // TASK-BILL-006: Standardized buckets
+      // current: 1-30 days, 30: 31-60 days, 60: 61-90 days, 90+: >90 days
+      const invoice29 = await createInvoice(29, InvoiceStatus.SENT, 100000, 0); // current bucket (1-30)
+      const invoice45 = await createInvoice(45, InvoiceStatus.SENT, 50000, 0); // 30-day bucket (31-60)
+      const invoice75 = await createInvoice(75, InvoiceStatus.SENT, 25000, 0); // 60-day bucket (61-90)
 
       const report = await service.getArrearsReport(testTenant.id);
 
-      const inv6 = report.invoices.find((i) => i.invoiceId === invoice6.id);
       const inv29 = report.invoices.find((i) => i.invoiceId === invoice29.id);
-      const inv59 = report.invoices.find((i) => i.invoiceId === invoice59.id);
+      const inv45 = report.invoices.find((i) => i.invoiceId === invoice45.id);
+      const inv75 = report.invoices.find((i) => i.invoiceId === invoice75.id);
 
-      expect(inv6?.agingBucket).toBe('current'); // 6 days = current (0-7)
-      expect(inv29?.agingBucket).toBe('30'); // 29 days = 30 bucket (8-30)
-      expect(inv59?.agingBucket).toBe('60'); // 59 days = 60 bucket (31-60)
+      expect(inv29?.agingBucket).toBe('current'); // 29 days = current (1-30)
+      expect(inv45?.agingBucket).toBe('30'); // 45 days = 30 bucket (31-60)
+      expect(inv75?.agingBucket).toBe('60'); // 75 days = 60 bucket (61-90)
     });
 
     it('should handle multiple payments on same invoice for history', async () => {

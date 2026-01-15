@@ -9,7 +9,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { UserRole } from '@prisma/client';
-import CryptoJS from 'crypto-js';
+// TASK-INT-003: Removed unused CryptoJS import
 import { XeroController } from '../xero.controller';
 import { XeroSyncGateway } from '../xero.gateway';
 import { BankFeedService } from '../bank-feed.service';

@@ -40,6 +40,7 @@ describe('PaymentController - matchPayments', () => {
     name: 'School Owner',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -53,6 +54,7 @@ describe('PaymentController - matchPayments', () => {
     name: 'School Admin',
     isActive: true,
     lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

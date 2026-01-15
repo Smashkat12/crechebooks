@@ -155,7 +155,7 @@ export class PayeeAliasService {
     const existingAliases = pattern.payeeAliases as string[];
     const updatedAliases = [...existingAliases, alias];
 
-    await this.payeePatternRepo.update(pattern.id, {
+    await this.payeePatternRepo.update(pattern.id, tenantId, {
       payeeAliases: updatedAliases,
     });
 
@@ -223,8 +223,8 @@ export class PayeeAliasService {
     const patternId = parts[0];
     const aliasToDelete = parts.slice(1).join(':'); // Handle aliases with colons
 
-    const pattern = await this.payeePatternRepo.findById(patternId);
-    if (!pattern || pattern.tenantId !== tenantId) {
+    const pattern = await this.payeePatternRepo.findById(patternId, tenantId);
+    if (!pattern) {
       throw new NotFoundException('PayeePattern', patternId);
     }
 
@@ -240,7 +240,7 @@ export class PayeeAliasService {
       throw new NotFoundException('Alias', aliasToDelete);
     }
 
-    await this.payeePatternRepo.update(patternId, {
+    await this.payeePatternRepo.update(patternId, tenantId, {
       payeeAliases: updatedAliases,
     });
 

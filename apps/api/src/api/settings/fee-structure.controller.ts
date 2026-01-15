@@ -109,8 +109,8 @@ export class FeeStructureController {
   ): Promise<Record<string, unknown>> {
     this.logger.log(`Get fee structure: id=${id}, tenant=${user.tenantId}`);
 
-    const fee = await this.feeStructureRepo.findById(id);
-    if (!fee || fee.tenantId !== user.tenantId) {
+    const fee = await this.feeStructureRepo.findById(id, user.tenantId);
+    if (!fee) {
       throw new Error('Fee structure not found');
     }
     return toSnakeCase(fee);
@@ -193,12 +193,12 @@ export class FeeStructureController {
     this.logger.log(`Update fee structure: id=${id}, tenant=${user.tenantId}`);
 
     // Verify ownership
-    const existing = await this.feeStructureRepo.findById(id);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const existing = await this.feeStructureRepo.findById(id, user.tenantId);
+    if (!existing) {
       throw new Error('Fee structure not found');
     }
 
-    const fee = await this.feeStructureRepo.update(id, {
+    const fee = await this.feeStructureRepo.update(id, user.tenantId, {
       name: body.name,
       description: body.description,
       feeType: body.fee_type,
@@ -242,12 +242,12 @@ export class FeeStructureController {
     );
 
     // Verify ownership
-    const existing = await this.feeStructureRepo.findById(id);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const existing = await this.feeStructureRepo.findById(id, user.tenantId);
+    if (!existing) {
       throw new Error('Fee structure not found');
     }
 
-    await this.feeStructureRepo.deactivate(id);
+    await this.feeStructureRepo.deactivate(id, user.tenantId);
 
     return { success: true };
   }

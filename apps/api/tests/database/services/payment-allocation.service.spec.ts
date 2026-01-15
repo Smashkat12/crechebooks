@@ -261,7 +261,10 @@ describe('PaymentAllocationService', () => {
         ],
       });
 
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
       expect(updatedInvoice?.amountPaidCents).toBe(500000);
     });
@@ -400,7 +403,10 @@ describe('PaymentAllocationService', () => {
         ],
       });
 
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PARTIALLY_PAID);
       expect(updatedInvoice?.amountPaidCents).toBe(200000);
     });
@@ -425,7 +431,10 @@ describe('PaymentAllocationService', () => {
         ],
       });
 
-      const payment = await paymentRepo.findById(result.payments[0].id);
+      const payment = await paymentRepo.findById(
+        result.payments[0].id,
+        testTenant.id,
+      );
       expect(payment?.matchType).toBe(MatchType.PARTIAL);
     });
 
@@ -467,7 +476,10 @@ describe('PaymentAllocationService', () => {
         ],
       });
 
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.amountPaidCents).toBe(500000);
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
     });
@@ -550,7 +562,10 @@ describe('PaymentAllocationService', () => {
         ],
       });
 
-      const updatedInvoice = await invoiceRepo.findById(invoice.id);
+      const updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
       expect(updatedInvoice?.amountPaidCents).toBe(500000);
     });
@@ -642,8 +657,14 @@ describe('PaymentAllocationService', () => {
         ],
       });
 
-      const updatedInvoice1 = await invoiceRepo.findById(invoice1.id);
-      const updatedInvoice2 = await invoiceRepo.findById(invoice2.id);
+      const updatedInvoice1 = await invoiceRepo.findById(
+        invoice1.id,
+        testTenant.id,
+      );
+      const updatedInvoice2 = await invoiceRepo.findById(
+        invoice2.id,
+        testTenant.id,
+      );
 
       expect(updatedInvoice1?.amountPaidCents).toBe(300000);
       expect(updatedInvoice1?.status).toBe(InvoiceStatus.PAID);
@@ -680,7 +701,7 @@ describe('PaymentAllocationService', () => {
       ).rejects.toThrow(NotFoundException);
 
       // Verify invoice1 was NOT updated (transaction rolled back)
-      const invoice = await invoiceRepo.findById(invoice1.id);
+      const invoice = await invoiceRepo.findById(invoice1.id, testTenant.id);
       expect(invoice?.amountPaidCents).toBe(0);
       expect(invoice?.status).toBe(InvoiceStatus.SENT);
     });
@@ -799,7 +820,10 @@ describe('PaymentAllocationService', () => {
       });
 
       // Verify invoice is paid
-      let updatedInvoice = await invoiceRepo.findById(invoice.id);
+      let updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.amountPaidCents).toBe(500000);
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
 
@@ -811,7 +835,7 @@ describe('PaymentAllocationService', () => {
       });
 
       // Verify invoice is reverted
-      updatedInvoice = await invoiceRepo.findById(invoice.id);
+      updatedInvoice = await invoiceRepo.findById(invoice.id, testTenant.id);
       expect(updatedInvoice?.amountPaidCents).toBe(0);
       expect(updatedInvoice?.status).toBe(InvoiceStatus.SENT);
     });
@@ -1262,8 +1286,14 @@ describe('PaymentAllocationService', () => {
       expect(result.payments[0].matchType).toBe(MatchType.EXACT);
       expect(result.payments[1].matchType).toBe(MatchType.PARTIAL);
 
-      const updatedInvoice1 = await invoiceRepo.findById(invoice1.id);
-      const updatedInvoice2 = await invoiceRepo.findById(invoice2.id);
+      const updatedInvoice1 = await invoiceRepo.findById(
+        invoice1.id,
+        testTenant.id,
+      );
+      const updatedInvoice2 = await invoiceRepo.findById(
+        invoice2.id,
+        testTenant.id,
+      );
 
       expect(updatedInvoice1?.status).toBe(InvoiceStatus.PAID);
       expect(updatedInvoice2?.status).toBe(InvoiceStatus.PARTIALLY_PAID);
@@ -1310,9 +1340,9 @@ describe('PaymentAllocationService', () => {
       expect(result.unallocatedAmountCents).toBe(0);
 
       const updatedInvoices = await Promise.all([
-        invoiceRepo.findById(invoice1.id),
-        invoiceRepo.findById(invoice2.id),
-        invoiceRepo.findById(invoice3.id),
+        invoiceRepo.findById(invoice1.id, testTenant.id),
+        invoiceRepo.findById(invoice2.id, testTenant.id),
+        invoiceRepo.findById(invoice3.id, testTenant.id),
       ]);
 
       updatedInvoices.forEach((inv) => {
@@ -1361,7 +1391,10 @@ describe('PaymentAllocationService', () => {
       });
 
       // Invoice should be PAID
-      let updatedInvoice = await invoiceRepo.findById(invoice.id);
+      let updatedInvoice = await invoiceRepo.findById(
+        invoice.id,
+        testTenant.id,
+      );
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
 
       // Reverse first payment
@@ -1372,7 +1405,7 @@ describe('PaymentAllocationService', () => {
       });
 
       // Invoice should be PARTIALLY_PAID
-      updatedInvoice = await invoiceRepo.findById(invoice.id);
+      updatedInvoice = await invoiceRepo.findById(invoice.id, testTenant.id);
       expect(updatedInvoice?.amountPaidCents).toBe(200000);
       expect(updatedInvoice?.status).toBe(InvoiceStatus.PARTIALLY_PAID);
     });

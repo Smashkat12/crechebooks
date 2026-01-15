@@ -95,23 +95,13 @@ export class AdhocChargeService {
     }
 
     // Get invoice with tenant validation
-    const invoice = await this.invoiceRepo.findById(invoiceId);
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
 
     if (!invoice) {
       this.logger.warn(
         `Invoice ${invoiceId} not found when adding ad-hoc charge`,
       );
       throw new NotFoundException('Invoice', invoiceId);
-    }
-
-    // Validate tenant ownership
-    if (invoice.tenantId !== tenantId) {
-      this.logger.error(
-        `Tenant ${tenantId} attempted to add charge to invoice ${invoiceId} owned by tenant ${invoice.tenantId}`,
-      );
-      throw new ForbiddenException(
-        'You do not have permission to modify this invoice',
-      );
     }
 
     // Validate invoice status - only DRAFT invoices can be modified
@@ -190,7 +180,7 @@ export class AdhocChargeService {
     const updatedTotals = await this.recalculateInvoiceTotals(invoiceId);
 
     // Update invoice with new totals
-    await this.invoiceRepo.update(invoiceId, {
+    await this.invoiceRepo.update(invoiceId, tenantId, {
       subtotalCents: updatedTotals.subtotalCents,
       vatCents: updatedTotals.vatCents,
       totalCents: updatedTotals.totalCents,
@@ -266,23 +256,13 @@ export class AdhocChargeService {
     }
 
     // Get invoice with tenant validation
-    const invoice = await this.invoiceRepo.findById(invoiceId);
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
 
     if (!invoice) {
       this.logger.warn(
         `Invoice ${invoiceId} not found when removing ad-hoc charge`,
       );
       throw new NotFoundException('Invoice', invoiceId);
-    }
-
-    // Validate tenant ownership
-    if (invoice.tenantId !== tenantId) {
-      this.logger.error(
-        `Tenant ${tenantId} attempted to remove charge from invoice ${invoiceId} owned by tenant ${invoice.tenantId}`,
-      );
-      throw new ForbiddenException(
-        'You do not have permission to modify this invoice',
-      );
     }
 
     // Validate invoice status - only DRAFT invoices can be modified
@@ -303,7 +283,7 @@ export class AdhocChargeService {
     }
 
     // Get the line to verify it exists and is an EXTRA type
-    const line = await this.invoiceLineRepo.findById(lineId);
+    const line = await this.invoiceLineRepo.findById(lineId, invoiceId);
 
     if (!line) {
       this.logger.warn(
@@ -341,7 +321,7 @@ export class AdhocChargeService {
     }
 
     // Delete the line
-    await this.invoiceLineRepo.delete(lineId);
+    await this.invoiceLineRepo.delete(lineId, invoiceId);
 
     this.logger.log(
       `Deleted ad-hoc charge line ${lineId}: ${line.description}`,
@@ -351,7 +331,7 @@ export class AdhocChargeService {
     const updatedTotals = await this.recalculateInvoiceTotals(invoiceId);
 
     // Update invoice with new totals
-    await this.invoiceRepo.update(invoiceId, {
+    await this.invoiceRepo.update(invoiceId, tenantId, {
       subtotalCents: updatedTotals.subtotalCents,
       vatCents: updatedTotals.vatCents,
       totalCents: updatedTotals.totalCents,
@@ -402,23 +382,13 @@ export class AdhocChargeService {
     }
 
     // Get invoice with tenant validation
-    const invoice = await this.invoiceRepo.findById(invoiceId);
+    const invoice = await this.invoiceRepo.findById(invoiceId, tenantId);
 
     if (!invoice) {
       this.logger.warn(
         `Invoice ${invoiceId} not found when getting ad-hoc charges`,
       );
       throw new NotFoundException('Invoice', invoiceId);
-    }
-
-    // Validate tenant ownership
-    if (invoice.tenantId !== tenantId) {
-      this.logger.error(
-        `Tenant ${tenantId} attempted to view charges for invoice ${invoiceId} owned by tenant ${invoice.tenantId}`,
-      );
-      throw new ForbiddenException(
-        'You do not have permission to view this invoice',
-      );
     }
 
     // Get all lines for the invoice

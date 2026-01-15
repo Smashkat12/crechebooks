@@ -1230,7 +1230,9 @@ export class ReconciliationController {
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiOperation({ summary: 'Manually match a bank statement record with a transaction' })
+  @ApiOperation({
+    summary: 'Manually match a bank statement record with a transaction',
+  })
   @ApiParam({ name: 'id', description: 'Reconciliation ID' })
   @ApiParam({ name: 'matchId', description: 'Bank statement match ID' })
   @ApiResponse({
@@ -1279,7 +1281,9 @@ export class ReconciliationController {
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiOperation({ summary: 'Unmatch a previously matched bank statement record' })
+  @ApiOperation({
+    summary: 'Unmatch a previously matched bank statement record',
+  })
   @ApiParam({ name: 'id', description: 'Reconciliation ID' })
   @ApiParam({ name: 'matchId', description: 'Bank statement match ID' })
   @ApiResponse({

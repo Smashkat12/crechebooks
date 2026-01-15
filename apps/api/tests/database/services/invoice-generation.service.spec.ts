@@ -22,6 +22,7 @@ import { XeroSyncService } from '../../../src/database/services/xero-sync.servic
 import { ProRataService } from '../../../src/database/services/pro-rata.service';
 import { CreditBalanceService } from '../../../src/database/services/credit-balance.service';
 import { CreditNoteService } from '../../../src/database/services/credit-note.service';
+import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
 
 /**
  * Mock XeroSyncService for tests
@@ -101,6 +102,7 @@ describe('InvoiceGenerationService', () => {
       providers: [
         PrismaService,
         InvoiceGenerationService,
+        InvoiceNumberService, // TASK-BILL-003: Required for atomic invoice number generation
         EnrollmentService,
         InvoiceRepository,
         InvoiceLineRepository,
@@ -153,6 +155,7 @@ describe('InvoiceGenerationService', () => {
     await prisma.statementLine.deleteMany({});
     await prisma.statement.deleteMany({});
     await prisma.invoice.deleteMany({});
+    await prisma.invoiceNumberCounter.deleteMany({}); // TASK-BILL-003: Clean up counters
     await prisma.enrollment.deleteMany({});
     await prisma.feeStructure.deleteMany({});
     await prisma.child.deleteMany({});
@@ -382,25 +385,19 @@ describe('InvoiceGenerationService', () => {
     });
 
     it('should increment invoice number sequentially', async () => {
-      // Create first invoice
-      await invoiceRepo.create({
-        tenantId: testTenant.id,
-        invoiceNumber: 'INV-2025-001',
-        parentId: testParent.id,
-        childId: testChild1.id,
-        billingPeriodStart: new Date('2025-01-01'),
-        billingPeriodEnd: new Date('2025-01-31'),
-        issueDate: new Date('2025-01-01'),
-        dueDate: new Date('2025-01-08'),
-        subtotalCents: 500000,
-        totalCents: 500000,
-      });
-
-      const invoiceNumber = await service.generateInvoiceNumber(
+      // TASK-BILL-003: Use atomic counter service - generate first number
+      const firstNumber = await service.generateInvoiceNumber(
         testTenant.id,
         2025,
       );
-      expect(invoiceNumber).toBe('INV-2025-002');
+      expect(firstNumber).toBe('INV-2025-001');
+
+      // Generate second number - should increment
+      const secondNumber = await service.generateInvoiceNumber(
+        testTenant.id,
+        2025,
+      );
+      expect(secondNumber).toBe('INV-2025-002');
     });
 
     it('should reset numbering for new year', async () => {
@@ -624,7 +621,10 @@ describe('InvoiceGenerationService', () => {
 
       // Check all invoices have 0 VAT
       for (const invoiceInfo of result.invoices) {
-        const invoice = await invoiceRepo.findByIdWithLines(invoiceInfo.id);
+        const invoice = await invoiceRepo.findByIdWithLines(
+          invoiceInfo.id,
+          testTenant.id,
+        );
         expect(invoice).toBeDefined();
         expect(invoice!.vatCents).toBe(0);
 
@@ -645,7 +645,10 @@ describe('InvoiceGenerationService', () => {
         testUser.id,
       );
 
-      const invoice = await invoiceRepo.findById(result.invoices[0].id);
+      const invoice = await invoiceRepo.findById(
+        result.invoices[0].id,
+        testTenant.id,
+      );
       expect(invoice).toBeDefined();
 
       // June billing period
@@ -695,7 +698,10 @@ describe('InvoiceGenerationService', () => {
         testUser.id,
       );
 
-      const invoice = await invoiceRepo.findById(result.invoices[0].id);
+      const invoice = await invoiceRepo.findById(
+        result.invoices[0].id,
+        testTenant.id,
+      );
       expect(invoice).toBeDefined();
 
       // Due date should be issue date + 7 days (testTenant.invoiceDueDays)
@@ -814,6 +820,7 @@ describe('InvoiceGenerationService', () => {
 
       const invoice = await invoiceRepo.findByIdWithLines(
         result.invoices[0].id,
+        testTenantVatRegistered.id,
       );
       expect(invoice).toBeDefined();
 
@@ -868,7 +875,10 @@ describe('InvoiceGenerationService', () => {
       const invoice2 = result.invoices.find((i) => i.childId === vatChild2.id);
       expect(invoice2).toBeDefined();
 
-      const invoice = await invoiceRepo.findByIdWithLines(invoice2!.id);
+      const invoice = await invoiceRepo.findByIdWithLines(
+        invoice2!.id,
+        testTenantVatRegistered.id,
+      );
       expect(invoice).toBeDefined();
       expect(invoice!.lines).toHaveLength(2);
 
@@ -914,6 +924,7 @@ describe('InvoiceGenerationService', () => {
 
       const invoice = await invoiceRepo.findByIdWithLines(
         result.invoices[0].id,
+        testTenant.id,
       );
       expect(invoice).toBeDefined();
 
@@ -948,6 +959,7 @@ describe('InvoiceGenerationService', () => {
 
       const invoice = await invoiceRepo.findByIdWithLines(
         result.invoices[0].id,
+        testTenant.id,
       );
       expect(invoice).toBeDefined();
       expect(invoice!.lines[0].unitPriceCents).toBe(450000);

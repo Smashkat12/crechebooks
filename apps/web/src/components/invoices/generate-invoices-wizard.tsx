@@ -1,4 +1,13 @@
-import { useState, useEffect } from "react";
+/**
+ * Generate Invoices Wizard
+ * TASK-BILL-001: Fix Frontend VAT Calculation Mismatch
+ *
+ * This wizard generates invoices for monthly childcare fees.
+ * Per SA VAT Act Section 12(h)(iii), childcare fees are VAT exempt.
+ * VAT is only applied to ad-hoc charges (meals, transport, etc.)
+ * which are added separately and calculated by the backend.
+ */
+import { useState } from "react";
 import { CalendarIcon, Check, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -23,6 +32,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn, formatCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
+import { calculateInvoiceVAT, type OrganizationConfig } from "@/lib/vat";
 
 interface EnrollmentPreview {
   id: string;
@@ -144,17 +154,32 @@ export function GenerateInvoicesWizard({
       return acc;
     }, {} as Record<string, EnrollmentPreview[]>);
 
-    return Object.entries(byParent).map(([parentName, enrollments]) => {
-      const subtotal = enrollments.reduce((sum, e) => sum + e.monthlyFee, 0);
-      const vat = subtotal * 0.15; // 15% VAT
-      const total = subtotal + vat;
+    // TASK-BILL-001: Organization config for VAT calculations
+    // Monthly childcare fees are MONTHLY_FEE line type = VAT exempt
+    const orgConfig: OrganizationConfig = {
+      defaultVatRate: 15,
+      vatStatus: 'standard',
+    };
+
+    return Object.entries(byParent).map(([parentName, parentEnrollments]) => {
+      // TASK-BILL-001: Use centralized VAT calculation utility
+      // Monthly childcare fees are VAT exempt per SA VAT Act Section 12(h)(iii)
+      // Transform enrollments to line items with MONTHLY_FEE type (exempt)
+      const lineItems = parentEnrollments.map((e) => ({
+        amount: e.monthlyFee,
+        lineType: 'MONTHLY_FEE' as const, // This line type is VAT exempt
+        isVatExempt: true, // Explicit exemption for childcare fees
+      }));
+
+      // Calculate using centralized utility - will return 0 VAT for exempt items
+      const vatResult = calculateInvoiceVAT(lineItems, orgConfig);
 
       return {
         parentName,
-        children: enrollments.map((e) => e.childName),
-        subtotal,
-        vat,
-        total,
+        children: parentEnrollments.map((e) => e.childName),
+        subtotal: vatResult.subtotal,
+        vat: vatResult.vatAmount, // Will be 0 for childcare fees
+        total: vatResult.total,
       };
     });
   };

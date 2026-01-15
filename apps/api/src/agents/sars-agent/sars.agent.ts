@@ -27,6 +27,7 @@ import {
   AgentVat201Dto,
 } from './interfaces/sars.interface';
 import { PayFrequency } from '@prisma/client';
+import { SarsPayFrequencyException } from '../../api/sars/exceptions';
 
 @Injectable()
 export class SarsAgent {
@@ -336,6 +337,10 @@ export class SarsAgent {
 
   /**
    * Map string pay frequency to enum
+   *
+   * @param frequency - Pay frequency string
+   * @returns PayFrequency enum value
+   * @throws SarsPayFrequencyException if frequency is invalid
    */
   private mapPayFrequency(frequency: string): PayFrequency {
     switch (frequency.toUpperCase()) {
@@ -348,9 +353,7 @@ export class SarsAgent {
       case 'HOURLY':
         return PayFrequency.HOURLY;
       default:
-        throw new Error(
-          `Invalid pay frequency: ${frequency}. Valid options: MONTHLY, WEEKLY, DAILY, HOURLY`,
-        );
+        throw new SarsPayFrequencyException(frequency);
     }
   }
 

@@ -233,7 +233,7 @@ describe('LeaveRequestRepository', () => {
       const data = createTestLeaveRequestData();
       const created = await repository.create(data);
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found?.id).toBe(created.id);
@@ -243,6 +243,7 @@ describe('LeaveRequestRepository', () => {
     it('should return null for non-existent id', async () => {
       const found = await repository.findById(
         '00000000-0000-0000-0000-000000000000',
+        tenant.id,
       );
 
       expect(found).toBeNull();
@@ -254,7 +255,7 @@ describe('LeaveRequestRepository', () => {
       const data = createTestLeaveRequestData();
       const created = await repository.create(data);
 
-      const found = await repository.findByIdOrThrow(created.id);
+      const found = await repository.findByIdOrThrow(created.id, tenant.id);
 
       expect(found).toBeDefined();
       expect(found.id).toBe(created.id);
@@ -262,7 +263,10 @@ describe('LeaveRequestRepository', () => {
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        repository.findByIdOrThrow('00000000-0000-0000-0000-000000000000'),
+        repository.findByIdOrThrow(
+          '00000000-0000-0000-0000-000000000000',
+          tenant.id,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -373,12 +377,11 @@ describe('LeaveRequestRepository', () => {
       expect(requests).toHaveLength(2);
     });
 
-    it('should include staff relation', async () => {
+    it('should include staffId reference', async () => {
       const requests = await repository.findByTenant(tenant.id);
 
-      expect(requests[0]).toHaveProperty('staff');
-      expect(requests[0].staff).toHaveProperty('firstName');
-      expect(requests[0].staff).toHaveProperty('lastName');
+      expect(requests[0]).toHaveProperty('staffId');
+      expect(requests[0].staffId).toBe(staff.id);
     });
   });
 
@@ -392,7 +395,7 @@ describe('LeaveRequestRepository', () => {
       });
 
       // Approve one
-      await repository.approve(pending1.id, 'manager-id');
+      await repository.approve(pending1.id, tenant.id, 'manager-id');
 
       const pendingRequests = await repository.findPendingByStaff(staff.id);
 
@@ -407,7 +410,7 @@ describe('LeaveRequestRepository', () => {
         createTestLeaveRequestData(),
       );
 
-      const updated = await repository.update(leaveRequest.id, {
+      const updated = await repository.update(leaveRequest.id, tenant.id, {
         reason: 'Updated reason',
         totalDays: 6,
         totalHours: 48,
@@ -423,7 +426,7 @@ describe('LeaveRequestRepository', () => {
         createTestLeaveRequestData(),
       );
 
-      const updated = await repository.update(leaveRequest.id, {
+      const updated = await repository.update(leaveRequest.id, tenant.id, {
         startDate: new Date('2024-06-10'),
         endDate: new Date('2024-06-15'),
       });
@@ -434,7 +437,7 @@ describe('LeaveRequestRepository', () => {
 
     it('should throw NotFoundException for non-existent leave request', async () => {
       await expect(
-        repository.update('00000000-0000-0000-0000-000000000000', {
+        repository.update('00000000-0000-0000-0000-000000000000', tenant.id, {
           reason: 'Test',
         }),
       ).rejects.toThrow(NotFoundException);
@@ -444,10 +447,10 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.approve(leaveRequest.id, 'manager-id');
+      await repository.approve(leaveRequest.id, tenant.id, 'manager-id');
 
       await expect(
-        repository.update(leaveRequest.id, { reason: 'Updated' }),
+        repository.update(leaveRequest.id, tenant.id, { reason: 'Updated' }),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -458,7 +461,11 @@ describe('LeaveRequestRepository', () => {
         createTestLeaveRequestData(),
       );
 
-      const approved = await repository.approve(leaveRequest.id, 'manager-id');
+      const approved = await repository.approve(
+        leaveRequest.id,
+        tenant.id,
+        'manager-id',
+      );
 
       expect(approved.status).toBe(LeaveRequestStatus.APPROVED);
       expect(approved.approvedBy).toBe('manager-id');
@@ -470,6 +477,7 @@ describe('LeaveRequestRepository', () => {
       await expect(
         repository.approve(
           '00000000-0000-0000-0000-000000000000',
+          tenant.id,
           'manager-id',
         ),
       ).rejects.toThrow(NotFoundException);
@@ -479,10 +487,10 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.approve(leaveRequest.id, 'manager-id');
+      await repository.approve(leaveRequest.id, tenant.id, 'manager-id');
 
       await expect(
-        repository.approve(leaveRequest.id, 'another-manager'),
+        repository.approve(leaveRequest.id, tenant.id, 'another-manager'),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -490,10 +498,15 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.reject(leaveRequest.id, 'manager-id', 'Not available');
+      await repository.reject(
+        leaveRequest.id,
+        tenant.id,
+        'manager-id',
+        'Not available',
+      );
 
       await expect(
-        repository.approve(leaveRequest.id, 'manager-id'),
+        repository.approve(leaveRequest.id, tenant.id, 'manager-id'),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -506,6 +519,7 @@ describe('LeaveRequestRepository', () => {
 
       const rejected = await repository.reject(
         leaveRequest.id,
+        tenant.id,
         'manager-id',
         'Staff shortage during that period',
       );
@@ -519,6 +533,7 @@ describe('LeaveRequestRepository', () => {
       await expect(
         repository.reject(
           '00000000-0000-0000-0000-000000000000',
+          tenant.id,
           'manager-id',
           'Reason',
         ),
@@ -529,10 +544,10 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.approve(leaveRequest.id, 'manager-id');
+      await repository.approve(leaveRequest.id, tenant.id, 'manager-id');
 
       await expect(
-        repository.reject(leaveRequest.id, 'manager-id', 'Reason'),
+        repository.reject(leaveRequest.id, tenant.id, 'manager-id', 'Reason'),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -543,7 +558,7 @@ describe('LeaveRequestRepository', () => {
         createTestLeaveRequestData(),
       );
 
-      const cancelled = await repository.cancel(leaveRequest.id);
+      const cancelled = await repository.cancel(leaveRequest.id, tenant.id);
 
       expect(cancelled.status).toBe(LeaveRequestStatus.CANCELLED);
     });
@@ -552,16 +567,16 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.approve(leaveRequest.id, 'manager-id');
+      await repository.approve(leaveRequest.id, tenant.id, 'manager-id');
 
-      const cancelled = await repository.cancel(leaveRequest.id);
+      const cancelled = await repository.cancel(leaveRequest.id, tenant.id);
 
       expect(cancelled.status).toBe(LeaveRequestStatus.CANCELLED);
     });
 
     it('should throw NotFoundException for non-existent leave request', async () => {
       await expect(
-        repository.cancel('00000000-0000-0000-0000-000000000000'),
+        repository.cancel('00000000-0000-0000-0000-000000000000', tenant.id),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -569,22 +584,27 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.reject(leaveRequest.id, 'manager-id', 'Reason');
-
-      await expect(repository.cancel(leaveRequest.id)).rejects.toThrow(
-        ConflictException,
+      await repository.reject(
+        leaveRequest.id,
+        tenant.id,
+        'manager-id',
+        'Reason',
       );
+
+      await expect(
+        repository.cancel(leaveRequest.id, tenant.id),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw ConflictException for already CANCELLED request', async () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.cancel(leaveRequest.id);
+      await repository.cancel(leaveRequest.id, tenant.id);
 
-      await expect(repository.cancel(leaveRequest.id)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        repository.cancel(leaveRequest.id, tenant.id),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -593,7 +613,7 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.approve(leaveRequest.id, 'manager-id');
+      await repository.approve(leaveRequest.id, tenant.id, 'manager-id');
 
       const synced = await repository.markSynced(leaveRequest.id, [
         'sp-123',
@@ -612,15 +632,15 @@ describe('LeaveRequestRepository', () => {
         createTestLeaveRequestData(),
       );
 
-      await repository.delete(leaveRequest.id);
+      await repository.delete(leaveRequest.id, tenant.id);
 
-      const found = await repository.findById(leaveRequest.id);
+      const found = await repository.findById(leaveRequest.id, tenant.id);
       expect(found).toBeNull();
     });
 
     it('should throw NotFoundException for non-existent leave request', async () => {
       await expect(
-        repository.delete('00000000-0000-0000-0000-000000000000'),
+        repository.delete('00000000-0000-0000-0000-000000000000', tenant.id),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -628,12 +648,12 @@ describe('LeaveRequestRepository', () => {
       const leaveRequest = await repository.create(
         createTestLeaveRequestData(),
       );
-      await repository.approve(leaveRequest.id, 'manager-id');
+      await repository.approve(leaveRequest.id, tenant.id, 'manager-id');
       await repository.markSynced(leaveRequest.id, ['sp-123']);
 
-      await expect(repository.delete(leaveRequest.id)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        repository.delete(leaveRequest.id, tenant.id),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -655,7 +675,7 @@ describe('LeaveRequestRepository', () => {
         startDate: new Date('2024-08-01'),
         endDate: new Date('2024-08-05'),
       });
-      await repository.approve(approved.id, 'manager-id');
+      await repository.approve(approved.id, tenant.id, 'manager-id');
     });
 
     it('should count all leave requests for tenant', async () => {
@@ -691,14 +711,14 @@ describe('LeaveRequestRepository', () => {
     it('should return only unsynced approved leave requests', async () => {
       // Create and approve leave requests
       const lr1 = await repository.create(createTestLeaveRequestData());
-      await repository.approve(lr1.id, 'manager-id');
+      await repository.approve(lr1.id, tenant.id, 'manager-id');
 
       const lr2 = await repository.create({
         ...createTestLeaveRequestData(),
         startDate: new Date('2024-07-01'),
         endDate: new Date('2024-07-05'),
       });
-      await repository.approve(lr2.id, 'manager-id');
+      await repository.approve(lr2.id, tenant.id, 'manager-id');
       await repository.markSynced(lr2.id, ['sp-123']); // Mark as synced
 
       // Create pending leave request
@@ -721,14 +741,14 @@ describe('LeaveRequestRepository', () => {
         startDate: new Date('2024-07-01'),
         endDate: new Date('2024-07-05'),
       });
-      await repository.approve(lr1.id, 'manager-id');
+      await repository.approve(lr1.id, tenant.id, 'manager-id');
 
       const lr2 = await repository.create({
         ...createTestLeaveRequestData(),
         startDate: new Date('2024-06-01'),
         endDate: new Date('2024-06-05'),
       });
-      await repository.approve(lr2.id, 'manager-id');
+      await repository.approve(lr2.id, tenant.id, 'manager-id');
 
       const unsynced = await repository.findUnsyncedApproved(tenant.id);
 
@@ -750,7 +770,11 @@ describe('LeaveRequestRepository', () => {
         startDate: new Date('2024-07-01'),
         endDate: new Date('2024-07-05'),
       });
-      const approved = await repository.approve(toApprove.id, 'manager-id');
+      const approved = await repository.approve(
+        toApprove.id,
+        tenant.id,
+        'manager-id',
+      );
       expect(approved.status).toBe(LeaveRequestStatus.APPROVED);
 
       // REJECTED
@@ -761,6 +785,7 @@ describe('LeaveRequestRepository', () => {
       });
       const rejected = await repository.reject(
         toReject.id,
+        tenant.id,
         'manager-id',
         'Reason',
       );
@@ -772,7 +797,7 @@ describe('LeaveRequestRepository', () => {
         startDate: new Date('2024-09-01'),
         endDate: new Date('2024-09-05'),
       });
-      const cancelled = await repository.cancel(toCancel.id);
+      const cancelled = await repository.cancel(toCancel.id, tenant.id);
       expect(cancelled.status).toBe(LeaveRequestStatus.CANCELLED);
     });
   });

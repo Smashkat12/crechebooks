@@ -9,7 +9,10 @@ import {
   ImportSource,
   TransactionStatus,
 } from '@prisma/client';
-import { NotFoundException, DatabaseException } from '../../../src/shared/exceptions';
+import {
+  NotFoundException,
+  DatabaseException,
+} from '../../../src/shared/exceptions';
 
 describe('CategorizationJournalRepository', () => {
   let repository: CategorizationJournalRepository;
@@ -113,7 +116,8 @@ describe('CategorizationJournalRepository', () => {
         toAccountCode: '6001',
         amountCents: 125000,
         isCredit: false,
-        narration: 'Categorization: PnP Insurance moved from Suspense to Expenses',
+        narration:
+          'Categorization: PnP Insurance moved from Suspense to Expenses',
       });
 
       expect(journal.id).toBeDefined();
@@ -166,14 +170,14 @@ describe('CategorizationJournalRepository', () => {
         narration: 'Test journal',
       });
 
-      const found = await repository.findById(created.id);
+      const found = await repository.findById(created.id, tenant.id);
 
       expect(found).not.toBeNull();
       expect(found!.id).toBe(created.id);
     });
 
     it('should return null for non-existent journal', async () => {
-      const found = await repository.findById('non-existent-id');
+      const found = await repository.findById('non-existent-id', tenant.id);
       expect(found).toBeNull();
     });
   });
@@ -209,7 +213,10 @@ describe('CategorizationJournalRepository', () => {
         narration: 'Test journal',
       });
 
-      const found = await repository.findByIdWithTransaction(created.id);
+      const found = await repository.findByIdWithTransaction(
+        created.id,
+        tenant.id,
+      );
 
       expect(found).not.toBeNull();
       expect(found!.transaction).toBeDefined();
@@ -250,13 +257,9 @@ describe('CategorizationJournalRepository', () => {
         narration: 'Test journal',
       });
 
-      await repository.markAsPosted(
-        journal.id,
-        'xero-journal-123',
-        'MJ-12345',
-      );
+      await repository.markAsPosted(journal.id, 'xero-journal-123', 'MJ-12345');
 
-      const updated = await repository.findById(journal.id);
+      const updated = await repository.findById(journal.id, tenant.id);
 
       expect(updated!.status).toBe(CategorizationJournalStatus.POSTED);
       expect(updated!.xeroJournalId).toBe('xero-journal-123');
@@ -286,7 +289,7 @@ describe('CategorizationJournalRepository', () => {
 
       await repository.markAsFailed(journal.id, 'Xero API error');
 
-      const updated = await repository.findById(journal.id);
+      const updated = await repository.findById(journal.id, tenant.id);
 
       expect(updated!.status).toBe(CategorizationJournalStatus.FAILED);
       expect(updated!.errorMessage).toBe('Xero API error');
@@ -295,7 +298,7 @@ describe('CategorizationJournalRepository', () => {
       // Mark as failed again
       await repository.markAsFailed(journal.id, 'Second attempt failed');
 
-      const secondUpdate = await repository.findById(journal.id);
+      const secondUpdate = await repository.findById(journal.id, tenant.id);
       expect(secondUpdate!.retryCount).toBe(2);
     });
   });
@@ -338,7 +341,7 @@ describe('CategorizationJournalRepository', () => {
       await repository.markAsFailed(journal.id, 'API error');
       await repository.resetForRetry(journal.id);
 
-      const updated = await repository.findById(journal.id);
+      const updated = await repository.findById(journal.id, tenant.id);
 
       expect(updated!.status).toBe(CategorizationJournalStatus.PENDING);
       expect(updated!.errorMessage).toBeNull();
@@ -394,7 +397,7 @@ describe('CategorizationJournalRepository', () => {
   });
 
   describe('delete', () => {
-    it('should delete a non-posted journal', async () => {
+    it('TC-002: should delete a non-posted journal with correct tenant', async () => {
       const journal = await repository.create({
         tenantId: tenant.id,
         transactionId: transaction.id,
@@ -405,9 +408,9 @@ describe('CategorizationJournalRepository', () => {
         narration: 'Test journal',
       });
 
-      await repository.delete(journal.id);
+      await repository.delete(journal.id, tenant.id);
 
-      const found = await repository.findById(journal.id);
+      const found = await repository.findById(journal.id, tenant.id);
       expect(found).toBeNull();
     });
 
@@ -424,9 +427,84 @@ describe('CategorizationJournalRepository', () => {
 
       await repository.markAsPosted(journal.id, 'xero-123', 'MJ-123');
 
-      await expect(repository.delete(journal.id)).rejects.toThrow(
+      await expect(repository.delete(journal.id, tenant.id)).rejects.toThrow(
         DatabaseException,
       );
+    });
+
+    it('TC-001: should throw NotFoundException when deleting with wrong tenant (cross-tenant deletion blocked)', async () => {
+      const journal = await repository.create({
+        tenantId: tenant.id,
+        transactionId: transaction.id,
+        fromAccountCode: '9999',
+        toAccountCode: '6001',
+        amountCents: 125000,
+        isCredit: false,
+        narration: 'Test journal',
+      });
+
+      // Create another tenant
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Other Creche Delete',
+          addressLine1: '456 Delete Street',
+          city: 'Cape Town',
+          province: 'Western Cape',
+          postalCode: '8001',
+          phone: '+27217654321',
+          email: `other-delete-${Date.now()}@creche.co.za`,
+        },
+      });
+
+      // Attempt cross-tenant deletion - should fail
+      await expect(
+        repository.delete(journal.id, otherTenant.id),
+      ).rejects.toThrow(NotFoundException);
+
+      // Verify original record still exists
+      const found = await repository.findById(journal.id, tenant.id);
+      expect(found).not.toBeNull();
+    });
+
+    it('TC-003: should throw NotFoundException for non-existent journal ID', async () => {
+      await expect(
+        repository.delete('non-existent-id', tenant.id),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('TC-004: error message should not leak tenant information', async () => {
+      const journal = await repository.create({
+        tenantId: tenant.id,
+        transactionId: transaction.id,
+        fromAccountCode: '9999',
+        toAccountCode: '6001',
+        amountCents: 125000,
+        isCredit: false,
+        narration: 'Test journal',
+      });
+
+      const otherTenant = await prisma.tenant.create({
+        data: {
+          name: 'Leak Test Creche',
+          addressLine1: '789 Test Street',
+          city: 'Durban',
+          province: 'KwaZulu-Natal',
+          postalCode: '4001',
+          phone: '+27317654321',
+          email: `leak-test-${Date.now()}@creche.co.za`,
+        },
+      });
+
+      try {
+        await repository.delete(journal.id, otherTenant.id);
+        fail('Expected NotFoundException to be thrown');
+      } catch (error) {
+        // Error message should be generic "not found" - not reveal tenant ownership
+        expect(error.message).not.toContain(tenant.id);
+        expect(error.message).not.toContain(otherTenant.id);
+        expect(error.message).not.toContain('wrong tenant');
+        expect(error.message).not.toContain('different tenant');
+      }
     });
   });
 });

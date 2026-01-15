@@ -226,8 +226,8 @@ describe('AmountVariationService', () => {
   });
 
   describe('getThresholdConfig', () => {
-    it('should return default config for new tenant', async () => {
-      const config = await service.getThresholdConfig(TENANT_ID);
+    it('should return default config for new tenant', () => {
+      const config = service.getThresholdConfig(TENANT_ID);
 
       expect(config.tenantId).toBe(TENANT_ID);
       expect(config.thresholdType).toBe('percentage');
@@ -235,24 +235,24 @@ describe('AmountVariationService', () => {
       expect(config.zScoreThreshold).toBe(2.5);
     });
 
-    it('should cache config for repeated calls', async () => {
-      const config1 = await service.getThresholdConfig(TENANT_ID);
-      const config2 = await service.getThresholdConfig(TENANT_ID);
+    it('should cache config for repeated calls', () => {
+      const config1 = service.getThresholdConfig(TENANT_ID);
+      const config2 = service.getThresholdConfig(TENANT_ID);
 
       expect(config1).toBe(config2); // Same object reference (cached)
     });
 
-    it('should support per-payee config', async () => {
-      const config = await service.getThresholdConfig(TENANT_ID, PAYEE_NAME);
+    it('should support per-payee config', () => {
+      const config = service.getThresholdConfig(TENANT_ID, PAYEE_NAME);
 
       expect(config.tenantId).toBe(TENANT_ID);
       expect(config.payee).toBe(PAYEE_NAME);
     });
 
-    it('should normalize payee name for cache key', async () => {
-      const config1 = await service.getThresholdConfig(TENANT_ID, 'Eskom');
-      const config2 = await service.getThresholdConfig(TENANT_ID, 'ESKOM');
-      const config3 = await service.getThresholdConfig(TENANT_ID, '  eskom  ');
+    it('should normalize payee name for cache key', () => {
+      const config1 = service.getThresholdConfig(TENANT_ID, 'Eskom');
+      const config2 = service.getThresholdConfig(TENANT_ID, 'ESKOM');
+      const config3 = service.getThresholdConfig(TENANT_ID, '  eskom  ');
 
       // All three should have the same underlying config (cache hit after first)
       // but the payee field reflects what was passed in
@@ -413,7 +413,7 @@ describe('AmountVariationService', () => {
       service.clearCache();
 
       // Next call should return default
-      const config = await service.getThresholdConfig(TENANT_ID);
+      const config = service.getThresholdConfig(TENANT_ID);
       expect(config.percentageThreshold).toBe(30); // Default
     });
   });
@@ -448,6 +448,7 @@ describe('AmountVariationService', () => {
       duplicateStatus: DuplicateStatus.NONE,
       reversesTransactionId: null,
       isReversal: false,
+      xeroAccountCode: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     }));

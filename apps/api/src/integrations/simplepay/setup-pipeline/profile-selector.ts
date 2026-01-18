@@ -4,9 +4,26 @@
  *
  * Automatically selects the appropriate SimplePay profile based on
  * staff role and employment type.
+ *
+ * NOTE: SimplePay SA API does not expose profiles via REST API.
+ * Profile IDs are hardcoded based on templates created in SimplePay admin.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+
+/**
+ * SimplePay Profile IDs - Hardcoded from SimplePay admin
+ * Client: Elle Elephant Kindergarten (353117)
+ *
+ * These MUST match the actual templates in SimplePay.
+ * If templates are recreated, these IDs must be updated.
+ */
+export const SIMPLEPAY_PROFILE_IDS: Record<string, number> = {
+  'General Staff': 380792,
+  'Full-Time Teacher': 380795,
+  'Part-Time Teacher': 380796,
+  'Principal/Manager': 380797,
+};
 
 /**
  * Staff Role for profile matching
@@ -52,55 +69,91 @@ export interface ProfileRule {
 /**
  * Default profile rules for creche/daycare
  * Based on TASK-SPAY-008 specification
+ *
+ * MUST match actual SimplePay templates:
+ * - General Staff (ID: 380792)
+ * - Full-Time Teacher (ID: 380795)
+ * - Part-Time Teacher (ID: 380796)
+ * - Principal/Manager (ID: 380797)
  */
 export const DEFAULT_PROFILE_RULES: ProfileRule[] = [
-  // Specific role + employment type combinations
+  // Principal/Manager
   {
     role: 'PRINCIPAL',
-    employmentType: 'PERMANENT',
+    employmentType: '*',
     profileName: 'Principal/Manager',
     priority: 1,
   },
+
+  // Full-Time Teachers
   {
     role: 'TEACHER',
     employmentType: 'PERMANENT',
     profileName: 'Full-Time Teacher',
     priority: 2,
   },
+
+  // Part-Time Teachers & Contract Teachers
   {
     role: 'TEACHER',
     employmentType: 'CONTRACT',
-    profileName: 'Part-Time Staff',
+    profileName: 'Part-Time Teacher',
     priority: 3,
   },
   {
-    role: 'ASSISTANT',
-    employmentType: '*',
-    profileName: 'Teaching Assistant',
+    role: 'TEACHER',
+    employmentType: 'CASUAL',
+    profileName: 'Part-Time Teacher',
     priority: 4,
   },
+
+  // Assistants go to Part-Time Teacher profile
+  {
+    role: 'ASSISTANT',
+    employmentType: '*',
+    profileName: 'Part-Time Teacher',
+    priority: 5,
+  },
+
+  // All other roles use General Staff profile
   {
     role: 'KITCHEN',
     employmentType: '*',
-    profileName: 'Kitchen Staff',
-    priority: 5,
+    profileName: 'General Staff',
+    priority: 10,
   },
   {
     role: 'ADMIN',
     employmentType: '*',
-    profileName: 'Admin Staff',
-    priority: 6,
+    profileName: 'General Staff',
+    priority: 11,
   },
-
-  // Wildcard rules (any role)
   {
-    role: '*',
-    employmentType: 'CASUAL',
-    profileName: 'Casual Worker',
-    priority: 10,
+    role: 'CLEANER',
+    employmentType: '*',
+    profileName: 'General Staff',
+    priority: 12,
+  },
+  {
+    role: 'DRIVER',
+    employmentType: '*',
+    profileName: 'General Staff',
+    priority: 13,
+  },
+  {
+    role: 'SECURITY',
+    employmentType: '*',
+    profileName: 'General Staff',
+    priority: 14,
+  },
+  {
+    role: 'MAINTENANCE',
+    employmentType: '*',
+    profileName: 'General Staff',
+    priority: 15,
   },
 
-  // Fallback rule
+  // Fallback rule - General Staff
   {
     role: '*',
     employmentType: '*',
@@ -175,6 +228,41 @@ export class ProfileSelector {
    */
   getAvailableProfiles(): string[] {
     return [...new Set(this.rules.map((r) => r.profileName))];
+  }
+
+  /**
+   * Get SimplePay profile ID for a profile name
+   * Returns null if profile name not found in hardcoded IDs
+   *
+   * NOTE: SimplePay SA API does not expose profiles via REST API.
+   * IDs are hardcoded from SimplePay admin configuration.
+   */
+  getProfileId(profileName: string): number | null {
+    return SIMPLEPAY_PROFILE_IDS[profileName] ?? null;
+  }
+
+  /**
+   * Select profile and return with SimplePay ID
+   * Combines selectProfile with getProfileId for convenience
+   */
+  selectProfileWithId(
+    position: string | null,
+    employmentType: string,
+  ): ProfileSelectionResult & { profileId: number | null } {
+    const selection = this.selectProfile(position, employmentType);
+    const profileId = this.getProfileId(selection.profileName);
+
+    if (!profileId) {
+      this.logger.warn(
+        `No SimplePay profile ID found for "${selection.profileName}". ` +
+          `This profile may need to be created in SimplePay admin.`,
+      );
+    }
+
+    return {
+      ...selection,
+      profileId,
+    };
   }
 
   /**

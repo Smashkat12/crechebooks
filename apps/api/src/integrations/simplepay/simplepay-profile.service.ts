@@ -49,13 +49,20 @@ export class SimplePayProfileService {
 
   /**
    * Get all available profiles for a tenant
+   *
+   * Note: SimplePay SA API does not have a direct /profiles endpoint.
+   * Profiles (calculation templates) are managed through SimplePay's admin UI.
+   * This method returns an empty list and profiles must be configured manually
+   * in SimplePay before they can be assigned to employees.
    */
   async getAvailableProfiles(tenantId: string): Promise<AvailableProfile[]> {
     await this.apiClient.initializeForTenant(tenantId);
     const clientId = this.apiClient.getClientId();
 
     try {
-      // SimplePay returns wrapped: [{ profile: {...} }, ...]
+      // SimplePay SA API does not have a /profiles endpoint
+      // Profiles must be created and managed via SimplePay admin UI
+      // We attempt the call but gracefully handle 404
       const response = await this.apiClient.get<ProfileWrapper[]>(
         `/clients/${clientId}/profiles`,
       );
@@ -70,6 +77,17 @@ export class SimplePayProfileService {
         isDefault: p.is_default,
       }));
     } catch (error) {
+      // SimplePay SA doesn't expose profiles via API (404)
+      // Return empty array - profiles must be managed in SimplePay admin UI
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+        this.logger.warn(
+          `SimplePay profiles endpoint not available for client ${clientId}. ` +
+            `Profiles must be created and managed in SimplePay admin UI.`,
+        );
+        return [];
+      }
       this.logger.error(`Failed to get available profiles: ${error}`);
       throw error;
     }

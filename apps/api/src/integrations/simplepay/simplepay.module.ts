@@ -7,6 +7,7 @@
  * TASK-SPAY-006: SimplePay Profile Mapping Management
  * TASK-SPAY-007: SimplePay Bulk Operations Service
  * TASK-SPAY-008: Employee Auto-Setup Pipeline
+ * TASK-SPAY-009: SimplePay Webhook Handler
  * TASK-STAFF-003 / TASK-STAFF-010: SimplePay Sync Retry Queue
  */
 
@@ -42,6 +43,7 @@ import { SetupPipeline } from './setup-pipeline/setup-pipeline';
 import { ProfileSelector } from './setup-pipeline/profile-selector';
 import { LeaveCalculator } from './setup-pipeline/leave-calculator';
 import { CreateEmployeeStep } from './setup-pipeline/steps/create-employee.step';
+import { SetSalaryStep } from './setup-pipeline/steps/set-salary.step';
 import { AssignProfileStep } from './setup-pipeline/steps/assign-profile.step';
 import { SetupLeaveStep } from './setup-pipeline/steps/setup-leave.step';
 import { ConfigureTaxStep } from './setup-pipeline/steps/configure-tax.step';
@@ -50,6 +52,9 @@ import { VerifySetupStep } from './setup-pipeline/steps/verify-setup.step';
 import { SendNotificationStep } from './setup-pipeline/steps/send-notification.step';
 // Event Handlers
 import { StaffCreatedHandler } from './handlers/staff-created.handler';
+// Webhook Handler (TASK-SPAY-009)
+import { SimplePayWebhookService } from './simplepay-webhook.service';
+import { SimplePayWebhookController } from './simplepay-webhook.controller';
 // Sync Queue (TASK-STAFF-003 / TASK-STAFF-010)
 import {
   SimplePaySyncProcessor,
@@ -132,6 +137,7 @@ const syncQueueProviders = isRedisConfigured()
     EventEmitterModule.forRoot(),
     ...bullImports,
   ],
+  controllers: [SimplePayWebhookController],
   providers: [
     SimplePayApiClient,
     SimplePayConnectionService,
@@ -159,6 +165,7 @@ const syncQueueProviders = isRedisConfigured()
     ProfileSelector,
     LeaveCalculator,
     CreateEmployeeStep,
+    SetSalaryStep,
     AssignProfileStep,
     SetupLeaveStep,
     ConfigureTaxStep,
@@ -167,6 +174,8 @@ const syncQueueProviders = isRedisConfigured()
     SendNotificationStep,
     // Event Handlers
     StaffCreatedHandler,
+    // Webhook Handler (TASK-SPAY-009)
+    SimplePayWebhookService,
     // Sync Queue Providers (conditional)
     ...syncQueueProviders,
   ],
@@ -196,6 +205,8 @@ const syncQueueProviders = isRedisConfigured()
     SetupPipeline,
     ProfileSelector,
     LeaveCalculator,
+    // Webhook Handler (TASK-SPAY-009)
+    SimplePayWebhookService,
     // Sync Queue Service (conditional)
     ...(isRedisConfigured() ? [SimplePaySyncService] : []),
   ],

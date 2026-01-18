@@ -151,14 +151,15 @@ describe('SetupPipeline', () => {
 
   describe('execute', () => {
     beforeEach(() => {
-      // Register all 7 steps in order
+      // Register all 8 steps in order
       pipeline.registerStep(createMockStep(PipelineStep.CREATE_EMPLOYEE), 1);
-      pipeline.registerStep(createMockStep(PipelineStep.ASSIGN_PROFILE), 2);
-      pipeline.registerStep(createMockStep(PipelineStep.SETUP_LEAVE), 3);
-      pipeline.registerStep(createMockStep(PipelineStep.CONFIGURE_TAX), 4);
-      pipeline.registerStep(createMockStep(PipelineStep.ADD_CALCULATIONS), 5);
-      pipeline.registerStep(createMockStep(PipelineStep.VERIFY_SETUP), 6);
-      pipeline.registerStep(createMockStep(PipelineStep.SEND_NOTIFICATION), 7);
+      pipeline.registerStep(createMockStep(PipelineStep.SET_SALARY), 2);
+      pipeline.registerStep(createMockStep(PipelineStep.ASSIGN_PROFILE), 3);
+      pipeline.registerStep(createMockStep(PipelineStep.SETUP_LEAVE), 4);
+      pipeline.registerStep(createMockStep(PipelineStep.CONFIGURE_TAX), 5);
+      pipeline.registerStep(createMockStep(PipelineStep.ADD_CALCULATIONS), 6);
+      pipeline.registerStep(createMockStep(PipelineStep.VERIFY_SETUP), 7);
+      pipeline.registerStep(createMockStep(PipelineStep.SEND_NOTIFICATION), 8);
     });
 
     it('should execute all steps in order', async () => {
@@ -169,7 +170,7 @@ describe('SetupPipeline', () => {
       const completedSteps = result.stepResults.filter(
         (s) => s.status === SetupStepStatus.COMPLETED,
       );
-      expect(completedSteps).toHaveLength(7);
+      expect(completedSteps).toHaveLength(8);
     });
 
     it('should return context with updated step results', async () => {
@@ -353,14 +354,15 @@ describe('SetupPipeline', () => {
 
   describe('getFinalStatus', () => {
     it('should return COMPLETED when all steps complete', async () => {
-      // Register ALL 7 steps so createInitialStepResults matches
+      // Register ALL 8 steps so createInitialStepResults matches
       pipeline.registerStep(createMockStep(PipelineStep.CREATE_EMPLOYEE), 1);
-      pipeline.registerStep(createMockStep(PipelineStep.ASSIGN_PROFILE), 2);
-      pipeline.registerStep(createMockStep(PipelineStep.SETUP_LEAVE), 3);
-      pipeline.registerStep(createMockStep(PipelineStep.CONFIGURE_TAX), 4);
-      pipeline.registerStep(createMockStep(PipelineStep.ADD_CALCULATIONS), 5);
-      pipeline.registerStep(createMockStep(PipelineStep.VERIFY_SETUP), 6);
-      pipeline.registerStep(createMockStep(PipelineStep.SEND_NOTIFICATION), 7);
+      pipeline.registerStep(createMockStep(PipelineStep.SET_SALARY), 2);
+      pipeline.registerStep(createMockStep(PipelineStep.ASSIGN_PROFILE), 3);
+      pipeline.registerStep(createMockStep(PipelineStep.SETUP_LEAVE), 4);
+      pipeline.registerStep(createMockStep(PipelineStep.CONFIGURE_TAX), 5);
+      pipeline.registerStep(createMockStep(PipelineStep.ADD_CALCULATIONS), 6);
+      pipeline.registerStep(createMockStep(PipelineStep.VERIFY_SETUP), 7);
+      pipeline.registerStep(createMockStep(PipelineStep.SEND_NOTIFICATION), 8);
 
       const context = createTestContext();
       await pipeline.execute(context);
@@ -442,7 +444,7 @@ describe('SetupPipeline', () => {
     it('createInitialStepResults should create all step results', () => {
       const results = createInitialStepResults();
 
-      expect(results).toHaveLength(7);
+      expect(results).toHaveLength(8);
       expect(results.every((r) => r.status === SetupStepStatus.PENDING)).toBe(
         true,
       );

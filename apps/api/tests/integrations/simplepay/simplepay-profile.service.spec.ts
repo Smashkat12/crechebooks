@@ -504,11 +504,12 @@ describe('SimplePayProfileService', () => {
 
   describe('getSuggestedProfileForRole', () => {
     it('should suggest profiles based on staff role', async () => {
+      // Mock must return profile name that matches CRECHE_PROFILES['FULL_TIME_TEACHER'] = 'Full-Time Teacher'
       mockGet.mockResolvedValueOnce([
         {
           profile: {
             id: 100,
-            name: 'Teacher Profile',
+            name: 'Full-Time Teacher',
             description: null,
             calculation_items: [],
             is_default: false,

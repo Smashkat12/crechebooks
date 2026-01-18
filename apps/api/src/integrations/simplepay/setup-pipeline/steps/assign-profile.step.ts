@@ -36,57 +36,47 @@ export class AssignProfileStep implements IPipelineStep {
 
       if (!profileId) {
         // Auto-select profile based on role and employment type
-        const selection = this.profileSelector.selectProfile(
+        // Uses hardcoded profile IDs since SimplePay SA API doesn't expose profiles
+        const selection = this.profileSelector.selectProfileWithId(
           context.staff.position,
           context.staff.employmentType,
         );
 
         this.logger.debug(
-          `Auto-selected profile: ${selection.profileName} (confidence: ${selection.confidence})`,
+          `Auto-selected profile: ${selection.profileName} (ID: ${selection.profileId}, confidence: ${selection.confidence})`,
         );
 
-        // Get available profiles from SimplePay
-        const availableProfiles =
-          await this.profileService.getAvailableProfiles(context.tenantId);
-
-        // Find matching profile by name
-        const matchedProfile = availableProfiles.find(
-          (p) =>
-            p.name
-              .toLowerCase()
-              .includes(selection.profileName.toLowerCase()) ||
-            selection.profileName.toLowerCase().includes(p.name.toLowerCase()),
-        );
-
-        if (matchedProfile) {
-          profileId = matchedProfile.id;
-          profileName = matchedProfile.name;
+        if (selection.profileId) {
+          profileId = selection.profileId;
+          profileName = selection.profileName;
         } else {
-          // Use default profile
-          const defaultProfile = availableProfiles.find((p) => p.isDefault);
-          if (defaultProfile) {
-            profileId = defaultProfile.id;
-            profileName = defaultProfile.name;
+          // Profile not found in hardcoded IDs - this means the template
+          // needs to be created in SimplePay admin and the ID added to profile-selector.ts
+          context.warnings.push({
+            step: this.name,
+            code: 'PROFILE_NOT_CONFIGURED',
+            message: `Profile "${selection.profileName}" not configured. Please create this template in SimplePay admin and update profile-selector.ts with the ID.`,
+            details: { suggestedProfile: selection.profileName },
+            timestamp: new Date().toISOString(),
+          });
+
+          // Fall back to General Staff profile
+          const fallbackId = this.profileSelector.getProfileId('General Staff');
+          if (fallbackId) {
+            profileId = fallbackId;
+            profileName = 'General Staff';
             context.warnings.push({
               step: this.name,
-              code: 'PROFILE_FALLBACK_TO_DEFAULT',
-              message: `No matching profile found for "${selection.profileName}", using default`,
-              details: { suggestedProfile: selection.profileName },
-              timestamp: new Date().toISOString(),
-            });
-          } else if (availableProfiles.length > 0) {
-            // Use first available profile
-            profileId = availableProfiles[0].id;
-            profileName = availableProfiles[0].name;
-            context.warnings.push({
-              step: this.name,
-              code: 'PROFILE_FALLBACK_TO_FIRST',
-              message: `No default profile found, using first available`,
+              code: 'PROFILE_FALLBACK_TO_GENERAL',
+              message: `Using "General Staff" profile as fallback`,
               details: {},
               timestamp: new Date().toISOString(),
             });
           } else {
-            throw new Error('No profiles available in SimplePay');
+            throw new Error(
+              'No profiles configured. Please create templates in SimplePay admin ' +
+                'and update SIMPLEPAY_PROFILE_IDS in profile-selector.ts',
+            );
           }
         }
       }

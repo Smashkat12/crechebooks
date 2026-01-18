@@ -68,10 +68,11 @@ export class AuthService {
     this.auth0ClientSecret =
       this.configService.get<string>('AUTH0_CLIENT_SECRET') || '';
     this.auth0Audience = this.configService.get<string>('AUTH0_AUDIENCE') || '';
-    // TASK-SEC-001: Reduced default from 86400 (24h) to 3600 (1h) for security
-    this.jwtExpiration =
-      this.configService.get<number>('JWT_EXPIRATION') ||
-      JWT_EXPIRATION_DEFAULT;
+    // TASK-SEC-001: Parse JWT_EXPIRATION as number, use default for development (8 hours)
+    const jwtExpirationStr = this.configService.get<string>('JWT_EXPIRATION');
+    this.jwtExpiration = jwtExpirationStr
+      ? parseInt(jwtExpirationStr, 10) || JWT_EXPIRATION_DEFAULT
+      : JWT_EXPIRATION_DEFAULT;
 
     if (!this.auth0Domain) {
       this.logger.error('AUTH0_DOMAIN environment variable is required');

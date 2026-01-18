@@ -23,10 +23,11 @@ export class DashboardService {
     let referenceDate: Date;
 
     if (year) {
-      // Year filter provided - show full calendar year data
-      startOfPeriod = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)); // Jan 1
-      endOfPeriod = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999)); // Dec 31
-      referenceDate = new Date(Date.UTC(year, 11, 31)); // Use Dec 31 as reference
+      // Year filter provided - show full SA tax year data (March - February)
+      // Tax year 2025 = 1 March 2025 to 28 Feb 2026
+      startOfPeriod = new Date(Date.UTC(year, 2, 1, 0, 0, 0, 0)); // March 1
+      endOfPeriod = new Date(Date.UTC(year + 1, 1, 28, 23, 59, 59, 999)); // Feb 28 of next year
+      referenceDate = new Date(Date.UTC(year + 1, 1, 28)); // Use Feb 28 as reference
     } else {
       // No year filter - use latest transaction's month
       const latestTransaction = await this.prisma.transaction.findFirst({
@@ -247,6 +248,83 @@ export class DashboardService {
     };
   }
 
+  /**
+   * Get available data periods for the tenant.
+   * Returns the date range of available transaction data.
+   */
+  async getAvailablePeriods(tenantId: string): Promise<{
+    hasData: boolean;
+    firstTransactionDate: string | null;
+    lastTransactionDate: string | null;
+    availableFinancialYears: {
+      year: number;
+      label: string;
+      startDate: string;
+      endDate: string;
+    }[];
+  }> {
+    // Get first and last transaction dates
+    const [firstTxn, lastTxn] = await Promise.all([
+      this.prisma.transaction.findFirst({
+        where: { tenantId, isDeleted: false },
+        orderBy: { date: 'asc' },
+        select: { date: true },
+      }),
+      this.prisma.transaction.findFirst({
+        where: { tenantId, isDeleted: false },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      }),
+    ]);
+
+    if (!firstTxn || !lastTxn) {
+      return {
+        hasData: false,
+        firstTransactionDate: null,
+        lastTransactionDate: null,
+        availableFinancialYears: [],
+      };
+    }
+
+    const firstDate = firstTxn.date;
+    const lastDate = lastTxn.date;
+
+    // Calculate available tax years (SA tax year: 1 March - 28/29 February)
+    // Tax year "2025" means 1 March 2025 to 28 Feb 2026 (TY 2025/26)
+    const getTaxYear = (date: Date): number => {
+      const month = date.getUTCMonth();
+      const year = date.getUTCFullYear();
+      // If before March (month 0=Jan, 1=Feb), it belongs to previous tax year
+      return month < 2 ? year - 1 : year;
+    };
+
+    const firstTY = getTaxYear(firstDate);
+    const lastTY = getTaxYear(lastDate);
+
+    const availableFinancialYears: {
+      year: number;
+      label: string;
+      startDate: string;
+      endDate: string;
+    }[] = [];
+
+    for (let ty = firstTY; ty <= lastTY; ty++) {
+      availableFinancialYears.push({
+        year: ty,
+        label: `TY ${ty}/${(ty + 1).toString().slice(-2)}`,
+        startDate: `${ty}-03-01`,
+        endDate: `${ty + 1}-02-28`, // Feb 28 (simplified, handles leap years in query)
+      });
+    }
+
+    return {
+      hasData: true,
+      firstTransactionDate: firstDate.toISOString().slice(0, 10),
+      lastTransactionDate: lastDate.toISOString().slice(0, 10),
+      availableFinancialYears: availableFinancialYears.reverse(), // Most recent first
+    };
+  }
+
   async getTrends(
     tenantId: string,
     period?: string,
@@ -261,11 +339,14 @@ export class DashboardService {
     let monthsToShow: number;
 
     if (year) {
-      // Year filter - show all 12 months of the specified year
-      refYear = year;
-      refMonth = 11; // December
+      // Year filter - show all 12 months of the SA tax year (March - February)
+      // Tax year 2025 = March 2025 to February 2026
+      refYear = year + 1; // End year (Feb of next year)
+      refMonth = 1; // February (0-indexed)
       monthsToShow = 12;
-      this.logger.debug(`Trends for calendar year ${year} (12 months)`);
+      this.logger.debug(
+        `Trends for tax year ${year}/${year + 1} (Mar ${year} - Feb ${year + 1})`,
+      );
     } else {
       // No year filter - use latest transaction's month as reference
       const latestTransaction = await this.prisma.transaction.findFirst({
@@ -287,11 +368,13 @@ export class DashboardService {
 
     for (let i = 0; i < monthsToShow; i++) {
       // Use UTC dates to avoid timezone issues
+      // Calculate start month: refMonth - (monthsToShow - 1) + i
+      const monthOffset = refMonth - (monthsToShow - 1) + i;
       const monthStart = new Date(
-        Date.UTC(refYear, refMonth - 5 + i, 1, 0, 0, 0, 0),
+        Date.UTC(refYear, monthOffset, 1, 0, 0, 0, 0),
       );
       const monthEnd = new Date(
-        Date.UTC(refYear, refMonth - 4 + i, 0, 23, 59, 59, 999),
+        Date.UTC(refYear, monthOffset + 1, 0, 23, 59, 59, 999),
       );
 
       // Get income from bank transactions (credits) for this month

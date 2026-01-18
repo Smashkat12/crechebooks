@@ -5,7 +5,9 @@ import {
   StaffOffboardingController,
   StaffOffboardingsController,
 } from './offboarding.controller';
+import { LeaveController } from './leave.controller';
 import { StaffRepository } from '../../database/repositories/staff.repository';
+import { LeaveRequestRepository } from '../../database/repositories/leave-request.repository';
 import { DatabaseModule } from '../../database/database.module';
 import { EmailModule } from '../../integrations/email/email.module';
 import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
@@ -17,8 +19,9 @@ import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
     StaffOnboardingController,
     StaffOffboardingController,
     StaffOffboardingsController,
+    LeaveController,
   ],
-  providers: [StaffRepository],
-  exports: [StaffRepository],
+  providers: [StaffRepository, LeaveRequestRepository],
+  exports: [StaffRepository, LeaveRequestRepository],
 })
 export class StaffModule {}

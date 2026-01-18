@@ -9,6 +9,7 @@ import { StatementSchedulerProcessor } from './processors/statement-scheduler.pr
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
+import { ReminderTemplateService } from '../billing/reminder-template.service';
 
 const logger = new Logger('SchedulerModule');
 
@@ -97,7 +98,7 @@ const schedulerProviders = isRedisConfigured()
 
 @Module({
   imports: [SarsSchedulerModule, DatabaseModule, ...bullImports],
-  providers: schedulerProviders,
+  providers: [...schedulerProviders, ReminderTemplateService],
   exports: [...(isRedisConfigured() ? [SchedulerService, BullModule] : [])],
 })
 export class SchedulerModule {}

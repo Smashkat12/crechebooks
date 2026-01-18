@@ -19,8 +19,27 @@ import {
 import { TenantRepository } from '../../database/repositories/tenant.repository';
 import { UpdateTenantDto } from '../../database/dto/tenant.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
-import type { Tenant } from '@prisma/client';
+import { UserRole, type Tenant } from '@prisma/client';
+
+/**
+ * Serializable tenant response type with BigInt converted to string
+ */
+type SerializedTenant = Omit<Tenant, 'cumulativeTurnoverCents'> & {
+  cumulativeTurnoverCents: string;
+};
+
+/**
+ * Transform tenant with BigInt fields to JSON-serializable format
+ * BigInt cannot be serialized by JSON.stringify, so we convert to string
+ */
+function serializeTenant(tenant: Tenant): SerializedTenant {
+  return {
+    ...tenant,
+    cumulativeTurnoverCents: tenant.cumulativeTurnoverCents.toString(),
+  };
+}
 
 @Controller('tenants')
 @ApiTags('Tenants')
@@ -42,9 +61,12 @@ export class TenantController {
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - valid JWT token required',
   })
-  async getCurrentTenant(@CurrentUser() user: IUser): Promise<Tenant> {
+  async getCurrentTenant(
+    @CurrentUser() user: IUser,
+  ): Promise<SerializedTenant> {
     this.logger.debug(`Getting tenant for user ${user.id}`);
-    return this.tenantRepository.findByIdOrThrow(user.tenantId);
+    const tenant = await this.tenantRepository.findByIdOrThrow(user.tenantId);
+    return serializeTenant(tenant);
   }
 
   @Get(':id')
@@ -70,20 +92,23 @@ export class TenantController {
   async getTenant(
     @CurrentUser() user: IUser,
     @Param('id') tenantId: string,
-  ): Promise<Tenant> {
+  ): Promise<SerializedTenant> {
     // Verify user belongs to this tenant
     if (user.tenantId !== tenantId) {
       throw new ForbiddenException('You do not have access to this tenant');
     }
 
     this.logger.debug(`Getting tenant ${tenantId}`);
-    return this.tenantRepository.findByIdOrThrow(tenantId);
+    const tenant = await this.tenantRepository.findByIdOrThrow(tenantId);
+    return serializeTenant(tenant);
   }
 
   @Put(':id')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Update tenant',
-    description: 'Updates tenant information (organization details)',
+    description:
+      'Updates tenant information (organization details). Requires OWNER or ADMIN role.',
   })
   @ApiParam({
     name: 'id',
@@ -98,22 +123,21 @@ export class TenantController {
     description: 'Unauthorized - valid JWT token required',
   })
   @ApiForbiddenResponse({
-    description: 'User does not belong to this tenant or lacks permission',
+    description:
+      'User does not belong to this tenant or lacks required role (OWNER/ADMIN)',
   })
   async updateTenant(
     @CurrentUser() user: IUser,
     @Param('id') tenantId: string,
     @Body() dto: UpdateTenantDto,
-  ): Promise<Tenant> {
-    // Verify user belongs to this tenant
+  ): Promise<SerializedTenant> {
+    // Verify user belongs to this tenant (tenant isolation check)
     if (user.tenantId !== tenantId) {
       throw new ForbiddenException('You do not have access to this tenant');
     }
 
-    // For now, allow any authenticated user to update their tenant
-    // In production, you might want to check for OWNER/ADMIN role
     this.logger.debug(`Updating tenant ${tenantId}: ${JSON.stringify(dto)}`);
-
-    return this.tenantRepository.update(tenantId, dto);
+    const tenant = await this.tenantRepository.update(tenantId, dto);
+    return serializeTenant(tenant);
   }
 }

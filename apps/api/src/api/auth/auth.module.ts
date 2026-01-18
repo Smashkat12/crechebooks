@@ -16,11 +16,11 @@ import { FailedAttemptsService } from './failed-attempts.service';
 
 /**
  * TASK-SEC-001: JWT Token Expiration Security Defaults
- * - Access tokens: 1 hour (3600s) - short-lived for security
+ * - Access tokens: 8 hours (28800s) in development, 1 hour in production
  * - Refresh tokens: 7 days (604800s) - longer-lived for convenience
  * - Minimum JWT secret length: 32 characters in production
  */
-export const JWT_EXPIRATION_DEFAULT = 3600; // 1 hour in seconds
+export const JWT_EXPIRATION_DEFAULT = 28800; // 8 hours in seconds (for development)
 export const JWT_REFRESH_EXPIRATION_DEFAULT = 604800; // 7 days in seconds
 export const JWT_SECRET_MIN_LENGTH = 32;
 
@@ -39,14 +39,18 @@ export const JWT_SECRET_MIN_LENGTH = 32;
         const secret =
           nodeEnv === 'development' && jwtSecret ? jwtSecret : auth0Secret;
 
-        // TASK-SEC-001: Reduced default from 86400 (24h) to 3600 (1h) for security
+        // TASK-SEC-001: Parse JWT_EXPIRATION as number, use default for development
+        const jwtExpirationStr = configService.get<string>('JWT_EXPIRATION');
+        const jwtExpiration = jwtExpirationStr
+          ? parseInt(jwtExpirationStr, 10)
+          : JWT_EXPIRATION_DEFAULT;
+
         return {
           secret,
           signOptions: {
-            expiresIn: configService.get<number>(
-              'JWT_EXPIRATION',
-              JWT_EXPIRATION_DEFAULT,
-            ),
+            expiresIn: isNaN(jwtExpiration)
+              ? JWT_EXPIRATION_DEFAULT
+              : jwtExpiration,
           },
         };
       },

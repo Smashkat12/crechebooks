@@ -29,7 +29,8 @@ async function bootstrap(): Promise<void> {
   });
 
   // Get the structured logger and use it as the app logger
-  const logger = app.get(StructuredLoggerService);
+  // Use resolve() for transient-scoped providers
+  const logger = await app.resolve(StructuredLoggerService);
   logger.setContext('Bootstrap');
   app.useLogger(logger);
 

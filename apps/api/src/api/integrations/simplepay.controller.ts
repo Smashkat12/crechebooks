@@ -41,6 +41,7 @@ import { SimplePayConnectionService } from '../../integrations/simplepay/simplep
 import { SimplePayEmployeeService } from '../../integrations/simplepay/simplepay-employee.service';
 import { SimplePayPayslipService } from '../../integrations/simplepay/simplepay-payslip.service';
 import { SimplePayTaxService } from '../../integrations/simplepay/simplepay-tax.service';
+import { SimplePayProfileService } from '../../integrations/simplepay/simplepay-profile.service';
 import {
   SetupConnectionDto,
   ConnectionStatusDto,
@@ -92,6 +93,7 @@ export class SimplePayController {
     private readonly employeeService: SimplePayEmployeeService,
     private readonly payslipService: SimplePayPayslipService,
     private readonly taxService: SimplePayTaxService,
+    private readonly profileService: SimplePayProfileService,
   ) {}
 
   // ============================================
@@ -220,8 +222,105 @@ export class SimplePayController {
   }
 
   // ============================================
+  // Profile Management
+  // ============================================
+
+  @Get('profiles')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Get available SimplePay profiles',
+    description:
+      'List all payroll profiles (calculation templates) configured in SimplePay. ' +
+      'Profiles define pay frequency, earnings, deductions, and leave settings.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of available profiles',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'number', description: 'SimplePay profile ID' },
+          name: { type: 'string', description: 'Profile name' },
+          description: { type: 'string', description: 'Profile description' },
+          calculationCount: {
+            type: 'number',
+            description: 'Number of calculations in profile',
+          },
+          isDefault: {
+            type: 'boolean',
+            description: 'Whether this is the default profile',
+          },
+        },
+      },
+    },
+  })
+  async getAvailableProfiles(@CurrentUser() user: IUser): Promise<
+    Array<{
+      id: number;
+      name: string;
+      description: string | null;
+      calculationCount: number;
+      isDefault: boolean;
+    }>
+  > {
+    return this.profileService.getAvailableProfiles(user.tenantId);
+  }
+
+  // ============================================
   // Employee Sync
   // ============================================
+
+  @Get('employees')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'List all SimplePay employees',
+    description:
+      'Fetch all employees from SimplePay for the connected client. ' +
+      'Useful for debugging and verifying employee sync status.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of SimplePay employees',
+    schema: {
+      type: 'object',
+      properties: {
+        employees: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'number' },
+              first_name: { type: 'string' },
+              last_name: { type: 'string' },
+              id_number: { type: 'string' },
+              number: { type: 'string' },
+              email: { type: 'string' },
+            },
+          },
+        },
+        count: { type: 'number' },
+      },
+    },
+  })
+  async listSimplePayEmployees(@CurrentUser() user: IUser): Promise<{
+    employees: Array<{
+      id: number;
+      first_name: string;
+      last_name: string;
+      id_number: string;
+      number: string;
+      email: string;
+    }>;
+    count: number;
+  }> {
+    const employees = await this.connectionService.listEmployees(user.tenantId);
+    return {
+      employees,
+      count: employees.length,
+    };
+  }
 
   @Post('employees/:staffId/sync')
   @Roles(UserRole.OWNER, UserRole.ADMIN)

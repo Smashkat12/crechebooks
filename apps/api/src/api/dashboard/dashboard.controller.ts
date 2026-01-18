@@ -101,6 +101,24 @@ export class DashboardController {
     return this.dashboardService.getTrends(user.tenantId, period, yearNum);
   }
 
+  @Get('available-periods')
+  @ApiOperation({
+    summary: 'Get available data periods',
+    description:
+      'Returns the date range of available transaction data and available financial years for filtering.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Available periods retrieved successfully',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  async getAvailablePeriods(@CurrentUser() user: IUser) {
+    this.logger.debug(`Getting available periods for tenant ${user.tenantId}`);
+    return this.dashboardService.getAvailablePeriods(user.tenantId);
+  }
+
   @Get('learning-mode')
   @ApiOperation({
     summary: 'Get learning mode progress',

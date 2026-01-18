@@ -127,20 +127,20 @@ enum LineType {
   // VAT EXEMPT - Educational/Childcare Services (Section 12(h))
   MONTHLY_FEE
   REGISTRATION
-  RE_REGISTRATION     // TASK-BILL-038: New - Continuing student annual fee
-  EXTRA_MURAL         // TASK-BILL-038: New - Subordinate to education
-  EXTRA               // Deprecated - Use specific types
+  RE_REGISTRATION // TASK-BILL-038: New - Continuing student annual fee
+  EXTRA_MURAL // TASK-BILL-038: New - Subordinate to education
+  EXTRA // Deprecated - Use specific types
 
   // VAT APPLICABLE - Goods & Non-Educational Services (15%)
   BOOKS
   SCHOOL_TRIP
   STATIONERY
   UNIFORM
-  MEALS               // TASK-BILL-038: New - Prepared food
-  TRANSPORT           // TASK-BILL-038: New - To/from school
-  LATE_PICKUP         // TASK-BILL-038: New - Penalty fee
-  DAMAGED_EQUIPMENT   // TASK-BILL-038: New - Replacement charge
-  AD_HOC              // Configurable via isVatExempt flag
+  MEALS // TASK-BILL-038: New - Prepared food
+  TRANSPORT // TASK-BILL-038: New - To/from school
+  LATE_PICKUP // TASK-BILL-038: New - Penalty fee
+  DAMAGED_EQUIPMENT // TASK-BILL-038: New - Replacement charge
+  AD_HOC // Configurable via isVatExempt flag
 
   // NO VAT - Adjustments
   DISCOUNT
@@ -204,11 +204,45 @@ enum ReconciliationStatus {
 
 // TASK-RECON-019: Bank Statement Transaction Matching
 enum BankStatementMatchStatus {
-  MATCHED          // Transaction exists in both bank and Xero
-  IN_BANK_ONLY     // Transaction in bank statement, not in Xero
-  IN_XERO_ONLY     // Transaction in Xero, not in bank statement
-  AMOUNT_MISMATCH  // Same transaction, different amounts
-  DATE_MISMATCH    // Same transaction, dates differ > 1 day
+  MATCHED // Transaction exists in both bank and Xero
+  IN_BANK_ONLY // Transaction in bank statement, not in Xero
+  IN_XERO_ONLY // Transaction in Xero, not in bank statement
+  AMOUNT_MISMATCH // Same transaction, different amounts
+  DATE_MISMATCH // Same transaction, dates differ > 1 day
+  FEE_ADJUSTED_MATCH // Match when Bank NET + Accrued Fee = Xero GROSS
+}
+
+// ============================================
+// TASK-RECON-036: Accrued Bank Charges
+// Tracks bank fees shown on statements but charged in following period
+// ============================================
+
+enum AccruedBankChargeStatus {
+  ACCRUED // Fee shown on statement but not yet charged
+  MATCHED // Fee matched to actual charge transaction
+  REVERSED // Fee was reversed/waived
+  WRITTEN_OFF // Fee written off (not expected to be charged)
+}
+
+// TASK-RECON-035: Split Transaction Matching
+enum SplitMatchStatus {
+  PENDING // Split match suggested, awaiting confirmation
+  CONFIRMED // Split match confirmed and applied
+  REJECTED // Split match rejected by user
+}
+
+// TASK-RECON-035: Split Match Types
+enum SplitMatchType {
+  ONE_TO_MANY // Single bank transaction matches multiple invoices
+  MANY_TO_ONE // Multiple payments match single invoice
+}
+
+// TASK-RECON-037: Xero Transaction Split Status
+enum XeroTransactionSplitStatus {
+  PENDING // Split created but not confirmed
+  CONFIRMED // Split confirmed and ready for matching
+  MATCHED // Net amount matched to bank statement
+  CANCELLED // Split cancelled/reverted
 }
 
 enum EscalationLevel {
@@ -433,6 +467,25 @@ model Tenant {
   // TASK-STAFF-006: UI-19 Deadline Tracking
   ui19Submissions UI19Submission[]
 
+  // TASK-SPAY-009: SimplePay Webhook Handler
+  webhookLogs WebhookLog[]
+
+  // TASK-XERO-009: Bidirectional Invoice Sync
+  xeroInvoiceMappings XeroInvoiceMapping[]
+
+  // TASK-XERO-010: Xero Contact and Payment Sync
+  xeroContactMappings XeroContactMapping[]
+  xeroPaymentMappings XeroPaymentMapping[]
+
+  // TASK-RECON-035: Split Transaction Matching
+  splitMatches SplitMatch[]
+
+  // TASK-RECON-036: Accrued Bank Charges
+  accruedBankCharges AccruedBankCharge[]
+
+  // TASK-RECON-037: Xero Transaction Splitting
+  xeroTransactionSplits XeroTransactionSplit[]
+
   @@map("tenants")
 }
 
@@ -461,6 +514,13 @@ model User {
 
   // TASK-RECON-005: Manual Match History tracking
   manualMatchHistory ManualMatchHistory[] @relation("ManualMatchPerformer")
+
+  // TASK-RECON-036: Accrued Bank Charge matching
+  accruedChargeMatches AccruedBankCharge[] @relation("AccruedChargeMatcher")
+
+  // TASK-RECON-037: Xero Transaction Split tracking
+  xeroSplitsCreated   XeroTransactionSplit[] @relation("XeroSplitCreator")
+  xeroSplitsConfirmed XeroTransactionSplit[] @relation("XeroSplitConfirmer")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -532,15 +592,22 @@ model Transaction {
   duplicates            Transaction[]          @relation("TransactionDuplicates")
   reversesTransaction   Transaction?           @relation("TransactionReversals", fields: [reversesTransactionId], references: [id], onDelete: SetNull)
   reversals             Transaction[]          @relation("TransactionReversals")
-  categorizations        Categorization[]
-  payments               Payment[]
-  categorizationMetrics  CategorizationMetric[]
-  bankStatementMatches   BankStatementMatch[]
-  categorizationJournal  CategorizationJournal?
+  categorizations       Categorization[]
+  payments              Payment[]
+  categorizationMetrics CategorizationMetric[]
+  bankStatementMatches  BankStatementMatch[]
+  categorizationJournal CategorizationJournal?
 
   // TASK-RECON-005: Manual Match History tracking
   previousMatchHistory ManualMatchHistory[] @relation("PreviousMatchedTransaction")
   newMatchHistory      ManualMatchHistory[] @relation("NewMatchedTransaction")
+
+  // TASK-RECON-036: Accrued Bank Charges
+  accruedChargesAsSource AccruedBankCharge[] @relation("AccruedChargeSource")
+  accruedChargesAsCharge AccruedBankCharge[] @relation("AccruedChargeActual")
+
+  // TASK-RECON-037: Xero Transaction Splitting
+  xeroSplitsAsBankTransaction XeroTransactionSplit[] @relation("XeroSplitBankTransaction")
 
   @@index([tenantId, date])
   @@index([tenantId, status])
@@ -676,6 +743,9 @@ model Parent {
   creditBalances CreditBalance[]
   statements     Statement[]
 
+  // TASK-XERO-010: Xero Contact Mapping
+  xeroContactMapping XeroContactMapping?
+
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([tenantId, lastName, firstName])
@@ -715,21 +785,21 @@ model CreditBalance {
 }
 
 model Child {
-  id               String   @id @default(uuid())
-  tenantId         String   @map("tenant_id")
-  parentId         String   @map("parent_id")
-  firstName        String   @map("first_name") @db.VarChar(100)
-  lastName         String   @map("last_name") @db.VarChar(100)
-  dateOfBirth      DateTime @map("date_of_birth") @db.Date
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  parentId         String    @map("parent_id")
+  firstName        String    @map("first_name") @db.VarChar(100)
+  lastName         String    @map("last_name") @db.VarChar(100)
+  dateOfBirth      DateTime  @map("date_of_birth") @db.Date
   gender           Gender?
-  medicalNotes     String?  @map("medical_notes")
-  emergencyContact String?  @map("emergency_contact") @db.VarChar(200)
-  emergencyPhone   String?  @map("emergency_phone") @db.VarChar(20)
-  isActive         Boolean  @default(true) @map("is_active")
+  medicalNotes     String?   @map("medical_notes")
+  emergencyContact String?   @map("emergency_contact") @db.VarChar(200)
+  emergencyPhone   String?   @map("emergency_phone") @db.VarChar(20)
+  isActive         Boolean   @default(true) @map("is_active")
   // TASK-DATA-003: Soft delete support
   deletedAt        DateTime? @map("deleted_at")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   parent      Parent       @relation(fields: [parentId], references: [id], onDelete: Cascade)
@@ -779,6 +849,12 @@ model Invoice {
   adHocCharges   AdHocCharge[]
   deliveryLogs   InvoiceDeliveryLog[]
   creditBalances CreditBalance[]      @relation("CreditAppliedToInvoice")
+
+  // TASK-XERO-009: Bidirectional Invoice Sync
+  xeroInvoiceMapping XeroInvoiceMapping?
+
+  // TASK-RECON-035: Split Transaction Matching
+  splitMatchComponents SplitMatchComponent[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, parentId])
@@ -868,9 +944,13 @@ model Payment {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  transaction Transaction? @relation(fields: [transactionId], references: [id])
-  invoice     Invoice      @relation(fields: [invoiceId], references: [id])
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  transaction          Transaction?          @relation(fields: [transactionId], references: [id])
+  invoice              Invoice               @relation(fields: [invoiceId], references: [id])
+  splitMatchComponents SplitMatchComponent[]
+
+  // TASK-XERO-010: Xero Payment Mapping
+  xeroPaymentMapping XeroPaymentMapping?
 
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
@@ -904,9 +984,9 @@ model Staff {
 
   // TASK-STAFF-001: Additional onboarding fields
   // Emergency contact details
-  emergencyContactName     String?  @map("emergency_contact_name") @db.VarChar(200)
-  emergencyContactPhone    String?  @map("emergency_contact_phone") @db.VarChar(20)
-  emergencyContactRelation String?  @map("emergency_contact_relation") @db.VarChar(50)
+  emergencyContactName     String? @map("emergency_contact_name") @db.VarChar(200)
+  emergencyContactPhone    String? @map("emergency_contact_phone") @db.VarChar(20)
+  emergencyContactRelation String? @map("emergency_contact_relation") @db.VarChar(50)
 
   // Address details
   address    String? @db.VarChar(500)
@@ -1047,8 +1127,8 @@ model Reconciliation {
   createdAt              DateTime             @default(now()) @map("created_at")
   updatedAt              DateTime             @updatedAt @map("updated_at")
 
-  tenant               Tenant                @relation(fields: [tenantId], references: [id])
-  reconciler           User?                 @relation("ReconciliationReconciler", fields: [reconciledBy], references: [id])
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  reconciler           User?                @relation("ReconciliationReconciler", fields: [reconciledBy], references: [id])
   bankStatementMatches BankStatementMatch[]
 
   @@unique([tenantId, bankAccount, periodStart])
@@ -1058,9 +1138,9 @@ model Reconciliation {
 
 // TASK-RECON-019: Bank Statement to Xero Transaction Matching
 model BankStatementMatch {
-  id               String                   @id @default(uuid())
-  tenantId         String                   @map("tenant_id")
-  reconciliationId String                   @map("reconciliation_id")
+  id               String @id @default(uuid())
+  tenantId         String @map("tenant_id")
+  reconciliationId String @map("reconciliation_id")
 
   // Bank statement side
   bankDate        DateTime @map("bank_date") @db.Date
@@ -1080,6 +1160,11 @@ model BankStatementMatch {
   matchConfidence   Decimal?                 @map("match_confidence") @db.Decimal(5, 2)
   discrepancyReason String?                  @map("discrepancy_reason")
 
+  // TASK-RECON-036: Fee adjustment tracking
+  isFeeAdjustedMatch  Boolean @default(false) @map("is_fee_adjusted_match")
+  accruedFeeAmountCents Int?   @map("accrued_fee_amount_cents")
+  feeType              String? @map("fee_type") @db.VarChar(50) // ADT_DEPOSIT_FEE, CASH_DEPOSIT_FEE, etc.
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1089,6 +1174,12 @@ model BankStatementMatch {
 
   // TASK-RECON-005: Manual Match History tracking
   manualMatchHistory ManualMatchHistory[]
+
+  // TASK-RECON-036: Accrued bank charge tracking
+  accruedBankCharge AccruedBankCharge?
+
+  // TASK-RECON-037: Xero transaction split tracking
+  xeroTransactionSplits XeroTransactionSplit[]
 
   @@index([tenantId])
   @@index([reconciliationId])
@@ -1138,17 +1229,62 @@ model ManualMatchHistory {
   action                String   @db.VarChar(20)
   reason                String?  @db.Text
 
-  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  match               BankStatementMatch  @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  performer           User                @relation("ManualMatchPerformer", fields: [performedBy], references: [id])
-  previousTransaction Transaction?        @relation("PreviousMatchedTransaction", fields: [previousTransactionId], references: [id], onDelete: SetNull)
-  newTransaction      Transaction?        @relation("NewMatchedTransaction", fields: [newTransactionId], references: [id], onDelete: SetNull)
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  match               BankStatementMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  performer           User               @relation("ManualMatchPerformer", fields: [performedBy], references: [id])
+  previousTransaction Transaction?       @relation("PreviousMatchedTransaction", fields: [previousTransactionId], references: [id], onDelete: SetNull)
+  newTransaction      Transaction?       @relation("NewMatchedTransaction", fields: [newTransactionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([matchId])
   @@index([performedBy])
   @@index([performedAt(sort: Desc)])
   @@map("manual_match_history")
+}
+
+// ============================================
+// TASK-RECON-035: Split Transaction Matching
+// Matches single bank transaction to multiple invoices or vice versa
+// ============================================
+
+model SplitMatch {
+  id                 String           @id @default(uuid())
+  tenantId           String           @map("tenant_id")
+  bankTransactionId  String           @map("bank_transaction_id")
+  matchType          SplitMatchType   @map("match_type")
+  totalAmountCents   Int              @map("total_amount_cents")
+  matchedAmountCents Int              @map("matched_amount_cents")
+  remainderCents     Int              @map("remainder_cents")
+  status             SplitMatchStatus @default(PENDING)
+  confirmedBy        String?          @map("confirmed_by")
+  confirmedAt        DateTime?        @map("confirmed_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  components SplitMatchComponent[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, bankTransactionId])
+  @@map("split_matches")
+}
+
+model SplitMatchComponent {
+  id           String   @id @default(uuid())
+  splitMatchId String   @map("split_match_id")
+  invoiceId    String?  @map("invoice_id")
+  paymentId    String?  @map("payment_id")
+  amountCents  Int      @map("amount_cents")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  splitMatch SplitMatch @relation(fields: [splitMatchId], references: [id], onDelete: Cascade)
+  invoice    Invoice?   @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  payment    Payment?   @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([splitMatchId])
+  @@index([invoiceId])
+  @@index([paymentId])
+  @@map("split_match_components")
 }
 
 model XeroToken {
@@ -1177,19 +1313,19 @@ enum XeroAccountStatus {
 }
 
 model XeroAccount {
-  id            String             @id @default(uuid())
-  tenantId      String             @map("tenant_id")
-  accountCode   String             @map("account_code") @db.VarChar(20)
-  name          String             @db.VarChar(255)
-  type          String             @db.VarChar(50)
-  taxType       String?            @map("tax_type") @db.VarChar(50)
-  status        XeroAccountStatus  @default(ACTIVE)
-  xeroAccountId String?            @map("xero_account_id") @db.VarChar(50)
-  lastSyncedAt  DateTime           @map("last_synced_at")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @updatedAt @map("updated_at")
+  id            String            @id @default(uuid())
+  tenantId      String            @map("tenant_id")
+  accountCode   String            @map("account_code") @db.VarChar(20)
+  name          String            @db.VarChar(255)
+  type          String            @db.VarChar(50)
+  taxType       String?           @map("tax_type") @db.VarChar(50)
+  status        XeroAccountStatus @default(ACTIVE)
+  xeroAccountId String?           @map("xero_account_id") @db.VarChar(50)
+  lastSyncedAt  DateTime          @map("last_synced_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
 
-  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, accountCode])
   @@index([tenantId])
@@ -1719,7 +1855,7 @@ model CategorizationJournal {
   journalNumber   String?                     @map("journal_number") @db.VarChar(50)
   status          CategorizationJournalStatus @default(PENDING)
   fromAccountCode String                      @map("from_account_code") @db.VarChar(20) // Suspense account (9999)
-  toAccountCode   String                      @map("to_account_code") @db.VarChar(20)   // Target expense account
+  toAccountCode   String                      @map("to_account_code") @db.VarChar(20) // Target expense account
   amountCents     Int                         @map("amount_cents")
   isCredit        Boolean                     @map("is_credit")
   narration       String                      @db.VarChar(500)
@@ -1924,24 +2060,24 @@ enum LeaveRequestStatus {
 }
 
 model LeaveRequest {
-  id               String             @id @default(uuid())
-  tenantId         String             @map("tenant_id")
-  staffId          String             @map("staff_id")
-  leaveTypeId      Int                @map("leave_type_id")
-  leaveTypeName    String             @map("leave_type_name") @db.VarChar(100)
-  startDate        DateTime           @map("start_date") @db.Date
-  endDate          DateTime           @map("end_date") @db.Date
-  totalDays        Decimal            @map("total_days") @db.Decimal(4, 1)
-  totalHours       Decimal            @map("total_hours") @db.Decimal(5, 1)
-  reason           String?
-  status           LeaveRequestStatus @default(PENDING)
-  approvedBy       String?            @map("approved_by")
-  approvedAt       DateTime?          @map("approved_at")
-  rejectedReason   String?            @map("rejected_reason")
-  simplePaySynced  Boolean            @default(false) @map("simplepay_synced")
-  simplePayIds     String[]           @map("simplepay_ids")
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
+  id              String             @id @default(uuid())
+  tenantId        String             @map("tenant_id")
+  staffId         String             @map("staff_id")
+  leaveTypeId     Int                @map("leave_type_id")
+  leaveTypeName   String             @map("leave_type_name") @db.VarChar(100)
+  startDate       DateTime           @map("start_date") @db.Date
+  endDate         DateTime           @map("end_date") @db.Date
+  totalDays       Decimal            @map("total_days") @db.Decimal(4, 1)
+  totalHours      Decimal            @map("total_hours") @db.Decimal(5, 1)
+  reason          String?
+  status          LeaveRequestStatus @default(PENDING)
+  approvedBy      String?            @map("approved_by")
+  approvedAt      DateTime?          @map("approved_at")
+  rejectedReason  String?            @map("rejected_reason")
+  simplePaySynced Boolean            @default(false) @map("simplepay_synced")
+  simplePayIds    String[]           @map("simplepay_ids")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -2060,15 +2196,15 @@ model PayrollAdjustment {
 // ============================================
 
 enum TerminationCode {
-  RESIGNATION          // Code 1: UIF eligible after waiting period
+  RESIGNATION // Code 1: UIF eligible after waiting period
   DISMISSAL_MISCONDUCT // Code 2: NOT UIF eligible
   DISMISSAL_INCAPACITY // Code 3: UIF eligible
-  RETRENCHMENT         // Code 4: UIF eligible
-  CONTRACT_EXPIRY      // Code 5: UIF eligible
-  RETIREMENT           // Code 6: UIF eligible
-  DEATH                // Code 7: Benefits to dependents
-  ABSCONDED            // Code 8: NOT UIF eligible
-  TRANSFER             // Code 9: N/A
+  RETRENCHMENT // Code 4: UIF eligible
+  CONTRACT_EXPIRY // Code 5: UIF eligible
+  RETIREMENT // Code 6: UIF eligible
+  DEATH // Code 7: Benefits to dependents
+  ABSCONDED // Code 8: NOT UIF eligible
+  TRANSFER // Code 9: N/A
 }
 
 model ServicePeriodSync {
@@ -2187,20 +2323,20 @@ enum BulkOperationStatus {
 }
 
 model BulkOperationLog {
-  id              String              @id @default(cuid())
-  tenantId        String              @map("tenant_id")
-  operationType   BulkOperationType   @map("operation_type")
-  status          BulkOperationStatus @default(PENDING)
-  totalEntities   Int                 @map("total_entities")
-  successCount    Int                 @default(0) @map("success_count")
-  failureCount    Int                 @default(0) @map("failure_count")
-  requestData     Json                @map("request_data")
-  resultData      Json?               @map("result_data")
-  errors          Json?
-  warnings        Json?
-  executedBy      String              @map("executed_by")
-  startedAt       DateTime            @default(now()) @map("started_at")
-  completedAt     DateTime?           @map("completed_at")
+  id            String              @id @default(cuid())
+  tenantId      String              @map("tenant_id")
+  operationType BulkOperationType   @map("operation_type")
+  status        BulkOperationStatus @default(PENDING)
+  totalEntities Int                 @map("total_entities")
+  successCount  Int                 @default(0) @map("success_count")
+  failureCount  Int                 @default(0) @map("failure_count")
+  requestData   Json                @map("request_data")
+  resultData    Json?               @map("result_data")
+  errors        Json?
+  warnings      Json?
+  executedBy    String              @map("executed_by")
+  startedAt     DateTime            @default(now()) @map("started_at")
+  completedAt   DateTime?           @map("completed_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
@@ -2227,31 +2363,31 @@ enum SetupStatus {
 // TASK-SARS-002: VAT201 Adjustment Fields (Fields 7-13)
 // South African VAT201 form adjustment types per SARS specification
 enum VatAdjustmentType {
-  CHANGE_IN_USE_OUTPUT    // Field 7: Change in use adjustments (Output)
-  CHANGE_IN_USE_INPUT     // Field 8: Change in use adjustments (Input)
-  OTHER_OUTPUT            // Field 9: Other adjustments to output tax
-  OTHER_INPUT             // Field 10: Other adjustments to input tax
-  BAD_DEBTS_WRITTEN_OFF   // Field 11: Bad debts written off
-  BAD_DEBTS_RECOVERED     // Field 12: Bad debts recovered
-  CAPITAL_GOODS_SCHEME    // Field 13: Capital goods scheme adjustments
+  CHANGE_IN_USE_OUTPUT // Field 7: Change in use adjustments (Output)
+  CHANGE_IN_USE_INPUT // Field 8: Change in use adjustments (Input)
+  OTHER_OUTPUT // Field 9: Other adjustments to output tax
+  OTHER_INPUT // Field 10: Other adjustments to input tax
+  BAD_DEBTS_WRITTEN_OFF // Field 11: Bad debts written off
+  BAD_DEBTS_RECOVERED // Field 12: Bad debts recovered
+  CAPITAL_GOODS_SCHEME // Field 13: Capital goods scheme adjustments
 }
 
 model EmployeeSetupLog {
-  id                  String       @id @default(cuid())
-  tenantId            String       @map("tenant_id")
-  staffId             String       @unique @map("staff_id")
-  simplePayEmployeeId String?      @map("simplepay_employee_id")
-  status              SetupStatus  @default(PENDING)
-  setupSteps          Json         @default("[]") @map("setup_steps")
-  profileAssigned     String?      @map("profile_assigned")
-  leaveInitialized    Boolean      @default(false) @map("leave_initialized")
-  taxConfigured       Boolean      @default(false) @map("tax_configured")
-  calculationsAdded   Int          @default(0) @map("calculations_added")
-  triggeredBy         String       @map("triggered_by")
+  id                  String      @id @default(cuid())
+  tenantId            String      @map("tenant_id")
+  staffId             String      @unique @map("staff_id")
+  simplePayEmployeeId String?     @map("simplepay_employee_id")
+  status              SetupStatus @default(PENDING)
+  setupSteps          Json        @default("[]") @map("setup_steps")
+  profileAssigned     String?     @map("profile_assigned")
+  leaveInitialized    Boolean     @default(false) @map("leave_initialized")
+  taxConfigured       Boolean     @default(false) @map("tax_configured")
+  calculationsAdded   Int         @default(0) @map("calculations_added")
+  triggeredBy         String      @map("triggered_by")
   errors              Json?
   warnings            Json?
-  startedAt           DateTime     @default(now()) @map("started_at")
-  completedAt         DateTime?    @map("completed_at")
+  startedAt           DateTime    @default(now()) @map("started_at")
+  completedAt         DateTime?   @map("completed_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   staff  Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
@@ -2292,4 +2428,231 @@ model VatAdjustment {
   @@index([tenantId, adjustmentDate])
   @@index([tenantId, isVoided])
   @@map("vat_adjustments")
+}
+
+// ============================================
+// TASK-SPAY-009: SimplePay Webhook Handler
+// Logs incoming webhooks for audit and processing
+// ============================================
+
+model WebhookLog {
+  id          String    @id @default(uuid())
+  tenantId    String?   @map("tenant_id")
+  source      String    @db.VarChar(50)
+  eventType   String    @map("event_type") @db.VarChar(100)
+  deliveryId  String?   @map("delivery_id") @db.VarChar(100) // SimplePay delivery_id for idempotency
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime? @map("processed_at")
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@unique([source, deliveryId]) // Ensure idempotency per source
+  @@index([source, eventType])
+  @@index([processed])
+  @@index([createdAt])
+  @@map("webhook_logs")
+}
+
+// ============================================
+// TASK-XERO-009: Bidirectional Invoice Sync
+// Track invoice sync mapping between CrecheBooks and Xero
+// ============================================
+
+enum InvoiceSyncDirection {
+  PUSH // CrecheBooks -> Xero
+  PULL // Xero -> CrecheBooks
+  BIDIRECTIONAL
+}
+
+enum InvoiceSyncStatus {
+  SYNCED
+  PENDING
+  FAILED
+  OUT_OF_SYNC
+}
+
+model XeroInvoiceMapping {
+  id                String               @id @default(uuid())
+  tenantId          String               @map("tenant_id")
+  invoiceId         String               @unique @map("invoice_id")
+  xeroInvoiceId     String               @map("xero_invoice_id") @db.VarChar(50)
+  xeroInvoiceNumber String?              @map("xero_invoice_number") @db.VarChar(50)
+  lastSyncedAt      DateTime             @map("last_synced_at")
+  syncDirection     InvoiceSyncDirection @map("sync_direction")
+  syncStatus        InvoiceSyncStatus    @default(SYNCED) @map("sync_status")
+  syncErrorMessage  String?              @map("sync_error_message")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@unique([tenantId, invoiceId])
+  @@unique([tenantId, xeroInvoiceId])
+  @@index([tenantId])
+  @@index([tenantId, syncStatus])
+  @@map("xero_invoice_mappings")
+}
+
+// ============================================
+// TASK-XERO-010: Xero Contact and Payment Sync
+// Maps parent records to Xero contacts for invoice/payment sync
+// ============================================
+
+model XeroContactMapping {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  parentId        String   @unique @map("parent_id")
+  xeroContactId   String   @map("xero_contact_id")
+  xeroContactName String?  @map("xero_contact_name")
+  lastSyncedAt    DateTime @map("last_synced_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  parent Parent @relation(fields: [parentId], references: [id])
+
+  @@unique([tenantId, parentId])
+  @@unique([tenantId, xeroContactId])
+  @@index([tenantId])
+  @@map("xero_contact_mappings")
+}
+
+// ============================================
+// TASK-XERO-010: Xero Payment Mapping
+// Tracks payments synced between CrecheBooks and Xero
+// ============================================
+
+model XeroPaymentMapping {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  paymentId     String   @unique @map("payment_id")
+  xeroPaymentId String   @map("xero_payment_id")
+  xeroInvoiceId String   @map("xero_invoice_id")
+  amountCents   Int      @map("amount_cents")
+  syncDirection String   @map("sync_direction") // 'push' or 'pull'
+  lastSyncedAt  DateTime @map("last_synced_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@unique([tenantId, paymentId])
+  @@unique([tenantId, xeroPaymentId])
+  @@index([tenantId])
+  @@index([tenantId, xeroInvoiceId])
+  @@map("xero_payment_mappings")
+}
+
+// ============================================
+// TASK-RECON-036: Accrued Bank Charges
+// Tracks bank fees shown on statements but charged in following period
+// FNB shows fees next to transactions but charges them in the next billing cycle
+// ============================================
+
+model AccruedBankCharge {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  // Source transaction that attracted the fee (e.g., ADT Cash Deposit)
+  sourceTransactionId String?   @map("source_transaction_id")
+  sourceDescription   String    @map("source_description")
+  sourceDate          DateTime  @map("source_date") @db.Date
+  sourceAmountCents   Int       @map("source_amount_cents") // NET amount credited
+
+  // The fee details
+  accruedAmountCents Int                     @map("accrued_amount_cents") // Fee amount
+  feeType            String                  @map("fee_type") @db.VarChar(50) // ADT_DEPOSIT_FEE, CASH_DEPOSIT_FEE, etc.
+  feeDescription     String?                 @map("fee_description")
+  status             AccruedBankChargeStatus @default(ACCRUED)
+
+  // Link to the bank statement match where this fee was detected
+  bankStatementMatchId String? @unique @map("bank_statement_match_id")
+
+  // Link to Xero transaction (has GROSS amount including fee)
+  xeroTransactionId   String? @map("xero_transaction_id")
+  xeroAmountCents     Int?    @map("xero_amount_cents") // GROSS amount from Xero
+
+  // When the fee is actually charged (matched to a real bank transaction)
+  chargeTransactionId String?   @map("charge_transaction_id")
+  chargeDate          DateTime? @map("charge_date") @db.Date
+  matchedAt           DateTime? @map("matched_at")
+  matchedBy           String?   @map("matched_by")
+
+  // Metadata
+  notes     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  sourceTransaction  Transaction?        @relation("AccruedChargeSource", fields: [sourceTransactionId], references: [id], onDelete: SetNull)
+  chargeTransaction  Transaction?        @relation("AccruedChargeActual", fields: [chargeTransactionId], references: [id], onDelete: SetNull)
+  bankStatementMatch BankStatementMatch? @relation(fields: [bankStatementMatchId], references: [id], onDelete: SetNull)
+  matcher            User?               @relation("AccruedChargeMatcher", fields: [matchedBy], references: [id], onDelete: SetNull)
+
+  // TASK-RECON-037: Link to Xero transaction split
+  xeroTransactionSplit XeroTransactionSplit?
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, feeType])
+  @@index([sourceDate])
+  @@index([chargeTransactionId])
+  @@map("accrued_bank_charges")
+}
+
+// TASK-RECON-037: Xero Transaction Splitting
+// Splits a Xero transaction (gross) into net amount + fee for bank statement matching
+model XeroTransactionSplit {
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
+
+  // Original Xero transaction (gross amount)
+  xeroTransactionId   String @map("xero_transaction_id") // Xero transaction ID
+  originalAmountCents Int    @map("original_amount_cents") // GROSS amount from Xero
+
+  // Split amounts
+  netAmountCents Int @map("net_amount_cents") // Amount matching bank statement
+  feeAmountCents Int @map("fee_amount_cents") // Bank fee portion
+
+  // Fee details
+  feeType        String  @map("fee_type") @db.VarChar(50) // ADT_DEPOSIT_FEE, etc.
+  feeDescription String? @map("fee_description")
+
+  // Status
+  status XeroTransactionSplitStatus @default(PENDING)
+
+  // Link to accrued bank charge (created for the fee portion)
+  accruedChargeId String? @unique @map("accrued_charge_id")
+
+  // Bank matching - where the net amount will be matched
+  bankTransactionId    String? @map("bank_transaction_id")
+  bankStatementMatchId String? @map("bank_statement_match_id")
+
+  // Metadata
+  notes       String?   @db.Text
+  createdBy   String?   @map("created_by")
+  confirmedBy String?   @map("confirmed_by")
+  confirmedAt DateTime? @map("confirmed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  accruedCharge      AccruedBankCharge?  @relation(fields: [accruedChargeId], references: [id], onDelete: SetNull)
+  bankTransaction    Transaction?        @relation("XeroSplitBankTransaction", fields: [bankTransactionId], references: [id], onDelete: SetNull)
+  bankStatementMatch BankStatementMatch? @relation(fields: [bankStatementMatchId], references: [id], onDelete: SetNull)
+  creator            User?               @relation("XeroSplitCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  confirmer          User?               @relation("XeroSplitConfirmer", fields: [confirmedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([xeroTransactionId])
+  @@index([bankTransactionId])
+  @@map("xero_transaction_splits")
 }

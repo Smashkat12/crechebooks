@@ -11,6 +11,7 @@ import { SarsController } from '../../../src/api/sars/sars.controller';
 import { SarsSubmissionRepository } from '../../../src/database/repositories/sars-submission.repository';
 import { Vat201Service } from '../../../src/database/services/vat201.service';
 import { Emp201Service } from '../../../src/database/services/emp201.service';
+import { SarsFileGeneratorService } from '../../../src/database/services/sars-file-generator.service';
 import { UserRole, SubmissionStatus, SarsSubmission } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import {
@@ -70,6 +71,13 @@ describe('SarsController - markSubmitted', () => {
           provide: Emp201Service,
           useValue: { generateEmp201: jest.fn() },
         },
+        {
+          provide: SarsFileGeneratorService,
+          useValue: {
+            generateEmp201Csv: jest.fn(),
+            generateEmp501Csv: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -123,7 +131,7 @@ describe('SarsController - markSubmitted', () => {
       );
 
       // Assert - repository called with camelCase
-      expect(submitSpy).toHaveBeenCalledWith(mockSubmissionId, {
+      expect(submitSpy).toHaveBeenCalledWith(mockSubmissionId, mockTenantId, {
         submittedBy: mockUserId,
         sarsReference: 'SARS-REF-2025-001234', // camelCase
       });
@@ -178,7 +186,7 @@ describe('SarsController - markSubmitted', () => {
       );
 
       // Verify transformation to camelCase
-      expect(submitSpy).toHaveBeenCalledWith(mockSubmissionId, {
+      expect(submitSpy).toHaveBeenCalledWith(mockSubmissionId, mockTenantId, {
         submittedBy: mockUserId,
         sarsReference: 'EMP-REF-2025-5678', // camelCase output
       });
@@ -334,7 +342,7 @@ describe('SarsController - markSubmitted', () => {
         mockAdminUser,
       );
 
-      expect(submitSpy).toHaveBeenCalledWith(mockSubmissionId, {
+      expect(submitSpy).toHaveBeenCalledWith(mockSubmissionId, mockTenantId, {
         submittedBy: mockAdminUser.id,
         sarsReference: 'ADMIN-REF',
       });

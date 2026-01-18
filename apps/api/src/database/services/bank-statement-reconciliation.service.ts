@@ -26,6 +26,8 @@ import {
 import { ReconciliationStatus } from '@prisma/client';
 import { BusinessException, NotFoundException } from '../../shared/exceptions';
 import { ToleranceConfigService } from './tolerance-config.service';
+import { AccruedBankChargeService } from './accrued-bank-charge.service';
+import { BankFeeService } from './bank-fee.service';
 
 /**
  * TASK-RECON-005: Result of a manual match operation
@@ -79,6 +81,8 @@ export class BankStatementReconciliationService {
     private readonly matchRepo: BankStatementMatchRepository,
     private readonly reconRepo: ReconciliationRepository,
     private readonly toleranceConfig: ToleranceConfigService,
+    private readonly accruedChargeService: AccruedBankChargeService,
+    private readonly bankFeeService: BankFeeService,
   ) {}
 
   /**
@@ -511,7 +515,26 @@ export class BankStatementReconciliationService {
       dateMatches &&
       descSimilarity >= descriptionThreshold
     ) {
-      // Amount difference exceeds tolerance
+      // Amount difference exceeds tolerance - check if this could be a fee-adjusted match
+      // Fee-adjusted match: Bank shows NET, Xero shows GROSS (Bank + Fee = Xero)
+      const feeDifference = xeroTx.amountCents - bankTx.amountCents;
+
+      // If Xero amount is higher and the difference is in typical fee range (R1 - R50)
+      if (
+        feeDifference > 0 &&
+        feeDifference >= 100 &&
+        feeDifference <= 5000 &&
+        bankTx.isCredit === xeroTx.isCredit
+      ) {
+        // This could be a fee-adjusted match - flag it as such
+        return {
+          confidence: descSimilarity * 0.9,
+          status: BankStatementMatchStatus.FEE_ADJUSTED_MATCH,
+          reason: `Possible fee-adjusted match: bank ${bankTx.amountCents}c (NET) + fee ${feeDifference}c = Xero ${xeroTx.amountCents}c (GROSS)`,
+        };
+      }
+
+      // Regular amount mismatch
       return {
         confidence: descSimilarity * 0.8,
         status: BankStatementMatchStatus.AMOUNT_MISMATCH,

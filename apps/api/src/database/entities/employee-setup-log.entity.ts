@@ -46,6 +46,7 @@ export type SetupStepStatus =
  */
 export const PipelineStep = {
   CREATE_EMPLOYEE: 'create_employee',
+  SET_SALARY: 'set_salary',
   ASSIGN_PROFILE: 'assign_profile',
   SETUP_LEAVE: 'setup_leave',
   CONFIGURE_TAX: 'configure_tax',

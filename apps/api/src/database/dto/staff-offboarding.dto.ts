@@ -191,8 +191,9 @@ export class RecordExitInterviewDto {
  * DTO for completing the offboarding process
  */
 export class CompleteOffboardingDto {
+  @IsOptional()
   @IsUUID()
-  completedBy!: string;
+  completedBy?: string; // Optional - will be set from authenticated user if not provided
 
   @IsOptional()
   @IsString()

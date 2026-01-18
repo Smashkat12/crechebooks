@@ -30,6 +30,7 @@ import {
   SimplePaySyncStatus,
   offboardingReasonToTerminationCode,
 } from '../entities/staff-offboarding.entity';
+import { AuditAction } from '../entities/audit-log.entity';
 import {
   InitiateOffboardingDto,
   RecordExitInterviewDto,
@@ -608,6 +609,10 @@ export class StaffOffboardingService {
   /**
    * Complete offboarding - marks staff as inactive
    *
+   * TASK-DB-001: Wrapped in Prisma transaction for atomicity.
+   * All local database mutations happen within transaction.
+   * SimplePay sync (external API) happens AFTER transaction commits.
+   *
    * @param offboardingId - Offboarding ID
    * @param dto - Completion data
    * @param tenantId - Tenant ID
@@ -649,23 +654,77 @@ export class StaffOffboardingService {
       );
     }
 
-    // Complete offboarding
-    await this.offboardingRepo.completeOffboarding(
-      offboardingId,
-      dto.completedBy,
-      dto.notes,
-    );
+    // Note: completedBy is guaranteed by controller (sets from authenticated user if not provided)
+    const completedBy = dto.completedBy!;
 
-    // Mark staff as inactive
-    await this.prisma.staff.update({
-      where: { id: offboarding.staffId },
-      data: {
-        isActive: false,
-        endDate: offboarding.lastWorkingDay,
-      },
-    });
+    // TASK-DB-001: Transaction wraps ALL local database mutations for atomicity
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Complete offboarding record
+        await tx.staffOffboarding.update({
+          where: { id: offboardingId },
+          data: {
+            status: StaffOffboardingStatus.COMPLETED,
+            completedAt: new Date(),
+            completedBy,
+            notes: dto.notes || null,
+          },
+        });
 
-    // TASK-STAFF-006: Sync termination to SimplePay
+        // 2. Mark staff as inactive
+        await tx.staff.update({
+          where: { id: offboarding.staffId },
+          data: {
+            isActive: false,
+            endDate: offboarding.lastWorkingDay,
+          },
+        });
+
+        // 3. Create audit logs (within transaction using tx client)
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: completedBy,
+            entityType: 'StaffOffboarding',
+            entityId: offboardingId,
+            action: AuditAction.UPDATE,
+            beforeValue: { status: offboarding.status },
+            afterValue: { status: 'COMPLETED' },
+            changeSummary: 'Offboarding completed',
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            tenantId,
+            userId: completedBy,
+            entityType: 'Staff',
+            entityId: offboarding.staffId,
+            action: AuditAction.UPDATE,
+            beforeValue: { isActive: true },
+            afterValue: {
+              isActive: false,
+              endDate: offboarding.lastWorkingDay,
+            },
+            changeSummary: 'Staff deactivated due to offboarding',
+          },
+        });
+      });
+    } catch (error) {
+      this.logger.error(
+        `Transaction failed for offboarding ${offboardingId}: ${error}`,
+        {
+          offboardingId,
+          staffId: offboarding.staffId,
+          tenantId,
+        },
+      );
+      throw error;
+    }
+
+    // TASK-STAFF-006: Sync termination to SimplePay OUTSIDE transaction
+    // External API calls should not be part of the transaction to avoid
+    // long-running transactions and inconsistent rollback behavior
     await this.syncTerminationToSimplePay(
       offboardingId,
       offboarding.staffId,
@@ -673,27 +732,6 @@ export class StaffOffboardingService {
       offboarding.reason as OffboardingReason,
       offboarding.lastWorkingDay,
     );
-
-    await this.auditLogService.logUpdate({
-      tenantId,
-      userId: dto.completedBy,
-      entityType: 'StaffOffboarding',
-      entityId: offboardingId,
-      beforeValue: { status: offboarding.status },
-      afterValue: { status: 'COMPLETED' },
-      changeSummary: 'Offboarding completed',
-    });
-
-    // Also log the staff deactivation
-    await this.auditLogService.logUpdate({
-      tenantId,
-      userId: dto.completedBy,
-      entityType: 'Staff',
-      entityId: offboarding.staffId,
-      beforeValue: { isActive: true },
-      afterValue: { isActive: false, endDate: offboarding.lastWorkingDay },
-      changeSummary: 'Staff deactivated due to offboarding',
-    });
 
     this.logger.log(`Completed offboarding ${offboardingId}`);
   }

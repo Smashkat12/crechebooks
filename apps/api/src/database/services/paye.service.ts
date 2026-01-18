@@ -23,6 +23,8 @@ import {
   TAX_THRESHOLDS_2025,
   PAY_FREQUENCY_MULTIPLIERS,
   PayeTaxBracket,
+  getTaxYearTables,
+  TaxYearTables,
 } from '../constants/paye.constants';
 
 // Configure Decimal.js for banker's rounding
@@ -43,11 +45,19 @@ export class PayeService {
    */
   // eslint-disable-next-line @typescript-eslint/require-await
   async calculatePaye(dto: CalculatePayeDto): Promise<PayeCalculationResult> {
-    const { grossIncomeCents, payFrequency, dateOfBirth, medicalAidMembers } =
-      dto;
+    const {
+      grossIncomeCents,
+      payFrequency,
+      dateOfBirth,
+      medicalAidMembers,
+      payPeriodDate,
+    } = dto;
+
+    // Get correct tax tables for pay period (TASK-SARS-034)
+    const taxTables = getTaxYearTables(payPeriodDate);
 
     this.logger.log(
-      `Calculating PAYE for gross ${grossIncomeCents} cents, frequency ${payFrequency}`,
+      `Calculating PAYE for gross ${grossIncomeCents} cents, frequency ${payFrequency}, tax year ${taxTables.taxYear}`,
     );
 
     // Validate inputs
@@ -71,8 +81,11 @@ export class PayeService {
       payFrequency,
     );
 
-    // Step 2: Get tax bracket
-    const { bracket, bracketIndex } = this.getTaxBracket(annualizedIncomeCents);
+    // Step 2: Get tax bracket using dynamic tables
+    const { bracket, bracketIndex } = this.getTaxBracketFromTables(
+      annualizedIncomeCents,
+      taxTables.brackets,
+    );
 
     // Step 3: Calculate tax before rebates
     const taxBeforeRebatesCents = this.calculateTaxOnIncome(
@@ -80,11 +93,11 @@ export class PayeService {
       bracket,
     );
 
-    // Step 4: Calculate rebates based on age
+    // Step 4: Calculate rebates based on age using dynamic tables
     const age = this.calculateAge(dateOfBirth);
-    const primaryRebateCents = REBATES_2025.PRIMARY;
-    const secondaryRebateCents = age >= 65 ? REBATES_2025.SECONDARY : 0;
-    const tertiaryRebateCents = age >= 75 ? REBATES_2025.TERTIARY : 0;
+    const primaryRebateCents = taxTables.rebates.PRIMARY;
+    const secondaryRebateCents = age >= 65 ? taxTables.rebates.SECONDARY : 0;
+    const tertiaryRebateCents = age >= 75 ? taxTables.rebates.TERTIARY : 0;
     const totalRebatesCents =
       primaryRebateCents + secondaryRebateCents + tertiaryRebateCents;
 
@@ -100,8 +113,11 @@ export class PayeService {
       .round()
       .toNumber();
 
-    // Step 7: Calculate medical aid tax credits (monthly)
-    const medicalCreditsCents = this.calculateMedicalCredits(medicalAidMembers);
+    // Step 7: Calculate medical aid tax credits (monthly) using dynamic tables
+    const medicalCreditsCents = this.calculateMedicalCreditsFromTables(
+      medicalAidMembers,
+      taxTables.medicalCredits,
+    );
 
     // Step 8: Net PAYE (after medical credits, floor at 0)
     let netPayeCents = monthlyPayeCents - medicalCreditsCents;
@@ -210,6 +226,109 @@ export class PayeService {
       MEDICAL_CREDITS_2025.MAIN_MEMBER +
       MEDICAL_CREDITS_2025.FIRST_DEPENDENT +
       MEDICAL_CREDITS_2025.ADDITIONAL_DEPENDENT * additionalDependents
+    );
+  }
+
+  /**
+   * Get the applicable tax bracket from dynamic tax tables
+   * TASK-SARS-034 - Supports multiple tax years
+   *
+   * @param annualIncomeCents - Annual income in cents
+   * @param brackets - Tax brackets array for the applicable tax year
+   * @returns Tax bracket and index
+   */
+  getTaxBracketFromTables(
+    annualIncomeCents: number,
+    brackets: PayeTaxBracket[],
+  ): {
+    bracket: PayeTaxBracket;
+    bracketIndex: number;
+  } {
+    for (let i = brackets.length - 1; i >= 0; i--) {
+      const bracket = brackets[i];
+      if (annualIncomeCents >= bracket.minIncomeCents) {
+        return { bracket, bracketIndex: i };
+      }
+    }
+
+    // Default to first bracket
+    return { bracket: brackets[0], bracketIndex: 0 };
+  }
+
+  /**
+   * Calculate medical aid tax credits from dynamic tax tables
+   * TASK-SARS-034 - Supports multiple tax years
+   *
+   * @param medicalAidMembers - Number of members on medical aid
+   * @param medicalCredits - Medical credits object for the applicable tax year
+   * @returns Monthly credit amount in cents
+   */
+  calculateMedicalCreditsFromTables(
+    medicalAidMembers: number,
+    medicalCredits: TaxYearTables['medicalCredits'],
+  ): number {
+    if (medicalAidMembers <= 0) {
+      return 0;
+    }
+
+    if (medicalAidMembers === 1) {
+      // Main member only
+      return medicalCredits.MAIN_MEMBER;
+    }
+
+    if (medicalAidMembers === 2) {
+      // Main + first dependent
+      return medicalCredits.MAIN_MEMBER + medicalCredits.FIRST_DEPENDENT;
+    }
+
+    // Main + first dependent + additional dependents
+    const additionalDependents = medicalAidMembers - 2;
+    return (
+      medicalCredits.MAIN_MEMBER +
+      medicalCredits.FIRST_DEPENDENT +
+      medicalCredits.ADDITIONAL_DEPENDENT * additionalDependents
+    );
+  }
+
+  /**
+   * Get tax threshold based on age from dynamic tax tables
+   * TASK-SARS-034 - Supports multiple tax years
+   *
+   * @param age - Employee's age
+   * @param thresholds - Tax thresholds object for the applicable tax year
+   * @returns Annual tax threshold in cents
+   */
+  getTaxThresholdFromTables(
+    age: number,
+    thresholds: TaxYearTables['thresholds'],
+  ): number {
+    if (age >= 75) {
+      return thresholds.AGE_75_PLUS;
+    }
+    if (age >= 65) {
+      return thresholds.AGE_65_TO_74;
+    }
+    return thresholds.BELOW_65;
+  }
+
+  /**
+   * Check if income is below tax threshold using dynamic tax tables
+   * TASK-SARS-034 - Supports multiple tax years
+   *
+   * @param annualIncomeCents - Annual income in cents
+   * @param age - Employee's age
+   * @param payPeriodDate - Date for tax year selection
+   * @returns True if below threshold
+   */
+  isBelowThresholdForDate(
+    annualIncomeCents: number,
+    age: number,
+    payPeriodDate?: Date,
+  ): boolean {
+    const taxTables = getTaxYearTables(payPeriodDate);
+    return (
+      annualIncomeCents <
+      this.getTaxThresholdFromTables(age, taxTables.thresholds)
     );
   }
 

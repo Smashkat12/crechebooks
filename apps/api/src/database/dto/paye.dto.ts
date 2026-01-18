@@ -64,6 +64,14 @@ export interface CalculatePayeDto {
 
   /** Number of medical aid members (0 if none) */
   medicalAidMembers: number;
+
+  /**
+   * Pay period date for tax year determination (optional)
+   * Used to select correct tax tables based on SA tax year (March-February)
+   * Defaults to current date if not provided
+   * TASK-SARS-034
+   */
+  payPeriodDate?: Date;
 }
 
 /**

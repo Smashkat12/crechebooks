@@ -154,10 +154,7 @@ describe('CurrencyConversionService', () => {
     it('should cache inverse rate', async () => {
       service.setManualRate(Currency.USD, Currency.ZAR, 18.5);
 
-      const inverseRate = service.getExchangeRate(
-        Currency.ZAR,
-        Currency.USD,
-      );
+      const inverseRate = service.getExchangeRate(Currency.ZAR, Currency.USD);
 
       expect(inverseRate.rate).toBeCloseTo(1 / 18.5, 4);
     });

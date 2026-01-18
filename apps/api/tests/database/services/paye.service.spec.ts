@@ -12,8 +12,15 @@ import { PayeService } from '../../../src/database/services/paye.service';
 import { PayFrequency } from '@prisma/client';
 import {
   REBATES_2025,
+  REBATES_2026,
   MEDICAL_CREDITS_2025,
+  MEDICAL_CREDITS_2026,
   TAX_THRESHOLDS_2025,
+  TAX_THRESHOLDS_2026,
+  TAX_BRACKETS_2025,
+  TAX_BRACKETS_2026,
+  getTaxYear,
+  getTaxYearTables,
 } from '../../../src/database/constants/paye.constants';
 
 // Configure Decimal.js for banker's rounding
@@ -375,6 +382,276 @@ describe('PayeService', () => {
 
       const test4 = new Decimal('100.155').round();
       expect(test4.toNumber()).toBe(100); // Round to even (down)
+    });
+  });
+
+  // TASK-SARS-034: Tax Year Selection Tests
+  describe('getTaxYear', () => {
+    it('should return 2024/2025 for dates in March 2024 - February 2025', () => {
+      expect(getTaxYear(new Date('2024-03-01'))).toBe('2024/2025');
+      expect(getTaxYear(new Date('2024-06-15'))).toBe('2024/2025');
+      expect(getTaxYear(new Date('2024-12-31'))).toBe('2024/2025');
+      expect(getTaxYear(new Date('2025-01-15'))).toBe('2024/2025');
+      expect(getTaxYear(new Date('2025-02-28'))).toBe('2024/2025');
+    });
+
+    it('should return 2025/2026 for dates in March 2025 - February 2026', () => {
+      expect(getTaxYear(new Date('2025-03-01'))).toBe('2025/2026');
+      expect(getTaxYear(new Date('2025-06-15'))).toBe('2025/2026');
+      expect(getTaxYear(new Date('2025-12-31'))).toBe('2025/2026');
+      expect(getTaxYear(new Date('2026-01-15'))).toBe('2025/2026');
+      expect(getTaxYear(new Date('2026-02-28'))).toBe('2025/2026');
+    });
+
+    it('should handle boundary dates correctly', () => {
+      // Last day of Feb 2025 is still 2024/2025 tax year
+      expect(getTaxYear(new Date('2025-02-28'))).toBe('2024/2025');
+      // First day of March 2025 is 2025/2026 tax year
+      expect(getTaxYear(new Date('2025-03-01'))).toBe('2025/2026');
+    });
+  });
+
+  describe('getTaxYearTables', () => {
+    it('should return 2024/2025 tables for dates in that tax year', () => {
+      const tables = getTaxYearTables(new Date('2024-06-15'));
+      expect(tables.taxYear).toBe('2024/2025');
+      expect(tables.brackets).toBe(TAX_BRACKETS_2025);
+      expect(tables.rebates).toBe(REBATES_2025);
+      expect(tables.medicalCredits).toBe(MEDICAL_CREDITS_2025);
+      expect(tables.thresholds).toBe(TAX_THRESHOLDS_2025);
+    });
+
+    it('should return 2025/2026 tables for dates in that tax year', () => {
+      const tables = getTaxYearTables(new Date('2025-06-15'));
+      expect(tables.taxYear).toBe('2025/2026');
+      expect(tables.brackets).toBe(TAX_BRACKETS_2026);
+      expect(tables.rebates).toBe(REBATES_2026);
+      expect(tables.medicalCredits).toBe(MEDICAL_CREDITS_2026);
+      expect(tables.thresholds).toBe(TAX_THRESHOLDS_2026);
+    });
+
+    it('should default to 2024/2025 for older dates', () => {
+      const tables = getTaxYearTables(new Date('2023-06-15'));
+      expect(tables.taxYear).toBe('2024/2025');
+    });
+
+    it('should use current date when no date provided', () => {
+      const tables = getTaxYearTables();
+      expect(tables).toBeDefined();
+      expect(tables.brackets).toBeDefined();
+      expect(tables.rebates).toBeDefined();
+    });
+  });
+
+  describe('Dynamic Tax Year PAYE Calculation (TASK-SARS-034)', () => {
+    it('should use 2024/2025 tables when payPeriodDate is in that tax year', async () => {
+      const result = await service.calculatePaye({
+        grossIncomeCents: 3000000, // R30,000
+        payFrequency: PayFrequency.MONTHLY,
+        dateOfBirth: new Date('1990-01-01'),
+        medicalAidMembers: 0,
+        payPeriodDate: new Date('2024-06-15'),
+      });
+
+      // Should use 2024/2025 rebates
+      expect(result.primaryRebateCents).toBe(REBATES_2025.PRIMARY);
+    });
+
+    it('should use 2025/2026 tables when payPeriodDate is in that tax year', async () => {
+      const result = await service.calculatePaye({
+        grossIncomeCents: 3000000, // R30,000
+        payFrequency: PayFrequency.MONTHLY,
+        dateOfBirth: new Date('1990-01-01'),
+        medicalAidMembers: 0,
+        payPeriodDate: new Date('2025-06-15'),
+      });
+
+      // Should use 2025/2026 rebates
+      expect(result.primaryRebateCents).toBe(REBATES_2026.PRIMARY);
+    });
+
+    it('should default to current date when payPeriodDate not provided', async () => {
+      const result = await service.calculatePaye({
+        grossIncomeCents: 3000000,
+        payFrequency: PayFrequency.MONTHLY,
+        dateOfBirth: new Date('1990-01-01'),
+        medicalAidMembers: 0,
+        // No payPeriodDate - uses current date
+      });
+
+      // Should complete without error
+      expect(result.grossIncomeCents).toBe(3000000);
+      expect(result.primaryRebateCents).toBeGreaterThan(0);
+    });
+
+    it('should calculate medical credits using correct tax year tables', async () => {
+      const result2024 = await service.calculatePaye({
+        grossIncomeCents: 5000000,
+        payFrequency: PayFrequency.MONTHLY,
+        dateOfBirth: new Date('1990-01-01'),
+        medicalAidMembers: 2,
+        payPeriodDate: new Date('2024-06-15'),
+      });
+
+      const result2025 = await service.calculatePaye({
+        grossIncomeCents: 5000000,
+        payFrequency: PayFrequency.MONTHLY,
+        dateOfBirth: new Date('1990-01-01'),
+        medicalAidMembers: 2,
+        payPeriodDate: new Date('2025-06-15'),
+      });
+
+      // Both years should have medical credits calculated
+      expect(result2024.medicalCreditsCents).toBe(
+        MEDICAL_CREDITS_2025.MAIN_MEMBER + MEDICAL_CREDITS_2025.FIRST_DEPENDENT,
+      );
+      expect(result2025.medicalCreditsCents).toBe(
+        MEDICAL_CREDITS_2026.MAIN_MEMBER + MEDICAL_CREDITS_2026.FIRST_DEPENDENT,
+      );
+    });
+  });
+
+  describe('getTaxBracketFromTables', () => {
+    it('should find correct bracket from 2025 tables', () => {
+      const { bracket, bracketIndex } = service.getTaxBracketFromTables(
+        30000000, // R300,000
+        TAX_BRACKETS_2025,
+      );
+      expect(bracketIndex).toBe(1);
+      expect(bracket.rate.toNumber()).toBe(0.26);
+    });
+
+    it('should find correct bracket from 2026 tables', () => {
+      const { bracket, bracketIndex } = service.getTaxBracketFromTables(
+        30000000, // R300,000
+        TAX_BRACKETS_2026,
+      );
+      expect(bracketIndex).toBe(1);
+      expect(bracket.rate.toNumber()).toBe(0.26);
+    });
+
+    it('should handle top bracket correctly', () => {
+      const { bracket, bracketIndex } = service.getTaxBracketFromTables(
+        200000000, // R2,000,000
+        TAX_BRACKETS_2026,
+      );
+      expect(bracketIndex).toBe(6);
+      expect(bracket.rate.toNumber()).toBe(0.45);
+      expect(bracket.maxIncomeCents).toBeNull();
+    });
+  });
+
+  describe('calculateMedicalCreditsFromTables', () => {
+    it('should calculate credits from 2025 tables', () => {
+      const credits = service.calculateMedicalCreditsFromTables(
+        3,
+        MEDICAL_CREDITS_2025,
+      );
+      expect(credits).toBe(
+        MEDICAL_CREDITS_2025.MAIN_MEMBER +
+          MEDICAL_CREDITS_2025.FIRST_DEPENDENT +
+          MEDICAL_CREDITS_2025.ADDITIONAL_DEPENDENT,
+      );
+    });
+
+    it('should calculate credits from 2026 tables', () => {
+      const credits = service.calculateMedicalCreditsFromTables(
+        3,
+        MEDICAL_CREDITS_2026,
+      );
+      expect(credits).toBe(
+        MEDICAL_CREDITS_2026.MAIN_MEMBER +
+          MEDICAL_CREDITS_2026.FIRST_DEPENDENT +
+          MEDICAL_CREDITS_2026.ADDITIONAL_DEPENDENT,
+      );
+    });
+
+    it('should return 0 for 0 members', () => {
+      expect(
+        service.calculateMedicalCreditsFromTables(0, MEDICAL_CREDITS_2025),
+      ).toBe(0);
+    });
+  });
+
+  describe('getTaxThresholdFromTables', () => {
+    it('should return correct threshold for under 65 from 2025 tables', () => {
+      expect(service.getTaxThresholdFromTables(30, TAX_THRESHOLDS_2025)).toBe(
+        TAX_THRESHOLDS_2025.BELOW_65,
+      );
+    });
+
+    it('should return correct threshold for 65-74 from 2026 tables', () => {
+      expect(service.getTaxThresholdFromTables(67, TAX_THRESHOLDS_2026)).toBe(
+        TAX_THRESHOLDS_2026.AGE_65_TO_74,
+      );
+    });
+
+    it('should return correct threshold for 75+ from 2026 tables', () => {
+      expect(service.getTaxThresholdFromTables(80, TAX_THRESHOLDS_2026)).toBe(
+        TAX_THRESHOLDS_2026.AGE_75_PLUS,
+      );
+    });
+  });
+
+  describe('isBelowThresholdForDate', () => {
+    it('should use correct threshold for 2024/2025 tax year', () => {
+      // R90,000 is below R95,750 threshold for under 65
+      expect(
+        service.isBelowThresholdForDate(9000000, 30, new Date('2024-06-15')),
+      ).toBe(true);
+      // R100,000 is above R95,750 threshold
+      expect(
+        service.isBelowThresholdForDate(10000000, 30, new Date('2024-06-15')),
+      ).toBe(false);
+    });
+
+    it('should use correct threshold for 2025/2026 tax year', () => {
+      // R90,000 is below R95,750 threshold for under 65
+      expect(
+        service.isBelowThresholdForDate(9000000, 30, new Date('2025-06-15')),
+      ).toBe(true);
+      // R100,000 is above R95,750 threshold
+      expect(
+        service.isBelowThresholdForDate(10000000, 30, new Date('2025-06-15')),
+      ).toBe(false);
+    });
+  });
+
+  describe('2026 Tax Constants Validation', () => {
+    it('should have 7 tax brackets for 2026', () => {
+      expect(TAX_BRACKETS_2026).toHaveLength(7);
+    });
+
+    it('should have correct bracket structure for 2026', () => {
+      // First bracket
+      expect(TAX_BRACKETS_2026[0].minIncomeCents).toBe(0);
+      expect(TAX_BRACKETS_2026[0].rate.toNumber()).toBe(0.18);
+
+      // Last bracket has no upper limit
+      expect(TAX_BRACKETS_2026[6].maxIncomeCents).toBeNull();
+      expect(TAX_BRACKETS_2026[6].rate.toNumber()).toBe(0.45);
+    });
+
+    it('should have all rebates defined for 2026', () => {
+      expect(REBATES_2026.PRIMARY).toBeGreaterThan(0);
+      expect(REBATES_2026.SECONDARY).toBeGreaterThan(0);
+      expect(REBATES_2026.TERTIARY).toBeGreaterThan(0);
+    });
+
+    it('should have all medical credits defined for 2026', () => {
+      expect(MEDICAL_CREDITS_2026.MAIN_MEMBER).toBeGreaterThan(0);
+      expect(MEDICAL_CREDITS_2026.FIRST_DEPENDENT).toBeGreaterThan(0);
+      expect(MEDICAL_CREDITS_2026.ADDITIONAL_DEPENDENT).toBeGreaterThan(0);
+    });
+
+    it('should have all thresholds defined for 2026', () => {
+      expect(TAX_THRESHOLDS_2026.BELOW_65).toBeGreaterThan(0);
+      expect(TAX_THRESHOLDS_2026.AGE_65_TO_74).toBeGreaterThan(
+        TAX_THRESHOLDS_2026.BELOW_65,
+      );
+      expect(TAX_THRESHOLDS_2026.AGE_75_PLUS).toBeGreaterThan(
+        TAX_THRESHOLDS_2026.AGE_65_TO_74,
+      );
     });
   });
 });

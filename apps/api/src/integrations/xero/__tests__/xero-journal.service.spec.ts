@@ -32,14 +32,30 @@ import {
   XeroJournalUnbalancedError,
   XeroMaxRetriesExceededError,
 } from '../xero-journal.errors';
+import { XeroRateLimiter } from '../xero-rate-limiter.service';
 
 describe('XeroJournalService', () => {
   let service: XeroJournalService;
   let httpService: HttpService;
+  let rateLimiter: XeroRateLimiter;
 
   const mockAccessToken = 'mock-access-token';
   const mockXeroTenantId = 'mock-xero-tenant-id';
   const mockTenantId = 'mock-internal-tenant-id';
+
+  // Mock rate limiter that always allows requests
+  const mockRateLimiter = {
+    acquireSlot: jest.fn().mockResolvedValue({
+      allowed: true,
+      remaining: 59,
+    }),
+    getStatus: jest.fn().mockResolvedValue({
+      allowed: true,
+      remaining: 60,
+    }),
+    reset: jest.fn().mockResolvedValue(undefined),
+    onModuleDestroy: jest.fn().mockResolvedValue(undefined),
+  };
 
   const createMockAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
     data,
@@ -100,11 +116,16 @@ describe('XeroJournalService', () => {
             get: jest.fn(),
           },
         },
+        {
+          provide: XeroRateLimiter,
+          useValue: mockRateLimiter,
+        },
       ],
     }).compile();
 
     service = module.get<XeroJournalService>(XeroJournalService);
     httpService = module.get<HttpService>(HttpService);
+    rateLimiter = module.get<XeroRateLimiter>(XeroRateLimiter);
   });
 
   afterEach(() => {
@@ -596,6 +617,7 @@ describe('XeroJournalService', () => {
         .mockReturnValue(of(createMockAxiosResponse(mockResponse)));
 
       const result = await service.getJournal(
+        mockTenantId,
         mockAccessToken,
         mockXeroTenantId,
         'xero-journal-123',
@@ -679,6 +701,145 @@ describe('XeroJournalService', () => {
       expect(payload.ManualJournals[0].JournalLines[0].Tracking).toEqual([
         { Name: 'Department', Option: 'Sales' },
       ]);
+    });
+  });
+
+  describe('rate limiting integration', () => {
+    const validJournal: CreateJournalDto = {
+      date: '2024-01-15',
+      narration: 'Test journal',
+      lines: [
+        { accountCode: '200', amountCents: 10000, isDebit: true },
+        { accountCode: '400', amountCents: 10000, isDebit: false },
+      ],
+    };
+
+    it('should check rate limit before API call', async () => {
+      const mockResponse = {
+        ManualJournals: [
+          {
+            ManualJournalID: 'xero-journal-123',
+            Narration: 'Test journal',
+            Date: '2024-01-15T00:00:00',
+            Status: 'POSTED',
+            JournalLines: [
+              { AccountCode: '200', LineAmount: 100.0, TaxType: 'NONE' },
+              { AccountCode: '400', LineAmount: -100.0, TaxType: 'NONE' },
+            ],
+          },
+        ],
+      };
+
+      jest
+        .spyOn(httpService, 'post')
+        .mockReturnValue(of(createMockAxiosResponse(mockResponse)));
+
+      await service.createJournal(
+        mockTenantId,
+        mockAccessToken,
+        mockXeroTenantId,
+        validJournal,
+      );
+
+      expect(mockRateLimiter.acquireSlot).toHaveBeenCalledWith(mockTenantId);
+    });
+
+    it('should throw XeroRateLimitError when rate limit is exceeded', async () => {
+      mockRateLimiter.acquireSlot.mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 30,
+      });
+
+      await expect(
+        service.createJournal(
+          mockTenantId,
+          mockAccessToken,
+          mockXeroTenantId,
+          validJournal,
+        ),
+      ).rejects.toThrow(XeroRateLimitError);
+
+      // HTTP call should not be made when rate limited
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should include retryAfter in rate limit error', async () => {
+      mockRateLimiter.acquireSlot.mockResolvedValueOnce({
+        allowed: false,
+        remaining: 0,
+        retryAfter: 45,
+      });
+
+      try {
+        await service.createJournal(
+          mockTenantId,
+          mockAccessToken,
+          mockXeroTenantId,
+          validJournal,
+        );
+        fail('Should have thrown XeroRateLimitError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(XeroRateLimitError);
+        const rateLimitError = error as XeroRateLimitError;
+        expect(rateLimitError.getRetryAfterSeconds()).toBe(45);
+      }
+    });
+
+    it('should check rate limit for voidJournal', async () => {
+      const mockResponse = {
+        ManualJournals: [
+          {
+            ManualJournalID: 'xero-journal-123',
+            Narration: 'Test journal',
+            Date: '2024-01-15T00:00:00',
+            Status: 'VOIDED',
+          },
+        ],
+      };
+
+      jest
+        .spyOn(httpService, 'post')
+        .mockReturnValue(of(createMockAxiosResponse(mockResponse)));
+
+      await service.voidJournal(
+        mockTenantId,
+        mockAccessToken,
+        mockXeroTenantId,
+        'xero-journal-123',
+      );
+
+      expect(mockRateLimiter.acquireSlot).toHaveBeenCalledWith(mockTenantId);
+    });
+
+    it('should check rate limit for getJournal', async () => {
+      const mockResponse = {
+        ManualJournals: [
+          {
+            ManualJournalID: 'xero-journal-123',
+            Narration: 'Test journal',
+            Date: '2024-01-15T00:00:00',
+            Status: 'POSTED',
+            JournalLines: [
+              { AccountCode: '200', LineAmount: 100.0, TaxType: 'NONE' },
+              { AccountCode: '400', LineAmount: -100.0, TaxType: 'NONE' },
+            ],
+          },
+        ],
+      };
+
+      jest
+        .spyOn(httpService, 'get')
+        .mockReturnValue(of(createMockAxiosResponse(mockResponse)));
+
+      await service.getJournal(
+        mockTenantId,
+        mockAccessToken,
+        mockXeroTenantId,
+        'xero-journal-123',
+      );
+
+      expect(mockRateLimiter.acquireSlot).toHaveBeenCalledWith(mockTenantId);
     });
   });
 });

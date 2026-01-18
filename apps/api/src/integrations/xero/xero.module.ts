@@ -5,6 +5,9 @@
  * TASK-XERO-004: Push Categorizations to Xero API Endpoint
  * TASK-INT-002: Secure OAuth State Encryption
  * TASK-STAFF-001: Implement Xero Journal Posting
+ * TASK-XERO-008: Implement Distributed Rate Limiting for Xero API
+ * TASK-XERO-009: Bidirectional Invoice Sync with Xero
+ * TASK-XERO-010: Xero Contact and Payment Sync
  *
  * NestJS module for Xero integration services including:
  * - Bank feed sync
@@ -12,6 +15,9 @@
  * - WebSocket sync progress
  * - Push categorizations to Xero
  * - Manual journal posting to Xero
+ * - Distributed rate limiting for Xero API
+ * - Bidirectional invoice sync with Xero
+ * - Contact and payment sync with Xero
  */
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -21,6 +27,10 @@ import { XeroController } from './xero.controller';
 import { XeroSyncGateway } from './xero.gateway';
 import { XeroAuthService } from './xero-auth.service';
 import { XeroJournalService } from './xero-journal.service';
+import { XeroRateLimiter } from './xero-rate-limiter.service';
+import { XeroInvoiceService } from './xero-invoice.service';
+import { XeroContactService } from './xero-contact.service';
+import { XeroPaymentService } from './xero-payment.service';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { DatabaseModule } from '../../database/database.module';
 import { TransactionRepository } from '../../database/repositories/transaction.repository';
@@ -42,6 +52,10 @@ import { AuditLogService } from '../../database/services/audit-log.service';
     XeroSyncGateway,
     XeroAuthService,
     XeroJournalService,
+    XeroRateLimiter,
+    XeroInvoiceService,
+    XeroContactService,
+    XeroPaymentService,
     TransactionRepository,
     AuditLogService,
   ],
@@ -50,6 +64,10 @@ import { AuditLogService } from '../../database/services/audit-log.service';
     XeroSyncGateway,
     XeroAuthService,
     XeroJournalService,
+    XeroRateLimiter,
+    XeroInvoiceService,
+    XeroContactService,
+    XeroPaymentService,
   ],
 })
 export class XeroModule {}

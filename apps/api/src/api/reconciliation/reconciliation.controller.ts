@@ -4,6 +4,7 @@
  * TASK-RECON-032: Financial Reports Endpoint
  * TASK-RECON-033: Balance Sheet API Endpoint
  * TASK-RECON-034: Audit Log Pagination and Filtering
+ * TASK-RECON-036: Comparative Balance Sheet
  *
  * Handles bank reconciliation and financial reporting operations.
  * Uses snake_case for external API, transforms to camelCase for internal services.
@@ -12,6 +13,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Param,
   Body,
   Query,
@@ -31,6 +33,8 @@ import {
   ApiBearerAuth,
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
+  ApiBadRequestResponse,
+  ApiNotFoundResponse,
   ApiParam,
   ApiConsumes,
   ApiBody,
@@ -42,6 +46,9 @@ import { FinancialReportService } from '../../database/services/financial-report
 import { BalanceSheetService } from '../../database/services/balance-sheet.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { BankStatementReconciliationService } from '../../database/services/bank-statement-reconciliation.service';
+import { ComparativeBalanceSheetService } from '../../database/services/comparative-balance-sheet.service';
+import { AccruedBankChargeService } from '../../database/services/accrued-bank-charge.service';
+import { XeroTransactionSplitService } from '../../database/services/xero-transaction-split.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -64,6 +71,10 @@ import { DiscrepancyService } from '../../database/services/discrepancy.service'
 import { NotFoundException } from '../../shared/exceptions';
 import { BalanceSheetResponse } from '../../database/dto/balance-sheet.dto';
 import {
+  ComparativeBalanceSheetResponse,
+  OpeningBalancesResult,
+} from '../../database/dto/comparative-balance-sheet.dto';
+import {
   AuditLogQueryDto,
   AuditLogExportDto,
   PaginatedAuditLogResponseDto,
@@ -75,6 +86,32 @@ import {
   BankStatementMatchResponseDto,
   BankStatementMatchFilterDto,
 } from '../../database/dto/bank-statement-reconciliation.dto';
+import {
+  SuggestSplitMatchDto,
+  ConfirmSplitMatchDto,
+  RejectSplitMatchDto,
+  SplitMatchFilterDto,
+  SplitMatchResponseDto,
+  SuggestSplitMatchResponseDto,
+  ConfirmSplitMatchResponseDto,
+  SplitMatchListResponseDto,
+} from '../../database/dto/split-transaction.dto';
+import {
+  CreateAccruedBankChargeDto,
+  MatchAccruedChargeDto,
+  UpdateAccruedChargeStatusDto,
+  AccruedChargeFilterDto,
+  AccruedBankChargeResponseDto,
+  AccruedChargeSummaryDto,
+} from '../../database/dto/accrued-bank-charge.dto';
+import { SplitTransactionMatcherService } from '../../database/services/split-transaction-matcher.service';
+import {
+  SplitXeroTransactionDto,
+  DetectSplitParamsDto,
+  ConfirmXeroSplitDto,
+  CancelXeroSplitDto,
+  XeroSplitFilterDto,
+} from '../../database/dto/xero-transaction-split.dto';
 
 @Controller('reconciliation')
 @ApiTags('Reconciliation')
@@ -89,6 +126,10 @@ export class ReconciliationController {
     private readonly auditLogService: AuditLogService,
     private readonly discrepancyService: DiscrepancyService,
     private readonly bankStatementReconciliationService: BankStatementReconciliationService,
+    private readonly comparativeBalanceSheetService: ComparativeBalanceSheetService,
+    private readonly splitTransactionMatcherService: SplitTransactionMatcherService,
+    private readonly accruedBankChargeService: AccruedBankChargeService,
+    private readonly xeroTransactionSplitService: XeroTransactionSplitService,
   ) {}
 
   @Post()
@@ -851,6 +892,138 @@ export class ReconciliationController {
   }
 
   // ============================================
+  // TASK-RECON-036: Comparative Balance Sheet
+  // ============================================
+
+  @Get('balance-sheet/comparative')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Generate Comparative Balance Sheet with variance analysis',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Comparative balance sheet generated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format or missing required parameters',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getComparativeBalanceSheet(
+    @Query('current_date') currentDate: string,
+    @Query('prior_date') priorDate: string,
+    @CurrentUser() user: IUser,
+  ): Promise<ComparativeBalanceSheetResponse> {
+    this.logger.log(
+      `Comparative Balance Sheet: tenant=${user.tenantId}, current_date=${currentDate}, prior_date=${priorDate}`,
+    );
+
+    // Validate required parameters
+    if (!currentDate || !priorDate) {
+      throw new BadRequestException(
+        'Both current_date and prior_date are required',
+      );
+    }
+
+    // Parse and validate dates
+    const current = new Date(currentDate);
+    const prior = new Date(priorDate);
+
+    if (isNaN(current.getTime())) {
+      throw new BadRequestException(
+        'Invalid current_date format. Use YYYY-MM-DD',
+      );
+    }
+
+    if (isNaN(prior.getTime())) {
+      throw new BadRequestException(
+        'Invalid prior_date format. Use YYYY-MM-DD',
+      );
+    }
+
+    if (prior >= current) {
+      throw new BadRequestException('prior_date must be before current_date');
+    }
+
+    const comparative =
+      await this.comparativeBalanceSheetService.generateComparative(
+        user.tenantId,
+        current,
+        prior,
+      );
+
+    this.logger.log(
+      `Comparative Balance Sheet generated: asset_variance=${comparative.variances.assets.totalVarianceCents}c, compliant=${comparative.complianceStatus.isCompliant}`,
+    );
+
+    return {
+      success: true,
+      data: comparative,
+    };
+  }
+
+  @Get('balance-sheet/opening-balances')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Get opening balances for a period',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Opening balances retrieved successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getOpeningBalances(
+    @Query('period_start_date') periodStartDate: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: OpeningBalancesResult }> {
+    this.logger.log(
+      `Opening Balances: tenant=${user.tenantId}, period_start_date=${periodStartDate}`,
+    );
+
+    // Validate required parameter
+    if (!periodStartDate) {
+      throw new BadRequestException('period_start_date is required');
+    }
+
+    // Parse and validate date
+    const startDate = new Date(periodStartDate);
+    if (isNaN(startDate.getTime())) {
+      throw new BadRequestException(
+        'Invalid period_start_date format. Use YYYY-MM-DD',
+      );
+    }
+
+    const openingBalances =
+      await this.comparativeBalanceSheetService.getOpeningBalances(
+        user.tenantId,
+        startDate,
+      );
+
+    this.logger.log(
+      `Opening Balances retrieved: total_assets=${openingBalances.totalAssetsCents}c`,
+    );
+
+    return {
+      success: true,
+      data: openingBalances,
+    };
+  }
+
+  // ============================================
   // TASK-RECON-034: Audit Log Endpoints
   // ============================================
 
@@ -1368,8 +1541,809 @@ export class ReconciliationController {
   }
 
   // ============================================
+  // TASK-RECON-035: Split Transaction Matching
+  // ============================================
+
+  @Post('split-matches/suggest')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Suggest split matches for a bank transaction',
+    description:
+      'Uses subset sum algorithm to find invoice combinations that match the transaction amount within tolerance',
+  })
+  @ApiResponse({
+    status: 200,
+    type: SuggestSplitMatchResponseDto,
+    description: 'Split match suggestions',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request parameters' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async suggestSplitMatches(
+    @Body() dto: SuggestSplitMatchDto,
+    @CurrentUser() user: IUser,
+  ): Promise<SuggestSplitMatchResponseDto> {
+    this.logger.log(
+      `Suggest split matches: tenant=${user.tenantId}, transaction=${dto.bank_transaction_id}, amount=${dto.amount_cents}c`,
+    );
+
+    const suggestions =
+      await this.splitTransactionMatcherService.suggestSplitMatches(
+        user.tenantId,
+        dto,
+      );
+
+    return {
+      success: true,
+      suggestions,
+      total_suggestions: suggestions.length,
+    };
+  }
+
+  @Post('split-matches/confirm')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Confirm a split match and create payments',
+    description:
+      'Confirms a split match suggestion, creates payment records, and updates invoice statuses',
+  })
+  @ApiResponse({
+    status: 200,
+    type: ConfirmSplitMatchResponseDto,
+    description: 'Split match confirmed',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Split match already confirmed or rejected',
+  })
+  @ApiResponse({ status: 404, description: 'Split match not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async confirmSplitMatch(
+    @Body() dto: ConfirmSplitMatchDto,
+    @CurrentUser() user: IUser,
+  ): Promise<ConfirmSplitMatchResponseDto> {
+    this.logger.log(
+      `Confirm split match: tenant=${user.tenantId}, match=${dto.split_match_id}`,
+    );
+
+    const result = await this.splitTransactionMatcherService.confirmSplitMatch(
+      user.tenantId,
+      dto,
+      user.id,
+    );
+
+    return {
+      success: true,
+      split_match: result.splitMatch,
+      invoices_paid: result.invoicesPaid,
+      payments_created: result.paymentsCreated,
+    };
+  }
+
+  @Post('split-matches/reject')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Reject a split match suggestion',
+  })
+  @ApiResponse({
+    status: 200,
+    type: SplitMatchResponseDto,
+    description: 'Split match rejected',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Split match already confirmed or rejected',
+  })
+  @ApiResponse({ status: 404, description: 'Split match not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async rejectSplitMatch(
+    @Body() dto: RejectSplitMatchDto,
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; split_match: SplitMatchResponseDto }> {
+    this.logger.log(
+      `Reject split match: tenant=${user.tenantId}, match=${dto.split_match_id}`,
+    );
+
+    const splitMatch =
+      await this.splitTransactionMatcherService.rejectSplitMatch(
+        user.tenantId,
+        dto.split_match_id,
+        dto.reason,
+      );
+
+    return {
+      success: true,
+      split_match: splitMatch,
+    };
+  }
+
+  @Get('split-matches')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'List split matches with filtering and pagination',
+  })
+  @ApiResponse({
+    status: 200,
+    type: SplitMatchListResponseDto,
+    description: 'Paginated list of split matches',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async listSplitMatches(
+    @Query() filter: SplitMatchFilterDto,
+    @CurrentUser() user: IUser,
+  ): Promise<SplitMatchListResponseDto> {
+    this.logger.log(
+      `List split matches: tenant=${user.tenantId}, status=${filter.status}, type=${filter.match_type}`,
+    );
+
+    const result = await this.splitTransactionMatcherService.getSplitMatches(
+      user.tenantId,
+      filter,
+    );
+
+    return {
+      success: true,
+      data: result.data,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      total_pages: result.totalPages,
+    };
+  }
+
+  @Get('split-matches/:splitMatchId')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Get a single split match by ID',
+  })
+  @ApiParam({ name: 'splitMatchId', description: 'Split match ID' })
+  @ApiResponse({
+    status: 200,
+    type: SplitMatchResponseDto,
+    description: 'Split match details',
+  })
+  @ApiResponse({ status: 404, description: 'Split match not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getSplitMatchById(
+    @Param('splitMatchId') splitMatchId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: SplitMatchResponseDto }> {
+    this.logger.log(
+      `Get split match by ID: tenant=${user.tenantId}, id=${splitMatchId}`,
+    );
+
+    const splitMatch =
+      await this.splitTransactionMatcherService.getSplitMatchById(
+        user.tenantId,
+        splitMatchId,
+      );
+
+    return {
+      success: true,
+      data: splitMatch,
+    };
+  }
+
+  // ============================================
+  // TASK-RECON-036: Accrued Bank Charges
+  // Handles fee-adjusted matches where Bank NET + Accrued Fee = Xero GROSS
+  // ============================================
+
+  @Get('accrued-charges')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'List accrued bank charges with filtering and pagination',
+    description:
+      'Returns accrued fees shown on bank statements but charged in following period',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of accrued charges',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAccruedCharges(
+    @Query() filter: AccruedChargeFilterDto,
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: AccruedBankChargeResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    this.logger.log(
+      `List accrued charges: tenant=${user.tenantId}, status=${filter.status ?? 'all'}, fee_type=${filter.fee_type ?? 'all'}`,
+    );
+
+    const result = await this.accruedBankChargeService.listAccruedCharges(
+      user.tenantId,
+      filter,
+    );
+
+    return {
+      success: true,
+      data: result.data,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    };
+  }
+
+  @Get('accrued-charges/summary')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Get accrued bank charges summary statistics',
+    description:
+      'Returns summary of accrued charges by status and fee type with totals',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Accrued charges summary',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAccruedChargesSummary(
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: AccruedChargeSummaryDto }> {
+    this.logger.log(`Accrued charges summary: tenant=${user.tenantId}`);
+
+    const summary = await this.accruedBankChargeService.getSummary(
+      user.tenantId,
+    );
+
+    return {
+      success: true,
+      data: summary,
+    };
+  }
+
+  @Get('accrued-charges/:chargeId')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'Get a single accrued charge by ID' })
+  @ApiParam({ name: 'chargeId', description: 'Accrued charge ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Accrued charge details',
+  })
+  @ApiResponse({ status: 404, description: 'Accrued charge not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getAccruedChargeById(
+    @Param('chargeId') chargeId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
+    this.logger.log(
+      `Get accrued charge by ID: tenant=${user.tenantId}, id=${chargeId}`,
+    );
+
+    const charge = await this.accruedBankChargeService.getAccruedCharge(
+      user.tenantId,
+      chargeId,
+    );
+
+    return {
+      success: true,
+      data: charge,
+    };
+  }
+
+  @Post('accrued-charges')
+  @HttpCode(201)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Create an accrued bank charge record',
+    description:
+      'Records a fee shown on bank statement that will be charged in the next billing period',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Accrued charge created successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request parameters',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async createAccruedCharge(
+    @Body() dto: CreateAccruedBankChargeDto,
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
+    this.logger.log(
+      `Create accrued charge: tenant=${user.tenantId}, fee_type=${dto.fee_type}, amount=${dto.accrued_amount_cents}c`,
+    );
+
+    const charge = await this.accruedBankChargeService.createAccruedCharge(
+      user.tenantId,
+      dto,
+    );
+
+    return {
+      success: true,
+      data: charge,
+    };
+  }
+
+  @Post('accrued-charges/:chargeId/match')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Match accrued charge to actual fee transaction',
+    description:
+      'Links the accrued charge to the actual bank fee transaction when it appears',
+  })
+  @ApiParam({ name: 'chargeId', description: 'Accrued charge ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Accrued charge matched successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Charge already matched or invalid transaction',
+  })
+  @ApiResponse({ status: 404, description: 'Accrued charge not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async matchAccruedCharge(
+    @Param('chargeId') chargeId: string,
+    @Body() body: { charge_transaction_id: string; charge_date?: string },
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
+    this.logger.log(
+      `Match accrued charge: tenant=${user.tenantId}, charge=${chargeId}, transaction=${body.charge_transaction_id}`,
+    );
+
+    const dto: MatchAccruedChargeDto = {
+      accrued_charge_id: chargeId,
+      charge_transaction_id: body.charge_transaction_id,
+      charge_date: body.charge_date,
+    };
+
+    const charge = await this.accruedBankChargeService.matchAccruedCharge(
+      user.tenantId,
+      dto,
+      user.id,
+    );
+
+    return {
+      success: true,
+      data: charge,
+    };
+  }
+
+  @Patch('accrued-charges/:chargeId/status')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Update accrued charge status',
+    description:
+      'Update the status of an accrued charge (e.g., to REVERSED or WRITTEN_OFF)',
+  })
+  @ApiParam({ name: 'chargeId', description: 'Accrued charge ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Status updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Accrued charge not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async updateAccruedChargeStatus(
+    @Param('chargeId') chargeId: string,
+    @Body() body: { status: string; notes?: string },
+    @CurrentUser() user: IUser,
+  ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
+    this.logger.log(
+      `Update accrued charge status: tenant=${user.tenantId}, charge=${chargeId}, status=${body.status}`,
+    );
+
+    const dto: UpdateAccruedChargeStatusDto = {
+      accrued_charge_id: chargeId,
+      status: body.status as any,
+      notes: body.notes,
+    };
+
+    const charge = await this.accruedBankChargeService.updateStatus(
+      user.tenantId,
+      dto,
+    );
+
+    return {
+      success: true,
+      data: charge,
+    };
+  }
+
+  @Post('accrued-charges/auto-match')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Auto-match pending accrued charges',
+    description:
+      'Automatically matches pending accrued charges to fee transactions from the next billing period',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Auto-matching completed',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async autoMatchAccruedCharges(@CurrentUser() user: IUser): Promise<{
+    success: boolean;
+    data: {
+      matched_count: number;
+      remaining_count: number;
+      total_matched_cents: number;
+    };
+  }> {
+    this.logger.log(`Auto-match accrued charges: tenant=${user.tenantId}`);
+
+    const result = await this.accruedBankChargeService.autoMatchAccruedCharges(
+      user.tenantId,
+      user.id,
+    );
+
+    return {
+      success: true,
+      data: {
+        matched_count: result.matchedCount,
+        remaining_count: result.remainingCount,
+        total_matched_cents: result.totalMatchedCents,
+      },
+    };
+  }
+
+  // ============================================
+  // TASK-RECON-037: Xero Transaction Splitting
+  // Split Xero transactions into net + fee for bank matching
+  // ============================================
+
+  @Post('xero-splits/detect')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Detect split parameters for a Xero transaction',
+    description:
+      'Analyzes the difference between a Xero transaction and bank statement amount to determine if splitting is recommended and suggests split parameters.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Split detection result with suggested parameters',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async detectXeroSplitParams(
+    @Body() dto: DetectSplitParamsDto,
+    @CurrentUser() user: IUser,
+  ) {
+    this.logger.log(
+      `Detecting Xero split params: tenant=${user.tenantId}, xeroAmount=${dto.xero_amount_cents}, bankAmount=${dto.bank_amount_cents}`,
+    );
+
+    const result = await this.xeroTransactionSplitService.detectSplitParams(
+      user.tenantId,
+      dto,
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Post('xero-splits')
+  @HttpCode(201)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Split a Xero transaction into net amount + fee',
+    description:
+      'Creates a split record for a Xero transaction, separating the gross amount into net (for bank matching) and fee (as accrued bank charge).',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Split created successfully with linked accrued charge',
+  })
+  @ApiBadRequestResponse({
+    description: 'Invalid split parameters or transaction already split',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async splitXeroTransaction(
+    @Body() dto: SplitXeroTransactionDto,
+    @CurrentUser() user: IUser,
+  ) {
+    this.logger.log(
+      `Splitting Xero transaction: tenant=${user.tenantId}, xeroTxn=${dto.xero_transaction_id}, net=${dto.net_amount_cents}, fee=${dto.fee_amount_cents}`,
+    );
+
+    const result = await this.xeroTransactionSplitService.splitXeroTransaction(
+      user.tenantId,
+      dto,
+      user.id,
+    );
+
+    return {
+      success: true,
+      data: result,
+      message: `Xero transaction split created. Net: R${(dto.net_amount_cents / 100).toFixed(2)}, Fee: R${(dto.fee_amount_cents / 100).toFixed(2)}`,
+    };
+  }
+
+  @Post('xero-splits/:id/confirm')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Confirm a pending Xero transaction split',
+    description:
+      'Confirms a pending split, making it ready for bank statement matching.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Split confirmed successfully',
+  })
+  @ApiNotFoundResponse({ description: 'Split not found' })
+  @ApiBadRequestResponse({ description: 'Split is not in pending status' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async confirmXeroSplit(
+    @Param('id') id: string,
+    @Body() dto: Partial<ConfirmXeroSplitDto>,
+    @CurrentUser() user: IUser,
+  ) {
+    this.logger.log(
+      `Confirming Xero split: tenant=${user.tenantId}, splitId=${id}`,
+    );
+
+    const result = await this.xeroTransactionSplitService.confirmSplit(
+      user.tenantId,
+      { split_id: id, ...dto },
+      user.id,
+    );
+
+    return {
+      success: true,
+      data: result,
+      message: 'Xero transaction split confirmed',
+    };
+  }
+
+  @Post('xero-splits/:id/cancel')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @ApiOperation({
+    summary: 'Cancel a Xero transaction split',
+    description:
+      'Cancels a split and reverses the associated accrued bank charge.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Split cancelled successfully',
+  })
+  @ApiNotFoundResponse({ description: 'Split not found' })
+  @ApiBadRequestResponse({ description: 'Split is already cancelled' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async cancelXeroSplit(
+    @Param('id') id: string,
+    @Body() dto: Partial<CancelXeroSplitDto>,
+    @CurrentUser() user: IUser,
+  ) {
+    this.logger.log(
+      `Cancelling Xero split: tenant=${user.tenantId}, splitId=${id}`,
+    );
+
+    const result = await this.xeroTransactionSplitService.cancelSplit(
+      user.tenantId,
+      { split_id: id, ...dto },
+      user.id,
+    );
+
+    return {
+      success: true,
+      data: result,
+      message: 'Xero transaction split cancelled',
+    };
+  }
+
+  @Get('xero-splits')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'List Xero transaction splits',
+    description:
+      'Returns a paginated list of Xero transaction splits with optional filtering.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of Xero transaction splits',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async listXeroSplits(
+    @Query() filter: XeroSplitFilterDto,
+    @CurrentUser() user: IUser,
+  ) {
+    this.logger.log(
+      `Listing Xero splits: tenant=${user.tenantId}, filter=${JSON.stringify(filter)}`,
+    );
+
+    const result = await this.xeroTransactionSplitService.listSplits(
+      user.tenantId,
+      filter,
+    );
+
+    return {
+      success: true,
+      ...result,
+    };
+  }
+
+  @Get('xero-splits/summary')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'Get Xero transaction split summary',
+    description:
+      'Returns a summary of Xero transaction splits including totals by status and fee type.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Split summary statistics',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getXeroSplitSummary(@CurrentUser() user: IUser) {
+    this.logger.log(`Getting Xero split summary: tenant=${user.tenantId}`);
+
+    const result = await this.xeroTransactionSplitService.getSummary(
+      user.tenantId,
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Get('xero-splits/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'Get a Xero transaction split by ID',
+    description:
+      'Returns the details of a specific Xero transaction split including the linked accrued charge.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Split details with linked accrued charge',
+  })
+  @ApiNotFoundResponse({ description: 'Split not found' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getXeroSplit(@Param('id') id: string, @CurrentUser() user: IUser) {
+    this.logger.log(
+      `Getting Xero split: tenant=${user.tenantId}, splitId=${id}`,
+    );
+
+    const result = await this.xeroTransactionSplitService.getSplit(
+      user.tenantId,
+      id,
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Get('xero-splits/by-xero-transaction/:xeroTransactionId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'Get a Xero transaction split by Xero transaction ID',
+    description:
+      'Checks if a Xero transaction has been split and returns the split details if found.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Split details or null if not found',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getXeroSplitByXeroTransactionId(
+    @Param('xeroTransactionId') xeroTransactionId: string,
+    @CurrentUser() user: IUser,
+  ) {
+    this.logger.log(
+      `Getting Xero split by xeroTransactionId: tenant=${user.tenantId}, xeroTxnId=${xeroTransactionId}`,
+    );
+
+    const result =
+      await this.xeroTransactionSplitService.getSplitByXeroTransactionId(
+        user.tenantId,
+        xeroTransactionId,
+      );
+
+    return {
+      success: true,
+      data: result,
+      message: result
+        ? 'Split found'
+        : 'No split found for this Xero transaction',
+    };
+  }
+
+  // ============================================
   // TASK-RECON-UI: Get Reconciliation by ID
-  // NOTE: This must be LAST to avoid matching specific routes like 'summary', 'discrepancies'
+  // NOTE: This must be LAST to avoid matching specific routes like 'summary', 'discrepancies', 'xero-splits'
   // ============================================
 
   @Get(':id')

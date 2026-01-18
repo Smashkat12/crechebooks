@@ -1,6 +1,7 @@
 /**
  * SARS Controller
  * TASK-SARS-031: SARS Controller and DTOs
+ * TASK-SARS-035: Replace Mock eFiling with File Generation
  *
  * Handles SARS tax submission operations.
  * Uses snake_case for external API, transforms to camelCase for internal services.
@@ -8,13 +9,18 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
   Param,
+  Query,
   Logger,
   HttpCode,
   UseGuards,
   BadRequestException,
+  Res,
+  ServiceUnavailableException,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -23,11 +29,14 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
   ApiParam,
+  ApiQuery,
+  ApiProduces,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { SarsSubmissionRepository } from '../../database/repositories/sars-submission.repository';
 import { Vat201Service } from '../../database/services/vat201.service';
 import { Emp201Service } from '../../database/services/emp201.service';
+import { SarsFileGeneratorService } from '../../database/services/sars-file-generator.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -41,6 +50,10 @@ import {
   ApiGenerateEmp201Dto,
   ApiEmp201ResponseDto,
 } from './dto';
+import {
+  Emp201DownloadQueryDto,
+  Emp501DownloadQueryDto,
+} from '../../database/dto/sars-file.dto';
 
 @Controller('sars')
 @ApiTags('SARS')
@@ -52,6 +65,7 @@ export class SarsController {
     private readonly sarsSubmissionRepo: SarsSubmissionRepository,
     private readonly vat201Service: Vat201Service,
     private readonly emp201Service: Emp201Service,
+    private readonly sarsFileGenerator: SarsFileGeneratorService,
   ) {}
 
   @Post(':id/submit')
@@ -266,5 +280,175 @@ export class SarsController {
         document_url: `/sars/emp201/${submission.id}/document`,
       },
     };
+  }
+
+  /**
+   * Download EMP201 CSV file for SARS submission
+   * TASK-SARS-035: Replace Mock eFiling with File Generation
+   */
+  @Get('emp201/download')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Download EMP201 CSV for SARS eFiling',
+    description:
+      'Generates EMP201 CSV file from SimplePay data for upload to SARS eFiling portal',
+  })
+  @ApiQuery({
+    name: 'taxYear',
+    description: 'Tax year in YYYY format',
+    example: '2025',
+  })
+  @ApiQuery({
+    name: 'taxPeriod',
+    description: 'Tax period (1-12 for monthly)',
+    example: '1',
+  })
+  @ApiProduces('text/csv')
+  @ApiResponse({
+    status: 200,
+    description: 'EMP201 CSV file download',
+    content: {
+      'text/csv': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid tax year or period format',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'SimplePay service unavailable',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async downloadEmp201(
+    @Query() query: Emp201DownloadQueryDto,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(
+      `Download EMP201: tenant=${user.tenantId}, year=${query.taxYear}, period=${query.taxPeriod}`,
+    );
+
+    try {
+      const result = await this.sarsFileGenerator.generateEmp201Csv(
+        user.tenantId,
+        parseInt(query.taxYear, 10),
+        parseInt(query.taxPeriod, 10),
+      );
+
+      res.set({
+        'Content-Type': result.contentType,
+        'Content-Disposition': `attachment; filename="${result.filename}"`,
+        'Cache-Control': 'no-cache',
+      });
+
+      res.send(result.content);
+
+      this.logger.log(`EMP201 CSV downloaded: ${result.filename}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate EMP201 CSV: ${error.message}`,
+        error.stack,
+      );
+
+      if (error.message?.includes('SimplePay')) {
+        throw new ServiceUnavailableException(
+          'SimplePay service unavailable. Please try again later.',
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Download EMP501 CSV file for SARS annual reconciliation
+   * TASK-SARS-035: Replace Mock eFiling with File Generation
+   */
+  @Get('emp501/download')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Download EMP501 CSV for SARS annual reconciliation',
+    description:
+      'Generates EMP501 CSV file from SimplePay IRP5 data for upload to SARS eFiling portal',
+  })
+  @ApiQuery({
+    name: 'taxYearStart',
+    description: 'Tax year start date (YYYY-MM-DD)',
+    example: '2025-03-01',
+  })
+  @ApiQuery({
+    name: 'taxYearEnd',
+    description: 'Tax year end date (YYYY-MM-DD)',
+    example: '2026-02-28',
+  })
+  @ApiProduces('text/csv')
+  @ApiResponse({
+    status: 200,
+    description: 'EMP501 CSV file download',
+    content: {
+      'text/csv': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid date format',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'SimplePay service unavailable',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async downloadEmp501(
+    @Query() query: Emp501DownloadQueryDto,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(
+      `Download EMP501: tenant=${user.tenantId}, period=${query.taxYearStart} to ${query.taxYearEnd}`,
+    );
+
+    try {
+      const result = await this.sarsFileGenerator.generateEmp501Csv(
+        user.tenantId,
+        query.taxYearStart,
+        query.taxYearEnd,
+      );
+
+      res.set({
+        'Content-Type': result.contentType,
+        'Content-Disposition': `attachment; filename="${result.filename}"`,
+        'Cache-Control': 'no-cache',
+      });
+
+      res.send(result.content);
+
+      this.logger.log(`EMP501 CSV downloaded: ${result.filename}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate EMP501 CSV: ${error.message}`,
+        error.stack,
+      );
+
+      if (error.message?.includes('SimplePay')) {
+        throw new ServiceUnavailableException(
+          'SimplePay service unavailable. Please try again later.',
+        );
+      }
+
+      throw error;
+    }
   }
 }

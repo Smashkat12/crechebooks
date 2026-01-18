@@ -21,6 +21,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -37,6 +38,7 @@ import { Staff } from '@prisma/client';
 import { ApiCreateStaffDto } from './dto';
 import { SimplePayEmployeeService } from '../../integrations/simplepay/simplepay-employee.service';
 import { SimplePayConnectionService } from '../../integrations/simplepay/simplepay-connection.service';
+import { StaffCreatedEvent } from '../../integrations/simplepay/handlers/staff-created.handler';
 import { Logger } from '@nestjs/common';
 
 /**
@@ -80,6 +82,7 @@ export class StaffController {
     private readonly staffRepository: StaffRepository,
     private readonly simplePayEmployeeService: SimplePayEmployeeService,
     private readonly simplePayConnectionService: SimplePayConnectionService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Get()
@@ -171,13 +174,26 @@ export class StaffController {
         bankBranchCode: dto.bank_branch_code,
       });
 
-      // TASK-STAFF-004: Auto-sync to SimplePay if connected
-      // Fire-and-forget - don't block staff creation on SimplePay sync
-      this.syncToSimplePay(user.tenantId, staff.id).catch((error) => {
-        this.logger.warn(
-          `Failed to auto-sync staff ${staff.id} to SimplePay: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      });
+      // TASK-STAFF-004 / TASK-SPAY-008: Emit staff.created event for SimplePay setup
+      // The StaffCreatedHandler will trigger comprehensive setup including:
+      // - Employee creation in SimplePay
+      // - Profile assignment
+      // - Leave initialization
+      // - Tax configuration
+      // - SA statutory calculations (PAYE, UIF, SDL)
+      const event: StaffCreatedEvent = {
+        tenantId: user.tenantId,
+        staffId: staff.id,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        employmentType: staff.employmentType,
+        position: null,
+        createdBy: user.id,
+      };
+      this.eventEmitter.emit('staff.created', event);
+      this.logger.log(
+        `Emitted staff.created event for ${staff.firstName} ${staff.lastName} (${staff.id})`,
+      );
 
       return toSnakeCase(staff);
     } catch (error) {
@@ -185,43 +201,6 @@ export class StaffController {
         throw new BadRequestException(error.message);
       }
       throw error;
-    }
-  }
-
-  /**
-   * Auto-sync staff member to SimplePay
-   * Called asynchronously after staff creation
-   */
-  private async syncToSimplePay(
-    tenantId: string,
-    staffId: string,
-  ): Promise<void> {
-    try {
-      // Check if SimplePay is connected for this tenant
-      const connectionStatus =
-        await this.simplePayConnectionService.getConnectionStatus(tenantId);
-      if (!connectionStatus.isConnected) {
-        this.logger.debug(
-          `SimplePay not connected for tenant ${tenantId}, skipping auto-sync`,
-        );
-        return;
-      }
-
-      // Sync employee to SimplePay
-      const mapping = await this.simplePayEmployeeService.syncEmployee(
-        tenantId,
-        staffId,
-      );
-
-      this.logger.log(
-        `Staff ${staffId} auto-synced to SimplePay employee ${mapping.simplePayEmployeeId}`,
-      );
-    } catch (error) {
-      // Log but don't throw - staff creation should succeed even if SimplePay sync fails
-      this.logger.error(
-        `Failed to sync staff ${staffId} to SimplePay`,
-        error instanceof Error ? error.stack : String(error),
-      );
     }
   }
 

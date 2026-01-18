@@ -298,11 +298,17 @@ graph TD
 | SimplePay Comprehensive - Bulk Ops | 1 | 1 | 100% |
 | SimplePay Comprehensive - Auto-Setup | 1 | 1 | 100% |
 | **Subtotal (Phase 14)** | **8** | **8** | **100%** |
-| VAT Compliance - Invoice Generation | 1 | 0 | 0% |
-| **Subtotal (Phase 15)** | **1** | **0** | **0%** |
-| **Grand Total** | **179** | **178** | **99.4%** |
+| VAT Compliance - Invoice Generation | 1 | 1 | 100% |
+| **Subtotal (Phase 15)** | **1** | **1** | **100%** |
+| **Subtotal (Phase 16)** | **63** | **15** | **24%** |
+| Code Review - Critical | 3 | 3 | 100% |
+| Code Review - High | 5 | 5 | 100% |
+| Code Review - Medium | 2 | 2 | 100% |
+| **Subtotal (Phase 17)** | **10** | **10** | **100%** |
+| **Subtotal (Phase 18)** | **3** | **3** | **100%** |
+| **Grand Total** | **192** | **191** | **99.5%** |
 
-**Last Updated**: 2026-01-13
+**Last Updated**: 2026-01-18
 - Phases 1-6 (Core): 93/93 tasks complete (100%) ✅
 - Phase 7 (Remediation): 28/28 tasks complete (100%) ✅
 - Phase 8 (Gap Remediation): 13/13 tasks complete (100%) ✅
@@ -312,8 +318,10 @@ graph TD
 - Phase 12 (Account Statements): 8/8 tasks complete (100%) ✅
 - Phase 13 (Staff Management & Integrations): 4/4 tasks complete (100%) ✅
 - Phase 14 (Comprehensive SimplePay Integration): 8/8 tasks complete (100%) ✅
-- Phase 15 (VAT Compliance Enhancement): 0/1 tasks complete (0%) ⭕
-- Overall Progress: 178/179 tasks (99.4%)
+- Phase 15 (VAT Compliance Enhancement): 1/1 tasks complete (100%) ✅
+- Phase 17 (Code Review Remediation): 10/10 tasks complete (100%) ✅
+- Phase 18 (Reconciliation Sign Convention): 3/3 tasks complete (100%) ✅
+- Overall Progress: 191/192 tasks (99.5%)
 
 ---
 
@@ -1101,6 +1109,77 @@ These tasks address security vulnerabilities, data integrity issues, and code qu
 | P4-LOW | 8 | 0 | 8 | 0% |
 | **Total Phase 16** | **63** | **15** | **48** | **24%** |
 
+---
+
+## Phase 17: Code Review Remediation (2026-01-17)
+
+Analysis Date: 2026-01-17
+Source: Coordinated multi-agent code review using claude-flow swarm orchestration.
+
+These tasks address critical issues identified through comprehensive 8-domain code review.
+
+### 17.1 Critical Fixes (Sequence 180-184)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 247 | TASK-DB-001 | Add Transaction Handling to completeOffboarding | logic | - | P0-CRITICAL | ✅ Complete |
+| 248 | TASK-SARS-034 | Update PAYE Tax Tables to 2025/2026 | logic | - | P0-CRITICAL | ✅ Complete |
+| 249 | TASK-SARS-035 | Replace Mock eFiling with File Generation | logic | TASK-SARS-034, TASK-SPAY-001 | P0-CRITICAL | ✅ Complete |
+| 250 | TASK-AUTH-001 | Add Role Enforcement to Tenant Controller | surface | - | P1-HIGH | ✅ Complete |
+| 251 | TASK-XERO-008 | Implement Distributed Rate Limiting for Xero API | logic | - | P1-HIGH | ✅ Complete |
+
+### 17.2 High Priority Fixes (Sequence 190-194)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 252 | TASK-XERO-009 | Implement Bidirectional Invoice Sync with Xero | logic | TASK-XERO-008 | P1-HIGH | ✅ Complete |
+| 253 | TASK-XERO-010 | Implement Xero Contact and Payment Sync | logic | TASK-XERO-009 | P1-HIGH | ✅ Complete |
+| 254 | TASK-SPAY-009 | Add SimplePay Webhook Handler | logic | TASK-SPAY-008 | P1-HIGH | ✅ Complete |
+| 255 | TASK-RECON-035 | Implement Split Transaction Matching | logic | TASK-RECON-011 | P2-MEDIUM | ✅ Complete |
+| 256 | TASK-RECON-036 | Complete Balance Sheet Implementation | logic | TASK-RECON-013 | P2-MEDIUM | ✅ Complete |
+
+---
+
+## Phase 17 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-CRITICAL | 3 | 3 | 0 | 100% |
+| P1-HIGH | 5 | 5 | 0 | 100% |
+| P2-MEDIUM | 2 | 2 | 0 | 100% |
+| **Total Phase 17** | **10** | **10** | **0** | **100%** |
+
+### Phase 17 Key Issues Addressed
+
+**SARS Compliance**:
+- TASK-SARS-034: Tax tables outdated (2024/2025 vs 2025/2026)
+- TASK-SARS-035: eFiling client uses hypothetical SARS API
+
+**Database Integrity**:
+- TASK-DB-001: Missing transaction handling in completeOffboarding
+
+**Integration Reliability**:
+- TASK-XERO-008: Rate limiter not distributed
+- TASK-XERO-009/010: Bidirectional sync incomplete
+- TASK-SPAY-009: No SimplePay webhook handler
+
+**Reconciliation**:
+- TASK-RECON-035: No split transaction matching
+- TASK-RECON-036: Balance Sheet incomplete
+
+### Review Source
+
+Findings stored in claude-flow memory:
+- `review/database/findings` - Database layer issues
+- `review/auth/findings` - Authentication findings
+- `review/billing/findings` - Billing/invoicing gaps
+- `review/staff-payroll/findings` - SimplePay integration
+- `review/sars/findings` - SARS compliance issues
+- `review/reconciliation/findings` - Matching gaps
+- `review/integrations/findings` - Xero/email issues
+- `review/frontend/findings` - Frontend integration
+- `review/synthesis` - Consolidated findings
+
 ### Phase 16 Execution Order
 
 **Sprint 1: Critical Security (Tasks 184-191, 195-196, 201-202, 208-209, 223)**
@@ -1138,3 +1217,80 @@ All findings stored in claude-flow unified memory:
 - `codebase-review/meta/summary` - Executive summary
 - `codebase-review/domains/*` - Domain-specific findings
 - `codebase-review/tasks/phase-16-manifest` - Task manifest
+
+---
+
+## Phase 18: Reconciliation Sign Convention Fixes (2026-01-18)
+
+Analysis Date: 2026-01-18
+Source: Architecture review of reconciliation system using hierarchical swarm orchestration.
+
+These tasks fix critical sign convention bugs that cause reconciliation mismatches between Xero transactions, bank statements, and payment allocations.
+
+### 18.1 Sign Convention Fixes (Sequence 257-259)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 257 | TASK-RECON-038 | Fix Xero Bank Feed Fee Sign Preservation | logic | TASK-RECON-037, TASK-XERO-008 | P0-BLOCKER | ✅ Complete |
+| 258 | TASK-RECON-039 | Fix CSV Import Fee Detection | logic | TASK-TRANS-011, TASK-RECON-038 | P0-BLOCKER | ✅ Complete |
+| 259 | TASK-RECON-040 | Fix Payment Allocation Fee Handling | logic | TASK-RECON-038, TASK-RECON-039, TASK-PAY-012 | P1-CRITICAL | ✅ Complete |
+
+---
+
+## Phase 18 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-BLOCKER | 2 | 2 | 0 | 100% |
+| P1-CRITICAL | 1 | 1 | 0 | 100% |
+| **Total Phase 18** | **3** | **3** | **0** | **100%** |
+
+### Phase 18 Key Issues Addressed
+
+**Bug #1 - Xero Fee Sign Stripping (TASK-RECON-038)**:
+- File: `bank-feed.service.ts:619`
+- Issue: `Math.abs()` strips negative sign from fee transactions
+- Impact: Fees display as +R6.36 instead of -R6.36
+- Fix: Remove Math.abs(), preserve Xero's original sign
+
+**Bug #2 - CSV Fee Miscategorization (TASK-RECON-039)**:
+- File: `csv-parser.ts`
+- Issue: Blindly trusts CSV "Type" column for fees
+- Impact: Fees marked as "Credit" import incorrectly
+- Fix: Add fee detection and sign correction logic
+
+**Bug #3 - Payment Allocation Ignores Fees (TASK-RECON-040)**:
+- File: `payment-allocation.service.ts`
+- Issue: Allocates GROSS amount instead of NET
+- Impact: Parent invoices over-credited by fee amount
+- Fix: Use NET amount from split transactions
+
+### Sign Convention Standard
+
+```
+amountCents (number) + isCredit (boolean)
+- Fees/Charges: amountCents=NEGATIVE, isCredit=false (DEBIT)
+- Income: amountCents=POSITIVE, isCredit=true (CREDIT)
+```
+
+### Critical Dependencies
+
+```mermaid
+graph LR
+    RECON037[TASK-RECON-037<br/>Split Matching] --> RECON038[TASK-RECON-038<br/>Xero Sign Fix]
+    RECON038 --> RECON039[TASK-RECON-039<br/>CSV Fee Fix]
+    RECON038 --> RECON040[TASK-RECON-040<br/>Allocation Fix]
+    RECON039 --> RECON040
+```
+
+### Execution Order
+
+Tasks MUST be implemented in this order:
+1. **TASK-RECON-038** (first - foundation fix)
+2. **TASK-RECON-039** (depends on 038)
+3. **TASK-RECON-040** (depends on 038 and 039)
+
+### Review Source
+
+Findings stored in claude-flow memory:
+- `reconciliation-architecture-review-2026-01-18` - Full architecture review

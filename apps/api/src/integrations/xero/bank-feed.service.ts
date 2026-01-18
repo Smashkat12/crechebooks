@@ -607,6 +607,18 @@ export class BankFeedService {
       );
     }
 
+    // TASK-RECON-038: Preserve Xero's sign - DO NOT use Math.abs()
+    // Xero sends negative amounts for fees/debits, positive for credits
+    // Sign convention: amountCents carries sign, isCredit indicates direction
+
+    // Detect fee transactions with incorrect positive amounts (audit warning)
+    if (this.isFeeTransaction(description) && amountCents > 0) {
+      this.logger.warn(
+        `Fee transaction "${description}" has positive amount - verify sign convention`,
+        { transactionId: xeroTx.bankTransactionID, amountCents },
+      );
+    }
+
     // Create transaction
     await this.transactionRepo.create({
       tenantId,
@@ -616,7 +628,7 @@ export class BankFeedService {
       description,
       payeeName: xeroTx.contact?.name ?? undefined,
       reference: xeroTx.reference ?? undefined,
-      amountCents: Math.abs(amountCents),
+      amountCents, // FIXED: Preserve original sign (no Math.abs)
       isCredit,
       source: ImportSource.BANK_FEED,
       status,
@@ -624,6 +636,16 @@ export class BankFeedService {
     });
 
     return 'created';
+  }
+
+  /**
+   * Check if a transaction description indicates a fee/charge
+   * Used for audit logging when fee signs appear incorrect
+   */
+  private isFeeTransaction(description: string): boolean {
+    return /\b(fee|charge|bank charges|service fee|monthly fee|transaction fee)\b/i.test(
+      description,
+    );
   }
 
   /**
@@ -942,9 +964,10 @@ export class BankFeedService {
       return 'duplicate';
     }
 
-    // Calculate amount in cents (Finance API returns decimal)
-    const amountCents = Math.round(Math.abs(line.amount) * 100);
-    const isCredit = line.amount > 0;
+    // TASK-RECON-038: Preserve Xero's sign - DO NOT use Math.abs()
+    // Finance API returns decimal amounts with sign (negative = debit)
+    const amountCents = Math.round(line.amount * 100);
+    const isCredit = amountCents > 0;
 
     // Build description from available fields
     // Priority: payee > reference > notes > fallback

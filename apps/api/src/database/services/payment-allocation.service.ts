@@ -32,6 +32,7 @@ import {
   SuggestedAllocationResult,
   AllocateTransactionInput,
 } from '../dto/payment-allocation.dto';
+import { XeroTransactionSplitService } from './xero-transaction-split.service';
 
 @Injectable()
 export class PaymentAllocationService {
@@ -46,6 +47,7 @@ export class PaymentAllocationService {
     private readonly auditLogService: AuditLogService,
     private readonly creditBalanceService: CreditBalanceService,
     private readonly xeroSyncService: XeroSyncService,
+    private readonly xeroSplitService: XeroTransactionSplitService,
   ) {}
 
   /**
@@ -90,20 +92,48 @@ export class PaymentAllocationService {
       (sum, p) => sum + p.amountCents,
       0,
     );
-    if (totalAlreadyAllocated >= transaction.amountCents) {
+
+    // 2b. TASK-RECON-040: Check if transaction has an associated Xero split
+    // When a Xero transaction is split to separate NET payment from bank fee,
+    // we should use the NET amount for allocation, not the GROSS amount
+    let effectiveAmountCents = transaction.amountCents;
+    if (transaction.xeroTransactionId) {
+      const split = await this.xeroSplitService.getSplitByXeroTransactionId(
+        dto.tenantId,
+        transaction.xeroTransactionId,
+      );
+
+      // Check if split is in a confirmed state (status is string from DTO)
+      const confirmedStatuses = ['CONFIRMED', 'MATCHED'];
+      if (split && confirmedStatuses.includes(split.status)) {
+        effectiveAmountCents = split.net_amount_cents;
+        this.logger.log(
+          `TASK-RECON-040: Using NET amount from split: R${(split.net_amount_cents / 100).toFixed(2)} instead of GROSS R${(transaction.amountCents / 100).toFixed(2)}`,
+          {
+            splitId: split.id,
+            xeroTransactionId: transaction.xeroTransactionId,
+            grossAmountCents: transaction.amountCents,
+            netAmountCents: split.net_amount_cents,
+            feeAmountCents: split.fee_amount_cents,
+          },
+        );
+      }
+    }
+
+    if (totalAlreadyAllocated >= effectiveAmountCents) {
       throw new BusinessException(
         'Transaction has already been fully allocated',
         'TRANSACTION_ALREADY_ALLOCATED',
         {
           transactionId: dto.transactionId,
-          transactionAmount: transaction.amountCents,
+          transactionAmount: effectiveAmountCents,
           alreadyAllocated: totalAlreadyAllocated,
         },
       );
     }
 
-    // 3. Validate total allocations <= transaction amount
-    this.validateAllocations(transaction.amountCents, dto.allocations);
+    // 3. Validate total allocations <= effective transaction amount
+    this.validateAllocations(effectiveAmountCents, dto.allocations);
 
     // 4. Call allocateToMultipleInvoices if multiple allocations
     if (dto.allocations.length > 1) {
@@ -200,9 +230,10 @@ export class PaymentAllocationService {
     });
 
     // 10. Return AllocationResult
+    // TASK-RECON-040: Use effectiveAmountCents (NET from split if applicable) for unallocated calculation
     const totalAllocated = new Decimal(allocation.amountCents);
-    const transactionAmount = new Decimal(transaction.amountCents);
-    const unallocatedAmountCents = transactionAmount
+    const transactionAmountForCalc = new Decimal(effectiveAmountCents);
+    const unallocatedAmountCents = transactionAmountForCalc
       .minus(totalAllocated)
       .toNumber();
 
@@ -363,7 +394,30 @@ export class PaymentAllocationService {
       dto.tenantId,
       dto.transactionId,
     );
-    const transactionAmount = new Decimal(transaction!.amountCents);
+
+    // TASK-RECON-040: Check for Xero split to use NET amount for unallocated calculation
+    let effectiveAmount = transaction!.amountCents;
+    if (transaction!.xeroTransactionId) {
+      const split = await this.xeroSplitService.getSplitByXeroTransactionId(
+        dto.tenantId,
+        transaction!.xeroTransactionId,
+      );
+
+      // Check if split is in a confirmed state (status is string from DTO)
+      const confirmedStatuses = ['CONFIRMED', 'MATCHED'];
+      if (split && confirmedStatuses.includes(split.status)) {
+        effectiveAmount = split.net_amount_cents;
+        this.logger.log(
+          `TASK-RECON-040 (multi-invoice): Using NET amount from split: R${(split.net_amount_cents / 100).toFixed(2)} instead of GROSS R${(transaction!.amountCents / 100).toFixed(2)}`,
+          {
+            splitId: split.id,
+            xeroTransactionId: transaction!.xeroTransactionId,
+          },
+        );
+      }
+    }
+
+    const transactionAmount = new Decimal(effectiveAmount);
     const unallocatedAmountCents = transactionAmount
       .minus(totalAllocated)
       .toNumber();

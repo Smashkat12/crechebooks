@@ -12,6 +12,10 @@ import { useOnboardingStatus } from '@/hooks/use-staff-onboarding';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { OnboardingStatusBadge } from '@/components/staff/OnboardingStatusBadge';
+import { SimplepayStatusCard } from '@/components/staff/SimplepayStatusCard';
+import { LeaveBalanceCard } from '@/components/staff/LeaveBalanceCard';
+import { PayslipsSection } from '@/components/staff/PayslipsSection';
+import { TaxDocumentsSection } from '@/components/staff/TaxDocumentsSection';
 import type { StaffStatus } from '@crechebooks/types';
 
 interface StaffDetailPageProps {
@@ -222,6 +226,18 @@ export default function StaffDetailPage({ params }: StaffDetailPageProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* SimplePay Integration & Leave Management */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <SimplepayStatusCard staffId={id} />
+        <LeaveBalanceCard staffId={id} />
+      </div>
+
+      {/* Payslips & Tax Documents */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <PayslipsSection staffId={id} />
+        <TaxDocumentsSection staffId={id} />
+      </div>
     </div>
   );
 }

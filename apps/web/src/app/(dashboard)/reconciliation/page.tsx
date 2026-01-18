@@ -128,6 +128,7 @@ export default function ReconciliationPage() {
           inXeroOnly: reconData.data.match_summary.in_xero_only,
           amountMismatch: reconData.data.match_summary.amount_mismatch,
           dateMismatch: reconData.data.match_summary.date_mismatch,
+          feeAdjustedMatch: (reconData.data.match_summary as Record<string, number>).fee_adjusted_match || 0,
           total: reconData.data.match_summary.total,
         } : {
           matched: reconData.data.matched_count,
@@ -135,6 +136,7 @@ export default function ReconciliationPage() {
           inXeroOnly: 0,
           amountMismatch: 0,
           dateMismatch: 0,
+          feeAdjustedMatch: 0,
           total: reconData.data.matched_count + reconData.data.unmatched_count,
         },
         status: reconData.data.status,

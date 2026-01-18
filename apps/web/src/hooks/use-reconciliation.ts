@@ -291,9 +291,12 @@ interface ApiBankStatementMatch {
   xero_description: string | null;
   xero_amount: number | null;
   xero_is_credit: boolean | null;
-  status: 'MATCHED' | 'IN_BANK_ONLY' | 'IN_XERO_ONLY' | 'AMOUNT_MISMATCH' | 'DATE_MISMATCH';
+  status: 'MATCHED' | 'IN_BANK_ONLY' | 'IN_XERO_ONLY' | 'AMOUNT_MISMATCH' | 'DATE_MISMATCH' | 'FEE_ADJUSTED_MATCH';
   match_confidence: number | null;
   discrepancy_reason: string | null;
+  // Fee-adjusted match fields
+  fee_type?: string | null;
+  accrued_fee_amount?: number | null;
 }
 
 interface ApiBankStatementReconciliationResponse {
@@ -312,6 +315,7 @@ interface ApiBankStatementReconciliationResponse {
       in_xero_only: number;
       amount_mismatch: number;
       date_mismatch: number;
+      fee_adjusted_match: number;
       total: number;
     };
     status: string;
@@ -331,9 +335,12 @@ export interface BankStatementMatch {
   xeroDescription: string | null;
   xeroAmount: number | null;
   xeroIsCredit: boolean | null;
-  status: 'MATCHED' | 'IN_BANK_ONLY' | 'IN_XERO_ONLY' | 'AMOUNT_MISMATCH' | 'DATE_MISMATCH';
+  status: 'MATCHED' | 'IN_BANK_ONLY' | 'IN_XERO_ONLY' | 'AMOUNT_MISMATCH' | 'DATE_MISMATCH' | 'FEE_ADJUSTED_MATCH';
   matchConfidence: number | null;
   discrepancyReason: string | null;
+  // Fee-adjusted match fields (when status is FEE_ADJUSTED_MATCH)
+  feeType?: string | null;
+  accruedFeeAmount?: number | null;
 }
 
 export interface BankStatementReconciliationResult {
@@ -350,6 +357,7 @@ export interface BankStatementReconciliationResult {
     inXeroOnly: number;
     amountMismatch: number;
     dateMismatch: number;
+    feeAdjustedMatch: number;
     total: number;
   };
   status: string;
@@ -372,6 +380,8 @@ function transformBankStatementMatch(api: ApiBankStatementMatch): BankStatementM
     status: api.status,
     matchConfidence: api.match_confidence,
     discrepancyReason: api.discrepancy_reason,
+    feeType: api.fee_type,
+    accruedFeeAmount: api.accrued_fee_amount,
   };
 }
 
@@ -414,6 +424,7 @@ export function useReconcileBankStatement() {
           inXeroOnly: data.data.match_summary.in_xero_only,
           amountMismatch: data.data.match_summary.amount_mismatch,
           dateMismatch: data.data.match_summary.date_mismatch,
+          feeAdjustedMatch: data.data.match_summary.fee_adjusted_match || 0,
           total: data.data.match_summary.total,
         },
         status: data.data.status,
@@ -621,6 +632,7 @@ export function useRefreshMatchResults(reconciliationId: string | null) {
         inXeroOnly: reconData.data.match_summary.in_xero_only,
         amountMismatch: reconData.data.match_summary.amount_mismatch,
         dateMismatch: reconData.data.match_summary.date_mismatch,
+        feeAdjustedMatch: (reconData.data.match_summary as Record<string, number>).fee_adjusted_match || 0,
         total: reconData.data.match_summary.total,
       } : {
         matched: reconData.data.matched_count,
@@ -628,6 +640,7 @@ export function useRefreshMatchResults(reconciliationId: string | null) {
         inXeroOnly: 0,
         amountMismatch: 0,
         dateMismatch: 0,
+        feeAdjustedMatch: 0,
         total: reconData.data.matched_count + reconData.data.unmatched_count,
       },
       status: reconData.data.status,

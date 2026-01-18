@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 
 const organizationSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
+  tradingName: z.string().optional(),
   registrationNumber: z.string().optional(),
   vatNumber: z.string().optional(),
   addressLine1: z.string().min(1, 'Address is required'),
@@ -61,6 +62,7 @@ export default function OrganizationSettingsPage() {
     if (tenant) {
       reset({
         name: tenant.name || '',
+        tradingName: tenant.tradingName || '',
         registrationNumber: tenant.registrationNumber || '',
         vatNumber: tenant.vatNumber || '',
         addressLine1: tenant.addressLine1 || '',
@@ -196,14 +198,19 @@ export default function OrganizationSettingsPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Organization Name *</Label>
-                <Input id="name" {...register('name')} placeholder="Elle Elephant" />
+                <Input id="name" {...register('name')} placeholder="Elle Elephant Creche" />
                 {errors.name && (
                   <p className="text-sm text-destructive">{errors.name.message}</p>
                 )}
               </div>
               <div className="space-y-2">
+                <Label htmlFor="tradingName">Trading Name</Label>
+                <Input id="tradingName" {...register('tradingName')} placeholder="Elle Elephant" />
+                <p className="text-xs text-muted-foreground">Used on documents if different from organization name</p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="registrationNumber">Registration Number</Label>
-                <Input id="registrationNumber" {...register('registrationNumber')} />
+                <Input id="registrationNumber" {...register('registrationNumber')} placeholder="e.g. 2024/123456/07" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="vatNumber">VAT Number</Label>

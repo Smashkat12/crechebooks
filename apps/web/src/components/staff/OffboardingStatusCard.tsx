@@ -106,13 +106,17 @@ function getReasonDisplay(reason: string): string {
 export function OffboardingStatusCard({ staffId }: OffboardingStatusCardProps) {
   const { data: status, isLoading, error } = useOffboardingStatus(staffId);
 
-  const { mutate: downloadUi19, isPending: downloadingUi19 } = useDownloadUi19(staffId);
+  // Get offboardingId early for hook initialization (will be empty string if not loaded yet)
+  const offboardingId = status?.id || '';
+
+  // Download hooks - require offboardingId for API endpoints
+  const { mutate: downloadUi19, isPending: downloadingUi19 } = useDownloadUi19(staffId, offboardingId);
   const { mutate: downloadCertificate, isPending: downloadingCertificate } =
-    useDownloadCertificate(staffId);
+    useDownloadCertificate(staffId, offboardingId);
   const { mutate: downloadExitPack, isPending: downloadingExitPack } =
-    useDownloadExitPack(staffId);
+    useDownloadExitPack(staffId, offboardingId);
   const { mutate: completeOffboarding, isPending: completing } =
-    useCompleteOffboarding(staffId);
+    useCompleteOffboarding(staffId, offboardingId);
 
   // Loading state
   if (isLoading) {
@@ -142,7 +146,15 @@ export function OffboardingStatusCard({ staffId }: OffboardingStatusCardProps) {
 
   const statusBadge = getStatusBadge(status.status);
   const StatusIcon = statusBadge.icon;
-  const canComplete = status.status === 'IN_PROGRESS' && status.settlementCalculated;
+
+  // Backend requires UI-19 AND Certificate to be generated before completion
+  const requiredDocsGenerated = status.documents?.ui19 && status.documents?.certificate;
+
+  // Allow completion when status is IN_PROGRESS or PENDING_SETTLEMENT and required docs are ready
+  const canComplete =
+    (status.status === 'IN_PROGRESS' || status.status === 'PENDING_SETTLEMENT') &&
+    status.settlementCalculated &&
+    requiredDocsGenerated;
 
   return (
     <Card>
@@ -182,19 +194,28 @@ export function OffboardingStatusCard({ staffId }: OffboardingStatusCardProps) {
           )}
         </div>
 
-        {/* Document Downloads */}
-        {status.documentsGenerated && (
+        {/* Document Downloads - Show when settlement is calculated (documents generate on-demand) */}
+        {status.settlementCalculated && (
           <div className="space-y-2 pt-2 border-t">
-            <h4 className="font-medium text-sm">Documents</h4>
+            <h4 className="font-medium text-sm">
+              Documents
+              {!requiredDocsGenerated && (
+                <span className="text-muted-foreground ml-1">
+                  (download UI-19 & Certificate to complete)
+                </span>
+              )}
+            </h4>
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                variant="outline"
+                variant={status.documents?.ui19 ? 'default' : 'outline'}
                 onClick={() => downloadUi19()}
                 disabled={downloadingUi19}
               >
                 {downloadingUi19 ? (
                   <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : status.documents?.ui19 ? (
+                  <CheckCircle className="mr-1 h-4 w-4" />
                 ) : (
                   <FileText className="mr-1 h-4 w-4" />
                 )}
@@ -202,12 +223,14 @@ export function OffboardingStatusCard({ staffId }: OffboardingStatusCardProps) {
               </Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant={status.documents?.certificate ? 'default' : 'outline'}
                 onClick={() => downloadCertificate()}
                 disabled={downloadingCertificate}
               >
                 {downloadingCertificate ? (
                   <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : status.documents?.certificate ? (
+                  <CheckCircle className="mr-1 h-4 w-4" />
                 ) : (
                   <Award className="mr-1 h-4 w-4" />
                 )}
@@ -215,12 +238,14 @@ export function OffboardingStatusCard({ staffId }: OffboardingStatusCardProps) {
               </Button>
               <Button
                 size="sm"
-                variant="outline"
+                variant={status.documents?.exitPack ? 'default' : 'outline'}
                 onClick={() => downloadExitPack()}
                 disabled={downloadingExitPack}
               >
                 {downloadingExitPack ? (
                   <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : status.documents?.exitPack ? (
+                  <CheckCircle className="mr-1 h-4 w-4" />
                 ) : (
                   <Package className="mr-1 h-4 w-4" />
                 )}

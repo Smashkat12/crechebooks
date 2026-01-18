@@ -13,6 +13,8 @@ export type { ExportReportParams } from './useExportReport';
 export { useBreakpoint, useMinBreakpoint, useMaxBreakpoint } from './useBreakpoint';
 export type { UseBreakpointReturn } from './useBreakpoint';
 export * from './use-simplepay';
+export * from './use-leave';
+export * from './use-xero-split';
 
 // TASK-UI-008: Mobile responsiveness hooks
 export {

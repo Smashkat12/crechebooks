@@ -71,6 +71,7 @@ export const endpoints = {
     metrics: '/dashboard/metrics',
     trends: '/dashboard/trends',
     learningMode: '/dashboard/learning-mode',
+    availablePeriods: '/dashboard/available-periods',
   },
   feeStructures: {
     list: '/fee-structures',
@@ -116,5 +117,15 @@ export const endpoints = {
     finalize: (id: string) => `/statements/${id}/finalize`,
     forParent: (parentId: string) => `/statements/parents/${parentId}`,
     parentAccount: (parentId: string) => `/statements/parents/${parentId}/account`,
+  },
+  xeroSplits: {
+    detect: '/reconciliation/xero-splits/detect',
+    create: '/reconciliation/xero-splits',
+    list: '/reconciliation/xero-splits',
+    summary: '/reconciliation/xero-splits/summary',
+    detail: (id: string) => `/reconciliation/xero-splits/${id}`,
+    confirm: (id: string) => `/reconciliation/xero-splits/${id}/confirm`,
+    cancel: (id: string) => `/reconciliation/xero-splits/${id}/cancel`,
+    byXeroTransaction: (xeroTxnId: string) => `/reconciliation/xero-splits/by-xero-transaction/${xeroTxnId}`,
   },
 } as const;

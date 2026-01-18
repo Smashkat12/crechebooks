@@ -139,6 +139,15 @@ This document maps SimplePay API capabilities to CrecheBooks implementation task
 |-------------------|-------------|-------------|---------|-------|
 | `/v1/clients/:client_id/bulk_input` | POST | ⭕ | TASK-SPAY-007 | Pending |
 
+### 17. Webhooks (Event-Driven)
+
+| SimplePay Event | Direction | Implemented | Task ID | Notes |
+|-----------------|-----------|-------------|---------|-------|
+| `employee.created` | SimplePay → CrecheBooks | ⭕ | TASK-SPAY-009 | Auto-create staff |
+| `employee.updated` | SimplePay → CrecheBooks | ⭕ | TASK-SPAY-009 | Sync changes |
+| `employee.terminated` | SimplePay → CrecheBooks | ⭕ | TASK-SPAY-009 | Trigger offboarding |
+| `payslip.finalized` | SimplePay → CrecheBooks | ⭕ | TASK-SPAY-009 | Import payslips |
+
 ---
 
 ## Implementation Coverage Summary
@@ -160,7 +169,8 @@ This document maps SimplePay API capabilities to CrecheBooks implementation task
 | Reports | 8 | 0 | 8 | 0% |
 | Profile Mappings | 4 | 0 | 4 | 0% |
 | Bulk Operations | 1 | 0 | 1 | 0% |
-| **Total** | **50** | **12** | **38** | **24%** |
+| Webhooks | 4 | 0 | 4 | 0% |
+| **Total** | **54** | **12** | **42** | **22%** |
 
 ---
 
@@ -204,6 +214,10 @@ graph TD
         I[TASK-SPAY-008<br/>Auto-Setup Pipeline]
     end
 
+    subgraph "Phase 17 - Webhooks"
+        J[TASK-SPAY-009<br/>Webhook Handler]
+    end
+
     A --> B
     A --> C
     A --> E
@@ -214,6 +228,8 @@ graph TD
     B --> I
     D --> I
     G --> I
+    A --> J
+    J --> I
 ```
 
 ---
@@ -257,6 +273,10 @@ graph TD
 | Leave Balances | Staff Leave Dashboard | TASK-SPAY-001 |
 | Pay Run Journals | Xero Sync | TASK-SPAY-002 |
 | Variance Reports | Financial Analytics | TASK-SPAY-005 |
+| Webhook: Employee Created | Auto Staff Creation | TASK-SPAY-009 |
+| Webhook: Employee Updated | Staff Sync | TASK-SPAY-009 |
+| Webhook: Employee Terminated | Offboarding Trigger | TASK-SPAY-009 |
+| Webhook: Payslip Finalized | Payslip Import | TASK-SPAY-009 |
 
 ---
 
@@ -360,6 +380,6 @@ Based on South African VAT Act No. 89 of 1991, Section 12(h).
 
 ---
 
-**Last Updated**: 2026-01-13
+**Last Updated**: 2026-01-17
 **Author**: Claude Code
-**Review Status**: Pending
+**Review Status**: Phase 17 Code Review Completed

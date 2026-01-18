@@ -35,6 +35,7 @@ import { SetupPipeline } from './setup-pipeline/setup-pipeline';
 import { ProfileSelector } from './setup-pipeline/profile-selector';
 import { LeaveCalculator } from './setup-pipeline/leave-calculator';
 import { CreateEmployeeStep } from './setup-pipeline/steps/create-employee.step';
+import { SetSalaryStep } from './setup-pipeline/steps/set-salary.step';
 import { AssignProfileStep } from './setup-pipeline/steps/assign-profile.step';
 import { SetupLeaveStep } from './setup-pipeline/steps/setup-leave.step';
 import { ConfigureTaxStep } from './setup-pipeline/steps/configure-tax.step';
@@ -55,6 +56,7 @@ export class SimplePayEmployeeSetupService implements OnModuleInit {
     private readonly profileSelector: ProfileSelector,
     private readonly leaveCalculator: LeaveCalculator,
     private readonly createEmployeeStep: CreateEmployeeStep,
+    private readonly setSalaryStep: SetSalaryStep,
     private readonly assignProfileStep: AssignProfileStep,
     private readonly setupLeaveStep: SetupLeaveStep,
     private readonly configureTaxStep: ConfigureTaxStep,
@@ -69,14 +71,15 @@ export class SimplePayEmployeeSetupService implements OnModuleInit {
   onModuleInit() {
     // Register steps in order
     this.pipeline.registerStep(this.createEmployeeStep, 1);
-    this.pipeline.registerStep(this.assignProfileStep, 2);
-    this.pipeline.registerStep(this.setupLeaveStep, 3);
-    this.pipeline.registerStep(this.configureTaxStep, 4);
-    this.pipeline.registerStep(this.addCalculationsStep, 5);
-    this.pipeline.registerStep(this.verifySetupStep, 6);
-    this.pipeline.registerStep(this.sendNotificationStep, 7);
+    this.pipeline.registerStep(this.setSalaryStep, 2); // Set salary immediately after creating employee
+    this.pipeline.registerStep(this.assignProfileStep, 3);
+    this.pipeline.registerStep(this.setupLeaveStep, 4);
+    this.pipeline.registerStep(this.configureTaxStep, 5);
+    this.pipeline.registerStep(this.addCalculationsStep, 6);
+    this.pipeline.registerStep(this.verifySetupStep, 7);
+    this.pipeline.registerStep(this.sendNotificationStep, 8);
 
-    this.logger.log('Setup pipeline initialized with 7 steps');
+    this.logger.log('Setup pipeline initialized with 8 steps');
   }
 
   /**

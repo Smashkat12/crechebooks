@@ -17,6 +17,7 @@ import { SetupPipeline } from '../../../src/integrations/simplepay/setup-pipelin
 import { ProfileSelector } from '../../../src/integrations/simplepay/setup-pipeline/profile-selector';
 import { LeaveCalculator } from '../../../src/integrations/simplepay/setup-pipeline/leave-calculator';
 import { CreateEmployeeStep } from '../../../src/integrations/simplepay/setup-pipeline/steps/create-employee.step';
+import { SetSalaryStep } from '../../../src/integrations/simplepay/setup-pipeline/steps/set-salary.step';
 import { AssignProfileStep } from '../../../src/integrations/simplepay/setup-pipeline/steps/assign-profile.step';
 import { SetupLeaveStep } from '../../../src/integrations/simplepay/setup-pipeline/steps/setup-leave.step';
 import { ConfigureTaxStep } from '../../../src/integrations/simplepay/setup-pipeline/steps/configure-tax.step';
@@ -46,8 +47,8 @@ describe('SimplePayEmployeeSetupService', () => {
     getOrderedSteps: jest.fn().mockReturnValue([]),
     getFinalStatus: jest.fn().mockReturnValue('COMPLETED'),
     getStepCounts: jest.fn().mockReturnValue({
-      total: 7,
-      completed: 7,
+      total: 8,
+      completed: 8,
       failed: 0,
       skipped: 0,
       pending: 0,
@@ -97,6 +98,10 @@ describe('SimplePayEmployeeSetupService', () => {
         {
           provide: CreateEmployeeStep,
           useValue: { ...mockStep, name: 'create_employee' },
+        },
+        {
+          provide: SetSalaryStep,
+          useValue: { ...mockStep, name: 'set_salary' },
         },
         {
           provide: AssignProfileStep,

@@ -1,15 +1,24 @@
 /**
  * Staff Created Event Handler
  * TASK-SPAY-008: Employee Auto-Setup Pipeline
+ * TASK-SPAY-010: Auto-add SA statutory calculations for payslip readiness
  *
  * Handles the staff.created event to automatically set up new employees
  * in SimplePay when SimplePay integration is enabled.
+ *
+ * Auto-adds standard SA statutory deductions:
+ * - PAYE (Pay As You Earn) - income tax
+ * - UIF Employee (1% capped)
+ * - UIF Employer (1% capped)
+ * - SDL (Skills Development Levy - 1%)
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { SimplePayRepository } from '../../../database/repositories/simplepay.repository';
 import { SimplePayEmployeeSetupService } from '../simplepay-employee-setup.service';
+import { AdditionalCalculation } from '../../../database/entities/employee-setup-log.entity';
+import { SA_PAYROLL_CODES } from '../../../database/entities/calculation.entity';
 
 /**
  * Staff created event payload
@@ -22,6 +31,51 @@ export interface StaffCreatedEvent {
   employmentType: string;
   position: string | null;
   createdBy: string;
+}
+
+/**
+ * Build standard SA statutory calculations for payslip readiness
+ * These are auto-calculated by SimplePay based on salary and tax tables
+ */
+function buildStandardSACalculations(): AdditionalCalculation[] {
+  return [
+    // PAYE - Income tax (auto-calculated based on tax tables)
+    {
+      code: SA_PAYROLL_CODES.PAYE,
+      name: 'PAYE (Pay As You Earn)',
+      type: 'DEDUCTION',
+      amountCents: null, // Auto-calculated by SimplePay
+      percentage: null,
+      isRecurring: true,
+    },
+    // UIF Employee - 1% of salary (capped at R177.12 from April 2024)
+    {
+      code: SA_PAYROLL_CODES.UIF_EMPLOYEE,
+      name: 'UIF Employee Contribution',
+      type: 'DEDUCTION',
+      amountCents: null, // Auto-calculated (1% capped)
+      percentage: null,
+      isRecurring: true,
+    },
+    // UIF Employer - 1% of salary (capped at R177.12 from April 2024)
+    {
+      code: SA_PAYROLL_CODES.UIF_EMPLOYER,
+      name: 'UIF Employer Contribution',
+      type: 'COMPANY_CONTRIBUTION',
+      amountCents: null, // Auto-calculated (1% capped)
+      percentage: null,
+      isRecurring: true,
+    },
+    // SDL - Skills Development Levy (1% of total payroll, employer only)
+    {
+      code: SA_PAYROLL_CODES.SDL,
+      name: 'Skills Development Levy',
+      type: 'COMPANY_CONTRIBUTION',
+      amountCents: null, // Auto-calculated (1%)
+      percentage: null,
+      isRecurring: true,
+    },
+  ];
 }
 
 @Injectable()
@@ -67,19 +121,27 @@ export class StaffCreatedHandler {
         `Auto-triggering SimplePay setup for staff ${event.staffId}`,
       );
 
-      // Trigger comprehensive setup
+      // Build standard SA statutory calculations for payslip readiness
+      const statutoryCalculations = buildStandardSACalculations();
+      this.logger.debug(
+        `Including ${statutoryCalculations.length} standard SA statutory calculations (PAYE, UIF, SDL)`,
+      );
+
+      // Trigger comprehensive setup with statutory calculations
       const result = await this.setupService.setupEmployeeComprehensive(
         event.tenantId,
         {
           staffId: event.staffId,
           triggeredBy: `auto:staff.created:${event.createdBy}`,
+          additionalCalculations: statutoryCalculations,
         },
       );
 
       if (result.success) {
         this.logger.log(
           `Successfully set up SimplePay employee for staff ${event.staffId}: ` +
-            `simplePayId=${result.simplePayEmployeeId}, profile=${result.profileAssigned}`,
+            `simplePayId=${result.simplePayEmployeeId}, profile=${result.profileAssigned}, ` +
+            `calculations=${result.calculationsAdded} (PAYE, UIF, SDL)`,
         );
       } else {
         this.logger.warn(

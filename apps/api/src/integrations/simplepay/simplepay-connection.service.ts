@@ -159,4 +159,45 @@ export class SimplePayConnectionService {
       syncErrorMessage: success ? null : errorMessage,
     });
   }
+
+  /**
+   * List all employees from SimplePay for debugging
+   */
+  async listEmployees(tenantId: string): Promise<
+    Array<{
+      id: number;
+      first_name: string;
+      last_name: string;
+      id_number: string;
+      number: string;
+      email: string;
+    }>
+  > {
+    await this.apiClient.initializeForTenant(tenantId);
+    const clientId = this.apiClient.getClientId();
+
+    interface EmployeeWrapper {
+      employee: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        id_number?: string;
+        number?: string;
+        email?: string;
+      };
+    }
+
+    const response = await this.apiClient.get<EmployeeWrapper[]>(
+      `/clients/${clientId}/employees`,
+    );
+
+    return response.map((w) => ({
+      id: w.employee.id,
+      first_name: w.employee.first_name,
+      last_name: w.employee.last_name,
+      id_number: w.employee.id_number || '',
+      number: w.employee.number || '',
+      email: w.employee.email || '',
+    }));
+  }
 }

@@ -67,72 +67,72 @@ describe('ProfileSelector', () => {
         expect(result.confidence).toBeGreaterThan(0.9);
       });
 
-      it('should select Part-Time Staff for TEACHER + CONTRACT', () => {
+      it('should select Part-Time Teacher for TEACHER + CONTRACT', () => {
         const result = profileSelector.selectProfile('Teacher', 'CONTRACT');
 
-        expect(result.profileName).toBe('Part-Time Staff');
+        expect(result.profileName).toBe('Part-Time Teacher');
       });
 
-      it('should select Casual Worker for TEACHER + CASUAL', () => {
+      it('should select Part-Time Teacher for TEACHER + CASUAL', () => {
         const result = profileSelector.selectProfile('Teacher', 'CASUAL');
 
-        expect(result.profileName).toBe('Casual Worker');
+        expect(result.profileName).toBe('Part-Time Teacher');
       });
     });
 
     describe('Assistant role', () => {
-      it('should select Teaching Assistant for ASSISTANT + any employment type', () => {
+      it('should select Part-Time Teacher for ASSISTANT + any employment type', () => {
         const permanent = profileSelector.selectProfile(
           'Assistant',
           'PERMANENT',
         );
-        expect(permanent.profileName).toBe('Teaching Assistant');
+        expect(permanent.profileName).toBe('Part-Time Teacher');
 
         const contract = profileSelector.selectProfile(
           'Teaching Aide',
           'CONTRACT',
         );
-        expect(contract.profileName).toBe('Teaching Assistant');
+        expect(contract.profileName).toBe('Part-Time Teacher');
       });
 
-      it('should select Teaching Assistant for Helper position', () => {
+      it('should select Part-Time Teacher for Helper position', () => {
         const result = profileSelector.selectProfile('Helper', 'PERMANENT');
-        expect(result.profileName).toBe('Teaching Assistant');
+        expect(result.profileName).toBe('Part-Time Teacher');
       });
     });
 
     describe('Kitchen role', () => {
-      it('should select Kitchen Staff for KITCHEN positions', () => {
+      it('should select General Staff for KITCHEN positions', () => {
         const cook = profileSelector.selectProfile('Cook', 'PERMANENT');
-        expect(cook.profileName).toBe('Kitchen Staff');
+        expect(cook.profileName).toBe('General Staff');
 
         const chef = profileSelector.selectProfile('Chef', 'PERMANENT');
-        expect(chef.profileName).toBe('Kitchen Staff');
+        expect(chef.profileName).toBe('General Staff');
 
         const kitchen = profileSelector.selectProfile(
           'Kitchen Staff',
           'PERMANENT',
         );
-        expect(kitchen.profileName).toBe('Kitchen Staff');
+        expect(kitchen.profileName).toBe('General Staff');
       });
     });
 
     describe('Admin role', () => {
-      it('should select Admin Staff for ADMIN positions', () => {
+      it('should select General Staff for ADMIN positions', () => {
         const admin = profileSelector.selectProfile('Admin', 'PERMANENT');
-        expect(admin.profileName).toBe('Admin Staff');
+        expect(admin.profileName).toBe('General Staff');
 
         const secretary = profileSelector.selectProfile(
           'Secretary',
           'PERMANENT',
         );
-        expect(secretary.profileName).toBe('Admin Staff');
+        expect(secretary.profileName).toBe('General Staff');
 
         const receptionist = profileSelector.selectProfile(
           'Receptionist',
           'PERMANENT',
         );
-        expect(receptionist.profileName).toBe('Admin Staff');
+        expect(receptionist.profileName).toBe('General Staff');
       });
     });
 
@@ -163,12 +163,13 @@ describe('ProfileSelector', () => {
     });
 
     describe('Casual employment type', () => {
-      it('should select Casual Worker for any role + CASUAL', () => {
+      it('should select General Staff for support roles + CASUAL', () => {
+        // Casual support staff (non-teacher roles) fall through to General Staff
         const cleaner = profileSelector.selectProfile('Cleaner', 'CASUAL');
-        expect(cleaner.profileName).toBe('Casual Worker');
+        expect(cleaner.profileName).toBe('General Staff');
 
         const driver = profileSelector.selectProfile('Driver', 'CASUAL');
-        expect(driver.profileName).toBe('Casual Worker');
+        expect(driver.profileName).toBe('General Staff');
       });
     });
 
@@ -194,7 +195,7 @@ describe('ProfileSelector', () => {
         expect(fullTime.profileName).toBe('Full-Time Teacher');
 
         const temporary = profileSelector.selectProfile('Teacher', 'TEMPORARY');
-        expect(temporary.profileName).toBe('Part-Time Staff');
+        expect(temporary.profileName).toBe('Part-Time Teacher');
       });
     });
   });

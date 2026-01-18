@@ -60,14 +60,26 @@ export class SimplePayLeaveService {
 
     try {
       // Fetch from SimplePay API
-      // SimplePay returns wrapped: [{ leave_type: {...} }, ...]
-      interface LeaveTypeWrapper {
-        leave_type: SimplePayLeaveType;
-      }
-      const response = await this.apiClient.get<LeaveTypeWrapper[]>(
+      // SimplePay returns: {leaveTypeId: name, ...}
+      // e.g., {"1418851":"Annual","1418852":"Sick",...}
+      const response = await this.apiClient.get<Record<string, string>>(
         `/clients/${clientId}/leave_types`,
       );
-      const leaveTypes = response.map((w) => w.leave_type);
+
+      // Transform to SimplePayLeaveType array with sensible defaults
+      const leaveTypes: SimplePayLeaveType[] = Object.entries(response).map(
+        ([id, name]) => ({
+          id: parseInt(id, 10),
+          name,
+          accrual_type: this.inferAccrualType(name),
+          accrual_rate: 0, // Not provided by simple endpoint
+          accrual_cap: null, // Not provided by simple endpoint
+          carry_over_cap: null, // Not provided by simple endpoint
+          units: 'days' as const,
+          requires_approval: true, // Default to requiring approval
+          is_active: true, // Assume active if returned
+        }),
+      );
 
       // Cache the result
       this.leaveTypeCache.set(cacheKey, {
@@ -89,22 +101,50 @@ export class SimplePayLeaveService {
 
   /**
    * Get leave balances for an employee
+   * Note: SimplePay API requires a date parameter and returns a simple
+   * {leaveTypeId: balance} format. We combine with leave types to build
+   * the full SimplePayLeaveBalance structure.
    */
   async getLeaveBalances(
     tenantId: string,
     simplePayEmployeeId: string,
+    asAtDate?: Date,
   ): Promise<SimplePayLeaveBalance[]> {
     await this.apiClient.initializeForTenant(tenantId);
 
     try {
-      // SimplePay returns wrapped: [{ leave_balance: {...} }, ...]
-      interface LeaveBalanceWrapper {
-        leave_balance: SimplePayLeaveBalance;
-      }
-      const response = await this.apiClient.get<LeaveBalanceWrapper[]>(
-        `/employees/${simplePayEmployeeId}/leave_balances`,
+      // Use today's date if not specified
+      const dateStr = this.formatDate(asAtDate || new Date());
+
+      // SimplePay returns: {leaveTypeId: balance, ...}
+      // e.g., {"1418851":0.0,"1418852":0.0,"1418853":0.0,"1418854":0.0}
+      const balanceResponse = await this.apiClient.get<Record<string, number>>(
+        `/employees/${simplePayEmployeeId}/leave_balances?date=${dateStr}`,
       );
-      const balances = response.map((w) => w.leave_balance);
+
+      // Get leave types to add names
+      // SimplePay returns: {leaveTypeId: name, ...}
+      // e.g., {"1418851":"Annual","1418852":"Sick",...}
+      const clientId = this.apiClient.getClientId();
+      const leaveTypesResponse = await this.apiClient.get<
+        Record<string, string>
+      >(`/clients/${clientId}/leave_types`);
+
+      // Combine balances with leave type names
+      const balances: SimplePayLeaveBalance[] = Object.entries(
+        balanceResponse,
+      ).map(([leaveTypeId, balance]) => ({
+        leave_type_id: parseInt(leaveTypeId, 10),
+        leave_type_name:
+          leaveTypesResponse[leaveTypeId] || `Leave Type ${leaveTypeId}`,
+        opening_balance: 0, // Not provided by simple endpoint
+        accrued: 0, // Not provided by simple endpoint
+        taken: 0, // Not provided by simple endpoint
+        pending: 0, // Not provided by simple endpoint
+        adjustment: 0, // Not provided by simple endpoint
+        current_balance: balance,
+        units: 'days' as const, // Default to days
+      }));
 
       this.logger.debug(
         `Fetched ${balances.length} leave balances for employee ${simplePayEmployeeId}`,
@@ -461,5 +501,32 @@ export class SimplePayLeaveService {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Infer accrual type from leave type name
+   */
+  private inferAccrualType(
+    name: string,
+  ):
+    | 'annual'
+    | 'sick'
+    | 'family_responsibility'
+    | 'maternity'
+    | 'parental'
+    | 'adoption'
+    | 'study'
+    | 'unpaid'
+    | 'custom' {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('annual')) return 'annual';
+    if (lowerName.includes('sick')) return 'sick';
+    if (lowerName.includes('family')) return 'family_responsibility';
+    if (lowerName.includes('maternity')) return 'maternity';
+    if (lowerName.includes('parental')) return 'parental';
+    if (lowerName.includes('adoption')) return 'adoption';
+    if (lowerName.includes('study')) return 'study';
+    if (lowerName.includes('unpaid')) return 'unpaid';
+    return 'custom';
   }
 }

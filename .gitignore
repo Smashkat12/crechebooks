@@ -89,3 +89,4 @@ test-results/
 # ESLint cache
 .eslintcache
 .cache/
+.env.dev-secrets

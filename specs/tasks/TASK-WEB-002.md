@@ -1,103 +1,82 @@
-<task_spec id="TASK-WEB-002" version="1.0">
+<task_spec id="TASK-WEB-002" version="2.0">
 
 <metadata>
-  <title>UI Component Library Setup (shadcn/ui)</title>
+  <title>Leave Balance and Application UI</title>
   <status>ready</status>
-  <layer>foundation</layer>
-  <sequence>2</sequence>
+  <layer>frontend</layer>
+  <sequence>201</sequence>
   <implements>
-    <requirement_ref>REQ-WEB-14</requirement_ref>
+    <requirement_ref>REQ-LEAVE-UI-001</requirement_ref>
   </implements>
   <depends_on>
-    <task_ref>TASK-WEB-001</task_ref>
+    <task_ref status="ready">TASK-WEB-005</task_ref>
   </depends_on>
-  <estimated_complexity>medium</estimated_complexity>
+  <estimated_complexity>high</estimated_complexity>
+  <estimated_effort>6 hours</estimated_effort>
+  <last_updated>2026-01-17</last_updated>
 </metadata>
 
-<context>
-Set up shadcn/ui component library with base components needed across the application. This includes buttons, forms, dialogs, tables, and other core UI elements that will be used throughout the CrecheBooks interface.
-</context>
+<project_state>
+  ## Current State
 
-<input_context_files>
-  <file purpose="tailwind_config">apps/web/tailwind.config.ts</file>
-  <file purpose="naming_conventions">specs/constitution.md#coding_standards</file>
-</input_context_files>
+  **Files to Create:**
+  - apps/web/src/components/staff/LeaveBalanceCard.tsx (NEW)
+  - apps/web/src/components/staff/LeaveRequestDialog.tsx (NEW)
 
-<prerequisites>
-  <check>TASK-WEB-001 completed</check>
-  <check>Tailwind CSS configured</check>
-</prerequisites>
+  **Files to Modify:**
+  - apps/web/src/app/(dashboard)/staff/[id]/page.tsx
+
+  **Current Problem:**
+  Backend has comprehensive leave management in simplepay-leave.service.ts but NO API controller exposes these endpoints, and NO UI displays or requests leave.
+
+  **Dependency:**
+  This task depends on TASK-WEB-005 which creates the leave API endpoints and frontend hooks.
+</project_state>
+
+<critical_patterns>
+  ## MANDATORY PATTERNS
+
+  ### 1. Package Manager
+  Use pnpm NOT npm.
+
+  ### 2. LeaveBalanceCard Component
+  - Display leave types with progress bars
+  - Show used/entitled/remaining days
+  - Request Leave button opens dialog
+  - Use hooks from use-leave.ts (TASK-WEB-005)
+
+  ### 3. LeaveRequestDialog Component
+  - Form with leave type selector
+  - Date pickers for start/end dates
+  - Optional reason field
+  - Zod validation
+  - Submit creates leave request
+</critical_patterns>
 
 <scope>
   <in_scope>
-    - Install and configure shadcn/ui
-    - Create base UI components: Button, Input, Label, Card
-    - Create form components: Form, Select, Checkbox
-    - Create feedback components: Toast, Dialog, AlertDialog
-    - Create data components: Table, DataTable skeleton
-    - Create layout components: Separator, Tabs
+    - Create LeaveBalanceCard component
+    - Create LeaveRequestDialog component
+    - Form validation with zod
+    - Date picker integration
+    - Loading/success/error states
   </in_scope>
   <out_of_scope>
-    - Page-specific components
-    - Business logic components
-    - API integration
+    - Leave approval workflow UI
+    - Leave calendar view
+    - Team leave overview
   </out_of_scope>
 </scope>
 
 <definition_of_done>
-  <signatures>
-    <signature file="apps/web/src/components/ui/button.tsx">
-      export const Button = React.forwardRef&lt;HTMLButtonElement, ButtonProps&gt;(...)
-    </signature>
-    <signature file="apps/web/src/components/ui/input.tsx">
-      export const Input = React.forwardRef&lt;HTMLInputElement, InputProps&gt;(...)
-    </signature>
-    <signature file="apps/web/src/lib/utils.ts">
-      export function cn(...inputs: ClassValue[]): string
-    </signature>
-  </signatures>
-
-  <constraints>
-    - Must follow shadcn/ui patterns
-    - All components must support dark mode
-    - Must use class-variance-authority for variants
-    - Must use tailwind-merge for class composition
-  </constraints>
-
   <verification>
-    - All components render without errors
-    - Components work in both light and dark mode
-    - No TypeScript errors
+    - pnpm run build: 0 errors
+    - pnpm run lint: 0 errors
+    - LeaveBalanceCard displays balances
+    - Progress bars calculate correctly
+    - LeaveRequestDialog validates inputs
+    - Leave request creation works
   </verification>
 </definition_of_done>
-
-<files_to_create>
-  <file path="apps/web/src/components/ui/button.tsx">Button component</file>
-  <file path="apps/web/src/components/ui/input.tsx">Input component</file>
-  <file path="apps/web/src/components/ui/label.tsx">Label component</file>
-  <file path="apps/web/src/components/ui/card.tsx">Card component</file>
-  <file path="apps/web/src/components/ui/dialog.tsx">Dialog component</file>
-  <file path="apps/web/src/components/ui/alert-dialog.tsx">Alert dialog component</file>
-  <file path="apps/web/src/components/ui/select.tsx">Select component</file>
-  <file path="apps/web/src/components/ui/checkbox.tsx">Checkbox component</file>
-  <file path="apps/web/src/components/ui/table.tsx">Table component</file>
-  <file path="apps/web/src/components/ui/tabs.tsx">Tabs component</file>
-  <file path="apps/web/src/components/ui/toast.tsx">Toast component</file>
-  <file path="apps/web/src/components/ui/toaster.tsx">Toaster provider</file>
-  <file path="apps/web/src/components/ui/separator.tsx">Separator component</file>
-  <file path="apps/web/src/lib/utils.ts">Utility functions (cn)</file>
-  <file path="apps/web/components.json">shadcn/ui config</file>
-</files_to_create>
-
-<validation_criteria>
-  <criterion>All UI components import and render correctly</criterion>
-  <criterion>Components respond to dark mode changes</criterion>
-  <criterion>No TypeScript errors in component files</criterion>
-</validation_criteria>
-
-<test_commands>
-  <command>cd apps/web && pnpm type-check</command>
-  <command>cd apps/web && pnpm lint</command>
-</test_commands>
 
 </task_spec>

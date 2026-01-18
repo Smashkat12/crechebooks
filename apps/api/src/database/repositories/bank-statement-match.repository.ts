@@ -237,6 +237,7 @@ export class BankStatementMatchRepository {
         [BankStatementMatchStatus.IN_XERO_ONLY]: 0,
         [BankStatementMatchStatus.AMOUNT_MISMATCH]: 0,
         [BankStatementMatchStatus.DATE_MISMATCH]: 0,
+        [BankStatementMatchStatus.FEE_ADJUSTED_MATCH]: 0,
       };
 
       // Populate with actual counts

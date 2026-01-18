@@ -131,3 +131,167 @@ export const PAY_FREQUENCY_MULTIPLIERS = {
   DAILY: 261, // SA standard working days per year
   HOURLY: 2088, // 261 days * 8 hours
 };
+
+// ============================================================================
+// 2025/2026 Tax Year (1 March 2025 - 28 February 2026)
+// TASK-SARS-034
+// TODO: Update with official SARS Gazette values when published
+// ============================================================================
+
+/**
+ * 2026 SARS Tax Brackets
+ * Effective 1 March 2025 - 28 February 2026
+ *
+ * Note: These are projected values. Update when SARS publishes official rates.
+ */
+export const TAX_BRACKETS_2026: PayeTaxBracket[] = [
+  {
+    minIncomeCents: 0,
+    maxIncomeCents: 23710000, // R237,100
+    baseAmountCents: 0,
+    rate: new Decimal('0.18'), // 18%
+  },
+  {
+    minIncomeCents: 23710001, // R237,100.01
+    maxIncomeCents: 37050000, // R370,500
+    baseAmountCents: 4267800, // R42,678
+    rate: new Decimal('0.26'), // 26%
+  },
+  {
+    minIncomeCents: 37050001, // R370,500.01
+    maxIncomeCents: 51280000, // R512,800
+    baseAmountCents: 7736200, // R77,362
+    rate: new Decimal('0.31'), // 31%
+  },
+  {
+    minIncomeCents: 51280001, // R512,800.01
+    maxIncomeCents: 67300000, // R673,000
+    baseAmountCents: 12147500, // R121,475
+    rate: new Decimal('0.36'), // 36%
+  },
+  {
+    minIncomeCents: 67300001, // R673,000.01
+    maxIncomeCents: 85790000, // R857,900
+    baseAmountCents: 17914700, // R179,147
+    rate: new Decimal('0.39'), // 39%
+  },
+  {
+    minIncomeCents: 85790001, // R857,900.01
+    maxIncomeCents: 181700000, // R1,817,000
+    baseAmountCents: 25125800, // R251,258
+    rate: new Decimal('0.41'), // 41%
+  },
+  {
+    minIncomeCents: 181700001, // R1,817,000.01
+    maxIncomeCents: null, // No upper limit
+    baseAmountCents: 64448900, // R644,489
+    rate: new Decimal('0.45'), // 45%
+  },
+];
+
+/**
+ * 2026 Tax Rebates (annual amounts in cents)
+ * Effective 1 March 2025 - 28 February 2026
+ */
+export const REBATES_2026 = {
+  /** Primary rebate - all taxpayers */
+  PRIMARY: 1723500, // R17,235
+  /** Secondary rebate - age 65 and older */
+  SECONDARY: 944400, // R9,444
+  /** Tertiary rebate - age 75 and older */
+  TERTIARY: 314500, // R3,145
+};
+
+/**
+ * 2026 Medical Aid Tax Credits (monthly amounts in cents)
+ * Effective 1 March 2025 - 28 February 2026
+ */
+export const MEDICAL_CREDITS_2026 = {
+  /** Main member monthly credit */
+  MAIN_MEMBER: 36400, // R364
+  /** First dependent monthly credit */
+  FIRST_DEPENDENT: 36400, // R364
+  /** Additional dependents monthly credit (each) */
+  ADDITIONAL_DEPENDENT: 24600, // R246
+};
+
+/**
+ * 2026 Tax Thresholds (annual income below which no tax is payable)
+ * Effective 1 March 2025 - 28 February 2026
+ */
+export const TAX_THRESHOLDS_2026 = {
+  /** Below age 65 */
+  BELOW_65: 9575000, // R95,750
+  /** Age 65 to 74 */
+  AGE_65_TO_74: 14821700, // R148,217
+  /** Age 75 and above */
+  AGE_75_PLUS: 16568900, // R165,689
+};
+
+// ============================================================================
+// Tax Year Selection Utilities
+// ============================================================================
+
+/**
+ * Determines the South African tax year for a given date.
+ * SA tax year runs from 1 March to 28/29 February.
+ *
+ * @param date - The date to determine the tax year for
+ * @returns Tax year string in format "YYYY/YYYY" (e.g., "2024/2025")
+ */
+export function getTaxYear(date: Date): string {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1; // 1-indexed (January = 1)
+
+  // SA Tax year runs March to February
+  // If month >= 3 (March onwards), we're in the year/year+1 tax year
+  // If month < 3 (Jan/Feb), we're still in the previous year's tax year
+  if (month >= 3) {
+    return `${year}/${year + 1}`;
+  }
+  return `${year - 1}/${year}`;
+}
+
+/**
+ * Tax tables structure returned by getTaxYearTables
+ */
+export interface TaxYearTables {
+  brackets: PayeTaxBracket[];
+  rebates: typeof REBATES_2025;
+  medicalCredits: typeof MEDICAL_CREDITS_2025;
+  thresholds: typeof TAX_THRESHOLDS_2025;
+  taxYear: string;
+}
+
+/**
+ * Gets the appropriate tax tables for a given pay period date.
+ * Automatically selects the correct tax year based on the date.
+ *
+ * @param payPeriodDate - The date of the pay period (defaults to current date)
+ * @returns Object containing all tax tables for the applicable tax year
+ */
+export function getTaxYearTables(payPeriodDate?: Date): TaxYearTables {
+  const date = payPeriodDate || new Date();
+  const taxYear = getTaxYear(date);
+
+  switch (taxYear) {
+    case '2025/2026':
+      return {
+        brackets: TAX_BRACKETS_2026,
+        rebates: REBATES_2026,
+        medicalCredits: MEDICAL_CREDITS_2026,
+        thresholds: TAX_THRESHOLDS_2026,
+        taxYear,
+      };
+    case '2024/2025':
+    default:
+      // Default to 2024/2025 for older dates or unrecognized tax years
+      return {
+        brackets: TAX_BRACKETS_2025,
+        rebates: REBATES_2025,
+        medicalCredits: MEDICAL_CREDITS_2025,
+        thresholds: TAX_THRESHOLDS_2025,
+        taxYear: '2024/2025',
+      };
+  }
+}

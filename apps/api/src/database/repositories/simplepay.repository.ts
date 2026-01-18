@@ -87,6 +87,37 @@ export class SimplePayRepository {
     });
   }
 
+  /**
+   * Find employee mapping by SimplePay employee ID (without tenant)
+   * TASK-SPAY-009: Used by webhook handler to resolve staff from SimplePay ID
+   */
+  async findEmployeeMappingBySimplePayIdOnly(
+    simplePayEmployeeId: string,
+  ): Promise<ISimplePayEmployeeMapping | null> {
+    return this.prisma.simplePayEmployeeMapping.findFirst({
+      where: { simplePayEmployeeId },
+    });
+  }
+
+  /**
+   * Update employee mapping sync status
+   * TASK-SPAY-009: Used by webhook handler to mark employees as out of sync
+   */
+  async updateEmployeeMappingSyncStatus(
+    staffId: string,
+    status: 'NOT_SYNCED' | 'SYNCED' | 'SYNC_FAILED' | 'OUT_OF_SYNC',
+    errorMessage: string | null,
+  ): Promise<ISimplePayEmployeeMapping> {
+    return this.prisma.simplePayEmployeeMapping.update({
+      where: { staffId },
+      data: {
+        syncStatus: status,
+        lastSyncAt: new Date(),
+        lastSyncError: errorMessage,
+      },
+    });
+  }
+
   async findAllEmployeeMappings(
     tenantId: string,
     options?: {

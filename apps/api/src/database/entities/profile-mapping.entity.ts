@@ -85,44 +85,57 @@ export interface SimplePayProfileCalculationSetting {
 }
 
 /**
- * Common creche/daycare profile types
- * Used for suggesting appropriate profiles based on staff role
+ * SimplePay Template Names - MUST match exactly what's in SimplePay admin
+ * Updated to match actual SimplePay templates created:
+ * - General Staff (ID: 380792)
+ * - Full-Time Teacher (ID: 380795)
+ * - Part-Time Teacher (ID: 380796)
+ * - Principal/Manager (ID: 380797)
  */
 export const CRECHE_PROFILES = {
-  TEACHER: 'Teacher',
-  ASSISTANT: 'Teacher Assistant',
-  ADMIN: 'Administrative Staff',
-  CLEANER: 'Cleaning Staff',
-  COOK: 'Kitchen Staff',
-  MANAGER: 'Management',
-  DRIVER: 'Transport Staff',
+  FULL_TIME_TEACHER: 'Full-Time Teacher',
+  PART_TIME_TEACHER: 'Part-Time Teacher',
+  PRINCIPAL: 'Principal/Manager',
+  GENERAL_STAFF: 'General Staff',
 } as const;
 
 export type CrecheProfileType = keyof typeof CRECHE_PROFILES;
 
 /**
  * Role to profile mapping suggestions
- * Maps common creche staff positions to appropriate profile types
+ * Maps common creche staff positions to appropriate SimplePay template types
  */
 export const ROLE_TO_PROFILE_SUGGESTIONS: Record<string, CrecheProfileType[]> =
   {
-    teacher: ['TEACHER'],
-    'head teacher': ['TEACHER', 'MANAGER'],
-    principal: ['MANAGER'],
-    assistant: ['ASSISTANT'],
-    'teacher assistant': ['ASSISTANT'],
-    admin: ['ADMIN'],
-    administrator: ['ADMIN'],
-    secretary: ['ADMIN'],
-    cleaner: ['CLEANER'],
-    cook: ['COOK'],
-    chef: ['COOK'],
-    kitchen: ['COOK'],
-    driver: ['DRIVER'],
-    transport: ['DRIVER'],
-    manager: ['MANAGER'],
-    director: ['MANAGER'],
-    owner: ['MANAGER'],
+    // Teachers
+    teacher: ['FULL_TIME_TEACHER'],
+    'full-time teacher': ['FULL_TIME_TEACHER'],
+    'full time teacher': ['FULL_TIME_TEACHER'],
+    'part-time teacher': ['PART_TIME_TEACHER'],
+    'part time teacher': ['PART_TIME_TEACHER'],
+    'head teacher': ['FULL_TIME_TEACHER', 'PRINCIPAL'],
+    assistant: ['PART_TIME_TEACHER'],
+    'teacher assistant': ['PART_TIME_TEACHER'],
+
+    // Management
+    principal: ['PRINCIPAL'],
+    manager: ['PRINCIPAL'],
+    director: ['PRINCIPAL'],
+    owner: ['PRINCIPAL'],
+
+    // General Staff
+    admin: ['GENERAL_STAFF'],
+    administrator: ['GENERAL_STAFF'],
+    secretary: ['GENERAL_STAFF'],
+    cleaner: ['GENERAL_STAFF'],
+    cook: ['GENERAL_STAFF'],
+    chef: ['GENERAL_STAFF'],
+    kitchen: ['GENERAL_STAFF'],
+    driver: ['GENERAL_STAFF'],
+    transport: ['GENERAL_STAFF'],
+    gardener: ['GENERAL_STAFF'],
+    maintenance: ['GENERAL_STAFF'],
+    security: ['GENERAL_STAFF'],
   };
 
 /**
@@ -274,8 +287,8 @@ export function getSuggestedProfilesForRole(role: string): CrecheProfileType[] {
     }
   }
 
-  // Default to admin if no match found
-  return ['ADMIN'];
+  // Default to General Staff if no match found
+  return ['GENERAL_STAFF'];
 }
 
 /**

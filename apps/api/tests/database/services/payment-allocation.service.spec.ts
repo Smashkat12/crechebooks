@@ -1,6 +1,7 @@
 /**
  * PaymentAllocationService Integration Tests
  * TASK-PAY-012: Payment Allocation Service
+ * TASK-RECON-040: Fix Payment Allocation Fee Deduction (split-aware tests)
  *
  * CRITICAL: Uses REAL database, no mocks
  * Tests payment allocation, partial payments, overpayments, multi-invoice allocations, and reversals
@@ -17,6 +18,11 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { CreditBalanceService } from '../../../src/database/services/credit-balance.service';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
+import { XeroTransactionSplitService } from '../../../src/database/services/xero-transaction-split.service';
+import { AccruedBankChargeService } from '../../../src/database/services/accrued-bank-charge.service';
+import { BankFeeService } from '../../../src/database/services/bank-fee.service';
+import { XeroTransactionSplitStatus } from '@prisma/client';
+import { XeroTransactionSplitStatusDto } from '../../../src/database/dto/xero-transaction-split.dto';
 
 /**
  * Mock XeroSyncService - external API integration
@@ -24,6 +30,23 @@ import { XeroSyncService } from '../../../src/database/services/xero-sync.servic
 const mockXeroSyncService = {
   syncPayment: async () => null,
   hasValidConnection: async () => false,
+};
+
+/**
+ * Mock XeroTransactionSplitService - default to returning null (no split)
+ * Individual tests can override this behavior
+ */
+let mockSplitResult: any = null;
+const mockXeroTransactionSplitService = {
+  getSplitByXeroTransactionId: jest.fn(async () => mockSplitResult),
+  detectSplitParams: jest.fn(async () => ({ is_split_recommended: false })),
+  splitXeroTransaction: jest.fn(),
+  confirmSplit: jest.fn(),
+  cancelSplit: jest.fn(),
+  getSplit: jest.fn(),
+  listSplits: jest.fn(),
+  getSummary: jest.fn(),
+  markSplitAsMatched: jest.fn(),
 };
 import {
   NotFoundException,
@@ -63,6 +86,10 @@ describe('PaymentAllocationService', () => {
         AuditLogService,
         CreditBalanceService,
         { provide: XeroSyncService, useValue: mockXeroSyncService },
+        {
+          provide: XeroTransactionSplitService,
+          useValue: mockXeroTransactionSplitService,
+        },
       ],
     }).compile();
 
@@ -80,8 +107,14 @@ describe('PaymentAllocationService', () => {
   });
 
   beforeEach(async () => {
+    // Reset mock for XeroTransactionSplitService
+    mockSplitResult = null;
+    jest.clearAllMocks();
+
     // Clean database in FK order
     await prisma.auditLog.deleteMany({});
+    await prisma.xeroTransactionSplit.deleteMany({});
+    await prisma.accruedBankCharge.deleteMany({});
     await prisma.bankStatementMatch.deleteMany({});
     await prisma.reconciliation.deleteMany({});
     await prisma.sarsSubmission.deleteMany({});
@@ -1076,6 +1109,8 @@ describe('PaymentAllocationService', () => {
         amountCents: 500000,
       });
 
+      // Invoice from another tenant should appear as "not found" due to tenant isolation
+      // This is the correct security behavior - prevents information leakage across tenants
       await expect(
         service.allocatePayment({
           tenantId: testTenant.id,
@@ -1087,7 +1122,7 @@ describe('PaymentAllocationService', () => {
             },
           ],
         }),
-      ).rejects.toThrow(BusinessException);
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw if no allocations provided', async () => {
@@ -1473,6 +1508,322 @@ describe('PaymentAllocationService', () => {
       auditLogs.forEach((log) => {
         expect(log.changeSummary).toContain('Multi-invoice allocation');
       });
+    });
+  });
+
+  /**
+   * TASK-RECON-040: Split-Aware Payment Allocation Tests
+   * When a Xero transaction has been split (to separate NET payment from bank fee),
+   * the allocation should use the NET amount, not the GROSS amount.
+   */
+  describe('Split-Aware Payment Allocation (TASK-RECON-040)', () => {
+    it('should use NET amount from confirmed split for validation', async () => {
+      // Scenario: Xero transaction R106.36 (GROSS) was split into NET R100.00 + FEE R6.36
+      const xeroTransactionId = `xero-tx-${Date.now()}`;
+
+      const invoice = await createInvoice({
+        totalCents: 10000, // R100.00
+        amountPaidCents: 0,
+      });
+
+      // Create transaction with Xero ID and GROSS amount
+      const transaction = await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB Cheque',
+          date: new Date('2025-01-15'),
+          description: 'Payment with bank fee',
+          amountCents: 10636, // GROSS including fee
+          isCredit: true,
+          source: ImportSource.BANK_FEED,
+          status: TransactionStatus.PENDING,
+          xeroTransactionId, // Link to Xero
+        },
+      });
+
+      // Mock the split service to return a CONFIRMED split
+      mockSplitResult = {
+        id: uuidv4(),
+        tenant_id: testTenant.id,
+        xero_transaction_id: xeroTransactionId,
+        original_amount_cents: 10636,
+        net_amount_cents: 10000, // NET amount
+        fee_amount_cents: 636, // R6.36 fee
+        fee_type: 'ADT_DEPOSIT_FEE',
+        status: XeroTransactionSplitStatusDto.CONFIRMED,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Allocate using NET amount (should succeed)
+      const result = await service.allocatePayment({
+        tenantId: testTenant.id,
+        transactionId: transaction.id,
+        allocations: [
+          {
+            invoiceId: invoice.id,
+            amountCents: 10000, // Allocating NET amount
+          },
+        ],
+      });
+
+      expect(result.payments).toHaveLength(1);
+      expect(result.payments[0].amountCents).toBe(10000);
+      expect(result.unallocatedAmountCents).toBe(0); // 10000 - 10000 = 0 (using NET)
+
+      // Verify the split service was called with the correct xeroTransactionId
+      expect(
+        mockXeroTransactionSplitService.getSplitByXeroTransactionId,
+      ).toHaveBeenCalledWith(testTenant.id, xeroTransactionId);
+    });
+
+    it('should reject allocation exceeding NET amount when split exists', async () => {
+      // Scenario: Trying to allocate GROSS amount when split requires NET
+      const xeroTransactionId = `xero-tx-${Date.now()}`;
+
+      const invoice = await createInvoice({
+        totalCents: 10636, // R106.36 - matches GROSS
+        amountPaidCents: 0,
+      });
+
+      const transaction = await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB Cheque',
+          date: new Date('2025-01-15'),
+          description: 'Payment with bank fee',
+          amountCents: 10636, // GROSS including fee
+          isCredit: true,
+          source: ImportSource.BANK_FEED,
+          status: TransactionStatus.PENDING,
+          xeroTransactionId,
+        },
+      });
+
+      // Mock the split service with CONFIRMED status
+      mockSplitResult = {
+        id: uuidv4(),
+        tenant_id: testTenant.id,
+        xero_transaction_id: xeroTransactionId,
+        original_amount_cents: 10636,
+        net_amount_cents: 10000, // Only R100 is allocatable
+        fee_amount_cents: 636,
+        fee_type: 'ADT_DEPOSIT_FEE',
+        status: XeroTransactionSplitStatusDto.CONFIRMED,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Trying to allocate GROSS amount (10636) should fail because split limits to NET (10000)
+      await expect(
+        service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: transaction.id,
+          allocations: [
+            {
+              invoiceId: invoice.id,
+              amountCents: 10636, // Trying to allocate GROSS - should fail
+            },
+          ],
+        }),
+      ).rejects.toThrow(BusinessException);
+    });
+
+    it('should use GROSS amount when split is PENDING (not confirmed)', async () => {
+      // Scenario: Split exists but is not confirmed yet, so use GROSS amount
+      const xeroTransactionId = `xero-tx-${Date.now()}`;
+
+      const invoice = await createInvoice({
+        totalCents: 10636,
+        amountPaidCents: 0,
+      });
+
+      const transaction = await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB Cheque',
+          date: new Date('2025-01-15'),
+          description: 'Payment with pending split',
+          amountCents: 10636,
+          isCredit: true,
+          source: ImportSource.BANK_FEED,
+          status: TransactionStatus.PENDING,
+          xeroTransactionId,
+        },
+      });
+
+      // Mock the split service with PENDING status (not confirmed)
+      mockSplitResult = {
+        id: uuidv4(),
+        tenant_id: testTenant.id,
+        xero_transaction_id: xeroTransactionId,
+        original_amount_cents: 10636,
+        net_amount_cents: 10000,
+        fee_amount_cents: 636,
+        fee_type: 'ADT_DEPOSIT_FEE',
+        status: XeroTransactionSplitStatusDto.PENDING, // Not confirmed
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Should use GROSS amount since split is not confirmed
+      const result = await service.allocatePayment({
+        tenantId: testTenant.id,
+        transactionId: transaction.id,
+        allocations: [
+          {
+            invoiceId: invoice.id,
+            amountCents: 10636, // Using GROSS amount
+          },
+        ],
+      });
+
+      expect(result.payments).toHaveLength(1);
+      expect(result.payments[0].amountCents).toBe(10636);
+      expect(result.unallocatedAmountCents).toBe(0);
+    });
+
+    it('should use GROSS amount when no Xero transaction ID exists', async () => {
+      // Scenario: Transaction without Xero link - use GROSS amount normally
+      const invoice = await createInvoice({
+        totalCents: 10636,
+        amountPaidCents: 0,
+      });
+
+      const transaction = await createTransaction({
+        amountCents: 10636,
+        isCredit: true,
+        // No xeroTransactionId
+      });
+
+      // Mock should not be called since there's no xeroTransactionId
+      const result = await service.allocatePayment({
+        tenantId: testTenant.id,
+        transactionId: transaction.id,
+        allocations: [
+          {
+            invoiceId: invoice.id,
+            amountCents: 10636,
+          },
+        ],
+      });
+
+      expect(result.payments).toHaveLength(1);
+      expect(result.payments[0].amountCents).toBe(10636);
+      // Split service should not be called
+      expect(
+        mockXeroTransactionSplitService.getSplitByXeroTransactionId,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should use NET amount for multi-invoice allocation with MATCHED split', async () => {
+      // Scenario: Multi-invoice allocation with split in MATCHED status
+      const xeroTransactionId = `xero-tx-${Date.now()}`;
+
+      const invoice1 = await createInvoice({
+        totalCents: 6000, // R60.00
+      });
+
+      const invoice2 = await createInvoice({
+        totalCents: 4000, // R40.00
+      });
+
+      const transaction = await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB Cheque',
+          date: new Date('2025-01-15'),
+          description: 'Multi-invoice payment with fee',
+          amountCents: 10636, // GROSS
+          isCredit: true,
+          source: ImportSource.BANK_FEED,
+          status: TransactionStatus.PENDING,
+          xeroTransactionId,
+        },
+      });
+
+      // Mock the split service with MATCHED status
+      mockSplitResult = {
+        id: uuidv4(),
+        tenant_id: testTenant.id,
+        xero_transaction_id: xeroTransactionId,
+        original_amount_cents: 10636,
+        net_amount_cents: 10000, // R100 total allocatable
+        fee_amount_cents: 636,
+        fee_type: 'ADT_DEPOSIT_FEE',
+        status: XeroTransactionSplitStatusDto.MATCHED, // Matched is also valid
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const result = await service.allocateToMultipleInvoices({
+        tenantId: testTenant.id,
+        transactionId: transaction.id,
+        allocations: [
+          { invoiceId: invoice1.id, amountCents: 6000 },
+          { invoiceId: invoice2.id, amountCents: 4000 },
+        ],
+      });
+
+      expect(result.payments).toHaveLength(2);
+      expect(result.invoicesUpdated).toHaveLength(2);
+      // Unallocated should be 0 based on NET amount (10000 - 6000 - 4000 = 0)
+      expect(result.unallocatedAmountCents).toBe(0);
+    });
+
+    it('should correctly calculate unallocated amount using NET from split', async () => {
+      // Scenario: Partial allocation - unallocated should be based on NET amount
+      const xeroTransactionId = `xero-tx-${Date.now()}`;
+
+      const invoice = await createInvoice({
+        totalCents: 5000, // R50.00 - partial payment
+        amountPaidCents: 0,
+      });
+
+      const transaction = await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: 'FNB Cheque',
+          date: new Date('2025-01-15'),
+          description: 'Partial payment with fee',
+          amountCents: 10636, // GROSS
+          isCredit: true,
+          source: ImportSource.BANK_FEED,
+          status: TransactionStatus.PENDING,
+          xeroTransactionId,
+        },
+      });
+
+      // Mock CONFIRMED split
+      mockSplitResult = {
+        id: uuidv4(),
+        tenant_id: testTenant.id,
+        xero_transaction_id: xeroTransactionId,
+        original_amount_cents: 10636,
+        net_amount_cents: 10000, // R100 allocatable
+        fee_amount_cents: 636,
+        fee_type: 'ADT_DEPOSIT_FEE',
+        status: XeroTransactionSplitStatusDto.CONFIRMED,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      // Allocate R50 of the R100 NET amount
+      const result = await service.allocatePayment({
+        tenantId: testTenant.id,
+        transactionId: transaction.id,
+        allocations: [
+          {
+            invoiceId: invoice.id,
+            amountCents: 5000,
+          },
+        ],
+      });
+
+      expect(result.payments).toHaveLength(1);
+      expect(result.payments[0].amountCents).toBe(5000);
+      // Unallocated should be R50 (10000 NET - 5000 allocated), NOT R56.36 (10636 GROSS - 5000)
+      expect(result.unallocatedAmountCents).toBe(5000);
     });
   });
 });

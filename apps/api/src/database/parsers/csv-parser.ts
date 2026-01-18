@@ -5,6 +5,44 @@ import { parseCurrency, parseDate, extractPayeeName } from './parse-utils';
 import { ValidationException } from '../../shared/exceptions';
 
 /**
+ * Keywords that indicate a transaction is a fee/charge.
+ * These transactions should ALWAYS be debits (isCredit=false) regardless of CSV markup.
+ * Banks sometimes incorrectly mark fees as "Credit" in the Type column.
+ */
+const FEE_KEYWORDS = [
+  'fee',
+  'charge',
+  'bank charge',
+  'bank charges',
+  'service fee',
+  'service charge',
+  'debit order fee',
+  'cash deposit fee',
+  'cash handling fee',
+  'withdrawal fee',
+  'monthly fee',
+  'transaction fee',
+  'atm fee',
+  'card fee',
+  'account fee',
+  'maintenance fee',
+  'penalty',
+  'interest charge',
+] as const;
+
+/**
+ * Detects if a transaction description indicates a fee/charge.
+ * Fee transactions should ALWAYS be debits regardless of how the bank CSV marks them.
+ *
+ * @param description Transaction description from CSV
+ * @returns true if transaction is a fee that should be a debit
+ */
+export function isFeeTransaction(description: string): boolean {
+  const lowerDesc = description.toLowerCase();
+  return FEE_KEYWORDS.some((keyword) => lowerDesc.includes(keyword));
+}
+
+/**
  * CSV parser for bank transaction files.
  * Supports flexible column mapping and various CSV formats.
  */
@@ -211,6 +249,19 @@ export class CsvParser {
       }
     } else {
       throw new Error('No amount, debit, or credit column found');
+    }
+
+    // Fee correction: Bank fees must ALWAYS be debits regardless of CSV markup
+    // Banks sometimes incorrectly mark fees as "Credit" in the Type column
+    if (isFeeTransaction(description) && isCredit) {
+      this.logger.warn(
+        `CSV import: Fee transaction "${description}" marked as credit, correcting to debit`,
+        {
+          originalType: columns.type,
+          amount: amountCents,
+        },
+      );
+      isCredit = false;
     }
 
     return {

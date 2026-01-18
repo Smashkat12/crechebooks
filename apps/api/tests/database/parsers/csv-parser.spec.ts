@@ -1,8 +1,12 @@
 /**
  * CSV Parser Unit Tests
  * TASK-TRANS-011
+ * TASK-RECON-039 - Fee detection and sign correction tests
  */
-import { CsvParser } from '../../../src/database/parsers/csv-parser';
+import {
+  CsvParser,
+  isFeeTransaction,
+} from '../../../src/database/parsers/csv-parser';
 import { ValidationException } from '../../../src/shared/exceptions';
 
 describe('CsvParser', () => {
@@ -130,6 +134,161 @@ invalid,bad,xxx`;
 
       const result = parser.parse(Buffer.from(csv));
       expect(result[0].date.getUTCFullYear()).toBe(2024);
+    });
+  });
+
+  /**
+   * TASK-RECON-039: Fee Detection Tests
+   */
+  describe('isFeeTransaction', () => {
+    it.each([
+      ['Cash Deposit Fee', true],
+      ['Bank Charges', true],
+      ['Monthly Service Fee', true],
+      ['ATM Fee', true],
+      ['Debit Order Fee', true],
+      ['Transaction Fee', true],
+      ['BANK CHARGE', true],
+      ['Service Charge', true],
+      ['Card Fee - Annual', true],
+      ['Account Maintenance Fee', true],
+      ['Withdrawal Fee', true],
+      ['Cash Handling Fee', true],
+      ['Interest Charge', true],
+      ['Penalty - Late Payment', true],
+      ['Payment Received', false],
+      ['Salary Deposit', false],
+      ['Transfer from Savings', false],
+      ['Purchase - Woolworths', false],
+      ['Direct Debit - Insurance', false],
+      ['CASH DEPOSIT', false],
+      ['EFT PAYMENT', false],
+    ])('should detect "%s" as fee: %s', (description, expected) => {
+      expect(isFeeTransaction(description)).toBe(expected);
+    });
+  });
+
+  /**
+   * TASK-RECON-039: Fee Sign Correction Tests
+   */
+  describe('Fee Sign Correction', () => {
+    it('should correct fee marked as credit to debit', () => {
+      const csv = `Date,Description,Type,Amount
+17/10/2025,Cash Deposit Fee,Credit,52.64`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result).toHaveLength(1);
+      expect(result[0].isCredit).toBe(false); // Should be corrected to debit
+      expect(result[0].amountCents).toBe(5264);
+      expect(result[0].description).toBe('Cash Deposit Fee');
+    });
+
+    it('should keep fee as debit when correctly marked', () => {
+      const csv = `Date,Description,Type,Amount
+17/10/2025,Monthly Bank Charges,Debit,25.00`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result[0].isCredit).toBe(false);
+      expect(result[0].amountCents).toBe(2500);
+    });
+
+    it('should not affect non-fee credits', () => {
+      const csv = `Date,Description,Type,Amount
+17/10/2025,Salary Deposit,Credit,15000.00`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result[0].isCredit).toBe(true); // Should remain credit
+      expect(result[0].amountCents).toBe(1500000);
+    });
+
+    it('should correct multiple fee transactions in same import', () => {
+      const csv = `Date,Description,Type,Amount
+17/10/2025,Cash Deposit,Credit,1000.00
+17/10/2025,Cash Deposit Fee,Credit,6.36
+18/10/2025,Bank Charges,Credit,25.00
+19/10/2025,Salary,Credit,15000.00`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result).toHaveLength(4);
+
+      // Cash Deposit - should be credit
+      expect(result[0].isCredit).toBe(true);
+      expect(result[0].amountCents).toBe(100000);
+
+      // Cash Deposit Fee - CORRECTED to debit
+      expect(result[1].isCredit).toBe(false);
+      expect(result[1].amountCents).toBe(636);
+
+      // Bank Charges - CORRECTED to debit
+      expect(result[2].isCredit).toBe(false);
+      expect(result[2].amountCents).toBe(2500);
+
+      // Salary - should be credit
+      expect(result[3].isCredit).toBe(true);
+      expect(result[3].amountCents).toBe(1500000);
+    });
+
+    it('should handle fee in separate debit/credit columns marked as credit', () => {
+      const csv = `Date,Description,Debit,Credit
+17/10/2025,ATM Fee,,10.00`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      // Fee in credit column should be corrected to debit
+      expect(result[0].isCredit).toBe(false);
+      expect(result[0].amountCents).toBe(1000);
+    });
+
+    it('should handle mixed case fee descriptions', () => {
+      const csv = `Date,Description,Type,Amount
+17/10/2025,BANK CHARGE,Credit,15.00
+17/10/2025,Service FEE,Credit,5.00
+17/10/2025,transaction fee,Credit,2.50`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result[0].isCredit).toBe(false);
+      expect(result[1].isCredit).toBe(false);
+      expect(result[2].isCredit).toBe(false);
+    });
+
+    it('should not affect fee correctly marked as debit with negative amount', () => {
+      const csv = `Date,Description,Amount
+17/10/2025,Bank Charges,-25.00`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result[0].isCredit).toBe(false);
+      expect(result[0].amountCents).toBe(2500);
+    });
+
+    it('should correct fee with positive amount when no type column', () => {
+      // When no Type column and amount is positive, parser treats as credit
+      // Fee should still be corrected to debit
+      const csv = `Date,Description,Amount
+17/10/2025,Service Fee,10.00`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result[0].isCredit).toBe(false); // Corrected from positive amount
+      expect(result[0].amountCents).toBe(1000);
+    });
+
+    it('should handle compound fee descriptions', () => {
+      const csv = `Date,Description,Type,Amount
+17/10/2025,Monthly Account Maintenance Fee,Credit,50.00
+17/10/2025,Debit Order Return - Fee,Credit,35.00
+17/10/2025,Card Replacement Fee,Credit,100.00`;
+
+      const result = parser.parse(Buffer.from(csv));
+
+      expect(result[0].isCredit).toBe(false);
+      expect(result[1].isCredit).toBe(false);
+      expect(result[2].isCredit).toBe(false);
     });
   });
 });

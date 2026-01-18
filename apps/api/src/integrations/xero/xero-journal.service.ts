@@ -1,9 +1,11 @@
 /**
  * XeroJournalService
  * TASK-STAFF-001: Implement Xero Journal Posting
+ * TASK-XERO-008: Implement Distributed Rate Limiting for Xero API
  *
  * Service for creating and managing manual journal entries in Xero.
  * Implements retry logic with exponential backoff for transient failures.
+ * Integrates with distributed rate limiter for multi-instance coordination.
  *
  * CRITICAL: All monetary values are in cents (integers).
  * Uses banker's rounding (ROUND_HALF_EVEN) for currency conversions.
@@ -32,6 +34,7 @@ import {
   isRetryableXeroError,
   extractRetryAfter,
 } from './xero-journal.errors';
+import { XeroRateLimiter } from './xero-rate-limiter.service';
 
 // Configure Decimal for banker's rounding (ROUND_HALF_EVEN)
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_EVEN });
@@ -102,6 +105,7 @@ export class XeroJournalService {
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
+    private readonly rateLimiter: XeroRateLimiter,
   ) {
     // Load retry configuration from environment or use defaults
     this.maxRetries = this.configService.get<number>('XERO_MAX_RETRIES', 3);
@@ -153,6 +157,15 @@ export class XeroJournalService {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      // Check rate limit before making API call
+      const rateLimit = await this.rateLimiter.acquireSlot(tenantId);
+      if (!rateLimit.allowed) {
+        this.logger.warn(
+          `Rate limit exceeded for tenant ${tenantId}. Retry after ${rateLimit.retryAfter}s.`,
+        );
+        throw new XeroRateLimitError(rateLimit.retryAfter);
+      }
+
       try {
         const response = await this.postJournalToXero(
           accessToken,
@@ -537,6 +550,15 @@ export class XeroJournalService {
     xeroTenantId: string,
     manualJournalId: string,
   ): Promise<JournalResponseDto> {
+    // Check rate limit before making API call
+    const rateLimit = await this.rateLimiter.acquireSlot(tenantId);
+    if (!rateLimit.allowed) {
+      this.logger.warn(
+        `Rate limit exceeded for tenant ${tenantId}. Retry after ${rateLimit.retryAfter}s.`,
+      );
+      throw new XeroRateLimitError(rateLimit.retryAfter);
+    }
+
     const url = `${this.xeroApiBaseUrl}/ManualJournals/${manualJournalId}`;
 
     this.logger.log(
@@ -592,16 +614,27 @@ export class XeroJournalService {
   /**
    * Get a journal entry from Xero by ID.
    *
+   * @param tenantId - Internal tenant ID (for rate limiting)
    * @param accessToken - Xero OAuth2 access token
    * @param xeroTenantId - Xero tenant ID
    * @param manualJournalId - ID of journal to retrieve
    * @returns Journal response
    */
   async getJournal(
+    tenantId: string,
     accessToken: string,
     xeroTenantId: string,
     manualJournalId: string,
   ): Promise<JournalResponseDto> {
+    // Check rate limit before making API call
+    const rateLimit = await this.rateLimiter.acquireSlot(tenantId);
+    if (!rateLimit.allowed) {
+      this.logger.warn(
+        `Rate limit exceeded for tenant ${tenantId}. Retry after ${rateLimit.retryAfter}s.`,
+      );
+      throw new XeroRateLimitError(rateLimit.retryAfter);
+    }
+
     const url = `${this.xeroApiBaseUrl}/ManualJournals/${manualJournalId}`;
 
     try {

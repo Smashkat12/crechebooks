@@ -12,10 +12,10 @@ import {
   DashboardWidgetSkeleton,
   MetricCardsGridSkeleton,
 } from '@/components/dashboard';
-import { useDashboardMetrics, useDashboardTrends } from '@/hooks/use-dashboard';
+import { useDashboardMetrics, useDashboardTrends, useAvailablePeriods } from '@/hooks/use-dashboard';
 import { useDashboardData, useInvalidateDashboardCache } from '@/hooks/use-dashboard-data';
 import { useLearningMode } from '@/hooks/useLearningMode';
-import { YearSelector } from '@/components/common/year-selector';
+import { FinancialYearSelector } from '@/components/common/financial-year-selector';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -31,10 +31,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
  * - Retry logic for failed requests
  */
 export default function DashboardPage() {
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  // Selected financial year (null = all time / auto-detect from latest transaction)
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+
+  // Fetch available periods to populate the selector
+  const { data: availablePeriods, isLoading: periodsLoading } = useAvailablePeriods();
 
   // Use the enhanced dashboard data hook with parallel queries and SWR
+  // Pass undefined for year when null (all time) to let API auto-detect
+  const yearParam = selectedYear ?? undefined;
   const {
     metrics,
     trends,
@@ -46,7 +51,7 @@ export default function DashboardPage() {
     totalQueries,
     refetchAll,
     refetchFailed,
-  } = useDashboardData(undefined, selectedYear);
+  } = useDashboardData(undefined, yearParam);
 
   // Learning mode state
   const { progress, isLoading: learningModeLoading, isDismissed, dismissIndicator } = useLearningMode();
@@ -120,11 +125,12 @@ export default function DashboardPage() {
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
-          <YearSelector
+          <FinancialYearSelector
             value={selectedYear}
             onChange={setSelectedYear}
-            startYear={2024}
-            endYear={currentYear}
+            availableYears={availablePeriods?.availableFinancialYears ?? []}
+            includeAllTime={true}
+            isLoading={periodsLoading}
           />
         </div>
       </div>

@@ -77,3 +77,30 @@ export function useDashboardTrends(period?: string, year?: number) {
     staleTime: 60 * 1000, // 1 minute - trends don't change as frequently
   });
 }
+
+// Types for available periods
+interface FinancialYear {
+  year: number;
+  label: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface AvailablePeriods {
+  hasData: boolean;
+  firstTransactionDate: string | null;
+  lastTransactionDate: string | null;
+  availableFinancialYears: FinancialYear[];
+}
+
+// Get available periods for the tenant
+export function useAvailablePeriods() {
+  return useQuery<AvailablePeriods, AxiosError>({
+    queryKey: queryKeys.dashboard.availablePeriods(),
+    queryFn: async () => {
+      const { data } = await apiClient.get<AvailablePeriods>(endpoints.dashboard.availablePeriods);
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes - periods don't change frequently
+  });
+}

@@ -12,6 +12,8 @@ import {
   Link2,
   Link2Off,
   Loader2,
+  Coins,
+  Scissors,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,8 +35,21 @@ import {
 } from '@/components/ui/tooltip';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { useUnmatch, type BankStatementMatch, type BankStatementReconciliationResult } from '@/hooks/use-reconciliation';
+import { useUnmatch, type BankStatementMatch, type BankStatementReconciliationResult, type AvailableTransaction } from '@/hooks/use-reconciliation';
 import { ManualMatchDialog } from './manual-match-dialog';
+import { XeroSplitDialog } from './xero-split-dialog';
+
+/** State for split dialog when opened from manual match */
+interface SplitFromManualMatchState {
+  matchId: string;
+  xeroTransaction: AvailableTransaction;
+  bankTransaction: {
+    date: string;
+    description: string;
+    amount: number;
+    isCredit: boolean;
+  };
+}
 
 type MatchStatus = BankStatementMatch['status'] | 'all';
 
@@ -70,6 +85,11 @@ const statusConfig: Record<BankStatementMatch['status'], { label: string; icon: 
     icon: <Calendar className="h-4 w-4 text-yellow-500" />,
     variant: 'outline',
   },
+  FEE_ADJUSTED_MATCH: {
+    label: 'Fee Adjusted',
+    icon: <Coins className="h-4 w-4 text-purple-600" />,
+    variant: 'default',
+  },
 };
 
 export function BankStatementMatchResults({
@@ -82,8 +102,16 @@ export function BankStatementMatchResults({
   const [matchDialogOpen, setMatchDialogOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<BankStatementMatch | null>(null);
   const [unmatchingId, setUnmatchingId] = useState<string | null>(null);
+  const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+  const [selectedSplitMatch, setSelectedSplitMatch] = useState<BankStatementMatch | null>(null);
+  const [splitFromManualMatch, setSplitFromManualMatch] = useState<SplitFromManualMatchState | null>(null);
 
   const unmatch = useUnmatch();
+
+  const handleOpenSplitDialog = (match: BankStatementMatch) => {
+    setSelectedSplitMatch(match);
+    setSplitDialogOpen(true);
+  };
 
   const handleOpenMatchDialog = (match: BankStatementMatch) => {
     setSelectedMatch(match);
@@ -119,6 +147,49 @@ export function BankStatementMatchResults({
     onRefresh?.();
   };
 
+  /** Handle when user clicks "Match with Split" in manual match dialog */
+  const handleMatchWithSplit = (matchId: string, xeroTransaction: AvailableTransaction) => {
+    if (!selectedMatch) return;
+
+    // Store the state for opening split dialog
+    setSplitFromManualMatch({
+      matchId,
+      xeroTransaction,
+      bankTransaction: {
+        date: selectedMatch.bankDate,
+        description: selectedMatch.bankDescription,
+        amount: selectedMatch.bankAmount,
+        isCredit: selectedMatch.bankIsCredit,
+      },
+    });
+
+    // Clear manual match state
+    setSelectedMatch(null);
+
+    // Open split dialog
+    setSplitDialogOpen(true);
+
+    // Refresh to get updated match data
+    onRefresh?.();
+  };
+
+  /** Handle split dialog success (from either source) */
+  const handleSplitDialogSuccess = () => {
+    setSplitDialogOpen(false);
+    setSelectedSplitMatch(null);
+    setSplitFromManualMatch(null);
+    onRefresh?.();
+  };
+
+  /** Handle split dialog close */
+  const handleSplitDialogClose = (open: boolean) => {
+    if (!open) {
+      setSplitDialogOpen(false);
+      setSelectedSplitMatch(null);
+      setSplitFromManualMatch(null);
+    }
+  };
+
   const filteredMatches = result.matches.filter((match) => {
     const matchesFilter = filter === 'all' || match.status === filter;
     const matchesSearch =
@@ -150,9 +221,15 @@ export function BankStatementMatchResults({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{matchSummary.matched}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {matchSummary.matched + (matchSummary.feeAdjustedMatch || 0)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              {((matchSummary.matched / matchSummary.total) * 100).toFixed(1)}% match rate
+              {matchSummary.feeAdjustedMatch > 0 && (
+                <span className="text-purple-600">{matchSummary.feeAdjustedMatch} fee-adjusted</span>
+              )}
+              {matchSummary.feeAdjustedMatch > 0 ? ' • ' : ''}
+              {(((matchSummary.matched + (matchSummary.feeAdjustedMatch || 0)) / matchSummary.total) * 100).toFixed(1)}% match rate
             </p>
           </CardContent>
         </Card>
@@ -267,6 +344,16 @@ export function BankStatementMatchResults({
               >
                 Amount ({matchSummary.amountMismatch})
               </Badge>
+              {matchSummary.feeAdjustedMatch > 0 && (
+                <Badge
+                  variant={filter === 'FEE_ADJUSTED_MATCH' ? 'default' : 'outline'}
+                  className="cursor-pointer bg-purple-100 text-purple-700 hover:bg-purple-200"
+                  onClick={() => setFilter('FEE_ADJUSTED_MATCH')}
+                >
+                  <Coins className="h-3 w-3 mr-1" />
+                  Fee Adjusted ({matchSummary.feeAdjustedMatch})
+                </Badge>
+              )}
             </div>
           </div>
           <Input
@@ -336,6 +423,8 @@ export function BankStatementMatchResults({
                         <TableCell className="text-center">
                           {match.status === 'MATCHED' ? (
                             <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
+                          ) : match.status === 'FEE_ADJUSTED_MATCH' ? (
+                            <Coins className="h-4 w-4 text-purple-600 mx-auto" />
                           ) : (
                             <XCircle className="h-4 w-4 text-muted-foreground mx-auto" />
                           )}
@@ -367,45 +456,90 @@ export function BankStatementMatchResults({
                                 vs {formatCurrency(match.xeroAmount)}
                               </p>
                             )}
+                            {match.status === 'FEE_ADJUSTED_MATCH' && match.accruedFeeAmount && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <p className="text-xs text-purple-600 font-mono cursor-help">
+                                      + Fee: {formatCurrency(match.accruedFeeAmount / 100)}
+                                    </p>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs">
+                                      <p>Bank NET + Accrued Fee = Xero GROSS</p>
+                                      <p className="mt-1">
+                                        {formatCurrency(match.bankAmount)} + {formatCurrency(match.accruedFeeAmount / 100)} = {formatCurrency(match.xeroAmount || 0)}
+                                      </p>
+                                      {match.feeType && <p className="mt-1">Fee type: {match.feeType}</p>}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          {match.status === 'MATCHED' ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleUnmatch(match.id)}
-                                    disabled={unmatchingId === match.id}
-                                  >
-                                    {unmatchingId === match.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Link2Off className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Unmatch</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : match.status === 'IN_BANK_ONLY' ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleOpenMatchDialog(match)}
-                                  >
-                                    <Link2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Manual Match</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : null}
+                          <div className="flex items-center gap-1">
+                            {(match.status === 'MATCHED' || match.status === 'FEE_ADJUSTED_MATCH') ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleUnmatch(match.id)}
+                                      disabled={unmatchingId === match.id}
+                                    >
+                                      {unmatchingId === match.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Link2Off className="h-4 w-4" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Unmatch</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : match.status === 'IN_BANK_ONLY' ? (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenMatchDialog(match)}
+                                    >
+                                      <Link2 className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Manual Match</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : null}
+                            {/* Split button for amount mismatches and fee-adjusted matches */}
+                            {(match.status === 'AMOUNT_MISMATCH' || match.status === 'FEE_ADJUSTED_MATCH') && match.xeroAmount && match.transactionId && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleOpenSplitDialog(match)}
+                                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                                    >
+                                      <Scissors className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs">
+                                      <p className="font-medium">Split Xero Transaction</p>
+                                      <p>Split into net amount + accrued fee</p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -440,6 +574,39 @@ export function BankStatementMatchResults({
             isCredit: selectedMatch.bankIsCredit,
           }}
           onSuccess={handleMatchSuccess}
+          onMatchWithSplit={handleMatchWithSplit}
+        />
+      )}
+
+      {/* Xero Split Dialog - from scissors button (only when not from manual match) */}
+      {splitDialogOpen && !splitFromManualMatch && selectedSplitMatch && selectedSplitMatch.transactionId && selectedSplitMatch.xeroAmount && (
+        <XeroSplitDialog
+          open={splitDialogOpen}
+          onOpenChange={handleSplitDialogClose}
+          bankStatementMatchId={selectedSplitMatch.id}
+          bankAmount={selectedSplitMatch.bankAmount}
+          bankDescription={selectedSplitMatch.bankDescription}
+          bankDate={selectedSplitMatch.bankDate}
+          xeroTransactionId={selectedSplitMatch.transactionId}
+          xeroAmount={selectedSplitMatch.xeroAmount}
+          xeroDescription={selectedSplitMatch.xeroDescription || undefined}
+          onSuccess={handleSplitDialogSuccess}
+        />
+      )}
+
+      {/* Xero Split Dialog - from manual match flow */}
+      {splitDialogOpen && splitFromManualMatch && (
+        <XeroSplitDialog
+          open={splitDialogOpen}
+          onOpenChange={handleSplitDialogClose}
+          bankStatementMatchId={splitFromManualMatch.matchId}
+          bankAmount={splitFromManualMatch.bankTransaction.amount}
+          bankDescription={splitFromManualMatch.bankTransaction.description}
+          bankDate={splitFromManualMatch.bankTransaction.date}
+          xeroTransactionId={splitFromManualMatch.xeroTransaction.id}
+          xeroAmount={splitFromManualMatch.xeroTransaction.amount}
+          xeroDescription={splitFromManualMatch.xeroTransaction.description}
+          onSuccess={handleSplitDialogSuccess}
         />
       )}
     </div>

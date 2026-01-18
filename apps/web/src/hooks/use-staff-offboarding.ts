@@ -22,6 +22,13 @@ export interface OffboardingStatus {
   settlementCalculated: boolean;
   settlementAmount?: number;
   documentsGenerated: boolean;
+  // Individual document generation status for completion validation
+  documents: {
+    ui19: boolean;
+    certificate: boolean;
+    irp5: boolean;
+    exitPack: boolean;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -165,6 +172,13 @@ function mapBackendToOffboardingStatus(data: BackendOffboardingProgress): Offboa
       documentsGenerated.certificate ||
       documentsGenerated.irp5 ||
       documentsGenerated.exitPack,
+    // Track individual document status for completion validation
+    documents: {
+      ui19: documentsGenerated.ui19,
+      certificate: documentsGenerated.certificate,
+      irp5: documentsGenerated.irp5,
+      exitPack: documentsGenerated.exitPack,
+    },
     createdAt: offboarding.createdAt,
     updatedAt: offboarding.updatedAt,
   };
@@ -290,33 +304,45 @@ export function useUpdateAssetReturn(staffId: string, offboardingId: string) {
 
 /**
  * Complete offboarding process
+ * Requires offboardingId for the API endpoint
  */
-export function useCompleteOffboarding(staffId: string) {
+export function useCompleteOffboarding(staffId: string, offboardingId: string) {
   const queryClient = useQueryClient();
 
   return useMutation<OffboardingStatus, AxiosError, void>({
     mutationFn: async () => {
+      // API endpoint: POST /staff/:staffId/offboarding/:offboardingId/complete
       const { data } = await apiClient.post<OffboardingStatus>(
-        `/staff/${staffId}/offboarding/complete`
+        `/staff/${staffId}/offboarding/${offboardingId}/complete`,
+        {
+          // completedBy will be set by the backend from the authenticated user
+        }
       );
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: offboardingKeys.all });
+      queryClient.invalidateQueries({ queryKey: offboardingKeys.status(staffId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.staff.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.staff.detail(staffId) });
     },
   });
 }
 
 /**
  * Download UI-19 form (UIF termination document)
+ * Requires offboardingId for the API endpoint
+ * Invalidates offboarding status on success to update documentsGenerated flag
  */
-export function useDownloadUi19(staffId: string) {
+export function useDownloadUi19(staffId: string, offboardingId: string) {
+  const queryClient = useQueryClient();
+
   return useMutation<void, AxiosError, void>({
     mutationFn: async () => {
-      const response = await apiClient.get(`/staff/${staffId}/offboarding/ui19`, {
-        responseType: 'blob',
-      });
+      const response = await apiClient.get(
+        `/staff/${staffId}/offboarding/${offboardingId}/ui19`,
+        { responseType: 'blob' }
+      );
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -327,17 +353,25 @@ export function useDownloadUi19(staffId: string) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
     },
+    onSuccess: () => {
+      // Refresh offboarding status to update documentsGenerated flag
+      queryClient.invalidateQueries({ queryKey: offboardingKeys.status(staffId) });
+    },
   });
 }
 
 /**
  * Download Certificate of Service
+ * Requires offboardingId for the API endpoint
+ * Invalidates offboarding status on success to update documentsGenerated flag
  */
-export function useDownloadCertificate(staffId: string) {
+export function useDownloadCertificate(staffId: string, offboardingId: string) {
+  const queryClient = useQueryClient();
+
   return useMutation<void, AxiosError, void>({
     mutationFn: async () => {
       const response = await apiClient.get(
-        `/staff/${staffId}/offboarding/certificate`,
+        `/staff/${staffId}/offboarding/${offboardingId}/certificate`,
         { responseType: 'blob' }
       );
       const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -350,17 +384,25 @@ export function useDownloadCertificate(staffId: string) {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
     },
+    onSuccess: () => {
+      // Refresh offboarding status to update documentsGenerated flag
+      queryClient.invalidateQueries({ queryKey: offboardingKeys.status(staffId) });
+    },
   });
 }
 
 /**
  * Download complete Exit Pack (all documents bundled)
+ * Requires offboardingId for the API endpoint
+ * Invalidates offboarding status on success to update documentsGenerated flag
  */
-export function useDownloadExitPack(staffId: string) {
+export function useDownloadExitPack(staffId: string, offboardingId: string) {
+  const queryClient = useQueryClient();
+
   return useMutation<void, AxiosError, void>({
     mutationFn: async () => {
       const response = await apiClient.get(
-        `/staff/${staffId}/offboarding/exit-pack`,
+        `/staff/${staffId}/offboarding/${offboardingId}/exit-pack`,
         { responseType: 'blob' }
       );
       const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -372,6 +414,10 @@ export function useDownloadExitPack(staffId: string) {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
+    },
+    onSuccess: () => {
+      // Refresh offboarding status to update documentsGenerated flag
+      queryClient.invalidateQueries({ queryKey: offboardingKeys.status(staffId) });
     },
   });
 }

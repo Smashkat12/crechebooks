@@ -14,6 +14,20 @@ export interface XeroStatusWidgetProps {
 }
 
 /**
+ * Safely convert a date value (Date object or ISO string) to a Date object
+ */
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  try {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Determine connection state based on status
  */
 function getConnectionState(status: XeroConnectionStatus | null): ConnectionState {
@@ -27,9 +41,10 @@ function getConnectionState(status: XeroConnectionStatus | null): ConnectionStat
   }
 
   // Check if last sync was more than 1 hour ago
-  if (status.lastSyncAt) {
+  const lastSyncDate = toDate(status.lastSyncAt);
+  if (lastSyncDate) {
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
-    if (status.lastSyncAt.getTime() < oneHourAgo) {
+    if (lastSyncDate.getTime() < oneHourAgo) {
       return 'expiring'; // Yellow warning
     }
   }
@@ -40,13 +55,14 @@ function getConnectionState(status: XeroConnectionStatus | null): ConnectionStat
 /**
  * Format last sync time
  */
-function formatLastSync(lastSyncAt: Date | null): string {
-  if (!lastSyncAt) {
+function formatLastSync(lastSyncAt: Date | string | null): string {
+  const date = toDate(lastSyncAt);
+  if (!date) {
     return 'Never synced';
   }
 
   try {
-    return formatDistanceToNow(lastSyncAt, { addSuffix: true });
+    return formatDistanceToNow(date, { addSuffix: true });
   } catch {
     return 'Unknown';
   }

@@ -85,6 +85,7 @@ export const queryKeys = {
     metrics: (period?: string, year?: number) => [...queryKeys.dashboard.all, 'metrics', period, year] as const,
     trends: (period?: string, year?: number) => [...queryKeys.dashboard.all, 'trends', period, year] as const,
     learningMode: () => [...queryKeys.dashboard.all, 'learning-mode'] as const,
+    availablePeriods: () => [...queryKeys.dashboard.all, 'available-periods'] as const,
   },
   // Reports
   reports: {
@@ -126,5 +127,14 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.statements.all, 'detail', id] as const,
     forParent: (parentId: string) => [...queryKeys.statements.all, 'parent', parentId] as const,
     parentAccount: (parentId: string) => [...queryKeys.statements.all, 'account', parentId] as const,
+  },
+  // Xero Transaction Splits
+  xeroSplits: {
+    all: ['xeroSplits'] as const,
+    lists: () => [...queryKeys.xeroSplits.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.xeroSplits.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.xeroSplits.all, 'detail', id] as const,
+    summary: () => [...queryKeys.xeroSplits.all, 'summary'] as const,
+    byXeroTransaction: (xeroTxnId: string) => [...queryKeys.xeroSplits.all, 'xero-txn', xeroTxnId] as const,
   },
 } as const;

@@ -7,3 +7,4 @@ export { ReconciliationForm } from './reconciliation-form';
 export { BankStatementUpload } from './bank-statement-upload';
 export { BankStatementMatchResults } from './bank-statement-match-results';
 export { ManualMatchDialog } from './manual-match-dialog';
+export { XeroSplitDialog } from './xero-split-dialog';

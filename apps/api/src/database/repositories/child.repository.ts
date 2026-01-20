@@ -93,6 +93,69 @@ export class ChildRepository {
   }
 
   /**
+   * TASK-PERF-101: Batch load children by IDs to eliminate N+1 queries
+   * @param ids - Array of child IDs
+   * @param tenantId - Tenant ID for isolation
+   * @returns Array of children
+   * @throws DatabaseException for database errors
+   */
+  async findByIds(ids: string[], tenantId: string): Promise<Child[]> {
+    if (ids.length === 0) return [];
+    try {
+      return await this.prisma.child.findMany({
+        where: {
+          id: { in: ids },
+          tenantId,
+          deletedAt: null,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find children by ids: ${ids.join(', ')} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByIds',
+        'Failed to find children by IDs',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
+   * TASK-PERF-101: Batch load children by parent IDs
+   * @param parentIds - Array of parent IDs
+   * @param tenantId - Tenant ID for isolation
+   * @returns Array of children
+   * @throws DatabaseException for database errors
+   */
+  async findByParentIds(
+    parentIds: string[],
+    tenantId: string,
+  ): Promise<Child[]> {
+    if (parentIds.length === 0) return [];
+    try {
+      return await this.prisma.child.findMany({
+        where: {
+          parentId: { in: parentIds },
+          tenantId,
+          deletedAt: null,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find children by parent ids: ${parentIds.join(', ')} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByParentIds',
+        'Failed to find children by parent IDs',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Find all children for a specific parent
    * TASK-DATA-003: Added includeDeleted option for soft delete support
    * @param tenantId - Tenant ID for isolation

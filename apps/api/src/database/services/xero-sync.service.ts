@@ -24,6 +24,7 @@ import {
   Parent,
   XeroAccountStatus,
   CategorizationJournalStatus,
+  PendingSyncEntityType,
 } from '@prisma/client';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { CategorizationRepository } from '../repositories/categorization.repository';
@@ -34,6 +35,12 @@ import { AuditLogService } from './audit-log.service';
 import { ConflictDetectionService } from './conflict-detection.service';
 import { ConflictResolutionService } from './conflict-resolution.service';
 import { PrismaService } from '../prisma/prisma.service';
+// TASK-REL-101: Circuit Breaker for Xero API resilience
+import {
+  XeroCircuitBreaker,
+  CircuitBreakerOpenError,
+} from '../../integrations/circuit-breaker';
+import { PendingSyncQueueService } from './pending-sync-queue.service';
 import {
   SyncResult,
   CategorySyncResult,
@@ -87,6 +94,9 @@ export class XeroSyncService {
     private readonly conflictDetection: ConflictDetectionService,
     private readonly conflictResolution: ConflictResolutionService,
     private readonly prisma: PrismaService,
+    // TASK-REL-101: Circuit breaker for Xero API resilience
+    private readonly circuitBreaker: XeroCircuitBreaker,
+    private readonly pendingSyncQueue: PendingSyncQueueService,
   ) {
     // Pass PrismaService (extends PrismaClient) to TokenManager
     this.tokenManager = new TokenManager(this.prisma);
@@ -160,6 +170,7 @@ export class XeroSyncService {
 
   /**
    * Push single transaction to Xero
+   * TASK-REL-101: Wrapped with circuit breaker for resilience
    * @returns true if synced, false if skipped (already synced or no Xero ID)
    */
   async pushToXero(
@@ -213,126 +224,163 @@ export class XeroSyncService {
     // Use the most recent categorization
     const categorization = categorizations[0];
 
-    // TASK-XERO-001: Check for conflicts before syncing
-    // Fetch current Xero version to detect conflicts
-    // Note: We'll need to fetch all transactions and filter by ID
-    // since getTransactions doesn't support transactionIds filter
-    const allXeroTransactions = await getTransactions(client, xeroTenantId, {
-      fromDate: format(transaction.date, 'yyyy-MM-dd'),
-      toDate: format(transaction.date, 'yyyy-MM-dd'),
-    });
+    // TASK-REL-101: Wrap all Xero API operations with circuit breaker
+    const pushTransactionToXero = async (): Promise<boolean> => {
+      // TASK-XERO-001: Check for conflicts before syncing
+      // Fetch current Xero version to detect conflicts
+      // Note: We'll need to fetch all transactions and filter by ID
+      // since getTransactions doesn't support transactionIds filter
+      const allXeroTransactions = await getTransactions(client, xeroTenantId, {
+        fromDate: format(transaction.date, 'yyyy-MM-dd'),
+        toDate: format(transaction.date, 'yyyy-MM-dd'),
+      });
 
-    const xeroTransactions = allXeroTransactions.filter(
-      (tx) => tx.transactionId === transaction.xeroTransactionId,
-    );
-
-    if (xeroTransactions.length > 0) {
-      const xeroTransaction = xeroTransactions[0];
-      const lastSyncedAt = transaction.reconciledAt; // Use reconciliation date as last sync
-
-      // Detect conflicts
-      const conflictCheck = await this.conflictDetection.detectConflicts(
-        tenantId,
-        'Transaction',
-        transactionId,
-        {
-          updatedAt: transaction.updatedAt,
-          accountCode: categorization.accountCode,
-          amountCents: transaction.amountCents,
-          description: transaction.description,
-        },
-        {
-          UpdatedDateUTC: xeroTransaction.date,
-          AccountCode: xeroTransaction.accountCode,
-          Total: xeroTransaction.amountCents / 100, // Convert cents to dollars
-          Description: xeroTransaction.description,
-        },
-        lastSyncedAt ?? undefined,
+      const xeroTransactions = allXeroTransactions.filter(
+        (tx) => tx.transactionId === transaction.xeroTransactionId,
       );
 
-      if (conflictCheck.hasConflict) {
-        this.logger.warn(
-          `Conflict detected for transaction ${transactionId}: ${conflictCheck.message}`,
-        );
+      if (xeroTransactions.length > 0) {
+        const xeroTransaction = xeroTransactions[0];
+        const lastSyncedAt = transaction.reconciledAt; // Use reconciliation date as last sync
 
-        // Create conflict record
-        const conflictId = await this.conflictDetection.createConflictRecord(
+        // Detect conflicts
+        const conflictCheck = await this.conflictDetection.detectConflicts(
           tenantId,
           'Transaction',
           transactionId,
-          conflictCheck.conflictType || ConflictType.UPDATE_UPDATE,
           {
             updatedAt: transaction.updatedAt,
             accountCode: categorization.accountCode,
             amountCents: transaction.amountCents,
+            description: transaction.description,
           },
           {
             UpdatedDateUTC: xeroTransaction.date,
             AccountCode: xeroTransaction.accountCode,
-            Total: xeroTransaction.amountCents / 100,
+            Total: xeroTransaction.amountCents / 100, // Convert cents to dollars
+            Description: xeroTransaction.description,
           },
-          transaction.updatedAt,
-          new Date(xeroTransaction.date),
+          lastSyncedAt ?? undefined,
         );
 
-        // Try auto-resolution with last_modified_wins strategy
-        const autoResolved = await this.conflictResolution.autoResolve(
-          conflictId,
-          'last_modified_wins',
-        );
+        if (conflictCheck.hasConflict) {
+          this.logger.warn(
+            `Conflict detected for transaction ${transactionId}: ${conflictCheck.message}`,
+          );
 
-        if (!autoResolved) {
-          throw new BusinessException(
-            `Sync conflict detected for transaction ${transactionId}. Manual resolution required.`,
-            'SYNC_CONFLICT',
+          // Create conflict record
+          const conflictId = await this.conflictDetection.createConflictRecord(
+            tenantId,
+            'Transaction',
+            transactionId,
+            conflictCheck.conflictType || ConflictType.UPDATE_UPDATE,
+            {
+              updatedAt: transaction.updatedAt,
+              accountCode: categorization.accountCode,
+              amountCents: transaction.amountCents,
+            },
+            {
+              UpdatedDateUTC: xeroTransaction.date,
+              AccountCode: xeroTransaction.accountCode,
+              Total: xeroTransaction.amountCents / 100,
+            },
+            transaction.updatedAt,
+            new Date(xeroTransaction.date),
+          );
+
+          // Try auto-resolution with last_modified_wins strategy
+          const autoResolved = await this.conflictResolution.autoResolve(
+            conflictId,
+            'last_modified_wins',
+          );
+
+          if (!autoResolved) {
+            throw new BusinessException(
+              `Sync conflict detected for transaction ${transactionId}. Manual resolution required.`,
+              'SYNC_CONFLICT',
+            );
+          }
+
+          this.logger.log(
+            `Auto-resolved conflict ${conflictId} for transaction ${transactionId}`,
           );
         }
-
-        this.logger.log(
-          `Auto-resolved conflict ${conflictId} for transaction ${transactionId}`,
-        );
       }
+
+      // Update transaction in Xero
+      await updateTransaction(
+        client,
+        xeroTenantId,
+        transaction.xeroTransactionId!,
+        categorization.accountCode,
+      );
+
+      // Mark as synced locally
+      await this.transactionRepo.updateStatus(
+        tenantId,
+        transactionId,
+        TransactionStatus.SYNCED,
+      );
+
+      // Log audit trail
+      await this.auditLogService.logAction({
+        tenantId,
+        entityType: 'Transaction',
+        entityId: transactionId,
+        action: AuditAction.UPDATE,
+        afterValue: {
+          xeroTransactionId: transaction.xeroTransactionId,
+          accountCode: categorization.accountCode,
+          syncedAt: new Date().toISOString(),
+          syncType: 'XERO_SYNC',
+        },
+        changeSummary: `Synced to Xero with account ${categorization.accountCode}`,
+      });
+
+      this.logger.log(
+        `Synced transaction ${transactionId} to Xero with account ${categorization.accountCode}`,
+      );
+
+      return true;
+    };
+
+    // TASK-REL-101: Fallback queues the transaction for later when circuit is open
+    const queueForRetry = async (): Promise<boolean> => {
+      this.logger.warn(
+        `Circuit breaker open - queuing transaction ${transactionId} for retry`,
+      );
+      await this.pendingSyncQueue.queueForSync({
+        tenantId,
+        entityType: PendingSyncEntityType.TRANSACTION,
+        entityId: transactionId,
+        operation: 'PUSH_TO_XERO',
+        payload: {
+          transactionId,
+          xeroTransactionId: transaction.xeroTransactionId,
+          accountCode: categorization.accountCode,
+        },
+      });
+      return false; // Return false to indicate not synced yet
+    };
+
+    try {
+      return await this.circuitBreaker.execute(
+        pushTransactionToXero,
+        queueForRetry,
+      );
+    } catch (error) {
+      // Handle circuit breaker open error specifically
+      if (error instanceof CircuitBreakerOpenError) {
+        return await queueForRetry();
+      }
+      // Re-throw other errors (business errors, etc.)
+      throw error;
     }
-
-    // Update transaction in Xero
-    await updateTransaction(
-      client,
-      xeroTenantId,
-      transaction.xeroTransactionId,
-      categorization.accountCode,
-    );
-
-    // Mark as synced locally
-    await this.transactionRepo.updateStatus(
-      tenantId,
-      transactionId,
-      TransactionStatus.SYNCED,
-    );
-
-    // Log audit trail
-    await this.auditLogService.logAction({
-      tenantId,
-      entityType: 'Transaction',
-      entityId: transactionId,
-      action: AuditAction.UPDATE,
-      afterValue: {
-        xeroTransactionId: transaction.xeroTransactionId,
-        accountCode: categorization.accountCode,
-        syncedAt: new Date().toISOString(),
-        syncType: 'XERO_SYNC',
-      },
-      changeSummary: `Synced to Xero with account ${categorization.accountCode}`,
-    });
-
-    this.logger.log(
-      `Synced transaction ${transactionId} to Xero with account ${categorization.accountCode}`,
-    );
-
-    return true;
   }
 
   /**
    * Pull transactions from Xero into CrecheBooks
+   * TASK-REL-101: Wrapped with circuit breaker for resilience
    */
   async pullFromXero(
     tenantId: string,
@@ -349,61 +397,87 @@ export class XeroSyncService {
       `Pulling transactions from Xero for tenant ${tenantId} from ${format(dateFrom, 'yyyy-MM-dd')} to ${format(dateTo, 'yyyy-MM-dd')}`,
     );
 
-    // Get authenticated client
-    const { client, xeroTenantId } =
-      await this.getAuthenticatedClient(tenantId);
+    // TASK-REL-101: Wrap Xero API call with circuit breaker
+    const pullTransactionsFromXero = async (): Promise<PullResult> => {
+      // Get authenticated client
+      const { client, xeroTenantId } =
+        await this.getAuthenticatedClient(tenantId);
 
-    // Fetch transactions from Xero
-    const xeroTransactions = await getTransactions(client, xeroTenantId, {
-      fromDate: format(dateFrom, 'yyyy-MM-dd'),
-      toDate: format(dateTo, 'yyyy-MM-dd'),
-    });
+      // Fetch transactions from Xero
+      const xeroTransactions = await getTransactions(client, xeroTenantId, {
+        fromDate: format(dateFrom, 'yyyy-MM-dd'),
+        toDate: format(dateTo, 'yyyy-MM-dd'),
+      });
 
-    for (const xeroTx of xeroTransactions) {
-      try {
-        // Check if already exists
-        const existing = await this.transactionRepo.findByXeroId(
-          tenantId,
-          xeroTx.transactionId,
-        );
+      for (const xeroTx of xeroTransactions) {
+        try {
+          // Check if already exists
+          const existing = await this.transactionRepo.findByXeroId(
+            tenantId,
+            xeroTx.transactionId,
+          );
 
-        if (existing) {
-          result.duplicatesSkipped++;
-          continue;
+          if (existing) {
+            result.duplicatesSkipped++;
+            continue;
+          }
+
+          // Create new transaction
+          await this.transactionRepo.create({
+            tenantId,
+            xeroTransactionId: xeroTx.transactionId,
+            bankAccount: xeroTx.bankAccount || 'UNKNOWN',
+            date: xeroTx.date,
+            description: xeroTx.description || 'Xero Import',
+            payeeName: xeroTx.payeeName ?? undefined,
+            reference: xeroTx.reference ?? undefined,
+            amountCents: xeroTx.amountCents,
+            isCredit: xeroTx.isCredit,
+            source: ImportSource.BANK_FEED,
+          });
+
+          result.transactionsPulled++;
+        } catch (error) {
+          result.errors.push(
+            `Transaction ${xeroTx.transactionId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+
+          this.logger.error(
+            `Failed to import Xero transaction ${xeroTx.transactionId}`,
+            error instanceof Error ? error.stack : String(error),
+          );
         }
-
-        // Create new transaction
-        await this.transactionRepo.create({
-          tenantId,
-          xeroTransactionId: xeroTx.transactionId,
-          bankAccount: xeroTx.bankAccount || 'UNKNOWN',
-          date: xeroTx.date,
-          description: xeroTx.description || 'Xero Import',
-          payeeName: xeroTx.payeeName ?? undefined,
-          reference: xeroTx.reference ?? undefined,
-          amountCents: xeroTx.amountCents,
-          isCredit: xeroTx.isCredit,
-          source: ImportSource.BANK_FEED,
-        });
-
-        result.transactionsPulled++;
-      } catch (error) {
-        result.errors.push(
-          `Transaction ${xeroTx.transactionId}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-
-        this.logger.error(
-          `Failed to import Xero transaction ${xeroTx.transactionId}`,
-          error instanceof Error ? error.stack : String(error),
-        );
       }
+
+      this.logger.log(
+        `Pull complete: ${result.transactionsPulled} pulled, ${result.duplicatesSkipped} duplicates skipped`,
+      );
+
+      return result;
+    };
+
+    // TASK-REL-101: Fallback returns empty result with circuit breaker error
+    const circuitOpenFallback = async (): Promise<PullResult> => {
+      this.logger.warn(
+        `Circuit breaker open - cannot pull transactions from Xero at this time`,
+      );
+      result.errors.push(
+        'Xero API temporarily unavailable. Please try again later.',
+      );
+      return result;
+    };
+
+    try {
+      return await this.circuitBreaker.execute(
+        pullTransactionsFromXero,
+        circuitOpenFallback,
+      );
+    } catch (error) {
+      if (error instanceof CircuitBreakerOpenError) {
+        return await circuitOpenFallback();
+      }
+      throw error;
     }
-
-    this.logger.log(
-      `Pull complete: ${result.transactionsPulled} pulled, ${result.duplicatesSkipped} duplicates skipped`,
-    );
-
-    return result;
   }
 
   /**
@@ -540,7 +614,8 @@ export class XeroSyncService {
       `Creating Xero invoice draft ${invoiceNumber} for tenant ${tenantId}`,
     );
 
-    try {
+    // TASK-REL-101: Wrap Xero API call with circuit breaker
+    const createInvoiceInXero = async (): Promise<string | null> => {
       // Get authenticated client
       const { client, xeroTenantId } =
         await this.getAuthenticatedClient(tenantId);
@@ -596,7 +671,34 @@ export class XeroSyncService {
         `Xero invoice creation returned no invoiceID for ${invoiceNumber}`,
       );
       return null;
+    };
+
+    // TASK-REL-101: Fallback queues the sync for later when circuit is open
+    const queueForRetry = async (): Promise<string | null> => {
+      this.logger.warn(
+        `Circuit breaker open - queuing invoice ${invoiceNumber} for retry`,
+      );
+      await this.pendingSyncQueue.queueForSync({
+        tenantId,
+        entityType: PendingSyncEntityType.INVOICE,
+        entityId: invoiceNumber,
+        operation: 'CREATE_DRAFT',
+        payload: { invoiceNumber, dueDate, xeroContactId, lineItems },
+      });
+      return null;
+    };
+
+    try {
+      return await this.circuitBreaker.execute(
+        createInvoiceInXero,
+        queueForRetry,
+      );
     } catch (error) {
+      // Handle circuit breaker open error specifically
+      if (error instanceof CircuitBreakerOpenError) {
+        return await queueForRetry();
+      }
+
       this.logger.error(
         `Failed to create Xero invoice for ${invoiceNumber}: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
@@ -643,7 +745,8 @@ export class XeroSyncService {
       return null;
     }
 
-    try {
+    // TASK-REL-101: Wrap Xero API call with circuit breaker
+    const syncPaymentToXero = async (): Promise<string | null> => {
       // Get authenticated client
       const { client, xeroTenantId } = await this.getAuthenticatedClient(
         payment.tenantId,
@@ -657,7 +760,7 @@ export class XeroSyncService {
 
       // Create payment via Xero API
       const response = await client.accountingApi.createPayment(xeroTenantId, {
-        invoice: { invoiceID: invoice.xeroInvoiceId },
+        invoice: { invoiceID: invoice.xeroInvoiceId! }, // Already validated above
         account: { code: accountCode },
         date: formattedDate,
         amount: payment.amountCents / 100, // Convert cents to rands
@@ -699,7 +802,38 @@ export class XeroSyncService {
         `Xero payment creation returned no paymentID for payment ${payment.id}`,
       );
       return null;
+    };
+
+    // TASK-REL-101: Fallback queues the sync for later when circuit is open
+    const queueForRetry = async (): Promise<string | null> => {
+      this.logger.warn(
+        `Circuit breaker open - queuing payment ${payment.id} for retry`,
+      );
+      await this.pendingSyncQueue.queueForSync({
+        tenantId: payment.tenantId,
+        entityType: PendingSyncEntityType.PAYMENT,
+        entityId: payment.id,
+        operation: 'SYNC_PAYMENT',
+        payload: {
+          paymentId: payment.id,
+          invoiceId: invoice.id,
+          xeroInvoiceId: invoice.xeroInvoiceId,
+        },
+      });
+      return null;
+    };
+
+    try {
+      return await this.circuitBreaker.execute(
+        syncPaymentToXero,
+        queueForRetry,
+      );
     } catch (error) {
+      // Handle circuit breaker open error specifically
+      if (error instanceof CircuitBreakerOpenError) {
+        return await queueForRetry();
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
@@ -1190,6 +1324,7 @@ export class XeroSyncService {
   /**
    * Post a categorization journal to Xero
    * TASK-XERO-007: Post manual journal for categorization
+   * TASK-REL-101: Wrapped with circuit breaker for resilience
    *
    * @param journalId - Categorization journal ID
    * @param tenantId - Tenant ID for isolation
@@ -1221,7 +1356,15 @@ export class XeroSyncService {
       };
     }
 
-    try {
+    type JournalResult = {
+      journalId: string;
+      xeroJournalId: string | null;
+      posted: boolean;
+      error?: string;
+    };
+
+    // TASK-REL-101: Wrap Xero API call with circuit breaker
+    const postJournalToXero = async (): Promise<JournalResult> => {
       // Get authenticated client
       const { client, xeroTenantId } =
         await this.getAuthenticatedClient(tenantId);
@@ -1287,7 +1430,39 @@ export class XeroSyncService {
         xeroJournalId,
         posted: true,
       };
+    };
+
+    // TASK-REL-101: Fallback queues the journal for later when circuit is open
+    const queueForRetry = async (): Promise<JournalResult> => {
+      this.logger.warn(
+        `Circuit breaker open - queuing journal ${journalId} for retry`,
+      );
+      await this.pendingSyncQueue.queueForSync({
+        tenantId,
+        entityType: PendingSyncEntityType.JOURNAL,
+        entityId: journalId,
+        operation: 'POST_JOURNAL',
+        payload: { journalId, transactionId: journal.transactionId },
+      });
+      return {
+        journalId,
+        xeroJournalId: null,
+        posted: false,
+        error: 'Xero API temporarily unavailable. Queued for retry.',
+      };
+    };
+
+    try {
+      return await this.circuitBreaker.execute(
+        postJournalToXero,
+        queueForRetry,
+      );
     } catch (error) {
+      // Handle circuit breaker open error specifically
+      if (error instanceof CircuitBreakerOpenError) {
+        return await queueForRetry();
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 

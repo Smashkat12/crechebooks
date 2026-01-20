@@ -405,6 +405,7 @@ model Tenant {
   xeroOAuthState        XeroOAuthState?
   invoiceDeliveryLogs   InvoiceDeliveryLog[]
   reminderTemplates     ReminderTemplate[]
+  reminderConfig        ReminderConfig?     // TASK-FEAT-102: Automated arrears config
   creditBalances        CreditBalance[]
   statements            Statement[]
   staffDocuments        StaffDocument[]
@@ -485,6 +486,12 @@ model Tenant {
 
   // TASK-RECON-037: Xero Transaction Splitting
   xeroTransactionSplits XeroTransactionSplit[]
+
+  // TASK-REL-101: Circuit Breaker Pending Sync Queue
+  pendingSyncs PendingSync[]
+
+  // TASK-INT-101: Stitch Open Banking Integration
+  linkedBankAccounts LinkedBankAccount[]
 
   @@map("tenants")
 }
@@ -1361,6 +1368,71 @@ model BankConnection {
   @@map("bank_connections")
 }
 
+// TASK-INT-101: Open Banking Integration via Stitch API
+enum LinkedBankAccountStatus {
+  PENDING     // OAuth flow initiated, waiting for callback
+  ACTIVE      // Account linked and syncing
+  EXPIRED     // Consent expired (90 days)
+  REVOKED     // User revoked access
+  ERROR       // Sync error occurred
+}
+
+// TASK-INT-101: Linked bank accounts for Open Banking (Stitch API)
+// Stores encrypted access/refresh tokens for SA banks (FNB, Standard, Nedbank, ABSA, Capitec)
+model LinkedBankAccount {
+  id                  String                  @id @default(uuid())
+  tenantId            String                  @map("tenant_id")
+  bankName            String                  @map("bank_name") @db.VarChar(100)
+  accountHolderName   String?                 @map("account_holder_name") @db.VarChar(200)
+  accountNumberMasked String                  @map("account_number_masked") @db.VarChar(20) // Last 4 digits only
+  accountType         String                  @map("account_type") @db.VarChar(50) // CURRENT, SAVINGS, etc.
+  stitchAccountId     String                  @unique @map("stitch_account_id") @db.VarChar(100)
+  accessToken         String                  @map("access_token") @db.Text // AES-256 encrypted
+  refreshToken        String                  @map("refresh_token") @db.Text // AES-256 encrypted
+  tokenExpiresAt      DateTime                @map("token_expires_at")
+  consentExpiresAt    DateTime                @map("consent_expires_at") // 90-day regulatory limit
+  consentGrantedAt    DateTime                @map("consent_granted_at")
+  lastSyncedAt        DateTime?               @map("last_synced_at")
+  lastSyncError       String?                 @map("last_sync_error") @db.Text
+  syncErrorCount      Int                     @default(0) @map("sync_error_count")
+  status              LinkedBankAccountStatus @default(PENDING)
+  metadata            Json?                   // Additional bank-specific metadata
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime                @updatedAt @map("updated_at")
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bankSyncHistory LinkedBankSyncEvent[]
+
+  @@index([tenantId, status])
+  @@index([consentExpiresAt])
+  @@index([lastSyncedAt])
+  @@map("linked_bank_accounts")
+}
+
+// TASK-INT-101: Bank sync event audit log
+// Tracks all sync operations for compliance and debugging
+model LinkedBankSyncEvent {
+  id                    String   @id @default(uuid())
+  linkedBankAccountId   String   @map("linked_bank_account_id")
+  syncType              String   @map("sync_type") @db.VarChar(50) // SCHEDULED, MANUAL, REFRESH_TOKEN
+  startedAt             DateTime @default(now()) @map("started_at")
+  completedAt           DateTime? @map("completed_at")
+  transactionsFetched   Int?     @map("transactions_fetched")
+  transactionsImported  Int?     @map("transactions_imported")
+  transactionsDuplicate Int?     @map("transactions_duplicate")
+  status                String   @map("status") @db.VarChar(20) // SUCCESS, FAILED, PARTIAL
+  errorMessage          String?  @map("error_message") @db.Text
+  errorCode             String?  @map("error_code") @db.VarChar(50)
+  durationMs            Int?     @map("duration_ms")
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  linkedBankAccount LinkedBankAccount @relation(fields: [linkedBankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([linkedBankAccountId, startedAt])
+  @@index([status])
+  @@map("linked_bank_sync_events")
+}
+
 // TASK-TRANS-017: Transaction Categorization Accuracy Tracking
 enum MetricEventType {
   CATEGORIZED
@@ -1464,6 +1536,29 @@ model XeroOAuthState {
 
   @@index([tenantId])
   @@map("xero_oauth_states")
+}
+
+// TASK-FEAT-102: Automated Arrears Reminders Configuration
+// Tenant-level settings for automated arrears reminders
+model ReminderConfig {
+  id              String   @id @default(uuid())
+  tenantId        String   @unique @map("tenant_id")
+  enabled         Boolean  @default(true)
+  level1Days      Int      @default(7) @map("level_1_days")
+  level2Days      Int      @default(14) @map("level_2_days")
+  level3Days      Int      @default(30) @map("level_3_days")
+  level4Days      Int      @default(60) @map("level_4_days")
+  ccAdminLevel    Int      @default(3) @map("cc_admin_level") // CC admin on level 3+
+  sendHoursStart  Int      @default(8) @map("send_hours_start") // 8 AM
+  sendHoursEnd    Int      @default(18) @map("send_hours_end") // 6 PM
+  maxPerDay       Int      @default(1) @map("max_per_day") // Max 1 reminder per invoice per day
+  adminEmail      String?  @map("admin_email") @db.VarChar(255) // Optional override for admin notifications
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("reminder_configs")
 }
 
 // TASK-PAY-017: Tenant-Customizable Reminder Templates
@@ -2655,4 +2750,49 @@ model XeroTransactionSplit {
   @@index([xeroTransactionId])
   @@index([bankTransactionId])
   @@map("xero_transaction_splits")
+}
+
+// ============================================
+// TASK-REL-101: Circuit Breaker Pending Sync Queue
+// Database-backed queue for entities that failed to sync to Xero
+// when circuit breaker is open. Persists across restarts.
+// ============================================
+
+enum PendingSyncStatus {
+  PENDING // Queued for sync
+  PROCESSING // Currently being processed
+  COMPLETED // Successfully synced
+  FAILED // Max attempts reached
+  RETRY // Failed but can retry
+}
+
+enum PendingSyncEntityType {
+  INVOICE
+  PAYMENT
+  TRANSACTION
+  CONTACT
+  JOURNAL
+}
+
+model PendingSync {
+  id          String                @id @default(cuid())
+  tenantId    String                @map("tenant_id")
+  entityType  PendingSyncEntityType @map("entity_type")
+  entityId    String                @map("entity_id")
+  operation   String                @db.VarChar(20) // create, update, delete
+  payload     Json? // Serialized entity data for retry
+  status      PendingSyncStatus     @default(PENDING)
+  attempts    Int                   @default(0)
+  maxAttempts Int                   @default(3) @map("max_attempts")
+  lastError   String?               @map("last_error") @db.Text
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  processedAt DateTime?             @map("processed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("pending_syncs")
 }

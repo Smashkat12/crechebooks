@@ -1,0 +1,14 @@
+{
+  "type": "architect",
+  "capabilities": [
+    "system-design",
+    "api-design",
+    "documentation"
+  ],
+  "optimizations": [
+    "context-caching",
+    "memory-persistence"
+  ],
+  "version": "3.0.0",
+  "createdAt": "2026-01-19T21:25:30.139Z"
+}

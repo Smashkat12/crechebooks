@@ -1,12 +1,18 @@
 /**
  * SimplePay Webhook Controller Tests
  * TASK-SPAY-009: SimplePay Webhook Handler
+ * TASK-SEC-102: Unified Webhook Signature Validation
+ *
+ * Note: Signature verification is tested separately in webhook-signature.guard.spec.ts
+ * These tests focus on the controller logic after signature validation passes.
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import { SimplePayWebhookController } from '../../../src/integrations/simplepay/simplepay-webhook.controller';
 import { SimplePayWebhookService } from '../../../src/integrations/simplepay/simplepay-webhook.service';
+import { WebhookSignatureGuard } from '../../../src/webhooks/guards/webhook-signature.guard';
 import type { SimplePayWebhookPayload } from '../../../src/integrations/simplepay/dto/simplepay-webhook.dto';
 
 describe('SimplePayWebhookController', () => {
@@ -16,7 +22,6 @@ describe('SimplePayWebhookController', () => {
   const tenantId = 'tenant-123';
   const clientId = 'client-456';
   const deliveryId = 'delivery-789';
-  const validSignature = 'valid-signature';
 
   const mockWebhookLog = {
     id: 'webhook-log-123',
@@ -40,12 +45,30 @@ describe('SimplePayWebhookController', () => {
       processWebhook: jest.fn(),
     };
 
+    // Mock ConfigService to provide webhook secret
+    const mockConfigService = {
+      get: jest.fn((key: string) => {
+        if (key === 'SIMPLEPAY_WEBHOOK_SECRET') {
+          return 'test-secret';
+        }
+        return undefined;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SimplePayWebhookController],
       providers: [
         { provide: SimplePayWebhookService, useValue: mockWebhookService },
+        { provide: ConfigService, useValue: mockConfigService },
+        { provide: Reflector, useValue: new Reflector() },
+        WebhookSignatureGuard,
       ],
-    }).compile();
+    })
+      // Override the guard to bypass signature verification in these tests
+      // Signature verification is tested in webhook-signature.guard.spec.ts
+      .overrideGuard(WebhookSignatureGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<SimplePayWebhookController>(
       SimplePayWebhookController,
@@ -58,7 +81,7 @@ describe('SimplePayWebhookController', () => {
       rawBody: Buffer.from(JSON.stringify(body)),
     });
 
-    it('should accept webhook with valid signature', async () => {
+    it('should process valid webhook and return acknowledgment', async () => {
       const payload: SimplePayWebhookPayload = {
         event: 'payrun.completed',
         delivery_id: deliveryId,
@@ -67,7 +90,6 @@ describe('SimplePayWebhookController', () => {
         data: {},
       };
 
-      webhookService.verifySignature.mockReturnValue(true);
       webhookService.isAlreadyProcessed.mockResolvedValue(false);
       webhookService.resolveTenantId.mockResolvedValue(tenantId);
       webhookService.logWebhook.mockResolvedValue(mockWebhookLog);
@@ -75,7 +97,6 @@ describe('SimplePayWebhookController', () => {
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
-        validSignature,
         payload,
       );
 
@@ -83,30 +104,7 @@ describe('SimplePayWebhookController', () => {
         received: true,
         webhookLogId: mockWebhookLog.id,
       });
-      expect(webhookService.verifySignature).toHaveBeenCalled();
       expect(webhookService.logWebhook).toHaveBeenCalledWith(payload, tenantId);
-    });
-
-    it('should reject webhook with invalid signature', async () => {
-      const payload: SimplePayWebhookPayload = {
-        event: 'payrun.completed',
-        delivery_id: deliveryId,
-        timestamp: new Date().toISOString(),
-        client_id: clientId,
-        data: {},
-      };
-
-      webhookService.verifySignature.mockReturnValue(false);
-
-      await expect(
-        controller.handleWebhook(
-          createMockRequest(payload) as any,
-          'invalid-signature',
-          payload,
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-
-      expect(webhookService.logWebhook).not.toHaveBeenCalled();
     });
 
     it('should return early for duplicate webhooks', async () => {
@@ -118,12 +116,10 @@ describe('SimplePayWebhookController', () => {
         data: {},
       };
 
-      webhookService.verifySignature.mockReturnValue(true);
       webhookService.isAlreadyProcessed.mockResolvedValue(true);
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
-        validSignature,
         payload,
       );
 
@@ -143,7 +139,6 @@ describe('SimplePayWebhookController', () => {
         data: {},
       };
 
-      webhookService.verifySignature.mockReturnValue(true);
       webhookService.isAlreadyProcessed.mockResolvedValue(false);
       webhookService.resolveTenantId.mockResolvedValue(null);
       webhookService.logWebhook.mockResolvedValue({
@@ -153,7 +148,6 @@ describe('SimplePayWebhookController', () => {
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
-        validSignature,
         payload,
       );
 
@@ -193,14 +187,12 @@ describe('SimplePayWebhookController', () => {
         },
       };
 
-      webhookService.verifySignature.mockReturnValue(true);
       webhookService.isAlreadyProcessed.mockResolvedValue(false);
       webhookService.resolveTenantId.mockResolvedValue(tenantId);
       webhookService.logWebhook.mockResolvedValue(mockWebhookLog);
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
-        validSignature,
         payload,
       );
 
@@ -228,7 +220,6 @@ describe('SimplePayWebhookController', () => {
         },
       };
 
-      webhookService.verifySignature.mockReturnValue(true);
       webhookService.isAlreadyProcessed.mockResolvedValue(false);
       webhookService.resolveTenantId.mockResolvedValue(tenantId);
       webhookService.logWebhook.mockResolvedValue({
@@ -238,7 +229,6 @@ describe('SimplePayWebhookController', () => {
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
-        validSignature,
         payload,
       );
 
@@ -257,7 +247,6 @@ describe('SimplePayWebhookController', () => {
         },
       };
 
-      webhookService.verifySignature.mockReturnValue(true);
       webhookService.isAlreadyProcessed.mockResolvedValue(false);
       webhookService.resolveTenantId.mockResolvedValue(tenantId);
       webhookService.logWebhook.mockResolvedValue({
@@ -267,7 +256,6 @@ describe('SimplePayWebhookController', () => {
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
-        validSignature,
         payload,
       );
 
@@ -288,7 +276,6 @@ describe('SimplePayWebhookController', () => {
         },
       };
 
-      webhookService.verifySignature.mockReturnValue(true);
       webhookService.isAlreadyProcessed.mockResolvedValue(false);
       webhookService.resolveTenantId.mockResolvedValue(tenantId);
       webhookService.logWebhook.mockResolvedValue({
@@ -298,42 +285,10 @@ describe('SimplePayWebhookController', () => {
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
-        validSignature,
         payload,
       );
 
       expect(result.received).toBe(true);
-    });
-
-    it('should use JSON.stringify as fallback when rawBody is missing', async () => {
-      const payload: SimplePayWebhookPayload = {
-        event: 'payrun.completed',
-        delivery_id: deliveryId,
-        timestamp: new Date().toISOString(),
-        client_id: clientId,
-        data: {},
-      };
-
-      const requestWithoutRawBody = {
-        rawBody: undefined,
-      };
-
-      webhookService.verifySignature.mockReturnValue(true);
-      webhookService.isAlreadyProcessed.mockResolvedValue(false);
-      webhookService.resolveTenantId.mockResolvedValue(tenantId);
-      webhookService.logWebhook.mockResolvedValue(mockWebhookLog);
-
-      const result = await controller.handleWebhook(
-        requestWithoutRawBody as any,
-        validSignature,
-        payload,
-      );
-
-      expect(result.received).toBe(true);
-      expect(webhookService.verifySignature).toHaveBeenCalledWith(
-        JSON.stringify(payload),
-        validSignature,
-      );
     });
   });
 });

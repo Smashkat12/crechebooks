@@ -145,25 +145,26 @@ export class InvoiceController {
     const parentMap = new Map<string, ParentSummaryDto>();
     const childMap = new Map<string, ChildSummaryDto>();
 
-    for (const parentId of parentIds) {
-      const parent = await this.parentRepo.findById(parentId, tenantId);
-      if (parent) {
-        parentMap.set(parentId, {
-          id: parent.id,
-          name: `${parent.firstName} ${parent.lastName}`,
-          email: parent.email,
-        });
-      }
+    // TASK-PERF-101: Batch load related entities using findByIds (eliminates N+1 queries)
+    const [parents, children] = await Promise.all([
+      this.parentRepo.findByIds(parentIds, tenantId),
+      this.childRepo.findByIds(childIds, tenantId),
+    ]);
+
+    // Build lookup maps for O(1) access
+    for (const parent of parents) {
+      parentMap.set(parent.id, {
+        id: parent.id,
+        name: `${parent.firstName} ${parent.lastName}`,
+        email: parent.email,
+      });
     }
 
-    for (const childId of childIds) {
-      const child = await this.childRepo.findById(childId, tenantId);
-      if (child) {
-        childMap.set(childId, {
-          id: child.id,
-          name: `${child.firstName} ${child.lastName}`,
-        });
-      }
+    for (const child of children) {
+      childMap.set(child.id, {
+        id: child.id,
+        name: `${child.firstName} ${child.lastName}`,
+      });
     }
 
     // Transform to response DTOs

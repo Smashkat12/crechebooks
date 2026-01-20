@@ -1,0 +1,13 @@
+{
+  "type": "tester",
+  "capabilities": [
+    "unit-testing",
+    "integration-testing",
+    "coverage"
+  ],
+  "optimizations": [
+    "parallel-execution"
+  ],
+  "version": "3.0.0",
+  "createdAt": "2026-01-19T21:25:30.139Z"
+}

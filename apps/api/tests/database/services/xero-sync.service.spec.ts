@@ -15,6 +15,11 @@ import { XeroSyncService } from '../../../src/database/services/xero-sync.servic
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { ConflictDetectionService } from '../../../src/database/services/conflict-detection.service';
 import { ConflictResolutionService } from '../../../src/database/services/conflict-resolution.service';
+import { XeroCircuitBreaker } from '../../../src/integrations/circuit-breaker';
+import { PendingSyncQueueService } from '../../../src/database/services/pending-sync-queue.service';
+import { ConfigService } from '@nestjs/config';
+import { XeroAccountRepository } from '../../../src/database/repositories/xero-account.repository';
+import { CategorizationJournalRepository } from '../../../src/database/repositories/categorization-journal.repository';
 import {
   ImportSource,
   TransactionStatus,
@@ -53,6 +58,7 @@ describe('XeroSyncService', () => {
   let transactionRepo: TransactionRepository;
   let categorizationRepo: CategorizationRepository;
   let prisma: PrismaService;
+  let circuitBreaker: XeroCircuitBreaker;
   let testTenant: Tenant;
   let testUser: User;
 
@@ -95,9 +101,34 @@ describe('XeroSyncService', () => {
         TransactionRepository,
         CategorizationRepository,
         PaymentRepository,
+        XeroAccountRepository,
+        CategorizationJournalRepository,
         AuditLogService,
         ConflictDetectionService,
         ConflictResolutionService,
+        XeroCircuitBreaker,
+        PendingSyncQueueService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest
+              .fn()
+              .mockImplementation((key: string, defaultValue: number) => {
+                switch (key) {
+                  case 'XERO_CIRCUIT_BREAKER_TIMEOUT':
+                    return 5000;
+                  case 'XERO_CIRCUIT_BREAKER_ERROR_THRESHOLD':
+                    return 50;
+                  case 'XERO_CIRCUIT_BREAKER_RESET_TIMEOUT':
+                    return 30000;
+                  case 'XERO_CIRCUIT_BREAKER_VOLUME_THRESHOLD':
+                    return 5;
+                  default:
+                    return defaultValue;
+                }
+              }),
+          },
+        },
         XeroSyncService,
       ],
     }).compile();
@@ -108,12 +139,19 @@ describe('XeroSyncService', () => {
       CategorizationRepository,
     );
     service = module.get<XeroSyncService>(XeroSyncService);
+    circuitBreaker = module.get<XeroCircuitBreaker>(XeroCircuitBreaker);
 
     await prisma.onModuleInit();
   });
 
   afterAll(async () => {
-    await prisma.onModuleDestroy();
+    // Cleanup circuit breaker to prevent resource leaks
+    if (circuitBreaker) {
+      circuitBreaker.onModuleDestroy();
+    }
+    if (prisma) {
+      await prisma.onModuleDestroy();
+    }
   });
 
   beforeEach(async () => {

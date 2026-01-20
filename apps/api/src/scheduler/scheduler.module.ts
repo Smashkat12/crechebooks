@@ -1,15 +1,19 @@
 import { Module, Logger } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { SchedulerService } from './scheduler.service';
 import { SarsDeadlineProcessor } from './processors/sars-deadline.processor';
 import { InvoiceSchedulerProcessor } from './processors/invoice-scheduler.processor';
 import { PaymentReminderProcessor } from './processors/payment-reminder.processor';
 import { StatementSchedulerProcessor } from './processors/statement-scheduler.processor';
+import { XeroSyncRecoveryProcessor } from './processors/xero-sync-recovery.processor';
+import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
 import { ReminderTemplateService } from '../billing/reminder-template.service';
+import { CircuitBreakerModule } from '../integrations/circuit-breaker';
 
 const logger = new Logger('SchedulerModule');
 
@@ -96,9 +100,24 @@ const schedulerProviders = isRedisConfigured()
     ]
   : [];
 
+// TASK-REL-101: XeroSyncRecoveryProcessor uses @nestjs/schedule, not Bull
+// TASK-FEAT-102: ArrearsReminderJob uses @nestjs/schedule for daily reminders
+// Always register them as they use NestJS cron scheduling
+const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
+
 @Module({
-  imports: [SarsSchedulerModule, DatabaseModule, ...bullImports],
-  providers: [...schedulerProviders, ReminderTemplateService],
-  exports: [...(isRedisConfigured() ? [SchedulerService, BullModule] : [])],
+  imports: [
+    SarsSchedulerModule,
+    DatabaseModule,
+    CircuitBreakerModule,
+    ScheduleModule.forRoot(), // TASK-REL-101: Enable cron scheduling
+    ...bullImports,
+  ],
+  providers: [...schedulerProviders, ...cronProviders, ReminderTemplateService],
+  exports: [
+    ...(isRedisConfigured() ? [SchedulerService, BullModule] : []),
+    XeroSyncRecoveryProcessor, // TASK-REL-101: Export for manual triggering
+    ArrearsReminderJob, // TASK-FEAT-102: Export for manual triggering
+  ],
 })
 export class SchedulerModule {}

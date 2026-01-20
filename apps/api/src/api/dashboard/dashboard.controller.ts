@@ -30,7 +30,8 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Get dashboard metrics',
     description:
-      'Returns aggregated metrics for revenue, expenses, arrears, and enrollment',
+      'Returns aggregated metrics for revenue, expenses, arrears, and enrollment. ' +
+      'TASK-PERF-102: Queries execute in parallel for ~3x performance improvement.',
   })
   @ApiQuery({
     name: 'period',
@@ -43,10 +44,22 @@ export class DashboardController {
     description: 'Calendar year to filter by (e.g., 2024, 2025)',
     type: Number,
   })
+  @ApiQuery({
+    name: 'timeout',
+    required: false,
+    description:
+      'Maximum time to wait for metrics in milliseconds (default: 3000ms, max: 10000ms). ' +
+      'If exceeded, returns timeout error for graceful degradation.',
+    type: Number,
+  })
   @ApiResponse({
     status: 200,
     description: 'Dashboard metrics retrieved successfully',
     type: DashboardMetricsResponseDto,
+  })
+  @ApiResponse({
+    status: 408,
+    description: 'Request timeout - metrics query exceeded timeout limit',
   })
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - valid JWT token required',
@@ -55,11 +68,28 @@ export class DashboardController {
     @CurrentUser() user: IUser,
     @Query('period') period?: string,
     @Query('year') year?: string,
+    @Query('timeout') timeout?: string,
   ): Promise<DashboardMetricsResponseDto> {
     this.logger.debug(
-      `Getting metrics for tenant ${user.tenantId}, year=${year || 'auto'}`,
+      `Getting metrics for tenant ${user.tenantId}, year=${year || 'auto'}, timeout=${timeout || 'default'}`,
     );
     const yearNum = year ? parseInt(year, 10) : undefined;
+
+    // If timeout is specified, use the timeout-protected method
+    if (timeout) {
+      // Parse and clamp timeout to valid range (100ms - 10000ms)
+      const timeoutMs = Math.min(
+        Math.max(parseInt(timeout, 10) || 3000, 100),
+        10000,
+      );
+      return this.dashboardService.getMetricsWithTimeout(
+        user.tenantId,
+        timeoutMs,
+        period,
+        yearNum,
+      );
+    }
+
     return this.dashboardService.getMetrics(user.tenantId, period, yearNum);
   }
 

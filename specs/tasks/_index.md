@@ -1180,6 +1180,200 @@ Findings stored in claude-flow memory:
 - `review/frontend/findings` - Frontend integration
 - `review/synthesis` - Consolidated findings
 
+---
+
+## Phase 19: USACF Sprint Tasks (2026-01-18)
+
+Analysis Date: 2026-01-18
+Source: USACF (Universal Search Algorithm for Claude Flow) analysis of codebase.
+
+These tasks address performance, security, reliability, and feature gaps identified through comprehensive USACF analysis. See `docs/usacf-analysis/` for full methodology.
+
+### USACF Analysis Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Gaps Identified | 117 |
+| Opportunities Generated | 52 |
+| Pareto-Optimal Opportunities | 12 |
+| Tasks Created | 12 |
+| Overall Confidence | 87% |
+| Projected ROI | 114% |
+
+### 19.1 Sprint 1: Foundation (Week 1-2)
+
+**Focus**: Critical reliability and security fixes
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 260 | TASK-PERF-101 | N+1 Query Batch Loading Fix | performance | - | P0-CRITICAL | ⭕ Ready |
+| 261 | TASK-SEC-101 | Rate Limiting on Auth Endpoints | security | - | P0-CRITICAL | ⭕ Ready |
+| 262 | TASK-REL-101 | Circuit Breaker Pattern for Xero | reliability | TASK-SEC-101 | P0-CRITICAL | ⭕ Ready |
+
+**Sprint 1 Goals**:
+- Invoice listing < 100ms (from 250ms)
+- Auth endpoints rate limited (5/min)
+- Xero outage graceful degradation working
+- Zero regressions in existing tests
+
+**Budget**: R43,000
+
+### 19.2 Sprint 2: Performance (Week 3-4)
+
+**Focus**: Performance optimization and monitoring
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 263 | TASK-PERF-102 | Parallel Dashboard Queries | performance | TASK-PERF-101 | P1-HIGH | ⭕ Ready |
+| 264 | TASK-PERF-103 | Stream-based Bank Statement Import | performance | - | P1-HIGH | ⭕ Ready |
+| 265 | TASK-PERF-104 | Database Connection Pool Monitoring | infrastructure | - | P1-HIGH | ⭕ Ready |
+
+**Sprint 2 Goals**:
+- Dashboard load < 500ms (from 1.5s)
+- Bank import handles 50MB files
+- Connection pool metrics visible
+- No memory spikes during batch ops
+
+**Budget**: R55,000
+
+### 19.3 Sprint 3: Security Hardening (Week 5-6)
+
+**Focus**: Security improvements and code quality
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 266 | TASK-SEC-102 | Webhook Signature Validation | security | - | P1-HIGH | ⭕ Ready |
+| 267 | TASK-SEC-103 | Content Security Policy Headers | security | - | P2-MEDIUM | ⭕ Ready |
+| 268 | TASK-SEC-104 | Error Handling Standardization | quality | - | P1-HIGH | ⭕ Ready |
+
+**Sprint 3 Goals**:
+- All webhooks signature validated
+- CSP headers on all responses
+- No sensitive data in error messages
+- Consistent error response format
+
+**Budget**: R42,000
+
+### 19.4 Sprint 4: Feature Enhancement (Week 7-8)
+
+**Focus**: High-value feature additions
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 269 | TASK-FEAT-101 | Real-time Dashboard (WebSocket) | feature | TASK-PERF-102 | P1-HIGH | ⭕ Ready |
+| 270 | TASK-FEAT-102 | Automated Arrears Reminders | feature | TASK-REL-101 | P1-HIGH | ⭕ Ready |
+
+**Sprint 4 Goals**:
+- Dashboard updates in real-time
+- Automated arrears emails sent
+- No performance regression
+- User acceptance testing passed
+
+**Budget**: R70,000
+
+### 19.5 Q2: Major Initiative
+
+**Focus**: Strategic capability addition
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 271 | TASK-INT-101 | Bank API Integration (Open Banking) | integration | TASK-FEAT-101 | P1-HIGH | ⭕ Ready |
+
+**Q2 Goals**:
+- Automated bank transaction retrieval
+- Support for major SA banks (FNB, Standard Bank, Nedbank, ABSA, Capitec)
+- 80% reduction in manual imports
+- POPIA compliant data handling
+
+**Budget**: R40,000
+
+---
+
+## Phase 19 Progress Summary
+
+| Sprint | Tasks | Complete | Pending | Percentage |
+|--------|-------|----------|---------|------------|
+| Sprint 1 (Foundation) | 3 | 0 | 3 | 0% |
+| Sprint 2 (Performance) | 3 | 0 | 3 | 0% |
+| Sprint 3 (Security) | 3 | 0 | 3 | 0% |
+| Sprint 4 (Features) | 2 | 0 | 2 | 0% |
+| Q2 (Bank API) | 1 | 0 | 1 | 0% |
+| **Total Phase 19** | **12** | **0** | **12** | **0%** |
+
+### USACF Task Dependencies
+
+```mermaid
+graph TB
+    subgraph "Sprint 1"
+        PERF101[TASK-PERF-101<br/>N+1 Queries]
+        SEC101[TASK-SEC-101<br/>Rate Limiting]
+        REL101[TASK-REL-101<br/>Circuit Breaker]
+    end
+
+    subgraph "Sprint 2"
+        PERF102[TASK-PERF-102<br/>Parallel Queries]
+        PERF103[TASK-PERF-103<br/>Stream Import]
+        PERF104[TASK-PERF-104<br/>Pool Monitoring]
+    end
+
+    subgraph "Sprint 3"
+        SEC102[TASK-SEC-102<br/>Webhook Validation]
+        SEC103[TASK-SEC-103<br/>CSP Headers]
+        SEC104[TASK-SEC-104<br/>Error Handling]
+    end
+
+    subgraph "Sprint 4"
+        FEAT101[TASK-FEAT-101<br/>Real-time Dashboard]
+        FEAT102[TASK-FEAT-102<br/>Arrears Reminders]
+    end
+
+    subgraph "Q2"
+        INT101[TASK-INT-101<br/>Bank API]
+    end
+
+    PERF101 --> PERF102
+    SEC101 --> REL101
+    PERF102 --> FEAT101
+    REL101 --> FEAT102
+    FEAT101 --> INT101
+```
+
+### USACF Performance Targets
+
+| Metric | Baseline | Target | Task |
+|--------|----------|--------|------|
+| Invoice List Response | 250ms | < 100ms | TASK-PERF-101 |
+| Dashboard Load | 1.5s | < 500ms | TASK-PERF-102 |
+| Bank Import Memory | 150MB | < 100MB | TASK-PERF-103 |
+
+### USACF Security Targets
+
+| Metric | Baseline | Target | Task |
+|--------|----------|--------|------|
+| Auth Attack Block | 0% | 100% | TASK-SEC-101 |
+| Webhook Spoofing | Vulnerable | Blocked | TASK-SEC-102 |
+| XSS Prevention | None | Full CSP | TASK-SEC-103 |
+
+### USACF Reliability Targets
+
+| Metric | Baseline | Target | Task |
+|--------|----------|--------|------|
+| Xero Outage Impact | 100% failure | 0% | TASK-REL-101 |
+| Pool Exhaustion Detection | None | < 30s | TASK-PERF-104 |
+
+### Related USACF Documentation
+
+- [USACF Analysis README](../../docs/usacf-analysis/README.md)
+- [Meta Analysis](../../docs/usacf-analysis/00-meta-analysis.md)
+- [Discovery](../../docs/usacf-analysis/01-discovery.md)
+- [Gap Analysis](../../docs/usacf-analysis/02-gap-analysis.md)
+- [Risk Analysis](../../docs/usacf-analysis/03-risk-analysis.md)
+- [Synthesis](../../docs/usacf-analysis/04-synthesis.md)
+- [Implementation Plan](../../docs/usacf-analysis/05-implementation.md)
+- [Observability](../../docs/usacf-analysis/06-observability.md)
+
+---
+
 ### Phase 16 Execution Order
 
 **Sprint 1: Critical Security (Tasks 184-191, 195-196, 201-202, 208-209, 223)**

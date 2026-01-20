@@ -30,17 +30,18 @@ export interface ReminderSchedule {
 
 /**
  * Default reminder schedule based on days overdue
+ * TASK-FEAT-102: Updated to use 60 days for escalation (level 4)
  *
- * - 7 days: Email only (gentle reminder)
- * - 14 days: Email + WhatsApp (second notice)
- * - 30 days: Email + WhatsApp (final warning)
- * - 45 days: Email only (escalation for manual review)
+ * - 7 days: Email only (gentle reminder) - Level 1
+ * - 14 days: Email + WhatsApp (second notice) - Level 2
+ * - 30 days: Email + WhatsApp (final warning, CC admin) - Level 3
+ * - 60 days: Email only (escalation for manual review) - Level 4
  */
 export const DEFAULT_REMINDER_SCHEDULE: ReminderSchedule[] = [
   { stage: 'FIRST', daysOverdue: 7, channels: ['email'] },
   { stage: 'SECOND', daysOverdue: 14, channels: ['email', 'whatsapp'] },
   { stage: 'FINAL', daysOverdue: 30, channels: ['email', 'whatsapp'] },
-  { stage: 'ESCALATED', daysOverdue: 45, channels: ['email'] },
+  { stage: 'ESCALATED', daysOverdue: 60, channels: ['email'] }, // TASK-FEAT-102: 60 days
 ];
 
 /**
@@ -120,6 +121,7 @@ export interface PaymentReminderResult {
 
 /**
  * Get the reminder stage for a given number of days overdue
+ * TASK-FEAT-102: Updated to use 60 days for escalation
  *
  * @param daysOverdue - Number of days past due date
  * @returns Reminder stage or null if not overdue
@@ -127,7 +129,7 @@ export interface PaymentReminderResult {
 export function getStageForDaysOverdue(
   daysOverdue: number,
 ): ReminderStage | null {
-  if (daysOverdue >= 45) return 'ESCALATED';
+  if (daysOverdue >= 60) return 'ESCALATED'; // TASK-FEAT-102: 60 days
   if (daysOverdue >= 30) return 'FINAL';
   if (daysOverdue >= 14) return 'SECOND';
   if (daysOverdue >= 7) return 'FIRST';

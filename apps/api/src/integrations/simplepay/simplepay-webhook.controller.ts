@@ -1,11 +1,12 @@
 /**
  * SimplePay Webhook Controller
  * TASK-SPAY-009: SimplePay Webhook Handler
+ * TASK-SEC-102: Unified Webhook Signature Validation
  *
  * @description REST endpoint for handling SimplePay webhooks.
- * Verifies signatures before processing events.
+ * Uses the unified WebhookSignatureGuard for signature verification.
  *
- * CRITICAL: Verify webhook signatures before processing.
+ * CRITICAL: Signature verification is handled by WebhookSignatureGuard.
  * CRITICAL: Return 200 quickly to prevent webhook retries.
  * CRITICAL: Check for duplicates to ensure idempotent processing.
  */
@@ -14,17 +15,18 @@ import {
   Controller,
   Post,
   Body,
-  Headers,
   Req,
   HttpCode,
   HttpStatus,
   Logger,
-  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { Public } from '../../api/auth/decorators/public.decorator';
+import { WebhookSignatureGuard } from '../../webhooks/guards/webhook-signature.guard';
+import { WebhookSignature } from '../../common/decorators/webhook-signature.decorator';
 import { SimplePayWebhookService } from './simplepay-webhook.service';
 import type {
   SimplePayWebhookPayload,
@@ -33,11 +35,12 @@ import type {
 
 /**
  * SimplePay Webhook Controller
- * Public endpoint (no auth required, signature verified)
+ * Public endpoint (no auth required, signature verified by guard)
  */
 @Controller('webhooks/simplepay')
 @ApiTags('Webhooks')
 @Public()
+@UseGuards(WebhookSignatureGuard)
 export class SimplePayWebhookController {
   private readonly logger = new Logger(SimplePayWebhookController.name);
 
@@ -53,20 +56,20 @@ export class SimplePayWebhookController {
    * - employee.terminated: Employee has been terminated
    *
    * Processing flow:
-   * 1. Verify signature (HMAC-SHA256)
+   * 1. Verify signature (handled by WebhookSignatureGuard)
    * 2. Check idempotency (delivery_id)
    * 3. Log webhook to database
    * 4. Resolve tenant from client_id
    * 5. Return 200 immediately (async processing)
    * 6. Process event-specific logic asynchronously
    *
-   * @param req - Raw request for signature verification
+   * @param req - Raw request (rawBody available for logging if needed)
    * @param payload - Parsed webhook payload
-   * @param signature - x-simplepay-signature header (HMAC-SHA256)
    * @returns Acknowledgment response
    */
   @Post()
   @HttpCode(HttpStatus.OK)
+  @WebhookSignature('simplepay')
   @ApiOperation({
     summary: 'Handle SimplePay webhook events',
     description:
@@ -76,7 +79,7 @@ export class SimplePayWebhookController {
   })
   @ApiHeader({
     name: 'x-simplepay-signature',
-    description: 'HMAC-SHA256 signature of the request body',
+    description: 'HMAC-SHA256 signature of the request body (hex encoded)',
     required: true,
   })
   @ApiResponse({
@@ -99,25 +102,16 @@ export class SimplePayWebhookController {
   })
   async handleWebhook(
     @Req() req: RawBodyRequest<Request>,
-    @Headers('x-simplepay-signature') signature: string,
     @Body() payload: SimplePayWebhookPayload,
   ): Promise<WebhookProcessingResult> {
     this.logger.debug(
       `Received SimplePay webhook: ${payload.event} (delivery_id: ${payload.delivery_id})`,
     );
 
-    // Get raw body for signature verification
-    const rawBody = req.rawBody?.toString() || JSON.stringify(payload);
+    // Note: Signature verification is now handled by WebhookSignatureGuard
+    // If we reach this point, the signature has already been validated
 
-    // 1. Verify signature FIRST
-    if (!this.webhookService.verifySignature(rawBody, signature)) {
-      this.logger.warn(
-        `Invalid SimplePay webhook signature for delivery_id: ${payload.delivery_id}`,
-      );
-      throw new UnauthorizedException('Invalid webhook signature');
-    }
-
-    // 2. Check idempotency
+    // 1. Check idempotency
     if (await this.webhookService.isAlreadyProcessed(payload.delivery_id)) {
       this.logger.debug(
         `Duplicate SimplePay webhook: delivery_id=${payload.delivery_id}`,
@@ -128,18 +122,18 @@ export class SimplePayWebhookController {
       };
     }
 
-    // 3. Resolve tenant from SimplePay client_id
+    // 2. Resolve tenant from SimplePay client_id
     const tenantId = await this.webhookService.resolveTenantId(
       payload.client_id,
     );
 
-    // 4. Log webhook (this acts as our idempotency record)
+    // 3. Log webhook (this acts as our idempotency record)
     const webhookLog = await this.webhookService.logWebhook(
       payload,
       tenantId ?? undefined,
     );
 
-    // 5. Return 200 immediately (don't block the webhook response)
+    // 4. Return 200 immediately (don't block the webhook response)
     // Process asynchronously to prevent SimplePay retries
     setImmediate(async () => {
       try {

@@ -117,6 +117,39 @@ export class ParentRepository {
   }
 
   /**
+   * TASK-PERF-101: Batch load parents by IDs to eliminate N+1 queries
+   * @param ids - Array of parent IDs
+   * @param tenantId - Tenant ID for isolation
+   * @returns Array of parents
+   * @throws DatabaseException for database errors
+   */
+  async findByIds(ids: string[], tenantId: string): Promise<Parent[]> {
+    if (ids.length === 0) return [];
+    try {
+      return await this.prisma.parent.findMany({
+        where: {
+          id: { in: ids },
+          tenantId,
+          deletedAt: null,
+        },
+        include: {
+          children: true,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to find parents by ids: ${ids.join(', ')} for tenant: ${tenantId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'findByIds',
+        'Failed to find parents by IDs',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Find all parents for a tenant with optional filters and pagination
    * TASK-DATA-004: Added pagination support for memory efficiency
    * TASK-DATA-003: Added includeDeleted option for soft delete support

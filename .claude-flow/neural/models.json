@@ -1,0 +1,19 @@
+{
+  "models": {
+    "model-1768743714502-7cqw": {
+      "id": "model-1768743714502-7cqw",
+      "name": "moe-model",
+      "type": "moe",
+      "status": "ready",
+      "accuracy": 0.9180031243759277,
+      "epochs": 100,
+      "config": {
+        "learningRate": 0.01,
+        "batchSize": 32
+      },
+      "trainedAt": "2026-01-18T13:41:54.603Z"
+    }
+  },
+  "patterns": {},
+  "version": "3.0.0"
+}

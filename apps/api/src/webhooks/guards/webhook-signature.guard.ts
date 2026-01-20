@@ -24,7 +24,12 @@ import type { Request } from 'express';
 
 export const WEBHOOK_PROVIDER_KEY = 'webhookProvider';
 
-export type WebhookProvider = 'sendgrid' | 'whatsapp' | 'stripe' | 'xero';
+export type WebhookProvider =
+  | 'sendgrid'
+  | 'whatsapp'
+  | 'stripe'
+  | 'xero'
+  | 'simplepay';
 
 interface WebhookProviderConfig {
   secretEnvVar: string;
@@ -66,6 +71,11 @@ export class WebhookSignatureGuard implements CanActivate {
       secretEnvVar: 'XERO_WEBHOOK_SECRET',
       signatureHeader: 'x-xero-signature',
       verifyFn: this.verifyXeroSignature.bind(this),
+    },
+    simplepay: {
+      secretEnvVar: 'SIMPLEPAY_WEBHOOK_SECRET',
+      signatureHeader: 'x-simplepay-signature',
+      verifyFn: this.verifySimplePaySignature.bind(this),
     },
   };
 
@@ -245,6 +255,28 @@ export class WebhookSignatureGuard implements CanActivate {
       return this.constantTimeCompare(signature, expectedSignature);
     } catch (error) {
       this.logger.error('Error verifying Xero signature', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verify SimplePay webhook signature (HMAC SHA256 hex)
+   * @see SimplePay uses HMAC-SHA256 with hex encoding (NOT base64 like Xero)
+   */
+  private verifySimplePaySignature(
+    payload: string,
+    signature: string,
+    secret: string,
+  ): boolean {
+    try {
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(payload)
+        .digest('hex');
+
+      return this.constantTimeCompare(signature, expectedSignature);
+    } catch (error) {
+      this.logger.error('Error verifying SimplePay signature', error);
       return false;
     }
   }

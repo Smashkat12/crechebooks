@@ -1,0 +1,14 @@
+{
+  "type": "coder",
+  "capabilities": [
+    "code-generation",
+    "refactoring",
+    "debugging"
+  ],
+  "optimizations": [
+    "flash-attention",
+    "token-reduction"
+  ],
+  "version": "3.0.0",
+  "createdAt": "2026-01-19T21:25:30.138Z"
+}

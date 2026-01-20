@@ -3,10 +3,11 @@
  * TASK-INFRA-001: Add Database Health Check
  * TASK-INFRA-002: Add Redis Health Check
  * TASK-INFRA-007: Integrate with Shutdown Service for graceful shutdown
+ * TASK-PERF-104: Add Database Pool Health Check
  *
  * Provides health check endpoints for monitoring using @nestjs/terminus:
  * - GET /health - Basic liveness check (fast, no external checks)
- * - GET /health/ready - Readiness check with database and Redis connectivity
+ * - GET /health/ready - Readiness check with database, Redis, and pool connectivity
  *
  * The /health/ready endpoint returns:
  * - HTTP 200 when all components are healthy
@@ -38,6 +39,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../api/auth/decorators/public.decorator';
 import { DatabaseHealthIndicator } from './indicators/database.health';
 import { RedisHealthIndicator } from './indicators/redis.health';
+import { PoolHealthIndicator } from '../database/monitoring/pool-health.indicator';
 import { ShutdownService } from '../common/shutdown';
 
 interface LivenessResponse {
@@ -58,6 +60,7 @@ export class HealthController {
     private readonly health: HealthCheckService,
     private readonly databaseHealth: DatabaseHealthIndicator,
     private readonly redisHealth: RedisHealthIndicator,
+    private readonly poolHealth: PoolHealthIndicator,
     @Optional() private readonly shutdownService?: ShutdownService,
   ) {}
 
@@ -95,7 +98,7 @@ export class HealthController {
   }
 
   /**
-   * Readiness check - verifies database and Redis connectivity.
+   * Readiness check - verifies database, Redis, and pool connectivity.
    * Use this for Kubernetes readiness probes and load balancer health checks.
    * GET /health/ready
    *
@@ -113,6 +116,8 @@ export class HealthController {
       () => this.databaseHealth.isHealthy('database', { timeout: 3000 }),
       // Redis health check with 3 second timeout
       () => this.redisHealth.isHealthy('redis', { timeout: 3000 }),
+      // TASK-PERF-104: Database pool health check
+      () => this.poolHealth.isHealthy('database_pool'),
     ]);
   }
 }

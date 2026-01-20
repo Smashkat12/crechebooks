@@ -1,0 +1,41 @@
+{
+  "tasks": {
+    "task-1768650435214-hm524e": {
+      "taskId": "task-1768650435214-hm524e",
+      "type": "feature",
+      "description": "TDD workflow for SimplePay integration refinement",
+      "priority": "high",
+      "status": "in_progress",
+      "progress": 15,
+      "assignedTo": [],
+      "tags": [
+        "tdd",
+        "simplepay",
+        "integration",
+        "testing"
+      ],
+      "createdAt": "2026-01-17T11:47:15.214Z",
+      "startedAt": "2026-01-17T11:47:32.693Z",
+      "completedAt": null
+    },
+    "task-1768757786041-2h0qm0": {
+      "taskId": "task-1768757786041-2h0qm0",
+      "type": "feature",
+      "description": "Create USACF Sprint 1-4 and Q2 task files following existing template conventions",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "usacf",
+        "tasks",
+        "sprints",
+        "documentation"
+      ],
+      "createdAt": "2026-01-18T17:36:26.041Z",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "version": "3.0.0"
+}

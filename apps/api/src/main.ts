@@ -5,6 +5,7 @@
  * TASK-INFRA-005: Added structured JSON logging with Pino
  * TASK-INFRA-007: Added shutdown hooks for graceful Bull queue shutdown
  * TASK-INFRA-008: Added request payload size limits
+ * TASK-SEC-103: Enhanced CSP with environment configuration and report-only mode
  */
 
 import { NestFactory } from '@nestjs/core';
@@ -19,6 +20,8 @@ import { Configuration } from './config';
 import { createCorsConfig } from './config/cors.config';
 import { StructuredLoggerService } from './common/logger';
 import { PayloadTooLargeFilter } from './common/filters/payload-too-large.filter';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { CspConfigService } from './common/security';
 
 async function bootstrap(): Promise<void> {
   // TASK-INFRA-008: Disable default body parser to use custom config with size limits
@@ -56,6 +59,7 @@ async function bootstrap(): Promise<void> {
     'x-signature',
     'x-whatsapp-signature',
     'x-xero-signature',
+    'x-simplepay-signature',
   ];
 
   // JSON body parser with limit and raw body preservation for webhook signature verification
@@ -91,26 +95,26 @@ async function bootstrap(): Promise<void> {
     `Body parser limits configured: JSON=${jsonLimit}, URL-encoded=${urlencodedLimit}`,
   );
 
-  // TASK-INFRA-008: Global exception filter for payload too large errors
-  app.useGlobalFilters(new PayloadTooLargeFilter(logger));
+  // TASK-SEC-104: Global exception filter for standardized error responses
+  // Order matters: GlobalExceptionFilter first, then PayloadTooLargeFilter
+  // PayloadTooLargeFilter handles specific payload errors before they reach GlobalExceptionFilter
+  app.useGlobalFilters(
+    new GlobalExceptionFilter(configService as unknown as ConfigService<Record<string, unknown>>),
+    new PayloadTooLargeFilter(logger),
+  );
 
-  // TASK-INFRA-004: Security headers with helmet
+  // TASK-SEC-103: Get CSP configuration service for environment-based CSP
+  const cspConfigService = app.get(CspConfigService);
+  const cspConfig = cspConfigService.getHelmetConfig();
+
+  // TASK-INFRA-004 & TASK-SEC-103: Security headers with helmet
   // Applied first in middleware chain for maximum protection
+  // CSP is now configurable via environment variables with report-only mode support
   app.use(
     helmet({
-      // Content Security Policy - restrictive for API
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for Swagger UI
-          imgSrc: ["'self'", 'data:', 'https:'],
-          scriptSrc: ["'self'", "'unsafe-inline'"], // Allow inline scripts for Swagger UI
-          objectSrc: ["'none'"],
-          frameAncestors: ["'none'"], // Prevent framing
-          formAction: ["'self'"],
-          upgradeInsecureRequests: isProduction ? [] : null,
-        },
-      },
+      // TASK-SEC-103: Content Security Policy - configurable via environment
+      // Supports report-only mode for safe deployment
+      contentSecurityPolicy: cspConfigService.isEnabled() ? cspConfig : false,
       // Cross-Origin policies
       crossOriginEmbedderPolicy: false, // Disabled to allow Swagger UI resources
       crossOriginOpenerPolicy: { policy: 'same-origin' },
@@ -144,8 +148,14 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  // TASK-SEC-103: Log CSP configuration
+  const cspMode = cspConfigService.isEnabled()
+    ? cspConfigService.isReportOnly()
+      ? 'report-only'
+      : 'enforcing'
+    : 'disabled';
   logger.log(
-    `Helmet security headers enabled (production mode: ${isProduction})`,
+    `Helmet security headers enabled (production: ${isProduction}, CSP: ${cspMode})`,
   );
 
   // TASK-UI-001: Enable cookie parser for HttpOnly cookie authentication

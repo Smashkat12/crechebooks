@@ -380,6 +380,229 @@ Based on South African VAT Act No. 89 of 1991, Section 12(h).
 
 ---
 
-**Last Updated**: 2026-01-17
+## USACF Task Coverage Matrix
+
+> Tasks derived from Universal Search Algorithm for Claude Flow (USACF) codebase analysis.
+> See [USACF Analysis](../../docs/usacf-analysis/) for full methodology.
+
+### Analysis Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Gaps Identified | 117 |
+| Opportunities Generated | 52 |
+| Pareto-Optimal Opportunities | 12 |
+| Tasks Created | 12 |
+| Overall Confidence | 87% |
+| Projected ROI | 114% |
+
+---
+
+### Gap-to-Task Mapping
+
+| Gap ID | Description | Task ID | Priority | Sprint |
+|--------|-------------|---------|----------|--------|
+| P001 | N+1 query on invoice listing | TASK-PERF-101 | P0-CRITICAL | 1 |
+| S001 | No rate limiting on auth endpoints | TASK-SEC-101 | P0-CRITICAL | 1 |
+| R001 | No circuit breaker for Xero | TASK-REL-101 | P0-CRITICAL | 1 |
+| P002 | Sequential dashboard queries | TASK-PERF-102 | P1-HIGH | 2 |
+| P003 | Memory spike on bank CSV import | TASK-PERF-103 | P1-HIGH | 2 |
+| P004 | No connection pool monitoring | TASK-PERF-104 | P1-HIGH | 2 |
+| S002 | Webhook signature not validated | TASK-SEC-102 | P1-HIGH | 3 |
+| S003 | Missing CSP security headers | TASK-SEC-103 | P2-MEDIUM | 3 |
+| S004 | Inconsistent error handling | TASK-SEC-104 | P1-HIGH | 3 |
+| C003 | No real-time dashboard updates | TASK-FEAT-101 | P1-HIGH | 4 |
+| C005 | No automated arrears reminders | TASK-FEAT-102 | P1-HIGH | 4 |
+| C002 | No automated bank statement import | TASK-INT-101 | P1-HIGH | Q2 |
+
+---
+
+### Performance Optimization Coverage
+
+| Current State | Target | Task ID | Improvement |
+|---------------|--------|---------|-------------|
+| Invoice list: 250ms | < 100ms | TASK-PERF-101 | 2.5x faster |
+| Dashboard load: 1.5s | < 500ms | TASK-PERF-102 | 3x faster |
+| Bank import memory: 150MB | < 100MB | TASK-PERF-103 | 33% reduction |
+| Pool monitoring: None | < 30s detection | TASK-PERF-104 | Full observability |
+
+**Implementation Details:**
+
+| Task | Key Components | Files Created |
+|------|---------------|---------------|
+| TASK-PERF-101 | DataLoader pattern, batch loading | `invoice-loader.ts`, `dataloader.service.ts` |
+| TASK-PERF-102 | Promise.all parallel queries | `dashboard.service.ts` refactor |
+| TASK-PERF-103 | Stream-based CSV parsing | `stream-csv-parser.ts`, `bank-import.service.ts` refactor |
+| TASK-PERF-104 | Prometheus metrics, health checks | `pool-monitor.service.ts`, `metrics.controller.ts` |
+
+---
+
+### Security Hardening Coverage
+
+| Vulnerability | Mitigation | Task ID | CVSS |
+|--------------|------------|---------|------|
+| Credential stuffing on auth | Redis-based rate limiting (5/min) | TASK-SEC-101 | 7.5 |
+| Webhook spoofing | HMAC-SHA256 signature validation | TASK-SEC-102 | 6.8 |
+| XSS/clickjacking | CSP headers, X-Frame-Options | TASK-SEC-103 | 5.4 |
+| PII in error logs | Standardized safe error responses | TASK-SEC-104 | 4.3 |
+
+**Implementation Details:**
+
+| Task | Security Controls | Files Created |
+|------|------------------|---------------|
+| TASK-SEC-101 | rate-limiter-flexible, Redis backend | `rate-limit.guard.ts`, `rate-limit.module.ts` |
+| TASK-SEC-102 | timingSafeEqual, replay attack prevention | `webhook-signature.guard.ts`, `signature.service.ts` |
+| TASK-SEC-103 | helmet CSP, frame-ancestors | `security-headers.middleware.ts` |
+| TASK-SEC-104 | ErrorSanitizer, PII detector | `error-sanitizer.filter.ts`, `safe-error.types.ts` |
+
+---
+
+### Reliability Coverage
+
+| Failure Mode | Recovery Strategy | Task ID | FMEA RPN |
+|--------------|------------------|---------|----------|
+| Xero API outage | Circuit breaker + pending queue | TASK-REL-101 | 432 |
+
+**Implementation Details:**
+
+| Task | Key Components | Files Created |
+|------|---------------|---------------|
+| TASK-REL-101 | opossum circuit breaker, BullMQ queue | `xero-circuit-breaker.ts`, `pending-sync-queue.service.ts`, `xero-sync-recovery.job.ts` |
+
+**Circuit Breaker Configuration:**
+
+| Parameter | Value |
+|-----------|-------|
+| Timeout | 5 seconds |
+| Failure threshold | 50% |
+| Reset timeout | 30 seconds |
+| Volume threshold | 5 requests |
+
+---
+
+### Feature Coverage
+
+| Current State | Target State | Task ID | Business Value |
+|---------------|--------------|---------|----------------|
+| Manual dashboard refresh | Real-time WebSocket updates | TASK-FEAT-101 | Instant visibility |
+| Manual arrears follow-up | Automated 4-level reminders | TASK-FEAT-102 | 15% collection improvement |
+
+**Implementation Details:**
+
+| Task | Key Components | Files Created |
+|------|---------------|---------------|
+| TASK-FEAT-101 | Socket.IO, JWT auth, room-based isolation | `dashboard.gateway.ts`, `useDashboardSocket.ts` |
+| TASK-FEAT-102 | Cron job, 4-level escalation emails | `arrears-reminder.job.ts`, `reminder-history.entity.ts` |
+
+**TASK-FEAT-101 Events:**
+
+| Event | Trigger | Latency Target |
+|-------|---------|----------------|
+| payment_received | Payment allocation | < 500ms |
+| invoice_status_changed | Status transition | < 500ms |
+| arrears_alert | Threshold crossed | < 500ms |
+
+**TASK-FEAT-102 Escalation Schedule:**
+
+| Level | Days Overdue | Tone |
+|-------|--------------|------|
+| 1 | 7 | Friendly |
+| 2 | 14 | Firm |
+| 3 | 30 | Serious |
+| 4 | 60 | Final |
+
+---
+
+### Integration Coverage
+
+| Current State | Target State | Task ID | Banks Supported |
+|---------------|--------------|---------|-----------------|
+| Manual CSV/PDF upload | Automated Open Banking API | TASK-INT-101 | FNB, Standard Bank, Nedbank, ABSA, Capitec |
+
+**Implementation Details:**
+
+| Task | Key Components | Files Created |
+|------|---------------|---------------|
+| TASK-INT-101 | Stitch API, OAuth flow, AES-256 tokens | `stitch.service.ts`, `linked-bank-account.entity.ts`, `bank-sync.job.ts` |
+
+**Compliance Requirements:**
+
+| Regulation | Requirement | Implementation |
+|------------|-------------|----------------|
+| POPIA | Explicit consent | Consent tracking entity |
+| POPIA | Purpose limitation | Reconciliation scope only |
+| SARS | 7-year retention | Audit trail, archival |
+| Bank | 90-day consent | Auto-renewal reminder |
+
+---
+
+### Sprint Coverage Summary
+
+| Sprint | Tasks | Priority | Budget |
+|--------|-------|----------|--------|
+| Sprint 1 (Week 1-2) | TASK-PERF-101, TASK-SEC-101, TASK-REL-101 | P0-CRITICAL | R43,000 |
+| Sprint 2 (Week 3-4) | TASK-PERF-102, TASK-PERF-103, TASK-PERF-104 | P1-HIGH | R55,000 |
+| Sprint 3 (Week 5-6) | TASK-SEC-102, TASK-SEC-103, TASK-SEC-104 | P1-P2 | R42,000 |
+| Sprint 4 (Week 7-8) | TASK-FEAT-101, TASK-FEAT-102 | P1-HIGH | R70,000 |
+| Q2 | TASK-INT-101 | P1-HIGH | R40,000 |
+| **Total** | **12 Tasks** | — | **R250,000** |
+
+---
+
+### Task Dependency Graph (USACF)
+
+```mermaid
+graph TB
+    subgraph "Sprint 1 - Foundation"
+        PERF101[TASK-PERF-101<br/>N+1 Query Fix]
+        SEC101[TASK-SEC-101<br/>Rate Limiting]
+        REL101[TASK-REL-101<br/>Circuit Breaker]
+    end
+
+    subgraph "Sprint 2 - Performance"
+        PERF102[TASK-PERF-102<br/>Parallel Queries]
+        PERF103[TASK-PERF-103<br/>Stream Import]
+        PERF104[TASK-PERF-104<br/>Pool Monitoring]
+    end
+
+    subgraph "Sprint 3 - Security"
+        SEC102[TASK-SEC-102<br/>Webhook Validation]
+        SEC103[TASK-SEC-103<br/>CSP Headers]
+        SEC104[TASK-SEC-104<br/>Error Handling]
+    end
+
+    subgraph "Sprint 4 - Features"
+        FEAT101[TASK-FEAT-101<br/>Real-time Dashboard]
+        FEAT102[TASK-FEAT-102<br/>Arrears Reminders]
+    end
+
+    subgraph "Q2 - Integration"
+        INT101[TASK-INT-101<br/>Bank API]
+    end
+
+    PERF101 --> PERF102
+    SEC101 --> REL101
+    PERF102 --> FEAT101
+    REL101 --> FEAT102
+    FEAT101 --> INT101
+```
+
+---
+
+### Cross-Reference: USACF Analysis Documents
+
+| Document | Purpose | Path |
+|----------|---------|------|
+| Meta Analysis | Methodology overview | `docs/usacf-analysis/00-meta-analysis.md` |
+| Discovery | Codebase exploration | `docs/usacf-analysis/01-discovery.md` |
+| Gap Analysis | 117 gaps identified | `docs/usacf-analysis/02-gap-analysis.md` |
+| Risk Analysis | FMEA risk scoring | `docs/usacf-analysis/03-risk-analysis.md` |
+| Synthesis | 52 opportunities | `docs/usacf-analysis/04-synthesis.md` |
+| Implementation | Sprint planning | `docs/usacf-analysis/05-implementation.md` |
+| Observability | Monitoring design | `docs/usacf-analysis/06-observability.md` |
+
+---
+
+**Last Updated**: 2026-01-19
 **Author**: Claude Code
-**Review Status**: Phase 17 Code Review Completed
+**Review Status**: Phase 19 (USACF Sprint Tasks) Added

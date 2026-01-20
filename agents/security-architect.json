@@ -1,0 +1,13 @@
+{
+  "type": "security-architect",
+  "capabilities": [
+    "threat-modeling",
+    "vulnerability-analysis",
+    "security-review"
+  ],
+  "optimizations": [
+    "pattern-matching"
+  ],
+  "version": "3.0.0",
+  "createdAt": "2026-01-19T21:25:30.139Z"
+}

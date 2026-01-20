@@ -1,6 +1,7 @@
 export * from './rate-limit.decorator';
 export * from './throttle.decorator';
 export * from './idempotent.decorator';
+export * from './webhook-signature.decorator';
 
 // Re-export sanitization decorators for convenience
 export {

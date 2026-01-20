@@ -23,12 +23,25 @@ export class PrismaService
     }
 
     // Prisma 7 requires an adapter for direct database connections
-    const pool = new Pool({ connectionString: databaseUrl });
+    // Pool size can be configured via DATABASE_POOL_SIZE environment variable
+    const poolSize = parseInt(process.env.DATABASE_POOL_SIZE || '10', 10);
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      max: poolSize,
+    });
     const adapter = new PrismaPg(pool);
 
     super({ adapter });
 
     this.pool = pool;
+  }
+
+  /**
+   * Get the underlying pg.Pool instance for monitoring
+   * TASK-PERF-104: Database Connection Pool Monitoring
+   */
+  getPool(): Pool {
+    return this.pool;
   }
 
   async onModuleInit(): Promise<void> {

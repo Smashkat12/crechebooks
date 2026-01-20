@@ -1,0 +1,13 @@
+{
+  "type": "reviewer",
+  "capabilities": [
+    "code-review",
+    "quality-analysis",
+    "best-practices"
+  ],
+  "optimizations": [
+    "incremental-analysis"
+  ],
+  "version": "3.0.0",
+  "createdAt": "2026-01-19T21:25:30.139Z"
+}

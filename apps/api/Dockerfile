@@ -96,6 +96,12 @@ RUN mkdir -p /app/prisma-cli /app/prisma-engines && \
     echo "=== Prisma CLI prepared ===" && ls -la /app/prisma-cli/ && \
     echo "=== Prisma Engines prepared ===" && ls -la /app/prisma-engines/
 
+# Prepare resolved node_modules for runner (resolve all pnpm symlinks)
+RUN mkdir -p /app/resolved_modules && \
+    cp -rL /app/node_modules/* /app/resolved_modules/ 2>/dev/null || true && \
+    echo "=== Resolved node_modules prepared ===" && \
+    ls /app/resolved_modules/ | head -20
+
 # Stage 3: Production Runner
 FROM node:20-slim AS runner
 
@@ -121,10 +127,8 @@ COPY --from=builder /app/apps/api/dist ./dist
 COPY --from=builder /app/apps/api/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
 
-# Copy node_modules (production deps)
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps_node_modules
-RUN cp -r ./apps_node_modules/* ./node_modules/ 2>/dev/null || true && rm -rf ./apps_node_modules
+# Copy resolved node_modules from builder (all pnpm symlinks resolved)
+COPY --from=builder /app/resolved_modules ./node_modules
 
 # Copy Prisma generated client from builder
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma

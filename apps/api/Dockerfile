@@ -84,9 +84,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps_node_modules
 RUN cp -r ./apps_node_modules/* ./node_modules/ 2>/dev/null || true && rm -rf ./apps_node_modules
 
-# Copy Prisma generated client
+# Copy Prisma generated client (only .prisma is needed from builder, @prisma packages come from deps)
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Set ownership
 RUN chown -R nestjs:nodejs /app

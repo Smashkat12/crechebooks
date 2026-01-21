@@ -60,10 +60,27 @@ RUN pnpm --filter @crechebooks/types build
 # Generate Prisma client from apps/api directory (finds prisma.config.ts)
 RUN cd apps/api && npx prisma generate
 
-# Ensure .prisma is at root node_modules (copy if it ended up in apps/api/node_modules)
-RUN if [ ! -d "/app/node_modules/.prisma" ] && [ -d "/app/apps/api/node_modules/.prisma" ]; then \
-      cp -r /app/apps/api/node_modules/.prisma /app/node_modules/.prisma; \
-    fi && ls -la /app/node_modules/.prisma || echo "WARNING: .prisma not found"
+# Debug: Show where .prisma was generated
+RUN echo "=== Searching for .prisma ===" && \
+    find /app -name ".prisma" -type d 2>/dev/null || echo "No .prisma directories found"
+
+# Ensure .prisma is at root node_modules
+# Check multiple possible locations due to pnpm hoisting behavior
+RUN mkdir -p /app/node_modules/.prisma && \
+    if [ -d "/app/apps/api/node_modules/.prisma/client" ]; then \
+      echo "Found .prisma in apps/api/node_modules" && \
+      cp -r /app/apps/api/node_modules/.prisma/* /app/node_modules/.prisma/; \
+    elif [ -d "/app/node_modules/.pnpm/@prisma+client@"*"/node_modules/.prisma" ]; then \
+      echo "Found .prisma in pnpm store" && \
+      cp -r /app/node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/* /app/node_modules/.prisma/; \
+    elif [ -d "/app/node_modules/@prisma/client/runtime" ]; then \
+      echo "Prisma client runtime found, creating .prisma structure" && \
+      mkdir -p /app/node_modules/.prisma/client && \
+      find /app -path "*/node_modules/.prisma/client/*" -exec cp -r {} /app/node_modules/.prisma/client/ \; 2>/dev/null || true; \
+    fi && \
+    echo "=== Final .prisma contents ===" && \
+    ls -la /app/node_modules/.prisma/ && \
+    ls -la /app/node_modules/.prisma/client/ 2>/dev/null || echo "No client subfolder"
 
 # Build the API
 RUN pnpm --filter @crechebooks/api build

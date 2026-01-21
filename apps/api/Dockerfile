@@ -98,9 +98,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Create non-root user for security
+# Create non-root user for security with home directory
 RUN groupadd --system --gid 1001 nodejs && \
-    useradd --system --uid 1001 --gid nodejs nestjs
+    useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nestjs nestjs
 
 # Install pnpm for production
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
@@ -137,4 +137,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Run database migrations and start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# Use direct path to prisma to avoid npx/npm cache permission issues
+CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main"]

@@ -2,10 +2,15 @@
 # CrecheBooks Web - Production Dockerfile
 # ============================================
 # Multi-stage build for optimized production image
+# Using Debian-based images for Railway compatibility
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+FROM node:20-slim AS deps
+
+# Install required system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -21,8 +26,12 @@ COPY packages/types/package.json ./packages/types/
 RUN pnpm install --frozen-lockfile --prod=false
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
-RUN apk add --no-cache libc6-compat
+FROM node:20-slim AS builder
+
+# Install required system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -45,14 +54,20 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter @crechebooks/web build
 
 # Stage 3: Production Runner
-FROM node:20-alpine AS runner
-RUN apk add --no-cache libc6-compat dumb-init
+FROM node:20-slim AS runner
+
+# Install required system dependencies and dumb-init
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    dumb-init \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nextjs
 
 # Set environment
 ENV NODE_ENV=production

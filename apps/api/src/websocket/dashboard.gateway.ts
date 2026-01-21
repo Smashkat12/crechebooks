@@ -179,7 +179,10 @@ export class DashboardGateway
    * Handle ping for manual heartbeat
    */
   @SubscribeMessage('ping')
-  handlePing(@ConnectedSocket() client: Socket): { event: string; data: { timestamp: string } } {
+  handlePing(@ConnectedSocket() client: Socket): {
+    event: string;
+    data: { timestamp: string };
+  } {
     return {
       event: 'pong',
       data: { timestamp: new Date().toISOString() },

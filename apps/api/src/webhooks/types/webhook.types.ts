@@ -35,6 +35,100 @@ export type EmailEventType =
   | 'unsubscribe';
 
 /**
+ * Mailgun email event types
+ * @see https://documentation.mailgun.com/en/latest/api-events.html
+ */
+export type MailgunEventType =
+  | 'accepted'
+  | 'delivered'
+  | 'failed'
+  | 'opened'
+  | 'clicked'
+  | 'unsubscribed'
+  | 'complained'
+  | 'stored';
+
+/**
+ * Mailgun webhook event structure
+ * @see https://documentation.mailgun.com/en/latest/user_manual.html#webhooks
+ */
+export interface MailgunWebhookEvent {
+  /** Event signature data for verification */
+  signature: {
+    timestamp: string;
+    token: string;
+    signature: string;
+  };
+  /** Event data */
+  'event-data': MailgunEventData;
+}
+
+/**
+ * Mailgun event data structure
+ */
+export interface MailgunEventData {
+  /** Event type */
+  event: MailgunEventType;
+  /** Unix timestamp */
+  timestamp: number;
+  /** Mailgun message ID */
+  id: string;
+  /** Message details */
+  message?: {
+    headers: {
+      'message-id': string;
+      to: string;
+      from: string;
+      subject: string;
+    };
+  };
+  /** Recipient email address */
+  recipient: string;
+  /** Delivery status info (for failed events) */
+  'delivery-status'?: {
+    code: number;
+    message: string;
+    description: string;
+    'attempt-no': number;
+    'session-seconds': number;
+  };
+  /** Severity for failed events */
+  severity?: 'permanent' | 'temporary';
+  /** Reason for failure */
+  reason?: string;
+  /** Client info (for opened/clicked events) */
+  'client-info'?: {
+    'client-type': string;
+    'client-name': string;
+    'device-type': string;
+    'client-os': string;
+    'user-agent': string;
+  };
+  /** Geolocation (for opened/clicked events) */
+  geolocation?: {
+    country: string;
+    region: string;
+    city: string;
+  };
+  /** Clicked URL (for click events) */
+  url?: string;
+  /** IP address */
+  ip?: string;
+  /** Custom variables passed with the email */
+  'user-variables'?: {
+    invoiceId?: string;
+    statementId?: string;
+    tenantId?: string;
+    documentType?: 'invoice' | 'statement';
+    [key: string]: string | undefined;
+  };
+  /** Tags */
+  tags?: string[];
+  /** Log level */
+  'log-level'?: 'info' | 'warn' | 'error';
+}
+
+/**
  * SendGrid email event structure
  */
 export interface EmailEvent {
@@ -198,7 +292,7 @@ export interface RawWebhookEvent {
 }
 
 /**
- * Map email event types to delivery status
+ * Map email event types to delivery status (SendGrid)
  */
 export function mapEmailEventToStatus(
   event: EmailEventType,
@@ -218,6 +312,36 @@ export function mapEmailEventToStatus(
     case 'processed':
     case 'deferred':
     case 'unsubscribe':
+      // These don't change delivery status
+      return null;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Map Mailgun event types to delivery status
+ */
+export function mapMailgunEventToStatus(
+  event: MailgunEventType,
+  severity?: 'permanent' | 'temporary',
+): DeliveryStatus | null {
+  switch (event) {
+    case 'accepted':
+      return 'SENT';
+    case 'delivered':
+      return 'DELIVERED';
+    case 'opened':
+      return 'OPENED';
+    case 'clicked':
+      return 'CLICKED';
+    case 'failed':
+      // Permanent failures are bounces, temporary are still pending
+      return severity === 'permanent' ? 'BOUNCED' : null;
+    case 'complained':
+      return 'COMPLAINED';
+    case 'unsubscribed':
+    case 'stored':
       // These don't change delivery status
       return null;
     default:

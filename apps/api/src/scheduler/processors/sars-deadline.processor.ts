@@ -201,7 +201,7 @@ ${this.getDeadlineDescription(deadline.type)}
 Please ensure timely submission to avoid SARS penalties.
 
 ---
-This is an automated reminder from CrecheBooks.
+This is an automated reminder.
     `.trim();
   }
 

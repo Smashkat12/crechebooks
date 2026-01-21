@@ -12,7 +12,7 @@
  * CRITICAL: Fail fast with detailed error logging.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
@@ -28,6 +28,11 @@ import {
   TemplateParams,
   TemplateComponent,
 } from './types/whatsapp.types';
+import {
+  WhatsAppMessageStatus,
+  WhatsAppContextType,
+} from './types/message-history.types';
+import { WhatsAppMessageEntity } from './entities/whatsapp-message.entity';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -43,6 +48,7 @@ export class WhatsAppService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
+    @Optional() private readonly messageEntity?: WhatsAppMessageEntity,
   ) {
     this.config = this.loadConfig();
 
@@ -630,28 +636,47 @@ export class WhatsAppService {
   }
 
   /**
-   * Update message delivery status from webhook
+   * Update message status from webhook
+   * TASK-WA-001: Use WhatsAppMessageEntity for persistence
    */
   private async updateMessageStatus(
-    messageId: string,
+    wamid: string,
     status: 'sent' | 'delivered' | 'read' | 'failed',
     errorCode?: number,
     errorMessage?: string,
   ): Promise<void> {
     this.logger.log({
       message: 'WhatsApp message status updated',
-      messageId,
+      wamid,
       status,
       errorCode,
       errorMessage,
       timestamp: new Date().toISOString(),
     });
 
+    // TASK-WA-001: Update message in database if entity is available
+    if (this.messageEntity) {
+      const statusMap: Record<string, WhatsAppMessageStatus> = {
+        sent: WhatsAppMessageStatus.SENT,
+        delivered: WhatsAppMessageStatus.DELIVERED,
+        read: WhatsAppMessageStatus.READ,
+        failed: WhatsAppMessageStatus.FAILED,
+      };
+
+      await this.messageEntity.updateStatus({
+        wamid,
+        status: statusMap[status],
+        timestamp: new Date(),
+        errorCode: errorCode?.toString(),
+        errorMessage,
+      });
+    }
+
     // Store status update in audit log for tracking
     await this.auditLogService.logAction({
       tenantId: 'system',
       entityType: 'WhatsAppMessageStatus',
-      entityId: messageId,
+      entityId: wamid,
       action: AuditAction.UPDATE,
       afterValue: {
         status,
@@ -659,7 +684,7 @@ export class WhatsAppService {
         errorMessage,
         updatedAt: new Date().toISOString(),
       },
-      changeSummary: `WhatsApp message ${messageId} status: ${status}`,
+      changeSummary: `WhatsApp message ${wamid} status: ${status}`,
     });
   }
 
@@ -699,6 +724,147 @@ export class WhatsAppService {
       // timingSafeEqual throws if buffers have different lengths
       // This indicates signature mismatch (wrong format or tampered)
       return false;
+    }
+  }
+
+  /**
+   * TASK-WA-003: Send a template message with pre-built components
+   *
+   * This public method allows sending templates with custom components,
+   * useful for statement delivery and other advanced use cases.
+   *
+   * @param to - Phone number in E.164 format or local format (will be converted)
+   * @param templateName - Name of the approved WhatsApp template
+   * @param components - Pre-built template components from WhatsAppTemplateService
+   * @returns Message result with messageId and status
+   */
+  async sendTemplate(
+    to: string,
+    templateName: WhatsAppTemplateName,
+    components: TemplateComponent[],
+  ): Promise<WhatsAppMessageResult> {
+    const config = this.ensureConfigured();
+
+    const phone = this.formatPhoneE164(to);
+    if (!this.isValidPhoneNumber(phone)) {
+      this.logger.error({
+        error: { message: 'Invalid phone number', name: 'ValidationError' },
+        file: 'whatsapp.service.ts',
+        function: 'sendTemplate',
+        inputs: { to, templateName },
+        timestamp: new Date().toISOString(),
+      });
+      throw new BusinessException(
+        `Invalid phone number: ${to}`,
+        'INVALID_PHONE',
+      );
+    }
+
+    return this.sendTemplateMessage(phone, templateName, components, config);
+  }
+
+  /**
+   * Send a plain text message via WhatsApp Business API
+   * TASK-COMM-002: Ad-hoc broadcast text messages
+   *
+   * Note: WhatsApp Business API typically requires template messages for business-initiated
+   * conversations. However, text messages can be sent during an active conversation window
+   * (24 hours after last user interaction). This method attempts a text message first.
+   *
+   * @param to - Phone number in E.164 format or local format (will be converted)
+   * @param message - Message content
+   * @returns Message result with wamid
+   */
+  async sendTextMessage(
+    to: string,
+    message: string,
+  ): Promise<{ wamid?: string }> {
+    const config = this.ensureConfigured();
+    this.checkRateLimit();
+
+    const phone = this.formatPhoneE164(to);
+    if (!this.isValidPhoneNumber(phone)) {
+      this.logger.error({
+        error: { message: 'Invalid phone number', name: 'ValidationError' },
+        file: 'whatsapp.service.ts',
+        function: 'sendTextMessage',
+        inputs: { to },
+        timestamp: new Date().toISOString(),
+      });
+      throw new BusinessException(
+        `Invalid phone number: ${to}`,
+        'INVALID_PHONE',
+      );
+    }
+
+    try {
+      const response = await fetch(config.apiUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${config.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: phone,
+          type: 'text',
+          text: { body: message.substring(0, 4096) }, // WhatsApp text limit
+        }),
+      });
+
+      if (!response.ok) {
+        const errorBody = (await response.json()) as WhatsAppApiError;
+        this.logger.error({
+          error: {
+            message: errorBody.error.message,
+            name: 'WhatsAppApiError',
+            code: errorBody.error.code,
+            type: errorBody.error.type,
+          },
+          file: 'whatsapp.service.ts',
+          function: 'sendTextMessage',
+          inputs: { to },
+          timestamp: new Date().toISOString(),
+        });
+        throw new BusinessException(
+          `WhatsApp API error: ${errorBody.error.message}`,
+          'WHATSAPP_API_ERROR',
+        );
+      }
+
+      const data = (await response.json()) as WhatsAppApiResponse;
+      const wamid = data.messages?.[0]?.id;
+
+      this.logger.log({
+        message: 'WhatsApp text message sent successfully',
+        wamid,
+        recipientPhone: phone,
+        timestamp: new Date().toISOString(),
+      });
+
+      return { wamid };
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        throw error;
+      }
+
+      this.logger.error({
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : 'UnknownError',
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+        file: 'whatsapp.service.ts',
+        function: 'sendTextMessage',
+        inputs: { to },
+        timestamp: new Date().toISOString(),
+      });
+
+      throw new BusinessException(
+        `Failed to send WhatsApp message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'WHATSAPP_SEND_FAILED',
+      );
     }
   }
 
@@ -809,5 +975,122 @@ export class WhatsAppService {
       month: 'long',
       day: 'numeric',
     });
+  }
+
+  // ============================================
+  // TASK-WA-001: Message History Methods
+  // ============================================
+
+  /**
+   * Get message history for a parent
+   */
+  async getMessageHistory(
+    tenantId: string,
+    parentId: string,
+    limit?: number,
+  ): Promise<import('@prisma/client').WhatsAppMessage[]> {
+    if (!this.messageEntity) {
+      return [];
+    }
+
+    return this.messageEntity.findByTenantAndParent(tenantId, parentId, {
+      limit: limit ?? 50,
+    });
+  }
+
+  /**
+   * Get message history summary for reporting
+   */
+  async getMessageHistorySummary(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    if (!this.messageEntity) {
+      return {
+        total: 0,
+        pending: 0,
+        sent: 0,
+        delivered: 0,
+        read: 0,
+        failed: 0,
+        deliveryRate: 0,
+        readRate: 0,
+      };
+    }
+
+    return this.messageEntity.getHistorySummary(tenantId, startDate, endDate);
+  }
+
+  /**
+   * Get messages by context (e.g., all messages for an invoice)
+   */
+  async getMessagesByContext(
+    tenantId: string,
+    contextType: WhatsAppContextType,
+    contextId: string,
+  ) {
+    if (!this.messageEntity) {
+      return [];
+    }
+
+    return this.messageEntity.findByContext(tenantId, contextType, contextId);
+  }
+
+  /**
+   * Create a message record (for tracking)
+   * TASK-WA-001: Public method for creating message history records
+   */
+  async createMessageRecord(
+    tenantId: string,
+    parentId: string | undefined,
+    recipientPhone: string,
+    templateName: string,
+    contextType: WhatsAppContextType,
+    contextId?: string,
+    templateParams?: Record<string, string>,
+  ): Promise<import('@prisma/client').WhatsAppMessage | null> {
+    if (!this.messageEntity) {
+      return null;
+    }
+
+    return this.messageEntity.create({
+      tenantId,
+      parentId,
+      recipientPhone,
+      templateName,
+      contextType,
+      contextId,
+      templateParams,
+    });
+  }
+
+  /**
+   * Mark a message as sent with WAMID
+   */
+  async markMessageSent(
+    messageId: string,
+    wamid: string,
+  ): Promise<import('@prisma/client').WhatsAppMessage | null> {
+    if (!this.messageEntity) {
+      return null;
+    }
+
+    return this.messageEntity.markAsSent(messageId, wamid);
+  }
+
+  /**
+   * Mark a message as failed
+   */
+  async markMessageFailed(
+    messageId: string,
+    errorCode: string,
+    errorMessage: string,
+  ): Promise<import('@prisma/client').WhatsAppMessage | null> {
+    if (!this.messageEntity) {
+      return null;
+    }
+
+    return this.messageEntity.markAsFailed(messageId, errorCode, errorMessage);
   }
 }

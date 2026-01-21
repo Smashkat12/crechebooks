@@ -30,15 +30,8 @@ const logger = new Logger('BankingModule');
     ScheduleModule.forRoot(), // For @Cron decorator
   ],
   controllers: [BankLinkController],
-  providers: [
-    StitchBankingService,
-    BankSyncJob,
-    EncryptionService,
-  ],
-  exports: [
-    StitchBankingService,
-    BankSyncJob,
-  ],
+  providers: [StitchBankingService, BankSyncJob, EncryptionService],
+  exports: [StitchBankingService, BankSyncJob],
 })
 export class BankingModule {
   constructor() {

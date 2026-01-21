@@ -245,8 +245,9 @@ export class SmsChannelAdapter implements INotificationChannel {
           `SMS send attempt ${attempt}/${maxRetries} to ${this.maskPhone(phone)}`,
         );
 
+        // Use a generic senderId for white-labeling - tenant-specific senderId can be configured
         const result = await this.smsGateway.send(phone, message, {
-          senderId: 'CrecheBooks',
+          senderId: 'Notify',
           priority: 'normal',
         });
 

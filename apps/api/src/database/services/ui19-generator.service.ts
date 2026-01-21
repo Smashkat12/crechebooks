@@ -512,12 +512,9 @@ export class Ui19GeneratorService {
         'This form must be submitted to the Department of Labour within 14 days of termination.',
         { align: 'center' },
       );
-      doc.text(
-        `Generated on ${new Date().toLocaleDateString('en-ZA')} by CrecheBooks`,
-        {
-          align: 'center',
-        },
-      );
+      doc.text(`Generated on ${new Date().toLocaleDateString('en-ZA')}`, {
+        align: 'center',
+      });
 
       doc.end();
     });

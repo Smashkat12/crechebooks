@@ -77,8 +77,7 @@ export class BankLinkController {
     private readonly configService: ConfigService,
   ) {
     this.frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ||
-      'http://localhost:3000';
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
   }
 
   // ===========================================================================
@@ -128,7 +127,11 @@ export class BankLinkController {
       'Handles the OAuth callback from the bank. Redirects to frontend after processing.',
   })
   @ApiResponse({ status: 302, description: 'Redirect to frontend' })
-  @ApiQuery({ name: 'code', required: false, description: 'Authorization code' })
+  @ApiQuery({
+    name: 'code',
+    required: false,
+    description: 'Authorization code',
+  })
   @ApiQuery({ name: 'state', required: true, description: 'CSRF state' })
   @ApiQuery({ name: 'error', required: false, description: 'Error code' })
   async handleCallback(
@@ -214,7 +217,8 @@ export class BankLinkController {
 
     const activeAccounts = accounts.filter((a) => a.status === 'active');
     const attentionNeeded = accounts.filter(
-      (a) => a.requiresRenewal || a.status === 'error' || a.status === 'expired',
+      (a) =>
+        a.requiresRenewal || a.status === 'error' || a.status === 'expired',
     );
 
     // Group by bank
@@ -324,7 +328,9 @@ export class BankLinkController {
     @CurrentUser() user: IUser,
     @Param('id', ParseUUIDPipe) accountId: string,
   ): Promise<void> {
-    this.logger.log(`Unlinking account ${accountId} for tenant ${user.tenantId}`);
+    this.logger.log(
+      `Unlinking account ${accountId} for tenant ${user.tenantId}`,
+    );
 
     // Verify account belongs to tenant
     const accounts = await this.stitchService.getLinkedAccounts(user.tenantId);
@@ -423,7 +429,8 @@ export class BankLinkController {
   @Get('accounts/:id/transactions')
   @ApiOperation({
     summary: 'Get transactions',
-    description: 'Fetches transactions for a linked bank account within date range.',
+    description:
+      'Fetches transactions for a linked bank account within date range.',
   })
   @ApiParam({ name: 'id', description: 'Linked bank account ID' })
   @ApiResponse({

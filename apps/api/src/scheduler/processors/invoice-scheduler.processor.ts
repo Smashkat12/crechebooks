@@ -302,7 +302,7 @@ ${result.errors.length > 10 ? `... and ${result.errors.length - 10} more errors`
     : ''
 }
 ---
-This is an automated notification from CrecheBooks.
+This is an automated notification.
     `.trim();
 
     // Log notification (would integrate with email service)

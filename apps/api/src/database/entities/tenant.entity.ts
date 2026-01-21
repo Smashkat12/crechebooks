@@ -47,6 +47,9 @@ export interface ITenant {
   closureDates: string[];
   // TASK-RECON-002: Amount tolerance for transaction matching (in cents)
   matchingToleranceCents: number;
+  // TASK-ENROL-006: Parent welcome pack customization
+  parentWelcomeMessage: string | null;
+  operatingHours: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

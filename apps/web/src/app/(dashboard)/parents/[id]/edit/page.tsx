@@ -1,11 +1,12 @@
 'use client';
 
 import { use, useState, useEffect } from 'react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +33,8 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
     whatsappNumber: '',
     address: '',
     preferredCommunication: 'EMAIL' as 'EMAIL' | 'WHATSAPP' | 'BOTH',
+    /** TASK-WA-004: WhatsApp opt-in consent (POPIA compliant) */
+    whatsappOptIn: false,
   });
 
   useEffect(() => {
@@ -44,6 +47,8 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
         whatsappNumber: parent.whatsapp || '',
         address: parent.address || '',
         preferredCommunication: (parent.preferredContact as 'EMAIL' | 'WHATSAPP' | 'BOTH') || 'EMAIL',
+        // TASK-WA-004: WhatsApp opt-in from parent record
+        whatsappOptIn: (parent as unknown as { whatsappOptIn?: boolean }).whatsappOptIn ?? false,
       });
     }
   }, [parent]);
@@ -70,6 +75,8 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
         whatsappNumber: formData.whatsappNumber || undefined,
         address: formData.address || undefined,
         preferredCommunication: formData.preferredCommunication,
+        // TASK-WA-004: WhatsApp opt-in consent
+        whatsappOptIn: formData.whatsappOptIn,
       });
 
       toast({
@@ -208,7 +215,65 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
                 </SelectContent>
               </Select>
             </div>
+          </CardContent>
+        </Card>
 
+        {/* TASK-WA-004: WhatsApp Opt-In Consent Section */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-green-600" />
+              WhatsApp Notifications
+            </CardTitle>
+            <CardDescription>
+              Receive invoices, statements, and payment reminders via WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start space-x-3 rounded-lg border p-4 bg-muted/50">
+              <Checkbox
+                id="whatsappOptIn"
+                checked={formData.whatsappOptIn}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, whatsappOptIn: checked === true })
+                }
+                disabled={!formData.whatsappNumber}
+                className="mt-1"
+              />
+              <div className="space-y-1">
+                <Label
+                  htmlFor="whatsappOptIn"
+                  className="text-sm font-medium leading-none cursor-pointer"
+                >
+                  I consent to receive WhatsApp messages
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  By checking this box, I agree to receive invoices, monthly statements, and payment
+                  reminders via WhatsApp to the number provided above. I understand I can withdraw
+                  this consent at any time by unchecking this box.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  This consent is required under the Protection of Personal Information Act (POPIA).
+                  Your WhatsApp number will only be used for billing-related communications.
+                </p>
+              </div>
+            </div>
+            {!formData.whatsappNumber && (
+              <p className="text-sm text-amber-600">
+                Please enter a WhatsApp number above to enable WhatsApp notifications.
+              </p>
+            )}
+            {formData.whatsappOptIn && formData.whatsappNumber && (
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <MessageSquare className="h-4 w-4" />
+                WhatsApp notifications are enabled for {formData.whatsappNumber}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardContent className="pt-6">
             <div className="flex justify-end gap-4">
               <Link href={`/parents/${id}`}>
                 <Button type="button" variant="outline">

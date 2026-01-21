@@ -5,6 +5,10 @@ export const QUEUE_NAMES = {
   BANK_SYNC: 'bank-sync',
   STATEMENT_GENERATION: 'statement-generation',
   SIMPLEPAY_SYNC: 'simplepay-sync',
+  /** TASK-WA-006: Queue for WhatsApp message retries with exponential backoff */
+  WHATSAPP_RETRY: 'whatsapp-retry',
+  /** TASK-COMM-002: Queue for broadcast message processing */
+  BROADCAST: 'broadcast',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -51,6 +55,36 @@ export interface StatementGenerationJobData extends ScheduledJobData {
   autoFinalize?: boolean;
   /** Whether to auto-deliver finalized statements */
   autoDeliver?: boolean;
+}
+
+/**
+ * TASK-WA-006: WhatsApp message retry job data
+ */
+export interface WhatsAppRetryJobData extends ScheduledJobData {
+  /** Message ID in our database */
+  messageId: string;
+  /** WhatsApp Message ID (wamid) if we have one from a previous attempt */
+  wamid?: string;
+  /** Parent ID to send the message to */
+  parentId?: string;
+  /** Phone number in E.164 format */
+  recipientPhone: string;
+  /** Template name to use */
+  templateName: string;
+  /** Template components */
+  components: unknown[];
+  /** Context type (INVOICE, STATEMENT, etc.) */
+  contextType: string;
+  /** Context ID (invoice ID, statement ID, etc.) */
+  contextId?: string;
+  /** Number of retry attempts made */
+  retryCount: number;
+  /** Maximum number of retries allowed */
+  maxRetries: number;
+  /** Reason for the retry (previous error message) */
+  retryReason?: string;
+  /** Original error code if any */
+  errorCode?: string;
 }
 
 export interface JobOptions {

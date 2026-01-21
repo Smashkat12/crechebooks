@@ -33,6 +33,7 @@ import {
   YearEndStudent,
   YearEndReviewResult,
 } from '../dto/year-end-review.dto';
+import { WelcomePackDeliveryService } from './welcome-pack-delivery.service';
 
 // Configure Decimal.js for banker's rounding
 Decimal.set({
@@ -43,10 +44,17 @@ Decimal.set({
 /**
  * Result of enrolling a child, including the generated invoice (if any)
  * TASK-BILL-023: Enrollment Invoice UI Integration
+ * TASK-ENROL-008: Welcome Pack Delivery Integration
  */
 export interface EnrollChildResult {
   enrollment: IEnrollment;
   invoice: Invoice | null;
+  /** Error message if invoice creation failed (enrollment succeeded but invoice didn't) */
+  invoiceError?: string;
+  /** Whether welcome pack email was sent successfully */
+  welcomePackSent?: boolean;
+  /** Error message if welcome pack delivery failed */
+  welcomePackError?: string;
 }
 
 @Injectable()
@@ -64,6 +72,7 @@ export class EnrollmentService {
     private readonly creditNoteService: CreditNoteService,
     private readonly auditLogService: AuditLogService,
     private readonly invoiceNumberService: InvoiceNumberService,
+    private readonly welcomePackDeliveryService: WelcomePackDeliveryService,
   ) {}
 
   /**
@@ -167,6 +176,7 @@ export class EnrollmentService {
 
     // 7. Generate enrollment invoice (registration fee + pro-rated first month)
     let enrollmentInvoice: Invoice | null = null;
+    let invoiceError: string | undefined;
     try {
       enrollmentInvoice = await this.createEnrollmentInvoice(
         tenantId,
@@ -178,20 +188,53 @@ export class EnrollmentService {
         `Created enrollment invoice ${enrollmentInvoice.invoiceNumber} for child ${childId}`,
       );
     } catch (error) {
-      // Log error but don't fail enrollment if invoice creation fails
+      // IMPORTANT: Capture error message so it's visible to API consumers
+      // Don't fail enrollment, but DO surface the error message
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      invoiceError = `Invoice creation failed: ${errorMessage}`;
       this.logger.error(
-        `Failed to create enrollment invoice for child ${childId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to create enrollment invoice for child ${childId}: ${errorMessage}`,
         error instanceof Error ? error.stack : undefined,
       );
     }
 
+    // 8. Send welcome pack (non-blocking, don't fail enrollment if email fails)
+    // TASK-ENROL-008: Welcome Pack Delivery Integration
+    let welcomePackResult: { sent: boolean; error?: string } = { sent: false };
+    try {
+      const deliveryResult =
+        await this.welcomePackDeliveryService.sendWelcomePack(
+          tenantId,
+          enrollment.id,
+        );
+      welcomePackResult = {
+        sent: deliveryResult.success,
+        error: deliveryResult.error,
+      };
+      if (deliveryResult.success) {
+        this.logger.log(`Welcome pack sent for enrollment ${enrollment.id}`);
+      }
+    } catch (error) {
+      welcomePackResult = {
+        sent: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+      this.logger.warn(
+        `Failed to send welcome pack for enrollment ${enrollment.id}: ${welcomePackResult.error}`,
+      );
+    }
+
     this.logger.log(
-      `Successfully enrolled child ${childId} in enrollment ${enrollment.id}`,
+      `Successfully enrolled child ${childId} in enrollment ${enrollment.id}${invoiceError ? ' (invoice creation failed)' : ''}${!welcomePackResult.sent ? ' (welcome pack not sent)' : ''}`,
     );
 
     return {
       enrollment: enrollment as IEnrollment,
       invoice: enrollmentInvoice,
+      invoiceError,
+      welcomePackSent: welcomePackResult.sent,
+      welcomePackError: welcomePackResult.error,
     };
   }
 

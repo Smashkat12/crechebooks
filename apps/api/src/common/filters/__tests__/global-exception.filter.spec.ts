@@ -5,8 +5,19 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { HttpException, HttpStatus, BadRequestException, UnauthorizedException, ForbiddenException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
-import { GlobalExceptionFilter, StandardErrorResponse } from '../global-exception.filter';
+import {
+  HttpException,
+  HttpStatus,
+  BadRequestException,
+  UnauthorizedException,
+  ForbiddenException,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import {
+  GlobalExceptionFilter,
+  StandardErrorResponse,
+} from '../global-exception.filter';
 import { AppException } from '../../../shared/exceptions/base.exception';
 import { ErrorCode } from '../../../shared/exceptions/error-codes';
 import * as correlationIdModule from '../../logger/correlation-id.middleware';
@@ -43,7 +54,9 @@ describe('GlobalExceptionFilter', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    (correlationIdModule.getCorrelationId as jest.Mock).mockReturnValue('test-correlation-id');
+    (correlationIdModule.getCorrelationId as jest.Mock).mockReturnValue(
+      'test-correlation-id',
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -73,7 +86,8 @@ describe('GlobalExceptionFilter', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
       expect(mockResponse.json).toHaveBeenCalled();
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.success).toBe(false);
       // Status 400 maps to VALIDATION_ERROR in ERROR_CODE_STATUS_MAP
       expect(response.error.code).toBe('VALIDATION_ERROR');
@@ -96,7 +110,8 @@ describe('GlobalExceptionFilter', () => {
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.code).toBe('VALIDATION_ERROR');
       expect(response.error.message).toBe('Email is invalid');
     });
@@ -106,9 +121,12 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(exception, mockHost as any);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(mockResponse.status).toHaveBeenCalledWith(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.code).toBe('INTERNAL_ERROR');
     });
 
@@ -117,20 +135,26 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(exception, mockHost as any);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect(mockResponse.status).toHaveBeenCalledWith(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.code).toBe('UNKNOWN_ERROR');
     });
   });
 
   describe('Correlation ID Handling', () => {
     it('should include correlation ID from middleware', () => {
-      (correlationIdModule.getCorrelationId as jest.Mock).mockReturnValue('custom-correlation-id');
+      (correlationIdModule.getCorrelationId as jest.Mock).mockReturnValue(
+        'custom-correlation-id',
+      );
 
       filter.catch(new BadRequestException(), mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.correlationId).toBe('custom-correlation-id');
     });
 
@@ -139,7 +163,8 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(new BadRequestException(), mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.correlationId).toMatch(/^fallback-\d+-[a-z0-9]+$/);
     });
 
@@ -156,11 +181,31 @@ describe('GlobalExceptionFilter', () => {
   describe('HTTP Status Code Mapping', () => {
     // Note: Status 400 maps to VALIDATION_ERROR in ERROR_CODE_STATUS_MAP (first match)
     const statusCases = [
-      { exception: new BadRequestException(), expectedStatus: 400, expectedCode: 'VALIDATION_ERROR' },
-      { exception: new UnauthorizedException(), expectedStatus: 401, expectedCode: 'UNAUTHORIZED' },
-      { exception: new ForbiddenException(), expectedStatus: 403, expectedCode: 'FORBIDDEN' },
-      { exception: new NotFoundException(), expectedStatus: 404, expectedCode: 'NOT_FOUND' },
-      { exception: new InternalServerErrorException(), expectedStatus: 500, expectedCode: 'INTERNAL_ERROR' },
+      {
+        exception: new BadRequestException(),
+        expectedStatus: 400,
+        expectedCode: 'VALIDATION_ERROR',
+      },
+      {
+        exception: new UnauthorizedException(),
+        expectedStatus: 401,
+        expectedCode: 'UNAUTHORIZED',
+      },
+      {
+        exception: new ForbiddenException(),
+        expectedStatus: 403,
+        expectedCode: 'FORBIDDEN',
+      },
+      {
+        exception: new NotFoundException(),
+        expectedStatus: 404,
+        expectedCode: 'NOT_FOUND',
+      },
+      {
+        exception: new InternalServerErrorException(),
+        expectedStatus: 500,
+        expectedCode: 'INTERNAL_ERROR',
+      },
     ];
 
     statusCases.forEach(({ exception, expectedStatus, expectedCode }) => {
@@ -168,7 +213,8 @@ describe('GlobalExceptionFilter', () => {
         filter.catch(exception, mockHost as any);
 
         expect(mockResponse.status).toHaveBeenCalledWith(expectedStatus);
-        const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+        const response: StandardErrorResponse =
+          mockResponse.json.mock.calls[0][0];
         expect(response.error.code).toBe(expectedCode);
       });
     });
@@ -180,7 +226,8 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.details).toBeDefined();
       expect((response.error.details as any).stack).toBeDefined();
     });
@@ -202,13 +249,16 @@ describe('GlobalExceptionFilter', () => {
         ],
       }).compile();
 
-      const productionFilter = productionModule.get<GlobalExceptionFilter>(GlobalExceptionFilter);
+      const productionFilter = productionModule.get<GlobalExceptionFilter>(
+        GlobalExceptionFilter,
+      );
 
       const exception = new Error('Test error');
 
       productionFilter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.details?.stack).toBeUndefined();
     });
 
@@ -228,12 +278,17 @@ describe('GlobalExceptionFilter', () => {
         ],
       }).compile();
 
-      const productionFilter = productionModule.get<GlobalExceptionFilter>(GlobalExceptionFilter);
-      const exception = new Error('Database connection failed to postgres://user:pass@localhost');
+      const productionFilter = productionModule.get<GlobalExceptionFilter>(
+        GlobalExceptionFilter,
+      );
+      const exception = new Error(
+        'Database connection failed to postgres://user:pass@localhost',
+      );
 
       productionFilter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       // In production, internal errors use the generic message from ERROR_CODE_MESSAGES
       expect(response.error.message).toBe('An internal server error occurred');
       expect(response.error.message).not.toContain('postgres');
@@ -252,7 +307,8 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.details).toBeDefined();
     });
 
@@ -265,18 +321,22 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.message).toContain('email must be an email');
     });
   });
 
   describe('Sensitive Data Sanitization', () => {
     it('should sanitize email addresses in error messages', () => {
-      const exception = new BadRequestException('User test@example.com not found');
+      const exception = new BadRequestException(
+        'User test@example.com not found',
+      );
 
       filter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.message).not.toContain('test@example.com');
       // Sanitizer uses [EMAIL_REDACTED] format
       expect(response.error.message).toContain('[EMAIL_REDACTED]');
@@ -287,7 +347,8 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.message).not.toContain('8501015800083');
       // Sanitizer uses [ID_REDACTED] format
       expect(response.error.message).toContain('[ID_REDACTED]');
@@ -295,23 +356,31 @@ describe('GlobalExceptionFilter', () => {
 
     it('should sanitize API keys in error messages', () => {
       // Use a longer key that matches the pattern (20+ chars after prefix)
-      const exception = new BadRequestException('Invalid key: sk_live_abc123def456ghi789jkl012');
+      const exception = new BadRequestException(
+        'Invalid key: sk_live_abc123def456ghi789jkl012',
+      );
 
       filter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
-      expect(response.error.message).not.toContain('sk_live_abc123def456ghi789jkl012');
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
+      expect(response.error.message).not.toContain(
+        'sk_live_abc123def456ghi789jkl012',
+      );
       // Sanitizer uses [API_KEY_REDACTED] format
       expect(response.error.message).toContain('[API_KEY_REDACTED]');
     });
 
     it('should hide internal error details in development mode', () => {
       // In development, detailed error messages are shown but PII is still sanitized
-      const exception = new BadRequestException('User john@example.com with ID 8501015800083 failed');
+      const exception = new BadRequestException(
+        'User john@example.com with ID 8501015800083 failed',
+      );
 
       filter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.message).not.toContain('john@example.com');
       expect(response.error.message).not.toContain('8501015800083');
     });
@@ -331,7 +400,8 @@ describe('GlobalExceptionFilter', () => {
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.code).toBe('CONFLICT');
     });
 
@@ -345,9 +415,12 @@ describe('GlobalExceptionFilter', () => {
 
       filter.catch(exception, mockHost as any);
 
-      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.UNPROCESSABLE_ENTITY);
+      expect(mockResponse.status).toHaveBeenCalledWith(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      );
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.code).toBe('BUSINESS_ERROR');
     });
   });
@@ -366,7 +439,8 @@ describe('GlobalExceptionFilter', () => {
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_GATEWAY);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.code).toBe('XERO_ERROR');
     });
 
@@ -386,7 +460,9 @@ describe('GlobalExceptionFilter', () => {
         ],
       }).compile();
 
-      const productionFilter = productionModule.get<GlobalExceptionFilter>(GlobalExceptionFilter);
+      const productionFilter = productionModule.get<GlobalExceptionFilter>(
+        GlobalExceptionFilter,
+      );
 
       // AppException constructor: (message, code, statusCode, details)
       const exception = new AppException(
@@ -398,10 +474,13 @@ describe('GlobalExceptionFilter', () => {
 
       productionFilter.catch(exception, mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       // In production, sensitive details should be sanitized or omitted
       if (response.error.details) {
-        expect(JSON.stringify(response.error.details)).not.toContain('secret_key');
+        expect(JSON.stringify(response.error.details)).not.toContain(
+          'secret_key',
+        );
       }
     });
   });
@@ -410,14 +489,16 @@ describe('GlobalExceptionFilter', () => {
     it('should always include success: false', () => {
       filter.catch(new BadRequestException(), mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.success).toBe(false);
     });
 
     it('should always include error object with required fields', () => {
       filter.catch(new BadRequestException(), mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error).toBeDefined();
       expect(response.error.code).toBeDefined();
       expect(response.error.message).toBeDefined();
@@ -428,7 +509,8 @@ describe('GlobalExceptionFilter', () => {
     it('should include valid ISO timestamp', () => {
       filter.catch(new BadRequestException(), mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       const timestamp = new Date(response.error.timestamp);
       expect(timestamp.toISOString()).toBe(response.error.timestamp);
     });
@@ -436,7 +518,8 @@ describe('GlobalExceptionFilter', () => {
     it('should include request path', () => {
       filter.catch(new BadRequestException(), mockHost as any);
 
-      const response: StandardErrorResponse = mockResponse.json.mock.calls[0][0];
+      const response: StandardErrorResponse =
+        mockResponse.json.mock.calls[0][0];
       expect(response.error.path).toBe('/api/test');
     });
   });
@@ -459,7 +542,9 @@ describe('GlobalExceptionFilter', () => {
       };
 
       // Spy on logger
-      const loggerSpy = jest.spyOn(filter['logger'], 'warn').mockImplementation();
+      const loggerSpy = jest
+        .spyOn(filter['logger'], 'warn')
+        .mockImplementation();
 
       filter.catch(new BadRequestException(), hostWithUser as any);
 

@@ -441,7 +441,7 @@ export class CertificateOfServiceService {
 
       doc.moveDown(0.5);
       doc.fontSize(7).fillColor('#888888');
-      doc.text(`Generated on ${this.formatDate(new Date())} by CrecheBooks`, {
+      doc.text(`Generated on ${this.formatDate(new Date())}`, {
         align: 'center',
       });
 

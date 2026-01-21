@@ -53,6 +53,8 @@ function toResponse(
     idNumber: parent.idNumber,
     address: parent.address,
     preferredCommunication: parent.preferredContact || 'EMAIL',
+    // TASK-WA-004: WhatsApp opt-in consent (POPIA compliant)
+    whatsappOptIn: parent.whatsappOptIn ?? false,
     isActive: parent.isActive,
     children: parent.children || [],
     createdAt: parent.createdAt,

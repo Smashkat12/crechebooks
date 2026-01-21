@@ -184,6 +184,27 @@ export class EnrollChildDataDto {
     description: 'Enrollment invoice (if created successfully)',
   })
   invoice?: EnrollmentInvoiceSummaryDto | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Error message if invoice creation failed (enrollment still succeeded)',
+  })
+  invoice_error?: string | null;
+
+  @ApiProperty({
+    description: 'Whether welcome pack email was sent successfully',
+  })
+  welcome_pack_sent!: boolean;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Error message if welcome pack delivery failed (enrollment still succeeded)',
+  })
+  welcome_pack_error?: string | null;
 }
 
 /**

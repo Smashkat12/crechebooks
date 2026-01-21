@@ -105,6 +105,7 @@ import {
   AccruedChargeSummaryDto,
 } from '../../database/dto/accrued-bank-charge.dto';
 import { SplitTransactionMatcherService } from '../../database/services/split-transaction-matcher.service';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import {
   SplitXeroTransactionDto,
   DetectSplitParamsDto,
@@ -130,6 +131,7 @@ export class ReconciliationController {
     private readonly splitTransactionMatcherService: SplitTransactionMatcherService,
     private readonly accruedBankChargeService: AccruedBankChargeService,
     private readonly xeroTransactionSplitService: XeroTransactionSplitService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
@@ -594,7 +596,13 @@ export class ReconciliationController {
     let mimeType: string;
     let filename: string;
 
-    const tenantName = 'CrecheBooks'; // Default branding
+    // Fetch tenant name for white-labeling
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: user.tenantId },
+      select: { name: true, tradingName: true },
+    });
+    const tenantName =
+      tenant?.tradingName ?? tenant?.name ?? 'Financial Report';
 
     if (format === 'pdf') {
       buffer = await this.financialReportService.exportIncomeStatementPDF(
@@ -736,7 +744,13 @@ export class ReconciliationController {
     let mimeType: string;
     let filename: string;
 
-    const tenantName = 'CrecheBooks'; // Default branding
+    // Fetch tenant name for white-labeling
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: user.tenantId },
+      select: { name: true, tradingName: true },
+    });
+    const tenantName =
+      tenant?.tradingName ?? tenant?.name ?? 'Financial Report';
 
     if (format === 'pdf') {
       buffer = await this.financialReportService.exportTrialBalancePDF(
@@ -867,12 +881,25 @@ export class ReconciliationController {
     let mimeType: string;
     let filename: string;
 
+    // Fetch tenant name for white-labeling
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: user.tenantId },
+      select: { name: true, tradingName: true },
+    });
+    const tenantName = tenant?.tradingName ?? tenant?.name ?? 'Balance Sheet';
+
     if (format === 'pdf') {
-      buffer = await this.balanceSheetService.exportToPdf(balanceSheet);
+      buffer = await this.balanceSheetService.exportToPdf(
+        balanceSheet,
+        tenantName,
+      );
       mimeType = 'application/pdf';
       filename = `balance-sheet-${asAtDate}.pdf`;
     } else {
-      buffer = await this.balanceSheetService.exportToExcel(balanceSheet);
+      buffer = await this.balanceSheetService.exportToExcel(
+        balanceSheet,
+        tenantName,
+      );
       mimeType =
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       filename = `balance-sheet-${asAtDate}.xlsx`;

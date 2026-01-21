@@ -1,25 +1,38 @@
 /**
  * Invoice Delivery Service
  * TASK-BILL-013: Invoice Delivery Service
+ * TASK-BILL-042: Email Templates and PDF Attachments
  *
  * @module database/services/invoice-delivery
  * @description Delivers invoices via email and WhatsApp.
  * Maps parent's PreferredContact to delivery channel.
  * Tracks delivery attempts with audit logging.
  *
+ * Email delivery includes:
+ * - HTML-formatted email using EmailTemplateService
+ * - PDF invoice attachment using InvoicePdfService
+ *
  * CRITICAL: Fail-fast with detailed error logging.
  * CRITICAL: All operations must filter by tenantId for multi-tenant isolation.
  * CRITICAL: No workarounds or fallbacks - fail with BusinessException.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Invoice } from '@prisma/client';
 import { InvoiceRepository } from '../repositories/invoice.repository';
 import { InvoiceLineRepository } from '../repositories/invoice-line.repository';
 import { ParentRepository } from '../repositories/parent.repository';
+import { TenantRepository } from '../repositories/tenant.repository';
+import { ChildRepository } from '../repositories/child.repository';
 import { AuditLogService } from './audit-log.service';
+import { InvoicePdfService } from './invoice-pdf.service';
 import { EmailService } from '../../integrations/email/email.service';
 import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
+import {
+  EmailTemplateService,
+  InvoiceEmailData,
+} from '../../common/services/email-template/email-template.service';
 import {
   DeliveryResult,
   SendInvoicesDto,
@@ -48,9 +61,16 @@ export class InvoiceDeliveryService {
     private readonly invoiceRepo: InvoiceRepository,
     private readonly invoiceLineRepo: InvoiceLineRepository,
     private readonly parentRepo: ParentRepository,
+    private readonly tenantRepo: TenantRepository,
+    private readonly childRepo: ChildRepository,
     private readonly auditLogService: AuditLogService,
     private readonly emailService: EmailService,
     private readonly whatsAppService: WhatsAppService,
+    private readonly emailTemplateService: EmailTemplateService,
+    private readonly invoicePdfService: InvoicePdfService,
+    // TASK-WA-007: WhatsApp provider service for Twilio/Meta routing
+    @Optional()
+    private readonly whatsAppProviderService?: WhatsAppProviderService,
   ) {}
 
   /**
@@ -112,6 +132,10 @@ export class InvoiceDeliveryService {
   /**
    * Deliver a single invoice to the parent
    *
+   * TASK-BILL-042: Enhanced delivery with HTML templates and PDF attachments
+   * - Email: HTML-formatted email using EmailTemplateService + PDF attachment
+   * - WhatsApp: Plain text message (PDF not supported)
+   *
    * @param tenantId - Tenant ID for isolation
    * @param invoiceId - Invoice to deliver
    * @param methodOverride - Optional override for delivery method
@@ -144,6 +168,19 @@ export class InvoiceDeliveryService {
       throw new NotFoundException('Parent', invoice.parentId);
     }
 
+    // Load tenant for branding
+    const tenant = await this.tenantRepo.findById(tenantId);
+    if (!tenant) {
+      throw new NotFoundException('Tenant', tenantId);
+    }
+
+    // Load child for payment reference
+    const child = await this.childRepo.findById(invoice.childId, tenantId);
+    if (!child) {
+      throw new NotFoundException('Child', invoice.childId);
+    }
+    const childName = `${child.firstName} ${child.lastName}`;
+
     // Determine delivery method
     const method =
       methodOverride ??
@@ -154,16 +191,12 @@ export class InvoiceDeliveryService {
     // Get invoice lines for email body
     const lines = await this.invoiceLineRepo.findByInvoice(invoiceId);
 
-    // Build message content
-    const subject = `Invoice ${invoice.invoiceNumber}`;
-    const body = this.buildInvoiceMessage(invoice, lines);
-
     // Track channel success/failure
     let emailSucceeded = false;
     let whatsAppSucceeded = false;
     let lastError: Error | null = null;
 
-    // Deliver via email
+    // Deliver via email with HTML template and PDF attachment
     if (method === DeliveryMethod.EMAIL || method === DeliveryMethod.BOTH) {
       if (!parent.email) {
         throw new BusinessException(
@@ -173,10 +206,95 @@ export class InvoiceDeliveryService {
       }
 
       try {
-        await this.emailService.sendEmail(parent.email, subject, body);
+        // TASK-BILL-042: Generate HTML email using template service
+        // TASK-BILL-043: Include bank details for payment instructions
+        const templateData: InvoiceEmailData = {
+          // Tenant branding
+          tenantName: tenant.tradingName ?? tenant.name,
+          supportEmail: tenant.email,
+          supportPhone: tenant.phone,
+          // TASK-BILL-043: Bank details for payment instructions
+          bankName: tenant.bankName ?? undefined,
+          bankAccountHolder:
+            tenant.bankAccountHolder ?? tenant.tradingName ?? tenant.name,
+          bankAccountNumber: tenant.bankAccountNumber ?? undefined,
+          bankBranchCode: tenant.bankBranchCode ?? undefined,
+          bankAccountType: tenant.bankAccountType ?? undefined,
+          bankSwiftCode: tenant.bankSwiftCode ?? undefined,
+          // Recipient
+          recipientName: `${parent.firstName} ${parent.lastName}`,
+          // Invoice details
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceDate: invoice.issueDate,
+          dueDate: invoice.dueDate,
+          billingPeriodStart: invoice.billingPeriodStart,
+          billingPeriodEnd: invoice.billingPeriodEnd,
+          subtotalCents: invoice.subtotalCents,
+          vatCents: invoice.vatCents,
+          totalCents: invoice.totalCents,
+          // Line items
+          lineItems: lines.map((line) => ({
+            description: line.description,
+            quantity:
+              typeof line.quantity === 'number'
+                ? line.quantity
+                : line.quantity.toNumber(),
+            unitPriceCents: line.unitPriceCents,
+            totalCents: line.totalCents,
+          })),
+          // Child name for payment reference
+          childName,
+        };
+
+        const { text, html, subject } =
+          this.emailTemplateService.renderInvoiceEmail(templateData);
+
+        this.logger.log(
+          `TASK-BILL-042: Rendered HTML template for invoice ${invoice.invoiceNumber}`,
+        );
+
+        // TASK-BILL-042: Generate PDF attachment
+        const pdfBuffer = await this.invoicePdfService.generatePdf(
+          tenantId,
+          invoiceId,
+        );
+
+        this.logger.log(
+          `TASK-BILL-042: Generated PDF (${pdfBuffer.length} bytes) for invoice ${invoice.invoiceNumber}`,
+        );
+
+        // Send email with HTML body and PDF attachment
+        // Include custom variables for Mailgun webhook correlation
+        const emailResult = await this.emailService.sendEmailWithOptions({
+          to: parent.email,
+          subject,
+          body: text, // Plain text fallback
+          html, // HTML body
+          attachments: [
+            {
+              filename: `${invoice.invoiceNumber}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ],
+          tags: ['invoice', `tenant-${tenantId}`],
+          trackOpens: true,
+          trackClicks: true,
+          customVariables: {
+            invoiceId: invoice.id,
+            tenantId: invoice.tenantId,
+            documentType: 'invoice',
+            invoiceNumber: invoice.invoiceNumber,
+          },
+        });
+
+        this.logger.log(
+          `TASK-BILL-035: Email sent with messageId ${emailResult.messageId} for webhook tracking`,
+        );
+
         emailSucceeded = true;
         this.logger.log(
-          `Email sent for invoice ${invoice.invoiceNumber} to ${parent.email}`,
+          `TASK-BILL-042: Email sent for invoice ${invoice.invoiceNumber} to ${parent.email} with HTML template and PDF attachment`,
         );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -193,6 +311,7 @@ export class InvoiceDeliveryService {
     }
 
     // Deliver via WhatsApp
+    // TASK-WA-007: Use WhatsAppProviderService (Twilio/Meta) when available
     if (method === DeliveryMethod.WHATSAPP || method === DeliveryMethod.BOTH) {
       if (!parent.whatsapp) {
         throw new BusinessException(
@@ -202,11 +321,37 @@ export class InvoiceDeliveryService {
       }
 
       try {
-        await this.whatsAppService.sendMessage(parent.whatsapp, body);
-        whatsAppSucceeded = true;
-        this.logger.log(
-          `WhatsApp sent for invoice ${invoice.invoiceNumber} to ${parent.whatsapp}`,
-        );
+        // TASK-WA-007: Use provider service for structured invoice notification
+        if (this.whatsAppProviderService?.isConfigured()) {
+          const organizationName = tenant.tradingName ?? tenant.name;
+          const whatsAppResult =
+            await this.whatsAppProviderService.sendInvoiceNotification(
+              tenantId,
+              parent.whatsapp,
+              `${parent.firstName} ${parent.lastName}`.trim(),
+              invoice.invoiceNumber,
+              invoice.totalCents / 100, // Convert cents to Rands
+              invoice.dueDate,
+              organizationName, // Use tenant name for white-labeling
+            );
+
+          if (whatsAppResult.success) {
+            whatsAppSucceeded = true;
+            this.logger.log(
+              `TASK-WA-007: WhatsApp invoice notification sent via provider for ${invoice.invoiceNumber} to ${parent.whatsapp}`,
+            );
+          } else {
+            throw new Error(whatsAppResult.error || 'WhatsApp delivery failed');
+          }
+        } else {
+          // Fallback to legacy WhatsApp service (Meta Cloud API)
+          const body = this.buildInvoiceMessage(invoice, lines);
+          await this.whatsAppService.sendMessage(parent.whatsapp, body);
+          whatsAppSucceeded = true;
+          this.logger.log(
+            `WhatsApp sent for invoice ${invoice.invoiceNumber} to ${parent.whatsapp}`,
+          );
+        }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         this.logger.error(

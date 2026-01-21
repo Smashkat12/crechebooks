@@ -448,7 +448,7 @@ export class ExitPackPdfService {
       );
 
       doc.moveDown(0.5);
-      doc.text(`Generated on ${this.formatDate(new Date())} by CrecheBooks`, {
+      doc.text(`Generated on ${this.formatDate(new Date())}`, {
         align: 'center',
       });
 

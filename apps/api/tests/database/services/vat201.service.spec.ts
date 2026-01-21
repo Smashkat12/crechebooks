@@ -9,6 +9,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { VatService } from '../../../src/database/services/vat.service';
 import { Vat201Service } from '../../../src/database/services/vat201.service';
+import { VatAdjustmentService } from '../../../src/database/services/vat-adjustment.service';
 import {
   TaxStatus,
   InvoiceStatus,
@@ -27,7 +28,12 @@ describe('Vat201Service', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PrismaService, VatService, Vat201Service],
+      providers: [
+        PrismaService,
+        VatService,
+        VatAdjustmentService,
+        Vat201Service,
+      ],
     }).compile();
 
     prisma = module.get<PrismaService>(PrismaService);

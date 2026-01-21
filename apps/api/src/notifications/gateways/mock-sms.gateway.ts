@@ -66,7 +66,7 @@ export class MockSmsGateway implements ISmsGateway {
       message: '[MOCK] SMS sent successfully',
       to,
       messageId,
-      senderId: options?.senderId || 'CrecheBooks',
+      senderId: options?.senderId || 'Notify',
       messageLength: message.length,
       priority: options?.priority || 'normal',
     });

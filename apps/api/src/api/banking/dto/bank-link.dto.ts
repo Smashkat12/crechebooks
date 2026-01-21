@@ -353,7 +353,15 @@ export class BankTransactionDto {
 
   @ApiProperty({
     description: 'Transaction type',
-    enum: ['debit', 'credit', 'transfer', 'fee', 'interest', 'reversal', 'other'],
+    enum: [
+      'debit',
+      'credit',
+      'transfer',
+      'fee',
+      'interest',
+      'reversal',
+      'other',
+    ],
     example: 'debit',
   })
   type: string;
@@ -461,7 +469,8 @@ export class ConsentStatusDto {
   daysRemaining: number;
 
   @ApiProperty({
-    description: 'Status: ok, warning (< 14 days), critical (< 7 days), expired',
+    description:
+      'Status: ok, warning (< 14 days), critical (< 7 days), expired',
     enum: ['ok', 'warning', 'critical', 'expired'],
     example: 'warning',
   })

@@ -2,7 +2,7 @@
 
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit, Mail, Phone, UserPlus } from 'lucide-react';
+import { ArrowLeft, Edit, Mail, Phone, UserPlus, MessageSquare, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -202,8 +202,32 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
               <p className="font-medium">{parent.phone ?? 'Not provided'}</p>
             </div>
             <div>
+              <p className="text-sm text-muted-foreground">WhatsApp</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{parent.whatsapp ?? 'Not provided'}</p>
+                {/* TASK-WA-004: WhatsApp opt-in status indicator */}
+                {parent.whatsapp && (
+                  (parent as unknown as { whatsappOptIn?: boolean }).whatsappOptIn ? (
+                    <Badge variant="outline" className="text-green-600 border-green-600">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Opted In
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-600 border-amber-600">
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Not Opted In
+                    </Badge>
+                  )
+                )}
+              </div>
+            </div>
+            <div>
               <p className="text-sm text-muted-foreground">Address</p>
               <p className="font-medium">{parent.address ?? 'Not provided'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Preferred Communication</p>
+              <p className="font-medium">{parent.preferredContact ?? 'Email'}</p>
             </div>
           </CardContent>
         </Card>

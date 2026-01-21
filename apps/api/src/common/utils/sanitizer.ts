@@ -29,8 +29,7 @@ const SENSITIVE_PATTERNS = {
   bankAccount: /\b\d{8,16}\b/g,
 
   // API keys (typically long alphanumeric strings with prefixes)
-  apiKey:
-    /\b(sk_|pk_|api_|key_|token_|secret_)[A-Za-z0-9_-]{20,}\b/gi,
+  apiKey: /\b(sk_|pk_|api_|key_|token_|secret_)[A-Za-z0-9_-]{20,}\b/gi,
 
   // Generic tokens (long alphanumeric strings)
   token: /\b[A-Za-z0-9_-]{40,}\b/g,
@@ -134,7 +133,8 @@ export function sanitizeString(
       continue;
     }
 
-    const replacement = REPLACEMENTS[patternName as keyof typeof SENSITIVE_PATTERNS];
+    const replacement =
+      REPLACEMENTS[patternName as keyof typeof SENSITIVE_PATTERNS];
     result = result.replace(pattern, replacement);
   }
 
@@ -156,10 +156,7 @@ export function sanitizeString(
 /**
  * Recursively sanitize an object by removing sensitive fields and patterns
  */
-export function sanitizeObject<T>(
-  obj: T,
-  options: SanitizerOptions = {},
-): T {
+export function sanitizeObject<T>(obj: T, options: SanitizerOptions = {}): T {
   if (obj === null || obj === undefined) {
     return obj;
   }
@@ -259,10 +256,7 @@ export function sanitizeStackTrace(stack: string): string {
   sanitized = sanitized.replace(/C:\\Users\\[^\\]+\\/gi, 'C:\\Users\\[USER]\\');
 
   // Remove node_modules paths (keep package names)
-  sanitized = sanitized.replace(
-    /node_modules\/([^/]+)/g,
-    'node_modules/$1',
-  );
+  sanitized = sanitized.replace(/node_modules\/([^/]+)/g, 'node_modules/$1');
 
   return sanitized;
 }

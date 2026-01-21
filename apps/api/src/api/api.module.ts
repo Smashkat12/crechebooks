@@ -13,6 +13,7 @@ import { SettingsModule } from './settings/settings.module';
 import { XeroModule } from '../integrations/xero/xero.module';
 import { XeroPayrollModule } from './xero/xero-payroll.module';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { CommunicationsApiModule } from './communications/communications-api.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     XeroModule,
     XeroPayrollModule,
     IntegrationsModule,
+    CommunicationsApiModule,
   ],
   exports: [
     AuthModule,
@@ -46,6 +48,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
     XeroModule,
     XeroPayrollModule,
     IntegrationsModule,
+    CommunicationsApiModule,
   ],
 })
 export class ApiModule {}

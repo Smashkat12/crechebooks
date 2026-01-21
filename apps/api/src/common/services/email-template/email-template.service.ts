@@ -25,6 +25,7 @@ export enum EmailTemplateName {
   STATEMENT_EMAIL = 'statement_email',
   REMINDER_EMAIL = 'reminder_email',
   PAYMENT_RECEIPT = 'payment_receipt',
+  WELCOME_PACK_EMAIL = 'welcome_pack_email',
 }
 
 /**
@@ -45,6 +46,19 @@ export interface TenantBranding {
   supportEmail?: string;
   /** Support phone number */
   supportPhone?: string;
+  // TASK-BILL-043: Bank details for payment instructions in emails
+  /** Bank name */
+  bankName?: string;
+  /** Bank account holder name */
+  bankAccountHolder?: string;
+  /** Bank account number */
+  bankAccountNumber?: string;
+  /** Bank branch code */
+  bankBranchCode?: string;
+  /** Bank account type (e.g., 'Cheque', 'Savings') */
+  bankAccountType?: string;
+  /** SWIFT code for international transfers */
+  bankSwiftCode?: string;
 }
 
 /**
@@ -75,6 +89,8 @@ export interface InvoiceEmailData extends BaseEmailTemplateData {
     unitPriceCents: number;
     totalCents: number;
   }>;
+  /** Child's full name for payment reference */
+  childName: string;
   /** Optional link to view invoice online */
   viewInvoiceUrl?: string;
   /** Optional link to pay invoice */
@@ -99,6 +115,8 @@ export interface StatementEmailData extends BaseEmailTemplateData {
     creditCents: number;
     balanceCents: number;
   }>;
+  /** Children's names for payment reference (may be multiple) */
+  childNames: string;
   /** Optional link to view statement online */
   viewStatementUrl?: string;
 }
@@ -138,13 +156,36 @@ export interface PaymentReceiptData extends BaseEmailTemplateData {
 }
 
 /**
+ * Welcome pack email template data (TASK-ENROL-007)
+ */
+export interface WelcomePackEmailData extends BaseEmailTemplateData {
+  /** Child's full name */
+  childName: string;
+  /** Enrollment start date */
+  startDate: Date | string;
+  /** Fee tier/structure name */
+  feeTierName: string;
+  /** Monthly fee in cents */
+  monthlyFeeCents: number;
+  /** Creche operating hours */
+  operatingHours?: string;
+  /** Custom welcome message from tenant */
+  welcomeMessage?: string;
+  /** Link to download welcome pack PDF */
+  welcomePackDownloadUrl?: string;
+  /** Link to parent portal (if applicable) */
+  parentPortalUrl?: string;
+}
+
+/**
  * Union type for all template data types
  */
 export type EmailTemplateData =
   | InvoiceEmailData
   | StatementEmailData
   | ReminderEmailData
-  | PaymentReceiptData;
+  | PaymentReceiptData
+  | WelcomePackEmailData;
 
 /**
  * Rendered email result
@@ -347,6 +388,16 @@ export class EmailTemplateService implements OnModuleInit {
       Handlebars.compile(this.getEmbeddedReceiptTextTemplate()),
     );
 
+    // Welcome pack email template (TASK-ENROL-007)
+    this.templates.set(
+      EmailTemplateName.WELCOME_PACK_EMAIL,
+      Handlebars.compile(this.getEmbeddedWelcomePackHtmlTemplate()),
+    );
+    this.textTemplates.set(
+      EmailTemplateName.WELCOME_PACK_EMAIL,
+      Handlebars.compile(this.getEmbeddedWelcomePackTextTemplate()),
+    );
+
     this.logger.log('Loaded embedded templates');
   }
 
@@ -489,13 +540,21 @@ export class EmailTemplateService implements OnModuleInit {
   }
 
   /**
+   * Render welcome pack email (TASK-ENROL-007)
+   */
+  renderWelcomePackEmail(data: WelcomePackEmailData): RenderedEmail {
+    return this.render(EmailTemplateName.WELCOME_PACK_EMAIL, data);
+  }
+
+  /**
    * Generate email subject based on template type
    */
   private generateSubject(
     templateName: EmailTemplateName,
     data: Record<string, unknown>,
   ): string {
-    const tenantName = (data.tenantName as string) || 'CrecheBooks';
+    // Use generic fallback for white-labeling when tenant name not provided
+    const tenantName = (data.tenantName as string) || 'Our Organization';
 
     switch (templateName) {
       case EmailTemplateName.INVOICE_EMAIL:
@@ -508,6 +567,8 @@ export class EmailTemplateService implements OnModuleInit {
           : `Payment Reminder - Invoice ${data.invoiceNumber || ''}`;
       case EmailTemplateName.PAYMENT_RECEIPT:
         return `Payment Receipt ${data.receiptNumber || ''} from ${tenantName}`;
+      case EmailTemplateName.WELCOME_PACK_EMAIL:
+        return `Welcome to ${tenantName} - ${(data as unknown as WelcomePackEmailData).childName || 'Your Child'}'s Enrollment`;
       default:
         return `Message from ${tenantName}`;
     }
@@ -647,6 +708,51 @@ export class EmailTemplateService implements OnModuleInit {
       </table>
     </div>
 
+    <!-- Bank Details / Payment Instructions -->
+    {{#if bankAccountNumber}}
+    <div style="background-color: #e8f4fd; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #b8daff;">
+      <h3 style="margin: 0 0 15px 0; color: {{defaultColor primaryColor '#007bff'}}; font-size: 16px;">Payment Instructions</h3>
+      <p style="margin: 0 0 15px 0; color: #555; font-size: 14px;">Please use the following banking details to make your payment:</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <tr>
+          <td style="padding: 8px 0; color: #555; width: 45%;">Bank:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankName}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Holder:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountHolder}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Number:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountNumber}}</td>
+        </tr>
+        {{#if bankBranchCode}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Branch Code:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankBranchCode}}</td>
+        </tr>
+        {{/if}}
+        {{#if bankAccountType}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Type:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountType}}</td>
+        </tr>
+        {{/if}}
+        {{#if bankSwiftCode}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">SWIFT Code:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankSwiftCode}}</td>
+        </tr>
+        {{/if}}
+      </table>
+      <div style="background-color: #fff3cd; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 4px solid #ffc107;">
+        <p style="margin: 0; font-size: 13px; color: #856404;">
+          <strong>Reference:</strong> Please use "{{childName}}" as the payment reference.
+        </p>
+      </div>
+    </div>
+    {{/if}}
+
     {{#if paymentUrl}}
     <div style="text-align: center; margin: 20px 0;">
       <a href="{{paymentUrl}}" style="background-color: {{defaultColor primaryColor '#007bff'}}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Pay Now</a>
@@ -694,6 +800,21 @@ VAT (15%): {{formatCurrency vatCents}}
 TOTAL DUE: {{formatCurrency totalCents}}
 ----------------------------------------
 
+{{#if bankAccountNumber}}
+PAYMENT INSTRUCTIONS
+--------------------
+Please use the following banking details to make your payment:
+
+Bank: {{bankName}}
+Account Holder: {{bankAccountHolder}}
+Account Number: {{bankAccountNumber}}
+{{#if bankBranchCode}}Branch Code: {{bankBranchCode}}{{/if}}
+{{#if bankAccountType}}Account Type: {{bankAccountType}}{{/if}}
+{{#if bankSwiftCode}}SWIFT Code: {{bankSwiftCode}}{{/if}}
+
+Reference: Please use "{{childName}}" as the payment reference.
+{{/if}}
+
 Please ensure payment is made by the due date.
 
 Thank you for your business.
@@ -716,83 +837,142 @@ Questions? Contact us at {{supportEmail}}
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Account Statement</title>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background-color: {{defaultColor primaryColor '#007bff'}}; color: white; padding: 20px; text-align: center;">
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 0; background-color: #f5f5f5;">
+  <!-- Header with branding -->
+  <div style="background: linear-gradient(135deg, {{defaultColor primaryColor '#007bff'}} 0%, {{defaultColor secondaryColor '#0056b3'}} 100%); color: white; padding: 30px 25px; text-align: center; border-radius: 0 0 20px 20px;">
     {{#if tenantLogo}}
-    <img src="{{tenantLogo}}" alt="{{tenantName}}" style="max-height: 60px; margin-bottom: 10px;">
+    <img src="{{tenantLogo}}" alt="{{tenantName}}" style="max-height: 70px; margin-bottom: 15px;">
     {{/if}}
-    <h1 style="margin: 0; font-size: 24px;">{{tenantName}}</h1>
-    <p style="margin: 5px 0 0 0;">Account Statement</p>
+    <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;">{{tenantName}}</h1>
+    <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.9;">Account Statement</p>
   </div>
 
-  <div style="padding: 20px; background-color: #f9f9f9;">
-    <p>Dear {{recipientName}},</p>
-    <p>Please find your account statement for the period {{formatDate periodStart}} to {{formatDate periodEnd}}.</p>
+  <!-- Main content -->
+  <div style="padding: 30px 25px; background-color: #ffffff; margin: 0;">
+    <p style="font-size: 16px; margin-bottom: 5px;">Dear <strong>{{recipientName}}</strong>,</p>
+    <p style="color: #666; margin-top: 0;">Please find your account statement for the period <strong>{{formatDate periodStart}}</strong> to <strong>{{formatDate periodEnd}}</strong>.</p>
+    <p style="color: #666; font-size: 14px;">A detailed PDF statement is attached to this email for your records.</p>
 
-    <div style="background-color: white; padding: 15px; border: 1px solid #ddd; margin: 20px 0;">
+    <!-- Account Summary Card -->
+    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 12px; margin: 25px 0; border-left: 4px solid {{defaultColor primaryColor '#007bff'}};">
+      <h3 style="margin: 0 0 15px 0; color: {{defaultColor primaryColor '#007bff'}}; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">Account Summary</h3>
       <table style="width: 100%; border-collapse: collapse;">
         <tr>
-          <td style="padding: 8px 0;"><strong>Statement Date:</strong></td>
-          <td style="padding: 8px 0; text-align: right;">{{formatDate statementDate}}</td>
+          <td style="padding: 10px 0; color: #555;">Statement Date:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500;">{{formatDate statementDate}}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0;"><strong>Opening Balance:</strong></td>
-          <td style="padding: 8px 0; text-align: right;">{{formatCurrency openingBalanceCents}}</td>
+          <td style="padding: 10px 0; color: #555;">Opening Balance:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500;">{{formatCurrency openingBalanceCents}}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0;"><strong>Total Charges:</strong></td>
-          <td style="padding: 8px 0; text-align: right;">{{formatCurrency totalChargesCents}}</td>
+          <td style="padding: 10px 0; color: #555;">Total Charges:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500; color: #dc3545;">{{formatCurrency totalChargesCents}}</td>
         </tr>
         <tr>
-          <td style="padding: 8px 0;"><strong>Total Payments:</strong></td>
-          <td style="padding: 8px 0; text-align: right; color: green;">-{{formatCurrency totalPaymentsCents}}</td>
+          <td style="padding: 10px 0; color: #555;">Total Payments:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500; color: #28a745;">-{{formatCurrency totalPaymentsCents}}</td>
         </tr>
-        <tr style="font-size: 18px; color: {{defaultColor primaryColor '#007bff'}};">
-          <td style="padding: 12px 0; border-top: 2px solid #ddd;"><strong>Closing Balance:</strong></td>
-          <td style="padding: 12px 0; text-align: right; border-top: 2px solid #ddd;"><strong>{{formatCurrency closingBalanceCents}}</strong></td>
+        <tr style="border-top: 2px solid {{defaultColor primaryColor '#007bff'}};">
+          <td style="padding: 15px 0 10px 0; font-size: 18px; font-weight: 600; color: #333;">Amount Due:</td>
+          <td style="padding: 15px 0 10px 0; text-align: right; font-size: 22px; font-weight: 700; color: {{defaultColor primaryColor '#007bff'}};">{{formatCurrency closingBalanceCents}}</td>
         </tr>
       </table>
     </div>
 
-    <h3 style="border-bottom: 2px solid {{defaultColor primaryColor '#007bff'}}; padding-bottom: 10px;">Transaction History</h3>
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
-      <thead>
-        <tr style="background-color: #f0f0f0;">
-          <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Date</th>
-          <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
-          <th style="padding: 8px; text-align: right; border-bottom: 1px solid #ddd;">Debit</th>
-          <th style="padding: 8px; text-align: right; border-bottom: 1px solid #ddd;">Credit</th>
-          <th style="padding: 8px; text-align: right; border-bottom: 1px solid #ddd;">Balance</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{#each transactions}}
-        <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #eee;">{{formatDate date}}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #eee;">{{description}}</td>
-          <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">{{#ifPositive debitCents}}{{formatCurrency debitCents}}{{/ifPositive}}</td>
-          <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee; color: green;">{{#ifPositive creditCents}}{{formatCurrency creditCents}}{{/ifPositive}}</td>
-          <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">{{formatCurrency balanceCents}}</td>
-        </tr>
-        {{/each}}
-      </tbody>
-    </table>
+    <!-- Recent Transactions -->
+    <h3 style="border-bottom: 2px solid {{defaultColor primaryColor '#007bff'}}; padding-bottom: 10px; color: #333; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">Recent Transactions</h3>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px;">
+        <thead>
+          <tr style="background-color: {{defaultColor primaryColor '#007bff'}}; color: white;">
+            <th style="padding: 12px 8px; text-align: left; border-radius: 6px 0 0 0;">Date</th>
+            <th style="padding: 12px 8px; text-align: left;">Description</th>
+            <th style="padding: 12px 8px; text-align: right;">Debit</th>
+            <th style="padding: 12px 8px; text-align: right;">Credit</th>
+            <th style="padding: 12px 8px; text-align: right; border-radius: 0 6px 0 0;">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each transactions}}
+          <tr style="{{#if @odd}}background-color: #f8f9fa;{{/if}}">
+            <td style="padding: 10px 8px; border-bottom: 1px solid #eee;">{{formatDate date}}</td>
+            <td style="padding: 10px 8px; border-bottom: 1px solid #eee;">{{description}}</td>
+            <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee; color: #dc3545;">{{#ifPositive debitCents}}{{formatCurrency debitCents}}{{/ifPositive}}</td>
+            <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee; color: #28a745;">{{#ifPositive creditCents}}{{formatCurrency creditCents}}{{/ifPositive}}</td>
+            <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee; font-weight: 600;">{{formatCurrency balanceCents}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
 
-    {{#if viewStatementUrl}}
-    <div style="text-align: center; margin: 20px 0;">
-      <a href="{{viewStatementUrl}}" style="background-color: {{defaultColor primaryColor '#007bff'}}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View Full Statement</a>
+    <!-- Bank Details / Payment Instructions (TASK-BILL-043) -->
+    {{#if bankAccountNumber}}
+    <div style="background-color: #e8f4fd; padding: 20px; border-radius: 12px; margin: 25px 0; border: 1px solid #b8daff;">
+      <h3 style="margin: 0 0 15px 0; color: {{defaultColor primaryColor '#007bff'}}; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+        <span style="margin-right: 8px;">&#128179;</span>Payment Instructions
+      </h3>
+      <p style="margin: 0 0 15px 0; color: #555; font-size: 14px;">Please use the following banking details to make your payment:</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <tr>
+          <td style="padding: 8px 0; color: #555; width: 45%;">Bank:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankName}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Holder:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountHolder}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Number:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountNumber}}</td>
+        </tr>
+        {{#if bankBranchCode}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Branch Code:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankBranchCode}}</td>
+        </tr>
+        {{/if}}
+        {{#if bankAccountType}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Type:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountType}}</td>
+        </tr>
+        {{/if}}
+        {{#if bankSwiftCode}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">SWIFT Code:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankSwiftCode}}</td>
+        </tr>
+        {{/if}}
+      </table>
+      <div style="background-color: #fff3cd; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 4px solid #ffc107;">
+        <p style="margin: 0; font-size: 13px; color: #856404;">
+          <strong>Reference:</strong> Please use "{{childNames}}" as the payment reference.
+        </p>
+      </div>
     </div>
     {{/if}}
+
+    {{#if viewStatementUrl}}
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="{{viewStatementUrl}}" style="background: linear-gradient(135deg, {{defaultColor primaryColor '#007bff'}} 0%, {{defaultColor secondaryColor '#0056b3'}} 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: 600; box-shadow: 0 4px 15px rgba(0,123,255,0.3);">View Full Statement Online</a>
+    </div>
+    {{/if}}
+
+    <p style="color: #666; font-size: 14px; margin-top: 25px;">If you have any questions about your statement, please don't hesitate to contact us.</p>
+    <p style="color: #666; font-size: 14px;">Thank you for choosing us for your childcare needs.</p>
   </div>
 
-  <div style="background-color: #333; color: #999; padding: 20px; text-align: center; font-size: 12px;">
+  <!-- Footer -->
+  <div style="background-color: #2c3e50; color: #bdc3c7; padding: 25px; text-align: center; font-size: 12px;">
     {{#if footerText}}
-    <p>{{footerText}}</p>
+    <p style="margin: 0 0 10px 0;">{{footerText}}</p>
     {{/if}}
     {{#if supportEmail}}
-    <p>Questions? Contact us at <a href="mailto:{{supportEmail}}" style="color: #007bff;">{{supportEmail}}</a></p>
+    <p style="margin: 0 0 10px 0;">Questions? Contact us at <a href="mailto:{{supportEmail}}" style="color: {{defaultColor primaryColor '#007bff'}}; text-decoration: none;">{{supportEmail}}</a>{{#if supportPhone}} | {{supportPhone}}{{/if}}</p>
     {{/if}}
-    <p>&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+    <p style="margin: 0; opacity: 0.7;">&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
   </div>
 </body>
 </html>`;
@@ -805,29 +985,49 @@ ACCOUNT STATEMENT
 
 Dear {{recipientName}},
 
-Statement for period {{formatDate periodStart}} to {{formatDate periodEnd}}.
+Please find your account statement for the period {{formatDate periodStart}} to {{formatDate periodEnd}}.
+A detailed PDF statement is attached to this email for your records.
 
 Statement Date: {{formatDate statementDate}}
 
-SUMMARY
--------
+ACCOUNT SUMMARY
+---------------
 Opening Balance: {{formatCurrency openingBalanceCents}}
 Total Charges: {{formatCurrency totalChargesCents}}
 Total Payments: -{{formatCurrency totalPaymentsCents}}
-CLOSING BALANCE: {{formatCurrency closingBalanceCents}}
+----------------------------------------
+AMOUNT DUE: {{formatCurrency closingBalanceCents}}
 
-TRANSACTIONS
-------------
+RECENT TRANSACTIONS
+-------------------
 {{#each transactions}}
 {{formatDate date}} | {{description}}
   Debit: {{formatCurrency debitCents}} | Credit: {{formatCurrency creditCents}} | Balance: {{formatCurrency balanceCents}}
 {{/each}}
 
+{{#if bankAccountNumber}}
+PAYMENT INSTRUCTIONS
+--------------------
+Please use the following banking details to make your payment:
+
+Bank: {{bankName}}
+Account Holder: {{bankAccountHolder}}
+Account Number: {{bankAccountNumber}}
+{{#if bankBranchCode}}Branch Code: {{bankBranchCode}}{{/if}}
+{{#if bankAccountType}}Account Type: {{bankAccountType}}{{/if}}
+{{#if bankSwiftCode}}SWIFT Code: {{bankSwiftCode}}{{/if}}
+
+Reference: Please use "{{childNames}}" as the payment reference.
+{{/if}}
+
+If you have any questions about your statement, please don't hesitate to contact us.
+Thank you for choosing us for your childcare needs.
+
 {{#if footerText}}
 {{footerText}}
 {{/if}}
 {{#if supportEmail}}
-Questions? Contact us at {{supportEmail}}
+Questions? Contact us at {{supportEmail}}{{#if supportPhone}} | {{supportPhone}}{{/if}}
 {{/if}}
 
 (c) {{currentYear}} {{tenantName}}`;
@@ -1081,6 +1281,181 @@ Thank you for your payment!
 {{/if}}
 {{#if supportEmail}}
 Questions? Contact us at {{supportEmail}}
+{{/if}}
+
+(c) {{currentYear}} {{tenantName}}`;
+  }
+
+  /**
+   * Welcome pack HTML email template (TASK-ENROL-007)
+   */
+  private getEmbeddedWelcomePackHtmlTemplate(): string {
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to {{tenantName}}</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 0; background-color: #f5f5f5;">
+  <!-- Header with branding -->
+  <div style="background: linear-gradient(135deg, {{defaultColor primaryColor '#007bff'}} 0%, {{defaultColor secondaryColor '#0056b3'}} 100%); color: white; padding: 30px 25px; text-align: center; border-radius: 0 0 20px 20px;">
+    {{#if tenantLogo}}
+    <img src="{{tenantLogo}}" alt="{{tenantName}}" style="max-height: 70px; margin-bottom: 15px;">
+    {{/if}}
+    <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;">{{tenantName}}</h1>
+    <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.9;">Welcome to Our Family!</p>
+  </div>
+
+  <!-- Main content -->
+  <div style="padding: 30px 25px; background-color: #ffffff; margin: 0;">
+    <!-- Welcome banner -->
+    <div style="background-color: #d4edda; border: 1px solid #c3e6cb; padding: 20px; margin-bottom: 25px; border-radius: 10px; text-align: center;">
+      <span style="font-size: 36px;">&#127881;</span>
+      <h2 style="margin: 10px 0 5px 0; color: #155724; font-size: 22px;">Welcome, {{recipientName}}!</h2>
+      <p style="margin: 0; color: #155724; font-size: 15px;">We are thrilled to have {{childName}} joining us!</p>
+    </div>
+
+    {{#if welcomeMessage}}
+    <div style="background-color: #f8f9fa; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid {{defaultColor primaryColor '#007bff'}};">
+      <p style="margin: 0; color: #555; font-style: italic;">{{welcomeMessage}}</p>
+    </div>
+    {{/if}}
+
+    <!-- Enrollment Details Card -->
+    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 12px; margin: 25px 0; border-left: 4px solid {{defaultColor primaryColor '#007bff'}};">
+      <h3 style="margin: 0 0 15px 0; color: {{defaultColor primaryColor '#007bff'}}; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">Enrollment Confirmation</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Child's Name:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 600; color: #333;">{{childName}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Start Date:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 600; color: #333;">{{formatDate startDate}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Fee Structure:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 600; color: #333;">{{feeTierName}}</td>
+        </tr>
+        <tr style="border-top: 2px solid {{defaultColor primaryColor '#007bff'}};">
+          <td style="padding: 15px 0 10px 0; font-size: 16px; font-weight: 600; color: #333;">Monthly Fee:</td>
+          <td style="padding: 15px 0 10px 0; text-align: right; font-size: 20px; font-weight: 700; color: {{defaultColor primaryColor '#007bff'}};">{{formatCurrency monthlyFeeCents}}</td>
+        </tr>
+      </table>
+    </div>
+
+    {{#if operatingHours}}
+    <!-- Operating Hours -->
+    <div style="background-color: #e7f3ff; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px;">
+      <h4 style="margin: 0 0 8px 0; color: {{defaultColor primaryColor '#007bff'}}; font-size: 14px;">
+        <span style="margin-right: 8px;">&#128336;</span>Operating Hours
+      </h4>
+      <p style="margin: 0; color: #333; font-weight: 500;">{{operatingHours}}</p>
+    </div>
+    {{/if}}
+
+    <!-- Next Steps -->
+    <h3 style="border-bottom: 2px solid {{defaultColor primaryColor '#007bff'}}; padding-bottom: 10px; color: #333; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">What's Next?</h3>
+    <ul style="padding-left: 20px; color: #555;">
+      <li style="margin-bottom: 10px;">Review your welcome pack documents for important information about our policies and procedures.</li>
+      <li style="margin-bottom: 10px;">Mark <strong>{{formatDate startDate}}</strong> on your calendar - that's when the adventure begins!</li>
+      <li style="margin-bottom: 10px;">Prepare {{childName}}'s essentials: change of clothes, water bottle, and any comfort items.</li>
+      <li style="margin-bottom: 10px;">Complete any outstanding enrollment forms before the start date.</li>
+      {{#if parentPortalUrl}}
+      <li style="margin-bottom: 10px;">Set up your parent portal account to stay connected with {{childName}}'s daily activities.</li>
+      {{/if}}
+    </ul>
+
+    <!-- Action Buttons -->
+    <div style="text-align: center; margin: 30px 0;">
+      {{#if welcomePackDownloadUrl}}
+      <a href="{{welcomePackDownloadUrl}}" style="background: linear-gradient(135deg, {{defaultColor primaryColor '#007bff'}} 0%, {{defaultColor secondaryColor '#0056b3'}} 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: 600; box-shadow: 0 4px 15px rgba(0,123,255,0.3); margin: 5px;">
+        <span style="margin-right: 8px;">&#128196;</span>Download Welcome Pack
+      </a>
+      {{/if}}
+      {{#if parentPortalUrl}}
+      <a href="{{parentPortalUrl}}" style="background: transparent; color: {{defaultColor primaryColor '#007bff'}}; padding: 14px 35px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: 600; border: 2px solid {{defaultColor primaryColor '#007bff'}}; margin: 5px;">
+        <span style="margin-right: 8px;">&#128100;</span>Parent Portal
+      </a>
+      {{/if}}
+    </div>
+
+    <p style="color: #666; font-size: 14px; margin-top: 25px;">We can't wait to see {{childName}} on {{formatDate startDate}}! If you have any questions before then, please don't hesitate to reach out.</p>
+    <p style="color: #666; font-size: 14px;">With warm regards,<br><strong>The {{tenantName}} Team</strong></p>
+  </div>
+
+  <!-- Footer -->
+  <div style="background-color: #2c3e50; color: #bdc3c7; padding: 25px; text-align: center; font-size: 12px;">
+    {{#if footerText}}
+    <p style="margin: 0 0 10px 0;">{{footerText}}</p>
+    {{/if}}
+    {{#if supportEmail}}
+    <p style="margin: 0 0 10px 0;">Questions? Contact us at <a href="mailto:{{supportEmail}}" style="color: {{defaultColor primaryColor '#007bff'}}; text-decoration: none;">{{supportEmail}}</a>{{#if supportPhone}} | {{supportPhone}}{{/if}}</p>
+    {{/if}}
+    <p style="margin: 0; opacity: 0.7;">&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Welcome pack text email template (TASK-ENROL-007)
+   */
+  private getEmbeddedWelcomePackTextTemplate(): string {
+    return `{{tenantName}}
+WELCOME TO OUR FAMILY!
+======================
+
+Dear {{recipientName}},
+
+We are thrilled to have {{childName}} joining us!
+
+{{#if welcomeMessage}}
+{{welcomeMessage}}
+{{/if}}
+
+ENROLLMENT CONFIRMATION
+-----------------------
+Child's Name: {{childName}}
+Start Date: {{formatDate startDate}}
+Fee Structure: {{feeTierName}}
+Monthly Fee: {{formatCurrency monthlyFeeCents}}
+
+{{#if operatingHours}}
+OPERATING HOURS
+---------------
+{{operatingHours}}
+{{/if}}
+
+WHAT'S NEXT?
+------------
+1. Review your welcome pack documents for important information about our policies and procedures.
+2. Mark {{formatDate startDate}} on your calendar - that's when the adventure begins!
+3. Prepare {{childName}}'s essentials: change of clothes, water bottle, and any comfort items.
+4. Complete any outstanding enrollment forms before the start date.
+{{#if parentPortalUrl}}
+5. Set up your parent portal account to stay connected with {{childName}}'s daily activities.
+{{/if}}
+
+{{#if welcomePackDownloadUrl}}
+Download your welcome pack: {{welcomePackDownloadUrl}}
+{{/if}}
+
+{{#if parentPortalUrl}}
+Access the parent portal: {{parentPortalUrl}}
+{{/if}}
+
+We can't wait to see {{childName}} on {{formatDate startDate}}! If you have any questions before then, please don't hesitate to reach out.
+
+With warm regards,
+The {{tenantName}} Team
+
+{{#if footerText}}
+{{footerText}}
+{{/if}}
+{{#if supportEmail}}
+Questions? Contact us at {{supportEmail}}{{#if supportPhone}} | {{supportPhone}}{{/if}}
 {{/if}}
 
 (c) {{currentYear}} {{tenantName}}`;

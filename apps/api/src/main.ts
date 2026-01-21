@@ -99,7 +99,9 @@ async function bootstrap(): Promise<void> {
   // Order matters: GlobalExceptionFilter first, then PayloadTooLargeFilter
   // PayloadTooLargeFilter handles specific payload errors before they reach GlobalExceptionFilter
   app.useGlobalFilters(
-    new GlobalExceptionFilter(configService as unknown as ConfigService<Record<string, unknown>>),
+    new GlobalExceptionFilter(
+      configService as unknown as ConfigService<Record<string, unknown>>,
+    ),
     new PayloadTooLargeFilter(logger),
   );
 

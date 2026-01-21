@@ -115,6 +115,7 @@ export const endpoints = {
     generate: '/statements/generate',
     generateBulk: '/statements/generate/bulk',
     finalize: (id: string) => `/statements/${id}/finalize`,
+    deliver: (id: string) => `/statements/${id}/deliver`,
     forParent: (parentId: string) => `/statements/parents/${parentId}`,
     parentAccount: (parentId: string) => `/statements/parents/${parentId}/account`,
   },
@@ -127,5 +128,14 @@ export const endpoints = {
     confirm: (id: string) => `/reconciliation/xero-splits/${id}/confirm`,
     cancel: (id: string) => `/reconciliation/xero-splits/${id}/cancel`,
     byXeroTransaction: (xeroTxnId: string) => `/reconciliation/xero-splits/by-xero-transaction/${xeroTxnId}`,
+  },
+  communications: {
+    broadcasts: '/communications/broadcasts',
+    broadcastDetail: (id: string) => `/communications/broadcasts/${id}`,
+    sendBroadcast: (id: string) => `/communications/broadcasts/${id}/send`,
+    cancelBroadcast: (id: string) => `/communications/broadcasts/${id}/cancel`,
+    previewRecipients: '/communications/recipients/preview',
+    groups: '/communications/groups',
+    groupDetail: (id: string) => `/communications/groups/${id}`,
   },
 } as const;

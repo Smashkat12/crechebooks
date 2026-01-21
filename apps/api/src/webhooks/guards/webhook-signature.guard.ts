@@ -29,7 +29,8 @@ export type WebhookProvider =
   | 'whatsapp'
   | 'stripe'
   | 'xero'
-  | 'simplepay';
+  | 'simplepay'
+  | 'mailgun';
 
 interface WebhookProviderConfig {
   secretEnvVar: string;
@@ -76,6 +77,11 @@ export class WebhookSignatureGuard implements CanActivate {
       secretEnvVar: 'SIMPLEPAY_WEBHOOK_SECRET',
       signatureHeader: 'x-simplepay-signature',
       verifyFn: this.verifySimplePaySignature.bind(this),
+    },
+    mailgun: {
+      secretEnvVar: 'MAILGUN_WEBHOOK_SIGNING_KEY',
+      signatureHeader: 'content-type', // Mailgun uses body-based signature, not header
+      verifyFn: this.verifyMailgunSignature.bind(this),
     },
   };
 
@@ -277,6 +283,46 @@ export class WebhookSignatureGuard implements CanActivate {
       return this.constantTimeCompare(signature, expectedSignature);
     } catch (error) {
       this.logger.error('Error verifying SimplePay signature', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verify Mailgun webhook signature (HMAC SHA256 hex)
+   * Mailgun sends signature in the request body, not headers
+   * @see https://documentation.mailgun.com/en/latest/user_manual.html#webhooks-1
+   */
+  private verifyMailgunSignature(
+    payload: string,
+    _signature: string, // Not used - Mailgun signature is in body
+    secret: string,
+  ): boolean {
+    try {
+      const body = JSON.parse(payload);
+      const signatureData = body.signature;
+
+      if (
+        !signatureData?.timestamp ||
+        !signatureData?.token ||
+        !signatureData?.signature
+      ) {
+        this.logger.warn('Mailgun webhook missing signature data in body');
+        return false;
+      }
+
+      // Mailgun signature = HMAC-SHA256(timestamp + token)
+      const encodedToken = signatureData.timestamp + signatureData.token;
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(encodedToken)
+        .digest('hex');
+
+      return this.constantTimeCompare(
+        signatureData.signature,
+        expectedSignature,
+      );
+    } catch (error) {
+      this.logger.error('Error verifying Mailgun signature', error);
       return false;
     }
   }

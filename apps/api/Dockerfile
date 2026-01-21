@@ -137,5 +137,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ENTRYPOINT ["dumb-init", "--"]
 
 # Run database migrations and start the server
-# Use direct path to prisma to avoid npx/npm cache permission issues
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main"]
+# Use node to run prisma directly since .bin symlinks aren't set up in pnpm
+CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js migrate deploy && node dist/main"]

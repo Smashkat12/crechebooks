@@ -7,7 +7,7 @@
  * credit handling, and final statement generation.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { CreditBalanceSourceType } from '@prisma/client';
 import { EnrollmentRepository } from '../repositories/enrollment.repository';
 import { ChildRepository } from '../repositories/child.repository';
@@ -20,6 +20,8 @@ import { ProRataService } from './pro-rata.service';
 import { CreditBalanceService } from './credit-balance.service';
 import { StatementGenerationService } from './statement-generation.service';
 import { AuditLogService } from './audit-log.service';
+import { EmailService } from '../../integrations/email/email.service';
+import { TwilioWhatsAppService } from '../../integrations/whatsapp/services/twilio-whatsapp.service';
 import { EnrollmentStatus } from '../entities/enrollment.entity';
 import {
   NotFoundException,
@@ -49,6 +51,8 @@ export class OffboardingService {
     private readonly creditBalanceService: CreditBalanceService,
     private readonly statementGenerationService: StatementGenerationService,
     private readonly auditLogService: AuditLogService,
+    @Optional() private readonly emailService?: EmailService,
+    @Optional() private readonly twilioWhatsAppService?: TwilioWhatsAppService,
   ) {}
 
   /**
@@ -425,10 +429,201 @@ export class OffboardingService {
       finalStatementId,
     };
 
+    // 9. TASK-WA-009: Send parent notification (email + WhatsApp)
+    await this.sendOffboardingNotification(
+      tenantId,
+      settlement,
+      reason,
+      endDate,
+      processedCreditAction,
+      creditAmount,
+    );
+
     this.logger.log(
       `Off-boarding complete for enrollment ${enrollmentId}: status=${status}, creditAction=${processedCreditAction}`,
     );
 
     return result;
+  }
+
+  /**
+   * Send off-boarding notification to parent via email and WhatsApp
+   * TASK-WA-009: Off-boarding Notifications
+   */
+  private async sendOffboardingNotification(
+    tenantId: string,
+    settlement: AccountSettlement,
+    reason: OffboardingReason,
+    endDate: Date,
+    creditAction: string,
+    creditAmount: number,
+  ): Promise<void> {
+    // Get parent details
+    const parent = await this.parentRepo.findById(
+      settlement.parentId,
+      tenantId,
+    );
+    if (!parent) {
+      this.logger.warn(
+        `Parent ${settlement.parentId} not found for offboarding notification`,
+      );
+      return;
+    }
+
+    // Get tenant details
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, tradingName: true, email: true, phone: true },
+    });
+    if (!tenant) {
+      this.logger.warn(
+        `Tenant ${tenantId} not found for offboarding notification`,
+      );
+      return;
+    }
+
+    const crecheName = tenant.tradingName || tenant.name;
+    const reasonText = reason === 'GRADUATION' ? 'graduation' : 'withdrawal';
+    const formattedDate = endDate.toLocaleDateString('en-ZA', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    // Build credit message if applicable
+    let creditMessage = '';
+    if (creditAmount > 0) {
+      const creditRands = (creditAmount / 100).toFixed(2);
+      switch (creditAction) {
+        case 'refunded':
+          creditMessage = `\n\nA credit of R${creditRands} will be refunded to you.`;
+          break;
+        case 'applied':
+          creditMessage = `\n\nA credit of R${creditRands} has been applied to your account.`;
+          break;
+        case 'sibling':
+          creditMessage = `\n\nA credit of R${creditRands} has been transferred to your other child's account.`;
+          break;
+        case 'donated':
+          creditMessage = `\n\nThank you for donating your credit of R${creditRands} to ${crecheName}.`;
+          break;
+      }
+    }
+
+    // Send email notification
+    if (this.emailService && parent.email) {
+      try {
+        const subject =
+          reason === 'GRADUATION'
+            ? `Congratulations on ${settlement.childName}'s Graduation! 🎓`
+            : `Confirmation: ${settlement.childName}'s Withdrawal from ${crecheName}`;
+
+        const body =
+          reason === 'GRADUATION'
+            ? `Dear ${parent.firstName},
+
+Congratulations! We are delighted to confirm that ${settlement.childName} has successfully completed their time at ${crecheName} and is ready to move on to the next exciting chapter of their educational journey.
+
+Graduation Date: ${formattedDate}
+
+It has been a privilege to be part of ${settlement.childName}'s early learning experience. We wish them all the best in big school!${creditMessage}
+
+A final statement has been generated and will be sent to you separately.
+
+Thank you for trusting ${crecheName} with your child's care and education.
+
+Warm regards,
+The ${crecheName} Team
+${tenant.phone ? `Tel: ${tenant.phone}` : ''}
+${tenant.email ? `Email: ${tenant.email}` : ''}`
+            : `Dear ${parent.firstName},
+
+This email confirms that ${settlement.childName}'s enrollment at ${crecheName} has been concluded as per your request.
+
+Last Day: ${formattedDate}${creditMessage}
+
+A final statement has been generated and will be sent to you separately.
+
+We wish ${settlement.childName} and your family all the best for the future.
+
+Kind regards,
+The ${crecheName} Team
+${tenant.phone ? `Tel: ${tenant.phone}` : ''}
+${tenant.email ? `Email: ${tenant.email}` : ''}`;
+
+        await this.emailService.sendEmail(parent.email, subject, body);
+
+        this.logger.log(
+          `TASK-WA-009: Offboarding email sent to ${parent.email} for ${settlement.childName}`,
+        );
+      } catch (error) {
+        this.logger.warn(
+          `TASK-WA-009: Failed to send offboarding email: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    // Send WhatsApp notification if opted in
+    if (
+      this.twilioWhatsAppService?.isConfigured() &&
+      (parent.whatsapp || parent.phone) &&
+      parent.whatsappOptIn
+    ) {
+      const whatsAppNumber = (parent.whatsapp || parent.phone) as string;
+
+      try {
+        let message: string;
+
+        if (reason === 'GRADUATION') {
+          message = `🎓 *Congratulations!*
+
+Dear ${parent.firstName},
+
+We're thrilled to confirm that *${settlement.childName}* has graduated from ${crecheName}!
+
+📅 Graduation Date: ${formattedDate}
+
+It's been a joy watching ${settlement.childName} grow and learn with us. We wish them all the best in big school!${creditMessage}
+
+Your final statement will be sent separately.
+
+Thank you for being part of the ${crecheName} family! 💙`;
+        } else {
+          message = `Dear ${parent.firstName},
+
+This confirms that *${settlement.childName}'s* enrollment at ${crecheName} has ended.
+
+📅 Last Day: ${formattedDate}${creditMessage}
+
+Your final statement will be sent separately.
+
+We wish ${settlement.childName} and your family all the best.
+
+Kind regards,
+${crecheName}`;
+        }
+
+        const result = await this.twilioWhatsAppService.sendMessage(
+          whatsAppNumber,
+          message,
+          { tenantId },
+        );
+
+        if (result.success) {
+          this.logger.log(
+            `TASK-WA-009: Offboarding WhatsApp sent to ${whatsAppNumber} for ${settlement.childName}`,
+          );
+        } else {
+          this.logger.warn(
+            `TASK-WA-009: WhatsApp offboarding notification failed: ${result.error}`,
+          );
+        }
+      } catch (error) {
+        // Non-blocking - don't fail offboarding if WhatsApp fails
+        this.logger.warn(
+          `TASK-WA-009: WhatsApp error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
   }
 }

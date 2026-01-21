@@ -329,6 +329,10 @@ export class EnrollmentRepository {
       if (dto.feeStructureId !== undefined) {
         updateData.feeStructure = { connect: { id: dto.feeStructureId } };
       }
+      // TASK-ENROL-008: Support welcomePackSentAt updates
+      if (dto.welcomePackSentAt !== undefined) {
+        updateData.welcomePackSentAt = dto.welcomePackSentAt;
+      }
 
       return await this.prisma.enrollment.update({
         where: { id },

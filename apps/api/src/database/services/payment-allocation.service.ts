@@ -1,6 +1,7 @@
 /**
  * Payment Allocation Service
  * TASK-PAY-012: Payment Allocation Service
+ * TASK-WA-007: WhatsApp Payment Confirmation via Twilio
  *
  * @module database/services/payment-allocation
  * @description Service for allocating bank transaction payments to invoices.
@@ -8,7 +9,7 @@
  * All amounts are in CENTS as integers. Uses Decimal.js for precise calculations.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Payment, Invoice, InvoiceStatus } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,6 +20,7 @@ import { ParentRepository } from '../repositories/parent.repository';
 import { AuditLogService } from './audit-log.service';
 import { CreditBalanceService } from './credit-balance.service';
 import { XeroSyncService } from './xero-sync.service';
+import { TwilioWhatsAppService } from '../../integrations/whatsapp/services/twilio-whatsapp.service';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import { MatchType, MatchedBy } from '../entities/payment.entity';
 import { AuditAction } from '../entities/audit-log.entity';
@@ -48,6 +50,8 @@ export class PaymentAllocationService {
     private readonly creditBalanceService: CreditBalanceService,
     private readonly xeroSyncService: XeroSyncService,
     private readonly xeroSplitService: XeroTransactionSplitService,
+    // TASK-WA-007: Optional WhatsApp service for payment confirmations
+    @Optional() private readonly twilioWhatsAppService?: TwilioWhatsAppService,
   ) {}
 
   /**
@@ -229,7 +233,16 @@ export class PaymentAllocationService {
       changeSummary: `Allocated ${allocation.amountCents} cents from transaction ${dto.transactionId} to invoice ${allocation.invoiceId}`,
     });
 
-    // 10. Return AllocationResult
+    // 10. TASK-WA-007: Send WhatsApp payment confirmation
+    await this.sendPaymentConfirmationWhatsApp(
+      dto.tenantId,
+      invoice.parentId,
+      invoice.invoiceNumber,
+      allocation.amountCents,
+      payment.id,
+    );
+
+    // 11. Return AllocationResult
     // TASK-RECON-040: Use effectiveAmountCents (NET from split if applicable) for unallocated calculation
     const totalAllocated = new Decimal(allocation.amountCents);
     const transactionAmountForCalc = new Decimal(effectiveAmountCents);
@@ -987,6 +1000,84 @@ export class PaymentAllocationService {
         error instanceof Error ? error.message : String(error);
       this.logger.error(`Xero payment sync error: ${errorMessage}`);
       return XeroSyncStatus.FAILED;
+    }
+  }
+
+  /**
+   * TASK-WA-007: Send WhatsApp payment confirmation to parent
+   * Non-blocking - logs errors but doesn't fail the allocation
+   *
+   * @param tenantId - Tenant ID
+   * @param parentId - Parent ID to notify
+   * @param invoiceNumber - Invoice number for reference
+   * @param amountCents - Payment amount in cents
+   * @param paymentId - Payment reference ID
+   * @private
+   */
+  private async sendPaymentConfirmationWhatsApp(
+    tenantId: string,
+    parentId: string,
+    invoiceNumber: string,
+    amountCents: number,
+    paymentId: string,
+  ): Promise<void> {
+    // Check if WhatsApp is configured
+    if (!this.twilioWhatsAppService?.isConfigured()) {
+      return;
+    }
+
+    try {
+      // Get parent for contact info
+      const parent = await this.parentRepo.findById(parentId, tenantId);
+      if (!parent) {
+        this.logger.warn(
+          `TASK-WA-007: Cannot send payment confirmation: Parent ${parentId} not found`,
+        );
+        return;
+      }
+
+      // Check if parent has WhatsApp and has opted in
+      const whatsAppNumber = parent.whatsapp || parent.phone;
+      if (!whatsAppNumber || !parent.whatsappOptIn) {
+        this.logger.debug(
+          `TASK-WA-007: Parent ${parentId} has no WhatsApp number or not opted in, skipping payment confirmation`,
+        );
+        return;
+      }
+
+      // Get tenant for organization name (white-labeling)
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { name: true, tradingName: true },
+      });
+      const organizationName =
+        tenant?.tradingName ?? tenant?.name ?? 'Our Organization';
+
+      // Send payment confirmation
+      const result = await this.twilioWhatsAppService.sendPaymentConfirmation(
+        tenantId,
+        whatsAppNumber,
+        `${parent.firstName} ${parent.lastName}`.trim(),
+        invoiceNumber,
+        amountCents / 100, // Convert cents to Rands
+        paymentId,
+        organizationName, // Use tenant name for white-labeling
+      );
+
+      if (result.success) {
+        this.logger.log(
+          `TASK-WA-007: Payment confirmation sent to ${whatsAppNumber} for invoice ${invoiceNumber}`,
+        );
+      } else {
+        this.logger.warn(
+          `TASK-WA-007: Payment confirmation failed: ${result.error}`,
+        );
+      }
+    } catch (error) {
+      // Non-blocking - log error but don't fail the allocation
+      this.logger.warn(
+        `TASK-WA-007: Payment confirmation error: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

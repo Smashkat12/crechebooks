@@ -16,10 +16,11 @@
  * CRITICAL: Fail fast with detailed error logging
  */
 
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma/prisma.service';
 import { EmailService } from '../integrations/email/email.service';
+import { TwilioWhatsAppService } from '../integrations/whatsapp/services/twilio-whatsapp.service';
 import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { AuditLogService } from '../database/services/audit-log.service';
 import { AuditAction } from '../database/entities/audit-log.entity';
@@ -162,6 +163,7 @@ export class ArrearsReminderJob implements OnModuleDestroy {
     private readonly reminderTemplateService: ReminderTemplateService,
     private readonly auditLogService: AuditLogService,
     private readonly configService: ConfigService,
+    @Optional() private readonly twilioWhatsAppService?: TwilioWhatsAppService,
   ) {}
 
   /**
@@ -176,7 +178,10 @@ export class ArrearsReminderJob implements OnModuleDestroy {
    * Daily cron job at 8 AM SAST
    * Processes all tenants and sends reminders for overdue invoices
    */
-  @Cron('0 8 * * *', { name: 'arrears-reminders', timeZone: 'Africa/Johannesburg' })
+  @Cron('0 8 * * *', {
+    name: 'arrears-reminders',
+    timeZone: 'Africa/Johannesburg',
+  })
   async processReminders(): Promise<void> {
     if (this.isProcessing) {
       this.logger.warn('Reminder job already in progress, skipping');
@@ -225,17 +230,16 @@ export class ArrearsReminderJob implements OnModuleDestroy {
           }
 
           // Check if within allowed send hours
-          if (!this.isWithinSendHours(config.sendHoursStart, config.sendHoursEnd)) {
+          if (
+            !this.isWithinSendHours(config.sendHoursStart, config.sendHoursEnd)
+          ) {
             this.logger.debug(
               `Outside send hours (${config.sendHoursStart}-${config.sendHoursEnd}) for tenant ${tenant.id}`,
             );
             continue;
           }
 
-          const result = await this.processTenantsReminders(
-            tenant.id,
-            config as ReminderConfig,
-          );
+          const result = await this.processTenantsReminders(tenant.id, config);
           allResults.push(result);
 
           // Send admin summary if any reminders were sent
@@ -263,7 +267,10 @@ export class ArrearsReminderJob implements OnModuleDestroy {
 
       const totalDuration = Date.now() - startTime;
       const totalSent = allResults.reduce((sum, r) => sum + r.remindersSent, 0);
-      const totalFailed = allResults.reduce((sum, r) => sum + r.remindersFailed, 0);
+      const totalFailed = allResults.reduce(
+        (sum, r) => sum + r.remindersFailed,
+        0,
+      );
 
       this.logger.log({
         message: 'Arrears reminder job completed',
@@ -411,7 +418,11 @@ export class ArrearsReminderJob implements OnModuleDestroy {
         isDeleted: false,
         dueDate: { lt: today },
         status: {
-          in: [InvoiceStatus.SENT, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID],
+          in: [
+            InvoiceStatus.SENT,
+            InvoiceStatus.OVERDUE,
+            InvoiceStatus.PARTIALLY_PAID,
+          ],
         },
       },
       include: {
@@ -498,9 +509,12 @@ export class ArrearsReminderJob implements OnModuleDestroy {
       if (nextLevel <= 4) {
         const nextLevelDays = this.getLevelDays(nextLevel, config);
         if (daysOverdue >= nextLevelDays) {
-          const nextLevelInfo = REMINDER_LEVELS.find((l) => l.level === nextLevel);
+          const nextLevelInfo = REMINDER_LEVELS.find(
+            (l) => l.level === nextLevel,
+          );
           const nextAlreadySent = history.some(
-            (h) => h.escalationLevel === nextLevelInfo?.stage && h.sentAt !== null,
+            (h) =>
+              h.escalationLevel === nextLevelInfo?.stage && h.sentAt !== null,
           );
           if (!nextAlreadySent && nextLevelInfo) {
             return nextLevelInfo;
@@ -657,7 +671,7 @@ export class ArrearsReminderJob implements OnModuleDestroy {
       4: 'FINAL', // Level 4 uses FINAL
     };
 
-    // Create reminder record
+    // Create reminder record for email
     await this.prisma.reminder.create({
       data: {
         tenantId: invoice.tenantId,
@@ -665,16 +679,20 @@ export class ArrearsReminderJob implements OnModuleDestroy {
         parentId: invoice.parentId,
         escalationLevel: escalationLevelMap[level.level],
         deliveryMethod: DeliveryMethod.EMAIL,
-        reminderStatus: emailResult.status === 'sent' ? ReminderStatus.SENT : ReminderStatus.FAILED,
+        reminderStatus:
+          emailResult.status === 'sent'
+            ? ReminderStatus.SENT
+            : ReminderStatus.FAILED,
         sentAt: emailResult.status === 'sent' ? new Date() : null,
         content: body,
         subject,
-        failureReason: emailResult.status !== 'sent' ? 'Email send failed' : null,
+        failureReason:
+          emailResult.status !== 'sent' ? 'Email send failed' : null,
       },
     });
 
     this.logger.log({
-      message: 'Reminder sent',
+      message: 'Email reminder sent',
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber,
       level: level.level,
@@ -682,6 +700,100 @@ export class ArrearsReminderJob implements OnModuleDestroy {
       daysOverdue,
       ccAdmin: ccRecipients.length > 0,
     });
+
+    // TASK-WA-008: Send WhatsApp reminder if opted in
+    await this.sendWhatsAppReminder(
+      invoice,
+      level,
+      daysOverdue,
+      outstandingCents,
+    );
+  }
+
+  /**
+   * Send WhatsApp payment reminder if parent has opted in
+   * TASK-WA-008: WhatsApp Arrears Reminders
+   */
+  private async sendWhatsAppReminder(
+    invoice: OverdueInvoice,
+    level: ReminderLevel,
+    daysOverdue: number,
+    outstandingCents: number,
+  ): Promise<void> {
+    // Check if WhatsApp is configured
+    if (!this.twilioWhatsAppService?.isConfigured()) {
+      return;
+    }
+
+    // Check if parent has WhatsApp and has opted in
+    const whatsAppNumber = invoice.parent.whatsapp;
+    if (!whatsAppNumber || !invoice.parent.whatsappOptIn) {
+      this.logger.debug(
+        `Skipping WhatsApp reminder for invoice ${invoice.invoiceNumber}: no WhatsApp or not opted in`,
+      );
+      return;
+    }
+
+    try {
+      const parentName =
+        `${invoice.parent.firstName} ${invoice.parent.lastName}`.trim();
+      const amount = outstandingCents / 100;
+
+      const result = await this.twilioWhatsAppService.sendPaymentReminder(
+        invoice.tenantId,
+        whatsAppNumber,
+        parentName,
+        invoice.invoiceNumber,
+        amount,
+        daysOverdue,
+        invoice.tenant.name, // Use tenant name for white-labeling
+      );
+
+      if (result.success) {
+        // Create reminder record for WhatsApp
+        await this.prisma.reminder.create({
+          data: {
+            tenantId: invoice.tenantId,
+            invoiceId: invoice.id,
+            parentId: invoice.parentId,
+            escalationLevel:
+              level.level === 1
+                ? 'FRIENDLY'
+                : level.level === 2
+                  ? 'FIRM'
+                  : 'FINAL',
+            deliveryMethod: DeliveryMethod.WHATSAPP,
+            reminderStatus: ReminderStatus.SENT,
+            sentAt: new Date(),
+            content: `Payment reminder sent via WhatsApp for invoice ${invoice.invoiceNumber}`,
+            subject: `Payment Reminder - Level ${level.level}`,
+          },
+        });
+
+        this.logger.log({
+          message: 'WhatsApp reminder sent',
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          level: level.level,
+          daysOverdue,
+          messageId: result.messageId,
+        });
+      } else {
+        this.logger.warn({
+          message: 'WhatsApp reminder failed',
+          invoiceId: invoice.id,
+          error: result.error,
+          errorCode: result.errorCode,
+        });
+      }
+    } catch (error) {
+      // Non-blocking - don't fail the entire reminder if WhatsApp fails
+      this.logger.warn({
+        message: 'WhatsApp reminder error',
+        invoiceId: invoice.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   /**
@@ -794,7 +906,7 @@ ${Object.entries(result.skipReasons)
     : ''
 }
 
-This is an automated message from CrecheBooks.
+This is an automated message.
     `.trim();
 
     try {
@@ -879,7 +991,8 @@ This is an automated message from CrecheBooks.
       throw new Error(`Tenant ${tenantId} not found`);
     }
 
-    const config = (tenant.reminderConfig as ReminderConfig | null) ?? DEFAULT_CONFIG;
+    const config =
+      (tenant.reminderConfig as ReminderConfig | null) ?? DEFAULT_CONFIG;
 
     return this.processTenantsReminders(tenantId, config);
   }

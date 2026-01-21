@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatementTable, GenerateStatementDialog } from '@/components/statements';
 import { StatementDetailDialog } from '@/components/statements/statement-detail-dialog';
-import { useDownloadStatementPdf, useFinalizeStatement, type StatementSummary } from '@/hooks/use-statements';
+import { useDownloadStatementPdf, useFinalizeStatement, useDeliverStatement, type StatementSummary } from '@/hooks/use-statements';
 import { useToast } from '@/hooks/use-toast';
 import { queryKeys } from '@/lib/api';
 
@@ -15,6 +15,7 @@ export default function StatementsPage() {
   const queryClient = useQueryClient();
   const { downloadPdf } = useDownloadStatementPdf();
   const finalizeStatement = useFinalizeStatement();
+  const deliverStatement = useDeliverStatement();
   const { toast } = useToast();
 
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
@@ -60,12 +61,21 @@ export default function StatementsPage() {
     }
   };
 
-  const handleSend = (statement: StatementSummary) => {
-    // TODO: Implement send dialog - will be handled in TASK-STMT-007
-    toast({
-      title: 'Coming Soon',
-      description: 'Statement delivery will be available in a future update',
-    });
+  const handleSend = async (statement: StatementSummary) => {
+    try {
+      await deliverStatement.mutateAsync({ statementId: statement.id });
+      toast({
+        title: 'Statement Sent',
+        description: `${statement.statement_number} has been sent to ${statement.parent.name}`,
+      });
+    } catch (error) {
+      console.error('Send failed:', error);
+      toast({
+        title: 'Send failed',
+        description: error instanceof Error ? error.message : 'Failed to send statement',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleGenerateSuccess = () => {

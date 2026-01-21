@@ -101,6 +101,11 @@ export class CreateParentDto {
   @SanitizeText()
   @IsString()
   notes?: string;
+
+  /** TASK-WA-004: WhatsApp opt-in consent (POPIA compliant) */
+  @IsOptional()
+  @IsBoolean()
+  whatsappOptIn?: boolean;
 }
 
 export class UpdateParentDto extends PartialType(CreateParentDto) {}

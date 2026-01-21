@@ -25,7 +25,9 @@ import { PrismaModule } from '../database/prisma';
         return {
           secret: secret || 'default-development-secret',
           signOptions: {
-            expiresIn: expiresIn as `${number}${'s' | 'm' | 'h' | 'd'}` | number,
+            expiresIn: expiresIn as
+              | `${number}${'s' | 'm' | 'h' | 'd'}`
+              | number,
           },
         };
       },

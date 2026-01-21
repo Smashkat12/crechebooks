@@ -30,7 +30,11 @@ import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { WebhookService } from './webhook.service';
 import { Public } from '../api/auth/decorators/public.decorator';
-import type { EmailEvent, WhatsAppWebhookPayload } from './types/webhook.types';
+import type {
+  EmailEvent,
+  WhatsAppWebhookPayload,
+  MailgunWebhookEvent,
+} from './types/webhook.types';
 import type { WebhookProcessingResult } from './types/webhook.types';
 import { BusinessException } from '../shared/exceptions';
 import {
@@ -145,6 +149,92 @@ export class WebhookController {
 
     this.logger.log(
       `Email webhook processed: ${result.processed} processed, ${result.skipped} skipped`,
+    );
+
+    return result;
+  }
+
+  /**
+   * Handle Mailgun email delivery webhooks
+   * Events: accepted, delivered, failed, opened, clicked, unsubscribed, complained
+   *
+   * IDEMPOTENCY: Uses event ID + event type as idempotency key.
+   * Mailgun may retry webhooks for up to 8 hours.
+   *
+   * @param req - Raw request for signature verification and idempotency
+   * @param body - Parsed webhook payload (includes signature in body)
+   */
+  @Post('mailgun')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(IdempotencyGuard)
+  @Idempotent({
+    keyExtractor: (req) => {
+      // Extract unique key from Mailgun event
+      // Format: mailgun:{event_id}:{event_type}:{timestamp}
+      const payload = req.body as MailgunWebhookEvent;
+      const eventData = payload?.['event-data'];
+      if (!eventData?.id) return null;
+      return IdempotencyService.generateKey(
+        'mailgun',
+        eventData.id,
+        `${eventData.event}:${eventData.timestamp}`,
+      );
+    },
+    ttl: 28800, // 8 hours for Mailgun retry window
+    keyPrefix: 'webhook:',
+    cacheResult: true,
+  })
+  @ApiOperation({ summary: 'Handle Mailgun email delivery webhooks' })
+  @ApiResponse({ status: 200, description: 'Webhook processed' })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
+  async handleMailgunWebhook(
+    @Req() req: RawBodyRequest<Request> & IdempotentRequest,
+    @Body() body: MailgunWebhookEvent,
+  ): Promise<WebhookProcessingResult> {
+    this.logger.debug(
+      `Received Mailgun webhook: ${body?.['event-data']?.event}`,
+    );
+
+    // Check for duplicate request (already processed)
+    if (req.isDuplicate) {
+      this.logger.log(
+        `Duplicate Mailgun webhook detected: ${req.idempotencyKey}`,
+      );
+      // Return cached result or default duplicate response
+      if (req.idempotencyResult) {
+        return req.idempotencyResult as WebhookProcessingResult;
+      }
+      return {
+        processed: 0,
+        skipped: 1,
+        errors: [],
+      };
+    }
+
+    // Verify signature (Mailgun includes signature in body)
+    if (!this.webhookService.verifyMailgunSignature(body)) {
+      this.logger.warn('Invalid Mailgun webhook signature');
+      throw new BusinessException(
+        'Invalid webhook signature',
+        'INVALID_SIGNATURE',
+      );
+    }
+
+    // Process event
+    const result = await this.webhookService.processMailgunEvent(body);
+
+    // Store result for future duplicate requests
+    if (req.idempotencyKey) {
+      await this.idempotencyService.markProcessed(
+        req.idempotencyKey,
+        result,
+        28800, // 8 hours
+        { provider: 'mailgun', eventType: body?.['event-data']?.event },
+      );
+    }
+
+    this.logger.log(
+      `Mailgun webhook processed: ${result.processed} processed, ${result.skipped} skipped`,
     );
 
     return result;
@@ -268,5 +358,56 @@ export class WebhookController {
       token,
       challenge,
     );
+  }
+
+  /**
+   * Handle Twilio WhatsApp/SMS status callbacks
+   * Statuses: queued, sent, delivered, read, failed, undelivered
+   *
+   * @param req - Express request
+   * @param body - Twilio status callback parameters
+   * @param signature - X-Twilio-Signature header
+   */
+  @Post('twilio/status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Handle Twilio WhatsApp/SMS status callbacks' })
+  @ApiHeader({ name: 'x-twilio-signature', required: false })
+  @ApiResponse({ status: 200, description: 'Webhook processed' })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
+  async handleTwilioStatusCallback(
+    @Req() req: Request,
+    @Body() body: Record<string, string>,
+    @Headers('x-twilio-signature') signature: string,
+  ): Promise<WebhookProcessingResult> {
+    this.logger.debug(
+      `Received Twilio status callback: ${body.MessageStatus} for ${body.MessageSid}`,
+    );
+
+    // Build the full URL for signature verification
+    const protocol =
+      req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    const url = `${protocol}://${host}${req.originalUrl}`;
+
+    // Verify signature (skip in development if not configured)
+    if (
+      process.env.NODE_ENV === 'production' &&
+      !this.webhookService.verifyTwilioSignature(url, body, signature)
+    ) {
+      this.logger.warn('Invalid Twilio webhook signature');
+      throw new BusinessException(
+        'Invalid webhook signature',
+        'INVALID_SIGNATURE',
+      );
+    }
+
+    // Process the status callback
+    const result = await this.webhookService.processTwilioStatusCallback(body);
+
+    this.logger.log(
+      `Twilio status callback processed: ${result.processed} processed, ${result.skipped} skipped`,
+    );
+
+    return result;
   }
 }

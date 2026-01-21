@@ -85,7 +85,8 @@ describe('ArrearsReminderJob', () => {
     tenantId: mockTenantId,
     stage: ReminderStage.FIRST,
     emailSubject: 'Payment Reminder: {{invoiceNumber}}',
-    emailBody: 'Dear {{parentName}}, your invoice {{invoiceNumber}} for {{amount}} is overdue.',
+    emailBody:
+      'Dear {{parentName}}, your invoice {{invoiceNumber}} for {{amount}} is overdue.',
     whatsappTemplate: null,
     isDefault: false,
     isActive: true,
@@ -133,7 +134,10 @@ describe('ArrearsReminderJob', () => {
         ArrearsReminderJob,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: EmailService, useValue: mockEmailService },
-        { provide: ReminderTemplateService, useValue: mockReminderTemplateService },
+        {
+          provide: ReminderTemplateService,
+          useValue: mockReminderTemplateService,
+        },
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: ConfigService, useValue: mockConfigService },
       ],
@@ -186,7 +190,9 @@ describe('ArrearsReminderJob', () => {
       const paidInvoice = createOverdueInvoice(10);
       paidInvoice.amountPaidCents = paidInvoice.totalCents;
 
-      prismaService.invoice.findMany = jest.fn().mockResolvedValue([paidInvoice]);
+      prismaService.invoice.findMany = jest
+        .fn()
+        .mockResolvedValue([paidInvoice]);
 
       const result = await job.getOverdueInvoices(mockTenantId);
 
@@ -197,7 +203,9 @@ describe('ArrearsReminderJob', () => {
       const inactiveParentInvoice = createOverdueInvoice(10);
       inactiveParentInvoice.parent.isActive = false;
 
-      prismaService.invoice.findMany = jest.fn().mockResolvedValue([inactiveParentInvoice]);
+      prismaService.invoice.findMany = jest
+        .fn()
+        .mockResolvedValue([inactiveParentInvoice]);
 
       const result = await job.getOverdueInvoices(mockTenantId);
 
@@ -453,9 +461,9 @@ describe('ArrearsReminderJob', () => {
       const invoice = createOverdueInvoice(10);
       invoice.parent.email = null;
 
-      await expect(job.sendReminder(invoice, mockLevel, defaultConfig)).rejects.toThrow(
-        'has no email address',
-      );
+      await expect(
+        job.sendReminder(invoice, mockLevel, defaultConfig),
+      ).rejects.toThrow('has no email address');
     });
 
     it('should render template variables correctly', async () => {
@@ -500,7 +508,10 @@ describe('ArrearsReminderJob', () => {
       prismaService.invoice.findMany = jest.fn().mockResolvedValue([invoice]);
       prismaService.reminder.findMany = jest.fn().mockResolvedValue([]);
 
-      const result = await job.processTenantsReminders(mockTenantId, defaultConfig);
+      const result = await job.processTenantsReminders(
+        mockTenantId,
+        defaultConfig,
+      );
 
       expect(result.totalOverdue).toBe(1);
       expect(result.remindersSent).toBe(1);
@@ -525,7 +536,10 @@ describe('ArrearsReminderJob', () => {
         },
       ]);
 
-      const result = await job.processTenantsReminders(mockTenantId, defaultConfig);
+      const result = await job.processTenantsReminders(
+        mockTenantId,
+        defaultConfig,
+      );
 
       expect(result.remindersSkipped).toBe(1);
       expect(result.skipReasons['max_daily_reached']).toBe(1);
@@ -534,7 +548,10 @@ describe('ArrearsReminderJob', () => {
     it('should return empty result when no overdue invoices', async () => {
       prismaService.invoice.findMany = jest.fn().mockResolvedValue([]);
 
-      const result = await job.processTenantsReminders(mockTenantId, defaultConfig);
+      const result = await job.processTenantsReminders(
+        mockTenantId,
+        defaultConfig,
+      );
 
       expect(result.totalOverdue).toBe(0);
       expect(result.remindersSent).toBe(0);
@@ -570,7 +587,10 @@ describe('ArrearsReminderJob', () => {
       prismaService.invoice.findMany = jest.fn().mockResolvedValue([invoice]);
       prismaService.reminder.findMany = jest.fn().mockResolvedValue([]);
 
-      const result = await job.processTenantsReminders(mockTenantId, defaultConfig);
+      const result = await job.processTenantsReminders(
+        mockTenantId,
+        defaultConfig,
+      );
 
       expect(result.remindersFailed).toBe(1);
       expect(result.errors).toHaveLength(1);
@@ -595,7 +615,10 @@ describe('ArrearsReminderJob', () => {
       prismaService.invoice.findMany = jest.fn().mockResolvedValue(invoices);
       prismaService.reminder.findMany = jest.fn().mockResolvedValue([]);
 
-      const result = await job.processTenantsReminders(mockTenantId, defaultConfig);
+      const result = await job.processTenantsReminders(
+        mockTenantId,
+        defaultConfig,
+      );
 
       expect(result.remindersSent).toBe(4);
       expect(result.byLevel.level1).toBe(1);
@@ -622,7 +645,9 @@ describe('ArrearsReminderJob', () => {
     it('should throw error for non-existent tenant', async () => {
       prismaService.tenant.findUnique = jest.fn().mockResolvedValue(null);
 
-      await expect(job.triggerForTenant('non-existent')).rejects.toThrow('Tenant non-existent not found');
+      await expect(job.triggerForTenant('non-existent')).rejects.toThrow(
+        'Tenant non-existent not found',
+      );
     });
 
     it('should use tenant-specific config if available', async () => {
@@ -641,7 +666,9 @@ describe('ArrearsReminderJob', () => {
           adminEmail: 'custom@admin.co.za',
         },
       };
-      prismaService.tenant.findUnique = jest.fn().mockResolvedValue(tenantWithConfig);
+      prismaService.tenant.findUnique = jest
+        .fn()
+        .mockResolvedValue(tenantWithConfig);
       prismaService.invoice.findMany = jest.fn().mockResolvedValue([]);
 
       await job.triggerForTenant(mockTenantId);
@@ -672,7 +699,9 @@ describe('ArrearsReminderJob', () => {
           adminEmail: null,
         },
       };
-      prismaService.tenant.findMany = jest.fn().mockResolvedValue([tenantWithRestrictedHours]);
+      prismaService.tenant.findMany = jest
+        .fn()
+        .mockResolvedValue([tenantWithRestrictedHours]);
 
       // Run processReminders
       await job.processReminders();
@@ -709,7 +738,9 @@ describe('ArrearsReminderJob', () => {
           adminEmail: null,
         },
       };
-      prismaService.tenant.findMany = jest.fn().mockResolvedValue([tenantWithConfig]);
+      prismaService.tenant.findMany = jest
+        .fn()
+        .mockResolvedValue([tenantWithConfig]);
 
       await job.processReminders();
 
@@ -773,13 +804,15 @@ describe('ArrearsReminderJob', () => {
 
       // Simulate shutdown after first few reminders
       let callCount = 0;
-      emailService.sendEmailWithOptions = jest.fn().mockImplementation(async () => {
-        callCount++;
-        if (callCount >= 2) {
-          job.onModuleDestroy(); // Request shutdown
-        }
-        return { status: 'sent' };
-      });
+      emailService.sendEmailWithOptions = jest
+        .fn()
+        .mockImplementation(async () => {
+          callCount++;
+          if (callCount >= 2) {
+            job.onModuleDestroy(); // Request shutdown
+          }
+          return { status: 'sent' };
+        });
 
       const result = await job.processTenantsReminders(mockTenantId, {
         enabled: true,
@@ -810,26 +843,31 @@ describe('ArrearsReminderJob', () => {
       prismaService.invoice.findMany = jest.fn().mockResolvedValue([invoice]);
 
       // Mock reminder history - level 1 already sent today
-      prismaService.reminder.findMany = jest.fn()
+      prismaService.reminder.findMany = jest
+        .fn()
         .mockImplementation(async (query) => {
           // Recent reminders check (24 hours) - first call with sentAt filter
           if (query.where?.sentAt?.gte) {
-            return [{
-              id: 'recent-1',
+            return [
+              {
+                id: 'recent-1',
+                invoiceId: mockInvoiceId,
+                sentAt: new Date(),
+                escalationLevel: 'FRIENDLY',
+                reminderStatus: 'SENT',
+              },
+            ];
+          }
+          // Full history check - second call without sentAt filter
+          return [
+            {
+              id: 'hist-1',
               invoiceId: mockInvoiceId,
               sentAt: new Date(),
               escalationLevel: 'FRIENDLY',
               reminderStatus: 'SENT',
-            }];
-          }
-          // Full history check - second call without sentAt filter
-          return [{
-            id: 'hist-1',
-            invoiceId: mockInvoiceId,
-            sentAt: new Date(),
-            escalationLevel: 'FRIENDLY',
-            reminderStatus: 'SENT',
-          }];
+            },
+          ];
         });
 
       const result = await job.processTenantsReminders(mockTenantId, {

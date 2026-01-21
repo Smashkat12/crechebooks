@@ -119,6 +119,37 @@ export class CreateTenantDto {
   @Min(0)
   @Max(10000) // Maximum R100 tolerance
   matchingToleranceCents?: number;
+
+  // TASK-BILL-043: Bank details for invoice/statement PDF generation
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  bankAccountHolder?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  bankAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  bankBranchCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  bankAccountType?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  bankSwiftCode?: string;
 }
 
 export class UpdateTenantDto extends PartialType(CreateTenantDto) {}

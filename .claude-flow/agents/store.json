@@ -197,6 +197,92 @@
       "createdAt": "2026-01-18T15:14:07.851Z",
       "model": "haiku",
       "modelRoutedBy": "router"
+    },
+    "agent-1768901757249-p0gqbi": {
+      "agentId": "agent-1768901757249-p0gqbi",
+      "agentType": "researcher",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "name": "WhatsApp API Analyzer",
+        "capabilities": [
+          "api-analysis",
+          "integration-patterns"
+        ]
+      },
+      "createdAt": "2026-01-20T09:35:57.249Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1768901757312-qw084h": {
+      "agentId": "agent-1768901757312-qw084h",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "name": "WhatsApp Code Reviewer",
+        "capabilities": [
+          "typescript",
+          "nestjs"
+        ]
+      },
+      "createdAt": "2026-01-20T09:35:57.312Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1768901757379-qdex4l": {
+      "agentId": "agent-1768901757379-qdex4l",
+      "agentType": "analyst",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "name": "Gap Analyzer",
+        "capabilities": [
+          "gap-analysis",
+          "task-planning"
+        ]
+      },
+      "createdAt": "2026-01-20T09:35:57.379Z",
+      "model": "sonnet",
+      "modelRoutedBy": "default"
+    },
+    "agent-1768903722132-tus3eb": {
+      "agentId": "agent-1768903722132-tus3eb",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "taskId": "WA-001",
+        "sequential": true,
+        "memoryKey": "whatsapp-impl/wa-001",
+        "model": "sonnet"
+      },
+      "createdAt": "2026-01-20T10:08:42.132Z",
+      "model": "sonnet",
+      "modelRoutedBy": "explicit"
+    },
+    "agent-1768950959310-mpjwvw": {
+      "agentId": "agent-1768950959310-mpjwvw",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "name": "comm-api-agent",
+        "capabilities": [
+          "nestjs",
+          "typescript",
+          "api-development"
+        ],
+        "model": "sonnet"
+      },
+      "createdAt": "2026-01-20T23:15:59.310Z",
+      "model": "sonnet",
+      "modelRoutedBy": "explicit"
     }
   },
   "version": "3.0.0"

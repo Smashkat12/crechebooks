@@ -593,7 +593,7 @@ export class FinancialReportService {
         .text(`Generated: ${report.generatedAt.toLocaleString('en-ZA')}`, {
           align: 'center',
         })
-        .text('CrecheBooks - Financial Report', { align: 'center' });
+        .text(`${tenantName} - Financial Report`, { align: 'center' });
 
       doc.end();
     });
@@ -915,7 +915,7 @@ export class FinancialReportService {
         .text(`Generated: ${report.generatedAt.toLocaleString('en-ZA')}`, {
           align: 'center',
         })
-        .text('CrecheBooks - Financial Report', { align: 'center' });
+        .text(`${tenantName} - Financial Report`, { align: 'center' });
 
       doc.end();
     });
@@ -1063,7 +1063,7 @@ export class FinancialReportService {
    */
   async exportPDF(
     report: IncomeStatement | TrialBalance,
-    tenantName = 'CrecheBooks',
+    tenantName = 'Financial Report',
   ): Promise<Buffer> {
     if ('netProfitCents' in report) {
       return this.exportIncomeStatementPDF(report, tenantName);
@@ -1079,7 +1079,7 @@ export class FinancialReportService {
    */
   async exportExcel(
     report: IncomeStatement | TrialBalance,
-    tenantName = 'CrecheBooks',
+    tenantName = 'Financial Report',
   ): Promise<Buffer> {
     if ('netProfitCents' in report) {
       return this.exportIncomeStatementExcel(report, tenantName);

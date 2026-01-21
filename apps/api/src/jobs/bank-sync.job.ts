@@ -169,10 +169,7 @@ export class BankSyncJob implements OnModuleDestroy {
           (sum, r) => sum + r.transactionsRetrieved,
           0,
         ),
-        newTransactions: results.reduce(
-          (sum, r) => sum + r.transactionsNew,
-          0,
-        ),
+        newTransactions: results.reduce((sum, r) => sum + r.transactionsNew, 0),
         startedAt,
         completedAt,
         durationMs: completedAt.getTime() - startedAt.getTime(),

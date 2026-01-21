@@ -88,6 +88,8 @@ interface CreateParentParams {
   whatsappNumber?: string;
   address?: string;
   preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'BOTH';
+  /** TASK-WA-004: WhatsApp opt-in consent (POPIA compliant) */
+  whatsappOptIn?: boolean;
 }
 
 // Create a new parent
@@ -104,6 +106,8 @@ export function useCreateParent() {
         whatsapp: params.whatsappNumber || null,
         address: params.address || null,
         preferredContact: params.preferredCommunication,
+        // TASK-WA-004: WhatsApp opt-in consent
+        whatsappOptIn: params.whatsappOptIn ?? false,
       });
       return data;
     },
@@ -234,6 +238,8 @@ interface UpdateParentParams {
   whatsappNumber?: string;
   address?: string;
   preferredCommunication?: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'BOTH';
+  /** TASK-WA-004: WhatsApp opt-in consent (POPIA compliant) */
+  whatsappOptIn?: boolean;
 }
 
 // Update a parent
@@ -250,6 +256,8 @@ export function useUpdateParent() {
         whatsapp: params.whatsappNumber || null,
         address: params.address || null,
         preferredContact: params.preferredCommunication,
+        // TASK-WA-004: WhatsApp opt-in consent
+        whatsappOptIn: params.whatsappOptIn,
       });
       return data;
     },

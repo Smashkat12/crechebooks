@@ -145,13 +145,15 @@ export interface WhatsAppDeliveryStatus {
 
 /**
  * Pre-approved template names for CrecheBooks
+ * TASK-WA-003: Added statement_notification template
  */
 export type WhatsAppTemplateName =
   | 'invoice_notification'
   | 'invoice_reminder'
   | 'payment_received'
   | 'arrears_notice'
-  | 'registration_welcome';
+  | 'registration_welcome'
+  | 'statement_notification';
 
 /**
  * WhatsApp configuration

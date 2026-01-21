@@ -78,7 +78,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
   private readonly isProduction: boolean;
 
-  constructor(private readonly configService: ConfigService<Record<string, unknown>>) {
+  constructor(
+    private readonly configService: ConfigService<Record<string, unknown>>,
+  ) {
     this.isProduction =
       this.configService.get<string>('NODE_ENV') === 'production';
   }
@@ -232,9 +234,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       case 504:
         return ErrorCode.GATEWAY_TIMEOUT;
       default:
-        return status >= 500
-          ? ErrorCode.INTERNAL_ERROR
-          : ErrorCode.BAD_REQUEST;
+        return status >= 500 ? ErrorCode.INTERNAL_ERROR : ErrorCode.BAD_REQUEST;
     }
   }
 
@@ -243,7 +243,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
    */
   private buildLogContext(
     exception: unknown,
-    errorInfo: { statusCode: number; code: string; message: string; details?: unknown; stack?: string },
+    errorInfo: {
+      statusCode: number;
+      code: string;
+      message: string;
+      details?: unknown;
+      stack?: string;
+    },
     request: Request,
     correlationId: string,
   ): ErrorLogContext {
@@ -310,7 +316,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
    * Build sanitized error response for client
    */
   private buildErrorResponse(
-    errorInfo: { statusCode: number; code: string; message: string; details?: unknown; stack?: string },
+    errorInfo: {
+      statusCode: number;
+      code: string;
+      message: string;
+      details?: unknown;
+      stack?: string;
+    },
     correlationId: string,
     path: string,
   ): StandardErrorResponse {
@@ -364,7 +376,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     // Allow specific safe fields
-    const safeFields = ['fields', 'errors', 'validationErrors', 'retryAfter', 'maxSize'];
+    const safeFields = [
+      'fields',
+      'errors',
+      'validationErrors',
+      'retryAfter',
+      'maxSize',
+    ];
     return Object.keys(obj).some((key) => safeFields.includes(key));
   }
 

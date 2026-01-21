@@ -22,6 +22,8 @@ export default function NewParentPage() {
     whatsappNumber?: string;
     address?: string;
     preferredCommunication: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'BOTH';
+    /** TASK-WA-004: WhatsApp opt-in consent (POPIA compliant) */
+    whatsappOptIn?: boolean;
   }) => {
     try {
       await createParentMutation.mutateAsync(data);

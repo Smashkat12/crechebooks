@@ -65,7 +65,9 @@ function mapPrismaStatus(status: LinkedBankAccountStatus): LinkedAccountStatus {
 /**
  * Maps API status to Prisma status
  */
-function mapToPrismaStatus(status: LinkedAccountStatus): LinkedBankAccountStatus {
+function mapToPrismaStatus(
+  status: LinkedAccountStatus,
+): LinkedBankAccountStatus {
   switch (status) {
     case 'pending':
       return 'PENDING';
@@ -100,8 +102,7 @@ export class StitchBankingService {
       clientId: this.configService.get<string>('STITCH_CLIENT_ID') || '',
       clientSecret:
         this.configService.get<string>('STITCH_CLIENT_SECRET') || '',
-      redirectUri:
-        this.configService.get<string>('STITCH_REDIRECT_URI') || '',
+      redirectUri: this.configService.get<string>('STITCH_REDIRECT_URI') || '',
       timeoutMs: DEFAULT_STITCH_CONFIG.timeoutMs!,
       sandbox:
         this.configService.get<string>('STITCH_SANDBOX') === 'true' ||
@@ -135,7 +136,9 @@ export class StitchBankingService {
    * @param request - Link initiation parameters
    * @returns Link URL and state for OAuth flow
    */
-  async initiateAccountLink(request: LinkInitRequest): Promise<LinkInitResponse> {
+  async initiateAccountLink(
+    request: LinkInitRequest,
+  ): Promise<LinkInitResponse> {
     this.logger.log(`Initiating account link for tenant: ${request.tenantId}`);
 
     // Generate state for CSRF protection
@@ -634,9 +637,7 @@ export class StitchBankingService {
           lastSyncError: errorMessage,
           syncErrorCount: { increment: 1 },
           status:
-            linkedAccount.syncErrorCount >= 2
-              ? 'ERROR'
-              : linkedAccount.status,
+            linkedAccount.syncErrorCount >= 2 ? 'ERROR' : linkedAccount.status,
         },
       });
 
@@ -652,7 +653,9 @@ export class StitchBankingService {
         },
       });
 
-      this.logger.error(`Sync failed for account ${accountId}: ${errorMessage}`);
+      this.logger.error(
+        `Sync failed for account ${accountId}: ${errorMessage}`,
+      );
 
       return {
         accountId,
@@ -850,7 +853,9 @@ export class StitchBankingService {
       accessToken,
     });
 
-    const transactions = Array.isArray(response.transactions) ? response.transactions : [];
+    const transactions = Array.isArray(response.transactions)
+      ? response.transactions
+      : [];
     return transactions.map((txn: Record<string, unknown>) =>
       this.mapStitchTransaction(txn),
     );
@@ -871,8 +876,12 @@ export class StitchBankingService {
 
     return {
       accountId: stitchAccountId,
-      currentBalanceCents: Math.round(Number(response.current_balance || 0) * 100),
-      availableBalanceCents: Math.round(Number(response.available_balance || 0) * 100),
+      currentBalanceCents: Math.round(
+        Number(response.current_balance || 0) * 100,
+      ),
+      availableBalanceCents: Math.round(
+        Number(response.available_balance || 0) * 100,
+      ),
       currency: String(response.currency || 'ZAR'),
       asOf: new Date(String(response.as_of) || Date.now()),
       overdraftLimitCents: response.overdraft_limit
@@ -899,7 +908,9 @@ export class StitchBankingService {
   /**
    * Make HTTP request to Stitch API
    */
-  private async makeRequest(options: StitchRequestOptions): Promise<Record<string, unknown>> {
+  private async makeRequest(
+    options: StitchRequestOptions,
+  ): Promise<Record<string, unknown>> {
     const url = new URL(options.path, this.config.baseUrl);
 
     if (options.params) {
@@ -948,10 +959,7 @@ export class StitchBankingService {
       }
 
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new HttpException(
-          'Request timeout',
-          HttpStatus.REQUEST_TIMEOUT,
-        );
+        throw new HttpException('Request timeout', HttpStatus.REQUEST_TIMEOUT);
       }
 
       throw new HttpException(
@@ -972,7 +980,9 @@ export class StitchBankingService {
       accountHolderName: String(data.account_holder_name || ''),
       accountNumber,
       accountNumberMasked: `****${accountNumber.slice(-4)}`,
-      accountType: String(data.account_type || 'unknown') as StitchAccount['accountType'],
+      accountType: String(
+        data.account_type || 'unknown',
+      ) as StitchAccount['accountType'],
       currency: String(data.currency || 'ZAR'),
       currentBalanceCents: Math.round(Number(data.current_balance || 0) * 100),
       availableBalanceCents: Math.round(
@@ -1004,7 +1014,9 @@ export class StitchBankingService {
         : undefined,
       counterparty: data.counterparty
         ? {
-            name: (data.counterparty as Record<string, unknown>).name as string | undefined,
+            name: (data.counterparty as Record<string, unknown>).name as
+              | string
+              | undefined,
             accountNumber: (data.counterparty as Record<string, unknown>)
               .account_number as string | undefined,
             bankId: (data.counterparty as Record<string, unknown>).bank_id as
@@ -1021,7 +1033,9 @@ export class StitchBankingService {
    * Map linked bank account record to API response
    */
   private mapToLinkedAccount(
-    account: Awaited<ReturnType<typeof this.prisma.linkedBankAccount.findUnique>> & {},
+    account: Awaited<
+      ReturnType<typeof this.prisma.linkedBankAccount.findUnique>
+    > & {},
   ): LinkedAccount {
     const daysRemaining = Math.max(
       0,
@@ -1073,9 +1087,10 @@ export class StitchBankingService {
     );
     return {
       code,
-      message: errorField && !description.includes(errorField)
-        ? `${errorField}: ${description}`
-        : description,
+      message:
+        errorField && !description.includes(errorField)
+          ? `${errorField}: ${description}`
+          : description,
       statusCode,
       details: body,
       retryable: RETRYABLE_ERRORS.includes(code),
@@ -1133,11 +1148,12 @@ export class StitchBankingService {
     transactions: BankTransaction[],
   ): Promise<void> {
     // Get linked account to determine bank account name
-    const linkedAccount = transactions.length > 0
-      ? await this.prisma.linkedBankAccount.findUnique({
-          where: { id: transactions[0].linkedBankAccountId },
-        })
-      : null;
+    const linkedAccount =
+      transactions.length > 0
+        ? await this.prisma.linkedBankAccount.findUnique({
+            where: { id: transactions[0].linkedBankAccountId },
+          })
+        : null;
 
     const bankAccountName = linkedAccount
       ? `${linkedAccount.bankName} (${linkedAccount.accountNumberMasked})`
@@ -1179,8 +1195,13 @@ export class StitchBankingService {
   }): Promise<void> {
     try {
       // Only log for real accounts (not temp IDs)
-      if (event.linkedBankAccountId === 'unknown' || !event.linkedBankAccountId) {
-        this.logger.warn(`Skipping sync event log - invalid account ID: ${event.linkedBankAccountId}`);
+      if (
+        event.linkedBankAccountId === 'unknown' ||
+        !event.linkedBankAccountId
+      ) {
+        this.logger.warn(
+          `Skipping sync event log - invalid account ID: ${event.linkedBankAccountId}`,
+        );
         return;
       }
 
@@ -1191,7 +1212,9 @@ export class StitchBankingService {
       });
 
       if (!accountExists) {
-        this.logger.debug(`Skipping sync event log - account not found: ${event.linkedBankAccountId}`);
+        this.logger.debug(
+          `Skipping sync event log - account not found: ${event.linkedBankAccountId}`,
+        );
         return;
       }
 
@@ -1202,9 +1225,12 @@ export class StitchBankingService {
           linkedBankAccountId: event.linkedBankAccountId,
           syncType: event.type,
           status: event.type.includes('failed') ? 'FAILED' : 'SUCCESS',
-          transactionsFetched: (event.details.transactionsRetrieved as number) || null,
-          transactionsImported: (event.details.transactionsNew as number) || null,
-          transactionsDuplicate: (event.details.transactionsDuplicate as number) || null,
+          transactionsFetched:
+            (event.details.transactionsRetrieved as number) || null,
+          transactionsImported:
+            (event.details.transactionsNew as number) || null,
+          transactionsDuplicate:
+            (event.details.transactionsDuplicate as number) || null,
           errorMessage: (event.details.error as string) || null,
           errorCode: (event.details.errorCode as string) || null,
           durationMs: durationMs || null,

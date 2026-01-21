@@ -66,9 +66,13 @@ export class BalanceSheetService {
   /**
    * Export balance sheet to PDF format
    * @param balanceSheet - The balance sheet data to export
+   * @param tenantName - Name of tenant for branding (white-labeling)
    * @returns PDF buffer
    */
-  async exportToPdf(balanceSheet: BalanceSheet): Promise<Buffer> {
+  async exportToPdf(
+    balanceSheet: BalanceSheet,
+    tenantName = 'Balance Sheet',
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50 });
       const buffers: Buffer[] = [];
@@ -77,8 +81,8 @@ export class BalanceSheetService {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', reject);
 
-      // Header
-      doc.fontSize(20).text('CrecheBooks', { align: 'center' });
+      // Header - use tenant name for white-labeling
+      doc.fontSize(20).text(tenantName, { align: 'center' });
       doc.fontSize(16).text('Balance Sheet', { align: 'center' });
       doc
         .fontSize(12)
@@ -247,9 +251,13 @@ export class BalanceSheetService {
   /**
    * Export balance sheet to Excel format with formulas
    * @param balanceSheet - The balance sheet data to export
+   * @param tenantName - Name of tenant for branding (white-labeling)
    * @returns Excel buffer
    */
-  async exportToExcel(balanceSheet: BalanceSheet): Promise<Buffer> {
+  async exportToExcel(
+    balanceSheet: BalanceSheet,
+    tenantName = 'Balance Sheet',
+  ): Promise<Buffer> {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Balance Sheet');
 
@@ -262,9 +270,9 @@ export class BalanceSheetService {
 
     let currentRow = 1;
 
-    // Header
+    // Header - use tenant name for white-labeling
     worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
-    worksheet.getCell(`A${currentRow}`).value = 'CrecheBooks';
+    worksheet.getCell(`A${currentRow}`).value = tenantName;
     worksheet.getCell(`A${currentRow}`).font = { bold: true, size: 16 };
     worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center' };
     currentRow++;

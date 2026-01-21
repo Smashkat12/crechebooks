@@ -47,6 +47,12 @@ export class CreateEnrollmentDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  // TASK-ENROL-008: Welcome Pack Delivery Integration
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  welcomePackSentAt?: Date;
 }
 
 export class UpdateEnrollmentDto extends PartialType(CreateEnrollmentDto) {}

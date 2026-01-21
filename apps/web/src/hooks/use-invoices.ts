@@ -282,14 +282,16 @@ export function useSendInvoices() {
     SendInvoicesParams
   >({
     mutationFn: async ({ invoiceIds, method }) => {
-      const { data } = await apiClient.post<{ success: boolean; sent: number; failed: number }>(
+      // Map frontend params to snake_case API format
+      const deliveryMethod = method === 'email' ? 'EMAIL' : method === 'whatsapp' ? 'WHATSAPP' : 'BOTH';
+      const { data } = await apiClient.post<{ success: boolean; data: { sent: number; failed: number } }>(
         endpoints.invoices.send,
         {
-          invoiceIds,
-          method,
+          invoice_ids: invoiceIds,
+          delivery_method: deliveryMethod,
         }
       );
-      return data;
+      return { success: data.success, sent: data.data.sent, failed: data.data.failed };
     },
     onSuccess: (_, variables) => {
       // Invalidate specific invoices that were sent
@@ -303,17 +305,25 @@ export function useSendInvoices() {
 
 /**
  * Download invoice PDF
- * TASK-UI-001: Uses HttpOnly cookies for authentication (no localStorage)
+ * TASK-UI-001: Uses Bearer token from NextAuth session for authentication
  */
 export function useDownloadInvoicePdf() {
   const downloadPdf = async (invoiceId: string, invoiceNumber: string): Promise<void> => {
-    // TASK-UI-001: Use credentials: 'include' to send HttpOnly cookies
-    // No localStorage token access - cookies are sent automatically
+    // Get auth token from NextAuth session (same method as apiClient)
+    const { getSession } = await import('next-auth/react');
+    const session = await getSession();
+
+    const headers: HeadersInit = {};
+    if (session?.accessToken) {
+      headers['Authorization'] = `Bearer ${session.accessToken}`;
+    }
+
     const response = await fetch(
       `${apiClient.defaults.baseURL}${endpoints.invoices.pdf(invoiceId)}`,
       {
         method: 'GET',
-        credentials: 'include', // TASK-UI-001: Send HttpOnly cookies
+        credentials: 'include', // Fallback for HttpOnly cookies
+        headers,
       }
     );
 

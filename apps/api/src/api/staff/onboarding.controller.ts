@@ -1130,7 +1130,7 @@ The ${companyName} Team
     <p>Best regards,<br>The ${companyName} Team</p>
   </div>
   <div class="footer">
-    <p>This email was sent from CrecheBooks - Staff Onboarding System</p>
+    <p>This email was sent from the Staff Onboarding System</p>
   </div>
 </body>
 </html>

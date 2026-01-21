@@ -41,6 +41,7 @@ import { ParentRepository } from '../../database/repositories/parent.repository'
 import { FeeStructureRepository } from '../../database/repositories/fee-structure.repository';
 import { EnrollmentRepository } from '../../database/repositories/enrollment.repository';
 import { EnrollmentService } from '../../database/services/enrollment.service';
+import { WelcomePackDeliveryService } from '../../database/services/welcome-pack-delivery.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -69,6 +70,7 @@ export class ChildController {
     private readonly feeStructureRepo: FeeStructureRepository,
     private readonly enrollmentRepo: EnrollmentRepository,
     private readonly enrollmentService: EnrollmentService,
+    private readonly welcomePackDeliveryService: WelcomePackDeliveryService,
   ) {}
 
   @Post()
@@ -131,9 +133,15 @@ export class ChildController {
 
     this.logger.log(`Created child: ${child.id}`);
 
-    // 4. Create enrollment using service (handles validation, audit, invoice generation)
+    // 4. Create enrollment using service (handles validation, audit, invoice generation, welcome pack)
     // NOTE: allowHistoricDates=true enables historical data imports (e.g., Jan 2023 enrollments)
-    const { enrollment, invoice } = await this.enrollmentService.enrollChild(
+    const {
+      enrollment,
+      invoice,
+      invoiceError,
+      welcomePackSent,
+      welcomePackError,
+    } = await this.enrollmentService.enrollChild(
       user.tenantId,
       child.id,
       dto.fee_structure_id,
@@ -145,6 +153,19 @@ export class ChildController {
     this.logger.log(`Created enrollment: ${enrollment.id}`);
     if (invoice) {
       this.logger.log(`Created enrollment invoice: ${invoice.invoiceNumber}`);
+    }
+    if (invoiceError) {
+      this.logger.warn(
+        `Invoice creation failed for enrollment ${enrollment.id}: ${invoiceError}`,
+      );
+    }
+    if (welcomePackSent) {
+      this.logger.log(`Welcome pack sent for enrollment ${enrollment.id}`);
+    }
+    if (welcomePackError) {
+      this.logger.warn(
+        `Welcome pack failed for enrollment ${enrollment.id}: ${welcomePackError}`,
+      );
     }
 
     // 5. Transform to response (camelCase -> snake_case)
@@ -179,7 +200,97 @@ export class ChildController {
               status: invoice.status,
             }
           : null,
+        // Surface invoice creation errors so they're not hidden from API consumers
+        invoice_error: invoiceError || null,
+        // TASK-ENROL-008: Include welcome pack status
+        welcome_pack_sent: welcomePackSent || false,
+        welcome_pack_error: welcomePackError || null,
       },
+    };
+  }
+
+  @Post(':childId/enrollments/:enrollmentId/resend-welcome-pack')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Resend welcome pack email for enrollment',
+    description:
+      'Resends the welcome pack email with PDF attachment for an existing enrollment.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Welcome pack resent successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        sent_at: { type: 'string', format: 'date-time' },
+        recipient_email: { type: 'string' },
+        error: { type: 'string', nullable: true },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Enrollment not found' })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions (requires OWNER or ADMIN)',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async resendWelcomePack(
+    @Param('childId', ParseUUIDPipe) childId: string,
+    @Param('enrollmentId', ParseUUIDPipe) enrollmentId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    sent_at?: string;
+    recipient_email?: string;
+    error?: string | null;
+  }> {
+    this.logger.log(
+      `Resend welcome pack: enrollment=${enrollmentId}, child=${childId}, tenant=${user.tenantId}`,
+    );
+
+    // 1. Verify enrollment exists and belongs to child and tenant
+    const enrollment = await this.enrollmentRepo.findById(
+      enrollmentId,
+      user.tenantId,
+    );
+    if (!enrollment) {
+      this.logger.error(
+        `Enrollment not found: ${enrollmentId} for tenant ${user.tenantId}`,
+      );
+      throw new NotFoundException('Enrollment', enrollmentId);
+    }
+
+    // 2. Verify enrollment belongs to the specified child
+    if (enrollment.childId !== childId) {
+      this.logger.error(
+        `Enrollment ${enrollmentId} does not belong to child ${childId}`,
+      );
+      throw new NotFoundException('Enrollment', enrollmentId);
+    }
+
+    // 3. Send welcome pack
+    const result = await this.welcomePackDeliveryService.sendWelcomePack(
+      user.tenantId,
+      enrollmentId,
+    );
+
+    if (result.success) {
+      this.logger.log(
+        `Welcome pack resent successfully for enrollment ${enrollmentId}`,
+      );
+    } else {
+      this.logger.warn(
+        `Welcome pack resend failed for enrollment ${enrollmentId}: ${result.error}`,
+      );
+    }
+
+    return {
+      success: result.success,
+      sent_at: result.sentAt?.toISOString(),
+      recipient_email: result.recipientEmail,
+      error: result.error || null,
     };
   }
 

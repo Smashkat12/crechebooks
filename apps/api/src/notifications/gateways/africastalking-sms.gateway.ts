@@ -66,10 +66,8 @@ export class AfricasTalkingSmsGateway implements ISmsGateway {
       'sandbox',
     );
 
-    this.senderId = this.configService.get<string>(
-      'SMS_SENDER_ID',
-      'CrecheBooks',
-    );
+    // Generic default senderId for white-labeling - configure SMS_SENDER_ID per tenant
+    this.senderId = this.configService.get<string>('SMS_SENDER_ID', 'Notify');
 
     // Validate configuration
     if (!apiKey) {

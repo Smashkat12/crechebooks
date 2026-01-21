@@ -28,6 +28,13 @@ export interface Tenant {
   invoiceDayOfMonth: number;
   invoiceDueDays: number;
   closureDates: ClosureDate[];
+  // TASK-BILL-043: Bank details for invoice/statement PDF generation
+  bankName?: string;
+  bankAccountHolder?: string;
+  bankAccountNumber?: string;
+  bankBranchCode?: string;
+  bankAccountType?: string;
+  bankSwiftCode?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +55,13 @@ export interface UpdateTenantDto {
   invoiceDayOfMonth?: number;
   invoiceDueDays?: number;
   closureDates?: ClosureDate[];
+  // TASK-BILL-043: Bank details for invoice/statement PDF generation
+  bankName?: string;
+  bankAccountHolder?: string;
+  bankAccountNumber?: string;
+  bankBranchCode?: string;
+  bankAccountType?: string;
+  bankSwiftCode?: string;
 }
 
 /**

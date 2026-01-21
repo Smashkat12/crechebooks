@@ -10,7 +10,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTenant, useUpdateTenant, type ClosureDate } from '@/hooks/useTenant';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, Trash2, Calendar } from 'lucide-react';
+import { Loader2, Plus, Trash2, Calendar, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 const organizationSchema = z.object({
@@ -25,6 +25,13 @@ const organizationSchema = z.object({
   postalCode: z.string().min(1, 'Postal code is required'),
   phone: z.string().min(1, 'Phone is required'),
   email: z.string().email('Invalid email'),
+  // TASK-BILL-043: Bank details for invoice/statement PDF generation
+  bankName: z.string().max(100).optional(),
+  bankAccountHolder: z.string().max(200).optional(),
+  bankAccountNumber: z.string().max(50).optional(),
+  bankBranchCode: z.string().max(20).optional(),
+  bankAccountType: z.string().max(30).optional(),
+  bankSwiftCode: z.string().max(20).optional(),
 });
 
 type OrganizationFormData = z.infer<typeof organizationSchema>;
@@ -72,6 +79,13 @@ export default function OrganizationSettingsPage() {
         postalCode: tenant.postalCode || '',
         phone: tenant.phone || '',
         email: tenant.email || '',
+        // TASK-BILL-043: Bank details
+        bankName: tenant.bankName || '',
+        bankAccountHolder: tenant.bankAccountHolder || '',
+        bankAccountNumber: tenant.bankAccountNumber || '',
+        bankBranchCode: tenant.bankBranchCode || '',
+        bankAccountType: tenant.bankAccountType || '',
+        bankSwiftCode: tenant.bankSwiftCode || '',
       });
 
       // Load closure dates - handle both array of strings and array of objects
@@ -274,6 +288,71 @@ export default function OrganizationSettingsPage() {
                 </>
               ) : (
                 'Save Changes'
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* TASK-BILL-043: Banking Details Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Banking Details
+          </CardTitle>
+          <CardDescription>
+            Configure your banking details for invoice and statement payment instructions. These details will appear on all invoices and statements sent to parents.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="bankName">Bank Name</Label>
+                <Input id="bankName" {...register('bankName')} placeholder="e.g., Standard Bank, FNB, ABSA" />
+                <p className="text-xs text-muted-foreground">The name of your bank</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankAccountHolder">Account Holder Name</Label>
+                <Input id="bankAccountHolder" {...register('bankAccountHolder')} placeholder="e.g., Elle Elephant Creche PTY LTD" />
+                <p className="text-xs text-muted-foreground">Name as it appears on the account</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankAccountNumber">Account Number</Label>
+                <Input id="bankAccountNumber" {...register('bankAccountNumber')} placeholder="e.g., 1234567890" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankBranchCode">Branch Code</Label>
+                <Input id="bankBranchCode" {...register('bankBranchCode')} placeholder="e.g., 051001" />
+                <p className="text-xs text-muted-foreground">Universal branch code or specific branch</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankAccountType">Account Type</Label>
+                <Input id="bankAccountType" {...register('bankAccountType')} placeholder="e.g., Cheque, Savings, Current" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bankSwiftCode">SWIFT/BIC Code</Label>
+                <Input id="bankSwiftCode" {...register('bankSwiftCode')} placeholder="e.g., SBZAZAJJ" />
+                <p className="text-xs text-muted-foreground">For international transfers (optional)</p>
+              </div>
+            </div>
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                <strong>Note:</strong> These banking details will be displayed on invoices and statements to facilitate parent payments. Please ensure accuracy to avoid payment issues. If not configured, invoices will display a message asking parents to contact you for payment details.
+              </p>
+            </div>
+            <Button
+              type="submit"
+              disabled={isSubmitting || updateTenantMutation.isPending || !isDirty}
+            >
+              {(isSubmitting || updateTenantMutation.isPending) ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Banking Details'
               )}
             </Button>
           </form>

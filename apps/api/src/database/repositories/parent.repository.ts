@@ -42,6 +42,8 @@ export class ParentRepository {
           idNumber: dto.idNumber ?? null,
           address: dto.address ?? null,
           notes: dto.notes ?? null,
+          // TASK-WA-004: WhatsApp opt-in consent (POPIA compliant)
+          whatsappOptIn: dto.whatsappOptIn ?? false,
         },
       });
     } catch (error) {
@@ -341,6 +343,10 @@ export class ParentRepository {
       }
       if (dto.notes !== undefined) {
         updateData.notes = dto.notes;
+      }
+      // TASK-WA-004: WhatsApp opt-in consent (POPIA compliant)
+      if (dto.whatsappOptIn !== undefined) {
+        updateData.whatsappOptIn = dto.whatsappOptIn;
       }
 
       return await this.prisma.parent.update({

@@ -1488,3 +1488,457 @@ Tasks MUST be implemented in this order:
 
 Findings stored in claude-flow memory:
 - `reconciliation-architecture-review-2026-01-18` - Full architecture review
+
+---
+
+## Phase 20: WhatsApp Integration Finalization (2026-01-20)
+
+Analysis Date: 2026-01-20
+Source: Comprehensive WhatsApp integration gap analysis using claude-flow agent orchestration.
+
+These tasks complete the WhatsApp Business API integration by adding message history tracking, template management, statement delivery, UI components, comprehensive tests, and retry logic.
+
+### 20.1 Message History (Sequence 260)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 260 | TASK-WA-001 | WhatsApp Message History Entity | foundation | TASK-INT-005, TASK-CORE-002 | P1-CRITICAL | ⭕ Pending |
+
+### 20.2 Template Management (Sequence 261)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 261 | TASK-WA-002 | WhatsApp Template Management Service | logic | TASK-INT-005, TASK-WA-001 | P2-HIGH | ⭕ Pending |
+
+### 20.3 Statement Delivery (Sequence 262)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 262 | TASK-WA-003 | Statement Delivery via WhatsApp | logic | TASK-BILL-035, TASK-WA-001, TASK-WA-002 | P2-HIGH | ⭕ Pending |
+
+### 20.4 Opt-In UI (Sequence 263)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 263 | TASK-WA-004 | WhatsApp Opt-In UI Components | surface | TASK-INT-005, TASK-WEB-031, TASK-WA-001 | P2-HIGH | ⭕ Pending |
+
+### 20.5 Test Coverage (Sequence 264)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 264 | TASK-WA-005 | WhatsApp Channel Adapter Tests | testing | TASK-INT-005, TASK-NOTIF-001, TASK-WA-001 | P2-HIGH | ⭕ Pending |
+
+### 20.6 Retry Service (Sequence 265)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 265 | TASK-WA-006 | WhatsApp Message Retry Service | logic | TASK-INT-005, TASK-WA-001, TASK-WA-002 | P1-CRITICAL | ⭕ Pending |
+
+---
+
+## Phase 20 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 2 | 0 | 2 | 0% |
+| P2-HIGH | 4 | 0 | 4 | 0% |
+| **Total Phase 20** | **6** | **0** | **6** | **0%** |
+
+### Phase 20 Key Features
+
+**Message History Entity (TASK-WA-001)**:
+- WhatsAppMessage Prisma model
+- Status tracking (pending, sent, delivered, read, failed)
+- Context linking (invoice, reminder, statement)
+- Webhook status update handling
+- POPIA compliance audit trail
+
+**Template Management Service (TASK-WA-002)**:
+- Fetch templates from Meta Graph API
+- Template caching with 1-hour TTL
+- Parameter validation before send
+- CrecheBooks template configurations
+- Build template message payloads
+
+**Statement Delivery (TASK-WA-003)**:
+- `statement_notification` template
+- Financial summary via WhatsApp
+- Full PDF via email (hybrid delivery)
+- Currency and date formatting
+- Opt-in verification
+
+**Opt-In UI Components (TASK-WA-004)**:
+- WhatsApp toggle switch per parent
+- Message history display
+- Status badges (delivered, read, failed)
+- POPIA consent notice
+- React Query hooks for API
+
+**Channel Adapter Tests (TASK-WA-005)**:
+- Unit tests for WhatsAppChannelAdapter
+- Webhook handler unit tests
+- Phone validator edge cases
+- Signature verification tests
+- 90%+ code coverage target
+
+**Retry Service (TASK-WA-006)**:
+- BullMQ queue for failed messages
+- Exponential backoff (1min, 5min, 15min)
+- Maximum 3 retry attempts
+- Dead letter queue for permanent failures
+- Error code classification (retryable vs permanent)
+
+### Task Dependencies (Phase 20)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        INT005[TASK-INT-005<br/>WhatsApp Base]
+        BILL035[TASK-BILL-035<br/>Statement Delivery]
+        NOTIF001[TASK-NOTIF-001<br/>SMS Channel]
+        WEB031[TASK-WEB-031<br/>Parent Pages]
+    end
+
+    subgraph "Phase 20 - WhatsApp Finalization"
+        WA001[TASK-WA-001<br/>Message History]
+        WA002[TASK-WA-002<br/>Template Mgmt]
+        WA003[TASK-WA-003<br/>Statement Delivery]
+        WA004[TASK-WA-004<br/>Opt-In UI]
+        WA005[TASK-WA-005<br/>Adapter Tests]
+        WA006[TASK-WA-006<br/>Retry Service]
+    end
+
+    INT005 --> WA001
+    INT005 --> WA002
+    WA001 --> WA003
+    WA002 --> WA003
+    BILL035 --> WA003
+    WA001 --> WA004
+    WEB031 --> WA004
+    INT005 --> WA005
+    NOTIF001 --> WA005
+    WA001 --> WA005
+    WA001 --> WA006
+    WA002 --> WA006
+```
+
+### Execution Order (Recommended)
+
+Tasks should be implemented in this order to respect dependencies:
+
+1. **TASK-WA-001** (Message History) - Foundation for all other tasks
+2. **TASK-WA-002** (Template Management) - Required for statement delivery and retry
+3. **TASK-WA-005** (Tests) - Can run parallel after WA-001
+4. **TASK-WA-003** (Statement Delivery) - Requires WA-001 and WA-002
+5. **TASK-WA-004** (Opt-In UI) - Requires WA-001
+6. **TASK-WA-006** (Retry Service) - Requires WA-001 and WA-002
+
+### WhatsApp Implementation Coverage
+
+| Category | Pre-Phase 20 | Post-Phase 20 | Change |
+|----------|--------------|---------------|--------|
+| Messaging | 83% | 100% | +17% |
+| History/Audit | 0% | 100% | +100% |
+| UI | 0% | 100% | +100% |
+| Reliability | 50% | 100% | +50% |
+| **Overall** | **70%** | **100%** | **+30%** |
+
+### Review Source
+
+Analysis stored in claude-flow unified memory:
+- `whatsapp-analysis-2026-01-20` - Full gap analysis
+- Identified 6 gaps with task assignments
+- WhatsApp API traceability matrix in `_traceability.md`
+
+---
+
+## Phase 21: Parent Welcome Pack (2026-01-20)
+
+Analysis Date: 2026-01-20
+Source: Parent onboarding gap analysis - identified missing welcome pack for parents after child enrollment.
+
+These tasks implement a parent welcome pack feature that sends a professional welcome email with PDF attachment when a child is enrolled at the crèche. This mirrors the staff welcome pack capability (TASK-STAFF-001) but is designed for parent onboarding.
+
+### 21.1 Parent Welcome Pack PDF (Sequence 266)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 266 | TASK-ENROL-006 | Parent Welcome Pack PDF Service | logic | TASK-BILL-021, TASK-BILL-013, TASK-STAFF-001 | P2-HIGH | ⭕ Ready |
+
+### 21.2 Parent Welcome Email Template (Sequence 267)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 267 | TASK-ENROL-007 | Parent Welcome Email Template | logic | TASK-ENROL-006, TASK-BILL-013, TASK-BILL-042 | P2-HIGH | ⭕ Ready |
+
+### 21.3 Welcome Pack Delivery Integration (Sequence 268)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 268 | TASK-ENROL-008 | Parent Welcome Pack Delivery Integration | logic | TASK-ENROL-006, TASK-ENROL-007, TASK-BILL-021 | P2-HIGH | ⭕ Ready |
+
+---
+
+## Phase 21 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P2-HIGH | 3 | 0 | 3 | 0% |
+| **Total Phase 21** | **3** | **0** | **3** | **0%** |
+
+### Phase 21 Key Features
+
+**Parent Welcome Pack PDF (TASK-ENROL-006)**:
+- PDF generation using PDFKit (same pattern as staff welcome pack)
+- Tenant branding (name, contact details)
+- Child enrollment details (name, start date, class)
+- Crèche information (hours, location, contact)
+- Fee structure with bank details for payment
+- Important policies summary
+- "What to bring" checklist for first day
+- Emergency procedures and contacts
+
+**Parent Welcome Email Template (TASK-ENROL-007)**:
+- HTML email with responsive design
+- Welcome message with child's name
+- Enrollment summary box
+- Quick reference section (hours, contact)
+- Bank details for payment reference
+- First day checklist highlights
+- Professional styling matching invoice/statement emails
+
+**Welcome Pack Delivery Integration (TASK-ENROL-008)**:
+- Automatic sending after successful enrollment
+- Integration into `enrollChild()` flow
+- PDF attachment via Mailgun
+- Webhook tracking for delivery status
+- Audit trail logging
+- Manual resend API endpoint
+- Non-blocking (enrollment succeeds even if email fails)
+
+### Task Dependencies (Phase 21)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        BILL021[TASK-BILL-021<br/>Auto-Invoice on Enrollment]
+        BILL013[TASK-BILL-013<br/>Invoice Delivery]
+        STAFF001[TASK-STAFF-001<br/>Staff Welcome Pack]
+    end
+
+    subgraph "Phase 21 - Parent Welcome Pack"
+        ENROL006[TASK-ENROL-006<br/>PDF Service]
+        ENROL007[TASK-ENROL-007<br/>Email Template]
+        ENROL008[TASK-ENROL-008<br/>Delivery Integration]
+    end
+
+    BILL021 --> ENROL006
+    BILL013 --> ENROL006
+    STAFF001 --> ENROL006
+    ENROL006 --> ENROL007
+    BILL013 --> ENROL007
+    ENROL006 --> ENROL008
+    ENROL007 --> ENROL008
+    BILL021 --> ENROL008
+```
+
+### Execution Order (Recommended)
+
+Tasks should be implemented in this order to respect dependencies:
+
+1. **TASK-ENROL-006** (PDF Service) - Foundation for email and delivery
+2. **TASK-ENROL-007** (Email Template) - Requires PDF service
+3. **TASK-ENROL-008** (Delivery Integration) - Requires both PDF and email
+
+### Parent Onboarding Coverage
+
+| Feature | Pre-Phase 21 | Post-Phase 21 | Change |
+|---------|--------------|---------------|--------|
+| Enrollment Invoice | 100% | 100% | — |
+| Welcome Email | 0% | 100% | +100% |
+| Welcome Pack PDF | 0% | 100% | +100% |
+| Auto Delivery | 0% | 100% | +100% |
+| **Overall** | **25%** | **100%** | **+75%** |
+
+### Review Source
+
+Analysis triggered by user inquiry about parent welcome pack capability.
+- Identified that staff welcome pack exists (TASK-STAFF-001) but parent equivalent is missing
+- Parent enrollment only sends registration invoice, no welcome communication
+- This phase addresses the gap with 3 focused tasks
+
+---
+
+## Phase 22: Ad-hoc Communications (2026-01-20)
+
+Analysis Date: 2026-01-20
+Source: Ad-hoc communication capability analysis - identified need for portal/dashboard to send targeted messages to parents and staff via email/WhatsApp.
+
+These tasks implement a complete ad-hoc communication system that allows creche administrators to send announcements and messages to targeted groups of parents or staff through multiple channels (email, WhatsApp) with recipient filtering, preview, and delivery tracking.
+
+### 22.1 Communication Database Schema (Sequence 280)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 280 | TASK-COMM-001 | Communication Database Schema | foundation | TASK-INT-005, TASK-CORE-002 | P1-CRITICAL | ⭕ Ready |
+
+### 22.2 Ad-hoc Communication Service (Sequence 281)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 281 | TASK-COMM-002 | Ad-hoc Communication Service | logic | TASK-COMM-001, TASK-INT-005, TASK-BILL-013 | P1-CRITICAL | ⭕ Ready |
+
+### 22.3 Communication API Controller (Sequence 282)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 282 | TASK-COMM-003 | Communication API Controller | surface | TASK-COMM-002, TASK-API-001 | P1-CRITICAL | ⭕ Ready |
+
+### 22.4 Frontend Communication Dashboard (Sequence 283)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 283 | TASK-COMM-004 | Frontend Communication Dashboard | surface | TASK-COMM-003, TASK-WEB-003 | P2-HIGH | ⭕ Ready |
+
+### 22.5 Recipient Selection Component (Sequence 284)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 284 | TASK-COMM-005 | Recipient Selection Component | surface | TASK-COMM-004 | P2-HIGH | ⭕ Ready |
+
+### 22.6 Message History & Analytics (Sequence 285)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 285 | TASK-COMM-006 | Message History & Analytics UI | surface | TASK-COMM-004, TASK-COMM-005 | P2-HIGH | ⭕ Ready |
+
+---
+
+## Phase 22 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P1-CRITICAL | 3 | 0 | 3 | 0% |
+| P2-HIGH | 3 | 0 | 3 | 0% |
+| **Total Phase 22** | **6** | **0** | **6** | **0%** |
+
+### Phase 22 Key Features
+
+**Communication Database Schema (TASK-COMM-001)**:
+- BroadcastMessage Prisma model for message storage
+- MessageRecipient for per-recipient delivery tracking
+- RecipientGroup for saved filter presets
+- Type enums: RecipientType, CommunicationChannel, BroadcastStatus, DeliveryStatus
+- Entity services with CRUD operations
+- Migration script for database changes
+
+**Ad-hoc Communication Service (TASK-COMM-002)**:
+- AdhocCommunicationService for orchestration
+- RecipientResolverService with filter-based targeting
+- BroadcastProcessor for BullMQ background processing
+- Parent filters: enrollment status, fee structure, arrears, days overdue
+- Staff filters: department, employment type, position
+- Rate limiting (50ms between messages)
+- Multi-channel support (email, WhatsApp, both)
+
+**Communication API Controller (TASK-COMM-003)**:
+- POST /communications/broadcasts - Create broadcast
+- POST /communications/broadcasts/:id/send - Send broadcast
+- GET /communications/broadcasts - List broadcasts
+- GET /communications/broadcasts/:id - Get broadcast details
+- POST /communications/recipients/preview - Preview recipients
+- GET/POST/DELETE /communications/groups - Manage recipient groups
+- Swagger documentation for all endpoints
+
+**Frontend Communication Dashboard (TASK-COMM-004)**:
+- Communications dashboard page with quick stats
+- New broadcast wizard (3-step: Recipients → Message → Review)
+- Message history with status tabs (All, Sent, Scheduled, Draft)
+- useCommunications hook with React Query
+- API client for communications endpoints
+- Toast notifications for actions
+
+**Recipient Selection Component (TASK-COMM-005)**:
+- RecipientSelector with type selection (Parents/Staff)
+- ParentFilterForm with all filter options
+- StaffFilterForm with department/type filters
+- SavedGroupsSelector for reusable groups
+- CustomRecipientPicker for manual selection
+- RecipientPreview with count and sample (limit 20)
+
+**Message History & Analytics (TASK-COMM-006)**:
+- DeliveryStatsChart with pie charts (recharts)
+- RecipientDeliveryTable with search/filter
+- Channel breakdown (email vs WhatsApp)
+- ExportButton for CSV/PDF reports
+- BroadcastTimeline component for status history
+
+### Task Dependencies (Phase 22)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        INT005[TASK-INT-005<br/>WhatsApp Base]
+        CORE002[TASK-CORE-002<br/>Prisma Setup]
+        BILL013[TASK-BILL-013<br/>Email Delivery]
+        API001[TASK-API-001<br/>NestJS API]
+        WEB003[TASK-WEB-003<br/>Next.js Setup]
+    end
+
+    subgraph "Phase 22 - Ad-hoc Communications"
+        COMM001[TASK-COMM-001<br/>Database Schema]
+        COMM002[TASK-COMM-002<br/>Communication Service]
+        COMM003[TASK-COMM-003<br/>API Controller]
+        COMM004[TASK-COMM-004<br/>Dashboard Page]
+        COMM005[TASK-COMM-005<br/>Recipient Selector]
+        COMM006[TASK-COMM-006<br/>Analytics UI]
+    end
+
+    INT005 --> COMM001
+    CORE002 --> COMM001
+    COMM001 --> COMM002
+    INT005 --> COMM002
+    BILL013 --> COMM002
+    COMM002 --> COMM003
+    API001 --> COMM003
+    COMM003 --> COMM004
+    WEB003 --> COMM004
+    COMM004 --> COMM005
+    COMM004 --> COMM006
+    COMM005 --> COMM006
+```
+
+### Execution Order (Recommended)
+
+Tasks should be implemented in this order to respect dependencies:
+
+1. **TASK-COMM-001** (Database Schema) - Foundation for all other tasks
+2. **TASK-COMM-002** (Communication Service) - Core business logic
+3. **TASK-COMM-003** (API Controller) - REST endpoints
+4. **TASK-COMM-004** (Dashboard Page) - Main UI
+5. **TASK-COMM-005** (Recipient Selector) - UI component
+6. **TASK-COMM-006** (Analytics UI) - Final UI components
+
+### Ad-hoc Communication Coverage
+
+| Feature | Pre-Phase 22 | Post-Phase 22 | Change |
+|---------|--------------|---------------|--------|
+| Transactional Messages | 100% | 100% | — |
+| Ad-hoc Announcements | 0% | 100% | +100% |
+| Recipient Filtering | 0% | 100% | +100% |
+| Multi-Channel Broadcast | 0% | 100% | +100% |
+| Delivery Analytics | 0% | 100% | +100% |
+| **Overall** | **20%** | **100%** | **+80%** |
+
+### Review Source
+
+Analysis triggered by user request for ad-hoc communication capability.
+- Identified that only transactional messages exist (invoices, reminders, statements)
+- No capability for targeted announcements or bulk messaging
+- This phase addresses the gap with 6 comprehensive tasks
+
+---
+
+**Total Tasks**: 207 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications)
+**Overall Completion**: 192/207 (92.8%)
+

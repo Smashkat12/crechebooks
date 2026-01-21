@@ -293,18 +293,77 @@ export function useFinalizeStatement() {
 }
 
 /**
+ * Deliver statement response
+ */
+interface DeliverStatementResponse {
+  success: boolean;
+  message: string;
+  data: {
+    statement_id: string;
+    parent_id: string;
+    success: boolean;
+    channel: string;
+    message_id: string | null;
+    error: string | null;
+    delivered_at: string | null;
+  };
+}
+
+export type DeliveryChannel = 'EMAIL' | 'WHATSAPP' | 'SMS';
+
+export interface DeliverStatementParams {
+  statementId: string;
+  channel?: DeliveryChannel;
+}
+
+/**
+ * Deliver a statement to the parent
+ * TASK-STMT-007: Statement delivery functionality
+ */
+export function useDeliverStatement() {
+  const queryClient = useQueryClient();
+
+  return useMutation<DeliverStatementResponse['data'], AxiosError, DeliverStatementParams>({
+    mutationFn: async ({ statementId, channel }) => {
+      const { data } = await apiClient.post<DeliverStatementResponse>(
+        endpoints.statements.deliver(statementId),
+        channel ? { channel } : {}
+      );
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to deliver statement');
+      }
+
+      return data.data;
+    },
+    onSuccess: (_, { statementId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.statements.detail(statementId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.statements.lists() });
+    },
+  });
+}
+
+/**
  * Download statement PDF
- * TASK-UI-001: Uses HttpOnly cookies for authentication (no localStorage)
+ * TASK-UI-001: Uses Bearer token from NextAuth session for authentication
  */
 export function useDownloadStatementPdf() {
   const downloadPdf = async (statementId: string, statementNumber: string): Promise<void> => {
-    // TASK-UI-001: Use credentials: 'include' to send HttpOnly cookies
-    // No localStorage token access - cookies are sent automatically
+    // Get auth token from NextAuth session (same method as apiClient)
+    const { getSession } = await import('next-auth/react');
+    const session = await getSession();
+
+    const headers: HeadersInit = {};
+    if (session?.accessToken) {
+      headers['Authorization'] = `Bearer ${session.accessToken}`;
+    }
+
     const response = await fetch(
       `${apiClient.defaults.baseURL}${endpoints.statements.pdf(statementId)}`,
       {
         method: 'GET',
-        credentials: 'include', // TASK-UI-001: Send HttpOnly cookies
+        credentials: 'include', // Fallback for HttpOnly cookies
+        headers,
       }
     );
 

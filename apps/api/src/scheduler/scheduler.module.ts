@@ -14,6 +14,7 @@ import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
 import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { CircuitBreakerModule } from '../integrations/circuit-breaker';
+import { EmailModule } from '../integrations/email/email.module';
 
 const logger = new Logger('SchedulerModule');
 
@@ -110,6 +111,7 @@ const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
     SarsSchedulerModule,
     DatabaseModule,
     CircuitBreakerModule,
+    EmailModule, // TASK-BILL-013: Email service for arrears reminders
     ScheduleModule.forRoot(), // TASK-REL-101: Enable cron scheduling
     ...bullImports,
   ],

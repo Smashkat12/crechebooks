@@ -378,6 +378,19 @@ model Tenant {
   closureDates            Json               @default("[]") @map("closure_dates")
   // TASK-RECON-002: Amount tolerance for transaction matching (in cents, default 0 = exact match)
   matchingToleranceCents  Int                @default(0) @map("matching_tolerance_cents")
+
+  // TASK-BILL-043: Bank details for invoice/statement PDF generation
+  bankName                String?            @map("bank_name") @db.VarChar(100)
+  bankAccountHolder       String?            @map("bank_account_holder") @db.VarChar(200)
+  bankAccountNumber       String?            @map("bank_account_number") @db.VarChar(50)
+  bankBranchCode          String?            @map("bank_branch_code") @db.VarChar(20)
+  bankAccountType         String?            @map("bank_account_type") @db.VarChar(30)
+  bankSwiftCode           String?            @map("bank_swift_code") @db.VarChar(20)
+
+  // TASK-ENROL-006: Parent welcome pack customization
+  parentWelcomeMessage    String?            @map("parent_welcome_message") @db.Text
+  operatingHours          String?            @map("operating_hours") @db.VarChar(200)
+
   xeroConnectedAt         DateTime?          @map("xero_connected_at")
   xeroTenantName          String?            @map("xero_tenant_name") @db.VarChar(200)
   createdAt               DateTime           @default(now()) @map("created_at")
@@ -493,6 +506,13 @@ model Tenant {
   // TASK-INT-101: Stitch Open Banking Integration
   linkedBankAccounts LinkedBankAccount[]
 
+  // TASK-WA-001: WhatsApp Message History
+  whatsAppMessages WhatsAppMessage[]
+
+  // TASK-COMM-001: Ad-hoc Communication
+  broadcastMessages BroadcastMessage[]
+  recipientGroups   RecipientGroup[]
+
   @@map("tenants")
 }
 
@@ -528,6 +548,9 @@ model User {
   // TASK-RECON-037: Xero Transaction Split tracking
   xeroSplitsCreated   XeroTransactionSplit[] @relation("XeroSplitCreator")
   xeroSplitsConfirmed XeroTransactionSplit[] @relation("XeroSplitConfirmer")
+
+  // TASK-COMM-001: Ad-hoc Communication
+  broadcastMessagesCreated BroadcastMessage[] @relation("BroadcastMessageCreatedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -710,6 +733,8 @@ model Enrollment {
   siblingDiscountApplied Boolean          @default(false) @map("sibling_discount_applied")
   customFeeOverrideCents Int?             @map("custom_fee_override_cents")
   notes                  String?
+  // TASK-ENROL-008: Welcome Pack Delivery Integration
+  welcomePackSentAt      DateTime?        @map("welcome_pack_sent_at")
   createdAt              DateTime         @default(now()) @map("created_at")
   updatedAt              DateTime         @updatedAt @map("updated_at")
 
@@ -752,6 +777,9 @@ model Parent {
 
   // TASK-XERO-010: Xero Contact Mapping
   xeroContactMapping XeroContactMapping?
+
+  // TASK-WA-001: WhatsApp Message History
+  whatsAppMessages WhatsAppMessage[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -2774,6 +2802,26 @@ enum PendingSyncEntityType {
   JOURNAL
 }
 
+// ============================================
+// TASK-WA-001: WhatsApp Message History
+// ============================================
+
+enum WhatsAppMessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum WhatsAppContextType {
+  INVOICE
+  REMINDER
+  STATEMENT
+  WELCOME
+  ARREARS
+}
+
 model PendingSync {
   id          String                @id @default(cuid())
   tenantId    String                @map("tenant_id")
@@ -2795,4 +2843,164 @@ model PendingSync {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("pending_syncs")
+}
+
+// ============================================
+// TASK-WA-001: WhatsApp Message History Entity
+// Tracks all outbound WhatsApp messages for audit trail and POPIA compliance
+// ============================================
+
+model WhatsAppMessage {
+  id              String                 @id @default(uuid())
+  tenantId        String                 @map("tenant_id")
+  parentId        String?                @map("parent_id")
+  recipientPhone  String                 @map("recipient_phone") @db.VarChar(20)
+  templateName    String                 @map("template_name") @db.VarChar(100)
+  templateParams  Json?                  @map("template_params")
+
+  // Message identifiers from Meta
+  wamid           String?                @unique @map("wamid") @db.VarChar(100) // WhatsApp Message ID
+
+  // Status tracking
+  status          WhatsAppMessageStatus  @default(PENDING)
+  statusUpdatedAt DateTime?              @map("status_updated_at")
+  errorCode       String?                @map("error_code") @db.VarChar(50)
+  errorMessage    String?                @map("error_message") @db.Text
+
+  // Context - links to invoices, statements, etc.
+  contextType     WhatsAppContextType    @map("context_type")
+  contextId       String?                @map("context_id") @db.VarChar(100)
+
+  // Timestamps
+  sentAt          DateTime?              @map("sent_at")
+  deliveredAt     DateTime?              @map("delivered_at")
+  readAt          DateTime?              @map("read_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  parent          Parent?                @relation(fields: [parentId], references: [id])
+
+  @@index([tenantId, parentId])
+  @@index([tenantId, status])
+  @@index([tenantId, contextType, contextId])
+  @@index([wamid])
+  @@map("whatsapp_messages")
+}
+
+// ============================================
+// TASK-COMM-001: Ad-hoc Communication Database Schema
+// Broadcast messaging to parents and staff via email, WhatsApp, SMS
+// ============================================
+
+model BroadcastMessage {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+
+  // Message content
+  subject         String?  @db.VarChar(200) // For email
+  body            String   @db.Text // Plain text content
+  htmlBody        String?  @map("html_body") @db.Text // HTML for email
+
+  // Targeting
+  recipientType   String   @map("recipient_type") @db.VarChar(20) // parent, staff, custom
+  recipientFilter Json?    @map("recipient_filter") // Filter criteria
+  recipientGroupId String? @map("recipient_group_id") // Saved group
+
+  // Channel selection
+  channel         String   @db.VarChar(20) // email, whatsapp, sms, all
+
+  // Scheduling
+  scheduledAt     DateTime? @map("scheduled_at")
+  sentAt          DateTime? @map("sent_at")
+
+  // Status
+  status          String   @default("draft") @db.VarChar(20) // draft, scheduled, sending, sent, partially_sent, failed, cancelled
+  totalRecipients Int      @default(0) @map("total_recipients")
+  sentCount       Int      @default(0) @map("sent_count")
+  failedCount     Int      @default(0) @map("failed_count")
+
+  // Metadata
+  createdBy       String   @map("created_by") // User ID
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  createdByUser   User     @relation("BroadcastMessageCreatedBy", fields: [createdBy], references: [id])
+  recipientGroup  RecipientGroup? @relation(fields: [recipientGroupId], references: [id])
+  recipients      MessageRecipient[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, recipientType])
+  @@index([tenantId, createdAt])
+  @@map("broadcast_messages")
+}
+
+model MessageRecipient {
+  id              String   @id @default(uuid())
+  broadcastId     String   @map("broadcast_id")
+
+  // Recipient info (copied for audit)
+  recipientId     String   @map("recipient_id") // Parent or Staff ID
+  recipientType   String   @map("recipient_type") @db.VarChar(20) // parent, staff
+  recipientName   String   @map("recipient_name") @db.VarChar(200)
+  recipientEmail  String?  @map("recipient_email") @db.VarChar(255)
+  recipientPhone  String?  @map("recipient_phone") @db.VarChar(20)
+
+  // Delivery status per channel
+  emailStatus     String?  @map("email_status") @db.VarChar(20) // pending, sent, delivered, opened, failed, bounced
+  emailSentAt     DateTime? @map("email_sent_at")
+  emailMessageId  String?  @map("email_message_id") @db.VarChar(255) // Mailgun ID
+
+  whatsappStatus  String?  @map("whatsapp_status") @db.VarChar(20) // pending, sent, delivered, read, failed
+  whatsappSentAt  DateTime? @map("whatsapp_sent_at")
+  whatsappWamid   String?  @map("whatsapp_wamid") @db.VarChar(100) // WhatsApp Message ID
+
+  smsStatus       String?  @map("sms_status") @db.VarChar(20) // pending, sent, delivered, failed
+  smsSentAt       DateTime? @map("sms_sent_at")
+  smsMessageId    String?  @map("sms_message_id") @db.VarChar(255)
+
+  // Error tracking
+  lastError       String?  @map("last_error") @db.Text
+  retryCount      Int      @default(0) @map("retry_count")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  broadcast       BroadcastMessage @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, recipientId])
+  @@index([broadcastId, recipientType])
+  @@index([emailStatus])
+  @@index([whatsappStatus])
+  @@map("message_recipients")
+}
+
+model RecipientGroup {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+
+  name        String   @db.VarChar(100) // "All Active Parents", "Grade 1 Parents"
+  description String?  @db.VarChar(500)
+
+  // Filter criteria (stored as JSON)
+  recipientType String  @map("recipient_type") @db.VarChar(20) // parent, staff
+  filterCriteria Json?  @map("filter_criteria")
+
+  // Metadata
+  isSystem    Boolean  @default(false) @map("is_system") // Built-in groups
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  broadcasts  BroadcastMessage[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, recipientType])
+  @@map("recipient_groups")
 }

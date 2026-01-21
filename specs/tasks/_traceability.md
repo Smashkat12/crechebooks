@@ -603,6 +603,383 @@ graph TB
 
 ---
 
-**Last Updated**: 2026-01-19
+---
+
+## WhatsApp Business API Traceability Matrix
+
+Analysis Date: 2026-01-20
+Based on Meta WhatsApp Business Cloud API v18.0.
+
+### WhatsApp API Resource Mapping
+
+| WhatsApp API Endpoint | HTTP Method | Implemented | Task ID | Notes |
+|----------------------|-------------|-------------|---------|-------|
+| `/v18.0/{PHONE_ID}/messages` (template) | POST | ✅ | TASK-INT-005 | Send template message |
+| `/v18.0/{PHONE_ID}/messages` (text) | POST | ✅ | TASK-INT-005 | Send text message |
+| `/v18.0/{WABA_ID}/message_templates` | GET | ⭕ | TASK-WA-002 | List templates |
+| Webhook: Message status | POST | ✅ | TASK-INT-005 | Delivery status updates |
+| Webhook: Verification | GET | ✅ | TASK-INT-005 | Hub challenge verification |
+
+### WhatsApp Feature Coverage
+
+| Feature | Description | Implemented | Task ID | Status |
+|---------|-------------|-------------|---------|--------|
+| Send Invoice Notification | Template message for new invoice | ✅ | TASK-INT-005 | Complete |
+| Send Payment Reminder | Template message for overdue | ✅ | TASK-INT-005 | Complete |
+| Send Payment Received | Template message for payment | ✅ | TASK-INT-005 | Complete |
+| Send Arrears Notice | Template message for arrears | ✅ | TASK-INT-005 | Complete |
+| Send Welcome Message | Template for new registration | ✅ | TASK-INT-005 | Complete |
+| Send Statement Summary | Template for monthly statement | ⭕ | TASK-WA-003 | Pending |
+| Webhook Signature Verification | HMAC-SHA256 validation | ✅ | TASK-INT-005 | Complete |
+| Delivery Status Tracking | Track sent/delivered/read/failed | ✅ | TASK-INT-005 | Complete |
+| Message History Storage | Persist all messages | ⭕ | TASK-WA-001 | Pending |
+| Template Management | List/validate templates | ⭕ | TASK-WA-002 | Pending |
+| Opt-In Management | POPIA consent tracking | ✅ | TASK-INT-005 | Complete |
+| Opt-In UI | Staff interface for consent | ⭕ | TASK-WA-004 | Pending |
+| Message Retry | Exponential backoff retry | ⭕ | TASK-WA-006 | Pending |
+| Rate Limiting | 80 msg/sec throttling | ✅ | TASK-INT-005 | Complete |
+
+### WhatsApp Template Definitions
+
+| Template Name | Parameters | Status | Task ID |
+|--------------|------------|--------|---------|
+| `invoice_notification` | parent_name, child_name, amount, due_date, invoice_number | ✅ Defined | TASK-INT-005 |
+| `invoice_reminder` | parent_name, amount, due_date, days_overdue | ✅ Defined | TASK-INT-005 |
+| `payment_received` | parent_name, amount, payment_date, reference | ✅ Defined | TASK-INT-005 |
+| `arrears_notice` | parent_name, total_arrears, oldest_invoice_date | ✅ Defined | TASK-INT-005 |
+| `registration_welcome` | parent_name, child_name, creche_name, start_date | ✅ Defined | TASK-INT-005 |
+| `statement_notification` | parent_name, child_name, period_start, period_end, opening_balance, total_charges, total_payments, closing_balance | ⭕ Pending | TASK-WA-003 |
+
+> **Note**: Templates must be created and approved in Meta Business Manager before use.
+
+### WhatsApp Security Implementation
+
+| Security Control | Description | Implemented | Task ID |
+|-----------------|-------------|-------------|---------|
+| HMAC-SHA256 Signature | X-Hub-Signature-256 verification | ✅ | TASK-INT-005 |
+| Timing-Safe Comparison | crypto.timingSafeEqual | ✅ | TASK-INT-005 |
+| App Secret Storage | Environment variable | ✅ | TASK-INT-005 |
+| Webhook Idempotency | Deduplicate retried webhooks | ✅ | TASK-INFRA-006 |
+| Phone Number Validation | E.164 format validation | ✅ | TASK-INT-005 |
+| Injection Prevention | Phone number sanitization | ✅ | TASK-INT-005 |
+
+### WhatsApp POPIA Compliance
+
+| Requirement | Implementation | Status |
+|-------------|---------------|--------|
+| Explicit Opt-In | `whatsappOptedIn` flag on Parent | ✅ Complete |
+| Opt-In Timestamp | `whatsappOptedInAt` field | ✅ Complete |
+| Easy Opt-Out | `optOut()` service method | ✅ Complete |
+| Consent UI | Staff interface | ⭕ TASK-WA-004 |
+| Message History | Audit trail | ⭕ TASK-WA-001 |
+| Data Retention | 5+ year retention | ⭕ TASK-WA-001 |
+
+### Implementation Coverage Summary
+
+| Category | Total Features | Implemented | Pending | Coverage |
+|----------|---------------|-------------|---------|----------|
+| Messaging | 6 | 5 | 1 | 83% |
+| Webhooks | 2 | 2 | 0 | 100% |
+| Security | 6 | 6 | 0 | 100% |
+| Templates | 6 | 5 | 1 | 83% |
+| History/Audit | 3 | 0 | 3 | 0% |
+| UI | 2 | 0 | 2 | 0% |
+| Reliability | 2 | 1 | 1 | 50% |
+| **Total** | **27** | **19** | **8** | **70%** |
+
+### Task Dependencies (WhatsApp Phase 20)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        INT005[TASK-INT-005<br/>WhatsApp Base Integration]
+    end
+
+    subgraph "Phase 20 - WhatsApp Finalization"
+        WA001[TASK-WA-001<br/>Message History Entity]
+        WA002[TASK-WA-002<br/>Template Management]
+        WA003[TASK-WA-003<br/>Statement Delivery]
+        WA004[TASK-WA-004<br/>Opt-In UI]
+        WA005[TASK-WA-005<br/>Adapter Tests]
+        WA006[TASK-WA-006<br/>Retry Service]
+    end
+
+    INT005 --> WA001
+    INT005 --> WA002
+    WA001 --> WA003
+    WA002 --> WA003
+    WA001 --> WA004
+    INT005 --> WA005
+    WA001 --> WA005
+    WA001 --> WA006
+    WA002 --> WA006
+```
+
+---
+
+## Parent Onboarding Traceability Matrix
+
+Analysis Date: 2026-01-20
+Based on parent enrollment workflow requirements.
+
+### Parent Enrollment Feature Mapping
+
+| Feature | Current Status | Post-Phase 21 | Task ID | Notes |
+|---------|---------------|---------------|---------|-------|
+| Child enrollment creation | ✅ Implemented | ✅ | TASK-BILL-011 | EnrollmentService.enrollChild() |
+| Registration fee invoice | ✅ Implemented | ✅ | TASK-BILL-021 | Auto-generated on enrollment |
+| Pro-rated first month invoice | ✅ Implemented | ✅ | TASK-BILL-014 | Pro-rata calculation |
+| Invoice delivery (email) | ✅ Implemented | ✅ | TASK-BILL-013 | Mailgun with PDF |
+| Welcome Pack PDF | ❌ Missing | ✅ | TASK-ENROL-006 | Parent-focused PDF |
+| Welcome Email Template | ❌ Missing | ✅ | TASK-ENROL-007 | HTML with child details |
+| Welcome Pack Auto-Delivery | ❌ Missing | ✅ | TASK-ENROL-008 | Integrated into enrollChild() |
+| Welcome Pack Resend | ❌ Missing | ✅ | TASK-ENROL-008 | Manual resend endpoint |
+
+### Welcome Pack PDF Sections
+
+| Section | Description | Required | Task ID |
+|---------|-------------|----------|---------|
+| Header | Tenant branding (name, logo placeholder) | Yes | TASK-ENROL-006 |
+| Welcome Message | Personalized greeting | Yes | TASK-ENROL-006 |
+| Enrollment Details | Child name, start date, class | Yes | TASK-ENROL-006 |
+| Crèche Information | Hours, location, contact | Yes | TASK-ENROL-006 |
+| Fee Structure | Monthly fee, payment reference | Yes | TASK-ENROL-006 |
+| Bank Details | Account for EFT payments | Conditional | TASK-ENROL-006 |
+| Policies | Attendance, illness, collection | Optional | TASK-ENROL-006 |
+| What to Bring | First day checklist | Optional | TASK-ENROL-006 |
+| Emergency Procedures | Contact tree, evacuation | Optional | TASK-ENROL-006 |
+
+### Parent vs Staff Welcome Pack Comparison
+
+| Feature | Staff (TASK-STAFF-001) | Parent (Phase 21) |
+|---------|------------------------|-------------------|
+| PDF Service | `welcome-pack-pdf.service.ts` | `parent-welcome-pack-pdf.service.ts` |
+| Target Audience | New staff members | Parents enrolling children |
+| Content Focus | Employment, compliance | Child enrollment, policies |
+| Checklist | Onboarding tasks | What to bring |
+| Policies | HR policies, POPIA | Crèche policies, attendance |
+| Banking | Employee banking form | Payment instructions |
+| Email Delivery | Integrated | TASK-ENROL-008 |
+| Auto-Send Trigger | Staff creation | Child enrollment |
+
+### Enrollment Flow Diagram
+
+```mermaid
+graph TD
+    subgraph "Current Flow"
+        A[enrollChild called] --> B[Create Enrollment]
+        B --> C[Generate Registration Invoice]
+        C --> D[Generate Pro-rated Invoice]
+        D --> E[Return Result]
+    end
+
+    subgraph "Phase 21 Enhancement"
+        E --> F{Parent has email?}
+        F -->|Yes| G[Generate Welcome Pack PDF]
+        G --> H[Render Welcome Email]
+        H --> I[Send via Mailgun]
+        I --> J[Update welcomePackSentAt]
+        J --> K[Log in Audit Trail]
+        F -->|No| L[Skip Welcome Pack]
+        L --> K
+        K --> M[Return Enhanced Result]
+    end
+```
+
+### Task Dependencies (Parent Onboarding)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        BILL011[TASK-BILL-011<br/>Enrollment Service]
+        BILL013[TASK-BILL-013<br/>Invoice Delivery]
+        BILL021[TASK-BILL-021<br/>Auto-Invoice]
+        STAFF001[TASK-STAFF-001<br/>Staff Welcome Pack]
+    end
+
+    subgraph "Phase 21 - Parent Welcome Pack"
+        ENROL006[TASK-ENROL-006<br/>PDF Service]
+        ENROL007[TASK-ENROL-007<br/>Email Template]
+        ENROL008[TASK-ENROL-008<br/>Delivery Integration]
+    end
+
+    BILL011 --> BILL021
+    BILL021 --> ENROL008
+    BILL013 --> ENROL006
+    STAFF001 -.->|Pattern Reference| ENROL006
+    ENROL006 --> ENROL007
+    ENROL006 --> ENROL008
+    ENROL007 --> ENROL008
+```
+
+### Implementation Coverage Summary
+
+| Category | Total Features | Implemented | Pending | Coverage |
+|----------|---------------|-------------|---------|----------|
+| Enrollment Creation | 2 | 2 | 0 | 100% |
+| Invoice Generation | 2 | 2 | 0 | 100% |
+| Invoice Delivery | 1 | 1 | 0 | 100% |
+| Welcome Pack PDF | 1 | 0 | 1 | 0% |
+| Welcome Email | 1 | 0 | 1 | 0% |
+| Welcome Delivery | 2 | 0 | 2 | 0% |
+| **Total** | **9** | **5** | **4** | **56%** |
+
+### SA Compliance Considerations
+
+| Requirement | Implementation | Task ID |
+|-------------|---------------|---------|
+| POPIA Consent | Implied by enrollment | Existing |
+| Data Minimization | Only necessary info in PDF | TASK-ENROL-006 |
+| Purpose Limitation | Welcome/onboarding only | All Phase 21 |
+| Secure Delivery | HTTPS email via Mailgun | TASK-ENROL-008 |
+| Audit Trail | Logged in AuditLog | TASK-ENROL-008 |
+
+---
+
+## Ad-hoc Communication Traceability Matrix
+
+Analysis Date: 2026-01-20
+Based on CrecheBooks communication requirements for targeted messaging to parents and staff.
+
+### Communication Channel Mapping
+
+| Channel | Provider | Implemented | Task ID | Notes |
+|---------|----------|-------------|---------|-------|
+| Email | Mailgun | ✅ | TASK-BILL-013 | Existing transactional emails |
+| Email (Raw/Adhoc) | Mailgun | ⭕ | TASK-COMM-002 | New sendRaw() method |
+| WhatsApp (Template) | Meta Cloud API | ✅ | TASK-INT-005 | Template messages only |
+| WhatsApp (Text) | Meta Cloud API | ⭕ | TASK-COMM-002 | New sendTextMessage() method |
+| SMS | Africa's Talking | ✅ | TASK-NOTIF-001 | Existing SMS channel |
+
+### Communication Feature Coverage
+
+| Feature | Description | Implemented | Task ID | Status |
+|---------|-------------|-------------|---------|--------|
+| Transactional Invoices | Invoice notification emails | ✅ | TASK-BILL-013 | Complete |
+| Payment Reminders | Overdue payment notifications | ✅ | TASK-BILL-024 | Complete |
+| Statement Delivery | Monthly statement emails | ✅ | TASK-BILL-035 | Complete |
+| Arrears Notifications | Escalating arrears alerts | ✅ | TASK-FEAT-102 | Complete |
+| Ad-hoc Broadcasts | Targeted announcements | ⭕ | TASK-COMM-002 | Pending |
+| Recipient Filtering | Filter by status/arrears/etc | ⭕ | TASK-COMM-002 | Pending |
+| Recipient Groups | Saved filter presets | ⭕ | TASK-COMM-001 | Pending |
+| Multi-channel Delivery | Email + WhatsApp simultaneously | ⭕ | TASK-COMM-002 | Pending |
+| Delivery Tracking | Per-recipient status tracking | ⭕ | TASK-COMM-001 | Pending |
+| Communication Dashboard | UI for composing/sending | ⭕ | TASK-COMM-004 | Pending |
+| Delivery Analytics | Charts and reports | ⭕ | TASK-COMM-006 | Pending |
+
+### Recipient Type Mapping
+
+| Recipient Type | Database Model | Filters Available | Task ID |
+|----------------|---------------|-------------------|---------|
+| Parent | Parent | isActive, enrollmentStatus, feeStructureId, hasOutstandingBalance, daysOverdue | TASK-COMM-002 |
+| Staff | Staff | isActive, employmentType, department, position | TASK-COMM-002 |
+| Custom | Parent/Staff | Manual ID selection | TASK-COMM-002 |
+
+### Database Entity Mapping
+
+| Entity | Purpose | Fields | Task ID |
+|--------|---------|--------|---------|
+| BroadcastMessage | Store broadcast messages | id, tenantId, subject, body, htmlBody, recipientType, channel, status, totalRecipients, sentCount, failedCount, createdAt, sentAt, scheduledAt | TASK-COMM-001 |
+| MessageRecipient | Track per-recipient delivery | id, broadcastId, recipientId, recipientType, recipientName, recipientEmail, recipientPhone, emailStatus, whatsappStatus, emailMessageId, whatsappWamid, emailSentAt, whatsappSentAt, emailError, whatsappError | TASK-COMM-001 |
+| RecipientGroup | Saved filter presets | id, tenantId, name, recipientType, filterCriteria, createdById, createdAt, updatedAt | TASK-COMM-001 |
+
+### API Endpoint Mapping
+
+| Endpoint | HTTP Method | Purpose | Task ID | Status |
+|----------|-------------|---------|---------|--------|
+| POST /communications/broadcasts | POST | Create broadcast message | TASK-COMM-003 | ⭕ Pending |
+| POST /communications/broadcasts/:id/send | POST | Queue broadcast for sending | TASK-COMM-003 | ⭕ Pending |
+| GET /communications/broadcasts | GET | List broadcasts with filters | TASK-COMM-003 | ⭕ Pending |
+| GET /communications/broadcasts/:id | GET | Get broadcast with delivery stats | TASK-COMM-003 | ⭕ Pending |
+| POST /communications/recipients/preview | POST | Preview matching recipients | TASK-COMM-003 | ⭕ Pending |
+| GET /communications/groups | GET | List recipient groups | TASK-COMM-003 | ⭕ Pending |
+| POST /communications/groups | POST | Create recipient group | TASK-COMM-003 | ⭕ Pending |
+| DELETE /communications/groups/:id | DELETE | Delete recipient group | TASK-COMM-003 | ⭕ Pending |
+
+### Frontend Component Mapping
+
+| Component | Purpose | Task ID | Status |
+|-----------|---------|---------|--------|
+| CommunicationsPage | Main dashboard with stats and list | TASK-COMM-004 | ⭕ Pending |
+| NewBroadcastPage | 3-step wizard for creating broadcasts | TASK-COMM-004 | ⭕ Pending |
+| BroadcastDetailPage | View broadcast details and delivery | TASK-COMM-004 | ⭕ Pending |
+| BroadcastList | Tabbed list of broadcasts | TASK-COMM-004 | ⭕ Pending |
+| MessageComposer | Rich text message input | TASK-COMM-004 | ⭕ Pending |
+| ChannelSelector | Email/WhatsApp/Both toggle | TASK-COMM-004 | ⭕ Pending |
+| RecipientSelector | Type and mode selection | TASK-COMM-005 | ⭕ Pending |
+| ParentFilterForm | Parent-specific filters | TASK-COMM-005 | ⭕ Pending |
+| StaffFilterForm | Staff-specific filters | TASK-COMM-005 | ⭕ Pending |
+| RecipientPreview | Preview of matching recipients | TASK-COMM-005 | ⭕ Pending |
+| SavedGroupsSelector | Select from saved groups | TASK-COMM-005 | ⭕ Pending |
+| CustomRecipientPicker | Manual recipient selection | TASK-COMM-005 | ⭕ Pending |
+| DeliveryStatsChart | Pie chart of delivery status | TASK-COMM-006 | ⭕ Pending |
+| RecipientDeliveryTable | Detailed recipient status list | TASK-COMM-006 | ⭕ Pending |
+| BroadcastTimeline | Status history timeline | TASK-COMM-006 | ⭕ Pending |
+| ExportButton | Export to CSV/PDF | TASK-COMM-006 | ⭕ Pending |
+
+### POPIA Compliance Considerations
+
+| Requirement | Implementation | Task ID |
+|-------------|---------------|---------|
+| WhatsApp Opt-In | Only send to whatsappOptIn=true | TASK-COMM-002 |
+| SMS Opt-In | Only send to smsOptIn=true | TASK-COMM-002 |
+| Message Logging | Store in BroadcastMessage/MessageRecipient | TASK-COMM-001 |
+| Audit Trail | AuditLogService for all broadcasts | TASK-COMM-002 |
+| Data Retention | 5+ year retention for compliance | TASK-COMM-001 |
+| Purpose Limitation | Tenant-scoped broadcasts only | TASK-COMM-003 |
+
+### Rate Limiting Configuration
+
+| Channel | Rate Limit | Source | Implementation |
+|---------|------------|--------|----------------|
+| Mailgun | 10,000/month (sandbox) | Mailgun API | Configurable for production |
+| WhatsApp (Meta) | 80 msg/sec | Meta Cloud API | BroadcastProcessor rate limiting |
+| Internal | 50ms between messages | CrecheBooks | BroadcastProcessor.handleSend() |
+
+### Task Dependencies (Ad-hoc Communications)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        INT005[TASK-INT-005<br/>WhatsApp Integration]
+        BILL013[TASK-BILL-013<br/>Email Delivery]
+        CORE002[TASK-CORE-002<br/>Prisma Setup]
+    end
+
+    subgraph "Phase 22 - Ad-hoc Communications"
+        COMM001[TASK-COMM-001<br/>Database Schema]
+        COMM002[TASK-COMM-002<br/>Communication Service]
+        COMM003[TASK-COMM-003<br/>API Controller]
+        COMM004[TASK-COMM-004<br/>Dashboard Page]
+        COMM005[TASK-COMM-005<br/>Recipient Selector]
+        COMM006[TASK-COMM-006<br/>Analytics UI]
+    end
+
+    INT005 --> COMM001
+    CORE002 --> COMM001
+    COMM001 --> COMM002
+    INT005 --> COMM002
+    BILL013 --> COMM002
+    COMM002 --> COMM003
+    COMM003 --> COMM004
+    COMM004 --> COMM005
+    COMM004 --> COMM006
+    COMM005 --> COMM006
+```
+
+### Implementation Coverage Summary
+
+| Category | Total Features | Implemented | Pending | Coverage |
+|----------|---------------|-------------|---------|----------|
+| Channels | 4 | 3 | 1 | 75% |
+| Database Entities | 3 | 0 | 3 | 0% |
+| API Endpoints | 8 | 0 | 8 | 0% |
+| Frontend Components | 16 | 0 | 16 | 0% |
+| Services | 3 | 0 | 3 | 0% |
+| **Total** | **34** | **3** | **31** | **9%** |
+
+---
+
+**Last Updated**: 2026-01-20
 **Author**: Claude Code
-**Review Status**: Phase 19 (USACF Sprint Tasks) Added
+**Review Status**: Phase 22 (Ad-hoc Communications) Added

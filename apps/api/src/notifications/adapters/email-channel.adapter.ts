@@ -98,8 +98,8 @@ export class EmailChannelAdapter implements INotificationChannel {
         );
       }
 
-      // Send email
-      const subject = notification.subject ?? 'CrecheBooks Notification';
+      // Send email - use generic fallback for white-labeling
+      const subject = notification.subject ?? 'Notification';
       const result = await this.emailService.sendEmail(
         parent.email,
         subject,

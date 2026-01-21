@@ -1,12 +1,15 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form } from '@/components/forms/form';
 import { FormInput } from '@/components/forms/form-input';
 import { FormSelect } from '@/components/forms/form-select';
+import { FormCheckbox } from '@/components/forms/form-checkbox';
 import type { IParent } from '@crechebooks/types';
 
 const SA_PHONE_REGEX = /^(\+27|0)[6-8][0-9]{8}$/;
@@ -19,6 +22,8 @@ const parentSchema = z.object({
   whatsappNumber: z.string().regex(SA_PHONE_REGEX, 'Invalid SA WhatsApp number').optional().or(z.literal('')),
   address: z.string().max(255).optional(),
   preferredCommunication: z.enum(['EMAIL', 'WHATSAPP', 'SMS', 'BOTH']),
+  /** TASK-WA-004: WhatsApp opt-in consent (POPIA compliant) */
+  whatsappOptIn: z.boolean().default(false),
 });
 
 type ParentFormValues = z.infer<typeof parentSchema>;
@@ -48,8 +53,14 @@ export function ParentForm({ parent, onSave, onCancel, isLoading = false }: Pare
       whatsappNumber: parent?.whatsapp ?? '',
       address: parent?.address ?? '',
       preferredCommunication: parent?.preferredContact ?? 'EMAIL',
+      // TASK-WA-004: WhatsApp opt-in from parent record
+      whatsappOptIn: (parent as unknown as { whatsappOptIn?: boolean })?.whatsappOptIn ?? false,
     },
   });
+
+  // Watch whatsappNumber for conditional rendering
+  const whatsappNumber = useWatch({ control: form.control, name: 'whatsappNumber' });
+  const whatsappOptIn = useWatch({ control: form.control, name: 'whatsappOptIn' });
 
   const onSubmit = async (data: ParentFormValues) => {
     try {
@@ -123,6 +134,39 @@ export function ParentForm({ parent, onSave, onCancel, isLoading = false }: Pare
           options={communicationOptions}
           required
         />
+
+        {/* TASK-WA-004: WhatsApp Opt-In Consent Section */}
+        <Card className="bg-muted/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-green-600" />
+              WhatsApp Notifications
+            </CardTitle>
+            <CardDescription className="text-sm">
+              Receive invoices, statements, and payment reminders via WhatsApp
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <FormCheckbox
+              control={form.control}
+              name="whatsappOptIn"
+              label="I consent to receive WhatsApp messages"
+              description="By checking this box, I agree to receive invoices, monthly statements, and payment reminders via WhatsApp. I understand I can withdraw this consent at any time. This consent is required under the Protection of Personal Information Act (POPIA)."
+              disabled={!whatsappNumber}
+            />
+            {!whatsappNumber && (
+              <p className="text-sm text-amber-600">
+                Please enter a WhatsApp number above to enable WhatsApp notifications.
+              </p>
+            )}
+            {whatsappOptIn && whatsappNumber && (
+              <div className="flex items-center gap-2 text-sm text-green-600">
+                <MessageSquare className="h-4 w-4" />
+                WhatsApp notifications will be enabled for {whatsappNumber}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="flex justify-end gap-2">
           {onCancel && (

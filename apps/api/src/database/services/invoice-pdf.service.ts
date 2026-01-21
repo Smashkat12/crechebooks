@@ -29,6 +29,13 @@ interface InvoiceWithRelations {
     postalCode: string;
     phone: string;
     email: string;
+    // TASK-BILL-043: Bank details for invoice PDF
+    bankName: string | null;
+    bankAccountHolder: string | null;
+    bankAccountNumber: string | null;
+    bankBranchCode: string | null;
+    bankAccountType: string | null;
+    bankSwiftCode: string | null;
   };
   parent: {
     firstName: string;
@@ -216,7 +223,8 @@ export class InvoicePdfService {
 
         // Banking Details
         doc.moveDown(2);
-        this.addBankingDetails(doc, invoice.tenant);
+        const childFullName = `${invoice.child.firstName} ${invoice.child.lastName}`;
+        this.addBankingDetails(doc, invoice.tenant, childFullName);
 
         // Notes
         if (invoice.notes) {
@@ -443,21 +451,52 @@ export class InvoicePdfService {
 
   /**
    * Add banking details for payment
+   * TASK-BILL-043: Uses real bank details from tenant configuration
    */
   private addBankingDetails(
     doc: typeof PDFDocument.prototype,
     tenant: InvoiceWithRelations['tenant'],
+    childFullName: string,
   ): void {
     doc
       .fontSize(10)
       .font('Helvetica-Bold')
       .text('Banking Details for Payment:', 50);
     doc.fontSize(9).font('Helvetica');
-    doc.text('Bank: [Your Bank Name]', 50);
-    doc.text('Account Holder: ' + (tenant.tradingName ?? tenant.name), 50);
-    doc.text('Account Number: [Your Account Number]', 50);
-    doc.text('Branch Code: [Your Branch Code]', 50);
-    doc.text('Reference: Please use invoice number as reference', 50);
+
+    // TASK-BILL-043: Use real bank details from tenant, with fallback messages if not configured
+    const hasBankDetails = tenant.bankName && tenant.bankAccountNumber;
+
+    if (hasBankDetails) {
+      doc.text(`Bank: ${tenant.bankName}`, 50);
+      doc.text(
+        `Account Holder: ${tenant.bankAccountHolder ?? tenant.tradingName ?? tenant.name}`,
+        50,
+      );
+      doc.text(`Account Number: ${tenant.bankAccountNumber}`, 50);
+      if (tenant.bankBranchCode) {
+        doc.text(`Branch Code: ${tenant.bankBranchCode}`, 50);
+      }
+      if (tenant.bankAccountType) {
+        doc.text(`Account Type: ${tenant.bankAccountType}`, 50);
+      }
+      if (tenant.bankSwiftCode) {
+        doc.text(`SWIFT Code: ${tenant.bankSwiftCode}`, 50);
+      }
+    } else {
+      doc
+        .font('Helvetica-Oblique')
+        .text(
+          'Banking details not configured - please contact us for payment information',
+          50,
+        );
+      doc.font('Helvetica');
+    }
+
+    doc.text(
+      `Reference: Please use "${childFullName}" as the payment reference.`,
+      50,
+    );
   }
 
   /**

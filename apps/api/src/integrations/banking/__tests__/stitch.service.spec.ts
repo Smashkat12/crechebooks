@@ -17,10 +17,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { StitchBankingService } from '../stitch.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { EncryptionService } from '../../../shared/services/encryption.service';
-import {
-  LinkedAccountStatus,
-  StitchErrorCode,
-} from '../stitch.types';
+import { LinkedAccountStatus, StitchErrorCode } from '../stitch.types';
 
 describe('StitchBankingService', () => {
   let service: StitchBankingService;
@@ -131,11 +128,17 @@ describe('StitchBankingService', () => {
       expect(result).toHaveProperty('linkId');
       expect(result).toHaveProperty('expiresAt');
 
-      expect(result.linkUrl).toContain('https://api.stitch.money/connect/authorize');
+      expect(result.linkUrl).toContain(
+        'https://api.stitch.money/connect/authorize',
+      );
       expect(result.linkUrl).toContain('client_id=test-client-id');
-      expect(result.linkUrl).toContain('redirect_uri=https%3A%2F%2Fcustom.callback.com%2Fbanking');
+      expect(result.linkUrl).toContain(
+        'redirect_uri=https%3A%2F%2Fcustom.callback.com%2Fbanking',
+      );
       expect(result.linkUrl).toContain('response_type=code');
-      expect(result.linkUrl).toContain('scope=accounts+balances+transactions+offline_access');
+      expect(result.linkUrl).toContain(
+        'scope=accounts+balances+transactions+offline_access',
+      );
     });
 
     it('should use default redirect URI if not provided', async () => {
@@ -167,14 +170,18 @@ describe('StitchBankingService', () => {
       const expiryTime = result.expiresAt.getTime();
       const expectedExpiry = 10 * 60 * 1000; // 10 minutes
 
-      expect(expiryTime).toBeGreaterThanOrEqual(beforeCall + expectedExpiry - 1000);
+      expect(expiryTime).toBeGreaterThanOrEqual(
+        beforeCall + expectedExpiry - 1000,
+      );
       expect(expiryTime).toBeLessThanOrEqual(afterCall + expectedExpiry + 1000);
     });
   });
 
   describe('getLinkedAccounts', () => {
     it('should return mapped linked accounts for tenant', async () => {
-      prismaService.linkedBankAccount.findMany.mockResolvedValue([mockLinkedAccount]);
+      prismaService.linkedBankAccount.findMany.mockResolvedValue([
+        mockLinkedAccount,
+      ]);
 
       const result = await service.getLinkedAccounts(mockTenantId);
 
@@ -239,7 +246,9 @@ describe('StitchBankingService', () => {
         consentExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       };
 
-      prismaService.linkedBankAccount.findMany.mockResolvedValue([expiringAccount]);
+      prismaService.linkedBankAccount.findMany.mockResolvedValue([
+        expiringAccount,
+      ]);
 
       const result = await service.getAccountsNeedingRenewal(mockTenantId, 14);
 
@@ -261,8 +270,10 @@ describe('StitchBankingService', () => {
       await service.getAccountsNeedingRenewal(mockTenantId);
 
       const call = prismaService.linkedBankAccount.findMany.mock.calls[0][0];
-      const threshold = (call as { where: { consentExpiresAt: { lte: Date } } }).where.consentExpiresAt.lte;
-      const daysDiff = (threshold.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+      const threshold = (call as { where: { consentExpiresAt: { lte: Date } } })
+        .where.consentExpiresAt.lte;
+      const daysDiff =
+        (threshold.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
 
       expect(daysDiff).toBeCloseTo(14, 0);
     });
@@ -290,7 +301,9 @@ describe('StitchBankingService', () => {
 
   describe('unlinkAccount', () => {
     it('should revoke tokens and update status', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
       prismaService.linkedBankAccount.update.mockResolvedValue({
         ...mockLinkedAccount,
         status: 'REVOKED',
@@ -321,7 +334,9 @@ describe('StitchBankingService', () => {
     });
 
     it('should still unlink account if token revocation fails', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
       prismaService.linkedBankAccount.update.mockResolvedValue({
         ...mockLinkedAccount,
         status: 'REVOKED',
@@ -337,7 +352,9 @@ describe('StitchBankingService', () => {
 
   describe('syncAccount', () => {
     beforeEach(() => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
       prismaService.transaction.findMany.mockResolvedValue([]);
       prismaService.transaction.createMany.mockResolvedValue({ count: 0 });
       encryptionService.decrypt.mockReturnValue(mockAccessToken);
@@ -348,7 +365,9 @@ describe('StitchBankingService', () => {
         ...mockLinkedAccount,
         consentExpiresAt: new Date(Date.now() - 1000), // Expired
       };
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(expiredAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        expiredAccount,
+      );
 
       const result = await service.syncAccount(mockAccountId);
 
@@ -445,7 +464,9 @@ describe('StitchBankingService', () => {
 
   describe('getTransactions', () => {
     it('should fetch and map transactions correctly', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
       prismaService.transaction.findMany.mockResolvedValue([]);
 
       const mockApiTransactions = [
@@ -492,7 +513,9 @@ describe('StitchBankingService', () => {
     });
 
     it('should mark existing transactions as duplicates', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
       prismaService.transaction.findMany.mockResolvedValue([
         { reference: 'existing-txn' },
       ]);
@@ -529,18 +552,16 @@ describe('StitchBankingService', () => {
       prismaService.linkedBankAccount.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.getTransactions(
-          'nonexistent-id',
-          new Date(),
-          new Date(),
-        ),
+        service.getTransactions('nonexistent-id', new Date(), new Date()),
       ).rejects.toThrow(HttpException);
     });
   });
 
   describe('getBalance', () => {
     it('should fetch and map balance correctly', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
 
       const mockBalanceResponse = {
         current_balance: 12345.67,
@@ -615,7 +636,9 @@ describe('StitchBankingService', () => {
     });
 
     it('should mark account as revoked on invalid_grant error', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
       encryptionService.decrypt.mockReturnValue(mockRefreshToken);
 
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -638,7 +661,9 @@ describe('StitchBankingService', () => {
 
   describe('error handling', () => {
     it('should handle network timeouts', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
 
       const abortError = new Error('The operation was aborted');
       abortError.name = 'AbortError';
@@ -650,7 +675,9 @@ describe('StitchBankingService', () => {
     });
 
     it('should handle rate limiting', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
@@ -664,7 +691,9 @@ describe('StitchBankingService', () => {
     });
 
     it('should handle server errors', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,
@@ -733,7 +762,9 @@ describe('StitchBankingService', () => {
 
   describe('POPIA compliance', () => {
     it('should log audit events for successful sync', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
       prismaService.transaction.findMany.mockResolvedValue([]);
 
       (global.fetch as jest.Mock).mockResolvedValue({
@@ -755,7 +786,9 @@ describe('StitchBankingService', () => {
     });
 
     it('should log audit events for failed sync', async () => {
-      prismaService.linkedBankAccount.findUnique.mockResolvedValue(mockLinkedAccount);
+      prismaService.linkedBankAccount.findUnique.mockResolvedValue(
+        mockLinkedAccount,
+      );
 
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: false,

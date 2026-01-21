@@ -78,7 +78,7 @@ export class InvoiceNumberService {
     // RETURNING gives us the new value in a single atomic operation
     const result = await client.$queryRaw<[{ current_value: number }]>`
       INSERT INTO invoice_number_counters (tenant_id, year, current_value, created_at, updated_at)
-      VALUES (${tenantId}::uuid, ${year}, 1, NOW(), NOW())
+      VALUES (${tenantId}, ${year}, 1, NOW(), NOW())
       ON CONFLICT (tenant_id, year)
       DO UPDATE SET
         current_value = invoice_number_counters.current_value + 1,
@@ -146,7 +146,7 @@ export class InvoiceNumberService {
     // Then calculate start value as (end - count + 1)
     const result = await client.$queryRaw<[{ current_value: number }]>`
       INSERT INTO invoice_number_counters (tenant_id, year, current_value, created_at, updated_at)
-      VALUES (${tenantId}::uuid, ${year}, ${count}, NOW(), NOW())
+      VALUES (${tenantId}, ${year}, ${count}, NOW(), NOW())
       ON CONFLICT (tenant_id, year)
       DO UPDATE SET
         current_value = invoice_number_counters.current_value + ${count},

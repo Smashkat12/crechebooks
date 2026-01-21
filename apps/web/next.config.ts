@@ -52,6 +52,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@crechebooks/types'],
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
   experimental: {
     // typedRoutes: true, // Enable after all pages are created
   },

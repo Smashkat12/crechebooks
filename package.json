@@ -31,7 +31,14 @@
     "prisma:push": "pnpm --filter @crechebooks/api prisma:push",
     "prisma:studio": "pnpm --filter @crechebooks/api prisma:studio",
     "clean": "pnpm -r exec rm -rf node_modules dist .next coverage",
-    "clean:install": "pnpm clean && pnpm install"
+    "clean:install": "pnpm clean && pnpm install",
+    "docker:build": "./scripts/docker-build.sh all",
+    "docker:build:api": "./scripts/docker-build.sh api",
+    "docker:build:web": "./scripts/docker-build.sh web",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "deploy": "./scripts/deploy-railway.sh"
   },
   "devDependencies": {
     "prettier": "^3.4.2",
@@ -42,6 +49,8 @@
     "@types/node": "^22.10.7",
     "@types/pdfkit": "^0.17.4",
     "exceljs": "^4.4.0",
+    "form-data": "^4.0.5",
+    "mailgun.js": "^12.6.1",
     "pdfkit": "^0.17.2"
   }
 }

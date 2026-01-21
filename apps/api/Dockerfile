@@ -57,8 +57,8 @@ RUN pnpm install --frozen-lockfile --offline || pnpm install --frozen-lockfile
 # Build shared types package first (required by API)
 RUN pnpm --filter @crechebooks/types build
 
-# Generate Prisma client
-RUN cd apps/api && npx prisma generate
+# Generate Prisma client (run from root to ensure .prisma goes to root node_modules)
+RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
 
 # Build the API
 RUN pnpm --filter @crechebooks/api build

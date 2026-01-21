@@ -324,9 +324,13 @@ export class AuthService {
   }
 
   /**
-   * Dev login - for local development only
-   * Generates a JWT token for test users without Auth0
+   * JWT-based login - for development or JWT auth provider mode
+   * Generates a JWT token for configured users without Auth0
    * Credentials are sourced from environment variables, never hardcoded
+   *
+   * Available when:
+   * - NODE_ENV=development with DEV_AUTH_ENABLED=true
+   * - AUTH_PROVIDER=jwt with DEV_AUTH_ENABLED=true (any environment)
    *
    * @param email - User email
    * @param password - User password
@@ -340,13 +344,22 @@ export class AuthService {
     const nodeEnv = this.configService.get<string>('NODE_ENV');
     const jwtSecret = this.configService.get<string>('JWT_SECRET');
     const devAuthEnabled = this.configService.get<string>('DEV_AUTH_ENABLED');
+    const authProvider =
+      this.configService.get<string>('AUTH_PROVIDER') || 'auth0';
 
-    if (nodeEnv !== 'development' || !jwtSecret || devAuthEnabled !== 'true') {
+    // Allow login when:
+    // 1. Development mode with DEV_AUTH_ENABLED=true
+    // 2. JWT auth provider with DEV_AUTH_ENABLED=true (any environment)
+    const isDevelopmentMode = nodeEnv === 'development' && devAuthEnabled === 'true';
+    const isJwtProviderMode = authProvider === 'jwt' && devAuthEnabled === 'true';
+
+    if ((!isDevelopmentMode && !isJwtProviderMode) || !jwtSecret) {
       this.logger.error(
-        'Dev login attempted in non-development environment or dev auth disabled',
+        `Login attempted but not allowed. NODE_ENV=${nodeEnv}, AUTH_PROVIDER=${authProvider}, DEV_AUTH_ENABLED=${devAuthEnabled}`,
       );
       throw new UnauthorizedException(
-        'Dev login is only available in development mode with DEV_AUTH_ENABLED=true',
+        'Login is only available in development mode with DEV_AUTH_ENABLED=true, ' +
+          'or in production with AUTH_PROVIDER=jwt and DEV_AUTH_ENABLED=true',
       );
     }
 

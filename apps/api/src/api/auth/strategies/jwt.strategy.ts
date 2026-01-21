@@ -73,24 +73,28 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const jwtSecret = configService.get<string>('JWT_SECRET');
     const nodeEnv = configService.get<string>('NODE_ENV');
     const devAuthEnabled = configService.get<string>('DEV_AUTH_ENABLED');
+    const authProvider = configService.get<string>('AUTH_PROVIDER') || 'auth0';
 
-    // Support local development without Auth0
-    // Also support DEV_AUTH_ENABLED=true for deployments without Auth0 configured
-    const isLocalDev =
-      (nodeEnv === 'development' || devAuthEnabled === 'true') &&
-      !domain &&
-      jwtSecret;
+    // Support local JWT auth without Auth0 in these cases:
+    // 1. NODE_ENV=development with JWT_SECRET
+    // 2. DEV_AUTH_ENABLED=true with JWT_SECRET (no Auth0 domain)
+    // 3. AUTH_PROVIDER=jwt with JWT_SECRET (explicit JWT mode)
+    const isJwtMode =
+      (authProvider === 'jwt' && jwtSecret) ||
+      ((nodeEnv === 'development' || devAuthEnabled === 'true') &&
+        !domain &&
+        jwtSecret);
 
-    if (!domain && !isLocalDev) {
+    if (!domain && !isJwtMode) {
       throw new Error(
         'AUTH0_DOMAIN environment variable is required in production. ' +
           'For local development, set NODE_ENV=development and JWT_SECRET. ' +
-          'Alternatively, set DEV_AUTH_ENABLED=true with JWT_SECRET for deployments without Auth0.',
+          'Alternatively, set AUTH_PROVIDER=jwt with JWT_SECRET for deployments without Auth0.',
       );
     }
 
     // TASK-UI-001: Use custom extractor for both cookie and header support
-    const strategyOptions = isLocalDev
+    const strategyOptions = isJwtMode
       ? {
           jwtFromRequest: extractJwtFromCookieOrHeader,
           secretOrKey: jwtSecret,
@@ -110,11 +114,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     super(strategyOptions as StrategyOptionsWithRequest);
 
-    this.isLocalDev = isLocalDev as boolean;
+    this.isLocalDev = isJwtMode as boolean;
     if (this.isLocalDev) {
-      this.logger.warn(
-        'Running in LOCAL DEVELOPMENT mode with JWT_SECRET. Do NOT use in production!',
-      );
+      const modeDescription =
+        authProvider === 'jwt' ? 'JWT provider mode' : 'local development mode';
+      this.logger.log(`Running in ${modeDescription} with JWT_SECRET`);
     }
     this.logger.log(
       'JWT Strategy initialized with HttpOnly cookie support (TASK-UI-001)',

@@ -43,7 +43,7 @@ RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
-COPY --from=deps /app/packages/types/node_modules ./packages/types/node_modules 2>/dev/null || true
+# Note: packages/types uses shared node_modules via pnpm workspaces
 
 # Copy source code
 COPY . .

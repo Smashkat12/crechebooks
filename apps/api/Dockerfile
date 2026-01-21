@@ -48,6 +48,9 @@ COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 # Copy source code
 COPY . .
 
+# Build shared types package first (required by API)
+RUN pnpm --filter @crechebooks/types build
+
 # Generate Prisma client
 RUN cd apps/api && npx prisma generate
 

@@ -50,6 +50,9 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# Build shared types package first (required by web app)
+RUN pnpm --filter @crechebooks/types build
+
 # Build the web app
 RUN pnpm --filter @crechebooks/web build
 

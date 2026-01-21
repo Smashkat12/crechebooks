@@ -600,13 +600,13 @@ export class StaffOnboardingController {
         destination: (req, _file, cb) => {
           const tenantId =
             (req as unknown as { user?: IUser }).user?.tenantId || 'default';
-          const staffId = req.params.staffId;
+          const staffId = Array.isArray(req.params.staffId) ? req.params.staffId[0] : req.params.staffId;
           const uploadPath = path.join(
             process.cwd(),
             'uploads',
             'staff-documents',
             tenantId,
-            staffId,
+            staffId || 'unknown',
           );
           // Ensure directory exists
           fs.mkdirSync(uploadPath, { recursive: true });

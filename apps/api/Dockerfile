@@ -2,10 +2,16 @@
 # CrecheBooks API - Production Dockerfile
 # ============================================
 # Multi-stage build for optimized production image
+# Using Debian-based images for Railway compatibility
 
 # Stage 1: Dependencies
-FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat openssl
+FROM node:20-slim AS deps
+
+# Install required system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -21,8 +27,13 @@ COPY packages/types/package.json ./packages/types/
 RUN pnpm install --frozen-lockfile --prod=false
 
 # Stage 2: Builder
-FROM node:20-alpine AS builder
-RUN apk add --no-cache libc6-compat openssl
+FROM node:20-slim AS builder
+
+# Install required system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -44,14 +55,21 @@ RUN cd apps/api && npx prisma generate
 RUN pnpm --filter @crechebooks/api build
 
 # Stage 3: Production Runner
-FROM node:20-alpine AS runner
-RUN apk add --no-cache libc6-compat openssl dumb-init
+FROM node:20-slim AS runner
+
+# Install required system dependencies and dumb-init
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
+    ca-certificates \
+    dumb-init \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nestjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nestjs
 
 # Install pnpm for production
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate

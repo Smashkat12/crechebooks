@@ -154,4 +154,4 @@ ENTRYPOINT ["dumb-init", "--"]
 # Start the server
 # Note: Migrations should be run separately via Railway release command or manually
 # To run migrations: railway run npx prisma migrate deploy
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]

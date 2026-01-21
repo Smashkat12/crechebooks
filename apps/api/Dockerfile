@@ -40,13 +40,19 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
+# Copy workspace configuration for pnpm
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/types/package.json ./packages/types/
+
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
-# Note: packages/types uses shared node_modules via pnpm workspaces
 
 # Copy source code
 COPY . .
+
+# Reinstall to set up workspace symlinks (uses cached node_modules)
+RUN pnpm install --frozen-lockfile --offline || pnpm install --frozen-lockfile
 
 # Build shared types package first (required by API)
 RUN pnpm --filter @crechebooks/types build

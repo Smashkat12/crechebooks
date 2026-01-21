@@ -72,14 +72,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const domain = configService.get<string>('AUTH0_DOMAIN');
     const jwtSecret = configService.get<string>('JWT_SECRET');
     const nodeEnv = configService.get<string>('NODE_ENV');
+    const devAuthEnabled = configService.get<string>('DEV_AUTH_ENABLED');
 
     // Support local development without Auth0
-    const isLocalDev = nodeEnv === 'development' && !domain && jwtSecret;
+    // Also support DEV_AUTH_ENABLED=true for deployments without Auth0 configured
+    const isLocalDev =
+      (nodeEnv === 'development' || devAuthEnabled === 'true') &&
+      !domain &&
+      jwtSecret;
 
     if (!domain && !isLocalDev) {
       throw new Error(
         'AUTH0_DOMAIN environment variable is required in production. ' +
-          'For local development, set NODE_ENV=development and JWT_SECRET.',
+          'For local development, set NODE_ENV=development and JWT_SECRET. ' +
+          'Alternatively, set DEV_AUTH_ENABLED=true with JWT_SECRET for deployments without Auth0.',
       );
     }
 

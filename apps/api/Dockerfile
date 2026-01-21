@@ -57,8 +57,13 @@ RUN pnpm install --frozen-lockfile --offline || pnpm install --frozen-lockfile
 # Build shared types package first (required by API)
 RUN pnpm --filter @crechebooks/types build
 
-# Generate Prisma client (run from root to ensure .prisma goes to root node_modules)
-RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
+# Generate Prisma client from apps/api directory (finds prisma.config.ts)
+RUN cd apps/api && npx prisma generate
+
+# Ensure .prisma is at root node_modules (copy if it ended up in apps/api/node_modules)
+RUN if [ ! -d "/app/node_modules/.prisma" ] && [ -d "/app/apps/api/node_modules/.prisma" ]; then \
+      cp -r /app/apps/api/node_modules/.prisma /app/node_modules/.prisma; \
+    fi && ls -la /app/node_modules/.prisma || echo "WARNING: .prisma not found"
 
 # Build the API
 RUN pnpm --filter @crechebooks/api build
@@ -93,7 +98,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps_node_modules
 RUN cp -r ./apps_node_modules/* ./node_modules/ 2>/dev/null || true && rm -rf ./apps_node_modules
 
-# Copy Prisma generated client (only .prisma is needed from builder, @prisma packages come from deps)
+# Copy Prisma generated client from builder
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Set ownership

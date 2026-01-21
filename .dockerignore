@@ -1,0 +1,85 @@
+# ============================================
+# CrecheBooks Docker Ignore
+# ============================================
+
+# Dependencies (will be installed in container)
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+.next
+**/.next
+out
+**/out
+
+# Development files
+.git
+.gitignore
+*.md
+!README.md
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+
+# Environment files (secrets should be passed via Railway)
+.env
+.env.*
+!.env.example
+
+# Test files
+coverage
+**/coverage
+**/*.spec.ts
+**/*.test.ts
+**/*.spec.js
+**/*.test.js
+**/test
+**/tests
+**/__tests__
+playwright-report
+test-results
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker files (not needed inside container)
+Dockerfile*
+docker-compose*
+.docker
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.circleci
+
+# Misc
+*.tgz
+*.tar.gz
+.turbo
+turbo.json
+
+# Local development
+.claude
+.claude-flow
+specs
+docs/company-docs
+
+# Prisma migrations (included, but ignore dev files)
+**/prisma/*.db
+**/prisma/*.db-journal
+
+# Scripts (not needed in production)
+apps/api/scripts
+
+# Playwright
+playwright.config.ts

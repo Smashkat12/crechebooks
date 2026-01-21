@@ -1,0 +1,27 @@
+# ============================================
+# CrecheBooks Nixpacks Configuration
+# ============================================
+# Fallback configuration if not using Dockerfile
+# Railway will auto-detect and use this for builds
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "pnpm", "openssl"]
+
+[phases.install]
+cmds = [
+    "corepack enable",
+    "corepack prepare pnpm@9.15.0 --activate",
+    "pnpm install --frozen-lockfile"
+]
+
+[phases.build]
+cmds = [
+    "pnpm prisma:generate",
+    "pnpm build"
+]
+
+[start]
+cmd = "pnpm start:api"
+
+[variables]
+NODE_ENV = "production"

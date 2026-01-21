@@ -69,8 +69,12 @@ docker-compose*
 turbo.json
 
 # Local development
-.claude
 .claude-flow
+
+# Claude Code - exclude dev files but include context for agents
+# First exclude all .claude subdirs, then re-include context
+.claude/*
+!.claude/context/
 specs
 docs/company-docs
 

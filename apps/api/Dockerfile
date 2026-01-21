@@ -151,6 +151,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
 
-# Run database migrations and start the server
-# Use node to run prisma directly since .bin symlinks aren't set up in pnpm
-CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js migrate deploy && node dist/main"]
+# Start the server
+# Note: Migrations should be run separately via Railway release command or manually
+# To run migrations: railway run npx prisma migrate deploy
+CMD ["node", "dist/main"]

@@ -85,13 +85,16 @@ RUN mkdir -p /app/node_modules/.prisma && \
 # Build the API
 RUN pnpm --filter @crechebooks/api build
 
-# Prepare prisma CLI for runner stage (resolve pnpm symlinks)
-RUN mkdir -p /app/prisma-cli && \
-    cp -rL /app/node_modules/prisma/* /app/prisma-cli/ 2>/dev/null || \
-    cp -rL /app/node_modules/.pnpm/prisma@*/node_modules/prisma/* /app/prisma-cli/ 2>/dev/null || \
-    (find /app/node_modules -path "*/prisma/build/index.js" -exec dirname {} \; | head -1 | xargs -I{} cp -rL {}/../ /app/prisma-cli/) && \
-    echo "=== Prisma CLI prepared ===" && \
-    ls -la /app/prisma-cli/
+# Prepare prisma CLI and engines for runner stage (resolve pnpm symlinks)
+RUN mkdir -p /app/prisma-cli /app/prisma-engines && \
+    (cp -rL /app/node_modules/prisma/* /app/prisma-cli/ 2>/dev/null || \
+     cp -rL /app/node_modules/.pnpm/prisma@*/node_modules/prisma/* /app/prisma-cli/ 2>/dev/null || \
+     find /app/node_modules -path "*/prisma/build/index.js" -exec dirname {} \; | head -1 | xargs -I{} cp -rL {}/../ /app/prisma-cli/) && \
+    (cp -rL /app/node_modules/@prisma/engines/* /app/prisma-engines/ 2>/dev/null || \
+     cp -rL /app/node_modules/.pnpm/@prisma+engines@*/node_modules/@prisma/engines/* /app/prisma-engines/ 2>/dev/null || \
+     find /app/node_modules -path "*/@prisma/engines/package.json" -exec dirname {} \; | head -1 | xargs -I{} cp -rL {}/* /app/prisma-engines/) && \
+    echo "=== Prisma CLI prepared ===" && ls -la /app/prisma-cli/ && \
+    echo "=== Prisma Engines prepared ===" && ls -la /app/prisma-engines/
 
 # Stage 3: Production Runner
 FROM node:20-slim AS runner
@@ -126,8 +129,9 @@ RUN cp -r ./apps_node_modules/* ./node_modules/ 2>/dev/null || true && rm -rf ./
 # Copy Prisma generated client from builder
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Copy Prisma CLI from builder (resolved from pnpm symlinks)
+# Copy Prisma CLI and engines from builder (resolved from pnpm symlinks)
 COPY --from=builder /app/prisma-cli ./node_modules/prisma
+COPY --from=builder /app/prisma-engines ./node_modules/@prisma/engines
 
 # Set ownership
 RUN chown -R nestjs:nodejs /app

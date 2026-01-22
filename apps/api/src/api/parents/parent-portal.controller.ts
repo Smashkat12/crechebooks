@@ -28,6 +28,9 @@ import {
   ParentStatementsListDto,
   ParentStatementDetailDto,
   EmailStatementResponseDto,
+  ParentPaymentsListDto,
+  ParentPaymentDetailDto,
+  CrecheBankDetailsDto,
 } from './dto/parent-dashboard.dto';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { InvoiceStatus } from '@prisma/client';
@@ -868,6 +871,287 @@ export class ParentPortalController {
     return {
       message: `Statement for ${this.getMonthName(month)} ${year} will be sent to your email`,
       sentTo: parent.email,
+    };
+  }
+
+  // ============================================================================
+  // TASK-PORTAL-015: Parent Portal Payments Endpoints
+  // ============================================================================
+
+  /**
+   * Map payment status to a simplified status
+   */
+  private mapPaymentStatus(
+    deletedAt: Date | null,
+    paymentDate: Date,
+  ): 'completed' | 'pending' | 'failed' {
+    if (deletedAt) {
+      return 'failed';
+    }
+    // If payment date is in the past, consider it completed
+    return paymentDate <= new Date() ? 'completed' : 'pending';
+  }
+
+  @Get('payments')
+  @ApiOperation({ summary: 'Get parent payment history with filters' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Filter payments from this date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'Filter payments until this date (YYYY-MM-DD)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'List of parent payments',
+    type: ParentPaymentsListDto,
+  })
+  async getPayments(
+    @CurrentParent() session: ParentSession,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+  ): Promise<ParentPaymentsListDto> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = Math.min(parseInt(limit, 10) || 10, 50);
+    const skip = (pageNum - 1) * limitNum;
+
+    this.logger.debug(`Fetching payments for parent ${parentId}, page ${pageNum}`);
+
+    // Build where clause for payments
+    const where: {
+      tenantId: string;
+      deletedAt: null;
+      invoice?: { parentId: string };
+      paymentDate?: { gte?: Date; lte?: Date };
+    } = {
+      tenantId,
+      deletedAt: null,
+      invoice: { parentId },
+    };
+
+    // Filter by date range
+    if (startDate || endDate) {
+      where.paymentDate = {};
+      if (startDate) {
+        where.paymentDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.paymentDate.lte = end;
+      }
+    }
+
+    // Get total count
+    const total = await this.prisma.payment.count({ where });
+
+    // Fetch payments
+    const payments = await this.prisma.payment.findMany({
+      where,
+      orderBy: { paymentDate: 'desc' },
+      skip,
+      take: limitNum,
+    });
+
+    // Calculate total outstanding balance
+    const unpaidInvoices = await this.prisma.invoice.findMany({
+      where: {
+        parentId,
+        tenantId,
+        isDeleted: false,
+        status: {
+          in: ['DRAFT', 'SENT', 'VIEWED', 'PARTIALLY_PAID', 'OVERDUE'],
+        },
+      },
+      select: { totalCents: true, amountPaidCents: true },
+    });
+
+    const totalOutstanding = unpaidInvoices.reduce(
+      (sum, inv) => sum + (inv.totalCents - inv.amountPaidCents),
+      0,
+    ) / 100;
+
+    const totalPages = Math.ceil(total / limitNum);
+
+    return {
+      payments: payments.map((payment) => ({
+        id: payment.id,
+        paymentDate: payment.paymentDate.toISOString(),
+        amount: payment.amountCents / 100,
+        reference: payment.reference || `PAY-${payment.id.substring(0, 8).toUpperCase()}`,
+        method: payment.matchType || 'EFT',
+        status: this.mapPaymentStatus(payment.deletedAt, payment.paymentDate),
+      })),
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages,
+      totalOutstanding,
+    };
+  }
+
+  @Get('payments/:id')
+  @ApiOperation({ summary: 'Get single payment detail with allocations' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment detail with allocations',
+    type: ParentPaymentDetailDto,
+  })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  async getPaymentDetail(
+    @CurrentParent() session: ParentSession,
+    @Param('id') paymentId: string,
+  ): Promise<ParentPaymentDetailDto> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+
+    this.logger.debug(`Fetching payment ${paymentId} for parent ${parentId}`);
+
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        tenantId,
+        invoice: { parentId },
+      },
+      include: {
+        invoice: {
+          include: {
+            child: {
+              select: { firstName: true, lastName: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    // Build allocations - for now, a payment is allocated to one invoice
+    const allocations = payment.invoice
+      ? [
+          {
+            invoiceId: payment.invoice.id,
+            invoiceNumber: payment.invoice.invoiceNumber,
+            childName: payment.invoice.child
+              ? `${payment.invoice.child.firstName} ${payment.invoice.child.lastName}`
+              : undefined,
+            allocatedAmount: payment.amountCents / 100,
+            invoiceTotal: payment.invoice.totalCents / 100,
+          },
+        ]
+      : [];
+
+    return {
+      id: payment.id,
+      paymentDate: payment.paymentDate.toISOString(),
+      amount: payment.amountCents / 100,
+      reference: payment.reference || `PAY-${payment.id.substring(0, 8).toUpperCase()}`,
+      method: payment.matchType || 'EFT',
+      status: this.mapPaymentStatus(payment.deletedAt, payment.paymentDate),
+      allocations,
+      hasReceipt: false, // TODO: Implement receipt generation
+      notes: undefined,
+    };
+  }
+
+  @Get('payments/:id/receipt')
+  @ApiOperation({ summary: 'Download payment receipt PDF' })
+  @ApiParam({ name: 'id', description: 'Payment ID' })
+  @ApiResponse({ status: 200, description: 'PDF file' })
+  @ApiResponse({ status: 404, description: 'Payment not found' })
+  async downloadPaymentReceipt(
+    @CurrentParent() session: ParentSession,
+    @Param('id') paymentId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+
+    this.logger.debug(`Downloading receipt for payment ${paymentId}, parent ${parentId}`);
+
+    // Verify payment belongs to this parent
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        tenantId,
+        invoice: { parentId },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    // TODO: Integrate with actual PDF generation service
+    res.setHeader('Content-Type', 'application/json');
+    res.status(501).json({
+      message: 'Receipt generation not yet implemented',
+      paymentId: payment.id,
+      hint: 'Integration with PDF service pending',
+    });
+  }
+
+  @Get('bank-details')
+  @ApiOperation({ summary: 'Get creche bank details for EFT payments' })
+  @ApiResponse({
+    status: 200,
+    description: 'Creche bank details',
+    type: CrecheBankDetailsDto,
+  })
+  async getBankDetails(
+    @CurrentParent() session: ParentSession,
+  ): Promise<CrecheBankDetailsDto> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+
+    this.logger.debug(`Fetching bank details for tenant ${tenantId}`);
+
+    // Get tenant info for bank details
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        name: true,
+        bankName: true,
+        bankAccountNumber: true,
+        bankBranchCode: true,
+        bankAccountType: true,
+        bankSwiftCode: true,
+      },
+    });
+
+    // Generate a unique payment reference for this parent
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const shortParentId = parentId.substring(0, 8).toUpperCase();
+    const paymentReference = `${shortParentId}-${dateStr}`;
+
+    // If tenant has bank details configured, use them
+    // Otherwise, return placeholder values (for demo/development)
+    if (tenant?.bankName && tenant?.bankAccountNumber) {
+      return {
+        bankName: tenant.bankName,
+        accountHolderName: tenant.name,
+        accountNumber: tenant.bankAccountNumber,
+        branchCode: tenant.bankBranchCode || '000000',
+        accountType: (tenant.bankAccountType as 'Cheque' | 'Savings' | 'Current') || 'Cheque',
+        swiftCode: tenant.bankSwiftCode || undefined,
+        paymentReference,
+        paymentInstructions: 'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
+      };
+    }
+
+    // Return placeholder bank details for development
+    return {
+      bankName: 'First National Bank',
+      accountHolderName: tenant?.name || 'Little Stars Creche',
+      accountNumber: '62123456789',
+      branchCode: '250655',
+      accountType: 'Cheque',
+      paymentReference,
+      paymentInstructions: 'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
     };
   }
 }

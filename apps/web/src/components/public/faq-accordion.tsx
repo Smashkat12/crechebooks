@@ -15,10 +15,17 @@ interface FaqItem {
 
 interface FaqAccordionProps {
   items: FaqItem[];
+  title?: string;
+  subtitle?: string;
   className?: string;
 }
 
-export function FaqAccordion({ items, className }: FaqAccordionProps) {
+export function FaqAccordion({
+  items,
+  title = 'Frequently Asked Questions',
+  subtitle = 'Everything you need to know about CrecheBooks',
+  className,
+}: FaqAccordionProps) {
   return (
     <section
       className={cn('py-12 sm:py-16', className)}
@@ -30,10 +37,10 @@ export function FaqAccordion({ items, className }: FaqAccordionProps) {
             id="faq-title"
             className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
           >
-            Frequently Asked Questions
+            {title}
           </h2>
           <p className="mt-4 text-center text-lg text-muted-foreground">
-            Everything you need to know about CrecheBooks
+            {subtitle}
           </p>
           <Accordion
             type="single"

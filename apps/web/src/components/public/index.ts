@@ -13,3 +13,5 @@ export { StatsCounter } from './stats-counter';
 export { FaqAccordion } from './faq-accordion';
 export { PricingTable } from './pricing-table';
 export { IntegrationCard } from './integration-card';
+export { ContactForm } from './contact-form';
+export { TeamMemberCard } from './team-member-card';

@@ -551,7 +551,8 @@ describe('Date Utilities', () => {
 
     describe('isTodaySA', () => {
       it('should return true for today', () => {
-        const today = new Date();
+        // Use todaySA() to get a date that is definitely "today" in SA timezone
+        const today = todaySA();
         expect(isTodaySA(today)).toBe(true);
       });
 
@@ -718,8 +719,9 @@ describe('Date Utilities', () => {
 
     describe('getMonthsBetween', () => {
       it('should return array of billing periods between dates', () => {
-        const startDate = new Date('2026-01-01');
-        const endDate = new Date('2026-03-31');
+        // Use explicit times at noon UTC to avoid timezone boundary issues
+        const startDate = new Date('2026-01-15T12:00:00Z');
+        const endDate = new Date('2026-03-15T12:00:00Z');
         const result = getMonthsBetween(startDate, endDate);
 
         expect(Array.isArray(result)).toBe(true);

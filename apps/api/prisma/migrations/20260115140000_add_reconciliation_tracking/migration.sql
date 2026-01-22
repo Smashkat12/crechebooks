@@ -4,7 +4,7 @@
 -- Create duplicate resolution table for tracking false positives and confirmed duplicates
 CREATE TABLE "duplicate_resolutions" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "tenant_id" UUID NOT NULL,
+    "tenant_id" TEXT NOT NULL,
     "composite_key" VARCHAR(255) NOT NULL,
     "status" VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     "resolved_by" UUID,
@@ -36,7 +36,7 @@ ALTER TABLE "duplicate_resolutions" ADD CONSTRAINT "duplicate_resolutions_resolv
 -- Create manual match history table for audit and undo functionality
 CREATE TABLE "manual_match_history" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "tenant_id" UUID NOT NULL,
+    "tenant_id" TEXT NOT NULL,
     "match_id" UUID NOT NULL,
     "previous_transaction_id" UUID,
     "new_transaction_id" UUID,

@@ -39,3 +39,9 @@ export { PaymentList } from './payment-list';
 export { PaymentDetail } from './payment-detail';
 export { BankDetailsCard } from './bank-details-card';
 export { PaymentReference } from './payment-reference';
+
+// Profile Components (TASK-PORTAL-016)
+export { ProfileForm } from './profile-form';
+export { ChildCard } from './child-card';
+export { CommunicationPrefs } from './communication-prefs';
+export { WhatsAppConsent } from './whatsapp-consent';

@@ -541,3 +541,193 @@ export class CrecheBankDetailsDto {
   @ApiPropertyOptional({ description: 'Payment instructions' })
   paymentInstructions?: string;
 }
+
+// ============================================================================
+// TASK-PORTAL-016: Parent Portal Profile and Preferences DTOs
+// ============================================================================
+
+/**
+ * Address DTO
+ */
+export class ParentAddressDto {
+  @ApiPropertyOptional({ description: 'Street address' })
+  street?: string;
+
+  @ApiPropertyOptional({ description: 'City' })
+  city?: string;
+
+  @ApiPropertyOptional({ description: 'Postal code (4 digits)' })
+  postalCode?: string;
+}
+
+/**
+ * Communication preferences DTO
+ */
+export class CommunicationPreferencesDto {
+  @ApiProperty({
+    description: 'Invoice delivery method',
+    enum: ['email', 'whatsapp', 'both'],
+  })
+  invoiceDelivery: 'email' | 'whatsapp' | 'both';
+
+  @ApiProperty({ description: 'Receive payment reminders' })
+  paymentReminders: boolean;
+
+  @ApiProperty({ description: 'Receive email notifications' })
+  emailNotifications: boolean;
+
+  @ApiProperty({ description: 'Opted in for marketing communications' })
+  marketingOptIn: boolean;
+
+  @ApiProperty({ description: 'Opted in for WhatsApp communications (POPIA consent)' })
+  whatsappOptIn: boolean;
+
+  @ApiPropertyOptional({ description: 'WhatsApp consent timestamp (ISO string)' })
+  whatsappConsentTimestamp: string | null;
+}
+
+/**
+ * Parent profile response DTO
+ */
+export class ParentProfileDto {
+  @ApiProperty({ description: 'Parent ID' })
+  id: string;
+
+  @ApiProperty({ description: 'First name' })
+  firstName: string;
+
+  @ApiProperty({ description: 'Last name' })
+  lastName: string;
+
+  @ApiProperty({ description: 'Email address' })
+  email: string;
+
+  @ApiPropertyOptional({ description: 'Phone number (SA format)' })
+  phone?: string;
+
+  @ApiPropertyOptional({ description: 'Alternative phone number' })
+  alternativePhone?: string;
+
+  @ApiPropertyOptional({ description: 'Address', type: ParentAddressDto })
+  address?: ParentAddressDto;
+
+  @ApiPropertyOptional({
+    description: 'Communication preferences',
+    type: CommunicationPreferencesDto,
+  })
+  communicationPreferences?: CommunicationPreferencesDto;
+
+  @ApiProperty({ description: 'Account created date (ISO string)' })
+  createdAt: string;
+}
+
+/**
+ * Update parent profile request DTO
+ */
+export class UpdateParentProfileDto {
+  @ApiPropertyOptional({ description: 'First name' })
+  firstName?: string;
+
+  @ApiPropertyOptional({ description: 'Last name' })
+  lastName?: string;
+
+  @ApiPropertyOptional({ description: 'Phone number (SA format)' })
+  phone?: string;
+
+  @ApiPropertyOptional({ description: 'Alternative phone number' })
+  alternativePhone?: string;
+
+  @ApiPropertyOptional({ description: 'Address', type: ParentAddressDto })
+  address?: ParentAddressDto;
+}
+
+/**
+ * Update communication preferences request DTO
+ */
+export class UpdateCommunicationPreferencesDto {
+  @ApiPropertyOptional({
+    description: 'Invoice delivery method',
+    enum: ['email', 'whatsapp', 'both'],
+  })
+  invoiceDelivery?: 'email' | 'whatsapp' | 'both';
+
+  @ApiPropertyOptional({ description: 'Receive payment reminders' })
+  paymentReminders?: boolean;
+
+  @ApiPropertyOptional({ description: 'Receive email notifications' })
+  emailNotifications?: boolean;
+
+  @ApiPropertyOptional({ description: 'Opted in for marketing communications' })
+  marketingOptIn?: boolean;
+
+  @ApiPropertyOptional({ description: 'Opted in for WhatsApp communications' })
+  whatsappOptIn?: boolean;
+
+  @ApiPropertyOptional({ description: 'WhatsApp consent timestamp (ISO string, set automatically)' })
+  whatsappConsentTimestamp?: string | null;
+}
+
+/**
+ * Child details for parent portal
+ */
+export class ParentChildDto {
+  @ApiProperty({ description: 'Child ID' })
+  id: string;
+
+  @ApiProperty({ description: 'First name' })
+  firstName: string;
+
+  @ApiProperty({ description: 'Last name' })
+  lastName: string;
+
+  @ApiPropertyOptional({ description: 'Date of birth (ISO string)' })
+  dateOfBirth?: string;
+
+  @ApiPropertyOptional({ description: 'Enrollment date (ISO string)' })
+  enrollmentDate?: string;
+
+  @ApiPropertyOptional({ description: 'Class/group name' })
+  className?: string;
+
+  @ApiPropertyOptional({
+    description: 'Attendance type',
+    enum: ['full_day', 'half_day', 'after_care'],
+  })
+  attendanceType?: 'full_day' | 'half_day' | 'after_care';
+
+  @ApiProperty({ description: 'Whether child enrollment is active' })
+  isActive: boolean;
+
+  @ApiPropertyOptional({ description: 'Photo URL' })
+  photoUrl?: string | null;
+}
+
+/**
+ * Children list response DTO
+ */
+export class ParentChildrenListDto {
+  @ApiProperty({
+    description: 'List of enrolled children',
+    type: [ParentChildDto],
+  })
+  children: ParentChildDto[];
+}
+
+/**
+ * Delete account request DTO
+ */
+export class DeleteAccountRequestDto {
+  @ApiPropertyOptional({ description: 'Reason for deletion request' })
+  reason?: string;
+}
+
+/**
+ * Delete account response DTO
+ */
+export class DeleteAccountResponseDto {
+  @ApiProperty({ description: 'Success message' })
+  message: string;
+
+  @ApiProperty({ description: 'Request ID for tracking' })
+  requestId: string;
+}

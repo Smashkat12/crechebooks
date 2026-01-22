@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Body,
   Param,
   Query,
   Res,
@@ -31,6 +33,13 @@ import {
   ParentPaymentsListDto,
   ParentPaymentDetailDto,
   CrecheBankDetailsDto,
+  ParentProfileDto,
+  UpdateParentProfileDto,
+  CommunicationPreferencesDto,
+  UpdateCommunicationPreferencesDto,
+  ParentChildDto,
+  DeleteAccountRequestDto,
+  DeleteAccountResponseDto,
 } from './dto/parent-dashboard.dto';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { InvoiceStatus } from '@prisma/client';
@@ -1152,6 +1161,383 @@ export class ParentPortalController {
       accountType: 'Cheque',
       paymentReference,
       paymentInstructions: 'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
+    };
+  }
+
+  // ============================================================================
+  // TASK-PORTAL-016: Parent Portal Profile Endpoints
+  // ============================================================================
+
+  @Get('profile')
+  @ApiOperation({ summary: 'Get parent profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Parent profile data',
+    type: ParentProfileDto,
+  })
+  async getProfile(
+    @CurrentParent() session: ParentSession,
+  ): Promise<ParentProfileDto> {
+    const parentId = session.parentId;
+
+    this.logger.debug(`Fetching profile for parent ${parentId}`);
+
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Parent not found');
+    }
+
+    // Parse preferences from notes if stored there
+    let storedPrefs: Record<string, unknown> = {};
+    if (parent.notes) {
+      const prefsMatch = parent.notes.match(/\[PREFERENCES\]: ({.*})/);
+      if (prefsMatch) {
+        try {
+          storedPrefs = JSON.parse(prefsMatch[1]);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+
+    // Map preferred contact to invoice delivery
+    let invoiceDelivery: 'email' | 'whatsapp' | 'both' = 'email';
+    if (storedPrefs.invoiceDelivery) {
+      invoiceDelivery = storedPrefs.invoiceDelivery as 'email' | 'whatsapp' | 'both';
+    } else if (parent.preferredContact === 'WHATSAPP') {
+      invoiceDelivery = 'whatsapp';
+    } else if (parent.preferredContact === 'BOTH') {
+      invoiceDelivery = 'both';
+    }
+
+    const communicationPreferences: CommunicationPreferencesDto = {
+      invoiceDelivery,
+      paymentReminders: storedPrefs.paymentReminders as boolean ?? true,
+      emailNotifications: storedPrefs.emailNotifications as boolean ?? true,
+      marketingOptIn: parent.smsOptIn ?? false,
+      whatsappOptIn: parent.whatsappOptIn ?? false,
+      whatsappConsentTimestamp: storedPrefs.whatsappConsentTimestamp as string || null,
+    };
+
+    // Parse address from address field (stored as JSON string)
+    let addressData: Record<string, string> = {};
+    if (parent.address) {
+      try {
+        addressData = JSON.parse(parent.address);
+      } catch {
+        // If not JSON, treat as street address
+        addressData = { street: parent.address };
+      }
+    }
+
+    return {
+      id: parent.id,
+      firstName: parent.firstName,
+      lastName: parent.lastName,
+      email: parent.email || '',
+      phone: parent.phone || undefined,
+      alternativePhone: parent.whatsapp || undefined,
+      address: {
+        street: addressData.street || undefined,
+        city: addressData.city || undefined,
+        postalCode: addressData.postalCode || undefined,
+      },
+      communicationPreferences,
+      createdAt: parent.createdAt.toISOString(),
+    };
+  }
+
+  @Put('profile')
+  @ApiOperation({ summary: 'Update parent profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Updated parent profile',
+    type: ParentProfileDto,
+  })
+  async updateProfile(
+    @CurrentParent() session: ParentSession,
+    @Body() dto: UpdateParentProfileDto,
+  ): Promise<ParentProfileDto> {
+    const parentId = session.parentId;
+
+    this.logger.debug(`Updating profile for parent ${parentId}`);
+
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Parent not found');
+    }
+
+    // Build update data
+    const updateData: Record<string, unknown> = {};
+
+    if (dto.firstName) {
+      updateData.firstName = dto.firstName;
+    }
+
+    if (dto.lastName) {
+      updateData.lastName = dto.lastName;
+    }
+
+    if (dto.phone !== undefined) {
+      updateData.phone = dto.phone || null;
+    }
+
+    // Store alternative phone in whatsapp field if provided
+    if (dto.alternativePhone !== undefined) {
+      updateData.whatsapp = dto.alternativePhone || null;
+    }
+
+    // Store address as JSON string in address field
+    if (dto.address) {
+      const existingAddress = parent.address ? JSON.parse(parent.address) : {};
+      updateData.address = JSON.stringify({
+        ...existingAddress,
+        ...dto.address,
+      });
+    }
+
+    // Update parent record
+    const updatedParent = await this.prisma.parent.update({
+      where: { id: parentId },
+      data: updateData,
+    });
+
+    // Return updated profile
+    return this.getProfile(session);
+  }
+
+  @Put('preferences')
+  @ApiOperation({ summary: 'Update communication preferences' })
+  @ApiResponse({
+    status: 200,
+    description: 'Updated communication preferences',
+    type: CommunicationPreferencesDto,
+  })
+  async updatePreferences(
+    @CurrentParent() session: ParentSession,
+    @Body() dto: UpdateCommunicationPreferencesDto,
+  ): Promise<CommunicationPreferencesDto> {
+    const parentId = session.parentId;
+
+    this.logger.debug(`Updating preferences for parent ${parentId}`);
+
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Parent not found');
+    }
+
+    // Parse existing notes to get stored preferences
+    let storedPrefs: Record<string, unknown> = {};
+    if (parent.notes) {
+      const prefsMatch = parent.notes.match(/\[PREFERENCES\]: ({.*})/);
+      if (prefsMatch) {
+        try {
+          storedPrefs = JSON.parse(prefsMatch[1]);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+
+    // Build updated preferences
+    const updateData: { whatsappOptIn?: boolean; smsOptIn?: boolean; preferredContact?: 'EMAIL' | 'WHATSAPP' | 'BOTH'; notes?: string } = {};
+
+    // Update WhatsApp opt-in
+    if (dto.whatsappOptIn !== undefined) {
+      updateData.whatsappOptIn = dto.whatsappOptIn;
+      if (dto.whatsappOptIn && !storedPrefs.whatsappConsentTimestamp) {
+        storedPrefs.whatsappConsentTimestamp = new Date().toISOString();
+      } else if (!dto.whatsappOptIn) {
+        storedPrefs.whatsappConsentTimestamp = null;
+      }
+    }
+
+    // Map invoice delivery to preferred contact
+    if (dto.invoiceDelivery !== undefined) {
+      storedPrefs.invoiceDelivery = dto.invoiceDelivery;
+      if (dto.invoiceDelivery === 'whatsapp') {
+        updateData.preferredContact = 'WHATSAPP';
+      } else if (dto.invoiceDelivery === 'email') {
+        updateData.preferredContact = 'EMAIL';
+      }
+    }
+
+    // Store other preferences in notes
+    if (dto.paymentReminders !== undefined) {
+      storedPrefs.paymentReminders = dto.paymentReminders;
+    }
+
+    if (dto.emailNotifications !== undefined) {
+      storedPrefs.emailNotifications = dto.emailNotifications;
+    }
+
+    if (dto.marketingOptIn !== undefined) {
+      storedPrefs.marketingOptIn = dto.marketingOptIn;
+      updateData.smsOptIn = dto.marketingOptIn;
+    }
+
+    if (dto.whatsappConsentTimestamp !== undefined) {
+      storedPrefs.whatsappConsentTimestamp = dto.whatsappConsentTimestamp;
+    }
+
+    // Update notes with preferences JSON
+    const prefsJson = JSON.stringify(storedPrefs);
+    const notesWithoutPrefs = parent.notes?.replace(/\n?\[PREFERENCES\]: {.*}/, '') || '';
+    updateData.notes = notesWithoutPrefs ? `${notesWithoutPrefs}\n[PREFERENCES]: ${prefsJson}` : `[PREFERENCES]: ${prefsJson}`;
+
+    // Update parent record
+    await this.prisma.parent.update({
+      where: { id: parentId },
+      data: updateData,
+    });
+
+    // Return updated preferences
+    return {
+      invoiceDelivery: (storedPrefs.invoiceDelivery as 'email' | 'whatsapp' | 'both') || 'email',
+      paymentReminders: storedPrefs.paymentReminders as boolean ?? true,
+      emailNotifications: storedPrefs.emailNotifications as boolean ?? true,
+      marketingOptIn: storedPrefs.marketingOptIn as boolean ?? false,
+      whatsappOptIn: dto.whatsappOptIn ?? parent.whatsappOptIn ?? false,
+      whatsappConsentTimestamp: storedPrefs.whatsappConsentTimestamp as string || null,
+    };
+  }
+
+  @Get('children')
+  @ApiOperation({ summary: 'Get parent\'s enrolled children' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of enrolled children',
+    type: [ParentChildDto],
+  })
+  async getChildren(
+    @CurrentParent() session: ParentSession,
+  ): Promise<ParentChildDto[]> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+
+    this.logger.debug(`Fetching children for parent ${parentId}`);
+
+    const children = await this.prisma.child.findMany({
+      where: {
+        parentId,
+        tenantId,
+        deletedAt: null,
+      },
+      include: {
+        enrollments: {
+          where: { status: 'ACTIVE' },
+          orderBy: { startDate: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { firstName: 'asc' },
+    });
+
+    return children.map((child) => {
+      const latestEnrollment = (child as typeof child & { enrollments: Array<{ startDate: Date }> }).enrollments?.[0];
+
+      return {
+        id: child.id,
+        firstName: child.firstName,
+        lastName: child.lastName,
+        dateOfBirth: child.dateOfBirth?.toISOString() || undefined,
+        enrollmentDate: latestEnrollment?.startDate?.toISOString() || child.createdAt?.toISOString() || undefined,
+        className: undefined, // Not stored in schema, would need Class relation
+        attendanceType: undefined, // Not stored in schema, would need FeeStructure relation
+        isActive: child.isActive,
+        photoUrl: null, // Photos not stored in current schema
+      };
+    });
+  }
+
+  @Post('delete-request')
+  @ApiOperation({ summary: 'Request account deletion' })
+  @ApiResponse({
+    status: 200,
+    description: 'Deletion request submitted',
+    type: DeleteAccountResponseDto,
+  })
+  async requestAccountDeletion(
+    @CurrentParent() session: ParentSession,
+    @Body() dto: DeleteAccountRequestDto,
+  ): Promise<DeleteAccountResponseDto> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+
+    this.logger.debug(`Account deletion request from parent ${parentId}`);
+
+    // Check for outstanding balance
+    const unpaidInvoices = await this.prisma.invoice.findMany({
+      where: {
+        parentId,
+        tenantId,
+        isDeleted: false,
+        status: {
+          in: ['DRAFT', 'SENT', 'VIEWED', 'PARTIALLY_PAID', 'OVERDUE'],
+        },
+      },
+      select: { totalCents: true, amountPaidCents: true },
+    });
+
+    const outstandingBalance = unpaidInvoices.reduce(
+      (sum, inv) => sum + (inv.totalCents - inv.amountPaidCents),
+      0,
+    );
+
+    if (outstandingBalance > 0) {
+      this.logger.warn(
+        `Account deletion request blocked: parent ${parentId} has outstanding balance of ${outstandingBalance / 100}`,
+      );
+    }
+
+    // Store deletion request in parent metadata
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Parent not found');
+    }
+
+    const requestId = `DEL-${Date.now()}-${parentId.substring(0, 8)}`.toUpperCase();
+
+    // Store deletion request in notes field (temporary solution)
+    // In production, this should be a separate DeletionRequest model
+    const deletionInfo = JSON.stringify({
+      requestId,
+      requestedAt: new Date().toISOString(),
+      reason: dto.reason || null,
+      outstandingBalance: outstandingBalance / 100,
+      status: outstandingBalance > 0 ? 'pending_balance' : 'pending_review',
+    });
+
+    await this.prisma.parent.update({
+      where: { id: parentId },
+      data: {
+        notes: parent.notes
+          ? `${parent.notes}\n\n[DELETION_REQUEST]: ${deletionInfo}`
+          : `[DELETION_REQUEST]: ${deletionInfo}`,
+      },
+    });
+
+    // TODO: Send confirmation email to parent
+    // TODO: Notify admin of deletion request
+    // TODO: Create proper DeletionRequest model in future iteration
+
+    return {
+      message: outstandingBalance > 0
+        ? 'Your account deletion request has been submitted. Please note that your outstanding balance must be cleared before the account can be deleted.'
+        : 'Your account deletion request has been submitted. You will receive confirmation via email once processed.',
+      requestId,
     };
   }
 }

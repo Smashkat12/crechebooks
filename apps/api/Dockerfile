@@ -38,6 +38,7 @@ RUN sed 's|"@crechebooks/types": "workspace:\*"|"@crechebooks/types": "file:../p
 RUN npm install --legacy-peer-deps
 
 # Copy prisma schema and generate client
+# Build timestamp to force fresh build: 2026-01-23T01:48:00Z
 COPY apps/api/prisma ./prisma
 RUN npx prisma generate
 

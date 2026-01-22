@@ -9,346 +9,332 @@ import {
   Receipt,
   Calendar,
   FileText,
-  Clock,
-  DollarSign,
-  ChevronRight,
+  User,
+  RefreshCw,
+  LogOut,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  EmploymentCard,
+  RecentPayslips,
+  LeaveBalanceCard,
+  NextPayCard,
+  Announcements,
+  YtdEarnings,
+} from '@/components/staff-portal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-interface StaffDashboardData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  position?: string;
-  department?: string;
+interface DashboardData {
+  employmentStatus: {
+    position: string;
+    department?: string;
+    startDate: Date | string;
+    status: 'active' | 'probation' | 'terminated';
+    employeeNumber?: string;
+  };
+  recentPayslips: Array<{
+    id: string;
+    payDate: Date | string;
+    period: string;
+    grossPay: number;
+    netPay: number;
+  }>;
   leaveBalance: {
     annual: number;
+    annualUsed: number;
     sick: number;
+    sickUsed: number;
     family: number;
+    familyUsed: number;
   };
-  nextPayday: {
-    date: string;
-    amount?: number;
-  } | null;
-  recentPayslips: {
+  nextPayDate: Date | string;
+  ytdEarnings: {
+    grossEarnings: number;
+    netEarnings: number;
+    totalTax: number;
+    totalDeductions: number;
+  };
+  announcements: Array<{
     id: string;
-    periodStart: string;
-    periodEnd: string;
-    netPay: number;
-    status: 'available' | 'pending';
-  }[];
-  pendingLeaveRequests: number;
+    title: string;
+    content: string;
+    createdAt: Date | string;
+    priority: 'low' | 'medium' | 'high';
+  }>;
 }
 
-// Mock data for development/demo
-const mockData: StaffDashboardData = {
-  firstName: 'Jane',
-  lastName: 'Doe',
-  email: 'jane.doe@example.com',
-  position: 'Teacher',
-  department: 'Education',
-  leaveBalance: {
-    annual: 15,
-    sick: 10,
-    family: 3,
-  },
-  nextPayday: {
-    date: new Date(new Date().setDate(25)).toISOString(),
-    amount: 2500000, // in cents
-  },
-  recentPayslips: [
-    {
-      id: '1',
-      periodStart: '2024-12-01',
-      periodEnd: '2024-12-31',
-      netPay: 2450000,
-      status: 'available',
+// Mock data for development/demo when API is unavailable
+function getMockData(): DashboardData {
+  const today = new Date();
+  return {
+    employmentStatus: {
+      position: 'Early Childhood Development Practitioner',
+      department: 'Education',
+      startDate: new Date('2023-03-15').toISOString(),
+      status: 'active',
+      employeeNumber: 'EMP-001',
     },
-    {
-      id: '2',
-      periodStart: '2024-11-01',
-      periodEnd: '2024-11-30',
-      netPay: 2450000,
-      status: 'available',
+    recentPayslips: [
+      {
+        id: 'ps-001',
+        payDate: new Date(today.getFullYear(), today.getMonth(), 25).toISOString(),
+        period: `${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
+        grossPay: 18500,
+        netPay: 15234.56,
+      },
+      {
+        id: 'ps-002',
+        payDate: new Date(today.getFullYear(), today.getMonth() - 1, 25).toISOString(),
+        period: `${new Date(today.getFullYear(), today.getMonth() - 1).toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
+        grossPay: 18500,
+        netPay: 15234.56,
+      },
+      {
+        id: 'ps-003',
+        payDate: new Date(today.getFullYear(), today.getMonth() - 2, 25).toISOString(),
+        period: `${new Date(today.getFullYear(), today.getMonth() - 2).toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
+        grossPay: 18500,
+        netPay: 15234.56,
+      },
+    ],
+    leaveBalance: {
+      annual: 15,
+      annualUsed: 5,
+      sick: 10,
+      sickUsed: 2,
+      family: 3,
+      familyUsed: 0,
     },
-    {
-      id: '3',
-      periodStart: '2024-10-01',
-      periodEnd: '2024-10-31',
-      netPay: 2350000,
-      status: 'available',
+    nextPayDate: new Date(today.getFullYear(), today.getMonth() + 1, 25).toISOString(),
+    ytdEarnings: {
+      grossEarnings: 111000,
+      netEarnings: 91407.36,
+      totalTax: 14850,
+      totalDeductions: 4742.64,
     },
-  ],
-  pendingLeaveRequests: 1,
-};
-
-function formatCurrency(cents: number): string {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-  }).format(cents / 100);
+    announcements: [
+      {
+        id: 'ann-001',
+        title: 'School Closure - Public Holiday',
+        content:
+          'The school will be closed on Monday for the public holiday. Normal operations resume on Tuesday.',
+        createdAt: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        priority: 'high',
+      },
+      {
+        id: 'ann-002',
+        title: 'Staff Meeting Reminder',
+        content: 'Monthly staff meeting this Friday at 2pm in the main hall.',
+        createdAt: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        priority: 'medium',
+      },
+    ],
+  };
 }
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+function QuickActionCard({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <Link href={href}>
+      <Card className="hover:bg-muted/50 transition-colors cursor-pointer h-full">
+        <CardContent className="flex flex-col items-center justify-center p-4 gap-2">
+          <Icon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+          <span className="text-sm font-medium text-center">{label}</span>
+        </CardContent>
+      </Card>
+    </Link>
+  );
 }
 
-function formatPeriod(start: string, end: string): string {
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  return `${startDate.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}`;
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-48" />
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-20" />
+        ))}
+      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-48" />
+      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Skeleton className="h-64" />
+        <Skeleton className="h-48" />
+      </div>
+    </div>
+  );
 }
 
 export default function StaffDashboardPage() {
   const router = useRouter();
-  const [data, setData] = useState<StaffDashboardData | null>(null);
+  const [staffName, setStaffName] = useState<string>('Staff Member');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    const fetchDashboard = async () => {
-      const token = localStorage.getItem('staff_session_token');
+    const token = localStorage.getItem('staff_session_token');
 
-      if (!token) {
-        router.push('/staff/login');
-        return;
-      }
+    if (!token) {
+      router.push('/staff/login');
+      return;
+    }
 
-      try {
-        const response = await fetch(`${API_URL}/api/v1/staff-portal/dashboard`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+    // Try to get staff name from stored session data
+    const storedName = localStorage.getItem('staff_name');
+    if (storedName) {
+      setStaffName(storedName);
+    }
 
-        if (!response.ok) {
-          if (response.status === 401) {
-            localStorage.removeItem('staff_session_token');
-            router.push('/staff/login');
-            return;
-          }
-          // If API fails, use mock data for development
-          console.warn('Dashboard API not available, using mock data');
-          setData(mockData);
-          setIsLoading(false);
-          return;
-        }
-
-        const dashboardData = await response.json();
-        setData(dashboardData);
-      } catch (err) {
-        // Use mock data if API is unavailable
-        console.warn('Dashboard API error, using mock data:', err);
-        setData(mockData);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchDashboard();
+    fetchDashboardData(token);
   }, [router]);
 
+  const fetchDashboardData = async (token: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_URL}/api/staff-portal/dashboard`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem('staff_session_token');
+          localStorage.removeItem('staff_name');
+          router.push('/staff/login');
+          return;
+        }
+        throw new Error('Failed to fetch dashboard data');
+      }
+
+      const data = await response.json();
+      setDashboardData(data);
+    } catch (err) {
+      // Use mock data for development when API is unavailable
+      console.warn('Dashboard API error, using mock data:', err);
+      setError('Unable to connect to server. Showing sample data.');
+      setDashboardData(getMockData());
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('staff_session_token');
+      if (token) {
+        await fetch(`${API_URL}/api/v1/auth/staff/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+    } catch {
+      // Continue with logout even if API call fails
+    } finally {
+      localStorage.removeItem('staff_session_token');
+      localStorage.removeItem('staff_name');
+      router.push('/staff/login');
+    }
+  };
+
+  const handleRefresh = () => {
+    const token = localStorage.getItem('staff_session_token');
+    if (token) {
+      fetchDashboardData(token);
+    }
+  };
+
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-lg mx-auto mt-8">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-        <Button
-          className="mt-4 w-full"
-          variant="outline"
-          onClick={() => window.location.reload()}
-        >
-          Try Again
-        </Button>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return null;
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Welcome Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Welcome, {data.firstName}!</h1>
-        <p className="text-muted-foreground">
-          {data.position && data.department
-            ? `${data.position} - ${data.department}`
-            : 'Here\'s your employment overview'}
-        </p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">
+            Welcome back, {staffName.split(' ')[0]}!
+          </h1>
+          <p className="text-muted-foreground">
+            Here&apos;s your employment overview
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Leave Balance */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Annual Leave</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.leaveBalance.annual} days</div>
-            <p className="text-xs text-muted-foreground">
-              Available balance
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sick Leave</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.leaveBalance.sick} days</div>
-            <p className="text-xs text-muted-foreground">
-              Available balance
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Next Payday */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Next Payday</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {data.nextPayday ? formatDate(data.nextPayday.date) : 'N/A'}
-            </div>
-            {data.nextPayday?.amount && (
-              <p className="text-xs text-muted-foreground">
-                Est. {formatCurrency(data.nextPayday.amount)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Pending Leave */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Requests</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.pendingLeaveRequests}</div>
-            <p className="text-xs text-muted-foreground">
-              Leave requests pending
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {error && (
+        <Alert variant="default" className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
+          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks you might need</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link href="/staff/payslips">
-                <Receipt className="h-6 w-6 text-emerald-600" />
-                <span>View Payslips</span>
-              </Link>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link href="/staff/leave">
-                <Calendar className="h-6 w-6 text-emerald-600" />
-                <span>Request Leave</span>
-              </Link>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link href="/staff/tax-documents">
-                <FileText className="h-6 w-6 text-emerald-600" />
-                <span>Tax Documents</span>
-              </Link>
-            </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col gap-2" asChild>
-              <Link href="/staff/profile">
-                <Clock className="h-6 w-6 text-emerald-600" />
-                <span>Update Profile</span>
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <QuickActionCard href="/staff/payslips" icon={Receipt} label="View Payslips" />
+        <QuickActionCard href="/staff/leave" icon={Calendar} label="Request Leave" />
+        <QuickActionCard
+          href="/staff/tax-documents"
+          icon={FileText}
+          label="Tax Documents"
+        />
+        <QuickActionCard href="/staff/profile" icon={User} label="My Profile" />
+      </div>
 
-      {/* Recent Payslips */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Recent Payslips</CardTitle>
-            <CardDescription>Your latest pay statements</CardDescription>
+      {dashboardData && (
+        <>
+          {/* Top Row - Pay and Employment */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <NextPayCard nextPayDate={dashboardData.nextPayDate} />
+            <EmploymentCard {...dashboardData.employmentStatus} />
           </div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/staff/payslips">
-              View All
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {data.recentPayslips.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">
-              No payslips available yet
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {data.recentPayslips.map((payslip) => (
-                <div
-                  key={payslip.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                      <Receipt className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="font-medium">
-                        {formatPeriod(payslip.periodStart, payslip.periodEnd)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(payslip.periodStart)} - {formatDate(payslip.periodEnd)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(payslip.netPay)}</p>
-                    <p className="text-xs text-emerald-600">{payslip.status}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+          {/* Middle Row - Payslips and Leave */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <RecentPayslips payslips={dashboardData.recentPayslips} />
+            <LeaveBalanceCard leaveBalance={dashboardData.leaveBalance} />
+          </div>
+
+          {/* Bottom Row - YTD and Announcements */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <YtdEarnings earnings={dashboardData.ytdEarnings} />
+            <Announcements announcements={dashboardData.announcements} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

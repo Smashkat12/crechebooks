@@ -92,6 +92,11 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @crechebooks/api prisma:generate
 
+      - name: Run database migrations
+        run: pnpm --filter @crechebooks/api exec prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
+
       - name: Run API unit tests
         run: pnpm --filter @crechebooks/api test
         env:

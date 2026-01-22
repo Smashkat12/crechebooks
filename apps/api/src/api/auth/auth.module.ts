@@ -4,12 +4,15 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { ParentAuthController } from './parent-auth.controller';
+import { StaffAuthController } from './staff-auth.controller';
 import { AuthService } from './auth.service';
 import { MagicLinkService } from './services/magic-link.service';
+import { StaffMagicLinkService } from './services/staff-magic-link.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { ParentAuthGuard } from './guards/parent-auth.guard';
+import { StaffAuthGuard } from './guards/staff-auth.guard';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { RedisModule } from '../../common/redis/redis.module';
 import { RateLimitModule } from '../../common/rate-limit/rate-limit.module';
@@ -78,14 +81,16 @@ export type AuthProvider = 'auth0' | 'jwt';
     RateLimitModule,
     MailgunModule,
   ],
-  controllers: [AuthController, ParentAuthController],
+  controllers: [AuthController, ParentAuthController, StaffAuthController],
   providers: [
     AuthService,
     MagicLinkService,
+    StaffMagicLinkService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
     ParentAuthGuard,
+    StaffAuthGuard,
     RateLimitGuard,
     CsrfStoreService,
     FailedAttemptsService,
@@ -93,9 +98,11 @@ export type AuthProvider = 'auth0' | 'jwt';
   exports: [
     AuthService,
     MagicLinkService,
+    StaffMagicLinkService,
     JwtAuthGuard,
     RolesGuard,
     ParentAuthGuard,
+    StaffAuthGuard,
     RateLimitGuard,
     CsrfStoreService,
     FailedAttemptsService,

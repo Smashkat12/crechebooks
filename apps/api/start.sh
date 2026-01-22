@@ -1,8 +1,15 @@
 #!/bin/sh
 set -e
 
+echo "Checking DATABASE_URL..."
+if [ -z "$DATABASE_URL" ]; then
+  echo "ERROR: DATABASE_URL is not set!"
+  exit 1
+fi
+echo "DATABASE_URL is set (length: ${#DATABASE_URL} characters)"
+
 echo "Pushing database schema..."
-npx prisma db push --accept-data-loss
+DATABASE_URL="$DATABASE_URL" npx prisma db push --accept-data-loss
 
 echo "Starting API server..."
 exec node dist/src/main

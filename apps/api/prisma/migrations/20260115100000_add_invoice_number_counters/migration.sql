@@ -4,7 +4,7 @@
 
 -- Create invoice number counters table
 CREATE TABLE "invoice_number_counters" (
-    "tenant_id" UUID NOT NULL,
+    "tenant_id" TEXT NOT NULL,
     "year" INTEGER NOT NULL,
     "current_value" INTEGER NOT NULL DEFAULT 0,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -97,7 +97,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the server
-# Note: Migrations should be run separately via Railway release command or manually
-# To run migrations: railway run npx prisma migrate deploy
-CMD ["node", "dist/src/main"]
+# Start the server (run migrations first, then start app)
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]

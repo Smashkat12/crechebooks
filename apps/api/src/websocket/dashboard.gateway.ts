@@ -83,7 +83,7 @@ export class DashboardGateway
    * Handle new client connection
    * Note: Authentication is handled by WsJwtGuard on message handlers
    */
-  async handleConnection(client: Socket): Promise<void> {
+  handleConnection(client: Socket): void {
     // Check connection limit
     if (this.connectionCount >= MAX_CONNECTIONS) {
       this.logger.warn(

@@ -416,8 +416,8 @@ describe('AuthController', () => {
     });
 
     describe('POST /auth/logout - Cookie Clearing', () => {
-      it('should clear HttpOnly cookie on logout', async () => {
-        const result = await controller.logout(mockResponse);
+      it('should clear HttpOnly cookie on logout', () => {
+        const result = controller.logout(mockResponse);
 
         expect(result).toEqual({
           success: true,
@@ -433,11 +433,11 @@ describe('AuthController', () => {
         );
       });
 
-      it('should clear cookie with secure flag in production', async () => {
+      it('should clear cookie with secure flag in production', () => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = 'production';
 
-        await controller.logout(mockResponse);
+        controller.logout(mockResponse);
 
         expect(mockResponse.clearCookie).toHaveBeenCalledWith(
           ACCESS_TOKEN_COOKIE,

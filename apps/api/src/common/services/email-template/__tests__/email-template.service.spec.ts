@@ -55,6 +55,7 @@ describe('EmailTemplateService', () => {
       subtotalCents: 500000,
       vatCents: 75000,
       totalCents: 575000,
+      childName: 'Emma Smith',
       lineItems: [
         {
           description: 'Monthly Tuition Fee',
@@ -128,6 +129,7 @@ describe('EmailTemplateService', () => {
       totalChargesCents: 575000,
       totalPaymentsCents: 500000,
       closingBalanceCents: 175000,
+      childNames: 'Emma Smith, Jack Smith',
       transactions: [
         {
           date: new Date('2026-01-01'),
@@ -283,6 +285,7 @@ describe('EmailTemplateService', () => {
           subtotalCents: 100,
           vatCents: 15,
           totalCents: 115,
+          childName: 'Test Child',
           lineItems: [],
         },
       };
@@ -305,6 +308,7 @@ describe('EmailTemplateService', () => {
         subtotalCents: 100,
         vatCents: 15,
         totalCents: 115,
+        childName: 'Test Child',
         lineItems: [
           {
             description: '<img src="x" onerror="alert(1)">',
@@ -333,6 +337,7 @@ describe('EmailTemplateService', () => {
         subtotalCents: 100,
         vatCents: 15,
         totalCents: 115,
+        childName: 'Test Child',
         lineItems: [],
       };
 
@@ -368,6 +373,7 @@ describe('EmailTemplateService', () => {
         subtotalCents: 0,
         vatCents: 0,
         totalCents: 0,
+        childName: 'Test Child',
         lineItems: [],
       };
 
@@ -386,6 +392,7 @@ describe('EmailTemplateService', () => {
         subtotalCents: 0,
         vatCents: 0,
         totalCents: 0,
+        childName: 'Test Child',
         lineItems: [],
       };
 
@@ -407,6 +414,7 @@ describe('EmailTemplateService', () => {
         subtotalCents: 100000,
         vatCents: 15000,
         totalCents: 115000,
+        childName: 'Test Child',
         lineItems: [
           {
             description: 'Test Item',
@@ -440,6 +448,7 @@ describe('EmailTemplateService', () => {
         subtotalCents: 0,
         vatCents: 0,
         totalCents: 0,
+        childName: 'Test Child',
         lineItems: [],
       };
 
@@ -461,6 +470,7 @@ describe('EmailTemplateService', () => {
         subtotalCents: 0,
         vatCents: 0,
         totalCents: 0,
+        childName: 'Test Child',
         lineItems: [],
       };
 

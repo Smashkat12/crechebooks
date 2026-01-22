@@ -38,10 +38,10 @@ const SA_SUFFIXES = [
  * Match payment references, not company names
  */
 const REFERENCE_PATTERNS = [
-  /[-\/]REF\d+/gi, // -REF123, /REF456
-  /[-\/]PMT\d+/gi, // -PMT123, /PMT456 (must have digit)
-  /[-\/]PAY\d+/gi, // -PAY123, /PAY456 (must have digit)
-  /[-\/]INV\d+/gi, // -INV123, /INV456
+  /[-/]REF\d+/gi, // -REF123, /REF456
+  /[-/]PMT\d+/gi, // -PMT123, /PMT456 (must have digit)
+  /[-/]PAY\d+/gi, // -PAY123, /PAY456 (must have digit)
+  /[-/]INV\d+/gi, // -INV123, /INV456
   /\*\d+$/gi, // *123 at end
   /#\d+$/gi, // #456 at end
 ];
@@ -65,27 +65,27 @@ export class PayeeNormalizerService {
       // Load abbreviations
       const abbrPath = path.join(__dirname, '../data/sa-abbreviations.json');
       if (fs.existsSync(abbrPath)) {
-        const abbrData = JSON.parse(fs.readFileSync(abbrPath, 'utf-8'));
+        const abbrData = JSON.parse(fs.readFileSync(abbrPath, 'utf-8')) as {
+          abbreviations?: Record<string, string[]>;
+          reverse_lookup?: Record<string, string>;
+        };
 
         // Load main abbreviations
         for (const [canonical, variants] of Object.entries(
-          abbrData.abbreviations || {},
+          abbrData.abbreviations ?? {},
         )) {
           if (Array.isArray(variants)) {
-            this.abbreviations.set(
-              canonical.toUpperCase(),
-              variants as string[],
-            );
+            this.abbreviations.set(canonical.toUpperCase(), variants);
           }
         }
 
         // Load reverse lookup
         for (const [abbr, canonical] of Object.entries(
-          abbrData.reverse_lookup || {},
+          abbrData.reverse_lookup ?? {},
         )) {
           this.reverseAbbreviations.set(
             abbr.toUpperCase(),
-            (canonical as string).toUpperCase(),
+            canonical.toUpperCase(),
           );
         }
 
@@ -97,16 +97,20 @@ export class PayeeNormalizerService {
       // Load locations
       const locPath = path.join(__dirname, '../data/sa-locations.json');
       if (fs.existsSync(locPath)) {
-        const locData = JSON.parse(fs.readFileSync(locPath, 'utf-8'));
-        const combined = locData.combined || [];
+        const locData = JSON.parse(fs.readFileSync(locPath, 'utf-8')) as {
+          combined?: string[];
+        };
+        const combined = locData.combined ?? [];
         combined.forEach((loc: string) =>
           this.locations.add(loc.toUpperCase()),
         );
         this.logger.log(`Loaded ${this.locations.size} SA locations`);
       }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Failed to load SA data files: ${error.message}. Using empty dictionaries.`,
+        `Failed to load SA data files: ${errorMessage}. Using empty dictionaries.`,
       );
     }
   }
@@ -154,7 +158,7 @@ export class PayeeNormalizerService {
     }
 
     // Remove special characters
-    normalized = normalized.replace(/[\/\-_.,()]/g, ' ');
+    normalized = normalized.replace(/[/\-_.,()]/g, ' ');
 
     // Collapse whitespace
     normalized = normalized.replace(/\s+/g, ' ').trim();

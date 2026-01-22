@@ -245,7 +245,7 @@ export class InvoicePdfService {
           `Error creating PDF document for invoice ${invoice.invoiceNumber}`,
           error instanceof Error ? error.stack : String(error),
         );
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }

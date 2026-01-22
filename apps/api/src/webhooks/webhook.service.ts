@@ -688,8 +688,9 @@ export class WebhookService {
         tenantId,
         channel: channel.toUpperCase(),
         status,
-        eventType: String(metadata.event || status),
-        externalMessageId: String(metadata.messageId || ''),
+        eventType: typeof metadata.event === 'string' ? metadata.event : status,
+        externalMessageId:
+          typeof metadata.messageId === 'string' ? metadata.messageId : '',
         metadata: JSON.parse(JSON.stringify(metadata)),
         occurredAt: metadata.timestamp
           ? new Date(Number(metadata.timestamp) * 1000)
@@ -944,7 +945,7 @@ export class WebhookService {
 
         // If it's an invoice context, update the invoice delivery status too
         if (
-          messageRecord.contextType === 'INVOICE' &&
+          String(messageRecord.contextType) === 'INVOICE' &&
           messageRecord.contextId &&
           deliveryStatus
         ) {

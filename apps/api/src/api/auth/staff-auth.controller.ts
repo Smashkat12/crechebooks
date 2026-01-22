@@ -53,9 +53,7 @@ import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 export class StaffAuthController {
   private readonly logger = new Logger(StaffAuthController.name);
 
-  constructor(
-    private readonly staffMagicLinkService: StaffMagicLinkService,
-  ) {}
+  constructor(private readonly staffMagicLinkService: StaffMagicLinkService) {}
 
   /**
    * Request a magic link for staff login.
@@ -125,7 +123,7 @@ export class StaffAuthController {
     const staff = await this.staffMagicLinkService.verifyMagicLink(dto.token);
 
     // Create session token
-    const session = await this.staffMagicLinkService.createStaffSession(
+    const session = this.staffMagicLinkService.createStaffSession(
       staff.id,
       staff.email,
       staff.tenantId,
@@ -166,7 +164,7 @@ export class StaffAuthController {
     description: 'Logout successful',
     type: StaffLogoutResponseDto,
   })
-  async logout(): Promise<StaffLogoutResponseDto> {
+  logout(): StaffLogoutResponseDto {
     // In a stateless JWT system, logout is handled client-side
     // Could implement token blacklisting here if needed
     return {
@@ -182,7 +180,8 @@ export class StaffAuthController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current staff session info',
-    description: 'Returns information about the currently authenticated staff member.',
+    description:
+      'Returns information about the currently authenticated staff member.',
   })
   @ApiResponse({
     status: 200,

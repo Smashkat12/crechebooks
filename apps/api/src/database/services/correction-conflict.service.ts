@@ -136,19 +136,11 @@ export class CorrectionConflictService {
         break;
 
       case 'split_by_amount':
-        await this.resolveSplitByAmount(
-          tenantId,
-          conflict,
-          resolution.threshold!,
-        );
+        this.resolveSplitByAmount(tenantId, conflict, resolution.threshold!);
         break;
 
       case 'split_by_description':
-        await this.resolveSplitByDescription(
-          tenantId,
-          conflict,
-          resolution.pattern!,
-        );
+        this.resolveSplitByDescription(tenantId, conflict, resolution.pattern!);
         break;
 
       default:

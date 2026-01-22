@@ -112,7 +112,7 @@ export class PaymentReminderProcessor extends BaseProcessor<PaymentReminderJobDa
       // Mark job as complete
       await job.progress(100);
     } catch (error) {
-      await this.handleError(
+      this.handleError(
         error instanceof Error ? error : new Error(String(error)),
         {
           file: 'payment-reminder.processor.ts',

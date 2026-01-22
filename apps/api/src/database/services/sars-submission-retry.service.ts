@@ -1,11 +1,7 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmissionStatus } from '@prisma/client';
-import {
-  NotFoundException,
-  ExternalServiceException,
-  BusinessException,
-} from '../../shared/exceptions';
+import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import {
   SubmissionState,
   SubmissionResult,
@@ -243,7 +239,7 @@ export class SarsSubmissionRetryService {
     );
 
     // Notify admin
-    await this.notifyAdmin(submission, {
+    this.notifyAdmin(submission, {
       statusCode: 0,
       message: reason,
     } as SarsApiError);
@@ -308,9 +304,9 @@ export class SarsSubmissionRetryService {
    * @param error - The error that occurred
    * @returns Promise<void>
    */
-  async notifyAdmin(submission: any, error: SarsApiError): Promise<void> {
+  notifyAdmin(submission: any, error: SarsApiError): void {
     const metadata = submission.documentData?.retryMetadata || {};
-    const errorType = await this.classifyError(error);
+    const errorType = this.classifyError(error);
 
     const notification: AdminNotification = {
       submissionId: submission.id,
@@ -345,7 +341,7 @@ export class SarsSubmissionRetryService {
     currentState: SubmissionState,
     correlationId: string,
   ): Promise<SubmissionResult> {
-    const errorType = await this.classifyError(error);
+    const errorType = this.classifyError(error);
     const newRetryCount = currentState.retryCount + 1;
 
     this.logger.error(
@@ -518,7 +514,7 @@ export class SarsSubmissionRetryService {
   ): Promise<{ reference: string }> {
     // FAIL FAST: Require SARS client to be configured
     if (!this.sarsClient) {
-      const error: SarsApiError = {
+      const errorData: SarsApiError = {
         statusCode: 0,
         message:
           'SARS eFiling client not available. Ensure SarsModule is imported and configured.',
@@ -527,7 +523,7 @@ export class SarsSubmissionRetryService {
       };
       this.logger.error({
         error: {
-          message: error.message,
+          message: errorData.message,
           name: 'ConfigurationError',
         },
         file: 'sars-submission-retry.service.ts',
@@ -537,12 +533,16 @@ export class SarsSubmissionRetryService {
         action:
           'Import SarsModule and configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
       });
-      throw error;
+      const err = new Error(errorData.message) as Error & {
+        sarsApiError: SarsApiError;
+      };
+      err.sarsApiError = errorData;
+      throw err;
     }
 
     // FAIL FAST: Check if SARS client is configured with credentials
     if (!this.sarsClient.getIsConfigured()) {
-      const error: SarsApiError = {
+      const errorData: SarsApiError = {
         statusCode: 0,
         message:
           'SARS eFiling credentials not configured. Set SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables.',
@@ -551,7 +551,7 @@ export class SarsSubmissionRetryService {
       };
       this.logger.error({
         error: {
-          message: error.message,
+          message: errorData.message,
           name: 'ConfigurationError',
         },
         file: 'sars-submission-retry.service.ts',
@@ -561,13 +561,17 @@ export class SarsSubmissionRetryService {
         action:
           'Configure SARS_CLIENT_ID and SARS_CLIENT_SECRET environment variables',
       });
-      throw error;
+      const err = new Error(errorData.message) as Error & {
+        sarsApiError: SarsApiError;
+      };
+      err.sarsApiError = errorData;
+      throw err;
     }
 
     // Extract VAT201 data from submission document
     const documentData = submission.documentData;
     if (!documentData?.fields) {
-      const error: SarsApiError = {
+      const errorData: SarsApiError = {
         statusCode: 400,
         message: 'Invalid submission document: missing VAT201 fields',
         sarsErrorCode: 'INVALID_DOCUMENT',
@@ -575,7 +579,7 @@ export class SarsSubmissionRetryService {
       };
       this.logger.error({
         error: {
-          message: error.message,
+          message: errorData.message,
           name: 'ValidationError',
         },
         file: 'sars-submission-retry.service.ts',
@@ -583,7 +587,11 @@ export class SarsSubmissionRetryService {
         inputs: { submissionId: submission.id, correlationId },
         timestamp: new Date().toISOString(),
       });
-      throw error;
+      const err = new Error(errorData.message) as Error & {
+        sarsApiError: SarsApiError;
+      };
+      err.sarsApiError = errorData;
+      throw err;
     }
 
     // Build SARS submission payload
@@ -620,7 +628,7 @@ export class SarsSubmissionRetryService {
 
     // Handle SARS API response
     if (!response.success) {
-      const error: SarsApiError = {
+      const errorData: SarsApiError = {
         statusCode: response.errorCode?.startsWith('HTTP_')
           ? parseInt(response.errorCode.replace('HTTP_', ''), 10)
           : 500,
@@ -630,9 +638,9 @@ export class SarsSubmissionRetryService {
       };
       this.logger.error({
         error: {
-          message: error.message,
+          message: errorData.message,
           name: 'SarsSubmissionError',
-          sarsErrorCode: error.sarsErrorCode,
+          sarsErrorCode: errorData.sarsErrorCode,
         },
         file: 'sars-submission-retry.service.ts',
         function: 'callSarsApi',
@@ -640,11 +648,15 @@ export class SarsSubmissionRetryService {
         response: response.rawResponse,
         timestamp: new Date().toISOString(),
       });
-      throw error;
+      const err = new Error(errorData.message) as Error & {
+        sarsApiError: SarsApiError;
+      };
+      err.sarsApiError = errorData;
+      throw err;
     }
 
     if (!response.reference) {
-      const error: SarsApiError = {
+      const errorData: SarsApiError = {
         statusCode: 500,
         message: 'SARS submission accepted but no reference number returned',
         sarsErrorCode: 'NO_REFERENCE',
@@ -652,7 +664,7 @@ export class SarsSubmissionRetryService {
       };
       this.logger.error({
         error: {
-          message: error.message,
+          message: errorData.message,
           name: 'SarsResponseError',
         },
         file: 'sars-submission-retry.service.ts',
@@ -661,7 +673,11 @@ export class SarsSubmissionRetryService {
         response: response.rawResponse,
         timestamp: new Date().toISOString(),
       });
-      throw error;
+      const err = new Error(errorData.message) as Error & {
+        sarsApiError: SarsApiError;
+      };
+      err.sarsApiError = errorData;
+      throw err;
     }
 
     this.logger.log({

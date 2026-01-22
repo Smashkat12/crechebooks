@@ -5,7 +5,6 @@
  * Comprehensive tests for SARS submission retry logic, error handling,
  * and dead letter queue management.
  */
-import { Test, TestingModule } from '@nestjs/testing';
 import { SarsSubmissionRetryService } from '../sars-submission-retry.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SubmissionStatus } from '@prisma/client';
@@ -21,11 +20,11 @@ import {
 
 describe('SarsSubmissionRetryService', () => {
   let service: SarsSubmissionRetryService;
+
   let mockPrisma: any;
 
   const tenantId = 'tenant-123';
   const submissionId = 'submission-456';
-  const userId = 'user-789';
 
   const mockSubmission = {
     id: submissionId,
@@ -278,122 +277,122 @@ describe('SarsSubmissionRetryService', () => {
   });
 
   describe('classifyError', () => {
-    it('should classify timeout as TRANSIENT', async () => {
+    it('should classify timeout as TRANSIENT', () => {
       const error: SarsApiError = {
         statusCode: 408,
         message: 'Request timeout',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.TRANSIENT);
     });
 
-    it('should classify 503 as TRANSIENT', async () => {
+    it('should classify 503 as TRANSIENT', () => {
       const error: SarsApiError = {
         statusCode: 503,
         message: 'Service unavailable',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.TRANSIENT);
     });
 
-    it('should classify rate limit as TRANSIENT', async () => {
+    it('should classify rate limit as TRANSIENT', () => {
       const error: SarsApiError = {
         statusCode: 429,
         message: 'Too many requests',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.TRANSIENT);
     });
 
-    it('should classify validation error as PERMANENT', async () => {
+    it('should classify validation error as PERMANENT', () => {
       const error: SarsApiError = {
         statusCode: 400,
         message: 'Invalid VAT number format',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.PERMANENT);
     });
 
-    it('should classify 422 as PERMANENT', async () => {
+    it('should classify 422 as PERMANENT', () => {
       const error: SarsApiError = {
         statusCode: 422,
         message: 'Unprocessable entity',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.PERMANENT);
     });
 
-    it('should classify unauthorized as PERMANENT', async () => {
+    it('should classify unauthorized as PERMANENT', () => {
       const error: SarsApiError = {
         statusCode: 401,
         message: 'Unauthorized',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.PERMANENT);
     });
 
-    it('should classify SARS T-code as TRANSIENT', async () => {
+    it('should classify SARS T-code as TRANSIENT', () => {
       const error: SarsApiError = {
         statusCode: 500,
         message: 'System temporarily unavailable',
         sarsErrorCode: 'T1001',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.TRANSIENT);
     });
 
-    it('should classify SARS V-code as PERMANENT', async () => {
+    it('should classify SARS V-code as PERMANENT', () => {
       const error: SarsApiError = {
         statusCode: 400,
         message: 'Validation failed',
         sarsErrorCode: 'V2003',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.PERMANENT);
     });
 
-    it('should respect explicit isTransient flag', async () => {
+    it('should respect explicit isTransient flag', () => {
       const error: SarsApiError = {
         statusCode: 400, // Would normally be PERMANENT
         message: 'Temporary issue',
         isTransient: true,
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.TRANSIENT);
     });
 
-    it('should classify timeout message as TRANSIENT', async () => {
+    it('should classify timeout message as TRANSIENT', () => {
       const error: SarsApiError = {
         statusCode: 500,
         message: 'Connection timeout after 30 seconds',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.TRANSIENT);
     });
 
-    it('should classify unknown errors as MANUAL_INTERVENTION', async () => {
+    it('should classify unknown errors as MANUAL_INTERVENTION', () => {
       const error: SarsApiError = {
         statusCode: 999,
         message: 'Unknown error occurred',
       };
 
-      const errorType = await service.classifyError(error);
+      const errorType = service.classifyError(error);
       expect(errorType).toBe(ErrorType.MANUAL_INTERVENTION);
     });
   });
 
   describe('notifyAdmin', () => {
-    it('should log admin notification for failed submission', async () => {
+    it('should log admin notification for failed submission', () => {
       const loggerSpy = jest.spyOn(service['logger'], 'error');
 
       const error: SarsApiError = {
@@ -401,7 +400,7 @@ describe('SarsSubmissionRetryService', () => {
         message: 'Service unavailable',
       };
 
-      await service.notifyAdmin(mockSubmission, error);
+      service.notifyAdmin(mockSubmission, error);
 
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining('[ADMIN ALERT]'),
@@ -409,7 +408,7 @@ describe('SarsSubmissionRetryService', () => {
       );
     });
 
-    it('should include all notification details', async () => {
+    it('should include all notification details', () => {
       const loggerSpy = jest.spyOn(service['logger'], 'error');
 
       const submissionWithMetadata = {
@@ -428,7 +427,7 @@ describe('SarsSubmissionRetryService', () => {
         message: 'Validation failed',
       };
 
-      await service.notifyAdmin(submissionWithMetadata, error);
+      service.notifyAdmin(submissionWithMetadata, error);
 
       const callArgs = loggerSpy.mock.calls[0][0];
       expect(callArgs).toContain(submissionId);
@@ -450,8 +449,9 @@ describe('SarsSubmissionRetryService', () => {
 
       // Mock API to throw transient error
       jest
+
         .spyOn(service as any, 'callSarsApi')
-        .mockRejectedValue({ statusCode: 503, message: 'Service unavailable' });
+        .mockRejectedValue(new Error('Service unavailable'));
 
       const result = await service.submitWithRetry(submissionId);
 
@@ -512,10 +512,11 @@ describe('SarsSubmissionRetryService', () => {
       mockPrisma.sarsSubmission.update.mockResolvedValue(failedSubmission);
 
       // First attempt fails
+
       jest.spyOn(service as any, 'callSarsApi').mockImplementation(() => {
         attemptCount++;
         if (attemptCount === 1) {
-          throw { statusCode: 503, message: 'Service unavailable' };
+          throw new Error('Service unavailable');
         }
         return Promise.resolve({ reference: 'SARS12345' });
       });

@@ -37,7 +37,8 @@ export class IRP5DocumentDto {
   id: string;
 
   @ApiProperty({
-    description: 'Tax year for the certificate (e.g., 2024 for 2023/2024 tax year)',
+    description:
+      'Tax year for the certificate (e.g., 2024 for 2023/2024 tax year)',
     example: 2024,
   })
   taxYear: number;

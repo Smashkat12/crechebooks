@@ -18,7 +18,7 @@ export class DashboardInvoiceDto {
 
   @ApiProperty({
     description: 'Invoice status',
-    enum: ['paid', 'pending', 'overdue']
+    enum: ['paid', 'pending', 'overdue'],
   })
   status: 'paid' | 'pending' | 'overdue';
 }
@@ -38,7 +38,7 @@ export class DashboardChildDto {
 
   @ApiProperty({
     description: 'Enrollment status',
-    enum: ['active', 'pending', 'inactive']
+    enum: ['active', 'pending', 'inactive'],
   })
   enrollmentStatus: 'active' | 'pending' | 'inactive';
 
@@ -66,26 +66,28 @@ export class ParentDashboardDto {
 
   @ApiProperty({
     description: 'List of recent invoices (up to 5)',
-    type: [DashboardInvoiceDto]
+    type: [DashboardInvoiceDto],
   })
   recentInvoices: DashboardInvoiceDto[];
 
   @ApiProperty({
     description: 'List of enrolled children',
-    type: [DashboardChildDto]
+    type: [DashboardChildDto],
   })
   children: DashboardChildDto[];
 
   @ApiPropertyOptional({
     description: 'Next payment due information',
-    type: NextPaymentDueDto
+    type: NextPaymentDueDto,
   })
   nextPaymentDue: NextPaymentDueDto | null;
 
   @ApiProperty({ description: 'Whether account has arrears' })
   hasArrears: boolean;
 
-  @ApiPropertyOptional({ description: 'Number of days overdue (if in arrears)' })
+  @ApiPropertyOptional({
+    description: 'Number of days overdue (if in arrears)',
+  })
   daysOverdue: number | null;
 
   @ApiProperty({ description: 'Parent first name' })
@@ -276,7 +278,9 @@ export class ParentStatementListItemDto {
   @ApiProperty({ description: 'Month of the statement (1-12)' })
   month: number;
 
-  @ApiProperty({ description: 'Human readable period label (e.g., "January 2024")' })
+  @ApiProperty({
+    description: 'Human readable period label (e.g., "January 2024")',
+  })
   periodLabel: string;
 
   @ApiProperty({ description: 'Number of transactions in the period' })
@@ -319,7 +323,10 @@ export class ParentStatementTransactionDto {
   @ApiProperty({ description: 'Transaction date (ISO string)' })
   date: string;
 
-  @ApiProperty({ description: 'Transaction description (invoice number or payment reference)' })
+  @ApiProperty({
+    description:
+      'Transaction description (invoice number or payment reference)',
+  })
   description: string;
 
   @ApiProperty({
@@ -331,7 +338,9 @@ export class ParentStatementTransactionDto {
   @ApiPropertyOptional({ description: 'Debit amount in Rands (for invoices)' })
   debit: number | null;
 
-  @ApiPropertyOptional({ description: 'Credit amount in Rands (for payments/credits)' })
+  @ApiPropertyOptional({
+    description: 'Credit amount in Rands (for payments/credits)',
+  })
   credit: number | null;
 
   @ApiProperty({ description: 'Running balance after this transaction' })
@@ -360,7 +369,9 @@ export class ParentStatementDetailDto {
   @ApiPropertyOptional({ description: 'Account number' })
   accountNumber?: string;
 
-  @ApiProperty({ description: 'Opening balance in Rands (previous period closing)' })
+  @ApiProperty({
+    description: 'Opening balance in Rands (previous period closing)',
+  })
   openingBalance: number;
 
   @ApiProperty({ description: 'Closing balance in Rands' })
@@ -535,7 +546,9 @@ export class CrecheBankDetailsDto {
   @ApiPropertyOptional({ description: 'SWIFT code for international payments' })
   swiftCode?: string;
 
-  @ApiProperty({ description: 'Auto-generated payment reference for this parent' })
+  @ApiProperty({
+    description: 'Auto-generated payment reference for this parent',
+  })
   paymentReference: string;
 
   @ApiPropertyOptional({ description: 'Payment instructions' })
@@ -579,10 +592,14 @@ export class CommunicationPreferencesDto {
   @ApiProperty({ description: 'Opted in for marketing communications' })
   marketingOptIn: boolean;
 
-  @ApiProperty({ description: 'Opted in for WhatsApp communications (POPIA consent)' })
+  @ApiProperty({
+    description: 'Opted in for WhatsApp communications (POPIA consent)',
+  })
   whatsappOptIn: boolean;
 
-  @ApiPropertyOptional({ description: 'WhatsApp consent timestamp (ISO string)' })
+  @ApiPropertyOptional({
+    description: 'WhatsApp consent timestamp (ISO string)',
+  })
   whatsappConsentTimestamp: string | null;
 }
 
@@ -663,7 +680,9 @@ export class UpdateCommunicationPreferencesDto {
   @ApiPropertyOptional({ description: 'Opted in for WhatsApp communications' })
   whatsappOptIn?: boolean;
 
-  @ApiPropertyOptional({ description: 'WhatsApp consent timestamp (ISO string, set automatically)' })
+  @ApiPropertyOptional({
+    description: 'WhatsApp consent timestamp (ISO string, set automatically)',
+  })
   whatsappConsentTimestamp?: string | null;
 }
 

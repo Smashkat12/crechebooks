@@ -558,10 +558,10 @@ invalid_date,INVALID ROW,VENDOR,REF,1000,false
         service.parseCSVStreamSafe(stream),
       );
 
-      const transactions = results.filter(
-        (r): r is { transaction: { amountCents: number }; rowNumber: number } =>
-          'transaction' in r,
-      );
+      const transactions = results.filter((r) => 'transaction' in r) as Array<{
+        transaction: { amountCents: number };
+        rowNumber: number;
+      }>;
 
       expect(transactions).toHaveLength(3);
       expect(transactions[0].transaction.amountCents).toBe(100000);
@@ -581,10 +581,10 @@ invalid_date,INVALID ROW,VENDOR,REF,1000,false
         service.parseCSVStreamSafe(stream),
       );
 
-      const transactions = results.filter(
-        (r): r is { transaction: { isCredit: boolean }; rowNumber: number } =>
-          'transaction' in r,
-      );
+      const transactions = results.filter((r) => 'transaction' in r) as Array<{
+        transaction: { isCredit: boolean };
+        rowNumber: number;
+      }>;
 
       expect(transactions).toHaveLength(4);
       expect(transactions[0].transaction.isCredit).toBe(false);

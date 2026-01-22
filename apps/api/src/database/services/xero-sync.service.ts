@@ -244,7 +244,7 @@ export class XeroSyncService {
         const lastSyncedAt = transaction.reconciledAt; // Use reconciliation date as last sync
 
         // Detect conflicts
-        const conflictCheck = await this.conflictDetection.detectConflicts(
+        const conflictCheck = this.conflictDetection.detectConflicts(
           tenantId,
           'Transaction',
           transactionId,
@@ -457,14 +457,14 @@ export class XeroSyncService {
     };
 
     // TASK-REL-101: Fallback returns empty result with circuit breaker error
-    const circuitOpenFallback = async (): Promise<PullResult> => {
+    const circuitOpenFallback = (): Promise<PullResult> => {
       this.logger.warn(
         `Circuit breaker open - cannot pull transactions from Xero at this time`,
       );
       result.errors.push(
         'Xero API temporarily unavailable. Please try again later.',
       );
-      return result;
+      return Promise.resolve(result);
     };
 
     try {

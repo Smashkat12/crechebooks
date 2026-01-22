@@ -155,13 +155,17 @@ describe('SarsDeadlineProcessor', () => {
 
 describe('SarsDeadlineService', () => {
   // Import separately to avoid circular dependency in tests
+
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const {
     SarsDeadlineService,
   } = require('../../../sars/sars-deadline.service');
+
   const {
     SARS_DEADLINE_CALENDAR,
     DEFAULT_REMINDER_DAYS,
   } = require('../../../sars/types/deadline.types');
+  /* eslint-enable @typescript-eslint/no-require-imports */
 
   describe('getNextDeadline', () => {
     it('should calculate VAT201 deadline correctly', () => {

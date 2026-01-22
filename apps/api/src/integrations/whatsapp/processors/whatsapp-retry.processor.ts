@@ -165,10 +165,7 @@ export class WhatsAppRetryProcessor {
    * Handle job failure
    */
   @OnQueueFailed()
-  async handleFailed(
-    job: Job<WhatsAppRetryJobData>,
-    error: Error,
-  ): Promise<void> {
+  handleFailed(job: Job<WhatsAppRetryJobData>, error: Error): void {
     const { data } = job;
 
     this.logger.error({

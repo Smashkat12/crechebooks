@@ -430,8 +430,8 @@ describe('BatchImportValidatorService', () => {
   });
 
   describe('import history', () => {
-    it('should save import history record', async () => {
-      const record = await service.saveImportHistory({
+    it('should save import history record', () => {
+      const record = service.saveImportHistory({
         tenantId: testTenant.id,
         batchId: 'batch-123',
         fileName: 'test.csv',

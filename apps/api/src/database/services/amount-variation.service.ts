@@ -296,7 +296,7 @@ export class AmountVariationService {
     }
 
     // Get existing config
-    const existing = await this.getThresholdConfig(tenantId, payee);
+    const existing = this.getThresholdConfig(tenantId, payee);
 
     // Merge with new config
     const updated: AmountThresholdConfig = {

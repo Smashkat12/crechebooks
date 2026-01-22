@@ -111,14 +111,17 @@ export class ParentPortalController {
     });
 
     // Calculate balance in Rands (convert from cents)
-    const currentBalance = unpaidInvoices.reduce(
-      (sum, inv) => sum + (inv.totalCents - inv.amountPaidCents),
-      0,
-    ) / 100;
+    const currentBalance =
+      unpaidInvoices.reduce(
+        (sum, inv) => sum + (inv.totalCents - inv.amountPaidCents),
+        0,
+      ) / 100;
 
     // Find oldest overdue invoice to calculate days overdue
     const overdueInvoices = unpaidInvoices.filter(
-      (inv) => inv.status === InvoiceStatus.OVERDUE || (inv.dueDate && new Date(inv.dueDate) < new Date()),
+      (inv) =>
+        inv.status === InvoiceStatus.OVERDUE ||
+        (inv.dueDate && new Date(inv.dueDate) < new Date()),
     );
 
     let daysOverdue: number | null = null;
@@ -141,7 +144,11 @@ export class ParentPortalController {
 
     // Find next payment due (oldest non-overdue unpaid invoice)
     const pendingInvoices = unpaidInvoices
-      .filter((inv) => inv.status !== InvoiceStatus.OVERDUE && inv.status !== InvoiceStatus.PAID)
+      .filter(
+        (inv) =>
+          inv.status !== InvoiceStatus.OVERDUE &&
+          inv.status !== InvoiceStatus.PAID,
+      )
       .sort((a, b) => {
         const dateA = new Date(a.dueDate);
         const dateB = new Date(b.dueDate);
@@ -152,7 +159,10 @@ export class ParentPortalController {
       pendingInvoices.length > 0
         ? {
             date: pendingInvoices[0].dueDate.toISOString(),
-            amount: (pendingInvoices[0].totalCents - pendingInvoices[0].amountPaidCents) / 100,
+            amount:
+              (pendingInvoices[0].totalCents -
+                pendingInvoices[0].amountPaidCents) /
+              100,
           }
         : null;
 
@@ -187,7 +197,9 @@ export class ParentPortalController {
     };
   }
 
-  private getEmptyDashboard(parent: ParentSession['parent']): ParentDashboardDto {
+  private getEmptyDashboard(
+    parent: ParentSession['parent'],
+  ): ParentDashboardDto {
     return {
       currentBalance: 0,
       recentInvoices: [],
@@ -234,9 +246,21 @@ export class ParentPortalController {
 
   @Get('invoices')
   @ApiOperation({ summary: 'Get parent invoices list with filters' })
-  @ApiQuery({ name: 'status', required: false, enum: ['all', 'paid', 'pending', 'overdue'] })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter invoices from this date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter invoices until this date (YYYY-MM-DD)' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['all', 'paid', 'pending', 'overdue'],
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Filter invoices from this date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Filter invoices until this date (YYYY-MM-DD)',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({
@@ -258,7 +282,9 @@ export class ParentPortalController {
     const limitNum = Math.min(parseInt(limit, 10) || 10, 50);
     const skip = (pageNum - 1) * limitNum;
 
-    this.logger.debug(`Fetching invoices for parent ${parentId}, page ${pageNum}`);
+    this.logger.debug(
+      `Fetching invoices for parent ${parentId}, page ${pageNum}`,
+    );
 
     // Build where clause
     const where: {
@@ -278,7 +304,14 @@ export class ParentPortalController {
       if (status === 'paid') {
         where.status = { in: [InvoiceStatus.PAID] };
       } else if (status === 'pending') {
-        where.status = { in: [InvoiceStatus.DRAFT, InvoiceStatus.SENT, InvoiceStatus.VIEWED, InvoiceStatus.PARTIALLY_PAID] };
+        where.status = {
+          in: [
+            InvoiceStatus.DRAFT,
+            InvoiceStatus.SENT,
+            InvoiceStatus.VIEWED,
+            InvoiceStatus.PARTIALLY_PAID,
+          ],
+        };
       } else if (status === 'overdue') {
         where.status = { in: [InvoiceStatus.OVERDUE] };
       }
@@ -324,7 +357,9 @@ export class ParentPortalController {
         id: inv.id,
         invoiceNumber: inv.invoiceNumber,
         date: inv.createdAt.toISOString(),
-        childName: inv.child ? `${inv.child.firstName} ${inv.child.lastName}` : undefined,
+        childName: inv.child
+          ? `${inv.child.firstName} ${inv.child.lastName}`
+          : undefined,
         amount: inv.totalCents / 100,
         status: this.mapInvoiceStatus(inv.status, inv.dueDate),
       })),
@@ -427,7 +462,9 @@ export class ParentPortalController {
       parentEmail: invoice.parent.email || undefined,
       crecheName: invoice.tenant?.name || 'Unknown',
       crecheAddress: formatAddress(),
-      childName: invoice.child ? `${invoice.child.firstName} ${invoice.child.lastName}` : 'Unknown',
+      childName: invoice.child
+        ? `${invoice.child.firstName} ${invoice.child.lastName}`
+        : 'Unknown',
       subtotal: invoice.subtotalCents / 100,
       vatAmount: invoice.vatCents / 100,
       total: invoice.totalCents / 100,
@@ -465,7 +502,9 @@ export class ParentPortalController {
     const parentId = session.parentId;
     const tenantId = session.tenantId;
 
-    this.logger.debug(`Downloading PDF for invoice ${invoiceId}, parent ${parentId}`);
+    this.logger.debug(
+      `Downloading PDF for invoice ${invoiceId}, parent ${parentId}`,
+    );
 
     // Verify invoice belongs to this parent
     const invoice = await this.prisma.invoice.findFirst({
@@ -503,15 +542,30 @@ export class ParentPortalController {
    */
   private getMonthName(month: number): string {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     return months[month - 1] || 'Unknown';
   }
 
   @Get('statements')
   @ApiOperation({ summary: 'Get list of available statements for a year' })
-  @ApiQuery({ name: 'year', required: false, type: Number, description: 'Year to filter statements (defaults to current year)' })
+  @ApiQuery({
+    name: 'year',
+    required: false,
+    type: Number,
+    description: 'Year to filter statements (defaults to current year)',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of available statements',
@@ -524,9 +578,13 @@ export class ParentPortalController {
     const parentId = session.parentId;
     const tenantId = session.tenantId;
     const currentDate = new Date();
-    const year = yearParam ? parseInt(yearParam, 10) : currentDate.getFullYear();
+    const year = yearParam
+      ? parseInt(yearParam, 10)
+      : currentDate.getFullYear();
 
-    this.logger.debug(`Fetching statements for parent ${parentId}, year ${year}`);
+    this.logger.debug(
+      `Fetching statements for parent ${parentId}, year ${year}`,
+    );
 
     // Find all months that have transactions (invoices or payments)
     const statements: ParentStatementsListDto['statements'] = [];
@@ -565,12 +623,25 @@ export class ParentPortalController {
     });
 
     // Group by month and calculate stats
-    const monthlyData: Map<number, { invoices: number; payments: number; invoiceTotal: number; paymentTotal: number }> = new Map();
+    const monthlyData: Map<
+      number,
+      {
+        invoices: number;
+        payments: number;
+        invoiceTotal: number;
+        paymentTotal: number;
+      }
+    > = new Map();
 
     // Initialize months that have data
     for (const invoice of invoices) {
       const month = invoice.createdAt.getMonth() + 1;
-      const existing = monthlyData.get(month) || { invoices: 0, payments: 0, invoiceTotal: 0, paymentTotal: 0 };
+      const existing = monthlyData.get(month) || {
+        invoices: 0,
+        payments: 0,
+        invoiceTotal: 0,
+        paymentTotal: 0,
+      };
       existing.invoices++;
       existing.invoiceTotal += invoice.totalCents;
       monthlyData.set(month, existing);
@@ -578,7 +649,12 @@ export class ParentPortalController {
 
     for (const payment of payments) {
       const month = payment.paymentDate.getMonth() + 1;
-      const existing = monthlyData.get(month) || { invoices: 0, payments: 0, invoiceTotal: 0, paymentTotal: 0 };
+      const existing = monthlyData.get(month) || {
+        invoices: 0,
+        payments: 0,
+        invoiceTotal: 0,
+        paymentTotal: 0,
+      };
       existing.payments++;
       existing.paymentTotal += payment.amountCents;
       monthlyData.set(month, existing);
@@ -599,7 +675,7 @@ export class ParentPortalController {
     });
 
     for (const inv of priorInvoices) {
-      runningBalance += (inv.totalCents - inv.amountPaidCents);
+      runningBalance += inv.totalCents - inv.amountPaidCents;
     }
 
     // Create statements for each month that has data
@@ -615,8 +691,11 @@ export class ParentPortalController {
       const closingBalance = runningBalance / 100;
 
       // Don't include future months
-      if (year > currentDate.getFullYear() ||
-          (year === currentDate.getFullYear() && month > currentDate.getMonth() + 1)) {
+      if (
+        year > currentDate.getFullYear() ||
+        (year === currentDate.getFullYear() &&
+          month > currentDate.getMonth() + 1)
+      ) {
         continue;
       }
 
@@ -661,7 +740,9 @@ export class ParentPortalController {
       throw new NotFoundException('Invalid year or month');
     }
 
-    this.logger.debug(`Fetching statement detail for parent ${parentId}, ${year}/${month}`);
+    this.logger.debug(
+      `Fetching statement detail for parent ${parentId}, ${year}/${month}`,
+    );
 
     // Get parent info
     const parent = await this.prisma.parent.findUnique({
@@ -690,7 +771,7 @@ export class ParentPortalController {
 
     let openingBalanceCents = 0;
     for (const inv of priorInvoices) {
-      openingBalanceCents += (inv.totalCents - inv.amountPaidCents);
+      openingBalanceCents += inv.totalCents - inv.amountPaidCents;
     }
 
     // Get invoices for this month
@@ -734,7 +815,7 @@ export class ParentPortalController {
     let runningBalanceCents = openingBalanceCents;
     let totalInvoicedCents = 0;
     let totalPaidCents = 0;
-    let totalCreditsCents = 0;
+    const totalCreditsCents = 0;
 
     // Add invoices
     for (const invoice of invoices) {
@@ -789,7 +870,8 @@ export class ParentPortalController {
     }
 
     const closingBalanceCents = sortedRunningBalanceCents;
-    const netMovementCents = totalInvoicedCents - totalPaidCents - totalCreditsCents;
+    const netMovementCents =
+      totalInvoicedCents - totalPaidCents - totalCreditsCents;
 
     return {
       year,
@@ -814,12 +896,12 @@ export class ParentPortalController {
   @ApiParam({ name: 'month', description: 'Statement month (1-12)' })
   @ApiResponse({ status: 200, description: 'PDF file' })
   @ApiResponse({ status: 404, description: 'Statement not found' })
-  async downloadStatementPdf(
+  downloadStatementPdf(
     @CurrentParent() session: ParentSession,
     @Param('year') yearParam: string,
     @Param('month') monthParam: string,
     @Res() res: Response,
-  ): Promise<void> {
+  ): void {
     const parentId = session.parentId;
     const year = parseInt(yearParam, 10);
     const month = parseInt(monthParam, 10);
@@ -828,7 +910,9 @@ export class ParentPortalController {
       throw new NotFoundException('Invalid year or month');
     }
 
-    this.logger.debug(`Downloading PDF for statement ${year}/${month}, parent ${parentId}`);
+    this.logger.debug(
+      `Downloading PDF for statement ${year}/${month}, parent ${parentId}`,
+    );
 
     // TODO: Integrate with actual PDF generation service
     // For now, return a placeholder response
@@ -863,7 +947,9 @@ export class ParentPortalController {
       throw new NotFoundException('Invalid year or month');
     }
 
-    this.logger.debug(`Emailing statement ${year}/${month} to parent ${parentId}`);
+    this.logger.debug(
+      `Emailing statement ${year}/${month} to parent ${parentId}`,
+    );
 
     // Get parent email
     const parent = await this.prisma.parent.findUnique({
@@ -903,8 +989,16 @@ export class ParentPortalController {
 
   @Get('payments')
   @ApiOperation({ summary: 'Get parent payment history with filters' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter payments from this date (YYYY-MM-DD)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter payments until this date (YYYY-MM-DD)' })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Filter payments from this date (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Filter payments until this date (YYYY-MM-DD)',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({
@@ -925,7 +1019,9 @@ export class ParentPortalController {
     const limitNum = Math.min(parseInt(limit, 10) || 10, 50);
     const skip = (pageNum - 1) * limitNum;
 
-    this.logger.debug(`Fetching payments for parent ${parentId}, page ${pageNum}`);
+    this.logger.debug(
+      `Fetching payments for parent ${parentId}, page ${pageNum}`,
+    );
 
     // Build where clause for payments
     const where: {
@@ -976,10 +1072,11 @@ export class ParentPortalController {
       select: { totalCents: true, amountPaidCents: true },
     });
 
-    const totalOutstanding = unpaidInvoices.reduce(
-      (sum, inv) => sum + (inv.totalCents - inv.amountPaidCents),
-      0,
-    ) / 100;
+    const totalOutstanding =
+      unpaidInvoices.reduce(
+        (sum, inv) => sum + (inv.totalCents - inv.amountPaidCents),
+        0,
+      ) / 100;
 
     const totalPages = Math.ceil(total / limitNum);
 
@@ -988,7 +1085,9 @@ export class ParentPortalController {
         id: payment.id,
         paymentDate: payment.paymentDate.toISOString(),
         amount: payment.amountCents / 100,
-        reference: payment.reference || `PAY-${payment.id.substring(0, 8).toUpperCase()}`,
+        reference:
+          payment.reference ||
+          `PAY-${payment.id.substring(0, 8).toUpperCase()}`,
         method: payment.matchType || 'EFT',
         status: this.mapPaymentStatus(payment.deletedAt, payment.paymentDate),
       })),
@@ -1058,7 +1157,8 @@ export class ParentPortalController {
       id: payment.id,
       paymentDate: payment.paymentDate.toISOString(),
       amount: payment.amountCents / 100,
-      reference: payment.reference || `PAY-${payment.id.substring(0, 8).toUpperCase()}`,
+      reference:
+        payment.reference || `PAY-${payment.id.substring(0, 8).toUpperCase()}`,
       method: payment.matchType || 'EFT',
       status: this.mapPaymentStatus(payment.deletedAt, payment.paymentDate),
       allocations,
@@ -1080,7 +1180,9 @@ export class ParentPortalController {
     const parentId = session.parentId;
     const tenantId = session.tenantId;
 
-    this.logger.debug(`Downloading receipt for payment ${paymentId}, parent ${parentId}`);
+    this.logger.debug(
+      `Downloading receipt for payment ${paymentId}, parent ${parentId}`,
+    );
 
     // Verify payment belongs to this parent
     const payment = await this.prisma.payment.findFirst({
@@ -1145,10 +1247,13 @@ export class ParentPortalController {
         accountHolderName: tenant.name,
         accountNumber: tenant.bankAccountNumber,
         branchCode: tenant.bankBranchCode || '000000',
-        accountType: (tenant.bankAccountType as 'Cheque' | 'Savings' | 'Current') || 'Cheque',
+        accountType:
+          (tenant.bankAccountType as 'Cheque' | 'Savings' | 'Current') ||
+          'Cheque',
         swiftCode: tenant.bankSwiftCode || undefined,
         paymentReference,
-        paymentInstructions: 'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
+        paymentInstructions:
+          'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
       };
     }
 
@@ -1160,7 +1265,8 @@ export class ParentPortalController {
       branchCode: '250655',
       accountType: 'Cheque',
       paymentReference,
-      paymentInstructions: 'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
+      paymentInstructions:
+        'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
     };
   }
 
@@ -1206,7 +1312,10 @@ export class ParentPortalController {
     // Map preferred contact to invoice delivery
     let invoiceDelivery: 'email' | 'whatsapp' | 'both' = 'email';
     if (storedPrefs.invoiceDelivery) {
-      invoiceDelivery = storedPrefs.invoiceDelivery as 'email' | 'whatsapp' | 'both';
+      invoiceDelivery = storedPrefs.invoiceDelivery as
+        | 'email'
+        | 'whatsapp'
+        | 'both';
     } else if (parent.preferredContact === 'WHATSAPP') {
       invoiceDelivery = 'whatsapp';
     } else if (parent.preferredContact === 'BOTH') {
@@ -1215,11 +1324,12 @@ export class ParentPortalController {
 
     const communicationPreferences: CommunicationPreferencesDto = {
       invoiceDelivery,
-      paymentReminders: storedPrefs.paymentReminders as boolean ?? true,
-      emailNotifications: storedPrefs.emailNotifications as boolean ?? true,
+      paymentReminders: (storedPrefs.paymentReminders as boolean) ?? true,
+      emailNotifications: (storedPrefs.emailNotifications as boolean) ?? true,
       marketingOptIn: parent.smsOptIn ?? false,
       whatsappOptIn: parent.whatsappOptIn ?? false,
-      whatsappConsentTimestamp: storedPrefs.whatsappConsentTimestamp as string || null,
+      whatsappConsentTimestamp:
+        (storedPrefs.whatsappConsentTimestamp as string) || null,
     };
 
     // Parse address from address field (stored as JSON string)
@@ -1349,7 +1459,12 @@ export class ParentPortalController {
     }
 
     // Build updated preferences
-    const updateData: { whatsappOptIn?: boolean; smsOptIn?: boolean; preferredContact?: 'EMAIL' | 'WHATSAPP' | 'BOTH'; notes?: string } = {};
+    const updateData: {
+      whatsappOptIn?: boolean;
+      smsOptIn?: boolean;
+      preferredContact?: 'EMAIL' | 'WHATSAPP' | 'BOTH';
+      notes?: string;
+    } = {};
 
     // Update WhatsApp opt-in
     if (dto.whatsappOptIn !== undefined) {
@@ -1391,8 +1506,11 @@ export class ParentPortalController {
 
     // Update notes with preferences JSON
     const prefsJson = JSON.stringify(storedPrefs);
-    const notesWithoutPrefs = parent.notes?.replace(/\n?\[PREFERENCES\]: {.*}/, '') || '';
-    updateData.notes = notesWithoutPrefs ? `${notesWithoutPrefs}\n[PREFERENCES]: ${prefsJson}` : `[PREFERENCES]: ${prefsJson}`;
+    const notesWithoutPrefs =
+      parent.notes?.replace(/\n?\[PREFERENCES\]: {.*}/, '') || '';
+    updateData.notes = notesWithoutPrefs
+      ? `${notesWithoutPrefs}\n[PREFERENCES]: ${prefsJson}`
+      : `[PREFERENCES]: ${prefsJson}`;
 
     // Update parent record
     await this.prisma.parent.update({
@@ -1402,17 +1520,20 @@ export class ParentPortalController {
 
     // Return updated preferences
     return {
-      invoiceDelivery: (storedPrefs.invoiceDelivery as 'email' | 'whatsapp' | 'both') || 'email',
-      paymentReminders: storedPrefs.paymentReminders as boolean ?? true,
-      emailNotifications: storedPrefs.emailNotifications as boolean ?? true,
-      marketingOptIn: storedPrefs.marketingOptIn as boolean ?? false,
+      invoiceDelivery:
+        (storedPrefs.invoiceDelivery as 'email' | 'whatsapp' | 'both') ||
+        'email',
+      paymentReminders: (storedPrefs.paymentReminders as boolean) ?? true,
+      emailNotifications: (storedPrefs.emailNotifications as boolean) ?? true,
+      marketingOptIn: (storedPrefs.marketingOptIn as boolean) ?? false,
       whatsappOptIn: dto.whatsappOptIn ?? parent.whatsappOptIn ?? false,
-      whatsappConsentTimestamp: storedPrefs.whatsappConsentTimestamp as string || null,
+      whatsappConsentTimestamp:
+        (storedPrefs.whatsappConsentTimestamp as string) || null,
     };
   }
 
   @Get('children')
-  @ApiOperation({ summary: 'Get parent\'s enrolled children' })
+  @ApiOperation({ summary: "Get parent's enrolled children" })
   @ApiResponse({
     status: 200,
     description: 'List of enrolled children',
@@ -1443,14 +1564,19 @@ export class ParentPortalController {
     });
 
     return children.map((child) => {
-      const latestEnrollment = (child as typeof child & { enrollments: Array<{ startDate: Date }> }).enrollments?.[0];
+      const latestEnrollment = (
+        child as typeof child & { enrollments: Array<{ startDate: Date }> }
+      ).enrollments?.[0];
 
       return {
         id: child.id,
         firstName: child.firstName,
         lastName: child.lastName,
         dateOfBirth: child.dateOfBirth?.toISOString() || undefined,
-        enrollmentDate: latestEnrollment?.startDate?.toISOString() || child.createdAt?.toISOString() || undefined,
+        enrollmentDate:
+          latestEnrollment?.startDate?.toISOString() ||
+          child.createdAt?.toISOString() ||
+          undefined,
         className: undefined, // Not stored in schema, would need Class relation
         attendanceType: undefined, // Not stored in schema, would need FeeStructure relation
         isActive: child.isActive,
@@ -1508,7 +1634,8 @@ export class ParentPortalController {
       throw new NotFoundException('Parent not found');
     }
 
-    const requestId = `DEL-${Date.now()}-${parentId.substring(0, 8)}`.toUpperCase();
+    const requestId =
+      `DEL-${Date.now()}-${parentId.substring(0, 8)}`.toUpperCase();
 
     // Store deletion request in notes field (temporary solution)
     // In production, this should be a separate DeletionRequest model
@@ -1534,9 +1661,10 @@ export class ParentPortalController {
     // TODO: Create proper DeletionRequest model in future iteration
 
     return {
-      message: outstandingBalance > 0
-        ? 'Your account deletion request has been submitted. Please note that your outstanding balance must be cleared before the account can be deleted.'
-        : 'Your account deletion request has been submitted. You will receive confirmation via email once processed.',
+      message:
+        outstandingBalance > 0
+          ? 'Your account deletion request has been submitted. Please note that your outstanding balance must be cleared before the account can be deleted.'
+          : 'Your account deletion request has been submitted. You will receive confirmation via email once processed.',
       requestId,
     };
   }

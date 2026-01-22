@@ -94,7 +94,7 @@ export class DatabaseHealthIndicator extends HealthIndicator {
    * Execute database query with timeout protection.
    * Prevents health check from hanging indefinitely if database is unresponsive.
    */
-  private async executeWithTimeout(timeoutMs: number): Promise<unknown> {
+  private executeWithTimeout(timeoutMs: number): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(
@@ -107,9 +107,9 @@ export class DatabaseHealthIndicator extends HealthIndicator {
           clearTimeout(timeoutId);
           resolve(result);
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           clearTimeout(timeoutId);
-          reject(error);
+          reject(error instanceof Error ? error : new Error(String(error)));
         });
     });
   }

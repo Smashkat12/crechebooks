@@ -246,7 +246,7 @@ export class StaffOnboardingRepository {
       notes: dto.notes,
     };
 
-    if (dto.status === 'COMPLETED') {
+    if (String(dto.status) === 'COMPLETED') {
       updateData.completedAt = new Date();
     }
 

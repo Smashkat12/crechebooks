@@ -684,7 +684,7 @@ describe('SimplePaySyncProcessor', () => {
       const mockJob = createMockJob(jobData, { attemptsMade: 5 });
       const error = new Error('Persistent API failure');
 
-      await processor.onFailed(mockJob as any, error);
+      processor.onFailed(mockJob as any, error);
 
       expect(mockEventEmitter.emit).toHaveBeenCalledWith(
         'simplepay.sync.failed',
@@ -698,7 +698,7 @@ describe('SimplePaySyncProcessor', () => {
       );
     });
 
-    it('should not emit alert before max retries', async () => {
+    it('should not emit alert before max retries', () => {
       const jobData: CreateEmployeeSyncJobData = {
         tenantId: 'tenant-123',
         type: SyncJobType.CREATE_EMPLOYEE,
@@ -710,7 +710,7 @@ describe('SimplePaySyncProcessor', () => {
       const mockJob = createMockJob(jobData, { attemptsMade: 2 });
       const error = new Error('Temporary API failure');
 
-      await processor.onFailed(mockJob as any, error);
+      processor.onFailed(mockJob as any, error);
 
       expect(mockEventEmitter.emit).not.toHaveBeenCalled();
     });

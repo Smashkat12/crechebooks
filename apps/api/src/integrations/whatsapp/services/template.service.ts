@@ -254,10 +254,21 @@ export class WhatsAppTemplateService {
       case 'text': {
         if (template.header.parameters) {
           headerComponent.parameters = template.header.parameters.map(
-            (paramDef) => ({
-              type: 'text' as const,
-              text: String(params[paramDef.name] ?? ''),
-            }),
+            (paramDef) => {
+              const value = params[paramDef.name];
+              let textValue = '';
+              if (typeof value === 'string') {
+                textValue = value;
+              } else if (typeof value === 'number') {
+                textValue = String(value);
+              } else if (value instanceof Date) {
+                textValue = value.toISOString();
+              }
+              return {
+                type: 'text' as const,
+                text: textValue,
+              };
+            },
           );
         }
         break;
@@ -326,7 +337,12 @@ export class WhatsAppTemplateService {
               k.toLowerCase().includes('number'),
           );
           if (paramName) {
-            urlParam = String(params[paramName]);
+            const paramValue = params[paramName];
+            if (typeof paramValue === 'string') {
+              urlParam = paramValue;
+            } else if (typeof paramValue === 'number') {
+              urlParam = String(paramValue);
+            }
           }
         }
 

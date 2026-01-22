@@ -41,7 +41,7 @@ describe('CspReportController', () => {
   });
 
   describe('handleReport', () => {
-    it('should handle valid CSP violation report', async () => {
+    it('should handle valid CSP violation report', () => {
       // This report from unknown external domain is high severity
       const report: CspViolationReportDto = {
         'csp-report': {
@@ -54,7 +54,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -64,10 +64,10 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
 
-    it('should warn when report is missing csp-report body', async () => {
+    it('should warn when report is missing csp-report body', () => {
       const report = {} as CspViolationReportDto;
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -78,7 +78,7 @@ describe('CspReportController', () => {
       );
     });
 
-    it('should log high severity for external script injection', async () => {
+    it('should log high severity for external script injection', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -90,7 +90,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -100,7 +100,7 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
 
-    it('should log high severity for eval injection attempts', async () => {
+    it('should log high severity for eval injection attempts', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -112,7 +112,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -121,7 +121,7 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
 
-    it('should log high severity for base-uri violations', async () => {
+    it('should log high severity for base-uri violations', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -133,7 +133,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -142,7 +142,7 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
 
-    it('should log high severity for object-src violations', async () => {
+    it('should log high severity for object-src violations', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -154,7 +154,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -163,7 +163,7 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).toHaveBeenCalled();
     });
 
-    it('should log low severity for browser extension violations', async () => {
+    it('should log low severity for browser extension violations', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -175,7 +175,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -186,7 +186,7 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('should log low severity for moz-extension violations', async () => {
+    it('should log low severity for moz-extension violations', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -198,7 +198,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -207,7 +207,7 @@ describe('CspReportController', () => {
       expect(loggerDebugSpy).toHaveBeenCalled();
     });
 
-    it('should extract client IP from x-forwarded-for header', async () => {
+    it('should extract client IP from x-forwarded-for header', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -228,14 +228,14 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(report, mockReq as any, 'Mozilla/5.0');
+      controller.handleReport(report, mockReq as any, 'Mozilla/5.0');
 
       // Verify IP was extracted from x-forwarded-for
       const logCall = loggerErrorSpy.mock.calls[0]?.[0];
       expect(logCall).toContain('192.168.1.100');
     });
 
-    it('should use x-real-ip header when x-forwarded-for is not present', async () => {
+    it('should use x-real-ip header when x-forwarded-for is not present', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -256,13 +256,13 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(report, mockReq as any, 'Mozilla/5.0');
+      controller.handleReport(report, mockReq as any, 'Mozilla/5.0');
 
       const logCall = loggerErrorSpy.mock.calls[0]?.[0];
       expect(logCall).toContain('203.0.113.50');
     });
 
-    it('should include script sample in log when available', async () => {
+    it('should include script sample in log when available', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -275,7 +275,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -285,7 +285,7 @@ describe('CspReportController', () => {
       expect(loggerWarnSpy).toHaveBeenCalled();
     });
 
-    it('should include line and column numbers when available', async () => {
+    it('should include line and column numbers when available', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -300,7 +300,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -310,7 +310,7 @@ describe('CspReportController', () => {
       expect(loggerWarnSpy).toHaveBeenCalled();
     });
 
-    it('should handle frame-ancestors violations as medium severity', async () => {
+    it('should handle frame-ancestors violations as medium severity', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -322,7 +322,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -333,7 +333,7 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('should not treat known sources as high severity', async () => {
+    it('should not treat known sources as high severity', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -345,7 +345,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',
@@ -355,23 +355,23 @@ describe('CspReportController', () => {
       expect(loggerErrorSpy).not.toHaveBeenCalled();
     });
 
-    it('should handle reports with minimal fields', async () => {
+    it('should handle reports with minimal fields', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'violated-directive': "script-src 'self'",
         },
       };
 
-      await expect(
+      expect(() =>
         controller.handleReport(
           report,
           createMockRequest() as any,
           'Mozilla/5.0',
         ),
-      ).resolves.not.toThrow();
+      ).not.toThrow();
     });
 
-    it('should handle about: URIs as low severity', async () => {
+    it('should handle about: URIs as low severity', () => {
       const report: CspViolationReportDto = {
         'csp-report': {
           'document-uri': 'https://example.com/page',
@@ -383,7 +383,7 @@ describe('CspReportController', () => {
         },
       };
 
-      await controller.handleReport(
+      controller.handleReport(
         report,
         createMockRequest() as any,
         'Mozilla/5.0',

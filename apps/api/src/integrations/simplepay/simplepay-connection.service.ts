@@ -37,7 +37,7 @@ export class SimplePayConnectionService {
     this.logger.log(`Setting up SimplePay connection for tenant ${tenantId}`);
 
     // Encrypt the API key
-    const encryptedApiKey = await this.encryptionService.encrypt(apiKey);
+    const encryptedApiKey = this.encryptionService.encrypt(apiKey);
 
     const connection = await this.simplePayRepo.upsertConnection(tenantId, {
       clientId,
@@ -60,7 +60,7 @@ export class SimplePayConnectionService {
       return { success: false, message: 'No connection configured' };
     }
 
-    const apiKey = await this.encryptionService.decrypt(connection.apiKey);
+    const apiKey = this.encryptionService.decrypt(connection.apiKey);
     return this.apiClient.testConnection(apiKey, connection.clientId);
   }
 

@@ -148,59 +148,59 @@ describe('EncryptionService', () => {
       service = module.get<EncryptionService>(EncryptionService);
     });
 
-    it('should encrypt and decrypt text correctly', async () => {
+    it('should encrypt and decrypt text correctly', () => {
       const plaintext = 'Hello, World! This is sensitive data.';
-      const encrypted = await service.encrypt(plaintext);
-      const decrypted = await service.decrypt(encrypted);
+      const encrypted = service.encrypt(plaintext);
+      const decrypted = service.decrypt(encrypted);
 
       expect(decrypted).toBe(plaintext);
     });
 
-    it('should produce different ciphertext for same plaintext (due to random IV)', async () => {
+    it('should produce different ciphertext for same plaintext (due to random IV)', () => {
       const plaintext = 'Same text encrypted twice';
-      const encrypted1 = await service.encrypt(plaintext);
-      const encrypted2 = await service.encrypt(plaintext);
+      const encrypted1 = service.encrypt(plaintext);
+      const encrypted2 = service.encrypt(plaintext);
 
       expect(encrypted1).not.toBe(encrypted2);
 
       // But both should decrypt to the same plaintext
-      expect(await service.decrypt(encrypted1)).toBe(plaintext);
-      expect(await service.decrypt(encrypted2)).toBe(plaintext);
+      expect(service.decrypt(encrypted1)).toBe(plaintext);
+      expect(service.decrypt(encrypted2)).toBe(plaintext);
     });
 
-    it('should handle empty strings', async () => {
-      const encrypted = await service.encrypt('');
-      const decrypted = await service.decrypt(encrypted);
+    it('should handle empty strings', () => {
+      const encrypted = service.encrypt('');
+      const decrypted = service.decrypt(encrypted);
 
       expect(decrypted).toBe('');
     });
 
-    it('should handle special characters and unicode', async () => {
+    it('should handle special characters and unicode', () => {
       const specialText = '!@#$%^&*()_+-=[]{}|;:\'",.<>?/`~\n\t\r';
-      const encrypted = await service.encrypt(specialText);
-      const decrypted = await service.decrypt(encrypted);
+      const encrypted = service.encrypt(specialText);
+      const decrypted = service.decrypt(encrypted);
 
       expect(decrypted).toBe(specialText);
     });
 
-    it('should handle unicode characters', async () => {
+    it('should handle unicode characters', () => {
       const unicodeText = 'Hello 世界 مرحبا שלום 🌍🔐';
-      const encrypted = await service.encrypt(unicodeText);
-      const decrypted = await service.decrypt(encrypted);
+      const encrypted = service.encrypt(unicodeText);
+      const decrypted = service.decrypt(encrypted);
 
       expect(decrypted).toBe(unicodeText);
     });
 
-    it('should handle long text', async () => {
+    it('should handle long text', () => {
       const longText = 'A'.repeat(10000);
-      const encrypted = await service.encrypt(longText);
-      const decrypted = await service.decrypt(encrypted);
+      const encrypted = service.encrypt(longText);
+      const decrypted = service.decrypt(encrypted);
 
       expect(decrypted).toBe(longText);
     });
 
-    it('encrypted format should be v2 base64 binary format', async () => {
-      const encrypted = await service.encrypt('test');
+    it('encrypted format should be v2 base64 binary format', () => {
+      const encrypted = service.encrypt('test');
 
       // v2 format is base64 encoded binary
       // Format: version(1) + salt(16) + iv(12) + authTag(16) + ciphertext
@@ -213,8 +213,8 @@ describe('EncryptionService', () => {
       expect(data[0]).toBe(2);
     });
 
-    it('should throw error on tampered ciphertext (v2 format)', async () => {
-      const encrypted = await service.encrypt('sensitive data');
+    it('should throw error on tampered ciphertext (v2 format)', () => {
+      const encrypted = service.encrypt('sensitive data');
 
       // Decode, tamper with ciphertext portion, re-encode
       const data = Buffer.from(encrypted, 'base64');
@@ -222,11 +222,11 @@ describe('EncryptionService', () => {
       data[data.length - 1] = data[data.length - 1] ^ 0xff;
       const tampered = data.toString('base64');
 
-      await expect(service.decrypt(tampered)).rejects.toThrow();
+      expect(() => service.decrypt(tampered)).toThrow();
     });
 
-    it('should throw error on tampered auth tag (v2 format)', async () => {
-      const encrypted = await service.encrypt('sensitive data');
+    it('should throw error on tampered auth tag (v2 format)', () => {
+      const encrypted = service.encrypt('sensitive data');
 
       // Decode, tamper with auth tag portion, re-encode
       const data = Buffer.from(encrypted, 'base64');
@@ -234,7 +234,7 @@ describe('EncryptionService', () => {
       data[29] = data[29] ^ 0xff;
       const tampered = data.toString('base64');
 
-      await expect(service.decrypt(tampered)).rejects.toThrow();
+      expect(() => service.decrypt(tampered)).toThrow();
     });
   });
 
@@ -341,9 +341,9 @@ describe('EncryptionService', () => {
       service = module.get<EncryptionService>(EncryptionService);
     });
 
-    it('should generate unique salt for each encryption operation', async () => {
-      const encrypted1 = await service.encrypt('test');
-      const encrypted2 = await service.encrypt('test');
+    it('should generate unique salt for each encryption operation', () => {
+      const encrypted1 = service.encrypt('test');
+      const encrypted2 = service.encrypt('test');
 
       const data1 = Buffer.from(encrypted1, 'base64');
       const data2 = Buffer.from(encrypted2, 'base64');
@@ -356,15 +356,15 @@ describe('EncryptionService', () => {
       expect(salt1.equals(salt2)).toBe(false);
     });
 
-    it('should generate salt of at least 16 bytes', async () => {
-      const encrypted = await service.encrypt('test');
+    it('should generate salt of at least 16 bytes', () => {
+      const encrypted = service.encrypt('test');
       const data = Buffer.from(encrypted, 'base64');
       const salt = data.subarray(1, 17);
       expect(salt.length).toBe(16);
     });
 
-    it('should detect legacy v1 format and handle migration check', async () => {
-      const encrypted = await service.encrypt('test');
+    it('should detect legacy v1 format and handle migration check', () => {
+      const encrypted = service.encrypt('test');
       expect(service.needsMigration(encrypted)).toBe(false);
 
       // v1 format uses colon-separated hex values
@@ -372,13 +372,13 @@ describe('EncryptionService', () => {
       expect(service.needsMigration(fakeV1)).toBe(true);
     });
 
-    it('should produce completely different encrypted outputs due to unique salts', async () => {
+    it('should produce completely different encrypted outputs due to unique salts', () => {
       const plaintext = 'identical-content';
       const results: string[] = [];
 
       // Encrypt same plaintext 10 times
       for (let i = 0; i < 10; i++) {
-        results.push(await service.encrypt(plaintext));
+        results.push(service.encrypt(plaintext));
       }
 
       // All should be unique (different salt + IV each time)
@@ -387,7 +387,7 @@ describe('EncryptionService', () => {
 
       // All should decrypt to same value
       for (const encrypted of results) {
-        expect(await service.decrypt(encrypted)).toBe(plaintext);
+        expect(service.decrypt(encrypted)).toBe(plaintext);
       }
     });
   });

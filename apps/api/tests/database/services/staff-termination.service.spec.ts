@@ -356,10 +356,10 @@ describe('StaffTerminationService', () => {
       staffRepo.findById.mockResolvedValue(mockStaff as any);
       offboardingRepo.findOffboardingByStaffId.mockResolvedValue(null);
       (prisma.staffOffboarding.create as jest.Mock).mockResolvedValue({
+        ...mockStaff,
         id: 'offboarding-001',
         staffId: mockStaff.id,
         status: 'INITIATED',
-        ...mockStaff,
       });
       (prisma.leaveRequest.findMany as jest.Mock).mockResolvedValue([]);
 

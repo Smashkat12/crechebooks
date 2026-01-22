@@ -270,7 +270,8 @@ describe('WebhookService', () => {
     it('should verify valid WhatsApp signature', () => {
       const secret = 'test-secret';
       const payload = 'test payload';
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const crypto = require('crypto') as typeof import('crypto');
       const expectedSig =
         'sha256=' +
         crypto.createHmac('sha256', secret).update(payload).digest('hex');
@@ -285,7 +286,8 @@ describe('WebhookService', () => {
       const key = 'test-key';
       const payload = 'test payload';
       const timestamp = '12345';
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const crypto = require('crypto') as typeof import('crypto');
       const expectedSig = crypto
         .createHmac('sha256', key)
         .update(timestamp + payload)

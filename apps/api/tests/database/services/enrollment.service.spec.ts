@@ -646,7 +646,9 @@ describe('EnrollmentService', () => {
 
       expect(enrollments).toHaveLength(3);
       expect(
-        enrollments.every((e) => e.status === EnrollmentStatus.ACTIVE),
+        enrollments.every(
+          (e) => String(e.status) === String(EnrollmentStatus.ACTIVE),
+        ),
       ).toBe(true);
     });
 

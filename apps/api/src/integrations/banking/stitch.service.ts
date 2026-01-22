@@ -65,7 +65,7 @@ function mapPrismaStatus(status: LinkedBankAccountStatus): LinkedAccountStatus {
 /**
  * Maps API status to Prisma status
  */
-function mapToPrismaStatus(
+function _mapToPrismaStatus(
   status: LinkedAccountStatus,
 ): LinkedBankAccountStatus {
   switch (status) {
@@ -199,7 +199,7 @@ export class StitchBankingService {
   async completeAccountLink(
     tenantId: string,
     authCode: string,
-    state?: string,
+    _state?: string,
   ): Promise<LinkedAccount> {
     this.logger.log(`Completing account link for tenant: ${tenantId}`);
 
@@ -874,6 +874,8 @@ export class StitchBankingService {
       accessToken,
     });
 
+    const currency = response.currency;
+    const asOf = response.as_of;
     return {
       accountId: stitchAccountId,
       currentBalanceCents: Math.round(
@@ -882,8 +884,15 @@ export class StitchBankingService {
       availableBalanceCents: Math.round(
         Number(response.available_balance || 0) * 100,
       ),
-      currency: String(response.currency || 'ZAR'),
-      asOf: new Date(String(response.as_of) || Date.now()),
+      currency:
+        typeof currency === 'string' || typeof currency === 'number'
+          ? String(currency)
+          : 'ZAR',
+      asOf: new Date(
+        typeof asOf === 'string' || typeof asOf === 'number'
+          ? asOf
+          : Date.now(),
+      ),
       overdraftLimitCents: response.overdraft_limit
         ? Math.round(Number(response.overdraft_limit) * 100)
         : undefined,
@@ -973,24 +982,30 @@ export class StitchBankingService {
    * Map Stitch API account response to internal type
    */
   private mapStitchAccount(data: Record<string, unknown>): StitchAccount {
-    const accountNumber = String(data.account_number || '');
+    const toStr = (val: unknown): string =>
+      typeof val === 'string' || typeof val === 'number' ? String(val) : '';
+    const toStrOrUndefined = (val: unknown): string | undefined =>
+      typeof val === 'string' || typeof val === 'number'
+        ? String(val)
+        : undefined;
+
+    const accountNumber = toStr(data.account_number);
     return {
-      id: String(data.id),
-      bankId: String(data.bank_id || 'unknown') as SupportedBank,
-      accountHolderName: String(data.account_holder_name || ''),
+      id: toStr(data.id),
+      bankId: (toStr(data.bank_id) || 'unknown') as SupportedBank,
+      accountHolderName: toStr(data.account_holder_name),
       accountNumber,
       accountNumberMasked: `****${accountNumber.slice(-4)}`,
-      accountType: String(
-        data.account_type || 'unknown',
-      ) as StitchAccount['accountType'],
-      currency: String(data.currency || 'ZAR'),
+      accountType: (toStr(data.account_type) ||
+        'unknown') as StitchAccount['accountType'],
+      currency: toStr(data.currency) || 'ZAR',
       currentBalanceCents: Math.round(Number(data.current_balance || 0) * 100),
       availableBalanceCents: Math.round(
         Number(data.available_balance || 0) * 100,
       ),
-      status: String(data.status || 'active') as StitchAccount['status'],
-      branchCode: data.branch_code ? String(data.branch_code) : undefined,
-      swiftCode: data.swift_code ? String(data.swift_code) : undefined,
+      status: (toStr(data.status) || 'active') as StitchAccount['status'],
+      branchCode: toStrOrUndefined(data.branch_code),
+      swiftCode: toStrOrUndefined(data.swift_code),
     };
   }
 
@@ -1000,15 +1015,22 @@ export class StitchBankingService {
   private mapStitchTransaction(
     data: Record<string, unknown>,
   ): StitchTransaction {
+    const toStr = (val: unknown): string =>
+      typeof val === 'string' || typeof val === 'number' ? String(val) : '';
+    const toStrOrUndefined = (val: unknown): string | undefined =>
+      typeof val === 'string' || typeof val === 'number'
+        ? String(val)
+        : undefined;
+
     return {
-      id: String(data.id),
-      accountId: String(data.account_id),
+      id: toStr(data.id),
+      accountId: toStr(data.account_id),
       amountCents: Math.round(Number(data.amount || 0) * 100),
-      currency: String(data.currency || 'ZAR'),
-      date: new Date(String(data.date)),
-      description: String(data.description || ''),
-      reference: String(data.reference || ''),
-      type: String(data.type || 'other') as StitchTransaction['type'],
+      currency: toStr(data.currency) || 'ZAR',
+      date: new Date(toStr(data.date) || Date.now()),
+      description: toStr(data.description),
+      reference: toStr(data.reference),
+      type: (toStr(data.type) || 'other') as StitchTransaction['type'],
       runningBalanceCents: data.running_balance
         ? Math.round(Number(data.running_balance) * 100)
         : undefined,
@@ -1024,8 +1046,8 @@ export class StitchBankingService {
               | undefined,
           }
         : undefined,
-      category: data.category ? String(data.category) : undefined,
-      status: String(data.status || 'posted') as StitchTransaction['status'],
+      category: toStrOrUndefined(data.category),
+      status: (toStr(data.status) || 'posted') as StitchTransaction['status'],
     };
   }
 
@@ -1079,12 +1101,17 @@ export class StitchBankingService {
     statusCode: number,
     body: Record<string, unknown>,
   ): StitchApiError {
+    const toStr = (val: unknown): string =>
+      typeof val === 'string' || typeof val === 'number' ? String(val) : '';
+
     const code = this.mapErrorCodeFromBody(body);
     // OAuth errors use 'error' field, include it in message for catch blocks to detect
-    const errorField = body.error ? String(body.error) : '';
-    const description = String(
-      body.error_description || body.message || errorField || 'Unknown error',
-    );
+    const errorField = toStr(body.error);
+    const description =
+      toStr(body.error_description) ||
+      toStr(body.message) ||
+      errorField ||
+      'Unknown error';
     return {
       code,
       message:
@@ -1101,7 +1128,11 @@ export class StitchBankingService {
    * Map error body to error code
    */
   private mapErrorCodeFromBody(body: Record<string, unknown>): StitchErrorCode {
-    const error = String(body.error || '').toLowerCase();
+    const errorVal = body.error;
+    const error =
+      typeof errorVal === 'string' || typeof errorVal === 'number'
+        ? String(errorVal).toLowerCase()
+        : '';
     if (error.includes('invalid_grant')) return 'INVALID_GRANT';
     if (error.includes('consent_expired')) return 'CONSENT_EXPIRED';
     if (error.includes('consent_revoked')) return 'CONSENT_REVOKED';

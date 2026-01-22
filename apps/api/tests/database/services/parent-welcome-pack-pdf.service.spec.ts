@@ -104,7 +104,7 @@ describe('ParentWelcomePackPdfService', () => {
         tenantId: testTenant.id,
         name: 'Full Day Care',
         description: 'Full day care from 7:00 to 18:00',
-        feeType: FeeType.MONTHLY,
+        feeType: FeeType.FULL_DAY,
         amountCents: 550000, // R5,500
         registrationFeeCents: 150000, // R1,500
         vatInclusive: true,

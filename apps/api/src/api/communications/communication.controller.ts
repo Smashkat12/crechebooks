@@ -189,9 +189,7 @@ export class CommunicationController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<MessageResponseDto> {
-    this.logger.log(
-      `Send broadcast: id=${id}, tenant=${user.tenantId}`,
-    );
+    this.logger.log(`Send broadcast: id=${id}, tenant=${user.tenantId}`);
 
     await this.adhocService.sendBroadcast(user.tenantId, id, user.id);
 
@@ -215,9 +213,7 @@ export class CommunicationController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<MessageResponseDto> {
-    this.logger.log(
-      `Cancel broadcast: id=${id}, tenant=${user.tenantId}`,
-    );
+    this.logger.log(`Cancel broadcast: id=${id}, tenant=${user.tenantId}`);
 
     await this.adhocService.cancelBroadcast(user.tenantId, id, user.id);
 
@@ -385,7 +381,8 @@ export class CommunicationController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Create a recipient group',
-    description: 'Creates a new recipient group with the specified filter criteria.',
+    description:
+      'Creates a new recipient group with the specified filter criteria.',
   })
   @ApiResponse({ status: 201, type: RecipientGroupResponseDto })
   @ApiResponse({ status: 400, description: 'Validation error' })
@@ -397,9 +394,7 @@ export class CommunicationController {
     @Body() dto: CreateRecipientGroupDto,
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: RecipientGroupResponseDto }> {
-    this.logger.log(
-      `Create group: tenant=${user.tenantId}, name=${dto.name}`,
-    );
+    this.logger.log(`Create group: tenant=${user.tenantId}, name=${dto.name}`);
 
     const group = await this.recipientGroupEntity.create(
       {

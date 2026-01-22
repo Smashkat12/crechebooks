@@ -5,11 +5,7 @@
  * DTOs for previewing recipients before sending a broadcast.
  */
 
-import {
-  IsEnum,
-  IsOptional,
-  ValidateNested,
-} from 'class-validator';
+import { IsEnum, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {

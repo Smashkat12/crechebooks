@@ -117,12 +117,12 @@ export class CurrencyConversionService {
   /**
    * Convert an amount from one currency to another
    */
-  async convertCurrency(
+  convertCurrency(
     amountCents: number,
     fromCurrency: Currency,
     toCurrency: Currency,
     effectiveDate?: Date,
-  ): Promise<ConvertedAmount> {
+  ): ConvertedAmount {
     // If same currency, no conversion needed
     if (fromCurrency === toCurrency) {
       return {
@@ -137,11 +137,7 @@ export class CurrencyConversionService {
       };
     }
 
-    const rate = await this.getExchangeRate(
-      fromCurrency,
-      toCurrency,
-      effectiveDate,
-    );
+    const rate = this.getExchangeRate(fromCurrency, toCurrency, effectiveDate);
 
     const convertedCents = Math.round(amountCents * rate.rate);
 
@@ -160,11 +156,11 @@ export class CurrencyConversionService {
   /**
    * Convert amount to ZAR (base currency)
    */
-  async convertToZAR(
+  convertToZAR(
     amountCents: number,
     fromCurrency: Currency,
     effectiveDate?: Date,
-  ): Promise<ConvertedAmount> {
+  ): ConvertedAmount {
     return this.convertCurrency(
       amountCents,
       fromCurrency,
@@ -176,11 +172,11 @@ export class CurrencyConversionService {
   /**
    * Convert amount from ZAR to another currency
    */
-  async convertFromZAR(
+  convertFromZAR(
     amountCents: number,
     toCurrency: Currency,
     effectiveDate?: Date,
-  ): Promise<ConvertedAmount> {
+  ): ConvertedAmount {
     return this.convertCurrency(
       amountCents,
       Currency.ZAR,

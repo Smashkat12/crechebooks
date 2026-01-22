@@ -350,8 +350,10 @@ export class AuthService {
     // Allow login when:
     // 1. Development mode with DEV_AUTH_ENABLED=true
     // 2. JWT auth provider with DEV_AUTH_ENABLED=true (any environment)
-    const isDevelopmentMode = nodeEnv === 'development' && devAuthEnabled === 'true';
-    const isJwtProviderMode = authProvider === 'jwt' && devAuthEnabled === 'true';
+    const isDevelopmentMode =
+      nodeEnv === 'development' && devAuthEnabled === 'true';
+    const isJwtProviderMode =
+      authProvider === 'jwt' && devAuthEnabled === 'true';
 
     if ((!isDevelopmentMode && !isJwtProviderMode) || !jwtSecret) {
       this.logger.error(

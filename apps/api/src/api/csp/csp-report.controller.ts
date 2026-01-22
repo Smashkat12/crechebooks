@@ -70,11 +70,11 @@ export class CspReportController {
     status: 204,
     description: 'Violation report received and logged',
   })
-  async handleReport(
+  handleReport(
     @Body() report: CspViolationReportDto,
     @Req() req: Request,
     @Headers('user-agent') userAgent?: string,
-  ): Promise<void> {
+  ): void {
     const violation = report['csp-report'];
 
     if (!violation) {

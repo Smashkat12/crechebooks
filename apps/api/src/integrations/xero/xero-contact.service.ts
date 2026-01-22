@@ -525,7 +525,7 @@ export class XeroContactService {
    * Get access token using TokenManager pattern.
    * This is a simplified version - in production use TokenManager.
    */
-  private async getAccessToken(tenantId: string): Promise<string> {
+  private getAccessToken(tenantId: string): Promise<string> {
     // Import and use TokenManager
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { TokenManager } = require('../../mcp/xero-mcp/auth/token-manager');

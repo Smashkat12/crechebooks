@@ -49,7 +49,8 @@ export class StaffLoginResponseDto {
   success: boolean;
 
   @ApiProperty({
-    example: 'If this email is registered, you will receive a magic link shortly',
+    example:
+      'If this email is registered, you will receive a magic link shortly',
     description: 'Generic message (does not reveal if email exists)',
   })
   message: string;
@@ -125,7 +126,10 @@ export class StaffSessionDto extends StaffUserDto {
   @ApiPropertyOptional({ example: 'FULL_TIME', description: 'Employment type' })
   employmentType?: string;
 
-  @ApiPropertyOptional({ example: '2020-01-15', description: 'Start date with employer' })
+  @ApiPropertyOptional({
+    example: '2020-01-15',
+    description: 'Start date with employer',
+  })
   startDate?: string;
 }
 

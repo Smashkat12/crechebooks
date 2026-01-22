@@ -145,6 +145,7 @@ describe('SimplePayWebhookController', () => {
         ...mockWebhookLog,
         tenantId: null,
       });
+      webhookService.processWebhook.mockResolvedValue();
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
@@ -190,6 +191,7 @@ describe('SimplePayWebhookController', () => {
       webhookService.isAlreadyProcessed.mockResolvedValue(false);
       webhookService.resolveTenantId.mockResolvedValue(tenantId);
       webhookService.logWebhook.mockResolvedValue(mockWebhookLog);
+      webhookService.processWebhook.mockResolvedValue();
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
@@ -226,6 +228,7 @@ describe('SimplePayWebhookController', () => {
         ...mockWebhookLog,
         eventType: 'payslip.created',
       });
+      webhookService.processWebhook.mockResolvedValue();
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
@@ -253,6 +256,7 @@ describe('SimplePayWebhookController', () => {
         ...mockWebhookLog,
         eventType: 'employee.updated',
       });
+      webhookService.processWebhook.mockResolvedValue();
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,
@@ -282,6 +286,7 @@ describe('SimplePayWebhookController', () => {
         ...mockWebhookLog,
         eventType: 'employee.terminated',
       });
+      webhookService.processWebhook.mockResolvedValue();
 
       const result = await controller.handleWebhook(
         createMockRequest(payload) as any,

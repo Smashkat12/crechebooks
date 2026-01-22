@@ -61,7 +61,7 @@ describe('UI19DeadlineService', () => {
 
   beforeAll(async () => {
     const mockPrisma = {
-      ui19Submission: {
+      uI19Submission: {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         findMany: jest.fn(),
@@ -360,8 +360,8 @@ describe('UI19DeadlineService', () => {
     it('should create commencement submission with correct due date', async () => {
       const expectedDueDate = service.calculateDueDate(mockStaff.startDate);
 
-      prisma.ui19Submission.findFirst.mockResolvedValue(null);
-      prisma.ui19Submission.create.mockResolvedValue(
+      (prisma.uI19Submission.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.uI19Submission.create as jest.Mock).mockResolvedValue(
         createMockSubmission({
           type: UI19Type.COMMENCEMENT,
           eventDate: mockStaff.startDate,
@@ -371,7 +371,7 @@ describe('UI19DeadlineService', () => {
 
       const result = await service.createCommencementSubmission(mockStaff);
 
-      expect(prisma.ui19Submission.create).toHaveBeenCalledWith({
+      expect(prisma.uI19Submission.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           staffId: mockStaff.id,
           tenantId: mockStaff.tenantId,
@@ -385,17 +385,19 @@ describe('UI19DeadlineService', () => {
 
     it('should not create duplicate submission', async () => {
       const existingSubmission = createMockSubmission();
-      prisma.ui19Submission.findFirst.mockResolvedValue(existingSubmission);
+      (prisma.uI19Submission.findFirst as jest.Mock).mockResolvedValue(
+        existingSubmission,
+      );
 
       const result = await service.createCommencementSubmission(mockStaff);
 
-      expect(prisma.ui19Submission.create).not.toHaveBeenCalled();
+      expect(prisma.uI19Submission.create).not.toHaveBeenCalled();
       expect(result.id).toBe(existingSubmission.id);
     });
 
     it('should include notes when provided', async () => {
-      prisma.ui19Submission.findFirst.mockResolvedValue(null);
-      prisma.ui19Submission.create.mockResolvedValue(
+      (prisma.uI19Submission.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.uI19Submission.create as jest.Mock).mockResolvedValue(
         createMockSubmission({ notes: 'Test note' }),
       );
 
@@ -403,7 +405,7 @@ describe('UI19DeadlineService', () => {
         notes: 'Test note',
       });
 
-      expect(prisma.ui19Submission.create).toHaveBeenCalledWith({
+      expect(prisma.uI19Submission.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           notes: 'Test note',
         }),
@@ -416,8 +418,8 @@ describe('UI19DeadlineService', () => {
       const endDate = new Date('2026-03-31');
       const expectedDueDate = service.calculateDueDate(endDate);
 
-      prisma.ui19Submission.findFirst.mockResolvedValue(null);
-      prisma.ui19Submission.create.mockResolvedValue(
+      (prisma.uI19Submission.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.uI19Submission.create as jest.Mock).mockResolvedValue(
         createMockSubmission({
           type: UI19Type.TERMINATION,
           eventDate: endDate,
@@ -430,7 +432,7 @@ describe('UI19DeadlineService', () => {
         endDate,
       );
 
-      expect(prisma.ui19Submission.create).toHaveBeenCalledWith({
+      expect(prisma.uI19Submission.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           staffId: mockStaff.id,
           type: UI19Type.TERMINATION,
@@ -449,8 +451,10 @@ describe('UI19DeadlineService', () => {
         futureDueDate.setDate(futureDueDate.getDate() + 5);
 
         const mockSubmission = createMockSubmission({ dueDate: futureDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
-        prisma.ui19Submission.update.mockResolvedValue({
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
+        (prisma.uI19Submission.update as jest.Mock).mockResolvedValue({
           ...mockSubmission,
           status: UI19Status.SUBMITTED,
           submittedAt: new Date(),
@@ -459,7 +463,7 @@ describe('UI19DeadlineService', () => {
 
         const result = await service.submitUI19('submission-123', mockUserId);
 
-        expect(prisma.ui19Submission.update).toHaveBeenCalledWith({
+        expect(prisma.uI19Submission.update).toHaveBeenCalledWith({
           where: { id: 'submission-123' },
           data: expect.objectContaining({
             status: UI19Status.SUBMITTED,
@@ -474,8 +478,10 @@ describe('UI19DeadlineService', () => {
         futureDueDate.setDate(futureDueDate.getDate() + 5);
 
         const mockSubmission = createMockSubmission({ dueDate: futureDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
-        prisma.ui19Submission.update.mockResolvedValue({
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
+        (prisma.uI19Submission.update as jest.Mock).mockResolvedValue({
           ...mockSubmission,
           referenceNumber: 'REF-001',
         });
@@ -484,7 +490,7 @@ describe('UI19DeadlineService', () => {
           referenceNumber: 'REF-001',
         });
 
-        expect(prisma.ui19Submission.update).toHaveBeenCalledWith({
+        expect(prisma.uI19Submission.update).toHaveBeenCalledWith({
           where: { id: 'submission-123' },
           data: expect.objectContaining({
             referenceNumber: 'REF-001',
@@ -499,8 +505,10 @@ describe('UI19DeadlineService', () => {
         pastDueDate.setDate(pastDueDate.getDate() - 3);
 
         const mockSubmission = createMockSubmission({ dueDate: pastDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
-        prisma.ui19Submission.update.mockResolvedValue({
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
+        (prisma.uI19Submission.update as jest.Mock).mockResolvedValue({
           ...mockSubmission,
           status: UI19Status.LATE_SUBMITTED,
         });
@@ -521,8 +529,10 @@ describe('UI19DeadlineService', () => {
         pastDueDate.setDate(pastDueDate.getDate() - 3);
 
         const mockSubmission = createMockSubmission({ dueDate: pastDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
-        prisma.ui19Submission.update.mockResolvedValue({
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
+        (prisma.uI19Submission.update as jest.Mock).mockResolvedValue({
           ...mockSubmission,
           status: UI19Status.LATE_SUBMITTED,
           lateReason: 'Staff was on leave',
@@ -532,7 +542,7 @@ describe('UI19DeadlineService', () => {
           lateReason: 'Staff was on leave',
         });
 
-        expect(prisma.ui19Submission.update).toHaveBeenCalledWith({
+        expect(prisma.uI19Submission.update).toHaveBeenCalledWith({
           where: { id: 'submission-123' },
           data: expect.objectContaining({
             lateReason: 'Staff was on leave',
@@ -547,7 +557,9 @@ describe('UI19DeadlineService', () => {
         pastDueDate.setDate(pastDueDate.getDate() - 3);
 
         const mockSubmission = createMockSubmission({ dueDate: pastDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
 
         configService.get.mockImplementation((key: string) => {
           if (key === UI19_CONFIG_KEYS.ENFORCEMENT_MODE) return 'block';
@@ -564,8 +576,10 @@ describe('UI19DeadlineService', () => {
         pastDueDate.setDate(pastDueDate.getDate() - 3);
 
         const mockSubmission = createMockSubmission({ dueDate: pastDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
-        prisma.ui19Submission.update.mockResolvedValue({
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
+        (prisma.uI19Submission.update as jest.Mock).mockResolvedValue({
           ...mockSubmission,
           status: UI19Status.LATE_SUBMITTED,
         });
@@ -587,8 +601,10 @@ describe('UI19DeadlineService', () => {
         pastDueDate.setDate(pastDueDate.getDate() - 3);
 
         const mockSubmission = createMockSubmission({ dueDate: pastDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
-        prisma.ui19Submission.update.mockResolvedValue({
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
+        (prisma.uI19Submission.update as jest.Mock).mockResolvedValue({
           ...mockSubmission,
           status: UI19Status.LATE_SUBMITTED,
         });
@@ -608,8 +624,10 @@ describe('UI19DeadlineService', () => {
         pastDueDate.setDate(pastDueDate.getDate() - 3);
 
         const mockSubmission = createMockSubmission({ dueDate: pastDueDate });
-        prisma.ui19Submission.findUnique.mockResolvedValue(mockSubmission);
-        prisma.ui19Submission.update.mockResolvedValue({
+        (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(
+          mockSubmission,
+        );
+        (prisma.uI19Submission.update as jest.Mock).mockResolvedValue({
           ...mockSubmission,
           status: UI19Status.LATE_SUBMITTED,
         });
@@ -626,7 +644,7 @@ describe('UI19DeadlineService', () => {
     });
 
     it('should throw NotFoundException when submission not found', async () => {
-      prisma.ui19Submission.findUnique.mockResolvedValue(null);
+      (prisma.uI19Submission.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.submitUI19('invalid-id', mockUserId),
@@ -644,11 +662,13 @@ describe('UI19DeadlineService', () => {
         }),
       ];
 
-      prisma.ui19Submission.findMany.mockResolvedValue(mockSubmissions);
+      (prisma.uI19Submission.findMany as jest.Mock).mockResolvedValue(
+        mockSubmissions,
+      );
 
       const result = await service.getPendingSubmissions(mockTenantId);
 
-      expect(prisma.ui19Submission.findMany).toHaveBeenCalledWith({
+      expect(prisma.uI19Submission.findMany).toHaveBeenCalledWith({
         where: {
           tenantId: mockTenantId,
           status: { in: [UI19Status.PENDING, UI19Status.OVERDUE] },
@@ -660,13 +680,13 @@ describe('UI19DeadlineService', () => {
     });
 
     it('should filter by type when provided', async () => {
-      prisma.ui19Submission.findMany.mockResolvedValue([]);
+      (prisma.uI19Submission.findMany as jest.Mock).mockResolvedValue([]);
 
       await service.getPendingSubmissions(mockTenantId, {
         type: UI19Type.TERMINATION,
       });
 
-      expect(prisma.ui19Submission.findMany).toHaveBeenCalledWith({
+      expect(prisma.uI19Submission.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
           type: UI19Type.TERMINATION,
         }),
@@ -683,11 +703,13 @@ describe('UI19DeadlineService', () => {
         dueDate: new Date('2025-01-01'),
       });
 
-      prisma.ui19Submission.findMany.mockResolvedValue([overdueSubmission]);
+      (prisma.uI19Submission.findMany as jest.Mock).mockResolvedValue([
+        overdueSubmission,
+      ]);
 
       const result = await service.getOverdueSubmissions(mockTenantId);
 
-      expect(prisma.ui19Submission.findMany).toHaveBeenCalledWith({
+      expect(prisma.uI19Submission.findMany).toHaveBeenCalledWith({
         where: {
           tenantId: mockTenantId,
           status: UI19Status.PENDING,
@@ -702,11 +724,13 @@ describe('UI19DeadlineService', () => {
 
   describe('updateOverdueStatuses', () => {
     it('should update pending submissions past due to OVERDUE', async () => {
-      prisma.ui19Submission.updateMany.mockResolvedValue({ count: 3 });
+      (prisma.uI19Submission.updateMany as jest.Mock).mockResolvedValue({
+        count: 3,
+      });
 
       const count = await service.updateOverdueStatuses(mockTenantId);
 
-      expect(prisma.ui19Submission.updateMany).toHaveBeenCalledWith({
+      expect(prisma.uI19Submission.updateMany).toHaveBeenCalledWith({
         where: {
           tenantId: mockTenantId,
           status: UI19Status.PENDING,
@@ -762,7 +786,9 @@ describe('UI19DeadlineService', () => {
         }),
       ];
 
-      prisma.ui19Submission.findMany.mockResolvedValue(mockSubmissions);
+      (prisma.uI19Submission.findMany as jest.Mock).mockResolvedValue(
+        mockSubmissions,
+      );
 
       const alerts = await service.getDashboardAlerts(mockTenantId);
 
@@ -783,7 +809,9 @@ describe('UI19DeadlineService', () => {
         type: UI19Type.COMMENCEMENT,
       });
 
-      prisma.ui19Submission.findMany.mockResolvedValue([mockSubmission]);
+      (prisma.uI19Submission.findMany as jest.Mock).mockResolvedValue([
+        mockSubmission,
+      ]);
 
       const alerts = await service.getDashboardAlerts(mockTenantId);
 
@@ -803,7 +831,7 @@ describe('UI19DeadlineService', () => {
 
   describe('getStatistics', () => {
     it('should return accurate statistics', async () => {
-      prisma.ui19Submission.count
+      (prisma.uI19Submission.count as jest.Mock)
         .mockResolvedValueOnce(10) // total
         .mockResolvedValueOnce(3) // pending
         .mockResolvedValueOnce(5) // submitted
@@ -821,7 +849,7 @@ describe('UI19DeadlineService', () => {
     });
 
     it('should return 100% on-time rate when no completed submissions', async () => {
-      prisma.ui19Submission.count
+      (prisma.uI19Submission.count as jest.Mock)
         .mockResolvedValueOnce(5) // total
         .mockResolvedValueOnce(5) // pending
         .mockResolvedValueOnce(0) // submitted

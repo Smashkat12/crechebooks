@@ -555,18 +555,22 @@ export class EmailTemplateService implements OnModuleInit {
   ): string {
     // Use generic fallback for white-labeling when tenant name not provided
     const tenantName = (data.tenantName as string) || 'Our Organization';
+    const invoiceNumber =
+      typeof data.invoiceNumber === 'string' ? data.invoiceNumber : '';
+    const receiptNumber =
+      typeof data.receiptNumber === 'string' ? data.receiptNumber : '';
 
     switch (templateName) {
       case EmailTemplateName.INVOICE_EMAIL:
-        return `Invoice ${data.invoiceNumber || ''} from ${tenantName}`;
+        return `Invoice ${invoiceNumber} from ${tenantName}`;
       case EmailTemplateName.STATEMENT_EMAIL:
         return `Account Statement from ${tenantName}`;
       case EmailTemplateName.REMINDER_EMAIL:
         return data.isFinalReminder
-          ? `URGENT: Final Payment Reminder - Invoice ${data.invoiceNumber || ''}`
-          : `Payment Reminder - Invoice ${data.invoiceNumber || ''}`;
+          ? `URGENT: Final Payment Reminder - Invoice ${invoiceNumber}`
+          : `Payment Reminder - Invoice ${invoiceNumber}`;
       case EmailTemplateName.PAYMENT_RECEIPT:
-        return `Payment Receipt ${data.receiptNumber || ''} from ${tenantName}`;
+        return `Payment Receipt ${receiptNumber} from ${tenantName}`;
       case EmailTemplateName.WELCOME_PACK_EMAIL:
         return `Welcome to ${tenantName} - ${(data as unknown as WelcomePackEmailData).childName || 'Your Child'}'s Enrollment`;
       default:

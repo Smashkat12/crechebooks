@@ -259,7 +259,9 @@ describe('GlobalExceptionFilter', () => {
 
       const response: StandardErrorResponse =
         mockResponse.json.mock.calls[0][0];
-      expect(response.error.details?.stack).toBeUndefined();
+      expect(
+        (response.error.details as { stack?: string } | undefined)?.stack,
+      ).toBeUndefined();
     });
 
     it('should use generic message for internal errors in production', async () => {

@@ -213,7 +213,7 @@ export class EncryptionService {
    * @param v1EncryptedText - Data encrypted with v1 format (static salt)
    * @returns Data encrypted with v2 format (per-record salt)
    */
-  async reencrypt(v1EncryptedText: string): Promise<string> {
+  reencrypt(v1EncryptedText: string): string {
     const plaintext = this.decryptV1Legacy(v1EncryptedText);
     return this.encrypt(plaintext);
   }

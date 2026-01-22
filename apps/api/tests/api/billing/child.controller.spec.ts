@@ -71,6 +71,7 @@ describe('ChildController', () => {
     address: null,
     notes: null,
     isActive: true,
+    deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -105,6 +106,7 @@ describe('ChildController', () => {
     emergencyContact: 'Jane Smith',
     emergencyPhone: '+27821234567',
     isActive: true,
+    deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -120,6 +122,7 @@ describe('ChildController', () => {
     siblingDiscountApplied: false,
     customFeeOverrideCents: null,
     notes: null,
+    welcomePackSentAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

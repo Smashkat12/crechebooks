@@ -12,7 +12,7 @@ export class EmploymentStatusDto {
 
   @ApiProperty({
     description: 'Employment status',
-    enum: ['active', 'probation', 'terminated']
+    enum: ['active', 'probation', 'terminated'],
   })
   status: 'active' | 'probation' | 'terminated';
 
@@ -86,7 +86,7 @@ export class AnnouncementDto {
 
   @ApiProperty({
     description: 'Announcement priority level',
-    enum: ['low', 'medium', 'high']
+    enum: ['low', 'medium', 'high'],
   })
   priority: 'low' | 'medium' | 'high';
 }
@@ -94,19 +94,19 @@ export class AnnouncementDto {
 export class StaffDashboardResponseDto {
   @ApiProperty({
     type: EmploymentStatusDto,
-    description: 'Current employment status information'
+    description: 'Current employment status information',
   })
   employmentStatus: EmploymentStatusDto;
 
   @ApiProperty({
     type: [PayslipPreviewDto],
-    description: 'Recent payslip previews (last 3)'
+    description: 'Recent payslip previews (last 3)',
   })
   recentPayslips: PayslipPreviewDto[];
 
   @ApiProperty({
     type: LeaveBalanceDto,
-    description: 'Current leave balance information'
+    description: 'Current leave balance information',
   })
   leaveBalance: LeaveBalanceDto;
 
@@ -115,13 +115,13 @@ export class StaffDashboardResponseDto {
 
   @ApiProperty({
     type: YtdEarningsDto,
-    description: 'Year-to-date earnings summary'
+    description: 'Year-to-date earnings summary',
   })
   ytdEarnings: YtdEarningsDto;
 
   @ApiProperty({
     type: [AnnouncementDto],
-    description: 'Recent company announcements'
+    description: 'Recent company announcements',
   })
   announcements: AnnouncementDto[];
 }

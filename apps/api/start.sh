@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "Running database migrations..."
-npx prisma migrate deploy
+echo "Pushing database schema..."
+npx prisma db push --accept-data-loss --skip-generate
 
 echo "Starting API server..."
 exec node dist/src/main

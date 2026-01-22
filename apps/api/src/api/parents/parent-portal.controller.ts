@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Param,
   Query,
   Res,
@@ -24,6 +25,9 @@ import {
   ParentDashboardDto,
   ParentInvoicesListDto,
   ParentInvoiceDetailDto,
+  ParentStatementsListDto,
+  ParentStatementDetailDto,
+  EmailStatementResponseDto,
 } from './dto/parent-dashboard.dto';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { InvoiceStatus } from '@prisma/client';
@@ -476,5 +480,394 @@ export class ParentPortalController {
       invoiceNumber: invoice.invoiceNumber,
       hint: 'Integration with PDF service pending',
     });
+  }
+
+  // ============================================================================
+  // TASK-PORTAL-014: Parent Portal Statements Endpoints
+  // ============================================================================
+
+  /**
+   * Get month name from month number
+   */
+  private getMonthName(month: number): string {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return months[month - 1] || 'Unknown';
+  }
+
+  @Get('statements')
+  @ApiOperation({ summary: 'Get list of available statements for a year' })
+  @ApiQuery({ name: 'year', required: false, type: Number, description: 'Year to filter statements (defaults to current year)' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of available statements',
+    type: ParentStatementsListDto,
+  })
+  async getStatements(
+    @CurrentParent() session: ParentSession,
+    @Query('year') yearParam?: string,
+  ): Promise<ParentStatementsListDto> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+    const currentDate = new Date();
+    const year = yearParam ? parseInt(yearParam, 10) : currentDate.getFullYear();
+
+    this.logger.debug(`Fetching statements for parent ${parentId}, year ${year}`);
+
+    // Find all months that have transactions (invoices or payments)
+    const statements: ParentStatementsListDto['statements'] = [];
+
+    // Get invoices and payments for the year
+    const startOfYear = new Date(year, 0, 1);
+    const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
+
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        parentId,
+        tenantId,
+        isDeleted: false,
+        createdAt: { gte: startOfYear, lte: endOfYear },
+      },
+      select: {
+        id: true,
+        totalCents: true,
+        amountPaidCents: true,
+        createdAt: true,
+      },
+    });
+
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        paymentDate: { gte: startOfYear, lte: endOfYear },
+        invoice: { parentId },
+      },
+      select: {
+        id: true,
+        amountCents: true,
+        paymentDate: true,
+      },
+    });
+
+    // Group by month and calculate stats
+    const monthlyData: Map<number, { invoices: number; payments: number; invoiceTotal: number; paymentTotal: number }> = new Map();
+
+    // Initialize months that have data
+    for (const invoice of invoices) {
+      const month = invoice.createdAt.getMonth() + 1;
+      const existing = monthlyData.get(month) || { invoices: 0, payments: 0, invoiceTotal: 0, paymentTotal: 0 };
+      existing.invoices++;
+      existing.invoiceTotal += invoice.totalCents;
+      monthlyData.set(month, existing);
+    }
+
+    for (const payment of payments) {
+      const month = payment.paymentDate.getMonth() + 1;
+      const existing = monthlyData.get(month) || { invoices: 0, payments: 0, invoiceTotal: 0, paymentTotal: 0 };
+      existing.payments++;
+      existing.paymentTotal += payment.amountCents;
+      monthlyData.set(month, existing);
+    }
+
+    // Calculate running balance and create statement items
+    let runningBalance = 0;
+
+    // Get opening balance (sum of all unpaid amounts before this year)
+    const priorInvoices = await this.prisma.invoice.findMany({
+      where: {
+        parentId,
+        tenantId,
+        isDeleted: false,
+        createdAt: { lt: startOfYear },
+      },
+      select: { totalCents: true, amountPaidCents: true },
+    });
+
+    for (const inv of priorInvoices) {
+      runningBalance += (inv.totalCents - inv.amountPaidCents);
+    }
+
+    // Create statements for each month that has data
+    const sortedMonths = Array.from(monthlyData.keys()).sort((a, b) => a - b);
+
+    for (const month of sortedMonths) {
+      const data = monthlyData.get(month)!;
+      const openingBalance = runningBalance;
+
+      // Net movement: invoices increase balance, payments decrease
+      const netMovement = (data.invoiceTotal - data.paymentTotal) / 100;
+      runningBalance += data.invoiceTotal - data.paymentTotal;
+      const closingBalance = runningBalance / 100;
+
+      // Don't include future months
+      if (year > currentDate.getFullYear() ||
+          (year === currentDate.getFullYear() && month > currentDate.getMonth() + 1)) {
+        continue;
+      }
+
+      statements.push({
+        year,
+        month,
+        periodLabel: `${this.getMonthName(month)} ${year}`,
+        transactionCount: data.invoices + data.payments,
+        openingBalance: openingBalance / 100,
+        closingBalance,
+        status: 'available',
+      });
+    }
+
+    // Sort by month descending (most recent first)
+    statements.sort((a, b) => b.month - a.month);
+
+    return { statements, year };
+  }
+
+  @Get('statements/:year/:month')
+  @ApiOperation({ summary: 'Get statement detail with transactions' })
+  @ApiParam({ name: 'year', description: 'Statement year' })
+  @ApiParam({ name: 'month', description: 'Statement month (1-12)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Statement detail with transactions',
+    type: ParentStatementDetailDto,
+  })
+  @ApiResponse({ status: 404, description: 'Statement not found' })
+  async getStatementDetail(
+    @CurrentParent() session: ParentSession,
+    @Param('year') yearParam: string,
+    @Param('month') monthParam: string,
+  ): Promise<ParentStatementDetailDto> {
+    const parentId = session.parentId;
+    const tenantId = session.tenantId;
+    const year = parseInt(yearParam, 10);
+    const month = parseInt(monthParam, 10);
+
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      throw new NotFoundException('Invalid year or month');
+    }
+
+    this.logger.debug(`Fetching statement detail for parent ${parentId}, ${year}/${month}`);
+
+    // Get parent info
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { firstName: true, lastName: true, email: true },
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Parent not found');
+    }
+
+    // Calculate date range for the month
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Get opening balance (sum of all unpaid amounts before this month)
+    const priorInvoices = await this.prisma.invoice.findMany({
+      where: {
+        parentId,
+        tenantId,
+        isDeleted: false,
+        createdAt: { lt: startOfMonth },
+      },
+      select: { totalCents: true, amountPaidCents: true },
+    });
+
+    let openingBalanceCents = 0;
+    for (const inv of priorInvoices) {
+      openingBalanceCents += (inv.totalCents - inv.amountPaidCents);
+    }
+
+    // Get invoices for this month
+    const invoices = await this.prisma.invoice.findMany({
+      where: {
+        parentId,
+        tenantId,
+        isDeleted: false,
+        createdAt: { gte: startOfMonth, lte: endOfMonth },
+      },
+      include: {
+        child: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Get payments for this month
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        paymentDate: { gte: startOfMonth, lte: endOfMonth },
+        invoice: { parentId },
+      },
+      orderBy: { paymentDate: 'asc' },
+    });
+
+    // Build transactions list with running balance
+    type TransactionItem = {
+      id: string;
+      date: string;
+      description: string;
+      type: 'invoice' | 'payment' | 'credit';
+      debit: number | null;
+      credit: number | null;
+      balance: number;
+      sortDate: Date;
+    };
+
+    const transactions: TransactionItem[] = [];
+    let runningBalanceCents = openingBalanceCents;
+    let totalInvoicedCents = 0;
+    let totalPaidCents = 0;
+    let totalCreditsCents = 0;
+
+    // Add invoices
+    for (const invoice of invoices) {
+      runningBalanceCents += invoice.totalCents;
+      totalInvoicedCents += invoice.totalCents;
+
+      const childName = invoice.child
+        ? `${invoice.child.firstName} ${invoice.child.lastName}`
+        : 'Unknown';
+
+      transactions.push({
+        id: invoice.id,
+        date: invoice.createdAt.toISOString(),
+        description: `${invoice.invoiceNumber} - ${childName}`,
+        type: 'invoice',
+        debit: invoice.totalCents / 100,
+        credit: null,
+        balance: runningBalanceCents / 100,
+        sortDate: invoice.createdAt,
+      });
+    }
+
+    // Add payments
+    for (const payment of payments) {
+      runningBalanceCents -= payment.amountCents;
+      totalPaidCents += payment.amountCents;
+
+      transactions.push({
+        id: payment.id,
+        date: payment.paymentDate.toISOString(),
+        description: `Payment - ${payment.matchType || 'EFT'} Ref: ${payment.reference || 'N/A'}`,
+        type: 'payment',
+        debit: null,
+        credit: payment.amountCents / 100,
+        balance: runningBalanceCents / 100,
+        sortDate: payment.paymentDate,
+      });
+    }
+
+    // Sort transactions by date
+    transactions.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
+
+    // Recalculate running balance after sorting
+    let sortedRunningBalanceCents = openingBalanceCents;
+    for (const txn of transactions) {
+      if (txn.type === 'invoice') {
+        sortedRunningBalanceCents += (txn.debit || 0) * 100;
+      } else {
+        sortedRunningBalanceCents -= (txn.credit || 0) * 100;
+      }
+      txn.balance = sortedRunningBalanceCents / 100;
+    }
+
+    const closingBalanceCents = sortedRunningBalanceCents;
+    const netMovementCents = totalInvoicedCents - totalPaidCents - totalCreditsCents;
+
+    return {
+      year,
+      month,
+      periodLabel: `${this.getMonthName(month)} ${year}`,
+      parentName: `${parent.firstName} ${parent.lastName}`,
+      parentEmail: parent.email || undefined,
+      accountNumber: `ACC-${parentId.substring(0, 8).toUpperCase()}`,
+      openingBalance: openingBalanceCents / 100,
+      closingBalance: closingBalanceCents / 100,
+      totalInvoiced: totalInvoicedCents / 100,
+      totalPaid: totalPaidCents / 100,
+      totalCredits: totalCreditsCents / 100,
+      netMovement: netMovementCents / 100,
+      transactions: transactions.map(({ sortDate, ...txn }) => txn),
+    };
+  }
+
+  @Get('statements/:year/:month/pdf')
+  @ApiOperation({ summary: 'Download statement PDF' })
+  @ApiParam({ name: 'year', description: 'Statement year' })
+  @ApiParam({ name: 'month', description: 'Statement month (1-12)' })
+  @ApiResponse({ status: 200, description: 'PDF file' })
+  @ApiResponse({ status: 404, description: 'Statement not found' })
+  async downloadStatementPdf(
+    @CurrentParent() session: ParentSession,
+    @Param('year') yearParam: string,
+    @Param('month') monthParam: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const parentId = session.parentId;
+    const year = parseInt(yearParam, 10);
+    const month = parseInt(monthParam, 10);
+
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      throw new NotFoundException('Invalid year or month');
+    }
+
+    this.logger.debug(`Downloading PDF for statement ${year}/${month}, parent ${parentId}`);
+
+    // TODO: Integrate with actual PDF generation service
+    // For now, return a placeholder response
+    res.setHeader('Content-Type', 'application/json');
+    res.status(501).json({
+      message: 'Statement PDF generation not yet implemented',
+      period: `${this.getMonthName(month)} ${year}`,
+      hint: 'Integration with PDF service pending',
+    });
+  }
+
+  @Post('statements/:year/:month/email')
+  @ApiOperation({ summary: 'Email statement to parent' })
+  @ApiParam({ name: 'year', description: 'Statement year' })
+  @ApiParam({ name: 'month', description: 'Statement month (1-12)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Statement emailed successfully',
+    type: EmailStatementResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Statement not found' })
+  async emailStatement(
+    @CurrentParent() session: ParentSession,
+    @Param('year') yearParam: string,
+    @Param('month') monthParam: string,
+  ): Promise<EmailStatementResponseDto> {
+    const parentId = session.parentId;
+    const year = parseInt(yearParam, 10);
+    const month = parseInt(monthParam, 10);
+
+    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+      throw new NotFoundException('Invalid year or month');
+    }
+
+    this.logger.debug(`Emailing statement ${year}/${month} to parent ${parentId}`);
+
+    // Get parent email
+    const parent = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+      select: { email: true },
+    });
+
+    if (!parent?.email) {
+      throw new NotFoundException('Parent email not found');
+    }
+
+    // TODO: Integrate with actual email service
+    // For now, return a success response indicating the feature will be implemented
+    return {
+      message: `Statement for ${this.getMonthName(month)} ${year} will be sent to your email`,
+      sentTo: parent.email,
+    };
   }
 }

@@ -3,6 +3,7 @@
  * TASK-PORTAL-011: Parent Portal Layout and Authentication
  * TASK-PORTAL-012: Parent Portal Dashboard
  * TASK-PORTAL-013: Parent Portal Invoices Page
+ * TASK-PORTAL-014: Parent Portal Statements Page
  *
  * Components for the parent-facing portal where parents can:
  * - View and pay invoices
@@ -26,3 +27,9 @@ export { InvoiceFilters } from './invoice-filters';
 export { InvoiceCard, type InvoiceCardData, type InvoiceStatus } from './invoice-card';
 export { InvoiceList, type InvoiceListItem } from './invoice-list';
 export { InvoiceLineItems, type LineItem } from './invoice-line-items';
+
+// Statement Components (TASK-PORTAL-014)
+export { StatementList, type StatementListItem, type StatementStatus } from './statement-list';
+export { StatementPreview } from './statement-preview';
+export { TransactionTable, type StatementTransaction, type TransactionType } from './transaction-table';
+export { MonthPicker } from './month-picker';

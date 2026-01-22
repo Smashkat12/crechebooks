@@ -43,3 +43,17 @@ export { LeaveCalendar } from './leave-calendar';
 export type { LeaveEvent, LeaveCalendarProps } from './leave-calendar';
 export { LeavePolicy } from './leave-policy';
 export type { LeavePolicyProps } from './leave-policy';
+
+// Tax Documents components (TASK-PORTAL-025)
+export { IRP5List } from './irp5-list';
+export type { IRP5Document, IRP5ListProps } from './irp5-list';
+export { DocumentCard } from './document-card';
+export type { DocumentCardProps } from './document-card';
+
+// Profile components (TASK-PORTAL-025)
+export { StaffProfileForm } from './staff-profile-form';
+export type { StaffProfileFormProps, StaffProfile, PersonalInfo, EmploymentInfo, UpdateProfileData } from './staff-profile-form';
+export { BankingDetailsDisplay } from './banking-details';
+export type { BankingDetails, BankingDetailsProps } from './banking-details';
+export { EmergencyContactForm } from './emergency-contact';
+export type { EmergencyContact, EmergencyContactProps } from './emergency-contact';

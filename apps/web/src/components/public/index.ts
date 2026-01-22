@@ -15,3 +15,4 @@ export { PricingTable } from './pricing-table';
 export { IntegrationCard } from './integration-card';
 export { ContactForm } from './contact-form';
 export { TeamMemberCard } from './team-member-card';
+export { DemoForm } from './demo-form';

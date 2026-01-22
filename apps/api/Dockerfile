@@ -81,7 +81,7 @@ RUN chmod +x ./start.sh
 COPY --from=builder /app/packages/types /app/packages/types
 
 # Copy agent context files (required for transaction categorizer)
-COPY .claude/context/ ./.claude/context/
+COPY apps/api/.claude/context/ ./.claude/context/
 
 # Set ownership
 RUN chown -R nestjs:nodejs /app

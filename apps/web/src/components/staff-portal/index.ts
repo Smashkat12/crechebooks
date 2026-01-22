@@ -31,3 +31,15 @@ export { PayslipList } from './payslip-list';
 export { PayslipCard } from './payslip-card';
 export { EarningsTable } from './earnings-table';
 export { DeductionsTable } from './deductions-table';
+
+// Leave Management components (TASK-PORTAL-024)
+export { LeaveBalanceDisplay } from './leave-balance-display';
+export type { LeaveBalanceItem as LeaveBalanceDisplayItem } from './leave-balance-display';
+export { LeaveRequestForm } from './leave-request-form';
+export type { LeaveRequestFormData, LeaveRequestFormProps } from './leave-request-form';
+export { LeaveHistory } from './leave-history';
+export type { LeaveRequest, LeaveStatus, LeaveHistoryProps } from './leave-history';
+export { LeaveCalendar } from './leave-calendar';
+export type { LeaveEvent, LeaveCalendarProps } from './leave-calendar';
+export { LeavePolicy } from './leave-policy';
+export type { LeavePolicyProps } from './leave-policy';

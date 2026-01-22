@@ -395,3 +395,149 @@ export class EmailStatementResponseDto {
   @ApiProperty({ description: 'Email address the statement was sent to' })
   sentTo: string;
 }
+
+// ============================================================================
+// TASK-PORTAL-015: Parent Portal Payments DTOs
+// ============================================================================
+
+/**
+ * Payment list item for parent portal
+ */
+export class ParentPaymentListItemDto {
+  @ApiProperty({ description: 'Payment ID' })
+  id: string;
+
+  @ApiProperty({ description: 'Payment date (ISO string)' })
+  paymentDate: string;
+
+  @ApiProperty({ description: 'Payment amount in Rands' })
+  amount: number;
+
+  @ApiProperty({ description: 'Payment reference' })
+  reference: string;
+
+  @ApiProperty({ description: 'Payment method (EFT, Card, etc.)' })
+  method: string;
+
+  @ApiProperty({
+    description: 'Payment status',
+    enum: ['completed', 'pending', 'failed'],
+  })
+  status: 'completed' | 'pending' | 'failed';
+}
+
+/**
+ * Parent payments list response with pagination
+ */
+export class ParentPaymentsListDto {
+  @ApiProperty({
+    description: 'List of payments',
+    type: [ParentPaymentListItemDto],
+  })
+  payments: ParentPaymentListItemDto[];
+
+  @ApiProperty({ description: 'Total number of payments' })
+  total: number;
+
+  @ApiProperty({ description: 'Current page number' })
+  page: number;
+
+  @ApiProperty({ description: 'Items per page' })
+  limit: number;
+
+  @ApiProperty({ description: 'Total number of pages' })
+  totalPages: number;
+
+  @ApiProperty({ description: 'Total outstanding amount in Rands' })
+  totalOutstanding: number;
+}
+
+/**
+ * Payment allocation to an invoice
+ */
+export class ParentPaymentAllocationDto {
+  @ApiProperty({ description: 'Invoice ID' })
+  invoiceId: string;
+
+  @ApiProperty({ description: 'Invoice number' })
+  invoiceNumber: string;
+
+  @ApiPropertyOptional({ description: 'Child name' })
+  childName?: string;
+
+  @ApiProperty({ description: 'Amount allocated to this invoice in Rands' })
+  allocatedAmount: number;
+
+  @ApiProperty({ description: 'Total invoice amount in Rands' })
+  invoiceTotal: number;
+}
+
+/**
+ * Payment detail response for parent portal
+ */
+export class ParentPaymentDetailDto {
+  @ApiProperty({ description: 'Payment ID' })
+  id: string;
+
+  @ApiProperty({ description: 'Payment date (ISO string)' })
+  paymentDate: string;
+
+  @ApiProperty({ description: 'Payment amount in Rands' })
+  amount: number;
+
+  @ApiProperty({ description: 'Payment reference' })
+  reference: string;
+
+  @ApiProperty({ description: 'Payment method (EFT, Card, etc.)' })
+  method: string;
+
+  @ApiProperty({
+    description: 'Payment status',
+    enum: ['completed', 'pending', 'failed'],
+  })
+  status: 'completed' | 'pending' | 'failed';
+
+  @ApiProperty({
+    description: 'Invoice allocations',
+    type: [ParentPaymentAllocationDto],
+  })
+  allocations: ParentPaymentAllocationDto[];
+
+  @ApiProperty({ description: 'Whether a receipt is available for download' })
+  hasReceipt: boolean;
+
+  @ApiPropertyOptional({ description: 'Payment notes' })
+  notes?: string;
+}
+
+/**
+ * Creche bank details for EFT payments
+ */
+export class CrecheBankDetailsDto {
+  @ApiProperty({ description: 'Bank name (e.g., FNB, Standard Bank)' })
+  bankName: string;
+
+  @ApiProperty({ description: 'Account holder name (Creche name)' })
+  accountHolderName: string;
+
+  @ApiProperty({ description: 'Bank account number' })
+  accountNumber: string;
+
+  @ApiProperty({ description: 'Branch code' })
+  branchCode: string;
+
+  @ApiProperty({
+    description: 'Account type',
+    enum: ['Cheque', 'Savings', 'Current'],
+  })
+  accountType: 'Cheque' | 'Savings' | 'Current';
+
+  @ApiPropertyOptional({ description: 'SWIFT code for international payments' })
+  swiftCode?: string;
+
+  @ApiProperty({ description: 'Auto-generated payment reference for this parent' })
+  paymentReference: string;
+
+  @ApiPropertyOptional({ description: 'Payment instructions' })
+  paymentInstructions?: string;
+}

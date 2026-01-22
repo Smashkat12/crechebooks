@@ -33,3 +33,9 @@ export { StatementList, type StatementListItem, type StatementStatus } from './s
 export { StatementPreview } from './statement-preview';
 export { TransactionTable, type StatementTransaction, type TransactionType } from './transaction-table';
 export { MonthPicker } from './month-picker';
+
+// Payment Components (TASK-PORTAL-015)
+export { PaymentList } from './payment-list';
+export { PaymentDetail } from './payment-detail';
+export { BankDetailsCard } from './bank-details-card';
+export { PaymentReference } from './payment-reference';

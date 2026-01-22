@@ -186,6 +186,9 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @crechebooks/api prisma:generate
 
+      - name: Build shared types
+        run: pnpm --filter @crechebooks/types build
+
       - name: Build API
         run: pnpm --filter @crechebooks/api build
 

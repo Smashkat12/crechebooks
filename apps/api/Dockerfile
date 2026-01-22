@@ -72,6 +72,7 @@ COPY --from=builder /app/api/dist ./dist
 COPY --from=builder /app/api/node_modules ./node_modules
 COPY --from=builder /app/api/package.json ./
 COPY --from=builder /app/api/prisma ./prisma
+COPY --from=builder /app/api/prisma.config.ts ./prisma.config.ts
 
 # Copy startup script
 COPY apps/api/start.sh ./start.sh

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Param,
   Query,
@@ -42,6 +43,15 @@ import {
   LeaveType,
   LeaveStatus,
 } from './dto/staff-leave.dto';
+import {
+  IRP5DocumentDto,
+  IRP5ListResponseDto,
+  IRP5Status,
+  StaffProfileDto,
+  UpdateProfileDto,
+  ProfileUpdateSuccessDto,
+  BankingDetailsDto,
+} from './dto/staff-profile.dto';
 
 interface UserPayload {
   sub: string;
@@ -638,5 +648,263 @@ export class StaffPortalController {
         reviewedAt: new Date(today.getFullYear(), today.getMonth() - 4, -9),
       },
     ];
+  }
+
+  // ============================================================================
+  // TAX DOCUMENTS (IRP5) ENDPOINTS (TASK-PORTAL-025)
+  // ============================================================================
+
+  @Get('documents/irp5')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get IRP5 tax certificates' })
+  @ApiQuery({
+    name: 'taxYear',
+    required: false,
+    description: 'Filter by tax year',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'IRP5 certificates retrieved successfully',
+    type: IRP5ListResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getIRP5Documents(
+    @CurrentUser() user: UserPayload,
+    @Query('taxYear') taxYear?: string,
+  ): Promise<IRP5ListResponseDto> {
+    this.logger.log(
+      `Fetching IRP5 documents for staff: ${user.email}, taxYear: ${taxYear || 'all'}`,
+    );
+
+    const currentYear = new Date().getFullYear();
+    const availableYears = [
+      currentYear,
+      currentYear - 1,
+      currentYear - 2,
+      currentYear - 3,
+      currentYear - 4,
+    ];
+
+    // Generate mock IRP5 documents
+    let documents = this.generateMockIRP5Documents(availableYears);
+
+    // Filter by tax year if provided
+    if (taxYear) {
+      const year = parseInt(taxYear);
+      documents = documents.filter((doc) => doc.taxYear === year);
+    }
+
+    return {
+      data: documents,
+      total: documents.length,
+      availableYears,
+    };
+  }
+
+  @Get('documents/irp5/:id/pdf')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download IRP5 PDF' })
+  @ApiParam({ name: 'id', description: 'IRP5 document ID' })
+  @Header('Content-Type', 'application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'IRP5 PDF downloaded successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'IRP5 document not found' })
+  async downloadIRP5Pdf(
+    @CurrentUser() user: UserPayload,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    this.logger.log(`Downloading IRP5 PDF for staff: ${user.email}, id: ${id}`);
+
+    // Extract tax year from ID (e.g., irp5-2024-001 -> 2024)
+    const parts = id.split('-');
+    const taxYear = parts.length >= 2 ? parts[1] : new Date().getFullYear().toString();
+
+    res.set({
+      'Content-Disposition': `attachment; filename="IRP5-${taxYear}.pdf"`,
+      'Content-Type': 'application/pdf',
+    });
+
+    // Create a mock PDF (in production, this would come from SimplePay)
+    const mockPdfContent = Buffer.from(
+      '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj xref 0 4 0000000000 65535 f 0000000009 00000 n 0000000052 00000 n 0000000101 00000 n trailer<</Size 4/Root 1 0 R>>startxref 178 %%EOF',
+      'utf-8',
+    );
+
+    res.send(mockPdfContent);
+  }
+
+  private generateMockIRP5Documents(years: number[]): IRP5DocumentDto[] {
+    const currentYear = new Date().getFullYear();
+
+    return years.map((year, index) => ({
+      id: `irp5-${year}-001`,
+      taxYear: year,
+      taxYearPeriod: `${year - 1}/${year}`,
+      status:
+        year === currentYear
+          ? IRP5Status.PENDING
+          : IRP5Status.AVAILABLE,
+      availableDate: new Date(year, 2, 1), // March 1st of tax year
+      referenceNumber:
+        year !== currentYear
+          ? `IRP5/${year}/${100000 + index * 12345}`
+          : undefined,
+      lastDownloadDate:
+        index > 0 && index < 3
+          ? new Date(year, 3 + index, 15)
+          : undefined,
+    }));
+  }
+
+  // ============================================================================
+  // STAFF PROFILE ENDPOINTS (TASK-PORTAL-025)
+  // ============================================================================
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get staff profile' })
+  @ApiResponse({
+    status: 200,
+    description: 'Staff profile retrieved successfully',
+    type: StaffProfileDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getProfile(@CurrentUser() user: UserPayload): Promise<StaffProfileDto> {
+    this.logger.log(`Fetching profile for staff: ${user.email}`);
+
+    return this.generateMockProfile(user);
+  }
+
+  @Put('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update staff profile' })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully',
+    type: ProfileUpdateSuccessDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid update data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateProfile(
+    @CurrentUser() user: UserPayload,
+    @Body() updateDto: UpdateProfileDto,
+  ): Promise<ProfileUpdateSuccessDto> {
+    this.logger.log(`Updating profile for staff: ${user.email}`);
+
+    // In production, this would update the database
+    const profile = this.generateMockProfile(user);
+
+    // Apply updates
+    if (updateDto.phone) {
+      profile.personal.phone = updateDto.phone;
+    }
+    if (updateDto.email) {
+      profile.personal.email = updateDto.email;
+    }
+    if (updateDto.address) {
+      const addr = updateDto.address;
+      profile.personal.address = [
+        addr.streetAddress,
+        addr.streetAddress2,
+        addr.suburb,
+        addr.city,
+        addr.province,
+        addr.postalCode,
+      ]
+        .filter(Boolean)
+        .join(', ');
+    }
+    if (updateDto.emergency) {
+      profile.emergency = {
+        contactName: updateDto.emergency.contactName,
+        relationship: updateDto.emergency.relationship,
+        contactPhone: updateDto.emergency.contactPhone,
+        alternatePhone: updateDto.emergency.alternatePhone,
+      };
+    }
+
+    profile.lastUpdated = new Date();
+
+    return {
+      message: 'Profile updated successfully',
+      profile,
+    };
+  }
+
+  @Get('banking')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get banking details (masked)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Banking details retrieved successfully',
+    type: BankingDetailsDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getBankingDetails(
+    @CurrentUser() user: UserPayload,
+  ): Promise<BankingDetailsDto> {
+    this.logger.log(`Fetching banking details for staff: ${user.email}`);
+
+    return {
+      bankName: 'First National Bank',
+      accountNumber: '****4521',
+      branchCode: '250655',
+      accountType: 'Cheque Account',
+      updateNote:
+        'To update your banking details, please contact HR directly. Changes require verification for your protection.',
+    };
+  }
+
+  private generateMockProfile(user: UserPayload): StaffProfileDto {
+    return {
+      personal: {
+        fullName: user.name || 'Thandi Nkosi',
+        idNumber: '******1234085',
+        dateOfBirth: new Date(1990, 4, 15),
+        phone: '+27 82 123 4567',
+        email: user.email,
+        address: '123 Main Street, Sandton, Johannesburg, Gauteng, 2196',
+      },
+      employment: {
+        position: 'Early Childhood Development Practitioner',
+        department: 'Education',
+        startDate: new Date(2023, 2, 15),
+        employmentType: 'Full-time',
+        employeeNumber: 'EMP-001',
+        managerName: 'Sarah Manager',
+      },
+      banking: {
+        bankName: 'First National Bank',
+        accountNumber: '****4521',
+        branchCode: '250655',
+        accountType: 'Cheque Account',
+        updateNote:
+          'To update your banking details, please contact HR directly. Changes require verification for your protection.',
+      },
+      emergency: {
+        contactName: 'Sipho Nkosi',
+        relationship: 'Spouse',
+        contactPhone: '+27 83 987 6543',
+        alternatePhone: '+27 11 123 4567',
+      },
+      preferences: {
+        emailPayslipNotifications: true,
+        emailLeaveNotifications: true,
+        emailTaxDocNotifications: true,
+        preferredLanguage: 'en-ZA',
+      },
+      lastUpdated: new Date(),
+    };
   }
 }

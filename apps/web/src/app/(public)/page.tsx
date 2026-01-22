@@ -1,4 +1,17 @@
-import { FileText, CreditCard, BarChart3, Shield } from 'lucide-react';
+import type { Metadata } from 'next';
+import {
+  FileText,
+  CreditCard,
+  Users,
+  Shield,
+  Building2,
+  MessageCircle,
+  RefreshCw,
+  MapPin,
+  UserPlus,
+  Settings,
+  Rocket,
+} from 'lucide-react';
 
 import {
   HeroSection,
@@ -10,6 +23,25 @@ import {
   FaqAccordion,
 } from '@/components/public';
 
+export const metadata: Metadata = {
+  title: 'CrecheBooks - Simplify Your Creche Bookkeeping',
+  description:
+    'Complete financial management for South African childcare centres. From invoicing to SARS compliance, we handle it all.',
+  keywords: [
+    'creche software',
+    'daycare management',
+    'childcare invoicing',
+    'South Africa',
+    'SARS compliant',
+  ],
+  openGraph: {
+    title: 'CrecheBooks - Simplify Your Creche Bookkeeping',
+    description:
+      'Complete financial management for South African childcare centres.',
+    type: 'website',
+  },
+};
+
 const features = [
   {
     icon: <FileText className="h-6 w-6" />,
@@ -19,21 +51,69 @@ const features = [
   },
   {
     icon: <CreditCard className="h-6 w-6" />,
-    title: 'Payment Tracking',
+    title: 'Parent Payments Tracking',
     description:
       'Track payments, identify arrears, and send automated reminders to parents.',
   },
   {
-    icon: <BarChart3 className="h-6 w-6" />,
-    title: 'Financial Reports',
+    icon: <Users className="h-6 w-6" />,
+    title: 'Staff Payroll (SimplePay)',
     description:
-      'Get instant insights with comprehensive reports on revenue, collections, and trends.',
+      'Seamlessly manage staff salaries with SimplePay integration for accurate payroll processing.',
   },
   {
     icon: <Shield className="h-6 w-6" />,
-    title: 'SARS Compliant',
+    title: 'SARS VAT201/EMP201',
     description:
-      'Built-in compliance for South African tax requirements including VAT and EMP201.',
+      'Built-in compliance for South African tax requirements including VAT and EMP201 submissions.',
+  },
+  {
+    icon: <Building2 className="h-6 w-6" />,
+    title: 'Bank Reconciliation',
+    description:
+      'Automatically match bank transactions with invoices and payments for accurate records.',
+  },
+  {
+    icon: <MessageCircle className="h-6 w-6" />,
+    title: 'WhatsApp Notifications',
+    description:
+      'Send invoice reminders and payment confirmations directly to parents via WhatsApp.',
+  },
+  {
+    icon: <RefreshCw className="h-6 w-6" />,
+    title: 'Xero Integration',
+    description:
+      'Sync your financial data seamlessly with Xero for comprehensive accounting management.',
+  },
+  {
+    icon: <MapPin className="h-6 w-6" />,
+    title: 'Multi-Location Support',
+    description:
+      'Manage multiple creche branches from a single dashboard with consolidated reporting.',
+  },
+];
+
+const howItWorksSteps = [
+  {
+    icon: <UserPlus className="h-8 w-8" />,
+    step: '1',
+    title: 'Sign Up & Import',
+    description:
+      'Create your account and import existing data in minutes. Our onboarding wizard guides you through every step.',
+  },
+  {
+    icon: <Settings className="h-8 w-8" />,
+    step: '2',
+    title: 'Configure & Customize',
+    description:
+      'Set up fee structures, payment terms, and notification preferences to match your creche operations.',
+  },
+  {
+    icon: <Rocket className="h-8 w-8" />,
+    step: '3',
+    title: 'Automate & Grow',
+    description:
+      'Let CrecheBooks handle the numbers while you focus on the children. Watch your efficiency soar.',
   },
 ];
 
@@ -101,9 +181,9 @@ const testimonials = [
 ];
 
 const stats = [
-  { value: '500+', label: 'Creches Using CrecheBooks' },
-  { value: 'R50M+', label: 'Invoices Processed' },
-  { value: '99.9%', label: 'Uptime Guarantee' },
+  { value: '500+', label: 'Creches' },
+  { value: '10,000+', label: 'Parents' },
+  { value: 'R50M+', label: 'Processed' },
   { value: '4.9/5', label: 'Customer Rating' },
 ];
 
@@ -135,15 +215,61 @@ const faqItems = [
   },
 ];
 
+// JSON-LD structured data for SEO
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'CrecheBooks',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  description:
+    'Complete financial management for South African childcare centres. From invoicing to SARS compliance, we handle it all.',
+  offers: {
+    '@type': 'AggregateOffer',
+    priceCurrency: 'ZAR',
+    lowPrice: '299',
+    highPrice: '599',
+    offerCount: '3',
+  },
+  aggregateRating: {
+    '@type': 'AggregateRating',
+    ratingValue: '4.9',
+    ratingCount: '500',
+    bestRating: '5',
+    worstRating: '1',
+  },
+  provider: {
+    '@type': 'Organization',
+    name: 'CrecheBooks',
+    url: 'https://crechebooks.co.za',
+  },
+  featureList: [
+    'Automated Invoicing',
+    'Parent Payments Tracking',
+    'Staff Payroll Integration',
+    'SARS VAT201/EMP201 Compliance',
+    'Bank Reconciliation',
+    'WhatsApp Notifications',
+    'Xero Integration',
+    'Multi-Location Support',
+  ],
+};
+
 export default function HomePage() {
   return (
     <>
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* Hero Section */}
       <HeroSection
-        title="Bookkeeping Made Simple for South African Creches"
-        subtitle="AI-powered financial management designed specifically for childcare centres. Automate invoicing, track payments, and stay SARS compliant."
+        title="Simplify Your Creche Bookkeeping"
+        subtitle="Complete financial management for South African childcare centres. From invoicing to SARS compliance, we handle it all."
         primaryCta={{ text: 'Start Free Trial', href: '/signup' }}
-        secondaryCta={{ text: 'Watch Demo', href: '/demo' }}
+        secondaryCta={{ text: 'Book a Demo', href: '/demo' }}
       />
 
       {/* Stats Section */}
@@ -172,11 +298,52 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
+      {/* How It Works Section */}
       <section
         className="bg-muted/40 py-16 sm:py-20"
-        aria-labelledby="testimonials-title"
+        aria-labelledby="how-it-works-title"
       >
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2
+              id="how-it-works-title"
+              className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
+            >
+              How It Works
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Get started in three simple steps and transform your creche
+              finances today.
+            </p>
+          </div>
+          <div className="mt-12 grid gap-8 md:grid-cols-3">
+            {howItWorksSteps.map((step, index) => (
+              <div
+                key={index}
+                className="relative flex flex-col items-center text-center"
+              >
+                {/* Connector line for desktop */}
+                {index < howItWorksSteps.length - 1 && (
+                  <div className="absolute left-1/2 top-12 hidden h-0.5 w-full bg-border md:block" />
+                )}
+                <div className="relative z-10 flex h-24 w-24 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  {step.icon}
+                </div>
+                <div className="mt-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                  {step.step}
+                </div>
+                <h3 className="mt-4 text-xl font-semibold text-foreground">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-muted-foreground">{step.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-16 sm:py-20" aria-labelledby="testimonials-title">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2
@@ -195,7 +362,10 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="py-16 sm:py-20" aria-labelledby="pricing-title">
+      <section
+        className="bg-muted/40 py-16 sm:py-20"
+        aria-labelledby="pricing-title"
+      >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2
@@ -218,7 +388,7 @@ export default function HomePage() {
       </section>
 
       {/* FAQ Section */}
-      <FaqAccordion items={faqItems} className="bg-muted/40" />
+      <FaqAccordion items={faqItems} />
 
       {/* CTA Section */}
       <CtaSection

@@ -7,7 +7,7 @@ CREATE TABLE "duplicate_resolutions" (
     "tenant_id" TEXT NOT NULL,
     "composite_key" VARCHAR(255) NOT NULL,
     "status" VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-    "resolved_by" UUID,
+    "resolved_by" TEXT,
     "resolved_at" TIMESTAMP(3),
     "notes" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -37,10 +37,10 @@ ALTER TABLE "duplicate_resolutions" ADD CONSTRAINT "duplicate_resolutions_resolv
 CREATE TABLE "manual_match_history" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "tenant_id" TEXT NOT NULL,
-    "match_id" UUID NOT NULL,
-    "previous_transaction_id" UUID,
-    "new_transaction_id" UUID,
-    "performed_by" UUID NOT NULL,
+    "match_id" TEXT NOT NULL,
+    "previous_transaction_id" TEXT,
+    "new_transaction_id" TEXT,
+    "performed_by" TEXT NOT NULL,
     "performed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "action" VARCHAR(20) NOT NULL,
     "reason" TEXT,
@@ -74,7 +74,7 @@ ALTER TABLE "manual_match_history" ADD CONSTRAINT "manual_match_history_new_tran
 ALTER TABLE "bank_statement_matches" ADD COLUMN "match_type" VARCHAR(20) DEFAULT 'AUTOMATIC';
 
 -- Add manual_match_by column to track who performed manual matches
-ALTER TABLE "bank_statement_matches" ADD COLUMN "manual_match_by" UUID;
+ALTER TABLE "bank_statement_matches" ADD COLUMN "manual_match_by" TEXT;
 ALTER TABLE "bank_statement_matches" ADD COLUMN "manual_match_at" TIMESTAMP(3);
 
 -- Add foreign key for manual_match_by

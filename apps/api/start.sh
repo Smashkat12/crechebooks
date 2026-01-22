@@ -8,8 +8,8 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 echo "DATABASE_URL is set (length: ${#DATABASE_URL} characters)"
 
-echo "Pushing database schema..."
-DATABASE_URL="$DATABASE_URL" npx prisma db push --accept-data-loss
+echo "Running database migrations..."
+DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy
 
 echo "Starting API server..."
 exec node dist/src/main

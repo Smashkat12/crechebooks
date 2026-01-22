@@ -3,7 +3,9 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
+import { ParentAuthController } from './parent-auth.controller';
 import { AuthService } from './auth.service';
+import { MagicLinkService } from './services/magic-link.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -13,6 +15,7 @@ import { RateLimitModule } from '../../common/rate-limit/rate-limit.module';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { CsrfStoreService } from './csrf-store.service';
 import { FailedAttemptsService } from './failed-attempts.service';
+import { MailgunModule } from '../../integrations/mailgun/mailgun.module';
 
 /**
  * TASK-SEC-001: JWT Token Expiration Security Defaults
@@ -39,7 +42,8 @@ export type AuthProvider = 'auth0' | 'jwt';
         const nodeEnv = configService.get<string>('NODE_ENV');
         const jwtSecret = configService.get<string>('JWT_SECRET');
         const auth0Secret = configService.get<string>('AUTH0_CLIENT_SECRET');
-        const authProvider = configService.get<string>('AUTH_PROVIDER') || 'auth0';
+        const authProvider =
+          configService.get<string>('AUTH_PROVIDER') || 'auth0';
 
         // Determine secret based on auth provider:
         // - AUTH_PROVIDER=jwt: Always use JWT_SECRET
@@ -48,7 +52,8 @@ export type AuthProvider = 'auth0' | 'jwt';
         if (authProvider === 'jwt') {
           secret = jwtSecret;
         } else {
-          secret = nodeEnv === 'development' && jwtSecret ? jwtSecret : auth0Secret;
+          secret =
+            nodeEnv === 'development' && jwtSecret ? jwtSecret : auth0Secret;
         }
 
         // TASK-SEC-001: Parse JWT_EXPIRATION as number, use default for development
@@ -70,10 +75,12 @@ export type AuthProvider = 'auth0' | 'jwt';
     PrismaModule,
     RedisModule,
     RateLimitModule,
+    MailgunModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, ParentAuthController],
   providers: [
     AuthService,
+    MagicLinkService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
@@ -83,6 +90,7 @@ export type AuthProvider = 'auth0' | 'jwt';
   ],
   exports: [
     AuthService,
+    MagicLinkService,
     JwtAuthGuard,
     RolesGuard,
     RateLimitGuard,
@@ -179,7 +187,8 @@ export class AuthModule implements OnModuleInit {
         }
 
         // With JWT provider, DEV_AUTH_ENABLED controls the login endpoint availability
-        const devAuthEnabled = this.configService.get<string>('DEV_AUTH_ENABLED');
+        const devAuthEnabled =
+          this.configService.get<string>('DEV_AUTH_ENABLED');
         if (devAuthEnabled === 'true') {
           this.logger.warn(
             'JWT auth mode with DEV_AUTH_ENABLED=true in production. ' +

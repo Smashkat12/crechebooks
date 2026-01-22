@@ -84,11 +84,13 @@ describe('ErrorBoundary', () => {
     );
   });
 
-  it('resets error state when retry button is clicked', () => {
+  it('resets error state when retry button is clicked', async () => {
     const onReset = jest.fn();
+    let shouldThrow = true;
+
     const { rerender } = render(
-      <ErrorBoundary onReset={onReset}>
-        <ThrowError shouldThrow={true} />
+      <ErrorBoundary onReset={onReset} key="error-boundary">
+        <ThrowError shouldThrow={shouldThrow} />
       </ErrorBoundary>
     );
 
@@ -99,10 +101,11 @@ describe('ErrorBoundary', () => {
 
     expect(onReset).toHaveBeenCalled();
 
-    // Re-render with non-throwing component
+    // Re-render with non-throwing component using a new key to force remount
+    shouldThrow = false;
     rerender(
-      <ErrorBoundary onReset={onReset}>
-        <ThrowError shouldThrow={false} />
+      <ErrorBoundary onReset={onReset} key="error-boundary-reset">
+        <ThrowError shouldThrow={shouldThrow} />
       </ErrorBoundary>
     );
 

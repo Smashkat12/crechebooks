@@ -73,6 +73,10 @@ COPY --from=builder /app/api/node_modules ./node_modules
 COPY --from=builder /app/api/package.json ./
 COPY --from=builder /app/api/prisma ./prisma
 
+# Copy startup script
+COPY apps/api/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 # Copy types package (needed at runtime for some type exports)
 COPY --from=builder /app/packages/types /app/packages/types
 
@@ -97,5 +101,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the server (run migrations first, then start app)
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
+# Start the server (run migrations first via startup script)
+CMD ["./start.sh"]

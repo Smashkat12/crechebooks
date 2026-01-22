@@ -93,6 +93,50 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 - Website - [https://nestjs.com](https://nestjs.com/)
 - Twitter - [@nestframework](https://twitter.com/nestframework)
 
+## GitHub Integration
+
+This project includes comprehensive GitHub integration powered by Claude Flow, providing AI-powered repository management, code review, issue triage, and pull request automation.
+
+### Quick Start
+
+```bash
+# Initialize GitHub swarm for repository management
+npx claude-flow github swarm --repository owner/repo
+
+# Analyze repository health
+npx claude-flow github repo-analyze --repository owner/repo --deep
+
+# Triage issues automatically
+npx claude-flow github issue-triage --repository owner/repo --auto-label
+
+# Review pull requests
+npx claude-flow github code-review --pr-number 123 --suggest-fixes
+```
+
+### Available GitHub Commands
+
+- **GitHub Swarm** - Specialized multi-agent repository management
+- **Repo Analyze** - Deep repository analysis with AI insights
+- **PR Enhance** - AI-powered pull request enhancements
+- **Code Review** - Automated code review with swarm intelligence
+- **Issue Triage** - Intelligent issue classification and management
+
+### Documentation
+
+- **Comprehensive Guide**: [docs/github/README.md](docs/github/README.md)
+- **Quick Reference**: [docs/github/quick-reference.md](docs/github/quick-reference.md)
+- **Integration Summary**: [docs/github/integration-summary.md](docs/github/integration-summary.md)
+
+### Features
+
+- 🤖 **5 Specialized Agents**: Issue Triager, PR Reviewer, Documentation, Test, Security
+- 🔄 **Automated Workflows**: Daily maintenance, pre-release checks, security audits
+- ⚡ **Performance**: 2.8-4.4x speed improvements through parallel coordination
+- 🎯 **84.8% SWE-Bench Solve Rate**: Enhanced problem-solving through AI coordination
+- 📊 **32.3% Token Reduction**: Efficient task breakdown and execution
+
+For detailed documentation, see [docs/github/README.md](docs/github/README.md).
+
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

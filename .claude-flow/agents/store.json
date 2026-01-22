@@ -283,6 +283,58 @@
       "createdAt": "2026-01-20T23:15:59.310Z",
       "model": "sonnet",
       "modelRoutedBy": "explicit"
+    },
+    "typescript-fixer-1": {
+      "agentId": "typescript-fixer-1",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "sonnet"
+      },
+      "createdAt": "2026-01-22T06:28:10.473Z",
+      "model": "sonnet",
+      "modelRoutedBy": "explicit"
+    },
+    "typescript-fixer-2": {
+      "agentId": "typescript-fixer-2",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "sonnet"
+      },
+      "createdAt": "2026-01-22T06:28:10.532Z",
+      "model": "sonnet",
+      "modelRoutedBy": "explicit"
+    },
+    "typescript-fixer-3": {
+      "agentId": "typescript-fixer-3",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "sonnet"
+      },
+      "createdAt": "2026-01-22T06:28:10.616Z",
+      "model": "sonnet",
+      "modelRoutedBy": "explicit"
+    },
+    "typescript-fixer-4": {
+      "agentId": "typescript-fixer-4",
+      "agentType": "coder",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "sonnet"
+      },
+      "createdAt": "2026-01-22T06:28:10.671Z",
+      "model": "sonnet",
+      "modelRoutedBy": "explicit"
     }
   },
   "version": "3.0.0"

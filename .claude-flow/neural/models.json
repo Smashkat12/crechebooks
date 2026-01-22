@@ -25,6 +25,19 @@
         "batchSize": 32
       },
       "trainedAt": "2026-01-20T01:22:11.631Z"
+    },
+    "model-1769046856724-3was": {
+      "id": "model-1769046856724-3was",
+      "name": "moe-model",
+      "type": "moe",
+      "status": "ready",
+      "accuracy": 0.8971054802669506,
+      "epochs": 10,
+      "config": {
+        "learningRate": 0.001,
+        "batchSize": 32
+      },
+      "trainedAt": "2026-01-22T01:54:16.825Z"
     }
   },
   "patterns": {},

@@ -13,6 +13,15 @@
  * - Manage their employment profile
  */
 
+// Layout components
 export { StaffHeader } from './staff-header';
 export { StaffSidebar } from './staff-sidebar';
 export { StaffMobileNav, StaffBottomNav } from './staff-mobile-nav';
+
+// Dashboard components (TASK-PORTAL-022)
+export { EmploymentCard } from './employment-card';
+export { RecentPayslips } from './recent-payslips';
+export { LeaveBalanceCard } from './leave-balance-card';
+export { NextPayCard } from './next-pay-card';
+export { Announcements } from './announcements';
+export { YtdEarnings } from './ytd-earnings';

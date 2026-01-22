@@ -248,7 +248,7 @@ export class ArrearsReportPdfService {
           'Error creating arrears PDF document',
           error instanceof Error ? error.stack : String(error),
         );
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }

@@ -13,7 +13,6 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
-import { InvoiceLine } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { InvoiceRepository } from '../repositories/invoice.repository';
@@ -29,7 +28,6 @@ import {
 import {
   NotFoundException,
   ValidationException,
-  ForbiddenException,
 } from '../../shared/exceptions';
 
 // Configure Decimal.js for banker's rounding
@@ -105,7 +103,7 @@ export class AdhocChargeService {
     }
 
     // Validate invoice status - only DRAFT invoices can be modified
-    if (invoice.status !== InvoiceStatus.DRAFT) {
+    if (invoice.status !== (InvoiceStatus.DRAFT as string)) {
       this.logger.warn(
         `Attempted to add charge to non-DRAFT invoice ${invoiceId} with status ${invoice.status}`,
       );
@@ -266,7 +264,7 @@ export class AdhocChargeService {
     }
 
     // Validate invoice status - only DRAFT invoices can be modified
-    if (invoice.status !== InvoiceStatus.DRAFT) {
+    if (invoice.status !== (InvoiceStatus.DRAFT as string)) {
       this.logger.warn(
         `Attempted to remove charge from non-DRAFT invoice ${invoiceId} with status ${invoice.status}`,
       );
@@ -307,7 +305,7 @@ export class AdhocChargeService {
     }
 
     // Verify the line is an ad-hoc charge (EXTRA type)
-    if (line.lineType !== LineType.EXTRA) {
+    if (line.lineType !== (LineType.EXTRA as string)) {
       this.logger.warn(
         `Attempted to remove non-EXTRA line ${lineId} with lineType ${line.lineType}`,
       );
@@ -396,7 +394,7 @@ export class AdhocChargeService {
 
     // Filter for EXTRA type lines (ad-hoc charges)
     const extraLines = allLines.filter(
-      (line) => line.lineType === LineType.EXTRA,
+      (line) => line.lineType === (LineType.EXTRA as string),
     );
 
     // Calculate total amount (excluding VAT)

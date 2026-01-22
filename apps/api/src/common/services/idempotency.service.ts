@@ -322,7 +322,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
    * @param key - Unique idempotency key
    * @returns The stored result, or null if not found
    */
-  async getStoredResult(key: string): Promise<unknown | null> {
+  async getStoredResult(key: string): Promise<unknown> {
     if (!this.redis || !this.isConnected) {
       return null; // Graceful degradation
     }

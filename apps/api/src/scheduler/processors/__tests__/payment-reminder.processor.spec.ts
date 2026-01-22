@@ -373,9 +373,11 @@ describe('PaymentReminderProcessor', () => {
 });
 
 describe('Reminder Stage Detection', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const {
     getStageForDaysOverdue,
   } = require('../../../billing/types/reminder.types');
+  /* eslint-enable @typescript-eslint/no-require-imports */
 
   it('should return null for invoices not yet at threshold', () => {
     expect(getStageForDaysOverdue(0)).toBeNull();
@@ -409,11 +411,13 @@ describe('Reminder Stage Detection', () => {
 });
 
 describe('Default Reminder Schedule', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const {
     DEFAULT_REMINDER_SCHEDULE,
     getScheduleForStage,
     shouldUseWhatsApp,
   } = require('../../../billing/types/reminder.types');
+  /* eslint-enable @typescript-eslint/no-require-imports */
 
   it('should have 4 stages defined', () => {
     expect(DEFAULT_REMINDER_SCHEDULE.length).toBe(4);

@@ -280,14 +280,14 @@ export class SetSalaryStep implements IPipelineStep {
     }
   }
 
-  async rollback(context: SetupPipelineContext): Promise<boolean> {
+  rollback(_context: SetupPipelineContext): Promise<boolean> {
     // On rollback, we could set salary to 0, but that might cause issues
     // Better to leave the salary as-is since the employee record itself
     // will be deleted by CREATE_EMPLOYEE rollback
     this.logger.log(
       `Salary rollback skipped - employee deletion handles cleanup`,
     );
-    return true;
+    return Promise.resolve(true);
   }
 
   shouldSkip(context: SetupPipelineContext): boolean {

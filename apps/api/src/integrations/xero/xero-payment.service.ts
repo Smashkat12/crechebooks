@@ -552,7 +552,7 @@ export class XeroPaymentService {
   /**
    * Get access token using TokenManager pattern.
    */
-  private async getAccessToken(tenantId: string): Promise<string> {
+  private getAccessToken(tenantId: string): Promise<string> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { TokenManager } = require('../../mcp/xero-mcp/auth/token-manager');
     const tokenManager = new TokenManager(this.prisma);

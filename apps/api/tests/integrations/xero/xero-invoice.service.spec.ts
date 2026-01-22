@@ -155,8 +155,8 @@ describe('XeroInvoiceService', () => {
       {
         InvoiceID: 'xero-invoice-abc123',
         InvoiceNumber: 'INV-0001',
-        Type: 'ACCREC',
-        Status: 'AUTHORISED',
+        Type: 'ACCREC' as const,
+        Status: 'AUTHORISED' as const,
         Contact: {
           ContactID: 'xero-contact-xyz789',
           Name: 'Sipho Mthembu',

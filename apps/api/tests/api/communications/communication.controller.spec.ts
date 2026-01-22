@@ -35,11 +35,13 @@ describe('CommunicationController', () => {
   const mockUser: IUser = {
     id: mockUserId,
     tenantId: mockTenantId,
+    auth0Id: 'auth0|admin123',
     email: 'admin@test.com',
-    role: 'ADMIN',
-    firstName: 'Test',
-    lastName: 'Admin',
+    name: 'Test Admin',
+    role: 'ADMIN' as any,
     isActive: true,
+    lastLoginAt: null,
+    currentTenantId: mockTenantId,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -208,7 +210,10 @@ describe('CommunicationController', () => {
     it('should cancel a pending broadcast', async () => {
       adhocService.cancelBroadcast.mockResolvedValue(undefined);
 
-      const result = await controller.cancelBroadcast('broadcast-123', mockUser);
+      const result = await controller.cancelBroadcast(
+        'broadcast-123',
+        mockUser,
+      );
 
       expect(result.message).toBe('Broadcast cancelled');
       expect(adhocService.cancelBroadcast).toHaveBeenCalledWith(
@@ -223,7 +228,10 @@ describe('CommunicationController', () => {
     it('should return paginated list of broadcasts', async () => {
       adhocService.listBroadcasts.mockResolvedValue([mockBroadcast]);
 
-      const result = await controller.listBroadcasts({ page: 1, limit: 20 }, mockUser);
+      const result = await controller.listBroadcasts(
+        { page: 1, limit: 20 },
+        mockUser,
+      );
 
       expect(result.success).toBe(true);
       expect(result.data).toHaveLength(1);

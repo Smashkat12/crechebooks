@@ -12,7 +12,7 @@
  */
 
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
-import { PayFrequency, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { StaffOffboardingRepository } from '../repositories/staff-offboarding.repository';
@@ -369,7 +369,10 @@ export class StaffOffboardingService {
       dto.staffId,
     );
 
-    if (existing && existing.status !== StaffOffboardingStatus.CANCELLED) {
+    if (
+      existing &&
+      existing.status !== (StaffOffboardingStatus.CANCELLED as string)
+    ) {
       throw new ConflictException(
         'Offboarding already exists for this staff member',
         { staffId: dto.staffId, existingId: existing.id },
@@ -757,7 +760,7 @@ export class StaffOffboardingService {
       throw new NotFoundException('Offboarding', offboardingId);
     }
 
-    if (offboarding.status === StaffOffboardingStatus.COMPLETED) {
+    if (offboarding.status === (StaffOffboardingStatus.COMPLETED as string)) {
       throw new BusinessException(
         'Cannot cancel a completed offboarding',
         'OFFBOARDING_ALREADY_COMPLETED',
@@ -991,7 +994,7 @@ export class StaffOffboardingService {
       throw new NotFoundException('Offboarding', offboardingId);
     }
 
-    if (offboarding.status !== StaffOffboardingStatus.COMPLETED) {
+    if (offboarding.status !== (StaffOffboardingStatus.COMPLETED as string)) {
       throw new BusinessException(
         'Can only retry SimplePay sync for completed offboardings',
         'OFFBOARDING_NOT_COMPLETED',

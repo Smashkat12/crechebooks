@@ -139,7 +139,9 @@ describe('SplitTransactionMatcherService', () => {
 
   describe('suggestSplitMatches', () => {
     it('should return empty array when not enough unpaid invoices', async () => {
-      prisma.invoice.findMany.mockResolvedValue([mockUnpaidInvoices[0]]);
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue([
+        mockUnpaidInvoices[0],
+      ]);
 
       const result = await service.suggestSplitMatches(mockTenantId, {
         bank_transaction_id: mockBankTransactionId,
@@ -150,8 +152,10 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should find exact match combinations', async () => {
-      prisma.invoice.findMany.mockResolvedValue(mockUnpaidInvoices);
-      prisma.splitMatch.create.mockResolvedValue(mockSplitMatch);
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue(
+        mockUnpaidInvoices,
+      );
+      (prisma.splitMatch.create as jest.Mock).mockResolvedValue(mockSplitMatch);
 
       const result = await service.suggestSplitMatches(mockTenantId, {
         bank_transaction_id: mockBankTransactionId,
@@ -164,8 +168,10 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should find match within tolerance', async () => {
-      prisma.invoice.findMany.mockResolvedValue(mockUnpaidInvoices);
-      prisma.splitMatch.create.mockResolvedValue({
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue(
+        mockUnpaidInvoices,
+      );
+      (prisma.splitMatch.create as jest.Mock).mockResolvedValue({
         ...mockSplitMatch,
         matchedAmountCents: 80000,
         remainderCents: 50,
@@ -181,8 +187,10 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should respect max_components limit', async () => {
-      prisma.invoice.findMany.mockResolvedValue(mockUnpaidInvoices);
-      prisma.splitMatch.create.mockResolvedValue(mockSplitMatch);
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue(
+        mockUnpaidInvoices,
+      );
+      (prisma.splitMatch.create as jest.Mock).mockResolvedValue(mockSplitMatch);
 
       await service.suggestSplitMatches(mockTenantId, {
         bank_transaction_id: mockBankTransactionId,
@@ -192,7 +200,7 @@ describe('SplitTransactionMatcherService', () => {
       });
 
       // The create call should only have at most 3 components
-      const createCall = prisma.splitMatch.create.mock.calls[0];
+      const createCall = (prisma.splitMatch.create as jest.Mock).mock.calls[0];
       if (createCall) {
         const data = createCall[0].data;
         expect(data.components?.create?.length || 0).toBeLessThanOrEqual(3);
@@ -200,7 +208,7 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should return empty when no valid combinations found', async () => {
-      prisma.invoice.findMany.mockResolvedValue([
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue([
         {
           id: 'inv-1',
           totalCents: 10000,
@@ -227,7 +235,7 @@ describe('SplitTransactionMatcherService', () => {
 
   describe('confirmSplitMatch', () => {
     it('should throw NotFoundException for non-existent split match', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue(null);
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.confirmSplitMatch(
@@ -241,7 +249,7 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should throw BadRequestException if already confirmed', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue({
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue({
         ...mockSplitMatch,
         status: SplitMatchStatus.CONFIRMED,
       });
@@ -258,7 +266,7 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should throw BadRequestException if already rejected', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue({
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue({
         ...mockSplitMatch,
         status: SplitMatchStatus.REJECTED,
       });
@@ -275,7 +283,9 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should confirm split match and create payments', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue(mockSplitMatch);
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue(
+        mockSplitMatch,
+      );
 
       const confirmedMatch = {
         ...mockSplitMatch,
@@ -284,28 +294,30 @@ describe('SplitTransactionMatcherService', () => {
         confirmedAt: new Date(),
       };
 
-      prisma.$transaction.mockImplementation(async (callback) => {
-        const tx = {
-          splitMatchComponent: {
-            deleteMany: jest.fn(),
-            createMany: jest.fn(),
-          },
-          splitMatch: {
-            update: jest.fn().mockResolvedValue(confirmedMatch),
-          },
-          payment: {
-            create: jest.fn(),
-            aggregate: jest
-              .fn()
-              .mockResolvedValue({ _sum: { amountCents: 50000 } }),
-          },
-          invoice: {
-            findUnique: jest.fn().mockResolvedValue({ totalCents: 50000 }),
-            update: jest.fn(),
-          },
-        };
-        return callback(tx);
-      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const tx = {
+            splitMatchComponent: {
+              deleteMany: jest.fn(),
+              createMany: jest.fn(),
+            },
+            splitMatch: {
+              update: jest.fn().mockResolvedValue(confirmedMatch),
+            },
+            payment: {
+              create: jest.fn(),
+              aggregate: jest
+                .fn()
+                .mockResolvedValue({ _sum: { amountCents: 50000 } }),
+            },
+            invoice: {
+              findUnique: jest.fn().mockResolvedValue({ totalCents: 50000 }),
+              update: jest.fn(),
+            },
+          };
+          return callback(tx);
+        },
+      );
 
       const result = await service.confirmSplitMatch(
         mockTenantId,
@@ -318,7 +330,9 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should allow custom components override', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue(mockSplitMatch);
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue(
+        mockSplitMatch,
+      );
 
       const confirmedMatch = {
         ...mockSplitMatch,
@@ -329,28 +343,30 @@ describe('SplitTransactionMatcherService', () => {
         remainderCents: 10000,
       };
 
-      prisma.$transaction.mockImplementation(async (callback) => {
-        const tx = {
-          splitMatchComponent: {
-            deleteMany: jest.fn(),
-            createMany: jest.fn(),
-          },
-          splitMatch: {
-            update: jest.fn().mockResolvedValue(confirmedMatch),
-          },
-          payment: {
-            create: jest.fn(),
-            aggregate: jest
-              .fn()
-              .mockResolvedValue({ _sum: { amountCents: 50000 } }),
-          },
-          invoice: {
-            findUnique: jest.fn().mockResolvedValue({ totalCents: 50000 }),
-            update: jest.fn(),
-          },
-        };
-        return callback(tx);
-      });
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const tx = {
+            splitMatchComponent: {
+              deleteMany: jest.fn(),
+              createMany: jest.fn(),
+            },
+            splitMatch: {
+              update: jest.fn().mockResolvedValue(confirmedMatch),
+            },
+            payment: {
+              create: jest.fn(),
+              aggregate: jest
+                .fn()
+                .mockResolvedValue({ _sum: { amountCents: 50000 } }),
+            },
+            invoice: {
+              findUnique: jest.fn().mockResolvedValue({ totalCents: 50000 }),
+              update: jest.fn(),
+            },
+          };
+          return callback(tx);
+        },
+      );
 
       const result = await service.confirmSplitMatch(
         mockTenantId,
@@ -370,7 +386,7 @@ describe('SplitTransactionMatcherService', () => {
 
   describe('rejectSplitMatch', () => {
     it('should throw NotFoundException for non-existent split match', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue(null);
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.rejectSplitMatch(mockTenantId, 'non-existent'),
@@ -378,7 +394,7 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should throw BadRequestException if already confirmed', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue({
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue({
         ...mockSplitMatch,
         status: SplitMatchStatus.CONFIRMED,
       });
@@ -389,8 +405,10 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should reject pending split match', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue(mockSplitMatch);
-      prisma.splitMatch.update.mockResolvedValue({
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue(
+        mockSplitMatch,
+      );
+      (prisma.splitMatch.update as jest.Mock).mockResolvedValue({
         ...mockSplitMatch,
         status: SplitMatchStatus.REJECTED,
       });
@@ -412,8 +430,10 @@ describe('SplitTransactionMatcherService', () => {
 
   describe('getSplitMatches', () => {
     it('should return paginated results', async () => {
-      prisma.splitMatch.findMany.mockResolvedValue([mockSplitMatch]);
-      prisma.splitMatch.count.mockResolvedValue(1);
+      (prisma.splitMatch.findMany as jest.Mock).mockResolvedValue([
+        mockSplitMatch,
+      ]);
+      (prisma.splitMatch.count as jest.Mock).mockResolvedValue(1);
 
       const result = await service.getSplitMatches(mockTenantId, {
         page: 1,
@@ -428,8 +448,8 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should filter by status', async () => {
-      prisma.splitMatch.findMany.mockResolvedValue([]);
-      prisma.splitMatch.count.mockResolvedValue(0);
+      (prisma.splitMatch.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.splitMatch.count as jest.Mock).mockResolvedValue(0);
 
       await service.getSplitMatches(mockTenantId, {
         status: 'PENDING' as any,
@@ -445,8 +465,8 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should filter by match_type', async () => {
-      prisma.splitMatch.findMany.mockResolvedValue([]);
-      prisma.splitMatch.count.mockResolvedValue(0);
+      (prisma.splitMatch.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.splitMatch.count as jest.Mock).mockResolvedValue(0);
 
       await service.getSplitMatches(mockTenantId, {
         match_type: 'ONE_TO_MANY' as any,
@@ -464,7 +484,9 @@ describe('SplitTransactionMatcherService', () => {
 
   describe('getSplitMatchById', () => {
     it('should return split match by ID', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue(mockSplitMatch);
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue(
+        mockSplitMatch,
+      );
 
       const result = await service.getSplitMatchById(
         mockTenantId,
@@ -477,7 +499,7 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should throw NotFoundException for non-existent split match', async () => {
-      prisma.splitMatch.findFirst.mockResolvedValue(null);
+      (prisma.splitMatch.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.getSplitMatchById(mockTenantId, 'non-existent'),
@@ -490,10 +512,12 @@ describe('SplitTransactionMatcherService', () => {
       // R500 + R300 = R800
       // R500 + R200 + R100 = R800
       // R300 + R200 + R150 + R100 = R750 (within R100 tolerance of R800)
-      prisma.invoice.findMany.mockResolvedValue(mockUnpaidInvoices);
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue(
+        mockUnpaidInvoices,
+      );
 
       let createCallCount = 0;
-      prisma.splitMatch.create.mockImplementation(() => {
+      (prisma.splitMatch.create as jest.Mock).mockImplementation(() => {
         createCallCount++;
         return Promise.resolve({
           ...mockSplitMatch,
@@ -512,10 +536,12 @@ describe('SplitTransactionMatcherService', () => {
     });
 
     it('should prioritize exact matches over partial matches', async () => {
-      prisma.invoice.findMany.mockResolvedValue(mockUnpaidInvoices);
+      (prisma.invoice.findMany as jest.Mock).mockResolvedValue(
+        mockUnpaidInvoices,
+      );
 
       const createdMatches: any[] = [];
-      prisma.splitMatch.create.mockImplementation((args) => {
+      (prisma.splitMatch.create as jest.Mock).mockImplementation((args) => {
         const match = {
           ...mockSplitMatch,
           id: `split-match-${createdMatches.length + 1}`,

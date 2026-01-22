@@ -78,7 +78,7 @@ export class WsJwtGuard implements CanActivate {
       }
 
       // Verify and decode the token
-      const payload = await this.verifyToken(token);
+      const payload = this.verifyToken(token);
 
       // Validate token expiration
       if (payload.exp && payload.exp <= Math.floor(Date.now() / 1000)) {
@@ -153,7 +153,7 @@ export class WsJwtGuard implements CanActivate {
   /**
    * Verify JWT token
    */
-  private async verifyToken(token: string): Promise<JwtPayload> {
+  private verifyToken(token: string): JwtPayload {
     if (this.isLocalDev && this.jwtSecret) {
       // Local development: verify with symmetric key
       try {

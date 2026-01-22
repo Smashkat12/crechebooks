@@ -56,10 +56,11 @@ describe('WhatsAppMessageEntity', () => {
         name: 'WA-001 Test Tenant',
         email: 'wa-test@example.com',
         phone: '+27110001234',
-        address: '123 Test Street, Test City',
-        taxStatus: TaxStatus.NON_VAT,
-        invoicePrefix: 'WATEST',
-        invoiceTerms: 'Due on receipt',
+        addressLine1: '123 Test Street',
+        city: 'Test City',
+        province: 'Gauteng',
+        postalCode: '2000',
+        taxStatus: TaxStatus.NOT_REGISTERED,
       },
     });
 
@@ -73,7 +74,7 @@ describe('WhatsAppMessageEntity', () => {
         phone: '+27821234567',
         preferredContact: PreferredContact.WHATSAPP,
         whatsappOptIn: true,
-        whatsappPhone: '+27821234567',
+        whatsapp: '+27821234567',
       },
     });
 
@@ -84,7 +85,7 @@ describe('WhatsAppMessageEntity', () => {
         parentId: testParent.id,
         firstName: 'Test',
         lastName: 'Child',
-        birthDate: new Date('2020-01-01'),
+        dateOfBirth: new Date('2020-01-01'),
       },
     });
   });

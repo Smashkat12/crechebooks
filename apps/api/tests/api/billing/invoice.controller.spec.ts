@@ -57,6 +57,7 @@ describe('InvoiceController', () => {
     address: null,
     notes: null,
     isActive: true,
+    deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -73,6 +74,7 @@ describe('InvoiceController', () => {
     emergencyContact: null,
     emergencyPhone: null,
     isActive: true,
+    deletedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

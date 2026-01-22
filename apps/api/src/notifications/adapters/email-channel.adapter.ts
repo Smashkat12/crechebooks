@@ -148,11 +148,9 @@ export class EmailChannelAdapter implements INotificationChannel {
    * Get delivery status for email
    * Note: Email doesn't provide real-time status tracking unless using advanced services
    */
-  async getDeliveryStatus(
-    _messageId: string,
-  ): Promise<NotificationDeliveryStatus> {
+  getDeliveryStatus(_messageId: string): Promise<NotificationDeliveryStatus> {
     // Email status tracking would require webhook integration with email provider
     // For now, we assume sent = delivered
-    return NotificationDeliveryStatus.SENT;
+    return Promise.resolve(NotificationDeliveryStatus.SENT);
   }
 }

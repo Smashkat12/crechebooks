@@ -78,9 +78,7 @@ export class StaffPortalController {
     type: StaffDashboardResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getDashboard(
-    @CurrentUser() user: UserPayload,
-  ): Promise<StaffDashboardResponseDto> {
+  getDashboard(@CurrentUser() user: UserPayload): StaffDashboardResponseDto {
     this.logger.log(`Fetching dashboard for staff: ${user.email}`);
 
     // Mock data for now - will integrate with SimplePay later
@@ -170,12 +168,12 @@ export class StaffPortalController {
     type: PayslipsResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getPayslips(
+  getPayslips(
     @CurrentUser() user: UserPayload,
     @Query('year') year?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-  ): Promise<PayslipsResponseDto> {
+  ): PayslipsResponseDto {
     this.logger.log(
       `Fetching payslips for staff: ${user.email}, year: ${year || 'current'}`,
     );
@@ -208,10 +206,10 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Payslip not found' })
-  async getPayslipDetail(
+  getPayslipDetail(
     @CurrentUser() user: UserPayload,
     @Param('id') id: string,
-  ): Promise<PayslipDetailDto> {
+  ): PayslipDetailDto {
     this.logger.log(
       `Fetching payslip detail for staff: ${user.email}, id: ${id}`,
     );
@@ -231,11 +229,11 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Payslip not found' })
-  async downloadPayslipPdf(
+  downloadPayslipPdf(
     @CurrentUser() user: UserPayload,
     @Param('id') id: string,
     @Res() res: Response,
-  ): Promise<void> {
+  ): void {
     this.logger.log(
       `Downloading payslip PDF for staff: ${user.email}, id: ${id}`,
     );
@@ -332,9 +330,7 @@ export class StaffPortalController {
     type: LeaveBalancesResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getLeaveBalances(
-    @CurrentUser() user: UserPayload,
-  ): Promise<LeaveBalancesResponseDto> {
+  getLeaveBalances(@CurrentUser() user: UserPayload): LeaveBalancesResponseDto {
     this.logger.log(`Fetching leave balances for staff: ${user.email}`);
 
     const year = new Date().getFullYear();
@@ -408,12 +404,12 @@ export class StaffPortalController {
     type: LeaveRequestsResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getLeaveRequests(
+  getLeaveRequests(
     @CurrentUser() user: UserPayload,
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-  ): Promise<LeaveRequestsResponseDto> {
+  ): LeaveRequestsResponseDto {
     this.logger.log(`Fetching leave requests for staff: ${user.email}`);
 
     // Get or initialize user's leave requests
@@ -426,7 +422,9 @@ export class StaffPortalController {
     // Filter by status if provided
     let filteredRequests = requests;
     if (status && status !== 'all') {
-      filteredRequests = requests.filter((r) => r.status === status);
+      filteredRequests = requests.filter(
+        (r) => r.status === (status as LeaveStatus),
+      );
     }
 
     // Sort by createdAt descending
@@ -456,10 +454,10 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 400, description: 'Invalid request data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async createLeaveRequest(
+  createLeaveRequest(
     @CurrentUser() user: UserPayload,
     @Body() createDto: CreateLeaveRequestDto,
-  ): Promise<LeaveRequestSuccessDto> {
+  ): LeaveRequestSuccessDto {
     this.logger.log(`Creating leave request for staff: ${user.email}`);
 
     const startDate = new Date(createDto.startDate);
@@ -525,10 +523,10 @@ export class StaffPortalController {
   @ApiResponse({ status: 400, description: 'Request cannot be cancelled' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Leave request not found' })
-  async cancelLeaveRequest(
+  cancelLeaveRequest(
     @CurrentUser() user: UserPayload,
     @Param('id') id: string,
-  ): Promise<LeaveRequestSuccessDto> {
+  ): LeaveRequestSuccessDto {
     this.logger.log(`Cancelling leave request ${id} for staff: ${user.email}`);
 
     const userRequests = this.mockLeaveRequests.get(user.sub) || [];
@@ -669,10 +667,10 @@ export class StaffPortalController {
     type: IRP5ListResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getIRP5Documents(
+  getIRP5Documents(
     @CurrentUser() user: UserPayload,
     @Query('taxYear') taxYear?: string,
-  ): Promise<IRP5ListResponseDto> {
+  ): IRP5ListResponseDto {
     this.logger.log(
       `Fetching IRP5 documents for staff: ${user.email}, taxYear: ${taxYear || 'all'}`,
     );
@@ -714,16 +712,17 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'IRP5 document not found' })
-  async downloadIRP5Pdf(
+  downloadIRP5Pdf(
     @CurrentUser() user: UserPayload,
     @Param('id') id: string,
     @Res() res: Response,
-  ): Promise<void> {
+  ): void {
     this.logger.log(`Downloading IRP5 PDF for staff: ${user.email}, id: ${id}`);
 
     // Extract tax year from ID (e.g., irp5-2024-001 -> 2024)
     const parts = id.split('-');
-    const taxYear = parts.length >= 2 ? parts[1] : new Date().getFullYear().toString();
+    const taxYear =
+      parts.length >= 2 ? parts[1] : new Date().getFullYear().toString();
 
     res.set({
       'Content-Disposition': `attachment; filename="IRP5-${taxYear}.pdf"`,
@@ -746,19 +745,14 @@ export class StaffPortalController {
       id: `irp5-${year}-001`,
       taxYear: year,
       taxYearPeriod: `${year - 1}/${year}`,
-      status:
-        year === currentYear
-          ? IRP5Status.PENDING
-          : IRP5Status.AVAILABLE,
+      status: year === currentYear ? IRP5Status.PENDING : IRP5Status.AVAILABLE,
       availableDate: new Date(year, 2, 1), // March 1st of tax year
       referenceNumber:
         year !== currentYear
           ? `IRP5/${year}/${100000 + index * 12345}`
           : undefined,
       lastDownloadDate:
-        index > 0 && index < 3
-          ? new Date(year, 3 + index, 15)
-          : undefined,
+        index > 0 && index < 3 ? new Date(year, 3 + index, 15) : undefined,
     }));
   }
 
@@ -776,7 +770,7 @@ export class StaffPortalController {
     type: StaffProfileDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProfile(@CurrentUser() user: UserPayload): Promise<StaffProfileDto> {
+  getProfile(@CurrentUser() user: UserPayload): StaffProfileDto {
     this.logger.log(`Fetching profile for staff: ${user.email}`);
 
     return this.generateMockProfile(user);
@@ -795,10 +789,10 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 400, description: 'Invalid update data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async updateProfile(
+  updateProfile(
     @CurrentUser() user: UserPayload,
     @Body() updateDto: UpdateProfileDto,
-  ): Promise<ProfileUpdateSuccessDto> {
+  ): ProfileUpdateSuccessDto {
     this.logger.log(`Updating profile for staff: ${user.email}`);
 
     // In production, this would update the database
@@ -851,9 +845,7 @@ export class StaffPortalController {
     type: BankingDetailsDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getBankingDetails(
-    @CurrentUser() user: UserPayload,
-  ): Promise<BankingDetailsDto> {
+  getBankingDetails(@CurrentUser() user: UserPayload): BankingDetailsDto {
     this.logger.log(`Fetching banking details for staff: ${user.email}`);
 
     return {

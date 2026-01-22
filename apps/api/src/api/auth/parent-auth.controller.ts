@@ -127,7 +127,7 @@ export class ParentAuthController {
     const parent = await this.magicLinkService.verifyMagicLink(dto.token);
 
     // Create session token
-    const session = await this.magicLinkService.createParentSession(
+    const session = this.magicLinkService.createParentSession(
       parent.id,
       parent.email,
       parent.tenantId,
@@ -165,7 +165,7 @@ export class ParentAuthController {
     description: 'Logout successful',
     type: ParentLogoutResponseDto,
   })
-  async logout(): Promise<ParentLogoutResponseDto> {
+  logout(): ParentLogoutResponseDto {
     // In a stateless JWT system, logout is handled client-side
     // Could implement token blacklisting here if needed
     return {
@@ -181,7 +181,8 @@ export class ParentAuthController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current parent info',
-    description: 'Returns information about the currently authenticated parent.',
+    description:
+      'Returns information about the currently authenticated parent.',
   })
   @ApiResponse({
     status: 200,

@@ -69,10 +69,16 @@ export class PayslipSummaryDto {
 }
 
 export class PayslipDetailDto extends PayslipSummaryDto {
-  @ApiProperty({ type: [EarningsItemDto], description: 'List of earnings items' })
+  @ApiProperty({
+    type: [EarningsItemDto],
+    description: 'List of earnings items',
+  })
   earnings: EarningsItemDto[];
 
-  @ApiProperty({ type: [DeductionItemDto], description: 'List of deduction items' })
+  @ApiProperty({
+    type: [DeductionItemDto],
+    description: 'List of deduction items',
+  })
   deductions: DeductionItemDto[];
 
   @ApiProperty({

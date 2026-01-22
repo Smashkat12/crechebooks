@@ -211,7 +211,7 @@ export class WhatsAppMessageEntity {
       const statusCount = count._count.status;
       summary.total += statusCount;
 
-      switch (count.status) {
+      switch (count.status as WhatsAppMessageStatus) {
         case WhatsAppMessageStatus.PENDING:
           summary.pending = statusCount;
           break;

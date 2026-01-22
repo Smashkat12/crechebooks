@@ -116,7 +116,8 @@ export class InvoiceVatService {
       throw new Error(`Tenant ${tenantId} not found`);
     }
 
-    const isVatRegistered = tenant.taxStatus === TaxStatus.VAT_REGISTERED;
+    const isVatRegistered =
+      String(tenant.taxStatus) === String(TaxStatus.VAT_REGISTERED);
 
     // Check if invoice date is after registration date
     let vatApplied = false;

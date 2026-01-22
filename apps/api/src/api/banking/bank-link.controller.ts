@@ -492,11 +492,11 @@ export class BankLinkController {
       },
     },
   })
-  async getSyncStatus(): Promise<{
+  getSyncStatus(): {
     enabled: boolean;
     isRunning: boolean;
     currentJobId: string | null;
-  }> {
+  } {
     return {
       enabled: this.bankSyncJob.isEnabled(),
       isRunning: this.bankSyncJob.isJobRunning(),

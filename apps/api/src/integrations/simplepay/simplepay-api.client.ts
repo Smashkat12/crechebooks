@@ -74,7 +74,7 @@ export class SimplePayApiClient {
       throw new Error('SimplePay connection is not active');
     }
 
-    const apiKey = await this.encryptionService.decrypt(connection.apiKey);
+    const apiKey = this.encryptionService.decrypt(connection.apiKey);
 
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,

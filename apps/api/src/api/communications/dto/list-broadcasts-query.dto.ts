@@ -5,13 +5,7 @@
  * Query parameters for listing broadcasts with filtering and pagination.
  */
 
-import {
-  IsOptional,
-  IsEnum,
-  IsNumber,
-  Min,
-  Max,
-} from 'class-validator';
+import { IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {

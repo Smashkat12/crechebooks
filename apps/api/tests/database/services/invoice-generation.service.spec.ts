@@ -884,13 +884,13 @@ describe('InvoiceGenerationService', () => {
 
       // Fee line does NOT have VAT (MONTHLY_FEE is VAT exempt for educational services)
       const feeLine = invoice!.lines.find(
-        (l) => l.lineType === LineType.MONTHLY_FEE,
+        (l) => String(l.lineType) === String(LineType.MONTHLY_FEE),
       );
       expect(feeLine!.vatCents).toBe(0); // Educational services are VAT exempt
 
       // Discount line also has NO VAT (discounts never have VAT)
       const discountLine = invoice!.lines.find(
-        (l) => l.lineType === LineType.DISCOUNT,
+        (l) => String(l.lineType) === String(LineType.DISCOUNT),
       );
       expect(discountLine!.vatCents).toBe(0);
     });

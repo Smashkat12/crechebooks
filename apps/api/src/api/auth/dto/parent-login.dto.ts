@@ -49,7 +49,8 @@ export class ParentMagicLinkResponseDto {
   success: boolean;
 
   @ApiProperty({
-    example: 'If this email is registered, you will receive a magic link shortly',
+    example:
+      'If this email is registered, you will receive a magic link shortly',
     description: 'Generic message (does not reveal if email exists)',
   })
   message: string;
@@ -116,6 +117,9 @@ export class ParentMeResponseDto extends ParentUserDto {
   @ApiProperty({ example: 'tenant-uuid-123' })
   tenantId: string;
 
-  @ApiPropertyOptional({ example: 2, description: 'Number of enrolled children' })
+  @ApiPropertyOptional({
+    example: 2,
+    description: 'Number of enrolled children',
+  })
   childrenCount?: number;
 }

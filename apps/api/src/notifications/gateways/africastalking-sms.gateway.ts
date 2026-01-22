@@ -87,7 +87,8 @@ export class AfricasTalkingSmsGateway implements ISmsGateway {
 
     try {
       // Dynamic import to avoid issues if package not installed
-
+      // Note: Using synchronous require in constructor, as async would change initialization pattern
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const AfricasTalking = require('africastalking');
       const client: AfricasTalkingSDK = AfricasTalking({
         apiKey,

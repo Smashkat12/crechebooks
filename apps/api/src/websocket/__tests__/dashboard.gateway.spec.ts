@@ -106,7 +106,7 @@ describe('DashboardGateway', () => {
 
   describe('handleConnection', () => {
     it('should accept connection when under limit', async () => {
-      await gateway.handleConnection(mockSocket as Socket);
+      gateway.handleConnection(mockSocket as unknown as Socket);
       expect(mockSocket.disconnect).not.toHaveBeenCalled();
       expect(gateway.getConnectionCount()).toBe(1);
     });
@@ -114,10 +114,10 @@ describe('DashboardGateway', () => {
     it('should reject connection when limit reached', async () => {
       // Set connection count to max
       for (let i = 0; i < 1000; i++) {
-        await gateway.handleConnection({
+        gateway.handleConnection({
           ...mockSocket,
           id: `socket-${i}`,
-        } as Socket);
+        } as unknown as Socket);
       }
 
       const newSocket: Partial<Socket> = {
@@ -126,7 +126,7 @@ describe('DashboardGateway', () => {
         disconnect: jest.fn(),
       };
 
-      await gateway.handleConnection(newSocket as Socket);
+      gateway.handleConnection(newSocket as Socket);
       expect(newSocket.emit).toHaveBeenCalledWith(
         DashboardEventType.ERROR,
         expect.objectContaining({
@@ -139,15 +139,15 @@ describe('DashboardGateway', () => {
 
   describe('handleDisconnect', () => {
     it('should decrement connection count', async () => {
-      await gateway.handleConnection(mockSocket as Socket);
+      gateway.handleConnection(mockSocket as unknown as Socket);
       expect(gateway.getConnectionCount()).toBe(1);
 
-      gateway.handleDisconnect(mockSocket as Socket);
+      gateway.handleDisconnect(mockSocket as unknown as Socket);
       expect(gateway.getConnectionCount()).toBe(0);
     });
 
     it('should not go below zero', () => {
-      gateway.handleDisconnect(mockSocket as Socket);
+      gateway.handleDisconnect(mockSocket as unknown as Socket);
       expect(gateway.getConnectionCount()).toBe(0);
     });
   });
@@ -199,7 +199,7 @@ describe('DashboardGateway', () => {
 
   describe('handlePing', () => {
     it('should return pong with timestamp', () => {
-      const result = gateway.handlePing(mockSocket as Socket);
+      const result = gateway.handlePing(mockSocket as unknown as Socket);
 
       expect(result.event).toBe('pong');
       expect(result.data.timestamp).toBeDefined();

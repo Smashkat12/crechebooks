@@ -42,10 +42,10 @@ export class PoolHealthIndicator extends HealthIndicator {
    * @returns Health indicator result
    * @throws HealthCheckError if pool utilization exceeds critical threshold
    */
-  async isHealthy(
+  isHealthy(
     key: string = 'database_pool',
     options?: PoolHealthOptions,
-  ): Promise<HealthIndicatorResult> {
+  ): HealthIndicatorResult {
     const warningThreshold =
       options?.warningThreshold ?? this.DEFAULT_WARNING_THRESHOLD;
     const criticalThreshold =

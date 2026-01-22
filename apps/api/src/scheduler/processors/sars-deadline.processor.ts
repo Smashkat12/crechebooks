@@ -72,7 +72,7 @@ export class SarsDeadlineProcessor extends BaseProcessor<SarsDeadlineJobData> {
       // Log job completion
       await job.progress(100);
     } catch (error) {
-      await this.handleError(
+      this.handleError(
         error instanceof Error ? error : new Error(String(error)),
         {
           file: 'sars-deadline.processor.ts',
@@ -127,7 +127,7 @@ export class SarsDeadlineProcessor extends BaseProcessor<SarsDeadlineJobData> {
     for (const channel of prefs.channels) {
       try {
         if (channel === 'email') {
-          await this.sendEmailReminder(prefs.recipientEmails, subject, body);
+          this.sendEmailReminder(prefs.recipientEmails, subject, body);
         } else if (channel === 'whatsapp') {
           // WhatsApp integration pending (TASK-BILL-015)
           this.logger.debug('WhatsApp channel pending implementation');

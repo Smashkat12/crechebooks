@@ -150,7 +150,7 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
       // Mark job as complete
       await job.progress(100);
     } catch (error) {
-      await this.handleError(
+      this.handleError(
         error instanceof Error ? error : new Error(String(error)),
         {
           file: 'statement-scheduler.processor.ts',

@@ -485,8 +485,25 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
       mockMatchRepo.findByReconciliationId.mockResolvedValue([
         {
           id: matchId,
-          status: BankStatementMatchStatus.MATCHED,
+          tenantId,
+          reconciliationId,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Bank Payment',
+          bankAmountCents: 10000,
+          bankIsCredit: true,
           transactionId,
+          xeroDate: new Date('2025-01-15'),
+          xeroDescription: 'Xero Transaction',
+          xeroAmountCents: 10000,
+          xeroIsCredit: true,
+          status: BankStatementMatchStatus.MATCHED,
+          matchConfidence: { toNumber: () => 1.0 } as any,
+          discrepancyReason: null,
+          isFeeAdjustedMatch: false,
+          feeType: null,
+          accruedFeeAmountCents: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ]);
       mockPrisma.reconciliation.findUnique.mockResolvedValue({
@@ -1116,7 +1133,7 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
     it('should return MATCHED status for exact match', () => {
       mockToleranceConfig.isWithinTolerance.mockReturnValue(true);
       mockToleranceConfig.isDateWithinTolerance.mockReturnValue(true);
-      mockToleranceConfig.descriptionSimilarityThreshold = 0.6;
+      (mockToleranceConfig as any).descriptionSimilarityThreshold = 0.6;
 
       const bankTx: ParsedBankTransaction = {
         date: new Date('2025-01-15'),
@@ -1142,7 +1159,7 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
     it('should return AMOUNT_MISMATCH for significant amount difference', () => {
       mockToleranceConfig.isWithinTolerance.mockReturnValue(false);
       mockToleranceConfig.isDateWithinTolerance.mockReturnValue(true);
-      mockToleranceConfig.descriptionSimilarityThreshold = 0.6;
+      (mockToleranceConfig as any).descriptionSimilarityThreshold = 0.6;
       mockToleranceConfig.getEffectiveTolerance.mockReturnValue(100);
 
       const bankTx: ParsedBankTransaction = {
@@ -1168,7 +1185,7 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
     it('should return DATE_MISMATCH for date difference outside tolerance', () => {
       mockToleranceConfig.isWithinTolerance.mockReturnValue(true);
       mockToleranceConfig.isDateWithinTolerance.mockReturnValue(false);
-      mockToleranceConfig.descriptionSimilarityThreshold = 0.6;
+      (mockToleranceConfig as any).descriptionSimilarityThreshold = 0.6;
 
       const bankTx: ParsedBankTransaction = {
         date: new Date('2025-01-15'),
@@ -1193,7 +1210,7 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
     it('should return IN_BANK_ONLY for low description similarity', () => {
       mockToleranceConfig.isWithinTolerance.mockReturnValue(true);
       mockToleranceConfig.isDateWithinTolerance.mockReturnValue(true);
-      mockToleranceConfig.descriptionSimilarityThreshold = 0.9; // High threshold
+      (mockToleranceConfig as any).descriptionSimilarityThreshold = 0.9; // High threshold
 
       const bankTx: ParsedBankTransaction = {
         date: new Date('2025-01-15'),
@@ -1217,7 +1234,7 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
     it('should handle credit/debit mismatch', () => {
       mockToleranceConfig.isWithinTolerance.mockReturnValue(true);
       mockToleranceConfig.isDateWithinTolerance.mockReturnValue(true);
-      mockToleranceConfig.descriptionSimilarityThreshold = 0.6;
+      (mockToleranceConfig as any).descriptionSimilarityThreshold = 0.6;
 
       const bankTx: ParsedBankTransaction = {
         date: new Date('2025-01-15'),

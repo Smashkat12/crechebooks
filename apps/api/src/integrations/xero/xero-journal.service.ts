@@ -332,24 +332,17 @@ export class XeroJournalService {
   ): Promise<JournalResponseDto> {
     const url = `${this.xeroApiBaseUrl}/ManualJournals`;
 
-    let response: AxiosResponse<XeroManualJournalResponse>;
-
-    try {
-      response = await firstValueFrom(
-        this.httpService.post<XeroManualJournalResponse>(url, payload, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'xero-tenant-id': xeroTenantId,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          timeout: 30000, // 30 second timeout
-        }),
-      );
-    } catch (error) {
-      // Re-throw for retry logic to handle
-      throw error;
-    }
+    const response = await firstValueFrom(
+      this.httpService.post<XeroManualJournalResponse>(url, payload, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'xero-tenant-id': xeroTenantId,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        timeout: 30000, // 30 second timeout
+      }),
+    );
 
     // Parse and validate response
     const journal = response.data.ManualJournals?.[0];
@@ -531,7 +524,7 @@ export class XeroJournalService {
    * @param ms - Milliseconds to sleep
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
 
   /**

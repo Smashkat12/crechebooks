@@ -154,8 +154,12 @@ describe('WhatsAppService', () => {
     };
 
     it('should send invoice notification to parent', async () => {
-      prismaService.parent.findUnique.mockResolvedValue(mockParent);
-      prismaService.invoice.findUnique.mockResolvedValue(mockInvoice);
+      (prismaService.parent.findUnique as jest.Mock).mockResolvedValue(
+        mockParent,
+      );
+      (prismaService.invoice.findUnique as jest.Mock).mockResolvedValue(
+        mockInvoice,
+      );
       mockFetch.mockResolvedValue({
         ok: true,
         json: () =>
@@ -176,7 +180,7 @@ describe('WhatsAppService', () => {
     });
 
     it('should throw if parent not found', async () => {
-      prismaService.parent.findUnique.mockResolvedValue(null);
+      (prismaService.parent.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.sendInvoice('nonexistent', 'invoice-123'),
@@ -184,7 +188,7 @@ describe('WhatsAppService', () => {
     });
 
     it('should throw if parent has not opted in', async () => {
-      prismaService.parent.findUnique.mockResolvedValue({
+      (prismaService.parent.findUnique as jest.Mock).mockResolvedValue({
         ...mockParent,
         whatsappOptIn: false,
       });
@@ -195,7 +199,7 @@ describe('WhatsAppService', () => {
     });
 
     it('should throw if parent has no phone number', async () => {
-      prismaService.parent.findUnique.mockResolvedValue({
+      (prismaService.parent.findUnique as jest.Mock).mockResolvedValue({
         ...mockParent,
         phone: null,
         whatsapp: null,
@@ -207,8 +211,10 @@ describe('WhatsAppService', () => {
     });
 
     it('should throw if invoice not found', async () => {
-      prismaService.parent.findUnique.mockResolvedValue(mockParent);
-      prismaService.invoice.findUnique.mockResolvedValue(null);
+      (prismaService.parent.findUnique as jest.Mock).mockResolvedValue(
+        mockParent,
+      );
+      (prismaService.invoice.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(
         service.sendInvoice('parent-123', 'nonexistent'),
@@ -267,7 +273,9 @@ describe('WhatsAppService', () => {
 
   describe('optOut', () => {
     it('should opt out all parents with matching phone number', async () => {
-      prismaService.parent.updateMany.mockResolvedValue({ count: 2 });
+      (prismaService.parent.updateMany as jest.Mock).mockResolvedValue({
+        count: 2,
+      });
 
       await service.optOut('+27821234567');
 
@@ -285,7 +293,7 @@ describe('WhatsAppService', () => {
 
   describe('optIn', () => {
     it('should opt in a parent', async () => {
-      prismaService.parent.update.mockResolvedValue({
+      (prismaService.parent.update as jest.Mock).mockResolvedValue({
         id: 'parent-123',
         whatsappOptIn: true,
       });
@@ -304,7 +312,9 @@ describe('WhatsAppService', () => {
 
   describe('checkOptIn', () => {
     it('should return true if parent is opted in', async () => {
-      prismaService.parent.findFirst.mockResolvedValue({ id: 'parent-123' });
+      (prismaService.parent.findFirst as jest.Mock).mockResolvedValue({
+        id: 'parent-123',
+      });
 
       const result = await service.checkOptIn('+27821234567');
 
@@ -312,7 +322,7 @@ describe('WhatsAppService', () => {
     });
 
     it('should return false if parent is not opted in', async () => {
-      prismaService.parent.findFirst.mockResolvedValue(null);
+      (prismaService.parent.findFirst as jest.Mock).mockResolvedValue(null);
 
       const result = await service.checkOptIn('+27821234567');
 
@@ -334,7 +344,9 @@ describe('WhatsAppService', () => {
           status: WhatsAppMessageStatus.READ,
         },
       ];
-      messageEntity.findByTenantAndParent.mockResolvedValue(mockMessages);
+      (messageEntity.findByTenantAndParent as jest.Mock).mockResolvedValue(
+        mockMessages,
+      );
 
       const result = await service.getMessageHistory(
         'tenant-123',
@@ -396,7 +408,9 @@ describe('WhatsAppService', () => {
       const mockMessages = [
         { id: 'msg-1', contextType: WhatsAppContextType.STATEMENT },
       ];
-      messageEntity.findByContext.mockResolvedValue(mockMessages);
+      (messageEntity.findByContext as jest.Mock).mockResolvedValue(
+        mockMessages,
+      );
 
       const result = await service.getMessagesByContext(
         'tenant-123',
@@ -487,7 +501,9 @@ describe('WhatsAppService', () => {
         ],
       };
 
-      prismaService.parent.updateMany.mockResolvedValue({ count: 1 });
+      (prismaService.parent.updateMany as jest.Mock).mockResolvedValue({
+        count: 1,
+      });
 
       await service.handleWebhook(optOutPayload);
 

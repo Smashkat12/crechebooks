@@ -227,6 +227,7 @@ describe('WelcomePackDeliveryService', () => {
       data: {
         tenantId: testTenant.id,
         name: 'Full Day Care',
+        feeType: 'FULL_DAY',
         amountCents: 350000, // R3,500
         registrationFeeCents: 50000, // R500
         effectiveFrom: new Date('2025-01-01'),

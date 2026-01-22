@@ -103,7 +103,9 @@ export class StaffMagicLinkService {
 
     if (!staff) {
       // Don't reveal that email doesn't exist - log and return success
-      this.logger.warn(`Staff magic link requested for non-existent email: ${email}`);
+      this.logger.warn(
+        `Staff magic link requested for non-existent email: ${email}`,
+      );
       return true;
     }
 
@@ -291,12 +293,12 @@ The CrecheBooks Team
    * @param simplePayEmployeeId - SimplePay employee ID (optional)
    * @returns Session token and expiry info
    */
-  async createStaffSession(
+  createStaffSession(
     staffId: string,
     email: string,
     tenantId: string,
     simplePayEmployeeId?: string,
-  ): Promise<{ token: string; expiresIn: number }> {
+  ): { token: string; expiresIn: number } {
     const payload: StaffSessionPayload = {
       sub: staffId,
       email,

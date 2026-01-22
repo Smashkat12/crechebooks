@@ -55,18 +55,17 @@ describe('PoolHealthIndicator', () => {
         createMockMetrics({ utilizationPercent: 30 }),
       );
 
-      const result = await indicator.isHealthy('database_pool');
+      const result = indicator.isHealthy('database_pool');
 
       expect(result).toEqual({
         database_pool: {
-          status: 'up',
+          status: 'healthy',
           utilization: '30%',
           active: 2,
           idle: 3,
           total: 5,
           waiting: 0,
           max: 10,
-          status: 'healthy',
         },
       });
     });
@@ -80,7 +79,7 @@ describe('PoolHealthIndicator', () => {
         }),
       );
 
-      const result = await indicator.isHealthy('database_pool');
+      const result = indicator.isHealthy('database_pool');
 
       // The indicator is still "healthy" (doesn't throw), but status field shows "warning"
       expect(result.database_pool).toMatchObject({
@@ -109,7 +108,7 @@ describe('PoolHealthIndicator', () => {
       );
 
       try {
-        await indicator.isHealthy('database_pool');
+        indicator.isHealthy('database_pool');
         fail('Expected HealthCheckError to be thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(HealthCheckError);
@@ -119,14 +118,14 @@ describe('PoolHealthIndicator', () => {
     });
 
     it('should use custom key in result', async () => {
-      const result = await indicator.isHealthy('custom_key');
+      const result = indicator.isHealthy('custom_key');
 
       expect(result).toHaveProperty('custom_key');
       expect(result.custom_key.status).toBe('healthy');
     });
 
     it('should use default key when not provided', async () => {
-      const result = await indicator.isHealthy();
+      const result = indicator.isHealthy();
 
       expect(result).toHaveProperty('database_pool');
     });
@@ -137,11 +136,11 @@ describe('PoolHealthIndicator', () => {
       );
 
       // With default thresholds (80% warning), 70% should be healthy
-      const result1 = await indicator.isHealthy('pool');
+      const result1 = indicator.isHealthy('pool');
       expect(result1.pool.status).toBe('healthy');
 
       // With custom warning threshold of 60%, 70% should show warning
-      const result2 = await indicator.isHealthy('pool', {
+      const result2 = indicator.isHealthy('pool', {
         warningThreshold: 60,
       });
       expect(result2.pool.status).toBe('warning');
@@ -166,7 +165,7 @@ describe('PoolHealthIndicator', () => {
         createMockMetrics({ waitingRequests: 2, utilizationPercent: 50 }),
       );
 
-      const result = await indicator.isHealthy('pool');
+      const result = indicator.isHealthy('pool');
 
       // The indicator is still "healthy" (doesn't throw), but status field shows "degraded"
       expect(result.pool).toMatchObject({
@@ -187,7 +186,7 @@ describe('PoolHealthIndicator', () => {
         }),
       );
 
-      const result = await indicator.isHealthy('pool');
+      const result = indicator.isHealthy('pool');
 
       expect(result.pool).toMatchObject({
         active: 4,
@@ -206,7 +205,7 @@ describe('PoolHealthIndicator', () => {
         createMockMetrics({ utilizationPercent: 80 }),
       );
 
-      const result = await indicator.isHealthy('pool');
+      const result = indicator.isHealthy('pool');
 
       expect(result.pool.status).toBe('warning');
     });
@@ -230,7 +229,7 @@ describe('PoolHealthIndicator', () => {
         }),
       );
 
-      const result = await indicator.isHealthy('pool');
+      const result = indicator.isHealthy('pool');
 
       // With 0% utilization, result should be healthy
       expect(result.pool).toMatchObject({

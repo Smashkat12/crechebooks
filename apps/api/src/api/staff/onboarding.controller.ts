@@ -600,7 +600,9 @@ export class StaffOnboardingController {
         destination: (req, _file, cb) => {
           const tenantId =
             (req as unknown as { user?: IUser }).user?.tenantId || 'default';
-          const staffId = Array.isArray(req.params.staffId) ? req.params.staffId[0] : req.params.staffId;
+          const staffId = Array.isArray(req.params.staffId)
+            ? req.params.staffId[0]
+            : req.params.staffId;
           const uploadPath = path.join(
             process.cwd(),
             'uploads',

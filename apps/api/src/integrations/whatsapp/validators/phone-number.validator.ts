@@ -144,7 +144,7 @@ export function normalizePhoneNumber(phone: string): string {
   }
 
   // Remove common separators (spaces, dashes, dots, parentheses)
-  const cleaned = phone.replace(/[\s\-\.\(\)]/g, '');
+  const cleaned = phone.replace(/[\s\-.()]/g, '');
 
   // If already in E.164 format, validate and return
   if (cleaned.startsWith('+')) {

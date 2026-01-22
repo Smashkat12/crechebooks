@@ -17,7 +17,7 @@ import {
 import {
   BankStatementMatchStatus,
   DuplicateResolutionStatus,
-  MatchType,
+  BankMatchType,
   ParsedBankTransaction,
 } from '../../../src/database/entities/bank-statement-match.entity';
 import { BusinessException } from '../../../src/shared/exceptions';
@@ -125,9 +125,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           createdAt: new Date(),
         };
 
-        prismaService.bankStatementMatch.findFirst.mockResolvedValue(
-          existingMatch,
-        );
+        (
+          prismaService.bankStatementMatch.findFirst as jest.Mock
+        ).mockResolvedValue(existingMatch);
 
         const duplicates = await service.detectDuplicates(
           mockTenantId,
@@ -149,7 +149,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           },
         ];
 
-        prismaService.bankStatementMatch.findFirst.mockResolvedValue(null);
+        (
+          prismaService.bankStatementMatch.findFirst as jest.Mock
+        ).mockResolvedValue(null);
 
         const duplicates = await service.detectDuplicates(
           mockTenantId,
@@ -169,7 +171,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           },
         ];
 
-        prismaService.bankStatementMatch.findFirst.mockResolvedValue(null);
+        (
+          prismaService.bankStatementMatch.findFirst as jest.Mock
+        ).mockResolvedValue(null);
 
         await service.detectDuplicates(mockTenantId, entries);
 
@@ -195,7 +199,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           },
         ];
 
-        prismaService.bankStatementMatch.findFirst.mockResolvedValue(null);
+        (
+          prismaService.bankStatementMatch.findFirst as jest.Mock
+        ).mockResolvedValue(null);
 
         const duplicates = await service.detectDuplicates(
           mockTenantId,
@@ -210,7 +216,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       it('should create false positive resolution', async () => {
         const compositeKey = '2026-01-15|100000|payment from client';
 
-        prismaService.duplicateResolution.upsert.mockResolvedValue({
+        (
+          prismaService.duplicateResolution.upsert as jest.Mock
+        ).mockResolvedValue({
           id: 'resolution-1',
           tenantId: mockTenantId,
           compositeKey,
@@ -249,7 +257,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       it('should create confirmed duplicate resolution', async () => {
         const compositeKey = '2026-01-15|100000|payment from client';
 
-        prismaService.duplicateResolution.upsert.mockResolvedValue({
+        (
+          prismaService.duplicateResolution.upsert as jest.Mock
+        ).mockResolvedValue({
           id: 'resolution-1',
           tenantId: mockTenantId,
           compositeKey,
@@ -277,7 +287,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       it('should return resolution if exists', async () => {
         const compositeKey = '2026-01-15|100000|payment';
 
-        prismaService.duplicateResolution.findUnique.mockResolvedValue({
+        (
+          prismaService.duplicateResolution.findUnique as jest.Mock
+        ).mockResolvedValue({
           id: 'resolution-1',
           tenantId: mockTenantId,
           compositeKey,
@@ -300,7 +312,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       });
 
       it('should return null if no resolution exists', async () => {
-        prismaService.duplicateResolution.findUnique.mockResolvedValue(null);
+        (
+          prismaService.duplicateResolution.findUnique as jest.Mock
+        ).mockResolvedValue(null);
 
         const result = await service.getDuplicateResolution(
           mockTenantId,
@@ -313,7 +327,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
 
     describe('getDuplicateResolutionHistory', () => {
       it('should return paginated history', async () => {
-        prismaService.duplicateResolution.findMany.mockResolvedValue([
+        (
+          prismaService.duplicateResolution.findMany as jest.Mock
+        ).mockResolvedValue([
           {
             id: '1',
             tenantId: mockTenantId,
@@ -345,7 +361,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       });
 
       it('should filter by status', async () => {
-        prismaService.duplicateResolution.findMany.mockResolvedValue([]);
+        (
+          prismaService.duplicateResolution.findMany as jest.Mock
+        ).mockResolvedValue([]);
 
         await service.getDuplicateResolutionHistory(mockTenantId, {
           status: DuplicateResolutionStatus.FALSE_POSITIVE,
@@ -377,6 +395,23 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       bankIsCredit: true,
       transactionId: null,
       status: BankStatementMatchStatus.IN_BANK_ONLY,
+      // Xero/CrecheBooks side (nullable fields)
+      xeroDate: null as Date | null,
+      xeroDescription: null as string | null,
+      xeroAmountCents: null as number | null,
+      xeroIsCredit: null as boolean | null,
+      // Match result fields
+      matchConfidence: null as unknown as
+        | import('@prisma/client').Prisma.Decimal
+        | null,
+      discrepancyReason: null as string | null,
+      // Fee tracking fields (TASK-RECON-036)
+      isFeeAdjustedMatch: false,
+      feeType: null as string | null,
+      accruedFeeAmountCents: null as number | null,
+      // Timestamps
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const mockTransaction = {
@@ -391,15 +426,21 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
     describe('manualMatchWithTracking', () => {
       it('should create manual match with history', async () => {
         matchRepo.findById.mockResolvedValue(mockMatch);
-        prismaService.transaction.findUnique.mockResolvedValue(mockTransaction);
+        (prismaService.transaction.findUnique as jest.Mock).mockResolvedValue(
+          mockTransaction,
+        );
         matchRepo.update.mockResolvedValue({
           ...mockMatch,
           transactionId: mockTransactionId,
           status: BankStatementMatchStatus.MATCHED,
         });
-        prismaService.manualMatchHistory.create.mockResolvedValue({} as any);
+        (
+          prismaService.manualMatchHistory.create as jest.Mock
+        ).mockResolvedValue({} as any);
         matchRepo.findByReconciliationId.mockResolvedValue([]);
-        prismaService.reconciliation.findUnique.mockResolvedValue({
+        (
+          prismaService.reconciliation.findUnique as jest.Mock
+        ).mockResolvedValue({
           id: 'recon-1',
           discrepancyCents: 0,
           status: 'IN_PROGRESS',
@@ -418,7 +459,7 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
         );
 
         expect(result.status).toBe(BankStatementMatchStatus.MATCHED);
-        expect(result.matchType).toBe(MatchType.MANUAL);
+        expect(result.matchType).toBe(BankMatchType.MANUAL);
         expect(result.matchConfidence).toBe(1.0);
         expect(prismaService.manualMatchHistory.create).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -445,7 +486,7 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
         };
 
         matchRepo.findById.mockResolvedValue(incompatibleMatch);
-        prismaService.transaction.findUnique.mockResolvedValue(
+        (prismaService.transaction.findUnique as jest.Mock).mockResolvedValue(
           incompatibleTransaction,
         );
 
@@ -474,7 +515,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
 
       it('should throw if transaction not found', async () => {
         matchRepo.findById.mockResolvedValue(mockMatch);
-        prismaService.transaction.findUnique.mockResolvedValue(null);
+        (prismaService.transaction.findUnique as jest.Mock).mockResolvedValue(
+          null,
+        );
 
         await expect(
           service.manualMatchWithTracking(
@@ -488,7 +531,7 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
 
       it('should throw if transaction belongs to different tenant', async () => {
         matchRepo.findById.mockResolvedValue(mockMatch);
-        prismaService.transaction.findUnique.mockResolvedValue({
+        (prismaService.transaction.findUnique as jest.Mock).mockResolvedValue({
           ...mockTransaction,
           tenantId: 'different-tenant',
         });
@@ -518,10 +561,16 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           transactionId: null,
           status: BankStatementMatchStatus.IN_BANK_ONLY,
         });
-        prismaService.manualMatchHistory.create.mockResolvedValue({} as any);
-        prismaService.transaction.update.mockResolvedValue(mockTransaction);
+        (
+          prismaService.manualMatchHistory.create as jest.Mock
+        ).mockResolvedValue({} as any);
+        (prismaService.transaction.update as jest.Mock).mockResolvedValue(
+          mockTransaction,
+        );
         matchRepo.findByReconciliationId.mockResolvedValue([]);
-        prismaService.reconciliation.findUnique.mockResolvedValue({
+        (
+          prismaService.reconciliation.findUnique as jest.Mock
+        ).mockResolvedValue({
           id: 'recon-1',
           discrepancyCents: 0,
           status: 'IN_PROGRESS',
@@ -569,10 +618,16 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           transactionId: null,
           status: BankStatementMatchStatus.IN_BANK_ONLY,
         });
-        prismaService.manualMatchHistory.create.mockResolvedValue({} as any);
-        prismaService.transaction.update.mockResolvedValue(mockTransaction);
+        (
+          prismaService.manualMatchHistory.create as jest.Mock
+        ).mockResolvedValue({} as any);
+        (prismaService.transaction.update as jest.Mock).mockResolvedValue(
+          mockTransaction,
+        );
         matchRepo.findByReconciliationId.mockResolvedValue([]);
-        prismaService.reconciliation.findUnique.mockResolvedValue({
+        (
+          prismaService.reconciliation.findUnique as jest.Mock
+        ).mockResolvedValue({
           id: 'recon-1',
           discrepancyCents: 0,
           status: 'IN_PROGRESS',
@@ -611,19 +666,25 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           status: BankStatementMatchStatus.MATCHED,
         };
 
-        prismaService.manualMatchHistory.findFirst.mockResolvedValue(
-          matchHistory,
-        );
+        (
+          prismaService.manualMatchHistory.findFirst as jest.Mock
+        ).mockResolvedValue(matchHistory);
         matchRepo.findById.mockResolvedValue(currentMatch);
         matchRepo.update.mockResolvedValue({
           ...currentMatch,
           transactionId: null,
           status: BankStatementMatchStatus.IN_BANK_ONLY,
         });
-        prismaService.manualMatchHistory.create.mockResolvedValue({} as any);
-        prismaService.transaction.update.mockResolvedValue(mockTransaction);
+        (
+          prismaService.manualMatchHistory.create as jest.Mock
+        ).mockResolvedValue({} as any);
+        (prismaService.transaction.update as jest.Mock).mockResolvedValue(
+          mockTransaction,
+        );
         matchRepo.findByReconciliationId.mockResolvedValue([]);
-        prismaService.reconciliation.findUnique.mockResolvedValue({
+        (
+          prismaService.reconciliation.findUnique as jest.Mock
+        ).mockResolvedValue({
           id: 'recon-1',
           discrepancyCents: 0,
           status: 'IN_PROGRESS',
@@ -651,19 +712,25 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           reason: null,
         };
 
-        prismaService.manualMatchHistory.findFirst.mockResolvedValue(
-          matchHistory,
-        );
+        (
+          prismaService.manualMatchHistory.findFirst as jest.Mock
+        ).mockResolvedValue(matchHistory);
         matchRepo.findById.mockResolvedValue(mockMatch);
-        prismaService.transaction.findUnique.mockResolvedValue(mockTransaction);
+        (prismaService.transaction.findUnique as jest.Mock).mockResolvedValue(
+          mockTransaction,
+        );
         matchRepo.update.mockResolvedValue({
           ...mockMatch,
           transactionId: mockTransactionId,
           status: BankStatementMatchStatus.MATCHED,
         });
-        prismaService.manualMatchHistory.create.mockResolvedValue({} as any);
+        (
+          prismaService.manualMatchHistory.create as jest.Mock
+        ).mockResolvedValue({} as any);
         matchRepo.findByReconciliationId.mockResolvedValue([]);
-        prismaService.reconciliation.findUnique.mockResolvedValue({
+        (
+          prismaService.reconciliation.findUnique as jest.Mock
+        ).mockResolvedValue({
           id: 'recon-1',
           discrepancyCents: 0,
           status: 'IN_PROGRESS',
@@ -679,7 +746,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       });
 
       it('should throw if no history exists', async () => {
-        prismaService.manualMatchHistory.findFirst.mockResolvedValue(null);
+        (
+          prismaService.manualMatchHistory.findFirst as jest.Mock
+        ).mockResolvedValue(null);
 
         await expect(
           service.undoLastManualMatch(mockTenantId, mockMatchId, mockUserId),
@@ -699,9 +768,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           reason: null,
         };
 
-        prismaService.manualMatchHistory.findFirst.mockResolvedValue(
-          matchHistory,
-        );
+        (
+          prismaService.manualMatchHistory.findFirst as jest.Mock
+        ).mockResolvedValue(matchHistory);
         matchRepo.findById.mockResolvedValue(mockMatch);
 
         await expect(
@@ -737,7 +806,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           },
         ];
 
-        prismaService.manualMatchHistory.findMany.mockResolvedValue(history);
+        (
+          prismaService.manualMatchHistory.findMany as jest.Mock
+        ).mockResolvedValue(history);
 
         const result = await service.getManualMatchHistory(
           mockTenantId,
@@ -755,7 +826,9 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
         const matches = [{ id: 'match-1' }, { id: 'match-2' }];
 
         matchRepo.findByReconciliationId.mockResolvedValue(matches as any);
-        prismaService.manualMatchHistory.findMany.mockResolvedValue([
+        (
+          prismaService.manualMatchHistory.findMany as jest.Mock
+        ).mockResolvedValue([
           {
             id: 'h1',
             tenantId: mockTenantId,

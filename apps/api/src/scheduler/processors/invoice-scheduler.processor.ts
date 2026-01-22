@@ -116,7 +116,7 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
       // Mark job as complete
       await job.progress(100);
     } catch (error) {
-      await this.handleError(
+      this.handleError(
         error instanceof Error ? error : new Error(String(error)),
         {
           file: 'invoice-scheduler.processor.ts',

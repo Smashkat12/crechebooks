@@ -100,7 +100,7 @@ export class RedisHealthIndicator extends HealthIndicator {
    * Execute Redis PING with timeout protection.
    * Prevents health check from hanging indefinitely if Redis is unresponsive.
    */
-  private async executeWithTimeout(timeoutMs: number): Promise<boolean> {
+  private executeWithTimeout(timeoutMs: number): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error(`Redis health check timed out after ${timeoutMs}ms`));
@@ -112,9 +112,9 @@ export class RedisHealthIndicator extends HealthIndicator {
           clearTimeout(timeoutId);
           resolve(result);
         })
-        .catch((error) => {
+        .catch((error: unknown) => {
           clearTimeout(timeoutId);
-          reject(error);
+          reject(error instanceof Error ? error : new Error(String(error)));
         });
     });
   }

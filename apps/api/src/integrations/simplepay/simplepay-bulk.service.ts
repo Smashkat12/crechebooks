@@ -82,7 +82,6 @@ export class SimplePayBulkService {
     request: BulkInputRequestDto,
   ): Promise<BulkOperationResult> {
     const startTime = Date.now();
-    let operationId: string;
 
     // Create operation log
     const log = await this.bulkOperationRepo.create({
@@ -95,7 +94,7 @@ export class SimplePayBulkService {
       }),
       executedBy: request.executedBy,
     });
-    operationId = log.id;
+    const operationId = log.id;
 
     try {
       // Mark as processing
@@ -176,7 +175,6 @@ export class SimplePayBulkService {
     request: BulkSalaryAdjustmentRequestDto,
   ): Promise<BulkOperationResult> {
     const startTime = Date.now();
-    let operationId: string;
 
     // Create operation log
     const log = await this.bulkOperationRepo.create({
@@ -189,7 +187,7 @@ export class SimplePayBulkService {
       }),
       executedBy: request.executedBy,
     });
-    operationId = log.id;
+    const operationId = log.id;
 
     try {
       await this.bulkOperationRepo.markProcessing(operationId);
@@ -306,7 +304,6 @@ export class SimplePayBulkService {
     request: BulkBonusDistributionRequestDto,
   ): Promise<BulkOperationResult> {
     const startTime = Date.now();
-    let operationId: string;
 
     const log = await this.bulkOperationRepo.create({
       tenantId,
@@ -318,7 +315,7 @@ export class SimplePayBulkService {
       }),
       executedBy: request.executedBy,
     });
-    operationId = log.id;
+    const operationId = log.id;
 
     try {
       await this.bulkOperationRepo.markProcessing(operationId);
@@ -413,7 +410,6 @@ export class SimplePayBulkService {
     request: BulkDeductionSetupRequestDto,
   ): Promise<BulkOperationResult> {
     const startTime = Date.now();
-    let operationId: string;
 
     const log = await this.bulkOperationRepo.create({
       tenantId,
@@ -425,7 +421,7 @@ export class SimplePayBulkService {
       }),
       executedBy: request.executedBy,
     });
-    operationId = log.id;
+    const operationId = log.id;
 
     try {
       await this.bulkOperationRepo.markProcessing(operationId);
@@ -523,7 +519,6 @@ export class SimplePayBulkService {
     request: BulkEmployeeUpdateRequestDto,
   ): Promise<BulkOperationResult> {
     const startTime = Date.now();
-    let operationId: string;
 
     const log = await this.bulkOperationRepo.create({
       tenantId,
@@ -535,7 +530,7 @@ export class SimplePayBulkService {
       }),
       executedBy: request.executedBy,
     });
-    operationId = log.id;
+    const operationId = log.id;
 
     try {
       await this.bulkOperationRepo.markProcessing(operationId);

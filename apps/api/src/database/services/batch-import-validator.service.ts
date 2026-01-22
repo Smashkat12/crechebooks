@@ -14,7 +14,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TransactionRepository } from '../repositories/transaction.repository';
 import { TransactionDateService } from './transaction-date.service';
 import { format, subDays } from 'date-fns';
-import { ValidationException } from '../../shared/exceptions';
 
 /**
  * Validation error severity levels
@@ -221,8 +220,12 @@ export class BatchImportValidatorService {
         message: 'Date is required',
       });
     } else {
+      const dateString =
+        typeof dateValue === 'string' || typeof dateValue === 'number'
+          ? String(dateValue)
+          : JSON.stringify(dateValue);
       try {
-        const parsed = this.dateService.parseDate(String(dateValue));
+        const parsed = this.dateService.parseDate(dateString);
         date = parsed.date;
 
         if (!this.dateService.validateTransactionDate(date)) {
@@ -234,12 +237,12 @@ export class BatchImportValidatorService {
             value: dateValue,
           });
         }
-      } catch (error) {
+      } catch {
         errors.push({
           rowNumber,
           field: 'date',
           severity: ValidationSeverity.ERROR,
-          message: `Invalid date format: ${dateValue}`,
+          message: `Invalid date format: ${dateString}`,
           value: dateValue,
           suggestion: 'Use format dd/MM/yyyy or yyyy-MM-dd',
         });
@@ -248,22 +251,30 @@ export class BatchImportValidatorService {
 
     // Parse description
     const descriptionField = mapping.description || 'description';
-    const description = row[descriptionField];
+    const descriptionRaw = row[descriptionField];
+    const descriptionStr =
+      typeof descriptionRaw === 'string'
+        ? descriptionRaw
+        : typeof descriptionRaw === 'number'
+          ? String(descriptionRaw)
+          : descriptionRaw != null
+            ? JSON.stringify(descriptionRaw)
+            : '';
 
-    if (!description || String(description).trim().length === 0) {
+    if (!descriptionRaw || descriptionStr.trim().length === 0) {
       errors.push({
         rowNumber,
         field: 'description',
         severity: ValidationSeverity.ERROR,
         message: 'Description is required',
       });
-    } else if (String(description).length > 500) {
+    } else if (descriptionStr.length > 500) {
       errors.push({
         rowNumber,
         field: 'description',
         severity: ValidationSeverity.WARNING,
         message: 'Description will be truncated to 500 characters',
-        value: String(description).length,
+        value: descriptionStr.length,
       });
     }
 
@@ -334,12 +345,20 @@ export class BatchImportValidatorService {
     }
 
     // Parse optional fields
-    const payeeName = mapping.payeeName
-      ? String(row[mapping.payeeName] || '').trim()
-      : undefined;
-    const reference = mapping.reference
-      ? String(row[mapping.reference] || '').trim()
-      : undefined;
+    const payeeRaw = mapping.payeeName ? row[mapping.payeeName] : undefined;
+    const payeeName =
+      typeof payeeRaw === 'string'
+        ? payeeRaw.trim()
+        : typeof payeeRaw === 'number'
+          ? String(payeeRaw)
+          : undefined;
+    const referenceRaw = mapping.reference ? row[mapping.reference] : undefined;
+    const reference =
+      typeof referenceRaw === 'string'
+        ? referenceRaw.trim()
+        : typeof referenceRaw === 'number'
+          ? String(referenceRaw)
+          : undefined;
 
     const hasErrors = errors.some(
       (e) => e.severity === ValidationSeverity.ERROR,
@@ -352,10 +371,10 @@ export class BatchImportValidatorService {
       errors,
     };
 
-    if (!hasErrors && date && description && amountCents !== undefined) {
+    if (!hasErrors && date && descriptionRaw && amountCents !== undefined) {
       result.data = {
         date,
-        description: String(description).trim().substring(0, 500),
+        description: descriptionStr.trim().substring(0, 500),
         amountCents,
         isCredit,
         payeeName: payeeName || undefined,

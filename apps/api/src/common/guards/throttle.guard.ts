@@ -28,25 +28,25 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
    * Get tracker identifier for rate limiting
    * Priority: API Key > User ID > IP Address
    */
-  protected async getTracker(req: Record<string, unknown>): Promise<string> {
+  protected getTracker(req: Record<string, unknown>): Promise<string> {
     const authRequest = req as unknown as AuthenticatedRequest;
 
     // Priority 1: API Key header
     const headers = (req as unknown as Request).headers || {};
     const apiKey = headers['x-api-key'] as string | undefined;
     if (apiKey) {
-      return `api:${apiKey}`;
+      return Promise.resolve(`api:${apiKey}`);
     }
 
     // Priority 2: Authenticated user ID
     const userId = authRequest.user?.id || authRequest.user?.sub;
     if (userId) {
-      return `user:${userId}`;
+      return Promise.resolve(`user:${userId}`);
     }
 
     // Priority 3: IP Address (with proxy support)
     const ip = this.getClientIp(req as unknown as Request);
-    return `ip:${ip}`;
+    return Promise.resolve(`ip:${ip}`);
   }
 
   /**
@@ -78,7 +78,7 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
   /**
    * Custom throttling exception with clear message
    */
-  protected async throwThrottlingException(
+  protected throwThrottlingException(
     _context: ExecutionContext,
     _throttlerLimitDetail: {
       limit: number;

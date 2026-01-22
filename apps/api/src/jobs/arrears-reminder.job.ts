@@ -17,7 +17,7 @@
  */
 
 import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma/prisma.service';
 import { EmailService } from '../integrations/email/email.service';
 import { TwilioWhatsAppService } from '../integrations/whatsapp/services/twilio-whatsapp.service';
@@ -28,7 +28,6 @@ import { InvoiceStatus } from '../database/entities/invoice.entity';
 import { ConfigService } from '@nestjs/config';
 import {
   ReminderStage,
-  ReminderChannel,
   TemplateVariables,
 } from '../billing/dto/reminder-template.dto';
 import { DeliveryMethod, ReminderStatus } from '@prisma/client';
@@ -500,7 +499,7 @@ export class ArrearsReminderJob implements OnModuleDestroy {
     // Check if we already sent a reminder at this level
     const levelStage = REMINDER_LEVELS.find((l) => l.level === level)?.stage;
     const alreadySent = history.some(
-      (h) => h.escalationLevel === levelStage && h.sentAt !== null,
+      (h) => h.escalationLevel === String(levelStage) && h.sentAt !== null,
     );
 
     if (alreadySent) {
@@ -514,7 +513,8 @@ export class ArrearsReminderJob implements OnModuleDestroy {
           );
           const nextAlreadySent = history.some(
             (h) =>
-              h.escalationLevel === nextLevelInfo?.stage && h.sentAt !== null,
+              h.escalationLevel === String(nextLevelInfo?.stage) &&
+              h.sentAt !== null,
           );
           if (!nextAlreadySent && nextLevelInfo) {
             return nextLevelInfo;
@@ -552,7 +552,7 @@ export class ArrearsReminderJob implements OnModuleDestroy {
     invoice: OverdueInvoice,
     config: ReminderConfig,
     result: ReminderJobResult,
-  ): Promise<'sent' | 'failed' | string> {
+  ): Promise<string> {
     // Check if parent opted out
     if (!invoice.parent.isActive) {
       return 'parent_inactive';

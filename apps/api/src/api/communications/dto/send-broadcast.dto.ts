@@ -51,7 +51,9 @@ export class ParentFilterDto {
   @IsUUID()
   fee_structure_id?: string;
 
-  @ApiPropertyOptional({ description: 'Filter parents with outstanding balance' })
+  @ApiPropertyOptional({
+    description: 'Filter parents with outstanding balance',
+  })
   @IsOptional()
   @IsBoolean()
   has_outstanding_balance?: boolean;

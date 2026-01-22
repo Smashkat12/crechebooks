@@ -36,8 +36,8 @@ describe('CurrencyConversionService', () => {
   });
 
   describe('convertCurrency', () => {
-    it('should return same amount when currencies match', async () => {
-      const result = await service.convertCurrency(
+    it('should return same amount when currencies match', () => {
+      const result = service.convertCurrency(
         10000, // R100.00
         Currency.ZAR,
         Currency.ZAR,
@@ -48,8 +48,8 @@ describe('CurrencyConversionService', () => {
       expect(result.exchangeRate).toBe(1.0);
     });
 
-    it('should convert USD to ZAR', async () => {
-      const result = await service.convertCurrency(
+    it('should convert USD to ZAR', () => {
+      const result = service.convertCurrency(
         10000, // $100.00
         Currency.USD,
         Currency.ZAR,
@@ -62,8 +62,8 @@ describe('CurrencyConversionService', () => {
       expect(result.exchangeRate).toBeGreaterThan(1); // USD > ZAR
     });
 
-    it('should convert ZAR to EUR', async () => {
-      const result = await service.convertCurrency(
+    it('should convert ZAR to EUR', () => {
+      const result = service.convertCurrency(
         100000, // R1000.00
         Currency.ZAR,
         Currency.EUR,
@@ -75,8 +75,8 @@ describe('CurrencyConversionService', () => {
       expect(result.convertedCents).toBeLessThan(100000); // EUR > ZAR
     });
 
-    it('should handle CMA currencies at 1:1', async () => {
-      const result = await service.convertCurrency(
+    it('should handle CMA currencies at 1:1', () => {
+      const result = service.convertCurrency(
         50000, // R500.00
         Currency.ZAR,
         Currency.NAD, // Namibian Dollar
@@ -86,9 +86,9 @@ describe('CurrencyConversionService', () => {
       expect(result.exchangeRate).toBe(1.0);
     });
 
-    it('should use effective date for rate lookup', async () => {
+    it('should use effective date for rate lookup', () => {
       const pastDate = new Date('2024-01-15');
-      const result = await service.convertCurrency(
+      const result = service.convertCurrency(
         10000,
         Currency.USD,
         Currency.ZAR,
@@ -102,24 +102,24 @@ describe('CurrencyConversionService', () => {
   });
 
   describe('convertToZAR', () => {
-    it('should convert foreign currency to ZAR', async () => {
-      const result = await service.convertToZAR(10000, Currency.GBP);
+    it('should convert foreign currency to ZAR', () => {
+      const result = service.convertToZAR(10000, Currency.GBP);
 
       expect(result.originalCurrency).toBe(Currency.GBP);
       expect(result.convertedCurrency).toBe(Currency.ZAR);
       expect(result.convertedCents).toBeGreaterThan(10000); // GBP > ZAR
     });
 
-    it('should handle ZAR input', async () => {
-      const result = await service.convertToZAR(10000, Currency.ZAR);
+    it('should handle ZAR input', () => {
+      const result = service.convertToZAR(10000, Currency.ZAR);
 
       expect(result.convertedCents).toBe(10000);
     });
   });
 
   describe('convertFromZAR', () => {
-    it('should convert ZAR to foreign currency', async () => {
-      const result = await service.convertFromZAR(100000, Currency.USD);
+    it('should convert ZAR to foreign currency', () => {
+      const result = service.convertFromZAR(100000, Currency.USD);
 
       expect(result.originalCurrency).toBe(Currency.ZAR);
       expect(result.convertedCurrency).toBe(Currency.USD);
@@ -128,7 +128,7 @@ describe('CurrencyConversionService', () => {
   });
 
   describe('setManualRate', () => {
-    it('should set and use manual exchange rate', async () => {
+    it('should set and use manual exchange rate', () => {
       service.setManualRate(
         Currency.USD,
         Currency.ZAR,
@@ -141,17 +141,17 @@ describe('CurrencyConversionService', () => {
       expect(rate.source).toBe(ExchangeRateSource.MANUAL);
     });
 
-    it('should reject zero or negative rates', async () => {
-      await expect(
+    it('should reject zero or negative rates', () => {
+      expect(() =>
         service.setManualRate(Currency.USD, Currency.ZAR, 0),
-      ).rejects.toThrow(ValidationException);
+      ).toThrow(ValidationException);
 
-      await expect(
+      expect(() =>
         service.setManualRate(Currency.USD, Currency.ZAR, -1),
-      ).rejects.toThrow(ValidationException);
+      ).toThrow(ValidationException);
     });
 
-    it('should cache inverse rate', async () => {
+    it('should cache inverse rate', () => {
       service.setManualRate(Currency.USD, Currency.ZAR, 18.5);
 
       const inverseRate = service.getExchangeRate(Currency.ZAR, Currency.USD);
@@ -161,7 +161,7 @@ describe('CurrencyConversionService', () => {
   });
 
   describe('getExchangeRate', () => {
-    it('should return rate between two currencies', async () => {
+    it('should return rate between two currencies', () => {
       const rate = service.getExchangeRate(Currency.USD, Currency.ZAR);
 
       expect(rate.fromCurrency).toBe(Currency.USD);
@@ -170,7 +170,7 @@ describe('CurrencyConversionService', () => {
       expect(rate.timestamp).toBeDefined();
     });
 
-    it('should cache rates', async () => {
+    it('should cache rates', () => {
       const rate1 = service.getExchangeRate(Currency.EUR, Currency.ZAR);
       const rate2 = service.getExchangeRate(Currency.EUR, Currency.ZAR);
 
@@ -285,7 +285,7 @@ describe('CurrencyConversionService', () => {
       expect(stats.currencies).toEqual([]);
     });
 
-    it('should track cached rates', async () => {
+    it('should track cached rates', () => {
       service.getExchangeRate(Currency.USD, Currency.ZAR);
       service.getExchangeRate(Currency.EUR, Currency.ZAR);
 
@@ -296,8 +296,8 @@ describe('CurrencyConversionService', () => {
   });
 
   describe('cross-currency conversion', () => {
-    it('should convert between non-ZAR currencies', async () => {
-      const result = await service.convertCurrency(
+    it('should convert between non-ZAR currencies', () => {
+      const result = service.convertCurrency(
         10000, // $100.00
         Currency.USD,
         Currency.EUR,
@@ -308,8 +308,8 @@ describe('CurrencyConversionService', () => {
       expect(result.convertedCents).toBeGreaterThan(0);
     });
 
-    it('should convert between African currencies', async () => {
-      const result = await service.convertCurrency(
+    it('should convert between African currencies', () => {
+      const result = service.convertCurrency(
         10000,
         Currency.BWP, // Botswana Pula
         Currency.ZMW, // Zambian Kwacha
@@ -320,15 +320,11 @@ describe('CurrencyConversionService', () => {
   });
 
   describe('rounding behavior', () => {
-    it('should round to nearest cent', async () => {
+    it('should round to nearest cent', () => {
       // Set a rate that would produce fractional cents
       service.setManualRate(Currency.USD, Currency.ZAR, 18.333);
 
-      const result = await service.convertCurrency(
-        100,
-        Currency.USD,
-        Currency.ZAR,
-      );
+      const result = service.convertCurrency(100, Currency.USD, Currency.ZAR);
 
       expect(Number.isInteger(result.convertedCents)).toBe(true);
     });

@@ -135,19 +135,15 @@ export class SimplePayWebhookController {
 
     // 4. Return 200 immediately (don't block the webhook response)
     // Process asynchronously to prevent SimplePay retries
-    setImmediate(async () => {
-      try {
-        await this.webhookService.processWebhook(
-          webhookLog.id,
-          payload,
-          tenantId,
-        );
-      } catch (error) {
-        // Error is already logged in processWebhook
-        this.logger.error(
-          `Async webhook processing failed: ${error instanceof Error ? error.message : error}`,
-        );
-      }
+    setImmediate(() => {
+      void this.webhookService
+        .processWebhook(webhookLog.id, payload, tenantId)
+        .catch((error: unknown) => {
+          // Error is already logged in processWebhook
+          this.logger.error(
+            `Async webhook processing failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
     });
 
     this.logger.log(

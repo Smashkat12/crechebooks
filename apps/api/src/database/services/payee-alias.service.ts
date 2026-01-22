@@ -357,7 +357,7 @@ export class PayeeAliasService {
   private normalizePayeeName(payee: string): string {
     return payee
       .toUpperCase()
-      .replace(/[\/\-_.,]/g, ' ') // Replace special chars with space
+      .replace(/[/\-_.,]/g, ' ') // Replace special chars with space
       .replace(/\s+/g, ' ') // Collapse multiple spaces
       .trim();
   }

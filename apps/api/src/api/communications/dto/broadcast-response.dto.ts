@@ -237,7 +237,10 @@ export class BroadcastListResponseDto {
   @ApiProperty({ description: 'Operation success status' })
   success: boolean;
 
-  @ApiProperty({ description: 'List of broadcasts', type: [BroadcastListItemDto] })
+  @ApiProperty({
+    description: 'List of broadcasts',
+    type: [BroadcastListItemDto],
+  })
   data: BroadcastListItemDto[];
 
   @ApiProperty({

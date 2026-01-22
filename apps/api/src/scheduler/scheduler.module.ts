@@ -28,7 +28,7 @@ const bullImports = isRedisConfigured()
   ? [
       BullModule.forRootAsync({
         imports: [ConfigModule],
-        useFactory: async (configService: ConfigService) => {
+        useFactory: (configService: ConfigService) => {
           const redisHost = configService.get<string>('REDIS_HOST');
           const redisPort = configService.get<number>('REDIS_PORT');
           const redisPassword = configService.get<string>('REDIS_PASSWORD');

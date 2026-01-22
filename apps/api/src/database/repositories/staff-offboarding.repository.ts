@@ -70,7 +70,10 @@ export class StaffOffboardingRepository {
         where: { staffId: dto.staffId },
       });
 
-      if (existing && existing.status !== StaffOffboardingStatus.CANCELLED) {
+      if (
+        existing &&
+        String(existing.status) !== String(StaffOffboardingStatus.CANCELLED)
+      ) {
         throw new ConflictException(
           `Staff member already has an active offboarding process`,
           { staffId: dto.staffId, existingId: existing.id },

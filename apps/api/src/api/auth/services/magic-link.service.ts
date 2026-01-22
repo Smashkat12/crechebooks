@@ -132,7 +132,11 @@ export class MagicLinkService {
 
     // Send email via Mailgun
     try {
-      await this.sendMagicLinkEmail(parent.email, parent.firstName, magicLinkUrl);
+      await this.sendMagicLinkEmail(
+        parent.email,
+        parent.firstName,
+        magicLinkUrl,
+      );
       this.logger.log(`Magic link sent to parent: ${parent.id}`);
       return true;
     } catch (error) {
@@ -286,11 +290,11 @@ The CrecheBooks Team
    * @param tenantId - Tenant UUID
    * @returns Session token and expiry info
    */
-  async createParentSession(
+  createParentSession(
     parentId: string,
     email: string,
     tenantId: string,
-  ): Promise<{ token: string; expiresIn: number }> {
+  ): { token: string; expiresIn: number } {
     const payload: SessionPayload = {
       sub: parentId,
       email,

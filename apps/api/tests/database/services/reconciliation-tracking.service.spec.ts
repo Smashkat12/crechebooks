@@ -401,9 +401,7 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
       xeroAmountCents: null as number | null,
       xeroIsCredit: null as boolean | null,
       // Match result fields
-      matchConfidence: null as unknown as
-        | import('@prisma/client').Prisma.Decimal
-        | null,
+      matchConfidence: null,
       discrepancyReason: null as string | null,
       // Fee tracking fields (TASK-RECON-036)
       isFeeAdjustedMatch: false,

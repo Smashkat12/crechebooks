@@ -1,8 +1,14 @@
 import path from 'node:path';
 import { defineConfig } from 'prisma/config';
 
-// Load environment variables
-import 'dotenv/config';
+// Load environment variables in development only
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    require('dotenv/config');
+  } catch {
+    // Dotenv not available, using system env vars
+  }
+}
 
 export default defineConfig({
   schema: path.join(__dirname, 'prisma/schema.prisma'),

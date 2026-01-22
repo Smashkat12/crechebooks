@@ -14,5 +14,6 @@ healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
+releaseCommand = "npx prisma migrate deploy"
 # Start command (handled by Dockerfile CMD)
 # startCommand = "node dist/main"

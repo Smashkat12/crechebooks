@@ -1,0 +1,101 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for CrecheBooks
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide as much detail as possible.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? Is your feature request related to a problem?
+      placeholder: I'm frustrated when... / It would be helpful if...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Target Component
+      description: Which part of the system should this feature be added to?
+      options:
+        - API (Backend)
+        - Web UI (Frontend)
+        - Database
+        - Authentication/Authorization
+        - Parent Portal
+        - Staff Portal
+        - Reports & Analytics
+        - Documentation
+        - Infrastructure/DevOps
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Describe any alternative solutions or features you've considered
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups/Examples
+      description: If applicable, add mockups, diagrams, or examples from other systems
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature to you?
+      options:
+        - Critical (Blocking work)
+        - High (Important for productivity)
+        - Medium (Nice to have)
+        - Low (Future enhancement)
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: Frame this as a user story if applicable
+      placeholder: "As a [parent/staff/administrator], I want to [action] so that [benefit]"
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What conditions must be met for this feature to be considered complete?
+      placeholder: |
+        - [ ] Users can...
+        - [ ] The system should...
+        - [ ] Data is validated...
+
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Verification
+      options:
+        - label: I have searched existing issues/features to ensure this is not a duplicate
+          required: true
+        - label: I have provided clear use cases for this feature
+          required: true
+        - label: I am willing to help implement or test this feature
+          required: false

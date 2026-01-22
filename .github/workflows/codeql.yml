@@ -1,0 +1,151 @@
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+  schedule:
+    # Run at 6:00 UTC every Monday
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      # Required for all workflows
+      security-events: write
+      # Required to fetch internal or private CodeQL packs
+      packages: read
+      # Required for workflows in private repositories
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript-typescript' ]
+        # Learn more about CodeQL language support at:
+        # https://aka.ms/codeql-docs/language-support
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: |
+          api/package-lock.json
+          web/package-lock.json
+
+    # Initialize CodeQL tools for scanning
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        # Specify CodeQL query suites
+        queries: +security-extended,security-and-quality
+        # Enable building for compiled languages
+        # build-mode: autobuild
+
+    # Install dependencies for better analysis
+    - name: Install API dependencies
+      working-directory: ./api
+      run: npm ci
+
+    - name: Install Web dependencies
+      working-directory: ./web
+      run: npm ci
+
+    # Autobuild attempts to build any compiled languages
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
+
+    # Perform CodeQL Analysis
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+        # Upload results even if there are failures
+        upload: always
+        # Add custom output location
+        output: sarif-results
+        # Specify threat models
+        threat-models: |
+          2023-CWE-Top25
+
+    # Upload SARIF file for additional processing
+    - name: Upload SARIF as artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: codeql-sarif-${{ matrix.language }}
+        path: sarif-results/${{ matrix.language }}.sarif
+        retention-days: 30
+
+    # Generate security summary
+    - name: Generate Security Summary
+      if: always()
+      run: |
+        echo "## CodeQL Security Analysis Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Language**: ${{ matrix.language }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Query Suite**: security-extended, security-and-quality" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Results have been uploaded to the Security tab." >> $GITHUB_STEP_SUMMARY
+
+  # Additional security scanning job
+  dependency-scan:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Run npm audit for API
+      working-directory: ./api
+      run: |
+        npm audit --audit-level=moderate --json > api-audit.json || true
+      continue-on-error: true
+
+    - name: Run npm audit for Web
+      working-directory: ./web
+      run: |
+        npm audit --audit-level=moderate --json > web-audit.json || true
+      continue-on-error: true
+
+    - name: Upload audit results
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-audit-results
+        path: |
+          api/api-audit.json
+          web/web-audit.json
+        retention-days: 30
+
+    - name: Generate Audit Summary
+      run: |
+        echo "## NPM Audit Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### API Dependencies" >> $GITHUB_STEP_SUMMARY
+        cd api && npm audit --audit-level=moderate || true
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Web Dependencies" >> $GITHUB_STEP_SUMMARY
+        cd ../web && npm audit --audit-level=moderate || true

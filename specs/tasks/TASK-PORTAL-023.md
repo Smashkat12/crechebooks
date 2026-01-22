@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Staff Portal Payslips Page</title>
-  <status>ready</status>
+  <status>completed</status>
   <layer>surface</layer>
   <sequence>312</sequence>
   <implements>

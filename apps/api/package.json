@@ -136,7 +136,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(uuid)/)"
+      "/node_modules/(?!.pnpm/uuid@|uuid/)"
     ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"

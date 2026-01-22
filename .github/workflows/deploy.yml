@@ -42,13 +42,19 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      - name: Link Railway Project
+        run: |
+          echo "🔗 Linking to Railway project..."
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
       - name: Deploy API to Railway
         run: |
           echo "🚀 Deploying API service..."
           railway up --service crechebooks-api --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
       - name: Wait for deployment
         run: |
@@ -61,7 +67,6 @@ jobs:
           railway run --service crechebooks-api npx prisma migrate deploy || echo "Migration skipped or already up to date"
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         continue-on-error: true
 
       - name: Verify API deployment
@@ -86,13 +91,19 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      - name: Link Railway Project
+        run: |
+          echo "🔗 Linking to Railway project..."
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
       - name: Deploy Web to Railway
         run: |
           echo "🚀 Deploying Web service..."
           railway up --service crechebooks-web --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
       - name: Verify Web deployment
         run: |

@@ -1939,6 +1939,182 @@ Analysis triggered by user request for ad-hoc communication capability.
 
 ---
 
-**Total Tasks**: 207 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications)
-**Overall Completion**: 192/207 (92.8%)
+## Phase 23: Public Pages & Self-Service Portals
+
+**Objective**: Create public landing pages for marketing/conversion and self-service portals for parents (invoices, payments, statements) and staff (payslips, leave, tax documents).
+
+### Analysis Date
+2026-01-21
+
+### Gap Analysis
+
+The CrecheBooks application was missing three critical frontend areas:
+1. **Public Landing Pages** - No marketing pages for conversion (homepage, features, pricing, about, contact)
+2. **Parent Self-Service Portal** - No way for parents to view invoices, make payments, or download statements
+3. **Staff Self-Service Portal** - No way for staff to view payslips, request leave, or access tax documents
+
+### Public Landing Pages (TASK-PORTAL-001 to TASK-PORTAL-005)
+
+| Task ID | Title | Complexity | Sequence | Dependencies |
+|---------|-------|------------|----------|--------------|
+| TASK-PORTAL-001 | Public Layout and Foundation | high | 290 | TASK-WEB-001 |
+| TASK-PORTAL-002 | Homepage | medium | 291 | TASK-PORTAL-001 |
+| TASK-PORTAL-003 | Features and Pricing Pages | medium | 292 | TASK-PORTAL-001 |
+| TASK-PORTAL-004 | About and Contact Pages | medium | 293 | TASK-PORTAL-001 |
+| TASK-PORTAL-005 | Demo Request and Legal Pages | medium | 294 | TASK-PORTAL-001 |
+
+**Key Deliverables (Public Pages)**:
+- Next.js (public) route group with SEO-optimized layout
+- Marketing header/footer components with CTAs
+- Homepage with hero, features overview, testimonials, CTA sections
+- Features page with creche management capability showcase
+- Pricing page with plan comparison table
+- About page with team, story, and values
+- Contact page with form and Mailgun integration
+- Demo request page with booking functionality
+- Legal pages (Terms, Privacy, Cookies, POPIA)
+
+### Parent Portal (TASK-PORTAL-011 to TASK-PORTAL-016)
+
+| Task ID | Title | Complexity | Sequence | Dependencies |
+|---------|-------|------------|----------|--------------|
+| TASK-PORTAL-011 | Parent Portal Layout and Authentication | high | 300 | TASK-WEB-001, TASK-WEB-004, TASK-BILL-011 |
+| TASK-PORTAL-012 | Parent Portal Dashboard | medium | 301 | TASK-PORTAL-011 |
+| TASK-PORTAL-013 | Parent Portal Invoices Page | medium | 302 | TASK-PORTAL-011, TASK-BILL-011 |
+| TASK-PORTAL-014 | Parent Portal Statements Page | medium | 303 | TASK-PORTAL-011, TASK-BILL-035 |
+| TASK-PORTAL-015 | Parent Portal Payments Page | medium | 304 | TASK-PORTAL-011, TASK-BILL-021 |
+| TASK-PORTAL-016 | Parent Portal Profile and Preferences | medium | 305 | TASK-PORTAL-011 |
+
+**Key Deliverables (Parent Portal)**:
+- Magic link authentication for parents (passwordless)
+- Portal layout with sidebar navigation
+- Dashboard with balance, children, recent invoices summary
+- Invoice list with filtering and PDF download
+- Statement list with date range filter and PDF download
+- Payment history and Yoco payment initiation
+- Profile update with POPIA-compliant WhatsApp opt-in
+- Emergency contact and communication preferences
+
+### Staff Portal (TASK-PORTAL-021 to TASK-PORTAL-025)
+
+| Task ID | Title | Complexity | Sequence | Dependencies |
+|---------|-------|------------|----------|--------------|
+| TASK-PORTAL-021 | Staff Portal Layout and Authentication | high | 310 | TASK-WEB-001, TASK-WEB-004, TASK-STAFF-004 |
+| TASK-PORTAL-022 | Staff Portal Dashboard | medium | 311 | TASK-PORTAL-021 |
+| TASK-PORTAL-023 | Staff Portal Payslips Page | medium | 312 | TASK-PORTAL-021, TASK-STAFF-004 |
+| TASK-PORTAL-024 | Staff Portal Leave Management Page | high | 313 | TASK-PORTAL-021, TASK-SPAY-001 |
+| TASK-PORTAL-025 | Staff Portal Tax Documents and Profile | medium | 314 | TASK-PORTAL-021, TASK-STAFF-004 |
+
+**Key Deliverables (Staff Portal)**:
+- Magic link authentication for staff (work email)
+- Portal layout with SimplePay employee ID linking
+- Dashboard with employment status, leave balance, recent payslips, YTD earnings
+- Payslip list with year filter and PDF download from SimplePay
+- Leave balance display and request form with BCEA entitlements
+- Leave history and calendar view
+- IRP5 tax certificates list and PDF download
+- Profile with personal info, banking (masked), emergency contacts
+
+### Task Dependencies (Phase 23)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        WEB001[TASK-WEB-001<br/>Next.js Setup]
+        WEB004[TASK-WEB-004<br/>NextAuth Setup]
+        BILL011[TASK-BILL-011<br/>Invoice Service]
+        BILL021[TASK-BILL-021<br/>Yoco Integration]
+        BILL035[TASK-BILL-035<br/>Statement Service]
+        STAFF004[TASK-STAFF-004<br/>SimplePay Integration]
+        SPAY001[TASK-SPAY-001<br/>Leave Management]
+    end
+
+    subgraph "Public Landing Pages"
+        PORTAL001[TASK-PORTAL-001<br/>Public Layout]
+        PORTAL002[TASK-PORTAL-002<br/>Homepage]
+        PORTAL003[TASK-PORTAL-003<br/>Features & Pricing]
+        PORTAL004[TASK-PORTAL-004<br/>About & Contact]
+        PORTAL005[TASK-PORTAL-005<br/>Demo & Legal]
+    end
+
+    subgraph "Parent Portal"
+        PORTAL011[TASK-PORTAL-011<br/>Parent Auth]
+        PORTAL012[TASK-PORTAL-012<br/>Parent Dashboard]
+        PORTAL013[TASK-PORTAL-013<br/>Invoices]
+        PORTAL014[TASK-PORTAL-014<br/>Statements]
+        PORTAL015[TASK-PORTAL-015<br/>Payments]
+        PORTAL016[TASK-PORTAL-016<br/>Profile]
+    end
+
+    subgraph "Staff Portal"
+        PORTAL021[TASK-PORTAL-021<br/>Staff Auth]
+        PORTAL022[TASK-PORTAL-022<br/>Staff Dashboard]
+        PORTAL023[TASK-PORTAL-023<br/>Payslips]
+        PORTAL024[TASK-PORTAL-024<br/>Leave]
+        PORTAL025[TASK-PORTAL-025<br/>Tax & Profile]
+    end
+
+    WEB001 --> PORTAL001
+    PORTAL001 --> PORTAL002
+    PORTAL001 --> PORTAL003
+    PORTAL001 --> PORTAL004
+    PORTAL001 --> PORTAL005
+
+    WEB001 --> PORTAL011
+    WEB004 --> PORTAL011
+    BILL011 --> PORTAL011
+    PORTAL011 --> PORTAL012
+    PORTAL011 --> PORTAL013
+    PORTAL011 --> PORTAL014
+    PORTAL011 --> PORTAL015
+    PORTAL011 --> PORTAL016
+    BILL021 --> PORTAL015
+    BILL035 --> PORTAL014
+
+    WEB001 --> PORTAL021
+    WEB004 --> PORTAL021
+    STAFF004 --> PORTAL021
+    PORTAL021 --> PORTAL022
+    PORTAL021 --> PORTAL023
+    PORTAL021 --> PORTAL024
+    PORTAL021 --> PORTAL025
+    SPAY001 --> PORTAL024
+```
+
+### Execution Order (Recommended)
+
+**Layer 1 - Foundation** (can run in parallel):
+1. **TASK-PORTAL-001** (Public Layout) - Foundation for all public pages
+2. **TASK-PORTAL-011** (Parent Portal Auth) - Foundation for parent portal
+3. **TASK-PORTAL-021** (Staff Portal Auth) - Foundation for staff portal
+
+**Layer 2 - Core Pages** (after Layer 1):
+4. **TASK-PORTAL-002** (Homepage)
+5. **TASK-PORTAL-012** (Parent Dashboard)
+6. **TASK-PORTAL-022** (Staff Dashboard)
+
+**Layer 3 - Feature Pages** (after Layer 2):
+7-16. All remaining TASK-PORTAL-* tasks
+
+### Portal Coverage Summary
+
+| Portal | Feature Set | Tasks | Complexity |
+|--------|-------------|-------|------------|
+| Public Landing | Marketing pages, SEO, conversion | 5 | Medium |
+| Parent Portal | Invoices, payments, statements, profile | 6 | Medium-High |
+| Staff Portal | Payslips, leave, tax docs, profile | 5 | Medium-High |
+| **Total** | **Complete self-service portals** | **16** | **High** |
+
+### Review Source
+
+Gap analysis triggered by user review identifying missing frontend areas:
+- No public-facing marketing pages for lead generation
+- No parent self-service capability despite complete billing backend
+- No staff self-service capability despite SimplePay integration
+- Phase 23 addresses all gaps with 16 comprehensive tasks
+
+---
+
+**Total Tasks**: 223 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals)
+**Overall Completion**: 192/223 (86.1%)
 

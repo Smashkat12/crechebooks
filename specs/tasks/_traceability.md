@@ -980,6 +980,173 @@ graph TD
 
 ---
 
-**Last Updated**: 2026-01-20
+## Portal Traceability Matrix (Phase 23)
+
+Analysis Date: 2026-01-21
+Based on CrecheBooks gap analysis for public pages and self-service portals.
+
+### Public Landing Pages API Mapping
+
+| Endpoint | HTTP Method | Purpose | Task ID | Status |
+|----------|-------------|---------|---------|--------|
+| GET /api/public/pricing | GET | Get pricing tiers for display | TASK-PORTAL-003 | ⭕ Pending |
+| POST /api/public/contact | POST | Submit contact form | TASK-PORTAL-004 | ⭕ Pending |
+| POST /api/public/demo-request | POST | Request demo booking | TASK-PORTAL-005 | ⭕ Pending |
+| GET /api/public/testimonials | GET | Get customer testimonials | TASK-PORTAL-002 | ⭕ Pending |
+
+### Parent Portal API Mapping
+
+| Endpoint | HTTP Method | Purpose | Task ID | Status |
+|----------|-------------|---------|---------|--------|
+| POST /api/parent-portal/auth/login | POST | Request magic link email | TASK-PORTAL-011 | ⭕ Pending |
+| GET /api/parent-portal/auth/verify | GET | Verify magic link token | TASK-PORTAL-011 | ⭕ Pending |
+| GET /api/parent-portal/dashboard | GET | Get aggregated dashboard data | TASK-PORTAL-012 | ⭕ Pending |
+| GET /api/parent-portal/invoices | GET | List invoices with filters | TASK-PORTAL-013 | ⭕ Pending |
+| GET /api/parent-portal/invoices/:id | GET | Get single invoice details | TASK-PORTAL-013 | ⭕ Pending |
+| GET /api/parent-portal/invoices/:id/pdf | GET | Download invoice PDF | TASK-PORTAL-013 | ⭕ Pending |
+| GET /api/parent-portal/statements | GET | List statements by date range | TASK-PORTAL-014 | ⭕ Pending |
+| GET /api/parent-portal/statements/:id/pdf | GET | Download statement PDF | TASK-PORTAL-014 | ⭕ Pending |
+| GET /api/parent-portal/payments | GET | Get payment history | TASK-PORTAL-015 | ⭕ Pending |
+| POST /api/parent-portal/payments/initiate | POST | Start Yoco payment | TASK-PORTAL-015 | ⭕ Pending |
+| GET /api/parent-portal/profile | GET | Get parent profile | TASK-PORTAL-016 | ⭕ Pending |
+| PUT /api/parent-portal/profile | PUT | Update parent profile | TASK-PORTAL-016 | ⭕ Pending |
+| PUT /api/parent-portal/preferences | PUT | Update communication preferences | TASK-PORTAL-016 | ⭕ Pending |
+
+### Staff Portal API Mapping
+
+| Endpoint | HTTP Method | Purpose | Task ID | Status |
+|----------|-------------|---------|---------|--------|
+| POST /api/staff-portal/auth/login | POST | Request staff magic link | TASK-PORTAL-021 | ⭕ Pending |
+| GET /api/staff-portal/auth/verify | GET | Verify staff magic link | TASK-PORTAL-021 | ⭕ Pending |
+| GET /api/staff-portal/dashboard | GET | Get staff dashboard data | TASK-PORTAL-022 | ⭕ Pending |
+| GET /api/staff-portal/payslips | GET | List payslips with filters | TASK-PORTAL-023 | ⭕ Pending |
+| GET /api/staff-portal/payslips/:id | GET | Get payslip detail | TASK-PORTAL-023 | ⭕ Pending |
+| GET /api/staff-portal/payslips/:id/pdf | GET | Download payslip PDF | TASK-PORTAL-023 | ⭕ Pending |
+| GET /api/staff-portal/leave/balances | GET | Get leave balances | TASK-PORTAL-024 | ⭕ Pending |
+| GET /api/staff-portal/leave/requests | GET | List leave requests | TASK-PORTAL-024 | ⭕ Pending |
+| POST /api/staff-portal/leave/requests | POST | Submit leave request | TASK-PORTAL-024 | ⭕ Pending |
+| DELETE /api/staff-portal/leave/requests/:id | DELETE | Cancel pending request | TASK-PORTAL-024 | ⭕ Pending |
+| GET /api/staff-portal/documents/irp5 | GET | List IRP5 certificates | TASK-PORTAL-025 | ⭕ Pending |
+| GET /api/staff-portal/documents/irp5/:id/pdf | GET | Download IRP5 PDF | TASK-PORTAL-025 | ⭕ Pending |
+| GET /api/staff-portal/profile | GET | Get staff profile | TASK-PORTAL-025 | ⭕ Pending |
+| PUT /api/staff-portal/profile | PUT | Update staff profile | TASK-PORTAL-025 | ⭕ Pending |
+| GET /api/staff-portal/banking | GET | Get masked banking details | TASK-PORTAL-025 | ⭕ Pending |
+
+### Frontend Component Mapping
+
+| Component | Purpose | Portal | Task ID | Status |
+|-----------|---------|--------|---------|--------|
+| PublicHeader | Marketing navigation | Public | TASK-PORTAL-001 | ⭕ Pending |
+| PublicFooter | Marketing footer links | Public | TASK-PORTAL-001 | ⭕ Pending |
+| HeroSection | Homepage hero with CTA | Public | TASK-PORTAL-002 | ⭕ Pending |
+| FeaturesGrid | Features showcase | Public | TASK-PORTAL-002 | ⭕ Pending |
+| TestimonialsCarousel | Customer testimonials | Public | TASK-PORTAL-002 | ⭕ Pending |
+| PricingTable | Plan comparison | Public | TASK-PORTAL-003 | ⭕ Pending |
+| ContactForm | Contact submission | Public | TASK-PORTAL-004 | ⭕ Pending |
+| DemoRequestForm | Demo booking | Public | TASK-PORTAL-005 | ⭕ Pending |
+| ParentHeader | Portal header with user | Parent | TASK-PORTAL-011 | ⭕ Pending |
+| ParentSidebar | Portal navigation | Parent | TASK-PORTAL-011 | ⭕ Pending |
+| BalanceCard | Outstanding balance | Parent | TASK-PORTAL-012 | ⭕ Pending |
+| ChildrenSummary | Children list | Parent | TASK-PORTAL-012 | ⭕ Pending |
+| InvoiceList | Invoice table/cards | Parent | TASK-PORTAL-013 | ⭕ Pending |
+| PaymentInitiator | Yoco payment UI | Parent | TASK-PORTAL-015 | ⭕ Pending |
+| StaffHeader | Staff portal header | Staff | TASK-PORTAL-021 | ⭕ Pending |
+| StaffSidebar | Staff navigation | Staff | TASK-PORTAL-021 | ⭕ Pending |
+| EmploymentCard | Employment status | Staff | TASK-PORTAL-022 | ⭕ Pending |
+| LeaveBalanceCard | Leave summary | Staff | TASK-PORTAL-022 | ⭕ Pending |
+| PayslipList | Payslip history | Staff | TASK-PORTAL-023 | ⭕ Pending |
+| PayslipDetail | Earnings breakdown | Staff | TASK-PORTAL-023 | ⭕ Pending |
+| LeaveRequestForm | Submit leave | Staff | TASK-PORTAL-024 | ⭕ Pending |
+| LeaveCalendar | Scheduled leave view | Staff | TASK-PORTAL-024 | ⭕ Pending |
+| IRP5List | Tax certificates | Staff | TASK-PORTAL-025 | ⭕ Pending |
+| BankingDetails | Masked bank info | Staff | TASK-PORTAL-025 | ⭕ Pending |
+
+### Authentication Flow Mapping
+
+| Flow | Steps | Portal | Task ID | Status |
+|------|-------|--------|---------|--------|
+| Parent Magic Link | Email → Token → Session | Parent | TASK-PORTAL-011 | ⭕ Pending |
+| Staff Magic Link | Work Email → Token → SimplePay Link | Staff | TASK-PORTAL-021 | ⭕ Pending |
+
+### External Integration Mapping
+
+| Integration | Purpose | Portal | Task ID | Existing Task |
+|-------------|---------|--------|---------|---------------|
+| Mailgun | Magic link emails, contact form | All | TASK-PORTAL-011, 021, 004 | TASK-BILL-013 |
+| Yoco | Payment processing | Parent | TASK-PORTAL-015 | TASK-BILL-021 |
+| SimplePay | Payslips, leave, IRP5 | Staff | TASK-PORTAL-021, 022, 023, 024, 025 | TASK-STAFF-004 |
+| NextAuth | Session management | Parent, Staff | TASK-PORTAL-011, 021 | TASK-WEB-004 |
+
+### BCEA Leave Entitlements (Staff Portal)
+
+| Leave Type | Entitlement | Accrual | Task ID |
+|------------|-------------|---------|---------|
+| Annual Leave | 15 working days/year | 1 day per 17 days worked | TASK-PORTAL-024 |
+| Sick Leave | 30 days over 3-year cycle | First 6 months: 1 day per 26 days | TASK-PORTAL-024 |
+| Family Responsibility | 3 days/year | Birth, illness, or death of family | TASK-PORTAL-024 |
+
+### POPIA Compliance Considerations
+
+| Requirement | Implementation | Task ID |
+|-------------|---------------|---------|
+| Magic Link Expiry | 15-minute token validity | TASK-PORTAL-011, 021 |
+| Data Minimization | Only necessary profile fields editable | TASK-PORTAL-016, 025 |
+| Banking Security | Account numbers masked (****1234) | TASK-PORTAL-025 |
+| WhatsApp Opt-In | Explicit consent checkbox | TASK-PORTAL-016 |
+| Session Security | HTTP-only cookies, secure flag | TASK-PORTAL-011, 021 |
+| Audit Logging | All profile changes logged | TASK-PORTAL-016, 025 |
+
+### Route Group Structure
+
+| Route Group | Base Path | Purpose | Task IDs |
+|-------------|-----------|---------|----------|
+| (public) | / | Marketing pages | TASK-PORTAL-001-005 |
+| (parent-portal) | /portal | Parent self-service | TASK-PORTAL-011-016 |
+| (staff-portal) | /staff | Staff self-service | TASK-PORTAL-021-025 |
+
+### Task Dependencies (Phase 23)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        WEB001[TASK-WEB-001<br/>Next.js Setup]
+        WEB004[TASK-WEB-004<br/>NextAuth]
+        BILL011[TASK-BILL-011<br/>Invoice Service]
+        BILL021[TASK-BILL-021<br/>Yoco]
+        BILL035[TASK-BILL-035<br/>Statement Service]
+        STAFF004[TASK-STAFF-004<br/>SimplePay]
+        SPAY001[TASK-SPAY-001<br/>Leave Service]
+    end
+
+    subgraph "Phase 23 - Portals"
+        PORTAL001[TASK-PORTAL-001<br/>Public Layout]
+        PORTAL011[TASK-PORTAL-011<br/>Parent Auth]
+        PORTAL021[TASK-PORTAL-021<br/>Staff Auth]
+    end
+
+    WEB001 --> PORTAL001
+    WEB001 --> PORTAL011
+    WEB001 --> PORTAL021
+    WEB004 --> PORTAL011
+    WEB004 --> PORTAL021
+    BILL011 --> PORTAL011
+    STAFF004 --> PORTAL021
+    SPAY001 --> PORTAL021
+```
+
+### Implementation Coverage Summary
+
+| Category | Total Features | Implemented | Pending | Coverage |
+|----------|---------------|-------------|---------|----------|
+| Public Pages | 9 | 0 | 9 | 0% |
+| Parent Portal APIs | 13 | 0 | 13 | 0% |
+| Staff Portal APIs | 14 | 0 | 14 | 0% |
+| Frontend Components | 24 | 0 | 24 | 0% |
+| Authentication Flows | 2 | 0 | 2 | 0% |
+| **Total** | **62** | **0** | **62** | **0%** |
+
+---
+
+**Last Updated**: 2026-01-21
 **Author**: Claude Code
-**Review Status**: Phase 22 (Ad-hoc Communications) Added
+**Review Status**: Phase 23 (Public Pages & Self-Service Portals) Added

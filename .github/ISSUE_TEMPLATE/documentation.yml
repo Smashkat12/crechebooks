@@ -1,0 +1,79 @@
+name: 📚 Documentation
+description: Report documentation issues or suggest improvements
+title: "[Docs]: "
+labels: ["documentation", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve our documentation! Your feedback is valuable.
+
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Documentation Type
+      description: What kind of documentation issue is this?
+      options:
+        - Missing documentation
+        - Incorrect/outdated information
+        - Unclear explanation
+        - Broken links
+        - Typo/grammar
+        - Code examples needed
+        - Architecture/design docs
+        - API documentation
+        - User guides
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Where is the documentation that needs improvement?
+      placeholder: |
+        - File path: docs/...
+        - URL: https://...
+        - Section: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: Issue Description
+      description: What's wrong or missing in the current documentation?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested Improvement
+      description: How should the documentation be improved?
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Who is affected by this documentation issue?
+      placeholder: |
+        - New developers
+        - End users
+        - System administrators
+        - API consumers
+
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Verification
+      options:
+        - label: I have checked that this documentation issue hasn't been reported
+          required: true
+        - label: I am willing to help improve the documentation
+          required: false

@@ -25,3 +25,9 @@ export { LeaveBalanceCard } from './leave-balance-card';
 export { NextPayCard } from './next-pay-card';
 export { Announcements } from './announcements';
 export { YtdEarnings } from './ytd-earnings';
+
+// Payslips components (TASK-PORTAL-023)
+export { PayslipList } from './payslip-list';
+export { PayslipCard } from './payslip-card';
+export { EarningsTable } from './earnings-table';
+export { DeductionsTable } from './deductions-table';

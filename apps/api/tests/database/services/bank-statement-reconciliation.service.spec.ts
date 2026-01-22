@@ -25,6 +25,8 @@ import {
   ToleranceConfigService,
   DEFAULT_TOLERANCE_CONFIG,
 } from '../../../src/database/services/tolerance-config.service';
+import { AccruedBankChargeService } from '../../../src/database/services/accrued-bank-charge.service';
+import { BankFeeService } from '../../../src/database/services/bank-fee.service';
 import { ConfigService } from '@nestjs/config';
 import {
   Tenant,
@@ -44,6 +46,8 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
   let mockReconRepo: jest.Mocked<ReconciliationRepository>;
   let mockToleranceConfig: jest.Mocked<ToleranceConfigService>;
   let mockLLMParser: jest.Mocked<LLMWhispererParser>;
+  let mockAccruedChargeService: jest.Mocked<AccruedBankChargeService>;
+  let mockBankFeeService: jest.Mocked<BankFeeService>;
 
   beforeEach(async () => {
     // Create comprehensive mocks
@@ -110,6 +114,23 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
       parseWithBalances: jest.fn(),
     } as any;
 
+    mockAccruedChargeService = {
+      createFromFeeAdjustedMatch: jest.fn(),
+      findPendingCharges: jest.fn(),
+      matchChargeToTransaction: jest.fn(),
+      getChargesSummary: jest.fn(),
+      findById: jest.fn(),
+      updateStatus: jest.fn(),
+      findByReconciliation: jest.fn(),
+    } as any;
+
+    mockBankFeeService = {
+      calculateFee: jest.fn(),
+      getFeeConfig: jest.fn(),
+      detectFeeTransaction: jest.fn(),
+      isPotentialBankFee: jest.fn().mockReturnValue(false),
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BankStatementReconciliationService,
@@ -118,6 +139,8 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
         { provide: ReconciliationRepository, useValue: mockReconRepo },
         { provide: ToleranceConfigService, useValue: mockToleranceConfig },
         { provide: LLMWhispererParser, useValue: mockLLMParser },
+        { provide: AccruedBankChargeService, useValue: mockAccruedChargeService },
+        { provide: BankFeeService, useValue: mockBankFeeService },
       ],
     }).compile();
 
@@ -1318,6 +1341,25 @@ const mockConfigService = {
   get: jest.fn(() => undefined), // Return default values
 };
 
+// Mock AccruedBankChargeService for integration tests
+const mockAccruedChargeServiceIntegration = {
+  createFromFeeAdjustedMatch: jest.fn(),
+  findPendingCharges: jest.fn(),
+  matchChargeToTransaction: jest.fn(),
+  getChargesSummary: jest.fn(),
+  findById: jest.fn(),
+  updateStatus: jest.fn(),
+  findByReconciliation: jest.fn(),
+};
+
+// Mock BankFeeService for integration tests
+const mockBankFeeServiceIntegration = {
+  calculateFee: jest.fn(),
+  getFeeConfig: jest.fn(),
+  detectFeeTransaction: jest.fn(),
+  isPotentialBankFee: jest.fn().mockReturnValue(false),
+};
+
 describe('BankStatementReconciliationService (Integration Tests)', () => {
   let service: BankStatementReconciliationService;
   let repository: BankStatementMatchRepository;
@@ -1341,6 +1383,14 @@ describe('BankStatementReconciliationService (Integration Tests)', () => {
         {
           provide: LLMWhispererParser,
           useValue: mockLLMWhispererParser,
+        },
+        {
+          provide: AccruedBankChargeService,
+          useValue: mockAccruedChargeServiceIntegration,
+        },
+        {
+          provide: BankFeeService,
+          useValue: mockBankFeeServiceIntegration,
         },
       ],
     }).compile();

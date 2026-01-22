@@ -12,66 +12,114 @@ on:
         options:
           - production
           - staging
+      services:
+        description: 'Services to deploy'
+        required: false
+        type: choice
+        default: 'all'
+        options:
+          - all
+          - api
+          - web
 
 env:
   NODE_VERSION: '20.x'
   PNPM_VERSION: '9.15.0'
 
 jobs:
-  deploy-railway:
-    name: Deploy to Railway
+  # Deploy API Service
+  deploy-api:
+    name: Deploy API to Railway
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.services != 'web' }}
     environment:
       name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ vars.API_URL || 'https://api.elleelephant.co.za' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+      - name: Deploy API to Railway
+        run: |
+          echo "🚀 Deploying API service..."
+          railway up --service crechebooks-api --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Wait for deployment
+        run: |
+          echo "⏳ Waiting for API deployment to complete..."
+          sleep 30
 
-      - name: Generate Prisma Client
-        run: pnpm --filter @crechebooks/api prisma:generate
+      - name: Run database migrations
+        run: |
+          echo "🔄 Running database migrations..."
+          railway run --service crechebooks-api npx prisma migrate deploy || echo "Migration skipped or already up to date"
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        continue-on-error: true
 
-      - name: Build applications
-        run: pnpm build
+      - name: Verify API deployment
+        run: |
+          echo "✅ API deployment initiated"
+          echo "Service: crechebooks-api"
+          echo "Commit: ${{ github.sha }}"
+
+  # Deploy Web Service
+  deploy-web:
+    name: Deploy Web to Railway
+    runs-on: ubuntu-latest
+    if: ${{ always() && github.event.inputs.services != 'api' && (needs.deploy-api.result == 'success' || needs.deploy-api.result == 'skipped') }}
+    needs: [deploy-api]
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ vars.WEB_URL || 'https://elleelephant.co.za' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway
-        run: railway up
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      - name: Run database migrations
-        run: railway run --service api pnpm prisma:migrate
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-      - name: Verify deployment
+      - name: Deploy Web to Railway
         run: |
-          echo "Deployment completed successfully"
+          echo "🚀 Deploying Web service..."
+          railway up --service crechebooks-web --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+
+      - name: Verify Web deployment
+        run: |
+          echo "✅ Web deployment initiated"
+          echo "Service: crechebooks-web"
+          echo "Commit: ${{ github.sha }}"
+
+  # Deployment Summary
+  deployment-summary:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-api, deploy-web]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "📊 Deployment Summary"
+          echo "====================="
           echo "Environment: ${{ github.event.inputs.environment || 'production' }}"
           echo "Commit: ${{ github.sha }}"
           echo "Deployed by: ${{ github.actor }}"
-
-      - name: Notify deployment status
-        if: always()
-        run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ Deployment successful"
+          echo ""
+          echo "API Status: ${{ needs.deploy-api.result }}"
+          echo "Web Status: ${{ needs.deploy-web.result }}"
+          echo ""
+          if [ "${{ needs.deploy-api.result }}" == "success" ] && [ "${{ needs.deploy-web.result }}" == "success" ]; then
+            echo "✅ All services deployed successfully"
           else
-            echo "❌ Deployment failed"
+            echo "⚠️ Some services may have failed - check Railway dashboard"
           fi

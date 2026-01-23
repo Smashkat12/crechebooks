@@ -23,7 +23,8 @@ const prisma = new PrismaClient();
 async function main() {
   const email = process.env.SUPER_ADMIN_EMAIL || 'katlego@elleelephant.co.za';
   const name = process.env.SUPER_ADMIN_NAME || 'Katlego Tsotetsi';
-  const auth0Id = process.env.SUPER_ADMIN_AUTH0_ID || `super-admin-${randomUUID()}`;
+  const auth0Id =
+    process.env.SUPER_ADMIN_AUTH0_ID || `super-admin-${randomUUID()}`;
 
   console.log('🚀 Creating CrecheBooks Super Admin User...\n');
   console.log(`Email: ${email}`);
@@ -35,10 +36,7 @@ async function main() {
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [
-          { email },
-          { auth0Id },
-        ],
+        OR: [{ email }, { auth0Id }],
       },
     });
 
@@ -47,12 +45,18 @@ async function main() {
       console.log(`   ID: ${existingUser.id}`);
       console.log(`   Email: ${existingUser.email}`);
       console.log(`   Role: ${existingUser.role}`);
-      console.log(`   Tenant ID: ${existingUser.tenantId || 'None (platform admin)'}\n`);
+      console.log(
+        `   Tenant ID: ${existingUser.tenantId || 'None (platform admin)'}\n`,
+      );
 
       if (existingUser.role !== UserRole.SUPER_ADMIN) {
-        console.log('❓ Would you like to upgrade this user to SUPER_ADMIN? (This script does not modify existing users)');
+        console.log(
+          '❓ Would you like to upgrade this user to SUPER_ADMIN? (This script does not modify existing users)',
+        );
         console.log('   Run this SQL manually if needed:');
-        console.log(`   UPDATE users SET role = 'SUPER_ADMIN', tenant_id = NULL WHERE id = '${existingUser.id}';\n`);
+        console.log(
+          `   UPDATE users SET role = 'SUPER_ADMIN', tenant_id = NULL WHERE id = '${existingUser.id}';\n`,
+        );
       } else {
         console.log('✅ User is already a SUPER_ADMIN.\n');
       }
@@ -82,10 +86,15 @@ async function main() {
     console.log(`   Created At: ${superAdmin.createdAt}\n`);
 
     console.log('📋 Next Steps:');
-    console.log('   1. Configure Auth0 to use this auth0Id for the super admin user');
-    console.log('   2. Log in with this account to access /api/admin/* endpoints');
-    console.log('   3. The super admin can view all contact submissions and demo requests\n');
-
+    console.log(
+      '   1. Configure Auth0 to use this auth0Id for the super admin user',
+    );
+    console.log(
+      '   2. Log in with this account to access /api/admin/* endpoints',
+    );
+    console.log(
+      '   3. The super admin can view all contact submissions and demo requests\n',
+    );
   } catch (error) {
     console.error('❌ Error creating super admin user:', error);
     process.exit(1);

@@ -24,7 +24,8 @@
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
     "migrate:deploy": "npx prisma migrate deploy",
-    "create-super-admin": "npx tsx scripts/create-super-admin.ts"
+    "create-super-admin": "npx tsx scripts/create-super-admin.ts",
+    "update-super-admin-auth0": "npx tsx scripts/update-super-admin-auth0.ts"
   },
   "dependencies": {
     "@crechebooks/types": "workspace:*",

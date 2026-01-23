@@ -271,7 +271,7 @@ export function SignupForm() {
           </Alert>
 
           <div className="bg-muted p-6 rounded-lg space-y-4">
-            <h3 className="font-semibold text-lg">What's Next?</h3>
+            <h3 className="font-semibold text-lg">What&apos;s Next?</h3>
             <ol className="space-y-3">
               <li className="flex items-start gap-3">
                 <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-medium">
@@ -280,7 +280,7 @@ export function SignupForm() {
                 <div>
                   <p className="font-medium">Check your email</p>
                   <p className="text-sm text-muted-foreground">
-                    We've sent a verification link to {formData.email}
+                    We&apos;ve sent a verification link to {formData.email}
                   </p>
                 </div>
               </li>
@@ -688,7 +688,7 @@ export function SignupForm() {
                     htmlFor="marketingConsent"
                     className="text-sm font-normal cursor-pointer"
                   >
-                    I'd like to receive updates, tips, and special offers via
+                    I&apos;d like to receive updates, tips, and special offers via
                     email
                   </Label>
                 </div>

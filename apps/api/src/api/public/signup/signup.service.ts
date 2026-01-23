@@ -35,7 +35,10 @@ export class SignupService {
       );
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(dto.password, this.BCRYPT_ROUNDS);
+      const hashedPassword = await bcrypt.hash(
+        dto.password,
+        this.BCRYPT_ROUNDS,
+      );
 
       // Generate a temporary auth0Id (will be replaced by actual Auth0 integration)
       const tempAuth0Id = `auth0|temp-${Date.now()}-${Math.random().toString(36).substring(7)}`;

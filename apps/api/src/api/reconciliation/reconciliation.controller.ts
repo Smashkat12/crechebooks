@@ -25,6 +25,7 @@ import {
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -163,13 +164,13 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<ApiReconciliationResponseDto> {
     this.logger.log(
-      `Reconcile: tenant=${user.tenantId}, account=${dto.bank_account}, period=${dto.period_start} to ${dto.period_end}`,
+      `Reconcile: tenant=${getTenantId(user)}, account=${dto.bank_account}, period=${dto.period_start} to ${dto.period_end}`,
     );
 
     // Transform API snake_case to service camelCase, Rands to cents
     const result = await this.reconciliationService.reconcile(
       {
-        tenantId: user.tenantId,
+        tenantId: getTenantId(user),
         bankAccount: dto.bank_account,
         periodStart: dto.period_start,
         periodEnd: dto.period_end,
@@ -227,7 +228,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<ReconciliationListResponseDto> {
     this.logger.log(
-      `List reconciliations: tenant=${user.tenantId}, bank_account=${query.bank_account ?? 'all'}, status=${query.status ?? 'all'}, page=${query.page}, limit=${query.limit}`,
+      `List reconciliations: tenant=${getTenantId(user)}, bank_account=${query.bank_account ?? 'all'}, status=${query.status ?? 'all'}, page=${query.page}, limit=${query.limit}`,
     );
 
     // Transform API snake_case filter to service camelCase
@@ -242,7 +243,7 @@ export class ReconciliationController {
 
     const reconciliations =
       await this.reconciliationService.getReconciliationsByTenant(
-        user.tenantId,
+        getTenantId(user),
       );
 
     // Apply filters manually since service returns all
@@ -307,12 +308,12 @@ export class ReconciliationController {
   async getDiscrepancies(
     @CurrentUser() user: IUser,
   ): Promise<DiscrepanciesResponseDto> {
-    this.logger.log(`Get discrepancies: tenant=${user.tenantId}`);
+    this.logger.log(`Get discrepancies: tenant=${getTenantId(user)}`);
 
     // Get all reconciliations with discrepancies
     const reconciliations =
       await this.reconciliationService.getReconciliationsByTenant(
-        user.tenantId,
+        getTenantId(user),
       );
 
     // Filter to those with status DISCREPANCY or non-zero discrepancy
@@ -331,7 +332,7 @@ export class ReconciliationController {
     for (const recon of withDiscrepancies) {
       try {
         const report = await this.discrepancyService.detectDiscrepancies(
-          user.tenantId,
+          getTenantId(user),
           recon.id,
         );
 
@@ -398,12 +399,12 @@ export class ReconciliationController {
   async getSummary(
     @CurrentUser() user: IUser,
   ): Promise<ReconciliationSummaryResponseDto> {
-    this.logger.log(`Reconciliation summary: tenant=${user.tenantId}`);
+    this.logger.log(`Reconciliation summary: tenant=${getTenantId(user)}`);
 
     // Query all reconciliations for this tenant
     const reconciliations =
       await this.reconciliationService.getReconciliationsByTenant(
-        user.tenantId,
+        getTenantId(user),
       );
 
     // Calculate summary statistics from real data
@@ -489,7 +490,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<ApiIncomeStatementResponseDto> {
     this.logger.log(
-      `Income Statement: tenant=${user.tenantId}, period=${query.period_start} to ${query.period_end}`,
+      `Income Statement: tenant=${getTenantId(user)}, period=${query.period_start} to ${query.period_end}`,
     );
 
     // Transform API snake_case to service camelCase
@@ -497,7 +498,7 @@ export class ReconciliationController {
     const periodEnd = new Date(query.period_end);
 
     const report = await this.financialReportService.generateIncomeStatement(
-      user.tenantId,
+      getTenantId(user),
       periodStart,
       periodEnd,
     );
@@ -569,7 +570,7 @@ export class ReconciliationController {
     @Res() res: Response,
   ): Promise<void> {
     this.logger.log(
-      `Income Statement Export: tenant=${user.tenantId}, period=${periodStart} to ${periodEnd}, format=${format}`,
+      `Income Statement Export: tenant=${getTenantId(user)}, period=${periodStart} to ${periodEnd}, format=${format}`,
     );
 
     // Validate format
@@ -586,7 +587,7 @@ export class ReconciliationController {
 
     // Generate income statement
     const report = await this.financialReportService.generateIncomeStatement(
-      user.tenantId,
+      getTenantId(user),
       start,
       end,
     );
@@ -598,7 +599,7 @@ export class ReconciliationController {
 
     // Fetch tenant name for white-labeling
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: user.tenantId },
+      where: { id: getTenantId(user) },
       select: { name: true, tradingName: true },
     });
     const tenantName =
@@ -656,7 +657,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: any }> {
     this.logger.log(
-      `Trial Balance: tenant=${user.tenantId}, as_at_date=${asAtDate}`,
+      `Trial Balance: tenant=${getTenantId(user)}, as_at_date=${asAtDate}`,
     );
 
     // Parse and validate date
@@ -666,7 +667,7 @@ export class ReconciliationController {
     }
 
     const trialBalance = await this.financialReportService.generateTrialBalance(
-      user.tenantId,
+      getTenantId(user),
       date,
     );
 
@@ -719,7 +720,7 @@ export class ReconciliationController {
     @Res() res: Response,
   ): Promise<void> {
     this.logger.log(
-      `Trial Balance Export: tenant=${user.tenantId}, as_at_date=${asAtDate}, format=${format}`,
+      `Trial Balance Export: tenant=${getTenantId(user)}, as_at_date=${asAtDate}, format=${format}`,
     );
 
     // Validate format
@@ -735,7 +736,7 @@ export class ReconciliationController {
 
     // Generate trial balance
     const trialBalance = await this.financialReportService.generateTrialBalance(
-      user.tenantId,
+      getTenantId(user),
       date,
     );
 
@@ -746,7 +747,7 @@ export class ReconciliationController {
 
     // Fetch tenant name for white-labeling
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: user.tenantId },
+      where: { id: getTenantId(user) },
       select: { name: true, tradingName: true },
     });
     const tenantName =
@@ -804,7 +805,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<BalanceSheetResponse> {
     this.logger.log(
-      `Balance Sheet: tenant=${user.tenantId}, as_at_date=${asAtDate}`,
+      `Balance Sheet: tenant=${getTenantId(user)}, as_at_date=${asAtDate}`,
     );
 
     // Parse and validate date
@@ -814,7 +815,7 @@ export class ReconciliationController {
     }
 
     const balanceSheet = await this.balanceSheetService.generate(
-      user.tenantId,
+      getTenantId(user),
       date,
     );
 
@@ -856,7 +857,7 @@ export class ReconciliationController {
     @Res() res: Response,
   ): Promise<void> {
     this.logger.log(
-      `Balance Sheet Export: tenant=${user.tenantId}, as_at_date=${asAtDate}, format=${format}`,
+      `Balance Sheet Export: tenant=${getTenantId(user)}, as_at_date=${asAtDate}, format=${format}`,
     );
 
     // Validate format
@@ -872,7 +873,7 @@ export class ReconciliationController {
 
     // Generate balance sheet
     const balanceSheet = await this.balanceSheetService.generate(
-      user.tenantId,
+      getTenantId(user),
       date,
     );
 
@@ -883,7 +884,7 @@ export class ReconciliationController {
 
     // Fetch tenant name for white-labeling
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: user.tenantId },
+      where: { id: getTenantId(user) },
       select: { name: true, tradingName: true },
     });
     const tenantName = tenant?.tradingName ?? tenant?.name ?? 'Balance Sheet';
@@ -947,7 +948,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<ComparativeBalanceSheetResponse> {
     this.logger.log(
-      `Comparative Balance Sheet: tenant=${user.tenantId}, current_date=${currentDate}, prior_date=${priorDate}`,
+      `Comparative Balance Sheet: tenant=${getTenantId(user)}, current_date=${currentDate}, prior_date=${priorDate}`,
     );
 
     // Validate required parameters
@@ -979,7 +980,7 @@ export class ReconciliationController {
 
     const comparative =
       await this.comparativeBalanceSheetService.generateComparative(
-        user.tenantId,
+        getTenantId(user),
         current,
         prior,
       );
@@ -1018,7 +1019,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: OpeningBalancesResult }> {
     this.logger.log(
-      `Opening Balances: tenant=${user.tenantId}, period_start_date=${periodStartDate}`,
+      `Opening Balances: tenant=${getTenantId(user)}, period_start_date=${periodStartDate}`,
     );
 
     // Validate required parameter
@@ -1036,7 +1037,7 @@ export class ReconciliationController {
 
     const openingBalances =
       await this.comparativeBalanceSheetService.getOpeningBalances(
-        user.tenantId,
+        getTenantId(user),
         startDate,
       );
 
@@ -1073,10 +1074,10 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<PaginatedAuditLogResponseDto> {
     this.logger.log(
-      `Audit logs: tenant=${user.tenantId}, offset=${query.offset}, limit=${query.limit}`,
+      `Audit logs: tenant=${getTenantId(user)}, offset=${query.offset}, limit=${query.limit}`,
     );
 
-    const result = await this.auditLogService.findAll(user.tenantId, {
+    const result = await this.auditLogService.findAll(getTenantId(user), {
       offset: query.offset,
       limit: query.limit,
       startDate: query.startDate ? new Date(query.startDate) : undefined,
@@ -1121,12 +1122,12 @@ export class ReconciliationController {
     @Res() res: Response,
   ): Promise<void> {
     this.logger.log(
-      `Audit logs export: tenant=${user.tenantId}, format=${query.format}`,
+      `Audit logs export: tenant=${getTenantId(user)}, format=${query.format}`,
     );
 
     const format = query.format || 'csv';
     const buffer = await this.auditLogService.export(
-      user.tenantId,
+      getTenantId(user),
       {
         startDate: query.startDate ? new Date(query.startDate) : undefined,
         endDate: query.endDate ? new Date(query.endDate) : undefined,
@@ -1168,9 +1169,9 @@ export class ReconciliationController {
     @Param('id') id: string,
     @CurrentUser() user: IUser,
   ): Promise<AuditLogResponseDto> {
-    this.logger.log(`Audit log by ID: tenant=${user.tenantId}, id=${id}`);
+    this.logger.log(`Audit log by ID: tenant=${getTenantId(user)}, id=${id}`);
 
-    const log = await this.auditLogService.getById(user.tenantId, id);
+    const log = await this.auditLogService.getById(getTenantId(user), id);
     return log as AuditLogResponseDto;
   }
 
@@ -1194,11 +1195,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<AuditLogResponseDto[]> {
     this.logger.log(
-      `Audit logs by entity: tenant=${user.tenantId}, entityId=${entityId}`,
+      `Audit logs by entity: tenant=${getTenantId(user)}, entityId=${entityId}`,
     );
 
     const logs = await this.auditLogService.getByEntityId(
-      user.tenantId,
+      getTenantId(user),
       entityId,
     );
     return logs as AuditLogResponseDto[];
@@ -1253,12 +1254,12 @@ export class ReconciliationController {
     }
 
     this.logger.log(
-      `Bank statement reconciliation: tenant=${user.tenantId}, file=${file.originalname}, size=${file.size}`,
+      `Bank statement reconciliation: tenant=${getTenantId(user)}, file=${file.originalname}, size=${file.size}`,
     );
 
     const result =
       await this.bankStatementReconciliationService.reconcileStatement(
-        user.tenantId,
+        getTenantId(user),
         dto.bank_account,
         file.buffer,
         user.id,
@@ -1267,7 +1268,7 @@ export class ReconciliationController {
     // Get all matches for response
     const matches =
       await this.bankStatementReconciliationService.getMatchesByReconciliationId(
-        user.tenantId,
+        getTenantId(user),
         result.reconciliationId,
       );
 
@@ -1336,7 +1337,7 @@ export class ReconciliationController {
   }> {
     const matches =
       await this.bankStatementReconciliationService.getMatchesByReconciliationId(
-        user.tenantId,
+        getTenantId(user),
         reconciliationId,
       );
 
@@ -1404,7 +1405,7 @@ export class ReconciliationController {
   }> {
     const unmatched =
       await this.bankStatementReconciliationService.getUnmatchedSummary(
-        user.tenantId,
+        getTenantId(user),
         reconciliationId,
       );
 
@@ -1462,7 +1463,7 @@ export class ReconciliationController {
     );
 
     const result = await this.bankStatementReconciliationService.manualMatch(
-      user.tenantId,
+      getTenantId(user),
       matchId,
       body.transaction_id,
     );
@@ -1511,7 +1512,7 @@ export class ReconciliationController {
     );
 
     const result = await this.bankStatementReconciliationService.unmatch(
-      user.tenantId,
+      getTenantId(user),
       matchId,
     );
 
@@ -1550,7 +1551,7 @@ export class ReconciliationController {
   }> {
     const transactions =
       await this.bankStatementReconciliationService.getAvailableTransactionsForMatching(
-        user.tenantId,
+        getTenantId(user),
         reconciliationId,
         { searchTerm },
       );
@@ -1595,12 +1596,12 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<SuggestSplitMatchResponseDto> {
     this.logger.log(
-      `Suggest split matches: tenant=${user.tenantId}, transaction=${dto.bank_transaction_id}, amount=${dto.amount_cents}c`,
+      `Suggest split matches: tenant=${getTenantId(user)}, transaction=${dto.bank_transaction_id}, amount=${dto.amount_cents}c`,
     );
 
     const suggestions =
       await this.splitTransactionMatcherService.suggestSplitMatches(
-        user.tenantId,
+        getTenantId(user),
         dto,
       );
 
@@ -1639,11 +1640,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<ConfirmSplitMatchResponseDto> {
     this.logger.log(
-      `Confirm split match: tenant=${user.tenantId}, match=${dto.split_match_id}`,
+      `Confirm split match: tenant=${getTenantId(user)}, match=${dto.split_match_id}`,
     );
 
     const result = await this.splitTransactionMatcherService.confirmSplitMatch(
-      user.tenantId,
+      getTenantId(user),
       dto,
       user.id,
     );
@@ -1682,12 +1683,12 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; split_match: SplitMatchResponseDto }> {
     this.logger.log(
-      `Reject split match: tenant=${user.tenantId}, match=${dto.split_match_id}`,
+      `Reject split match: tenant=${getTenantId(user)}, match=${dto.split_match_id}`,
     );
 
     const splitMatch =
       await this.splitTransactionMatcherService.rejectSplitMatch(
-        user.tenantId,
+        getTenantId(user),
         dto.split_match_id,
         dto.reason,
       );
@@ -1719,11 +1720,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<SplitMatchListResponseDto> {
     this.logger.log(
-      `List split matches: tenant=${user.tenantId}, status=${filter.status}, type=${filter.match_type}`,
+      `List split matches: tenant=${getTenantId(user)}, status=${filter.status}, type=${filter.match_type}`,
     );
 
     const result = await this.splitTransactionMatcherService.getSplitMatches(
-      user.tenantId,
+      getTenantId(user),
       filter,
     );
 
@@ -1760,12 +1761,12 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: SplitMatchResponseDto }> {
     this.logger.log(
-      `Get split match by ID: tenant=${user.tenantId}, id=${splitMatchId}`,
+      `Get split match by ID: tenant=${getTenantId(user)}, id=${splitMatchId}`,
     );
 
     const splitMatch =
       await this.splitTransactionMatcherService.getSplitMatchById(
-        user.tenantId,
+        getTenantId(user),
         splitMatchId,
       );
 
@@ -1808,11 +1809,11 @@ export class ReconciliationController {
     limit: number;
   }> {
     this.logger.log(
-      `List accrued charges: tenant=${user.tenantId}, status=${filter.status ?? 'all'}, fee_type=${filter.fee_type ?? 'all'}`,
+      `List accrued charges: tenant=${getTenantId(user)}, status=${filter.status ?? 'all'}, fee_type=${filter.fee_type ?? 'all'}`,
     );
 
     const result = await this.accruedBankChargeService.listAccruedCharges(
-      user.tenantId,
+      getTenantId(user),
       filter,
     );
 
@@ -1845,10 +1846,10 @@ export class ReconciliationController {
   async getAccruedChargesSummary(
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: AccruedChargeSummaryDto }> {
-    this.logger.log(`Accrued charges summary: tenant=${user.tenantId}`);
+    this.logger.log(`Accrued charges summary: tenant=${getTenantId(user)}`);
 
     const summary = await this.accruedBankChargeService.getSummary(
-      user.tenantId,
+      getTenantId(user),
     );
 
     return {
@@ -1877,11 +1878,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
     this.logger.log(
-      `Get accrued charge by ID: tenant=${user.tenantId}, id=${chargeId}`,
+      `Get accrued charge by ID: tenant=${getTenantId(user)}, id=${chargeId}`,
     );
 
     const charge = await this.accruedBankChargeService.getAccruedCharge(
-      user.tenantId,
+      getTenantId(user),
       chargeId,
     );
 
@@ -1917,11 +1918,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
     this.logger.log(
-      `Create accrued charge: tenant=${user.tenantId}, fee_type=${dto.fee_type}, amount=${dto.accrued_amount_cents}c`,
+      `Create accrued charge: tenant=${getTenantId(user)}, fee_type=${dto.fee_type}, amount=${dto.accrued_amount_cents}c`,
     );
 
     const charge = await this.accruedBankChargeService.createAccruedCharge(
-      user.tenantId,
+      getTenantId(user),
       dto,
     );
 
@@ -1960,7 +1961,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
     this.logger.log(
-      `Match accrued charge: tenant=${user.tenantId}, charge=${chargeId}, transaction=${body.charge_transaction_id}`,
+      `Match accrued charge: tenant=${getTenantId(user)}, charge=${chargeId}, transaction=${body.charge_transaction_id}`,
     );
 
     const dto: MatchAccruedChargeDto = {
@@ -1970,7 +1971,7 @@ export class ReconciliationController {
     };
 
     const charge = await this.accruedBankChargeService.matchAccruedCharge(
-      user.tenantId,
+      getTenantId(user),
       dto,
       user.id,
     );
@@ -2006,7 +2007,7 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: AccruedBankChargeResponseDto }> {
     this.logger.log(
-      `Update accrued charge status: tenant=${user.tenantId}, charge=${chargeId}, status=${body.status}`,
+      `Update accrued charge status: tenant=${getTenantId(user)}, charge=${chargeId}, status=${body.status}`,
     );
 
     const dto: UpdateAccruedChargeStatusDto = {
@@ -2016,7 +2017,7 @@ export class ReconciliationController {
     };
 
     const charge = await this.accruedBankChargeService.updateStatus(
-      user.tenantId,
+      getTenantId(user),
       dto,
     );
 
@@ -2051,10 +2052,10 @@ export class ReconciliationController {
       total_matched_cents: number;
     };
   }> {
-    this.logger.log(`Auto-match accrued charges: tenant=${user.tenantId}`);
+    this.logger.log(`Auto-match accrued charges: tenant=${getTenantId(user)}`);
 
     const result = await this.accruedBankChargeService.autoMatchAccruedCharges(
-      user.tenantId,
+      getTenantId(user),
       user.id,
     );
 
@@ -2095,11 +2096,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ) {
     this.logger.log(
-      `Detecting Xero split params: tenant=${user.tenantId}, xeroAmount=${dto.xero_amount_cents}, bankAmount=${dto.bank_amount_cents}`,
+      `Detecting Xero split params: tenant=${getTenantId(user)}, xeroAmount=${dto.xero_amount_cents}, bankAmount=${dto.bank_amount_cents}`,
     );
 
     const result = await this.xeroTransactionSplitService.detectSplitParams(
-      user.tenantId,
+      getTenantId(user),
       dto,
     );
 
@@ -2134,11 +2135,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ) {
     this.logger.log(
-      `Splitting Xero transaction: tenant=${user.tenantId}, xeroTxn=${dto.xero_transaction_id}, net=${dto.net_amount_cents}, fee=${dto.fee_amount_cents}`,
+      `Splitting Xero transaction: tenant=${getTenantId(user)}, xeroTxn=${dto.xero_transaction_id}, net=${dto.net_amount_cents}, fee=${dto.fee_amount_cents}`,
     );
 
     const result = await this.xeroTransactionSplitService.splitXeroTransaction(
-      user.tenantId,
+      getTenantId(user),
       dto,
       user.id,
     );
@@ -2175,11 +2176,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ) {
     this.logger.log(
-      `Confirming Xero split: tenant=${user.tenantId}, splitId=${id}`,
+      `Confirming Xero split: tenant=${getTenantId(user)}, splitId=${id}`,
     );
 
     const result = await this.xeroTransactionSplitService.confirmSplit(
-      user.tenantId,
+      getTenantId(user),
       { split_id: id, ...dto },
       user.id,
     );
@@ -2216,11 +2217,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ) {
     this.logger.log(
-      `Cancelling Xero split: tenant=${user.tenantId}, splitId=${id}`,
+      `Cancelling Xero split: tenant=${getTenantId(user)}, splitId=${id}`,
     );
 
     const result = await this.xeroTransactionSplitService.cancelSplit(
-      user.tenantId,
+      getTenantId(user),
       { split_id: id, ...dto },
       user.id,
     );
@@ -2253,11 +2254,11 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ) {
     this.logger.log(
-      `Listing Xero splits: tenant=${user.tenantId}, filter=${JSON.stringify(filter)}`,
+      `Listing Xero splits: tenant=${getTenantId(user)}, filter=${JSON.stringify(filter)}`,
     );
 
     const result = await this.xeroTransactionSplitService.listSplits(
-      user.tenantId,
+      getTenantId(user),
       filter,
     );
 
@@ -2284,10 +2285,10 @@ export class ReconciliationController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async getXeroSplitSummary(@CurrentUser() user: IUser) {
-    this.logger.log(`Getting Xero split summary: tenant=${user.tenantId}`);
+    this.logger.log(`Getting Xero split summary: tenant=${getTenantId(user)}`);
 
     const result = await this.xeroTransactionSplitService.getSummary(
-      user.tenantId,
+      getTenantId(user),
     );
 
     return {
@@ -2315,11 +2316,11 @@ export class ReconciliationController {
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async getXeroSplit(@Param('id') id: string, @CurrentUser() user: IUser) {
     this.logger.log(
-      `Getting Xero split: tenant=${user.tenantId}, splitId=${id}`,
+      `Getting Xero split: tenant=${getTenantId(user)}, splitId=${id}`,
     );
 
     const result = await this.xeroTransactionSplitService.getSplit(
-      user.tenantId,
+      getTenantId(user),
       id,
     );
 
@@ -2350,12 +2351,12 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ) {
     this.logger.log(
-      `Getting Xero split by xeroTransactionId: tenant=${user.tenantId}, xeroTxnId=${xeroTransactionId}`,
+      `Getting Xero split by xeroTransactionId: tenant=${getTenantId(user)}, xeroTxnId=${xeroTransactionId}`,
     );
 
     const result =
       await this.xeroTransactionSplitService.getSplitByXeroTransactionId(
-        user.tenantId,
+        getTenantId(user),
         xeroTransactionId,
       );
 
@@ -2394,13 +2395,13 @@ export class ReconciliationController {
     @CurrentUser() user: IUser,
   ): Promise<ApiReconciliationResponseDto> {
     this.logger.log(
-      `Get reconciliation by ID: tenant=${user.tenantId}, id=${id}`,
+      `Get reconciliation by ID: tenant=${getTenantId(user)}, id=${id}`,
     );
 
     // Use the repository to find by ID
     const reconciliations =
       await this.reconciliationService.getReconciliationsByTenant(
-        user.tenantId,
+        getTenantId(user),
       );
 
     const reconciliation = reconciliations.find((r) => r.id === id);
@@ -2410,14 +2411,14 @@ export class ReconciliationController {
     }
 
     // Verify tenant ownership (already filtered by tenant above, but explicit check)
-    if (reconciliation.tenantId !== user.tenantId) {
+    if (reconciliation.tenantId !== getTenantId(user)) {
       throw new NotFoundException('Reconciliation', id);
     }
 
     // Get matches to compute summary counts
     const matches =
       await this.bankStatementReconciliationService.getMatchesByReconciliationId(
-        user.tenantId,
+        getTenantId(user),
         id,
       );
 

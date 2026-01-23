@@ -23,7 +23,7 @@ export class FeeStructureRepository {
     try {
       return await this.prisma.feeStructure.create({
         data: {
-          tenantId: dto.tenantId,
+          tenantId: dto.tenantId!,
           name: dto.name,
           description: dto.description ?? null,
           feeType: dto.feeType,
@@ -44,7 +44,7 @@ export class FeeStructureRepository {
 
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2003') {
-          throw new NotFoundException('Tenant', dto.tenantId);
+          throw new NotFoundException('Tenant', dto.tenantId!);
         }
       }
       throw new DatabaseException(

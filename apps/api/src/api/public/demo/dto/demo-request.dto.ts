@@ -14,7 +14,11 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { SanitizeString, SanitizeEmail, SanitizePhone } from '../../../../common/decorators';
+import {
+  SanitizeString,
+  SanitizeEmail,
+  SanitizePhone,
+} from '../../../../common/decorators';
 
 export enum PreferredTimeSlot {
   MORNING = 'MORNING',
@@ -160,7 +164,8 @@ export class DemoRequestResponseDto {
 
   @ApiProperty({
     description: 'Response message',
-    example: 'Demo request received! Our team will contact you within 24 hours.',
+    example:
+      'Demo request received! Our team will contact you within 24 hours.',
   })
   message: string;
 

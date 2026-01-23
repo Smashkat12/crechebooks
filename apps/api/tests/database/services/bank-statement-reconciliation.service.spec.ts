@@ -139,7 +139,10 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
         { provide: ReconciliationRepository, useValue: mockReconRepo },
         { provide: ToleranceConfigService, useValue: mockToleranceConfig },
         { provide: LLMWhispererParser, useValue: mockLLMParser },
-        { provide: AccruedBankChargeService, useValue: mockAccruedChargeService },
+        {
+          provide: AccruedBankChargeService,
+          useValue: mockAccruedChargeService,
+        },
         { provide: BankFeeService, useValue: mockBankFeeService },
       ],
     }).compile();

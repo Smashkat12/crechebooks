@@ -27,6 +27,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { IUser } from '../../database/entities/user.entity';
 import { StaffRepository } from '../../database/repositories/staff.repository';
 import { UpdateStaffDto, StaffFilterDto } from '../../database/dto/staff.dto';
@@ -116,7 +117,7 @@ export class StaffController {
     if (payFrequency) filter.payFrequency = payFrequency;
 
     const staffMembers = await this.staffRepository.findByTenantId(
-      user.tenantId,
+      getTenantId(user),
       filter,
     );
     return {
@@ -137,7 +138,7 @@ export class StaffController {
     @CurrentUser() user: IUser,
     @Param('id') id: string,
   ): Promise<Record<string, unknown>> {
-    const staff = await this.staffRepository.findById(id, user.tenantId);
+    const staff = await this.staffRepository.findById(id, getTenantId(user));
     if (!staff) {
       throw new NotFoundException('Staff member not found');
     }
@@ -158,7 +159,7 @@ export class StaffController {
       // Transform API snake_case to service camelCase
       // Note: isActive defaults to true in Prisma schema, no need to pass explicitly
       const staff = await this.staffRepository.create({
-        tenantId: user.tenantId,
+        tenantId: getTenantId(user),
         employeeNumber: dto.employee_number,
         firstName: dto.first_name,
         lastName: dto.last_name,
@@ -182,7 +183,7 @@ export class StaffController {
       // - Tax configuration
       // - SA statutory calculations (PAYE, UIF, SDL)
       const event: StaffCreatedEvent = {
-        tenantId: user.tenantId,
+        tenantId: getTenantId(user),
         staffId: staff.id,
         firstName: staff.firstName,
         lastName: staff.lastName,
@@ -216,11 +217,11 @@ export class StaffController {
     @Body() dto: UpdateStaffDto,
   ): Promise<Record<string, unknown>> {
     // Verify staff belongs to tenant
-    const existing = await this.staffRepository.findById(id, user.tenantId);
+    const existing = await this.staffRepository.findById(id, getTenantId(user));
     if (!existing) {
       throw new NotFoundException('Staff member not found');
     }
-    const staff = await this.staffRepository.update(id, user.tenantId, dto);
+    const staff = await this.staffRepository.update(id, getTenantId(user), dto);
     return toSnakeCase(staff);
   }
 
@@ -236,11 +237,11 @@ export class StaffController {
     @Param('id') id: string,
   ): Promise<void> {
     // Verify staff belongs to tenant
-    const existing = await this.staffRepository.findById(id, user.tenantId);
+    const existing = await this.staffRepository.findById(id, getTenantId(user));
     if (!existing) {
       throw new NotFoundException('Staff member not found');
     }
     // Use deactivate instead of hard delete to preserve payroll history
-    await this.staffRepository.deactivate(id, user.tenantId);
+    await this.staffRepository.deactivate(id, getTenantId(user));
   }
 }

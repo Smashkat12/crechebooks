@@ -21,7 +21,7 @@ import { DeliveryMethod, DeliveryStatus } from '../entities/invoice.entity';
  */
 export class SendInvoicesDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsArray()
   @IsUUID('4', { each: true })
@@ -37,7 +37,7 @@ export class SendInvoicesDto {
  */
 export class RetryFailedDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsOptional()
   @IsInt()

@@ -78,7 +78,7 @@ export interface Vat201Document {
   submissionId: string;
 
   /** Tenant ID */
-  tenantId: string;
+  tenantId?: string;
 
   /** Tenant's VAT number */
   vatNumber: string;
@@ -112,7 +112,7 @@ export interface Vat201Document {
  * DTO for VAT201 generation request
  */
 export interface GenerateVat201Dto {
-  tenantId: string;
+  tenantId?: string;
   periodStart: Date;
   periodEnd: Date;
 }

@@ -99,7 +99,7 @@ export class PaymentMatchingService {
 
     // 1. Get unallocated credit transactions
     const transactions = await this.getUnallocatedCredits(
-      dto.tenantId,
+      dto.tenantId!,
       dto.transactionIds,
     );
 
@@ -115,7 +115,9 @@ export class PaymentMatchingService {
     }
 
     // 2. Get outstanding invoices with parent/child relations
-    const outstandingInvoices = await this.getOutstandingInvoices(dto.tenantId);
+    const outstandingInvoices = await this.getOutstandingInvoices(
+      dto.tenantId!,
+    );
 
     if (outstandingInvoices.length === 0) {
       this.logger.log('No outstanding invoices to match against');
@@ -160,7 +162,7 @@ export class PaymentMatchingService {
         // Single exact match - auto-apply
         const applied = await this.autoApplyMatch(
           exactMatches[0],
-          dto.tenantId,
+          dto.tenantId!,
         );
         results.push({
           transactionId: transaction.id,
@@ -197,7 +199,7 @@ export class PaymentMatchingService {
         // Single high-confidence - auto-apply
         const applied = await this.autoApplyMatch(
           highConfidence[0],
-          dto.tenantId,
+          dto.tenantId!,
         );
         results.push({
           transactionId: transaction.id,
@@ -211,7 +213,7 @@ export class PaymentMatchingService {
         const agentResult = await this.resolveAmbiguousMatch(
           transaction,
           partialMatches,
-          dto.tenantId,
+          dto.tenantId!,
         );
 
         if (agentResult.status === 'AUTO_APPLIED') {
@@ -727,7 +729,7 @@ export class PaymentMatchingService {
 
     // Create payment record
     const payment = await this.paymentRepo.create({
-      tenantId,
+      tenantId: tenantId,
       transactionId: candidate.transactionId,
       invoiceId: candidate.invoiceId,
       amountCents: candidate.transactionAmountCents,
@@ -746,7 +748,7 @@ export class PaymentMatchingService {
 
     // Create audit log
     await this.auditLogService.logAction({
-      tenantId,
+      tenantId: tenantId,
       entityType: 'Payment',
       entityId: payment.id,
       action: AuditAction.CREATE,
@@ -786,7 +788,7 @@ export class PaymentMatchingService {
     const transaction = await this.prisma.transaction.findFirst({
       where: {
         id: dto.transactionId,
-        tenantId: dto.tenantId,
+        tenantId: dto.tenantId!,
         isCredit: true,
         isDeleted: false,
       },
@@ -808,7 +810,7 @@ export class PaymentMatchingService {
     const invoice = await this.prisma.invoice.findFirst({
       where: {
         id: dto.invoiceId,
-        tenantId: dto.tenantId,
+        tenantId: dto.tenantId!,
         isDeleted: false,
         status: { notIn: [InvoiceStatus.PAID, InvoiceStatus.VOID] },
       },
@@ -834,7 +836,7 @@ export class PaymentMatchingService {
 
     // Create payment record
     const payment = await this.paymentRepo.create({
-      tenantId: dto.tenantId,
+      tenantId: dto.tenantId!,
       transactionId: dto.transactionId,
       invoiceId: dto.invoiceId,
       amountCents,
@@ -847,13 +849,13 @@ export class PaymentMatchingService {
     // Update invoice with payment
     await this.invoiceRepo.recordPayment(
       dto.invoiceId,
-      dto.tenantId,
+      dto.tenantId!,
       amountCents,
     );
 
     // Create audit log
     await this.auditLogService.logAction({
-      tenantId: dto.tenantId,
+      tenantId: dto.tenantId!,
       entityType: 'Payment',
       entityId: payment.id,
       action: AuditAction.CREATE,
@@ -944,7 +946,7 @@ export class PaymentMatchingService {
   ): Promise<InvoiceWithRelations[]> {
     return this.prisma.invoice.findMany({
       where: {
-        tenantId,
+        tenantId: tenantId,
         isDeleted: false,
         status: { notIn: [InvoiceStatus.PAID, InvoiceStatus.VOID] },
       },
@@ -967,7 +969,7 @@ export class PaymentMatchingService {
     const allocatedTransactionIds = await this.prisma.payment
       .findMany({
         where: {
-          tenantId,
+          tenantId: tenantId,
           isReversed: false,
           transactionId: { not: null },
         },
@@ -978,7 +980,7 @@ export class PaymentMatchingService {
       );
 
     const where: Prisma.TransactionWhereInput = {
-      tenantId,
+      tenantId: tenantId,
       isCredit: true,
       isDeleted: false,
     };
@@ -1090,7 +1092,7 @@ export class PaymentMatchingService {
 
       // Log agent failure to audit
       await this.auditLogService.logAction({
-        tenantId,
+        tenantId: tenantId,
         entityType: 'Payment',
         entityId: transaction.id,
         action: AuditAction.UPDATE,
@@ -1114,7 +1116,7 @@ export class PaymentMatchingService {
 
     // Log agent decision to audit
     await this.auditLogService.logAction({
-      tenantId,
+      tenantId: tenantId,
       entityType: 'Payment',
       entityId: transaction.id,
       action: AuditAction.UPDATE,

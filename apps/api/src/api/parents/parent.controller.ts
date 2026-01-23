@@ -13,6 +13,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -109,7 +110,7 @@ export class ParentController {
     if (isActive !== undefined) filter.isActive = isActive === 'true';
 
     const result = await this.parentRepository.findByTenant(
-      user.tenantId,
+      getTenantId(user),
       filter,
     );
 
@@ -134,7 +135,7 @@ export class ParentController {
     @CurrentUser() user: IUser,
     @Param('id') id: string,
   ): Promise<Record<string, unknown>> {
-    const parent = await this.parentRepository.findById(id, user.tenantId);
+    const parent = await this.parentRepository.findById(id, getTenantId(user));
     if (!parent) {
       throw new NotFoundException('Parent not found');
     }
@@ -151,7 +152,7 @@ export class ParentController {
     @CurrentUser() user: IUser,
     @Param('id') id: string,
   ): Promise<Record<string, unknown>[]> {
-    const parent = await this.parentRepository.findById(id, user.tenantId);
+    const parent = await this.parentRepository.findById(id, getTenantId(user));
     if (!parent) {
       throw new NotFoundException('Parent not found');
     }
@@ -186,12 +187,12 @@ export class ParentController {
   ): Promise<Record<string, unknown>> {
     const parent = await this.parentRepository.create({
       ...dto,
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
     });
 
     // TASK-XERO-004: Auto-sync to Xero as contact if connected
     // Fire-and-forget - don't block parent creation on Xero sync
-    this.syncToXero(user.tenantId, parent).catch((error) => {
+    this.syncToXero(getTenantId(user), parent).catch((error) => {
       this.logger.warn(
         `Failed to auto-sync parent ${parent.id} to Xero: ${error instanceof Error ? error.message : String(error)}`,
       );
@@ -254,11 +255,18 @@ export class ParentController {
     @Body() dto: UpdateParentDto,
   ): Promise<Record<string, unknown>> {
     // Verify parent belongs to tenant
-    const existing = await this.parentRepository.findById(id, user.tenantId);
+    const existing = await this.parentRepository.findById(
+      id,
+      getTenantId(user),
+    );
     if (!existing) {
       throw new NotFoundException('Parent not found');
     }
-    const parent = await this.parentRepository.update(id, user.tenantId, dto);
+    const parent = await this.parentRepository.update(
+      id,
+      getTenantId(user),
+      dto,
+    );
     return toResponse(parent);
   }
 
@@ -274,10 +282,13 @@ export class ParentController {
     @Param('id') id: string,
   ): Promise<void> {
     // Verify parent belongs to tenant
-    const existing = await this.parentRepository.findById(id, user.tenantId);
+    const existing = await this.parentRepository.findById(
+      id,
+      getTenantId(user),
+    );
     if (!existing) {
       throw new NotFoundException('Parent not found');
     }
-    await this.parentRepository.delete(id, user.tenantId);
+    await this.parentRepository.delete(id, getTenantId(user));
   }
 }

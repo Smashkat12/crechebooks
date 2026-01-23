@@ -7,7 +7,11 @@ import {
   MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { SanitizeString, SanitizeEmail, SanitizePhone } from '../../../../common/decorators';
+import {
+  SanitizeString,
+  SanitizeEmail,
+  SanitizePhone,
+} from '../../../../common/decorators';
 
 export class CreateContactDto {
   @ApiProperty({

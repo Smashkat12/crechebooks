@@ -68,7 +68,7 @@ export class PaymentAllocationService {
 
     // 1. Get transaction by ID with tenant validation
     const transaction = await this.transactionRepo.findById(
-      dto.tenantId,
+      dto.tenantId!,
       dto.transactionId,
     );
     if (!transaction) {
@@ -89,7 +89,7 @@ export class PaymentAllocationService {
 
     // 2a. Check if transaction has already been fully allocated
     const existingPayments = await this.paymentRepo.findByTenantId(
-      dto.tenantId,
+      dto.tenantId!,
       { transactionId: dto.transactionId },
     );
     const totalAlreadyAllocated = existingPayments.reduce(
@@ -103,7 +103,7 @@ export class PaymentAllocationService {
     let effectiveAmountCents = transaction.amountCents;
     if (transaction.xeroTransactionId) {
       const split = await this.xeroSplitService.getSplitByXeroTransactionId(
-        dto.tenantId,
+        dto.tenantId!,
         transaction.xeroTransactionId,
       );
 
@@ -148,7 +148,7 @@ export class PaymentAllocationService {
     const allocation = dto.allocations[0];
     const invoice = await this.invoiceRepo.findById(
       allocation.invoiceId,
-      dto.tenantId,
+      dto.tenantId!,
     );
     if (!invoice) {
       throw new NotFoundException('Invoice', allocation.invoiceId);
@@ -179,7 +179,7 @@ export class PaymentAllocationService {
         dto.transactionId,
         allocation.invoiceId,
         allocation.amountCents,
-        dto.tenantId,
+        dto.tenantId!,
         dto.userId,
       );
     } else if (allocationAmount.lt(outstanding)) {
@@ -188,13 +188,13 @@ export class PaymentAllocationService {
         dto.transactionId,
         allocation.invoiceId,
         allocation.amountCents,
-        dto.tenantId,
+        dto.tenantId!,
         dto.userId,
       );
     } else {
       // Exact match
       payment = await this.paymentRepo.create({
-        tenantId: dto.tenantId,
+        tenantId: dto.tenantId!,
         transactionId: dto.transactionId,
         invoiceId: allocation.invoiceId,
         amountCents: allocation.amountCents,
@@ -208,7 +208,7 @@ export class PaymentAllocationService {
       // 7. Update invoice via invoiceRepo.recordPayment() - status auto-set
       await this.invoiceRepo.recordPayment(
         allocation.invoiceId,
-        dto.tenantId,
+        dto.tenantId!,
         allocation.amountCents,
       );
     }
@@ -218,7 +218,7 @@ export class PaymentAllocationService {
 
     // 9. Create audit log entry
     await this.auditLogService.logAction({
-      tenantId: dto.tenantId,
+      tenantId: dto.tenantId!,
       userId: dto.userId,
       entityType: 'Payment',
       entityId: payment.id,
@@ -235,7 +235,7 @@ export class PaymentAllocationService {
 
     // 10. TASK-WA-007: Send WhatsApp payment confirmation
     await this.sendPaymentConfirmationWhatsApp(
-      dto.tenantId,
+      dto.tenantId!,
       invoice.parentId,
       invoice.invoiceNumber,
       allocation.amountCents,
@@ -280,7 +280,7 @@ export class PaymentAllocationService {
     try {
       await this.prisma.$transaction(async (tx) => {
         const transaction = await tx.transaction.findFirst({
-          where: { id: dto.transactionId, tenantId: dto.tenantId },
+          where: { id: dto.transactionId, tenantId: dto.tenantId! },
         });
 
         if (!transaction) {
@@ -303,7 +303,7 @@ export class PaymentAllocationService {
             throw new NotFoundException('Invoice', allocation.invoiceId);
           }
 
-          if (invoice.tenantId !== dto.tenantId) {
+          if (invoice.tenantId !== dto.tenantId!) {
             errors.push({
               invoiceId: allocation.invoiceId,
               reason: 'Invoice does not belong to tenant',
@@ -314,7 +314,7 @@ export class PaymentAllocationService {
               'TENANT_MISMATCH',
               {
                 invoiceTenantId: invoice.tenantId,
-                requestTenantId: dto.tenantId,
+                requestTenantId: dto.tenantId!,
               },
             );
           }
@@ -404,7 +404,7 @@ export class PaymentAllocationService {
     );
 
     const transaction = await this.transactionRepo.findById(
-      dto.tenantId,
+      dto.tenantId!,
       dto.transactionId,
     );
 
@@ -412,7 +412,7 @@ export class PaymentAllocationService {
     let effectiveAmount = transaction!.amountCents;
     if (transaction!.xeroTransactionId) {
       const split = await this.xeroSplitService.getSplitByXeroTransactionId(
-        dto.tenantId,
+        dto.tenantId!,
         transaction!.xeroTransactionId,
       );
 
@@ -440,7 +440,7 @@ export class PaymentAllocationService {
     for (const payment of createdPayments) {
       const invoice = await this.invoiceRepo.findById(
         payment.invoiceId,
-        dto.tenantId,
+        dto.tenantId!,
       );
       if (invoice) {
         const status = await this.syncToXero(payment, invoice);
@@ -459,7 +459,7 @@ export class PaymentAllocationService {
     // 4. Audit log each allocation
     for (const payment of createdPayments) {
       await this.auditLogService.logAction({
-        tenantId: dto.tenantId,
+        tenantId: dto.tenantId!,
         userId: dto.userId,
         entityType: 'Payment',
         entityId: payment.id,
@@ -658,7 +658,7 @@ export class PaymentAllocationService {
     // 1. Get payment by ID with tenant validation
     const payment = await this.paymentRepo.findById(
       dto.paymentId,
-      dto.tenantId,
+      dto.tenantId!,
     );
     if (!payment) {
       throw new NotFoundException('Payment', dto.paymentId);
@@ -682,7 +682,7 @@ export class PaymentAllocationService {
     // 3. Reverse payment using PaymentRepository.reverse() method
     const reversedPayment = await this.paymentRepo.reverse(
       dto.paymentId,
-      dto.tenantId,
+      dto.tenantId!,
       {
         reversalReason: dto.reason,
       },
@@ -691,13 +691,13 @@ export class PaymentAllocationService {
     // 4. Revert invoice amount: invoiceRepo.recordPayment(id, -payment.amountCents)
     await this.invoiceRepo.recordPayment(
       payment.invoiceId,
-      dto.tenantId,
+      dto.tenantId!,
       -payment.amountCents,
     );
 
     // 5. Audit log the reversal
     await this.auditLogService.logAction({
-      tenantId: dto.tenantId,
+      tenantId: dto.tenantId!,
       userId: dto.userId,
       entityType: 'Payment',
       entityId: payment.id,
@@ -720,7 +720,7 @@ export class PaymentAllocationService {
     // The payment reversal is tracked in CrecheBooks; Xero sync would require payment deletion API
     const invoice = await this.invoiceRepo.findById(
       payment.invoiceId,
-      dto.tenantId,
+      dto.tenantId!,
     );
     if (invoice) {
       // Log the reversal attempt - actual Xero payment deletion is out of scope for TASK-XERO-003
@@ -911,7 +911,7 @@ export class PaymentAllocationService {
     for (const allocation of input.allocations) {
       const invoice = await this.invoiceRepo.findById(
         allocation.invoiceId,
-        input.tenantId,
+        input.tenantId!,
       );
       if (!invoice) {
         throw new NotFoundException('Invoice', allocation.invoiceId);
@@ -931,7 +931,7 @@ export class PaymentAllocationService {
 
     // Delegate to existing allocatePayment
     return this.allocatePayment({
-      tenantId: input.tenantId,
+      tenantId: input.tenantId!,
       transactionId: input.transactionId,
       allocations: input.allocations.map((a) => ({
         invoiceId: a.invoiceId,

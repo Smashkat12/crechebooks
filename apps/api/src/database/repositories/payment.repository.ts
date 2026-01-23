@@ -29,7 +29,7 @@ export class PaymentRepository {
     try {
       return await this.prisma.payment.create({
         data: {
-          tenantId: dto.tenantId,
+          tenantId: dto.tenantId!,
           xeroPaymentId: dto.xeroPaymentId ?? null,
           transactionId: dto.transactionId ?? null,
           invoiceId: dto.invoiceId,
@@ -65,7 +65,7 @@ export class PaymentRepository {
           if (field?.includes('invoice')) {
             throw new NotFoundException('Invoice', dto.invoiceId);
           }
-          throw new NotFoundException('Tenant', dto.tenantId);
+          throw new NotFoundException('Tenant', dto.tenantId!);
         }
       }
       throw new DatabaseException(

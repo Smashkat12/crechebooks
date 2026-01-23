@@ -22,6 +22,7 @@ import {
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiOperation,
@@ -160,7 +161,7 @@ export class SimplePayController {
     @CurrentUser() user: IUser,
     @Body() dto: SetupConnectionDto,
   ): Promise<{ message: string }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     // Test credentials first
     const test = await this.connectionService.testCredentials(
@@ -189,7 +190,7 @@ export class SimplePayController {
     @CurrentUser() user: IUser,
   ): Promise<ConnectionStatusDto> {
     const status = await this.connectionService.getConnectionStatus(
-      user.tenantId,
+      getTenantId(user),
     );
     return {
       isConnected: status.isConnected,
@@ -209,7 +210,7 @@ export class SimplePayController {
   async testConnection(
     @CurrentUser() user: IUser,
   ): Promise<TestConnectionResultDto> {
-    return this.connectionService.testConnection(user.tenantId);
+    return this.connectionService.testConnection(getTenantId(user));
   }
 
   @Delete('disconnect')
@@ -218,7 +219,7 @@ export class SimplePayController {
   @ApiOperation({ summary: 'Disconnect SimplePay integration' })
   @ApiResponse({ status: 204, description: 'Disconnected' })
   async disconnect(@CurrentUser() user: IUser): Promise<void> {
-    await this.connectionService.disconnect(user.tenantId);
+    await this.connectionService.disconnect(getTenantId(user));
   }
 
   // ============================================
@@ -265,7 +266,7 @@ export class SimplePayController {
       isDefault: boolean;
     }>
   > {
-    return this.profileService.getAvailableProfiles(user.tenantId);
+    return this.profileService.getAvailableProfiles(getTenantId(user));
   }
 
   // ============================================
@@ -315,7 +316,9 @@ export class SimplePayController {
     }>;
     count: number;
   }> {
-    const employees = await this.connectionService.listEmployees(user.tenantId);
+    const employees = await this.connectionService.listEmployees(
+      getTenantId(user),
+    );
     return {
       employees,
       count: employees.length,
@@ -332,7 +335,7 @@ export class SimplePayController {
   ): Promise<SyncEmployeeResultDto> {
     try {
       const mapping = await this.employeeService.syncEmployee(
-        user.tenantId,
+        getTenantId(user),
         staffId,
       );
       return {
@@ -357,7 +360,7 @@ export class SimplePayController {
   async syncAllEmployees(
     @CurrentUser() user: IUser,
   ): Promise<SyncAllEmployeesResultDto> {
-    return this.employeeService.syncAllEmployees(user.tenantId);
+    return this.employeeService.syncAllEmployees(getTenantId(user));
   }
 
   @Get('employees/:staffId/status')
@@ -382,7 +385,7 @@ export class SimplePayController {
     @CurrentUser() user: IUser,
     @Param('staffId') staffId: string,
   ): Promise<EmployeeComparisonDto> {
-    return this.employeeService.compareEmployee(user.tenantId, staffId);
+    return this.employeeService.compareEmployee(getTenantId(user), staffId);
   }
 
   // ============================================
@@ -398,7 +401,7 @@ export class SimplePayController {
     @Body() dto: ImportPayslipsDto,
   ): Promise<BulkImportResultDto> {
     return this.payslipService.importAllPayslips(
-      user.tenantId,
+      getTenantId(user),
       dto.payPeriodStart,
       dto.payPeriodEnd,
       dto.staffIds,
@@ -417,7 +420,7 @@ export class SimplePayController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ): Promise<{ data: PayslipImportDto[]; total: number }> {
-    return this.payslipService.getImportedPayslips(user.tenantId, staffId, {
+    return this.payslipService.getImportedPayslips(getTenantId(user), staffId, {
       fromDate: fromDate ? new Date(fromDate) : undefined,
       toDate: toDate ? new Date(toDate) : undefined,
       page: page ? Number(page) : undefined,
@@ -435,7 +438,7 @@ export class SimplePayController {
     @Res() res: Response,
   ): Promise<void> {
     const pdf = await this.payslipService.getPayslipPdf(
-      user.tenantId,
+      getTenantId(user),
       simplePayPayslipId,
     );
     res.set({
@@ -459,7 +462,7 @@ export class SimplePayController {
     @Query('year') year?: number,
   ): Promise<Irp5CertificateDto[]> {
     const certificates = await this.taxService.fetchIrp5Certificates(
-      user.tenantId,
+      getTenantId(user),
       staffId,
       year ? Number(year) : undefined,
     );
@@ -482,7 +485,7 @@ export class SimplePayController {
     @Res() res: Response,
   ): Promise<void> {
     const pdf = await this.taxService.getIrp5Pdf(
-      user.tenantId,
+      getTenantId(user),
       staffId,
       Number(year),
     );
@@ -502,7 +505,7 @@ export class SimplePayController {
     @Query('date') date: string,
   ): Promise<Emp201DataDto> {
     const data = await this.taxService.fetchEmp201(
-      user.tenantId,
+      getTenantId(user),
       new Date(date),
     );
     return {

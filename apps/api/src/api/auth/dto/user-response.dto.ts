@@ -14,6 +14,10 @@ export class UserResponseDto {
   @ApiProperty({ enum: UserRole, example: 'OWNER', description: 'User role' })
   role: UserRole;
 
-  @ApiProperty({ example: 'tenant-uuid', description: 'Tenant ID' })
-  tenant_id: string;
+  @ApiProperty({
+    example: 'tenant-uuid',
+    description: 'Tenant ID (null for SUPER_ADMIN)',
+    nullable: true,
+  })
+  tenant_id: string | null;
 }

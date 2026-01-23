@@ -10,6 +10,7 @@ import {
   Res,
   Header,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -73,7 +74,7 @@ export class ArrearsController {
     @Query() query: ListArrearsQueryDto,
     @CurrentUser() user: IUser,
   ): Promise<ArrearsListResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(
       `Listing arrears for tenant=${tenantId}, page=${query.page}, limit=${query.limit}`,
@@ -213,7 +214,7 @@ export class ArrearsController {
   async getArrearsSummary(
     @CurrentUser() user: IUser,
   ): Promise<ArrearsSummaryResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(`Getting arrears summary for tenant=${tenantId}`);
 
@@ -305,7 +306,7 @@ export class ArrearsController {
     @CurrentUser() user: IUser,
   ): SendReminderResponseDto {
     this.logger.log(
-      `Send reminder: tenant=${user.tenantId}, count=${dto.parentIds.length}, method=${dto.method}`,
+      `Send reminder: tenant=${getTenantId(user)}, count=${dto.parentIds.length}, method=${dto.method}`,
     );
 
     // TODO: In a real implementation, this would integrate with email/WhatsApp services
@@ -348,7 +349,7 @@ export class ArrearsController {
     @CurrentUser() user: IUser,
     @Res() res: Response,
   ): Promise<void> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(`Generating arrears PDF for tenant=${tenantId}`);
 

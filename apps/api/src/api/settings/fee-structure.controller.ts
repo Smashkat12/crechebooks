@@ -16,6 +16,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -80,14 +81,14 @@ export class FeeStructureController {
     @Query('isActive') isActive?: string,
     @Query('feeType') feeType?: FeeType,
   ): Promise<{ fee_structures: Record<string, unknown>[]; total: number }> {
-    this.logger.log(`List fee structures: tenant=${user.tenantId}`);
+    this.logger.log(`List fee structures: tenant=${getTenantId(user)}`);
 
     const filter: { isActive?: boolean; feeType?: FeeType } = {};
     if (isActive !== undefined) filter.isActive = isActive === 'true';
     if (feeType) filter.feeType = feeType;
 
     const feeStructures = await this.feeStructureRepo.findByTenant(
-      user.tenantId,
+      getTenantId(user),
       filter,
     );
 
@@ -107,9 +108,9 @@ export class FeeStructureController {
     @CurrentUser() user: IUser,
     @Param('id') id: string,
   ): Promise<Record<string, unknown>> {
-    this.logger.log(`Get fee structure: id=${id}, tenant=${user.tenantId}`);
+    this.logger.log(`Get fee structure: id=${id}, tenant=${getTenantId(user)}`);
 
-    const fee = await this.feeStructureRepo.findById(id, user.tenantId);
+    const fee = await this.feeStructureRepo.findById(id, getTenantId(user));
     if (!fee) {
       throw new Error('Fee structure not found');
     }
@@ -138,11 +139,11 @@ export class FeeStructureController {
     },
   ): Promise<{ success: boolean; data: Record<string, unknown> }> {
     this.logger.log(
-      `Create fee structure: tenant=${user.tenantId}, name=${body.name}`,
+      `Create fee structure: tenant=${getTenantId(user)}, name=${body.name}`,
     );
 
     const fee = await this.feeStructureRepo.create({
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       name: body.name,
       description: body.description,
       feeType: body.fee_type,
@@ -190,15 +191,20 @@ export class FeeStructureController {
       effective_to?: string;
     },
   ): Promise<{ success: boolean; data: Record<string, unknown> }> {
-    this.logger.log(`Update fee structure: id=${id}, tenant=${user.tenantId}`);
+    this.logger.log(
+      `Update fee structure: id=${id}, tenant=${getTenantId(user)}`,
+    );
 
     // Verify ownership
-    const existing = await this.feeStructureRepo.findById(id, user.tenantId);
+    const existing = await this.feeStructureRepo.findById(
+      id,
+      getTenantId(user),
+    );
     if (!existing) {
       throw new Error('Fee structure not found');
     }
 
-    const fee = await this.feeStructureRepo.update(id, user.tenantId, {
+    const fee = await this.feeStructureRepo.update(id, getTenantId(user), {
       name: body.name,
       description: body.description,
       feeType: body.fee_type,
@@ -238,16 +244,19 @@ export class FeeStructureController {
     @Param('id') id: string,
   ): Promise<{ success: boolean }> {
     this.logger.log(
-      `Deactivate fee structure: id=${id}, tenant=${user.tenantId}`,
+      `Deactivate fee structure: id=${id}, tenant=${getTenantId(user)}`,
     );
 
     // Verify ownership
-    const existing = await this.feeStructureRepo.findById(id, user.tenantId);
+    const existing = await this.feeStructureRepo.findById(
+      id,
+      getTenantId(user),
+    );
     if (!existing) {
       throw new Error('Fee structure not found');
     }
 
-    await this.feeStructureRepo.deactivate(id, user.tenantId);
+    await this.feeStructureRepo.deactivate(id, getTenantId(user));
 
     return { success: true };
   }

@@ -34,7 +34,7 @@ export class WhatsAppMessageEntity {
 
     return this.prisma.whatsAppMessage.create({
       data: {
-        tenantId: data.tenantId,
+        tenantId: data.tenantId ?? undefined,
         parentId: data.parentId,
         recipientPhone: data.recipientPhone,
         templateName: data.templateName,

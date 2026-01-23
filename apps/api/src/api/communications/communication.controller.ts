@@ -21,6 +21,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiOperation,
@@ -149,14 +150,14 @@ export class CommunicationController {
     @CurrentUser() user: IUser,
   ): Promise<BroadcastSingleResponseDto> {
     this.logger.log(
-      `Create broadcast: tenant=${user.tenantId}, type=${dto.recipient_type}, channel=${dto.channel}`,
+      `Create broadcast: tenant=${getTenantId(user)}, type=${dto.recipient_type}, channel=${dto.channel}`,
     );
 
     const broadcast = await this.adhocService.createBroadcast(
-      user.tenantId,
+      getTenantId(user),
       user.id,
       {
-        tenantId: user.tenantId,
+        tenantId: getTenantId(user),
         subject: dto.subject,
         body: dto.body,
         htmlBody: dto.html_body,
@@ -189,9 +190,9 @@ export class CommunicationController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<MessageResponseDto> {
-    this.logger.log(`Send broadcast: id=${id}, tenant=${user.tenantId}`);
+    this.logger.log(`Send broadcast: id=${id}, tenant=${getTenantId(user)}`);
 
-    await this.adhocService.sendBroadcast(user.tenantId, id, user.id);
+    await this.adhocService.sendBroadcast(getTenantId(user), id, user.id);
 
     return { message: 'Broadcast queued for sending' };
   }
@@ -213,9 +214,9 @@ export class CommunicationController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<MessageResponseDto> {
-    this.logger.log(`Cancel broadcast: id=${id}, tenant=${user.tenantId}`);
+    this.logger.log(`Cancel broadcast: id=${id}, tenant=${getTenantId(user)}`);
 
-    await this.adhocService.cancelBroadcast(user.tenantId, id, user.id);
+    await this.adhocService.cancelBroadcast(getTenantId(user), id, user.id);
 
     return { message: 'Broadcast cancelled' };
   }
@@ -234,7 +235,7 @@ export class CommunicationController {
     @CurrentUser() user: IUser,
   ): Promise<BroadcastListResponseDto> {
     this.logger.debug(
-      `List broadcasts: tenant=${user.tenantId}, page=${query.page}, status=${query.status}`,
+      `List broadcasts: tenant=${getTenantId(user)}, page=${query.page}, status=${query.status}`,
     );
 
     const page = query.page ?? 1;
@@ -242,12 +243,15 @@ export class CommunicationController {
     const offset = (page - 1) * limit;
 
     // Get broadcasts with filter
-    const broadcasts = await this.adhocService.listBroadcasts(user.tenantId, {
-      status: query.status,
-      recipientType: query.recipient_type,
-      limit: limit + 1, // Fetch one extra to check if there are more
-      offset,
-    });
+    const broadcasts = await this.adhocService.listBroadcasts(
+      getTenantId(user),
+      {
+        status: query.status,
+        recipientType: query.recipient_type,
+        limit: limit + 1, // Fetch one extra to check if there are more
+        offset,
+      },
+    );
 
     // Check if there are more results
     const hasNext = broadcasts.length > limit;
@@ -291,9 +295,12 @@ export class CommunicationController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: BroadcastDetailDto }> {
-    this.logger.debug(`Get broadcast: id=${id}, tenant=${user.tenantId}`);
+    this.logger.debug(`Get broadcast: id=${id}, tenant=${getTenantId(user)}`);
 
-    const broadcast = await this.adhocService.getBroadcast(user.tenantId, id);
+    const broadcast = await this.adhocService.getBroadcast(
+      getTenantId(user),
+      id,
+    );
     if (!broadcast) {
       throw new NotFoundException('Broadcast', id);
     }
@@ -323,11 +330,11 @@ export class CommunicationController {
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: RecipientPreviewResponseDto }> {
     this.logger.debug(
-      `Preview recipients: tenant=${user.tenantId}, type=${dto.recipient_type}`,
+      `Preview recipients: tenant=${getTenantId(user)}, type=${dto.recipient_type}`,
     );
 
     const recipients = await this.recipientResolver.resolve(
-      user.tenantId,
+      getTenantId(user),
       dto.recipient_type,
       transformFilterDto(dto.filter),
       dto.channel,
@@ -366,9 +373,11 @@ export class CommunicationController {
   async listGroups(
     @CurrentUser() user: IUser,
   ): Promise<RecipientGroupListResponseDto> {
-    this.logger.debug(`List groups: tenant=${user.tenantId}`);
+    this.logger.debug(`List groups: tenant=${getTenantId(user)}`);
 
-    const groups = await this.recipientGroupEntity.findByTenant(user.tenantId);
+    const groups = await this.recipientGroupEntity.findByTenant(
+      getTenantId(user),
+    );
 
     return {
       success: true,
@@ -394,11 +403,13 @@ export class CommunicationController {
     @Body() dto: CreateRecipientGroupDto,
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: RecipientGroupResponseDto }> {
-    this.logger.log(`Create group: tenant=${user.tenantId}, name=${dto.name}`);
+    this.logger.log(
+      `Create group: tenant=${getTenantId(user)}, name=${dto.name}`,
+    );
 
     const group = await this.recipientGroupEntity.create(
       {
-        tenantId: user.tenantId,
+        tenantId: getTenantId(user),
         name: dto.name,
         description: dto.description,
         recipientType: dto.recipient_type,
@@ -426,10 +437,10 @@ export class CommunicationController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; data: RecipientGroupResponseDto }> {
-    this.logger.debug(`Get group: id=${id}, tenant=${user.tenantId}`);
+    this.logger.debug(`Get group: id=${id}, tenant=${getTenantId(user)}`);
 
     const group = await this.recipientGroupEntity.findById(id);
-    if (!group || group.tenantId !== user.tenantId) {
+    if (!group || group.tenantId !== getTenantId(user)) {
       throw new NotFoundException('RecipientGroup', id);
     }
 
@@ -458,8 +469,8 @@ export class CommunicationController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<void> {
-    this.logger.log(`Delete group: id=${id}, tenant=${user.tenantId}`);
+    this.logger.log(`Delete group: id=${id}, tenant=${getTenantId(user)}`);
 
-    await this.recipientGroupEntity.delete(user.tenantId, id);
+    await this.recipientGroupEntity.delete(getTenantId(user), id);
   }
 }

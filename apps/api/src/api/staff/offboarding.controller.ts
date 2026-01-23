@@ -57,6 +57,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
 import type { IUser } from '../../database/entities/user.entity';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import { StaffOffboardingService } from '../../database/services/staff-offboarding.service';
 import { Ui19GeneratorService } from '../../database/services/ui19-generator.service';
 import { CertificateOfServiceService } from '../../database/services/certificate-of-service.service';
@@ -109,13 +110,11 @@ export class StaffOffboardingController {
     @CurrentUser() user: IUser,
     @Body() dto: InitiateOffboardingDto,
   ) {
+    const tenantId = getTenantId(user);
+
     // Override staffId from path parameter
     dto.staffId = staffId;
-    return this.offboardingService.initiateOffboarding(
-      user.tenantId,
-      dto,
-      user.id,
-    );
+    return this.offboardingService.initiateOffboarding(tenantId, dto, user.id);
   }
 
   @Get('settlement-preview')
@@ -329,6 +328,8 @@ export class StaffOffboardingController {
     @CurrentUser() user: IUser,
     @Body() dto: UpdateFinalPayDto,
   ) {
+    const tenantId = getTenantId(user);
+
     const offboarding =
       await this.offboardingRepo.findOffboardingByStaffId(staffId);
     if (!offboarding) {
@@ -341,7 +342,7 @@ export class StaffOffboardingController {
     await this.offboardingService.updateFinalPay(
       offboarding.id,
       dto,
-      user.tenantId,
+      tenantId,
       user.id,
     );
     return { success: true, message: 'Final pay updated' };
@@ -420,6 +421,8 @@ export class StaffOffboardingController {
     @CurrentUser() user: IUser,
     @Body() dto: MarkAssetReturnedDto,
   ) {
+    const tenantId = getTenantId(user);
+
     return this.offboardingRepo.markAssetReturned(assetId, user.id, dto.notes);
   }
 
@@ -450,10 +453,12 @@ export class StaffOffboardingController {
     @CurrentUser() user: IUser,
     @Body() dto: RecordExitInterviewDto,
   ) {
+    const tenantId = getTenantId(user);
+
     await this.offboardingService.recordExitInterview(
       offboardingId,
       dto,
-      user.tenantId,
+      tenantId,
       user.id,
     );
     return { success: true, message: 'Exit interview recorded' };
@@ -636,12 +641,14 @@ export class StaffOffboardingController {
     @CurrentUser() user: IUser,
     @Body() dto: CompleteOffboardingDto,
   ) {
+    const tenantId = getTenantId(user);
+
     // Use current user as completedBy if not provided
     dto.completedBy = dto.completedBy || user.id;
     await this.offboardingService.completeOffboarding(
       offboardingId,
       dto,
-      user.tenantId,
+      tenantId,
     );
     return { success: true, message: 'Offboarding completed' };
   }
@@ -666,7 +673,7 @@ export class StaffOffboardingController {
     await this.offboardingService.cancelOffboarding(
       offboardingId,
       body.reason || '',
-      user.tenantId,
+      getTenantId(user),
       user.id,
     );
     return { success: true, message: 'Offboarding cancelled' };
@@ -696,14 +703,13 @@ export class StaffOffboardingsController {
     @CurrentUser() user: IUser,
     @Query('status') status?: StaffOffboardingStatus,
   ) {
+    const tenantId = getTenantId(user);
+
     const filter: OffboardingFilterDto = {};
     if (status) {
       filter.status = status;
     }
-    return this.offboardingService.getOffboardingsByTenant(
-      user.tenantId,
-      filter,
-    );
+    return this.offboardingService.getOffboardingsByTenant(tenantId, filter);
   }
 
   @Get('stats')
@@ -711,7 +717,9 @@ export class StaffOffboardingsController {
   @ApiOperation({ summary: 'Get offboarding statistics for tenant' })
   @ApiResponse({ status: 200, description: 'Offboarding statistics' })
   async getOffboardingStats(@CurrentUser() user: IUser) {
-    return this.offboardingService.getOffboardingStats(user.tenantId);
+    const tenantId = getTenantId(user);
+
+    return this.offboardingService.getOffboardingStats(tenantId);
   }
 
   @Get('pending')
@@ -719,7 +727,9 @@ export class StaffOffboardingsController {
   @ApiOperation({ summary: 'Get pending offboardings for tenant' })
   @ApiResponse({ status: 200, description: 'List of pending offboardings' })
   async getPendingOffboardings(@CurrentUser() user: IUser) {
-    return this.offboardingService.getPendingOffboardings(user.tenantId);
+    const tenantId = getTenantId(user);
+
+    return this.offboardingService.getPendingOffboardings(tenantId);
   }
 
   @Get('upcoming')
@@ -736,6 +746,8 @@ export class StaffOffboardingsController {
     @CurrentUser() user: IUser,
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
   ) {
-    return this.offboardingService.getUpcomingOffboardings(user.tenantId, days);
+    const tenantId = getTenantId(user);
+
+    return this.offboardingService.getUpcomingOffboardings(tenantId, days);
   }
 }

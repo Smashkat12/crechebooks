@@ -32,7 +32,7 @@ export class ParentRepository {
     try {
       return await this.prisma.parent.create({
         data: {
-          tenantId: dto.tenantId,
+          tenantId: dto.tenantId!,
           firstName: dto.firstName,
           lastName: dto.lastName,
           email: dto.email ?? null,
@@ -58,7 +58,7 @@ export class ParentRepository {
           if (target?.includes('email')) {
             throw new ConflictException(
               `Parent with email '${dto.email}' already exists for this tenant`,
-              { tenantId: dto.tenantId, email: dto.email },
+              { tenantId: dto.tenantId!, email: dto.email },
             );
           }
           if (target?.includes('xero_contact_id')) {
@@ -69,7 +69,7 @@ export class ParentRepository {
           throw new ConflictException('Parent already exists');
         }
         if (error.code === 'P2003') {
-          throw new NotFoundException('Tenant', dto.tenantId);
+          throw new NotFoundException('Tenant', dto.tenantId!);
         }
       }
       throw new DatabaseException(

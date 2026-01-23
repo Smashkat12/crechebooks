@@ -58,7 +58,7 @@ import {
  */
 export class CreateStaffDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsOptional()
   @SanitizeHtml()

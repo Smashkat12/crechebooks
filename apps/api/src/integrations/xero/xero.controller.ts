@@ -22,6 +22,7 @@ import {
   HttpStatus,
   Param,
 } from '@nestjs/common';
+import { getTenantId } from '../../api/auth/utils/tenant-assertions';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -112,7 +113,7 @@ export class XeroController {
   async initiateConnection(
     @CurrentUser() user: IUser,
   ): Promise<ConnectResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Initiating Xero connection for tenant ${tenantId}`);
 
     // Fail fast: Validate required Xero credentials
@@ -361,7 +362,7 @@ export class XeroController {
     @Body() body: SyncRequestDto,
     @CurrentUser() user: IUser,
   ): Promise<SyncJobResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Triggering Xero sync for tenant ${tenantId}, direction: ${body.direction}`,
     );
@@ -421,7 +422,7 @@ export class XeroController {
   async getStatus(
     @CurrentUser() user: IUser,
   ): Promise<XeroConnectionStatusDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(`Getting Xero status for tenant ${tenantId}`);
 
     const isConnected = await this.tokenManager.hasValidConnection(tenantId);
@@ -487,7 +488,7 @@ export class XeroController {
       connectionId?: string;
     }>;
   }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Fetching Xero bank accounts for tenant ${tenantId}`);
 
     // Check connection
@@ -571,7 +572,7 @@ export class XeroController {
     @Body() body: { accountId: string },
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; connectionId: string; message: string }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Connecting bank account ${body.accountId} for tenant ${tenantId}`,
     );
@@ -608,7 +609,7 @@ export class XeroController {
     @Body() body: { connectionId: string },
     @CurrentUser() user: IUser,
   ): Promise<{ success: boolean; message: string }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Disconnecting bank connection ${body.connectionId} for tenant ${tenantId}`,
     );
@@ -650,7 +651,7 @@ export class XeroController {
       errorMessage: string | null;
     }>;
   }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     const connections = await this.prisma.bankConnection.findMany({
       where: { tenantId },
@@ -689,7 +690,7 @@ export class XeroController {
   @ApiForbiddenResponse({ description: 'Requires OWNER or ADMIN role' })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async disconnect(@CurrentUser() user: IUser): Promise<DisconnectResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Disconnecting Xero for tenant ${tenantId}`);
 
     try {
@@ -761,7 +762,7 @@ export class XeroController {
     @Body() body: PushCategorizationsRequestDto,
     @CurrentUser() user: IUser,
   ): Promise<PushCategorizationsResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     // Check connection
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
@@ -843,7 +844,7 @@ export class XeroController {
     @Body() body: SyncAccountsRequestDto,
     @CurrentUser() user: IUser,
   ): Promise<SyncAccountsResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Syncing Chart of Accounts for tenant ${tenantId}`);
 
     // Check connection
@@ -891,7 +892,7 @@ export class XeroController {
     @Query() filter: XeroAccountFilterDto,
     @CurrentUser() user: IUser,
   ): Promise<ListAccountsResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     const result = await this.xeroSyncService.getSyncedAccounts(tenantId, {
       status: filter.status,
@@ -946,7 +947,7 @@ export class XeroController {
     @Param('code') code: string,
     @CurrentUser() user: IUser,
   ): Promise<ValidateAccountCodeResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     if (!code) {
       return {
@@ -1332,7 +1333,7 @@ export class XeroController {
   async getTransactionsNeedingReview(
     @CurrentUser() user: IUser,
   ): Promise<TransactionsNeedingReviewDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     // Get transactions with REVIEW_REQUIRED status
     const reviewRequired = await this.prisma.transaction.findMany({

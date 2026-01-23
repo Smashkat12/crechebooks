@@ -46,15 +46,26 @@ export class EmailService {
   private readonly isConfigured: boolean;
 
   constructor(private readonly configService: ConfigService) {
-    this.supportEmail = this.configService.get<string>('SUPPORT_EMAIL', 'hello@crechebooks.co.za');
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://app.elleelephant.co.za');
+    this.supportEmail = this.configService.get<string>(
+      'SUPPORT_EMAIL',
+      'hello@crechebooks.co.za',
+    );
+    this.frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'https://app.elleelephant.co.za',
+    );
     this.mailgunDomain = this.configService.get<string>('MAILGUN_DOMAIN', '');
-    this.mailgunFromEmail = this.configService.get<string>('MAILGUN_FROM_EMAIL', 'CrecheBooks <noreply@crechebooks.co.za>');
+    this.mailgunFromEmail = this.configService.get<string>(
+      'MAILGUN_FROM_EMAIL',
+      'CrecheBooks <noreply@crechebooks.co.za>',
+    );
 
     const mailgunApiKey = this.configService.get<string>('MAILGUN_API_KEY');
 
     if (!mailgunApiKey || !this.mailgunDomain) {
-      this.logger.warn('Mailgun not configured. Email notifications will be disabled. Set MAILGUN_API_KEY and MAILGUN_DOMAIN.');
+      this.logger.warn(
+        'Mailgun not configured. Email notifications will be disabled. Set MAILGUN_API_KEY and MAILGUN_DOMAIN.',
+      );
       this.isConfigured = false;
       return;
     }
@@ -76,7 +87,9 @@ export class EmailService {
 
   async sendContactNotification(contact: ContactSubmission): Promise<void> {
     if (!this.isConfigured) {
-      this.logger.warn('Mailgun not configured. Skipping contact notification.');
+      this.logger.warn(
+        'Mailgun not configured. Skipping contact notification.',
+      );
       return;
     }
 
@@ -102,14 +115,17 @@ export class EmailService {
             </div>
 
             <p style="color: #6B7280; font-size: 14px; margin-top: 20px;">
-              <strong>Submitted:</strong> ${contact.submittedAt.toLocaleString('en-ZA', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              <strong>Submitted:</strong> ${contact.submittedAt.toLocaleString(
+                'en-ZA',
+                {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                },
+              )}
             </p>
 
             <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
@@ -124,14 +140,19 @@ export class EmailService {
       await this.mailgunClient.messages.create(this.mailgunDomain, messageData);
       this.logger.log(`✅ Contact notification sent for ${contact.email}`);
     } catch (error) {
-      this.logger.error('Failed to send contact notification via Mailgun', error);
+      this.logger.error(
+        'Failed to send contact notification via Mailgun',
+        error,
+      );
       // Don't throw - we don't want to fail the request if email fails
     }
   }
 
   async sendDemoRequestNotification(demo: DemoRequest): Promise<void> {
     if (!this.isConfigured) {
-      this.logger.warn('Mailgun not configured. Skipping demo request notification.');
+      this.logger.warn(
+        'Mailgun not configured. Skipping demo request notification.',
+      );
       return;
     }
 
@@ -163,14 +184,17 @@ export class EmailService {
             </div>
 
             <p style="color: #6B7280; font-size: 14px; margin-top: 20px;">
-              <strong>Submitted:</strong> ${demo.submittedAt.toLocaleString('en-ZA', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              <strong>Submitted:</strong> ${demo.submittedAt.toLocaleString(
+                'en-ZA',
+                {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                },
+              )}
             </p>
 
             <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
@@ -185,19 +209,28 @@ export class EmailService {
       await this.mailgunClient.messages.create(this.mailgunDomain, messageData);
       this.logger.log(`✅ Demo request notification sent for ${demo.email}`);
     } catch (error) {
-      this.logger.error('Failed to send demo request notification via Mailgun', error);
+      this.logger.error(
+        'Failed to send demo request notification via Mailgun',
+        error,
+      );
       // Don't throw - we don't want to fail the request if email fails
     }
   }
 
-  async sendWelcomeEmail(user: User, tenant: Tenant, trialExpiresAt: Date): Promise<void> {
+  async sendWelcomeEmail(
+    user: User,
+    tenant: Tenant,
+    trialExpiresAt: Date,
+  ): Promise<void> {
     if (!this.isConfigured) {
       this.logger.warn('Mailgun not configured. Skipping welcome email.');
       return;
     }
 
     const userName = user.firstName || user.email.split('@')[0];
-    const trialDays = Math.ceil((trialExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const trialDays = Math.ceil(
+      (trialExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    );
 
     try {
       const messageData = {
@@ -259,9 +292,14 @@ export class EmailService {
     }
   }
 
-  async sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {
+  async sendPasswordResetEmail(
+    email: string,
+    resetToken: string,
+  ): Promise<void> {
     if (!this.isConfigured) {
-      this.logger.warn('Mailgun not configured. Skipping password reset email.');
+      this.logger.warn(
+        'Mailgun not configured. Skipping password reset email.',
+      );
       return;
     }
 
@@ -306,7 +344,10 @@ export class EmailService {
       await this.mailgunClient.messages.create(this.mailgunDomain, messageData);
       this.logger.log(`✅ Password reset email sent to ${email}`);
     } catch (error) {
-      this.logger.error('Failed to send password reset email via Mailgun', error);
+      this.logger.error(
+        'Failed to send password reset email via Mailgun',
+        error,
+      );
       throw error;
     }
   }

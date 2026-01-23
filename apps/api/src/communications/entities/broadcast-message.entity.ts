@@ -45,7 +45,7 @@ export class BroadcastMessageEntity {
 
     return this.prisma.broadcastMessage.create({
       data: {
-        tenantId: data.tenantId,
+        tenantId: data.tenantId! ?? undefined,
         subject: data.subject,
         body: data.body,
         htmlBody: data.htmlBody,

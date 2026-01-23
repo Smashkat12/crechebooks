@@ -22,6 +22,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -169,14 +170,14 @@ export class LeaveController {
   ): Promise<{ leave_types: LeaveTypeResponseDto[] }> {
     try {
       const leaveTypes = await this.simplePayLeaveService.getLeaveTypes(
-        user.tenantId,
+        getTenantId(user),
       );
       return {
         leave_types: leaveTypes.map(transformLeaveType),
       };
     } catch (error) {
       this.logger.error(
-        `Failed to get leave types for tenant ${user.tenantId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to get leave types for tenant ${getTenantId(user)}: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw new BadRequestException(
         'Failed to retrieve leave types. Please ensure SimplePay is connected.',
@@ -202,14 +203,17 @@ export class LeaveController {
     @Param('staffId') staffId: string,
   ): Promise<{ balances: LeaveBalanceResponseDto[] }> {
     // Verify staff belongs to tenant
-    const staff = await this.staffRepository.findById(staffId, user.tenantId);
+    const staff = await this.staffRepository.findById(
+      staffId,
+      getTenantId(user),
+    );
     if (!staff) {
       throw new NotFoundException('Staff member not found');
     }
 
     try {
       const balances = await this.simplePayLeaveService.getLeaveBalancesByStaff(
-        user.tenantId,
+        getTenantId(user),
         staffId,
       );
       return {
@@ -290,7 +294,10 @@ export class LeaveController {
     limit: number;
   }> {
     // Verify staff belongs to tenant
-    const staff = await this.staffRepository.findById(staffId, user.tenantId);
+    const staff = await this.staffRepository.findById(
+      staffId,
+      getTenantId(user),
+    );
     if (!staff) {
       throw new NotFoundException('Staff member not found');
     }
@@ -365,7 +372,10 @@ export class LeaveController {
     @Body() dto: ApiCreateLeaveRequestDto,
   ): Promise<Record<string, unknown>> {
     // Verify staff belongs to tenant
-    const staff = await this.staffRepository.findById(staffId, user.tenantId);
+    const staff = await this.staffRepository.findById(
+      staffId,
+      getTenantId(user),
+    );
     if (!staff) {
       throw new NotFoundException('Staff member not found');
     }
@@ -386,7 +396,7 @@ export class LeaveController {
 
     // Transform snake_case input to camelCase for repository
     const createDto: CreateLeaveRequestDto = {
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       staffId,
       leaveTypeId: dto.leave_type_id,
       leaveTypeName: dto.leave_type_name,

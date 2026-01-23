@@ -40,18 +40,23 @@ export class DemoRequestService {
       );
 
       // Send email notification to CrecheBooks support (non-blocking)
-      this.emailService.sendDemoRequestNotification({
-        fullName: dto.fullName,
-        email: dto.email,
-        phone: dto.phone,
-        crecheName: dto.crecheName,
-        childrenCount: dto.childrenCount,
-        province: dto.province,
-        submittedAt: demoRequest.createdAt,
-      }).catch(error => {
-        this.logger.error('Failed to send demo request email notification', error);
-        // Don't fail the request if email fails
-      });
+      this.emailService
+        .sendDemoRequestNotification({
+          fullName: dto.fullName,
+          email: dto.email,
+          phone: dto.phone,
+          crecheName: dto.crecheName,
+          childrenCount: dto.childrenCount,
+          province: dto.province,
+          submittedAt: demoRequest.createdAt,
+        })
+        .catch((error) => {
+          this.logger.error(
+            'Failed to send demo request email notification',
+            error,
+          );
+          // Don't fail the request if email fails
+        });
 
       return {
         success: true,

@@ -12,6 +12,7 @@ import {
   BadRequestException,
   Res,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiOperation,
@@ -88,7 +89,7 @@ export class InvoiceController {
     @Query() query: ListInvoicesQueryDto,
     @CurrentUser() user: IUser,
   ): Promise<InvoiceListResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(
       `Listing invoices for tenant=${tenantId}, page=${query.page}, limit=${query.limit}`,
@@ -238,13 +239,13 @@ export class InvoiceController {
     @CurrentUser() user: IUser,
   ): Promise<InvoiceDetailResponseDto> {
     this.logger.debug(
-      `Getting invoice ${invoiceId} for tenant ${user.tenantId}`,
+      `Getting invoice ${invoiceId} for tenant ${getTenantId(user)}`,
     );
 
     // Fetch invoice with lines
     const invoice = await this.invoiceRepo.findByIdWithLines(
       invoiceId,
-      user.tenantId,
+      getTenantId(user),
     );
 
     if (!invoice) {
@@ -253,9 +254,9 @@ export class InvoiceController {
     }
 
     // Verify tenant isolation
-    if (invoice.tenantId !== user.tenantId) {
+    if (invoice.tenantId !== getTenantId(user)) {
       this.logger.error(
-        `Invoice ${invoiceId} belongs to tenant ${invoice.tenantId}, not ${user.tenantId}`,
+        `Invoice ${invoiceId} belongs to tenant ${invoice.tenantId}, not ${getTenantId(user)}`,
       );
       throw new BadRequestException('Invoice not found');
     }
@@ -263,9 +264,12 @@ export class InvoiceController {
     // Fetch parent and child data
     const parent = await this.parentRepo.findById(
       invoice.parentId,
-      user.tenantId,
+      getTenantId(user),
     );
-    const child = await this.childRepo.findById(invoice.childId, user.tenantId);
+    const child = await this.childRepo.findById(
+      invoice.childId,
+      getTenantId(user),
+    );
 
     if (!parent || !child) {
       this.logger.error(
@@ -360,11 +364,11 @@ export class InvoiceController {
 
     // 2. Call service
     this.logger.log(
-      `Generate invoices: tenant=${user.tenantId}, month=${dto.billing_month}`,
+      `Generate invoices: tenant=${getTenantId(user)}, month=${dto.billing_month}`,
     );
 
     const result = await this.invoiceGenerationService.generateMonthlyInvoices(
-      user.tenantId,
+      getTenantId(user),
       dto.billing_month,
       user.id,
       dto.child_ids,
@@ -419,12 +423,12 @@ export class InvoiceController {
     @CurrentUser() user: IUser,
   ): Promise<SendInvoicesResponseDto> {
     this.logger.log(
-      `Send invoices: tenant=${user.tenantId}, count=${dto.invoice_ids.length}`,
+      `Send invoices: tenant=${getTenantId(user)}, count=${dto.invoice_ids.length}`,
     );
 
     // Call service layer (handles DRAFT validation, tenant isolation, delivery)
     const result = await this.invoiceDeliveryService.sendInvoices({
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       invoiceIds: dto.invoice_ids, // API: snake_case -> Service: camelCase
       method: dto.delivery_method,
     });
@@ -474,12 +478,12 @@ export class InvoiceController {
     @CurrentUser() user: IUser,
   ): Promise<AddAdhocChargeResponseDto> {
     this.logger.log(
-      `Adding ad-hoc charge to invoice ${invoiceId} for tenant ${user.tenantId}`,
+      `Adding ad-hoc charge to invoice ${invoiceId} for tenant ${getTenantId(user)}`,
     );
 
     // Map snake_case request to camelCase for service
     const result = await this.adhocChargeService.addCharge(
-      user.tenantId,
+      getTenantId(user),
       invoiceId,
       {
         description: dto.description,
@@ -523,11 +527,11 @@ export class InvoiceController {
     @CurrentUser() user: IUser,
   ): Promise<ListAdhocChargesResponseDto> {
     this.logger.log(
-      `Listing ad-hoc charges for invoice ${invoiceId} for tenant ${user.tenantId}`,
+      `Listing ad-hoc charges for invoice ${invoiceId} for tenant ${getTenantId(user)}`,
     );
 
     const result = await this.adhocChargeService.getCharges(
-      user.tenantId,
+      getTenantId(user),
       invoiceId,
     );
 
@@ -579,11 +583,11 @@ export class InvoiceController {
     @CurrentUser() user: IUser,
   ): Promise<RemoveAdhocChargeResponseDto> {
     this.logger.log(
-      `Removing ad-hoc charge ${lineId} from invoice ${invoiceId} for tenant ${user.tenantId}`,
+      `Removing ad-hoc charge ${lineId} from invoice ${invoiceId} for tenant ${getTenantId(user)}`,
     );
 
     await this.adhocChargeService.removeCharge(
-      user.tenantId,
+      getTenantId(user),
       invoiceId,
       lineId,
     );
@@ -615,12 +619,15 @@ export class InvoiceController {
     @Res() res: Response,
   ): Promise<void> {
     this.logger.log(
-      `Downloading PDF for invoice ${invoiceId} for tenant ${user.tenantId}`,
+      `Downloading PDF for invoice ${invoiceId} for tenant ${getTenantId(user)}`,
     );
 
     try {
       // Get invoice to retrieve invoice number for filename
-      const invoice = await this.invoiceRepo.findById(invoiceId, user.tenantId);
+      const invoice = await this.invoiceRepo.findById(
+        invoiceId,
+        getTenantId(user),
+      );
 
       if (!invoice) {
         this.logger.error(`Invoice ${invoiceId} not found`);
@@ -632,9 +639,9 @@ export class InvoiceController {
       }
 
       // Verify tenant isolation
-      if (invoice.tenantId !== user.tenantId) {
+      if (invoice.tenantId !== getTenantId(user)) {
         this.logger.error(
-          `Invoice ${invoiceId} belongs to tenant ${invoice.tenantId}, not ${user.tenantId}`,
+          `Invoice ${invoiceId} belongs to tenant ${invoice.tenantId}, not ${getTenantId(user)}`,
         );
         res.status(404).json({
           success: false,
@@ -645,7 +652,7 @@ export class InvoiceController {
 
       // Generate PDF buffer
       const pdfBuffer = await this.invoicePdfService.generatePdf(
-        user.tenantId,
+        getTenantId(user),
         invoiceId,
       );
 

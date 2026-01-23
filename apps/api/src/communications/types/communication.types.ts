@@ -172,7 +172,7 @@ export interface DeliveryStats {
  * Broadcast message creation data
  */
 export interface CreateBroadcastData {
-  tenantId: string;
+  tenantId?: string;
   subject?: string;
   body: string;
   htmlBody?: string;
@@ -199,7 +199,7 @@ export interface CreateMessageRecipientData {
  * Recipient group creation data
  */
 export interface CreateRecipientGroupData {
-  tenantId: string;
+  tenantId?: string;
   name: string;
   description?: string;
   recipientType: RecipientType;

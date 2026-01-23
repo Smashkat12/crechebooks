@@ -39,7 +39,7 @@ export class RecipientGroupEntity {
 
     return this.prisma.recipientGroup.create({
       data: {
-        tenantId: data.tenantId,
+        tenantId: data.tenantId! ?? undefined,
         name: data.name,
         description: data.description,
         recipientType: data.recipientType,

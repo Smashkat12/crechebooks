@@ -20,7 +20,7 @@ import { VatAdjustmentType } from '@prisma/client';
  * DTO for creating a VAT adjustment entry
  */
 export interface CreateVatAdjustmentDto {
-  tenantId: string;
+  tenantId?: string;
   adjustmentType: VatAdjustmentType;
   amountCents: number;
   adjustmentDate: Date;
@@ -37,7 +37,7 @@ export interface CreateVatAdjustmentDto {
  */
 export interface VoidVatAdjustmentDto {
   adjustmentId: string;
-  tenantId: string;
+  tenantId?: string;
   voidedBy: string;
   voidReason: string;
 }
@@ -75,7 +75,7 @@ export interface VatAdjustmentAggregation {
  * DTO for querying adjustments by period
  */
 export interface GetAdjustmentsForPeriodDto {
-  tenantId: string;
+  tenantId?: string;
   periodStart: Date;
   periodEnd: Date;
 }

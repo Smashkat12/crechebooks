@@ -20,7 +20,7 @@ import { MatchType, MatchedBy } from '../entities/payment.entity';
  */
 export class CreatePaymentDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsOptional()
   @IsString()

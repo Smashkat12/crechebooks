@@ -78,7 +78,7 @@ export interface Emp201Document {
   submissionId: string;
 
   /** Tenant ID */
-  tenantId: string;
+  tenantId?: string;
 
   /** Employer PAYE reference number */
   payeReference: string | null;
@@ -116,7 +116,7 @@ export interface Emp201Document {
  */
 export interface GenerateEmp201Dto {
   /** Tenant ID */
-  tenantId: string;
+  tenantId?: string;
 
   /** Period in YYYY-MM format */
   periodMonth: string;

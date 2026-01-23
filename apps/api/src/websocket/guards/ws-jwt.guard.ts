@@ -206,7 +206,7 @@ export class WsJwtGuard implements CanActivate {
 
     if (this.isLocalDev) {
       // Local dev: try multiple lookup strategies
-      user = await this.prisma.user.findFirst({
+      const foundUser = await this.prisma.user.findFirst({
         where: {
           OR: [
             { id: payload.sub },
@@ -215,11 +215,23 @@ export class WsJwtGuard implements CanActivate {
           ],
         },
       });
+
+      if (!foundUser) throw new Error('User not found');
+      if (!foundUser.tenantId) throw new Error('User has no tenantId');
+
+      // Assert tenantId is non-null after validation
+      user = { ...foundUser, tenantId: foundUser.tenantId } as any;
     } else {
       // Production: Find by Auth0 ID
-      user = await this.prisma.user.findUnique({
+      const foundUser = await this.prisma.user.findUnique({
         where: { auth0Id: payload.sub },
       });
+
+      if (foundUser) {
+        if (!foundUser.tenantId) throw new Error('User has no tenantId');
+        // Assert tenantId is non-null after validation
+        user = { ...foundUser, tenantId: foundUser.tenantId } as any;
+      }
     }
 
     if (!user) {

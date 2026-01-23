@@ -18,7 +18,7 @@ import { FeeType } from '../entities/fee-structure.entity';
 
 export class CreateFeeStructureDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsString()
   @MinLength(1)

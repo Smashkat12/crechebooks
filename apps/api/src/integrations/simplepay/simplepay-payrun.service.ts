@@ -596,7 +596,7 @@ export class SimplePayPayRunService {
   /**
    * Clear the wave cache
    */
-  clearWaveCache(tenantId?: string): void {
+  clearWaveCache(tenantId: string): void {
     if (tenantId) {
       const clientId = this.apiClient.getClientId();
       const cacheKey = `${tenantId}-${clientId}`;

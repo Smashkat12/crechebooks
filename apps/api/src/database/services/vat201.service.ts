@@ -63,7 +63,7 @@ export class Vat201Service {
 
     // Step 1: Validate tenant and get details
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+      where: { id: tenantId! },
     });
 
     if (!tenant) {
@@ -84,14 +84,14 @@ export class Vat201Service {
 
     // Step 2: Calculate output VAT (sales)
     const outputVat = await this.vatService.calculateOutputVat(
-      tenantId,
+      tenantId!,
       periodStart,
       periodEnd,
     );
 
     // Step 3: Calculate input VAT (purchases)
     const inputVat = await this.vatService.calculateInputVat(
-      tenantId,
+      tenantId!,
       periodStart,
       periodEnd,
     );
@@ -99,7 +99,7 @@ export class Vat201Service {
     // Step 4: Get VAT adjustments for fields 7-13 (TASK-SARS-002)
     const adjustments = await this.vatAdjustmentService.getAdjustmentsForPeriod(
       {
-        tenantId,
+        tenantId: tenantId!,
         periodStart,
         periodEnd,
       },
@@ -107,7 +107,7 @@ export class Vat201Service {
 
     // Step 5: Get flagged items
     const flaggedItems = await this.vatService.getFlaggedItems(
-      tenantId,
+      tenantId!,
       periodStart,
       periodEnd,
     );
@@ -117,7 +117,7 @@ export class Vat201Service {
 
     // Step 7: Generate document structure
     const document = this.generateDocument(
-      tenantId,
+      tenantId!,
       tenant.vatNumber,
       periodStart,
       periodEnd,
@@ -144,7 +144,7 @@ export class Vat201Service {
     // Step 10: Check for existing submission and upsert
     const existing = await this.prisma.sarsSubmission.findFirst({
       where: {
-        tenantId,
+        tenantId: tenantId!,
         submissionType: SubmissionType.VAT201,
         periodStart,
       },
@@ -178,7 +178,7 @@ export class Vat201Service {
     // Create new submission
     const submission = await this.prisma.sarsSubmission.create({
       data: {
-        tenantId,
+        tenantId: tenantId!,
         submissionType: SubmissionType.VAT201,
         periodStart,
         periodEnd,
@@ -329,7 +329,7 @@ export class Vat201Service {
 
     return {
       submissionId: uuidv4(),
-      tenantId,
+      tenantId: tenantId,
       vatNumber,
       periodStart,
       periodEnd,

@@ -31,6 +31,6 @@ export class DevLoginResponseDto {
     email: string;
     name: string;
     role: string;
-    tenant_id: string;
+    tenant_id: string | null;
   };
 }

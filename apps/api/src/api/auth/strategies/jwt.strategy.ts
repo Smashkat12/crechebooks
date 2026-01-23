@@ -139,7 +139,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // In local dev mode, try to find by ID first, then by auth0Id
     let user: {
       id: string;
-      tenantId: string;
+      tenantId: string | null;
       auth0Id: string | null;
       email: string;
       name: string | null;

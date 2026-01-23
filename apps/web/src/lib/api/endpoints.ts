@@ -138,4 +138,10 @@ export const endpoints = {
     groups: '/communications/groups',
     groupDetail: (id: string) => `/communications/groups/${id}`,
   },
+  admin: {
+    contactSubmissions: '/admin/contact-submissions',
+    demoRequests: '/admin/demo-requests',
+    updateContactSubmissionStatus: (id: string) => `/admin/contact-submissions/${id}/status`,
+    updateDemoRequestStatus: (id: string) => `/admin/demo-requests/${id}/status`,
+  },
 } as const;

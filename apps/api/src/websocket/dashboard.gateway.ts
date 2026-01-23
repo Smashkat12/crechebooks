@@ -21,6 +21,7 @@ import {
   ConnectedSocket,
   WsException,
 } from '@nestjs/websockets';
+import { getTenantId } from '../api/auth/utils/tenant-assertions';
 import { Logger, UseGuards } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
@@ -130,7 +131,7 @@ export class DashboardGateway
     }
 
     // Use user's tenantId, ignore payload.tenantId for security
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     const room = getTenantRoom(tenantId);
 
     // Leave any existing rooms first (except socket's own room)
@@ -170,7 +171,7 @@ export class DashboardGateway
       return;
     }
 
-    const room = getTenantRoom(user.tenantId);
+    const room = getTenantRoom(getTenantId(user));
     client.leave(room);
     this.logger.debug(`Client ${client.id} left room: ${room}`);
   }

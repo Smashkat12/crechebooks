@@ -89,7 +89,7 @@ export class VatAdjustmentService {
     // Create the adjustment
     const adjustment = await this.prisma.vatAdjustment.create({
       data: {
-        tenantId: dto.tenantId,
+        tenantId: dto.tenantId!,
         adjustmentType: dto.adjustmentType,
         amountCents: dto.amountCents,
         adjustmentDate: dto.adjustmentDate,
@@ -123,7 +123,7 @@ export class VatAdjustmentService {
     const adjustment = await this.prisma.vatAdjustment.findFirst({
       where: {
         id: dto.adjustmentId,
-        tenantId: dto.tenantId,
+        tenantId: dto.tenantId!,
       },
     });
 
@@ -180,7 +180,7 @@ export class VatAdjustmentService {
     // Get all non-voided adjustments for the period
     const adjustments = await this.prisma.vatAdjustment.findMany({
       where: {
-        tenantId,
+        tenantId: tenantId!,
         adjustmentDate: {
           gte: periodStart,
           lte: periodEnd,
@@ -250,7 +250,7 @@ export class VatAdjustmentService {
 
     return this.prisma.vatAdjustment.findMany({
       where: {
-        tenantId,
+        tenantId: tenantId!,
         adjustmentDate: {
           gte: periodStart,
           lte: periodEnd,
@@ -271,7 +271,7 @@ export class VatAdjustmentService {
     return this.prisma.vatAdjustment.findFirst({
       where: {
         id,
-        tenantId,
+        tenantId: tenantId,
       },
     });
   }
@@ -287,7 +287,7 @@ export class VatAdjustmentService {
     const warnings: string[] = [];
 
     // Required field validations
-    if (!dto.tenantId) {
+    if (!dto.tenantId!) {
       errors.push('Tenant ID is required');
     }
 

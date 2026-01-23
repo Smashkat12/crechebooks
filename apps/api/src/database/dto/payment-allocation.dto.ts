@@ -29,7 +29,7 @@ export class AllocationDto {
  */
 export class AllocatePaymentDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsUUID()
   transactionId!: string;
@@ -50,7 +50,7 @@ export class AllocatePaymentDto {
  */
 export class ReverseAllocationDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsUUID()
   paymentId!: string;
@@ -111,7 +111,7 @@ export interface SuggestedAllocationResult {
  * TASK-STMT-002: Input for allocating a transaction to invoices
  */
 export interface AllocateTransactionInput {
-  tenantId: string;
+  tenantId?: string;
   transactionId: string;
   parentId: string;
   allocations: AllocationDto[];

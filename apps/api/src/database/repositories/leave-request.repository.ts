@@ -34,7 +34,7 @@ export class LeaveRequestRepository {
     try {
       return await this.prisma.leaveRequest.create({
         data: {
-          tenantId: dto.tenantId,
+          tenantId: dto.tenantId!,
           staffId: dto.staffId,
           leaveTypeId: dto.leaveTypeId,
           leaveTypeName: dto.leaveTypeName,
@@ -62,7 +62,7 @@ export class LeaveRequestRepository {
             throw new NotFoundException('Staff', dto.staffId);
           }
           // Default to tenant error if not staff-related FK
-          throw new NotFoundException('Tenant', dto.tenantId);
+          throw new NotFoundException('Tenant', dto.tenantId!);
         }
       }
       throw new DatabaseException(

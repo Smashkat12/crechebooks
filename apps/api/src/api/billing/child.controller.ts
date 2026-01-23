@@ -26,6 +26,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiOperation,
@@ -94,14 +95,17 @@ export class ChildController {
     @CurrentUser() user: IUser,
   ): Promise<EnrollChildResponseDto> {
     this.logger.log(
-      `Enroll child: tenant=${user.tenantId}, parent=${dto.parent_id}`,
+      `Enroll child: tenant=${getTenantId(user)}, parent=${dto.parent_id}`,
     );
 
     // 1. Validate parent exists and belongs to tenant
-    const parent = await this.parentRepo.findById(dto.parent_id, user.tenantId);
+    const parent = await this.parentRepo.findById(
+      dto.parent_id,
+      getTenantId(user),
+    );
     if (!parent) {
       this.logger.error(
-        `Parent not found: ${dto.parent_id} for tenant ${user.tenantId}`,
+        `Parent not found: ${dto.parent_id} for tenant ${getTenantId(user)}`,
       );
       throw new NotFoundException('Parent', dto.parent_id);
     }
@@ -109,18 +113,18 @@ export class ChildController {
     // 2. Validate fee structure exists and belongs to tenant
     const feeStructure = await this.feeStructureRepo.findById(
       dto.fee_structure_id,
-      user.tenantId,
+      getTenantId(user),
     );
     if (!feeStructure) {
       this.logger.error(
-        `Fee structure not found: ${dto.fee_structure_id} for tenant ${user.tenantId}`,
+        `Fee structure not found: ${dto.fee_structure_id} for tenant ${getTenantId(user)}`,
       );
       throw new NotFoundException('FeeStructure', dto.fee_structure_id);
     }
 
     // 3. Create child (API snake_case -> Repository camelCase)
     const child = await this.childRepo.create({
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       parentId: dto.parent_id,
       firstName: dto.first_name,
       lastName: dto.last_name,
@@ -142,7 +146,7 @@ export class ChildController {
       welcomePackSent,
       welcomePackError,
     } = await this.enrollmentService.enrollChild(
-      user.tenantId,
+      getTenantId(user),
       child.id,
       dto.fee_structure_id,
       new Date(dto.start_date),
@@ -247,17 +251,17 @@ export class ChildController {
     error?: string | null;
   }> {
     this.logger.log(
-      `Resend welcome pack: enrollment=${enrollmentId}, child=${childId}, tenant=${user.tenantId}`,
+      `Resend welcome pack: enrollment=${enrollmentId}, child=${childId}, tenant=${getTenantId(user)}`,
     );
 
     // 1. Verify enrollment exists and belongs to child and tenant
     const enrollment = await this.enrollmentRepo.findById(
       enrollmentId,
-      user.tenantId,
+      getTenantId(user),
     );
     if (!enrollment) {
       this.logger.error(
-        `Enrollment not found: ${enrollmentId} for tenant ${user.tenantId}`,
+        `Enrollment not found: ${enrollmentId} for tenant ${getTenantId(user)}`,
       );
       throw new NotFoundException('Enrollment', enrollmentId);
     }
@@ -272,7 +276,7 @@ export class ChildController {
 
     // 3. Send welcome pack
     const result = await this.welcomePackDeliveryService.sendWelcomePack(
-      user.tenantId,
+      getTenantId(user),
       enrollmentId,
     );
 
@@ -306,7 +310,7 @@ export class ChildController {
     @Query() query: ListChildrenQueryDto,
     @CurrentUser() user: IUser,
   ): Promise<ChildListResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(
       `Listing children for tenant=${tenantId}, page=${query.page}, limit=${query.limit}`,
@@ -455,19 +459,21 @@ export class ChildController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: IUser,
   ): Promise<ChildDetailResponseDto> {
-    this.logger.debug(`Getting child: ${id} for tenant ${user.tenantId}`);
+    this.logger.debug(`Getting child: ${id} for tenant ${getTenantId(user)}`);
 
     // 1. Find child and verify tenant isolation
-    const child = await this.childRepo.findById(id, user.tenantId);
+    const child = await this.childRepo.findById(id, getTenantId(user));
     if (!child) {
-      this.logger.error(`Child not found: ${id} for tenant ${user.tenantId}`);
+      this.logger.error(
+        `Child not found: ${id} for tenant ${getTenantId(user)}`,
+      );
       throw new NotFoundException('Child', id);
     }
 
     // 2. Find parent
     const parent = await this.parentRepo.findById(
       child.parentId,
-      user.tenantId,
+      getTenantId(user),
     );
     if (!parent) {
       this.logger.error(`Parent ${child.parentId} not found for child ${id}`);
@@ -476,7 +482,7 @@ export class ChildController {
 
     // 3. Find current enrollment (if any)
     const activeEnrollment = await this.enrollmentRepo.findActiveByChild(
-      user.tenantId,
+      getTenantId(user),
       id,
     );
 
@@ -491,7 +497,7 @@ export class ChildController {
     if (activeEnrollment) {
       const feeStructure = await this.feeStructureRepo.findById(
         activeEnrollment.feeStructureId,
-        user.tenantId,
+        getTenantId(user),
       );
       if (!feeStructure) {
         this.logger.error(
@@ -560,17 +566,19 @@ export class ChildController {
     @Body() dto: ApiUpdateChildDto,
     @CurrentUser() user: IUser,
   ): Promise<ChildDetailResponseDto> {
-    this.logger.log(`Update child: ${id} for tenant ${user.tenantId}`);
+    this.logger.log(`Update child: ${id} for tenant ${getTenantId(user)}`);
 
     // 1. Find child and verify tenant isolation
-    const child = await this.childRepo.findById(id, user.tenantId);
+    const child = await this.childRepo.findById(id, getTenantId(user));
     if (!child) {
-      this.logger.error(`Child not found: ${id} for tenant ${user.tenantId}`);
+      this.logger.error(
+        `Child not found: ${id} for tenant ${getTenantId(user)}`,
+      );
       throw new NotFoundException('Child', id);
     }
 
     // 2. Update child (API snake_case -> Repository camelCase)
-    const updated = await this.childRepo.update(id, user.tenantId, {
+    const updated = await this.childRepo.update(id, getTenantId(user), {
       firstName: dto.first_name,
       lastName: dto.last_name,
       gender: dto.gender,

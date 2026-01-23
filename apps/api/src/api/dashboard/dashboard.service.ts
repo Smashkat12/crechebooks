@@ -42,7 +42,7 @@ export class DashboardService {
     } else {
       // No year filter - use latest transaction's month
       const latestTransaction = await this.prisma.transaction.findFirst({
-        where: { tenantId, isDeleted: false },
+        where: { tenantId: tenantId ?? undefined, isDeleted: false },
         orderBy: { date: 'desc' },
         select: { date: true },
       });
@@ -319,7 +319,7 @@ export class DashboardService {
    * Returns the date range of available transaction data.
    * Already uses Promise.all for parallel execution.
    */
-  async getAvailablePeriods(tenantId: string): Promise<{
+  async getAvailablePeriods(tenantId?: string): Promise<{
     hasData: boolean;
     firstTransactionDate: string | null;
     lastTransactionDate: string | null;
@@ -333,12 +333,12 @@ export class DashboardService {
     // Get first and last transaction dates in parallel
     const [firstTxn, lastTxn] = await Promise.all([
       this.prisma.transaction.findFirst({
-        where: { tenantId, isDeleted: false },
+        where: { tenantId: tenantId ?? undefined, isDeleted: false },
         orderBy: { date: 'asc' },
         select: { date: true },
       }),
       this.prisma.transaction.findFirst({
-        where: { tenantId, isDeleted: false },
+        where: { tenantId: tenantId ?? undefined, isDeleted: false },
         orderBy: { date: 'desc' },
         select: { date: true },
       }),
@@ -505,7 +505,7 @@ export class DashboardService {
     } else {
       // No year filter - use latest transaction's month as reference
       const latestTransaction = await this.prisma.transaction.findFirst({
-        where: { tenantId, isDeleted: false },
+        where: { tenantId: tenantId ?? undefined, isDeleted: false },
         orderBy: { date: 'desc' },
         select: { date: true },
       });

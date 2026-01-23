@@ -32,21 +32,24 @@ export class ContactService {
       );
 
       // Send email notification to CrecheBooks support (non-blocking)
-      this.emailService.sendContactNotification({
-        name: dto.name,
-        email: dto.email,
-        phone: dto.phone,
-        subject: dto.subject,
-        message: dto.message,
-        submittedAt: submission.createdAt,
-      }).catch(error => {
-        this.logger.error('Failed to send contact email notification', error);
-        // Don't fail the request if email fails
-      });
+      this.emailService
+        .sendContactNotification({
+          name: dto.name,
+          email: dto.email,
+          phone: dto.phone,
+          subject: dto.subject,
+          message: dto.message,
+          submittedAt: submission.createdAt,
+        })
+        .catch((error) => {
+          this.logger.error('Failed to send contact email notification', error);
+          // Don't fail the request if email fails
+        });
 
       return {
         success: true,
-        message: 'Thank you for contacting us! We will respond within 24 hours.',
+        message:
+          'Thank you for contacting us! We will respond within 24 hours.',
         submissionId: submission.id,
       };
     } catch (error) {

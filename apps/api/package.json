@@ -12,6 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "start:prod:migrate": "npx prisma migrate deploy && npx tsx scripts/create-super-admin.ts && node dist/main",
     "lint": "eslint \"{src,test,tests}/**/*.ts\" --fix",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
@@ -21,7 +22,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "migrate:deploy": "npx prisma migrate deploy",
+    "create-super-admin": "npx tsx scripts/create-super-admin.ts"
   },
   "dependencies": {
     "@crechebooks/types": "workspace:*",

@@ -46,8 +46,8 @@ async function main() {
   console.log(`New Auth0 ID: ${auth0Id}\n`);
 
   try {
-    // Find existing user
-    const existingUser = await prisma.user.findUnique({
+    // Find existing user by email (email is not unique, use findFirst)
+    const existingUser = await prisma.user.findFirst({
       where: { email },
     });
 
@@ -75,9 +75,9 @@ async function main() {
       );
     }
 
-    // Update Auth0 ID
+    // Update Auth0 ID using the user's unique id
     const updatedUser = await prisma.user.update({
-      where: { email },
+      where: { id: existingUser.id },
       data: {
         auth0Id,
       },

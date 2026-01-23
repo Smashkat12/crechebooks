@@ -218,6 +218,7 @@ async function bootstrap(): Promise<void> {
   logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
   logger.log(`Health check: http://localhost:${port}/health`);
   logger.log(`Auth login: http://localhost:${port}/api/v1/auth/login`);
+  logger.log(`✅ Railway GitHub integration - deployment test`);
 }
 
 void bootstrap();

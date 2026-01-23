@@ -40,6 +40,7 @@ enum AuditAction {
   MATCH
   RECONCILE
   SUBMIT
+  TRIAL_SIGNUP
 }
 
 enum ImportSource {
@@ -373,6 +374,7 @@ model Tenant {
   email                   String             @unique @db.VarChar(255)
   xeroTenantId            String?            @unique @map("xero_tenant_id") @db.VarChar(50)
   subscriptionStatus      SubscriptionStatus @default(TRIAL) @map("subscription_status")
+  trialExpiresAt          DateTime?          @map("trial_expires_at")
   invoiceDayOfMonth       Int                @default(1) @map("invoice_day_of_month")
   invoiceDueDays          Int                @default(7) @map("invoice_due_days")
   closureDates            Json               @default("[]") @map("closure_dates")
@@ -3003,4 +3005,54 @@ model RecipientGroup {
   @@unique([tenantId, name])
   @@index([tenantId, recipientType])
   @@map("recipient_groups")
+}
+
+enum FormSubmissionStatus {
+  PENDING
+  CONTACTED
+  COMPLETED
+  SPAM
+}
+
+// ============================================
+// PUBLIC FORM SUBMISSIONS
+// ============================================
+model ContactSubmission {
+  id        String           @id @default(uuid())
+  name      String           @db.VarChar(100)
+  email     String           @db.VarChar(255)
+  phone     String?          @db.VarChar(20)
+  subject   String           @db.VarChar(200)
+  message   String           @db.Text
+  status    FormSubmissionStatus @default(PENDING)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  @@map("contact_submissions")
+  @@index([email])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model DemoRequest {
+  id                 String           @id @default(uuid())
+  fullName           String           @map("full_name") @db.VarChar(100)
+  email              String           @db.VarChar(255)
+  phone              String           @db.VarChar(20)
+  crecheName         String           @map("creche_name") @db.VarChar(200)
+  childrenCount      Int              @map("children_count")
+  province           String           @db.VarChar(50)
+  currentSoftware    String?          @map("current_software") @db.VarChar(200)
+  challenges         String[]
+  preferredTime      String?          @map("preferred_time") @db.VarChar(20)
+  marketingConsent   Boolean          @default(false) @map("marketing_consent")
+  status             FormSubmissionStatus @default(PENDING)
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  @@map("demo_requests")
+  @@index([email])
+  @@index([createdAt])
+  @@index([status])
+  @@index([province])
 }

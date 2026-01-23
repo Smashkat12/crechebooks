@@ -6,6 +6,7 @@ import { ConfigModule } from './config/config.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './database/prisma';
 import { ApiModule } from './api/api.module';
+import { PublicModule } from './api/public/public.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -13,6 +14,7 @@ import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';
 import { CustomThrottlerGuard } from './common/guards/throttle.guard';
 import { LoggerModule } from './common/logger';
+import { EmailModule } from './common/email/email.module';
 import { CircuitBreakerModule } from './integrations/circuit-breaker';
 import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
@@ -23,6 +25,8 @@ import { BankingModule } from './integrations/banking';
     ConfigModule,
     // TASK-INFRA-005: Structured JSON logging with correlation ID
     LoggerModule,
+    // Email service for notifications
+    EmailModule,
     // TASK-REL-101: Circuit Breaker for Xero API
     CircuitBreakerModule,
     // TASK-INFRA-003: Global rate limiting with configurable throttlers
@@ -55,6 +59,7 @@ import { BankingModule } from './integrations/banking';
     PrismaModule,
     HealthModule,
     ApiModule,
+    PublicModule,
     SchedulerModule,
     WebhookModule,
     MetricsModule, // TASK-PERF-104: Database pool metrics endpoint

@@ -1,12 +1,42 @@
+-- CreateEnum
+CREATE TYPE "PendingSyncStatus" AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'RETRY');
+
+-- CreateEnum
+CREATE TYPE "PendingSyncEntityType" AS ENUM ('INVOICE', 'PAYMENT', 'TRANSACTION', 'CONTACT', 'JOURNAL');
+
+-- CreateEnum
+CREATE TYPE "LinkedBankAccountStatus" AS ENUM ('PENDING', 'ACTIVE', 'EXPIRED', 'REVOKED', 'ERROR');
+
+-- CreateEnum
+CREATE TYPE "SplitMatchStatus" AS ENUM ('PENDING', 'CONFIRMED', 'REJECTED');
+
+-- CreateEnum
+CREATE TYPE "SplitMatchType" AS ENUM ('ONE_TO_MANY', 'MANY_TO_ONE');
+
+-- CreateEnum
+CREATE TYPE "UI19Type" AS ENUM ('COMMENCEMENT', 'TERMINATION');
+
+-- CreateEnum
+CREATE TYPE "UI19Status" AS ENUM ('PENDING', 'SUBMITTED', 'LATE_SUBMITTED', 'OVERDUE');
+
+-- CreateEnum
+CREATE TYPE "VatAdjustmentType" AS ENUM ('CHANGE_IN_USE_OUTPUT', 'CHANGE_IN_USE_INPUT', 'OTHER_OUTPUT', 'OTHER_INPUT', 'BAD_DEBTS_WRITTEN_OFF', 'BAD_DEBTS_RECOVERED', 'CAPITAL_GOODS_SCHEME');
+
+-- CreateEnum
+CREATE TYPE "AccruedBankChargeStatus" AS ENUM ('ACCRUED', 'MATCHED', 'REVERSED', 'WRITTEN_OFF');
+
+-- CreateEnum
+CREATE TYPE "XeroTransactionSplitStatus" AS ENUM ('PENDING', 'CONFIRMED', 'MATCHED', 'CANCELLED');
+
 -- CreateTable
 CREATE TABLE "pending_syncs" (
     "id" TEXT NOT NULL,
     "tenant_id" TEXT NOT NULL,
-    "entity_type" TEXT NOT NULL,
+    "entity_type" "PendingSyncEntityType" NOT NULL,
     "entity_id" TEXT NOT NULL,
     "operation" VARCHAR(20) NOT NULL,
     "payload" JSONB,
-    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "status" "PendingSyncStatus" NOT NULL DEFAULT 'PENDING',
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "max_attempts" INTEGER NOT NULL DEFAULT 3,
     "last_error" TEXT,
@@ -34,7 +64,7 @@ CREATE TABLE "linked_bank_accounts" (
     "last_synced_at" TIMESTAMP(3),
     "last_sync_error" TEXT,
     "sync_error_count" INTEGER NOT NULL DEFAULT 0,
-    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "status" "LinkedBankAccountStatus" NOT NULL DEFAULT 'PENDING',
     "metadata" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -66,11 +96,11 @@ CREATE TABLE "split_matches" (
     "id" TEXT NOT NULL,
     "tenant_id" TEXT NOT NULL,
     "bank_transaction_id" TEXT NOT NULL,
-    "match_type" TEXT NOT NULL,
+    "match_type" "SplitMatchType" NOT NULL,
     "total_amount_cents" INTEGER NOT NULL,
     "matched_amount_cents" INTEGER NOT NULL,
     "remainder_cents" INTEGER NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "status" "SplitMatchStatus" NOT NULL DEFAULT 'PENDING',
     "confirmed_by" TEXT,
     "confirmed_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -116,10 +146,10 @@ CREATE TABLE "ui19_submissions" (
     "id" TEXT NOT NULL,
     "tenant_id" TEXT NOT NULL,
     "staff_id" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
+    "type" "UI19Type" NOT NULL,
     "event_date" DATE NOT NULL,
     "due_date" DATE NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "status" "UI19Status" NOT NULL DEFAULT 'PENDING',
     "submitted_at" TIMESTAMP(3),
     "submitted_by" TEXT,
     "reference_number" VARCHAR(50),
@@ -135,7 +165,7 @@ CREATE TABLE "ui19_submissions" (
 CREATE TABLE "vat_adjustments" (
     "id" TEXT NOT NULL,
     "tenant_id" TEXT NOT NULL,
-    "adjustment_type" TEXT NOT NULL,
+    "adjustment_type" "VatAdjustmentType" NOT NULL,
     "amount_cents" INTEGER NOT NULL,
     "adjustment_date" DATE NOT NULL,
     "description" VARCHAR(500) NOT NULL,
@@ -228,7 +258,7 @@ CREATE TABLE "accrued_bank_charges" (
     "accrued_amount_cents" INTEGER NOT NULL,
     "fee_type" VARCHAR(50) NOT NULL,
     "fee_description" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'ACCRUED',
+    "status" "AccruedBankChargeStatus" NOT NULL DEFAULT 'ACCRUED',
     "bank_statement_match_id" TEXT,
     "xero_transaction_id" TEXT,
     "xero_amount_cents" INTEGER,
@@ -253,7 +283,7 @@ CREATE TABLE "xero_transaction_splits" (
     "fee_amount_cents" INTEGER NOT NULL,
     "fee_type" VARCHAR(50) NOT NULL,
     "fee_description" TEXT,
-    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "status" "XeroTransactionSplitStatus" NOT NULL DEFAULT 'PENDING',
     "accrued_charge_id" TEXT,
     "bank_transaction_id" TEXT,
     "bank_statement_match_id" TEXT,

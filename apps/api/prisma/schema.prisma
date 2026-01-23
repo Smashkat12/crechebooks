@@ -25,10 +25,11 @@ enum SubscriptionStatus {
 }
 
 enum UserRole {
-  OWNER
-  ADMIN
-  VIEWER
-  ACCOUNTANT
+  SUPER_ADMIN // CrecheBooks platform administrator (no tenant)
+  OWNER       // Creche/tenant owner
+  ADMIN       // Tenant administrator
+  VIEWER      // Read-only tenant user
+  ACCOUNTANT  // Tenant accountant
 }
 
 enum AuditAction {
@@ -520,15 +521,15 @@ model Tenant {
 
 model User {
   id              String    @id @default(uuid())
-  tenantId        String    @map("tenant_id")
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  tenantId        String?   @map("tenant_id") // Nullable for SUPER_ADMIN users
+  tenant          Tenant?   @relation(fields: [tenantId], references: [id])
   auth0Id         String    @unique @map("auth0_id")
   email           String
   name            String
-  role            UserRole // Kept for backward compatibility - primary tenant role
+  role            UserRole // User role (SUPER_ADMIN for platform admins, OWNER/ADMIN/etc for tenant users)
   isActive        Boolean   @default(true) @map("is_active")
   lastLoginAt     DateTime? @map("last_login_at")
-  currentTenantId String?   @map("current_tenant_id") // Active tenant in current session
+  currentTenantId String?   @map("current_tenant_id") // Active tenant in current session (for SUPER_ADMIN impersonation)
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

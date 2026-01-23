@@ -18,7 +18,7 @@ export interface TestTenant {
 
 export interface TestUser {
   id: string;
-  tenantId: string;
+  tenantId: string | null;
   email: string;
   role: UserRole;
   auth0Id: string;

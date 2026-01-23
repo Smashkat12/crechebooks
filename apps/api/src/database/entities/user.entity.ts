@@ -15,14 +15,15 @@ export { UserRole };
  * Represents a user in a tenant with Auth0 authentication
  *
  * TASK-USER-001: Extended to support multi-tenant membership
+ * SUPER_ADMIN: Platform admins have no tenantId (null)
  *
  * @interface IUser
  * @property {string} id - Unique identifier (UUID)
- * @property {string} tenantId - Primary tenant this user belongs to (backward compatibility)
+ * @property {string | null} tenantId - Primary tenant this user belongs to (null for SUPER_ADMIN)
  * @property {string} auth0Id - Auth0 user identifier (unique)
  * @property {string} email - User email address (unique per tenant)
  * @property {string} name - User display name
- * @property {UserRole} role - User role in primary tenant (backward compatibility)
+ * @property {UserRole} role - User role (SUPER_ADMIN, OWNER, ADMIN, VIEWER, ACCOUNTANT)
  * @property {boolean} isActive - Whether user account is active
  * @property {Date | null} lastLoginAt - Last login timestamp
  * @property {string | null} currentTenantId - Currently active tenant in session
@@ -31,7 +32,7 @@ export { UserRole };
  */
 export interface IUser {
   id: string;
-  tenantId: string;
+  tenantId: string | null;
   auth0Id: string;
   email: string;
   name: string;

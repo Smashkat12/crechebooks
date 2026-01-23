@@ -3,6 +3,7 @@ import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 
 export enum UserRole {
+  SUPER_ADMIN = 'SUPER_ADMIN', // CrecheBooks platform administrator (not selectable in tenant UI)
   OWNER = 'OWNER',
   ADMIN = 'ADMIN',
   ACCOUNTANT = 'ACCOUNTANT',

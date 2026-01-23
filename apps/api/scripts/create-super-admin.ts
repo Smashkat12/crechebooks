@@ -45,9 +45,30 @@ async function main() {
       console.log(`   ID: ${existingUser.id}`);
       console.log(`   Email: ${existingUser.email}`);
       console.log(`   Role: ${existingUser.role}`);
+      console.log(`   Current Auth0 ID: ${existingUser.auth0Id}`);
       console.log(
         `   Tenant ID: ${existingUser.tenantId || 'None (platform admin)'}\n`,
       );
+
+      // Update auth0_id if provided and different
+      if (
+        process.env.SUPER_ADMIN_AUTH0_ID &&
+        existingUser.auth0Id !== process.env.SUPER_ADMIN_AUTH0_ID
+      ) {
+        console.log(
+          `🔄 Updating Auth0 ID from ${existingUser.auth0Id} to ${process.env.SUPER_ADMIN_AUTH0_ID}`,
+        );
+
+        const updatedUser = await prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            auth0Id: process.env.SUPER_ADMIN_AUTH0_ID,
+          },
+        });
+
+        console.log('✅ Auth0 ID updated successfully!');
+        console.log(`   New Auth0 ID: ${updatedUser.auth0Id}\n`);
+      }
 
       if (existingUser.role !== UserRole.SUPER_ADMIN) {
         console.log(

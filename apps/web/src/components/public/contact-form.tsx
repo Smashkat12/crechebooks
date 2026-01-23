@@ -99,19 +99,41 @@ export function ContactForm({ className }: ContactFormProps) {
     setStatus('loading');
 
     try {
-      // Simulate API call - replace with actual endpoint
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/v1/public/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-      // In production, this would be an actual API call:
-      // const response = await fetch('/api/contact', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(formData),
-      // });
+      if (!response.ok) {
+        // Handle specific error responses
+        if (response.status === 429) {
+          throw new Error(
+            'Too many requests. Please wait a few minutes before trying again.'
+          );
+        }
+
+        if (response.status === 500) {
+          throw new Error(
+            'Server error. Please try again later or email us directly at hello@crechebooks.co.za'
+          );
+        }
+
+        // Try to parse error message from response
+        const error = await response.json().catch(() => ({}));
+        throw new Error(
+          error.message || 'Failed to submit contact form. Please try again.'
+        );
+      }
+
+      const data = await response.json();
 
       setStatus('success');
       setStatusMessage(
-        'Thank you for your message! We will get back to you within 24 hours.'
+        data.message ||
+          'Thank you for your message! We will get back to you within 24 hours.'
       );
 
       // Reset form after success
@@ -124,9 +146,19 @@ export function ContactForm({ className }: ContactFormProps) {
       });
     } catch (error) {
       setStatus('error');
-      setStatusMessage(
-        'Something went wrong. Please try again or email us directly at hello@crechebooks.co.za'
-      );
+
+      // Handle different error types
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        setStatusMessage(
+          'Unable to connect to the server. Please check your internet connection and try again.'
+        );
+      } else if (error instanceof Error) {
+        setStatusMessage(error.message);
+      } else {
+        setStatusMessage(
+          'Something went wrong. Please try again or email us directly at hello@crechebooks.co.za'
+        );
+      }
     }
   };
 

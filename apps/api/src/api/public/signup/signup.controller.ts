@@ -15,7 +15,7 @@ import { SignupService } from './signup.service';
 import { SignupDto, SignupResponseDto } from './dto/signup.dto';
 
 @ApiTags('Public - Signup')
-@Controller('api/v1/public/signup')
+@Controller('public/signup')
 export class SignupController {
   constructor(private readonly signupService: SignupService) {}
 

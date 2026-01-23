@@ -5,7 +5,10 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
 } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminService } from './admin.service';
 import {
   ContactSubmissionsResponseDto,
@@ -21,6 +24,7 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('contact-submissions')
+  @Roles(UserRole.OWNER)
   @ApiOperation({
     summary: 'Get all contact form submissions',
     description:
@@ -34,12 +38,16 @@ export class AdminController {
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - valid JWT token required',
   })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - OWNER role required',
+  })
   async getContactSubmissions(): Promise<ContactSubmissionsResponseDto> {
     this.logger.debug('Getting contact submissions');
     return this.adminService.getContactSubmissions();
   }
 
   @Get('demo-requests')
+  @Roles(UserRole.OWNER)
   @ApiOperation({
     summary: 'Get all demo requests',
     description:
@@ -53,12 +61,16 @@ export class AdminController {
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - valid JWT token required',
   })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - OWNER role required',
+  })
   async getDemoRequests(): Promise<DemoRequestsResponseDto> {
     this.logger.debug('Getting demo requests');
     return this.adminService.getDemoRequests();
   }
 
   @Patch('contact-submissions/:id/status')
+  @Roles(UserRole.OWNER)
   @ApiOperation({
     summary: 'Update contact submission status',
     description: 'Allows administrators to mark contact submissions as contacted or resolved.',
@@ -69,6 +81,9 @@ export class AdminController {
   })
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - OWNER role required',
   })
   async updateContactSubmissionStatus(
     @Param('id') id: string,
@@ -83,6 +98,7 @@ export class AdminController {
   }
 
   @Patch('demo-requests/:id/status')
+  @Roles(UserRole.OWNER)
   @ApiOperation({
     summary: 'Update demo request status',
     description: 'Allows administrators to mark demo requests as contacted, scheduled, completed, or cancelled.',
@@ -93,6 +109,9 @@ export class AdminController {
   })
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - OWNER role required',
   })
   async updateDemoRequestStatus(
     @Param('id') id: string,

@@ -117,7 +117,7 @@ export class SignupService {
       }
 
       this.logger.error(
-        `Failed to process signup for ${dto.adminEmail}`,
+        `Failed to process signup for ${dto.adminEmail}. Error code: ${error.code}, Message: ${error.message}`,
         error.stack,
       );
 

@@ -53,8 +53,7 @@ export class SignupService {
             province: dto.province,
             postalCode: dto.postalCode,
             subscriptionStatus: 'TRIAL',
-            // Store trial expiry in a custom field if needed
-            // For now, we rely on subscriptionStatus = TRIAL
+            trialExpiresAt, // Store trial expiry date
           },
         });
 

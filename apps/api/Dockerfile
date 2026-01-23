@@ -44,6 +44,7 @@ RUN npx prisma generate
 
 # Copy source code
 COPY apps/api/src ./src
+COPY apps/api/scripts ./scripts
 COPY apps/api/tsconfig.json apps/api/tsconfig.build.json ./
 COPY apps/api/nest-cli.json ./
 COPY apps/api/prisma.config.ts ./
@@ -74,6 +75,8 @@ COPY --from=builder /app/api/node_modules ./node_modules
 COPY --from=builder /app/api/package.json ./
 COPY --from=builder /app/api/prisma ./prisma
 COPY --from=builder /app/api/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/api/scripts ./scripts
+COPY --from=builder /app/api/tsconfig.json ./tsconfig.json
 
 # Copy startup script
 COPY apps/api/start.sh ./start.sh

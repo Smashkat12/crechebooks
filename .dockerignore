@@ -82,8 +82,8 @@ docs/company-docs
 **/prisma/*.db
 **/prisma/*.db-journal
 
-# Scripts (not needed in production)
-apps/api/scripts
+# Scripts - now needed for super admin creation during deployment
+# apps/api/scripts
 
 # Playwright
 playwright.config.ts

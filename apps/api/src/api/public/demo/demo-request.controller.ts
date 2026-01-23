@@ -17,7 +17,7 @@ import {
 } from './dto/demo-request.dto';
 
 @ApiTags('Public - Demo Request')
-@Controller('api/v1/public/demo-request')
+@Controller('public/demo-request')
 export class DemoRequestController {
   constructor(private readonly demoRequestService: DemoRequestService) {}
 

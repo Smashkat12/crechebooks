@@ -14,7 +14,7 @@ import { ContactService } from './contact.service';
 import { CreateContactDto, ContactResponseDto } from './dto/contact.dto';
 
 @ApiTags('Public - Contact')
-@Controller('api/v1/public/contact')
+@Controller('public/contact')
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 

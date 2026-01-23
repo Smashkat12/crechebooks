@@ -39,6 +39,7 @@ interface InviteUserModalProps {
 }
 
 const roleDescriptions: Record<UserRole, string> = {
+  [UserRole.SUPER_ADMIN]: 'CrecheBooks platform administrator (not selectable)',
   [UserRole.OWNER]: 'Full access, can delete tenant',
   [UserRole.ADMIN]: 'Full access except tenant deletion',
   [UserRole.ACCOUNTANT]: 'Financial data access',
@@ -128,16 +129,18 @@ export function InviteUserModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(roleDescriptions).map(([role, description]) => (
-                  <SelectItem key={role} value={role}>
-                    <div className="flex flex-col items-start">
-                      <span className="font-medium">{role}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {description}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
+                {Object.entries(roleDescriptions)
+                  .filter(([role]) => role !== UserRole.SUPER_ADMIN)
+                  .map(([role, description]) => (
+                    <SelectItem key={role} value={role}>
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{role}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {description}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             {errors.role && (

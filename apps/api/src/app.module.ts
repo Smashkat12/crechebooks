@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './database/prisma';
 import { ApiModule } from './api/api.module';
 import { PublicModule } from './api/public/public.module';
+import { AdminModule } from './api/admin/admin.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -60,6 +61,7 @@ import { BankingModule } from './integrations/banking';
     HealthModule,
     ApiModule,
     PublicModule,
+    AdminModule,
     SchedulerModule,
     WebhookModule,
     MetricsModule, // TASK-PERF-104: Database pool metrics endpoint

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma';
+import { EmailService } from '../../../common/email';
 import {
   CreateDemoRequestDto,
   DemoRequestResponseDto,
@@ -9,7 +10,10 @@ import {
 export class DemoRequestService {
   private readonly logger = new Logger(DemoRequestService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async createDemoRequest(
     dto: CreateDemoRequestDto,
@@ -34,6 +38,20 @@ export class DemoRequestService {
       this.logger.log(
         `Demo request created: ${demoRequest.id} for ${dto.crecheName} (${dto.email})`,
       );
+
+      // Send email notification to CrecheBooks support (non-blocking)
+      this.emailService.sendDemoRequestNotification({
+        fullName: dto.fullName,
+        email: dto.email,
+        phone: dto.phone,
+        crecheName: dto.crecheName,
+        childrenCount: dto.childrenCount,
+        province: dto.province,
+        submittedAt: demoRequest.createdAt,
+      }).catch(error => {
+        this.logger.error('Failed to send demo request email notification', error);
+        // Don't fail the request if email fails
+      });
 
       return {
         success: true,

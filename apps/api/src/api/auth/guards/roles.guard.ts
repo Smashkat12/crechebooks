@@ -43,6 +43,14 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Access denied: user not authenticated');
     }
 
+    // SUPER_ADMIN has access to everything (platform administrator)
+    if (user.role === UserRole.SUPER_ADMIN) {
+      this.logger.debug(
+        `RolesGuard: SUPER_ADMIN user ${user.id} granted full access to ${method} ${path}`,
+      );
+      return true;
+    }
+
     // Check if user has any of the required roles
     const hasRole = requiredRoles.includes(user.role);
 

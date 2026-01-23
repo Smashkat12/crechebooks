@@ -53,10 +53,11 @@ export interface IUser {
 }
 
 export enum UserRole {
-  OWNER = 'OWNER',
-  ADMIN = 'ADMIN',
-  VIEWER = 'VIEWER',
-  ACCOUNTANT = 'ACCOUNTANT',
+  SUPER_ADMIN = 'SUPER_ADMIN', // CrecheBooks platform administrator
+  OWNER = 'OWNER',             // Creche/tenant owner
+  ADMIN = 'ADMIN',             // Tenant administrator
+  VIEWER = 'VIEWER',           // Read-only tenant user
+  ACCOUNTANT = 'ACCOUNTANT',   // Tenant accountant
 }
 
 // South African specific

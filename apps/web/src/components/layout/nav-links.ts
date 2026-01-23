@@ -12,6 +12,7 @@ import {
   Settings,
   GraduationCap,
   ClipboardList,
+  Shield,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -21,6 +22,7 @@ export interface NavLink {
   icon: LucideIcon;
   badge?: number;
   children?: NavLink[];
+  requiredRole?: string; // Optional: restrict navigation to specific roles
 }
 
 export const mainNavLinks: NavLink[] = [
@@ -49,4 +51,11 @@ export const settingsNavLink: NavLink = {
   title: 'Settings',
   href: '/settings',
   icon: Settings
+};
+
+export const adminNavLink: NavLink = {
+  title: 'Admin Portal',
+  href: '/admin',
+  icon: Shield,
+  requiredRole: 'SUPER_ADMIN'
 };

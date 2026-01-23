@@ -137,7 +137,7 @@ export interface ConfidenceResult {
  */
 export class MatchPaymentsDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   /**
    * Optional array of transaction IDs to match.
@@ -154,7 +154,7 @@ export class MatchPaymentsDto {
  */
 export class ApplyMatchDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @IsUUID()
   transactionId!: string;

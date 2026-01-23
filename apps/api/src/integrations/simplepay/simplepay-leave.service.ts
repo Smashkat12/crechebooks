@@ -449,7 +449,7 @@ export class SimplePayLeaveService {
   /**
    * Clear the leave type cache (useful after configuration changes)
    */
-  clearCache(tenantId?: string): void {
+  clearCache(tenantId: string): void {
     if (tenantId) {
       const clientId = this.apiClient.getClientId();
       const cacheKey = `${tenantId}-${clientId}`;

@@ -27,7 +27,7 @@ export class AdminService {
       this.logger.log(`Retrieved ${submissions.length} contact submissions`);
 
       // Convert null to undefined for optional fields
-      const transformedSubmissions = submissions.map(s => ({
+      const transformedSubmissions = submissions.map((s) => ({
         ...s,
         phone: s.phone ?? undefined,
       }));
@@ -59,7 +59,7 @@ export class AdminService {
       this.logger.log(`Retrieved ${requests.length} demo requests`);
 
       // Convert null to undefined for optional fields
-      const transformedRequests = requests.map(r => ({
+      const transformedRequests = requests.map((r) => ({
         ...r,
         currentSoftware: r.currentSoftware ?? undefined,
         preferredTime: r.preferredTime ?? undefined,

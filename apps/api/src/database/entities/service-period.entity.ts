@@ -241,7 +241,7 @@ export interface ServicePeriodComparison {
  * Helper function: Convert SimplePay termination code to our enum
  */
 export function simplePayCodeToTerminationCode(
-  code: string | null | undefined,
+  code: string | undefined,
 ): TerminationCode | null {
   if (!code) return null;
   return SIMPLEPAY_CODE_MAP[code] || null;
@@ -293,7 +293,9 @@ export function parseSimplePayServicePeriod(
     simplePayEmployeeId: String(raw.employee_id),
     startDate: new Date(raw.start_date),
     endDate: raw.end_date ? new Date(raw.end_date) : null,
-    terminationCode: simplePayCodeToTerminationCode(raw.termination_code),
+    terminationCode: simplePayCodeToTerminationCode(
+      raw.termination_code ?? undefined,
+    ),
     terminationReason: raw.termination_reason,
     lastWorkingDay: raw.last_working_day
       ? new Date(raw.last_working_day)

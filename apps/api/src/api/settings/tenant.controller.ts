@@ -7,6 +7,7 @@ import {
   Logger,
   ForbiddenException,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiOperation,
@@ -65,7 +66,9 @@ export class TenantController {
     @CurrentUser() user: IUser,
   ): Promise<SerializedTenant> {
     this.logger.debug(`Getting tenant for user ${user.id}`);
-    const tenant = await this.tenantRepository.findByIdOrThrow(user.tenantId);
+    const tenant = await this.tenantRepository.findByIdOrThrow(
+      getTenantId(user),
+    );
     return serializeTenant(tenant);
   }
 
@@ -94,7 +97,7 @@ export class TenantController {
     @Param('id') tenantId: string,
   ): Promise<SerializedTenant> {
     // Verify user belongs to this tenant
-    if (user.tenantId !== tenantId) {
+    if (getTenantId(user) !== tenantId) {
       throw new ForbiddenException('You do not have access to this tenant');
     }
 
@@ -132,7 +135,7 @@ export class TenantController {
     @Body() dto: UpdateTenantDto,
   ): Promise<SerializedTenant> {
     // Verify user belongs to this tenant (tenant isolation check)
-    if (user.tenantId !== tenantId) {
+    if (getTenantId(user) !== tenantId) {
       throw new ForbiddenException('You do not have access to this tenant');
     }
 

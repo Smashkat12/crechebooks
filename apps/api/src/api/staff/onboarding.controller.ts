@@ -28,6 +28,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
@@ -119,7 +120,7 @@ export class StaffOnboardingController {
     );
     const fullDto: InitiateOnboardingDto = { ...dto, staffId };
     return this.onboardingService.initiateOnboarding(
-      user.tenantId,
+      getTenantId(user),
       fullDto,
       user.id,
     );
@@ -218,7 +219,7 @@ export class StaffOnboardingController {
     await this.onboardingService.completeOnboarding(
       onboarding.onboarding.id,
       dto,
-      user.tenantId,
+      getTenantId(user),
     );
     return { success: true, message: 'Onboarding completed' };
   }
@@ -301,7 +302,7 @@ export class StaffOnboardingController {
     @Query('status') status?: OnboardingStatus,
   ) {
     // Verify user has access to the tenant
-    if (user.tenantId !== tenantId) {
+    if (getTenantId(user) !== tenantId) {
       throw new BadRequestException('Access denied to tenant data');
     }
     this.logger.debug(`Listing onboardings for tenant ${tenantId}`);
@@ -335,7 +336,7 @@ export class StaffOnboardingController {
       `Initiating onboarding for staff ${dto.staffId} by user ${user.id}`,
     );
     return this.onboardingService.initiateOnboarding(
-      user.tenantId,
+      getTenantId(user),
       dto,
       user.id,
     );
@@ -358,8 +359,11 @@ export class StaffOnboardingController {
     @CurrentUser() user: IUser,
     @Query('status') status?: OnboardingStatus,
   ) {
-    this.logger.debug(`Listing onboardings for tenant ${user.tenantId}`);
-    return this.onboardingService.getOnboardingsByTenant(user.tenantId, status);
+    this.logger.debug(`Listing onboardings for tenant ${getTenantId(user)}`);
+    return this.onboardingService.getOnboardingsByTenant(
+      getTenantId(user),
+      status,
+    );
   }
 
   @Get('staff/onboarding/dashboard')
@@ -371,8 +375,8 @@ export class StaffOnboardingController {
   })
   @ApiResponse({ status: 200, description: 'Dashboard statistics' })
   async getDashboard(@CurrentUser() user: IUser) {
-    this.logger.debug(`Getting dashboard for tenant ${user.tenantId}`);
-    return this.onboardingService.getDashboardStats(user.tenantId);
+    this.logger.debug(`Getting dashboard for tenant ${getTenantId(user)}`);
+    return this.onboardingService.getDashboardStats(getTenantId(user));
   }
 
   @Get('staff/onboarding/staff/:staffId')
@@ -412,7 +416,7 @@ export class StaffOnboardingController {
       staffId,
       dto,
       user.id,
-      user.tenantId,
+      getTenantId(user),
     );
   }
 
@@ -452,7 +456,7 @@ export class StaffOnboardingController {
     @Body() dto: CompleteOnboardingDto,
   ) {
     this.logger.log(`Completing onboarding ${id} by user ${user.id}`);
-    await this.onboardingService.completeOnboarding(id, dto, user.tenantId);
+    await this.onboardingService.completeOnboarding(id, dto, getTenantId(user));
     return { success: true, message: 'Onboarding completed' };
   }
 
@@ -473,7 +477,11 @@ export class StaffOnboardingController {
   @ApiResponse({ status: 404, description: 'Onboarding not found' })
   async cancelOnboarding(@Param('id') id: string, @CurrentUser() user: IUser) {
     this.logger.log(`Cancelling onboarding ${id} by user ${user.id}`);
-    await this.onboardingService.cancelOnboarding(id, user.tenantId, user.id);
+    await this.onboardingService.cancelOnboarding(
+      id,
+      getTenantId(user),
+      user.id,
+    );
     return { success: true, message: 'Onboarding cancelled' };
   }
 
@@ -588,7 +596,7 @@ export class StaffOnboardingController {
     this.logger.log(
       `Uploading document ${dto.documentType} for staff ${dto.staffId}`,
     );
-    return this.documentService.uploadDocument(user.tenantId, dto, user.id);
+    return this.documentService.uploadDocument(getTenantId(user), dto, user.id);
   }
 
   @Post('staff/onboarding/documents/staff/:staffId')
@@ -679,7 +687,7 @@ export class StaffOnboardingController {
     };
 
     const document = await this.documentService.uploadDocument(
-      user.tenantId,
+      getTenantId(user),
       dto,
       user.id,
     );
@@ -723,8 +731,10 @@ export class StaffOnboardingController {
   })
   @ApiResponse({ status: 200, description: 'List of pending documents' })
   async getPendingDocuments(@CurrentUser() user: IUser) {
-    this.logger.debug(`Getting pending documents for tenant ${user.tenantId}`);
-    return this.documentService.getPendingDocuments(user.tenantId);
+    this.logger.debug(
+      `Getting pending documents for tenant ${getTenantId(user)}`,
+    );
+    return this.documentService.getPendingDocuments(getTenantId(user));
   }
 
   @Get('documents/expiring')
@@ -744,8 +754,13 @@ export class StaffOnboardingController {
     @CurrentUser() user: IUser,
     @Query('days') days?: number,
   ) {
-    this.logger.debug(`Getting expiring documents for tenant ${user.tenantId}`);
-    return this.documentService.getExpiringDocuments(user.tenantId, days || 30);
+    this.logger.debug(
+      `Getting expiring documents for tenant ${getTenantId(user)}`,
+    );
+    return this.documentService.getExpiringDocuments(
+      getTenantId(user),
+      days || 30,
+    );
   }
 
   @Get('documents/:id')
@@ -759,7 +774,7 @@ export class StaffOnboardingController {
   @ApiResponse({ status: 404, description: 'Document not found' })
   async getDocument(@Param('id') id: string, @CurrentUser() user: IUser) {
     this.logger.debug(`Getting document ${id}`);
-    return this.documentService.getDocumentById(id, user.tenantId);
+    return this.documentService.getDocumentById(id, getTenantId(user));
   }
 
   @Post('documents/:id/verify')
@@ -779,7 +794,7 @@ export class StaffOnboardingController {
     @Body() dto: VerifyDocumentDto,
   ) {
     this.logger.log(`Verifying document ${id} by user ${user.id}`);
-    return this.documentService.verifyDocument(id, dto, user.tenantId);
+    return this.documentService.verifyDocument(id, dto, getTenantId(user));
   }
 
   @Post('documents/:id/reject')
@@ -799,7 +814,12 @@ export class StaffOnboardingController {
     @Body() dto: RejectDocumentDto,
   ) {
     this.logger.log(`Rejecting document ${id} by user ${user.id}`);
-    return this.documentService.rejectDocument(id, dto, user.tenantId, user.id);
+    return this.documentService.rejectDocument(
+      id,
+      dto,
+      getTenantId(user),
+      user.id,
+    );
   }
 
   @Delete('documents/:id')
@@ -814,7 +834,7 @@ export class StaffOnboardingController {
   @ApiResponse({ status: 404, description: 'Document not found' })
   async deleteDocument(@Param('id') id: string, @CurrentUser() user: IUser) {
     this.logger.log(`Deleting document ${id} by user ${user.id}`);
-    await this.documentService.deleteDocument(id, user.tenantId, user.id);
+    await this.documentService.deleteDocument(id, getTenantId(user), user.id);
   }
 
   // ============ Welcome Pack Endpoints ============
@@ -875,7 +895,7 @@ export class StaffOnboardingController {
 
     const pdfBuffer = await this.welcomePackService.generateWelcomePack(
       progress.onboarding.staffId,
-      user.tenantId,
+      getTenantId(user),
       options,
     );
 
@@ -949,7 +969,7 @@ export class StaffOnboardingController {
     // Get staff name for the ZIP filename
     const staff = await this.onboardingService.getStaffById(
       staffId,
-      user.tenantId,
+      getTenantId(user),
     );
     const staffName = `${staff.firstName}_${staff.lastName}`.replace(
       /\s+/g,
@@ -959,7 +979,7 @@ export class StaffOnboardingController {
     // Generate welcome pack PDF
     const welcomePackBuffer = await this.welcomePackService.generateWelcomePack(
       staffId,
-      user.tenantId,
+      getTenantId(user),
       { includeFirstDaySchedule: true },
     );
 
@@ -1038,7 +1058,7 @@ export class StaffOnboardingController {
     // Get staff details including email
     const staff = await this.onboardingService.getStaffById(
       staffId,
-      user.tenantId,
+      getTenantId(user),
     );
 
     if (!staff.email) {
@@ -1050,7 +1070,7 @@ export class StaffOnboardingController {
     // Generate welcome pack PDF
     const welcomePackBuffer = await this.welcomePackService.generateWelcomePack(
       staffId,
-      user.tenantId,
+      getTenantId(user),
       { includeFirstDaySchedule: true, customMessage: body.customMessage },
     );
 
@@ -1080,7 +1100,9 @@ export class StaffOnboardingController {
     }
 
     // Get tenant/company name for email
-    const tenant = await this.onboardingService.getTenantById(user.tenantId);
+    const tenant = await this.onboardingService.getTenantById(
+      getTenantId(user),
+    );
     const companyName = tenant?.name || 'Your New Employer';
 
     // Build email content
@@ -1212,7 +1234,7 @@ The ${companyName} Team
     );
     const documents = await this.onboardingService.generateAllDocuments(
       staffId,
-      user.tenantId,
+      getTenantId(user),
     );
     return {
       success: true,
@@ -1329,7 +1351,7 @@ The ${companyName} Team
   })
   @ApiResponse({ status: 200, description: 'Document statistics' })
   async getDocumentStats(@CurrentUser() user: IUser) {
-    this.logger.debug(`Getting document stats for tenant ${user.tenantId}`);
-    return this.documentService.getDocumentStats(user.tenantId);
+    this.logger.debug(`Getting document stats for tenant ${getTenantId(user)}`);
+    return this.documentService.getDocumentStats(getTenantId(user));
   }
 }

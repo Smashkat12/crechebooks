@@ -20,6 +20,7 @@ import {
   Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -89,14 +90,18 @@ export class SarsController {
     @CurrentUser() user: IUser,
   ): Promise<SarsSubmissionResponseDto> {
     this.logger.log(
-      `Mark submitted: tenant=${user.tenantId}, submission=${id}`,
+      `Mark submitted: tenant=${getTenantId(user)}, submission=${id}`,
     );
 
     // Transform API snake_case to service camelCase
-    const submission = await this.sarsSubmissionRepo.submit(id, user.tenantId, {
-      submittedBy: user.id,
-      sarsReference: dto.sars_reference, // snake_case -> camelCase
-    });
+    const submission = await this.sarsSubmissionRepo.submit(
+      id,
+      getTenantId(user),
+      {
+        submittedBy: user.id,
+        sarsReference: dto.sars_reference, // snake_case -> camelCase
+      },
+    );
 
     this.logger.log(`Submission ${id} marked as submitted`);
 
@@ -131,7 +136,7 @@ export class SarsController {
     @CurrentUser() user: IUser,
   ): Promise<ApiVat201ResponseDto> {
     this.logger.log(
-      `Generate VAT201: tenant=${user.tenantId}, period=${dto.period_start} to ${dto.period_end}`,
+      `Generate VAT201: tenant=${getTenantId(user)}, period=${dto.period_start} to ${dto.period_end}`,
     );
 
     // Validate period_end is after period_start
@@ -143,7 +148,7 @@ export class SarsController {
 
     // Transform API snake_case to service camelCase
     const submission = await this.vat201Service.generateVat201({
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       periodStart,
       periodEnd,
     });
@@ -205,12 +210,12 @@ export class SarsController {
     @CurrentUser() user: IUser,
   ): Promise<ApiEmp201ResponseDto> {
     this.logger.log(
-      `Generate EMP201: tenant=${user.tenantId}, period=${dto.period_month}`,
+      `Generate EMP201: tenant=${getTenantId(user)}, period=${dto.period_month}`,
     );
 
     // Transform API snake_case to service camelCase
     const submission = await this.emp201Service.generateEmp201({
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       periodMonth: dto.period_month, // snake_case -> camelCase
     });
 
@@ -332,12 +337,12 @@ export class SarsController {
     @Res() res: Response,
   ): Promise<void> {
     this.logger.log(
-      `Download EMP201: tenant=${user.tenantId}, year=${query.taxYear}, period=${query.taxPeriod}`,
+      `Download EMP201: tenant=${getTenantId(user)}, year=${query.taxYear}, period=${query.taxPeriod}`,
     );
 
     try {
       const result = await this.sarsFileGenerator.generateEmp201Csv(
-        user.tenantId,
+        getTenantId(user),
         parseInt(query.taxYear, 10),
         parseInt(query.taxPeriod, 10),
       );
@@ -417,12 +422,12 @@ export class SarsController {
     @Res() res: Response,
   ): Promise<void> {
     this.logger.log(
-      `Download EMP501: tenant=${user.tenantId}, period=${query.taxYearStart} to ${query.taxYearEnd}`,
+      `Download EMP501: tenant=${getTenantId(user)}, period=${query.taxYearStart} to ${query.taxYearEnd}`,
     );
 
     try {
       const result = await this.sarsFileGenerator.generateEmp501Csv(
-        user.tenantId,
+        getTenantId(user),
         query.taxYearStart,
         query.taxYearEnd,
       );

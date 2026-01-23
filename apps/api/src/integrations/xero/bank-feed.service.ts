@@ -459,7 +459,7 @@ export class BankFeedService {
    */
   async getConnectedAccounts(tenantId: string): Promise<BankConnection[]> {
     const connections = await this.prisma.bankConnection.findMany({
-      where: { tenantId },
+      where: { tenantId: tenantId ?? undefined },
       orderBy: { connectedAt: 'desc' },
     });
 

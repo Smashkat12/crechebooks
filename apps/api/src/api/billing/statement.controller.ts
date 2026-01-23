@@ -24,6 +24,7 @@ import {
   Optional,
   Inject,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -116,7 +117,7 @@ export class StatementController {
     @Query() query: ListStatementsQueryDto,
     @CurrentUser() user: IUser,
   ): Promise<StatementListResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(
       `Listing statements for tenant=${tenantId}, page=${query.page}, limit=${query.limit}`,
@@ -234,7 +235,7 @@ export class StatementController {
     @Param('id') id: string,
     @CurrentUser() user: IUser,
   ): Promise<StatementDetailResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(`Getting statement ${id} for tenant ${tenantId}`);
 
@@ -328,7 +329,7 @@ export class StatementController {
     @CurrentUser() user: IUser,
     @Res() res: Response,
   ): Promise<void> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(`Downloading PDF for statement ${id}`);
 
@@ -395,7 +396,7 @@ export class StatementController {
     @Body() dto: GenerateStatementDto,
     @CurrentUser() user: IUser,
   ): Promise<GenerateStatementResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(
       `Generating statement for parent ${dto.parent_id}, period ${dto.period_start} to ${dto.period_end}`,
@@ -505,7 +506,7 @@ export class StatementController {
     @Body() dto: BulkGenerateStatementDto,
     @CurrentUser() user: IUser,
   ): Promise<BulkGenerateResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(
       `Bulk generating statements for tenant ${tenantId}, period ${dto.period_start} to ${dto.period_end}`,
@@ -573,7 +574,7 @@ export class StatementController {
     @Param('id') id: string,
     @CurrentUser() user: IUser,
   ): Promise<FinalizeStatementResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(`Finalizing statement ${id} for tenant ${tenantId}`);
 
@@ -651,7 +652,7 @@ export class StatementController {
     @Param('parentId') parentId: string,
     @CurrentUser() user: IUser,
   ): Promise<ParentStatementsResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(
       `Getting statements for parent ${parentId} in tenant ${tenantId}`,
@@ -718,7 +719,7 @@ export class StatementController {
     @Param('parentId') parentId: string,
     @CurrentUser() user: IUser,
   ): Promise<ParentAccountResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(
       `Getting account summary for parent ${parentId} in tenant ${tenantId}`,
@@ -786,7 +787,7 @@ export class StatementController {
     @Body() dto: DeliverStatementDto,
     @CurrentUser() user: IUser,
   ): Promise<DeliverStatementResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(`Delivering statement ${id} for tenant ${tenantId}`);
 
@@ -850,7 +851,7 @@ export class StatementController {
     @Body() dto: BulkDeliverStatementDto,
     @CurrentUser() user: IUser,
   ): Promise<BulkDeliverResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(
       `Bulk delivering ${dto.statement_ids.length} statements for tenant ${tenantId}`,
@@ -912,7 +913,7 @@ export class StatementController {
     @Body() dto: ScheduleStatementGenerationDto,
     @CurrentUser() user: IUser,
   ): Promise<ScheduleStatementResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.log(
       `Scheduling statement generation for tenant ${tenantId}, month ${dto.statement_month}`,

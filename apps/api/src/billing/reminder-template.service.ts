@@ -75,7 +75,7 @@ export class ReminderTemplateService {
 
     try {
       const templates = await this.prisma.reminderTemplate.findMany({
-        where: { tenantId },
+        where: { tenantId: tenantId ?? undefined },
         orderBy: { daysOverdue: 'asc' },
       });
 
@@ -102,7 +102,7 @@ export class ReminderTemplateService {
 
     try {
       const templates = await this.prisma.reminderTemplate.findMany({
-        where: { tenantId, isActive: true },
+        where: { tenantId: tenantId ?? undefined, isActive: true },
         orderBy: { daysOverdue: 'asc' },
       });
 
@@ -375,7 +375,7 @@ export class ReminderTemplateService {
    * @param id - Template ID
    * @param tenantId - Tenant ID for isolation
    */
-  async deleteTemplate(id: string, tenantId: string): Promise<void> {
+  async deleteTemplate(id: string, tenantId?: string): Promise<void> {
     this.logger.log(`Deleting template ${id} (tenant: ${tenantId})`);
 
     try {
@@ -419,7 +419,7 @@ export class ReminderTemplateService {
     try {
       // Delete all existing templates
       await this.prisma.reminderTemplate.deleteMany({
-        where: { tenantId },
+        where: { tenantId: tenantId ?? undefined },
       });
 
       // Seed defaults

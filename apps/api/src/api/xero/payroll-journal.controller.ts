@@ -26,6 +26,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiOperation,
@@ -107,7 +108,7 @@ export class XeroPayrollJournalController {
     @CurrentUser() user: IUser,
     @Body() dto: CreatePayrollJournalDto,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Creating payroll journal for payroll ${dto.payrollId}, tenant ${tenantId}`,
     );
@@ -145,7 +146,7 @@ export class XeroPayrollJournalController {
     @CurrentUser() user: IUser,
     @Query('status') status?: PayrollJournalStatus,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(
       `Listing journals for tenant ${tenantId}, status filter: ${status ?? 'none'}`,
     );
@@ -195,7 +196,7 @@ export class XeroPayrollJournalController {
     @CurrentUser() user: IUser,
     @Body() dto: GenerateJournalsFromPeriodDto,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Generating journals for period ${dto.payrollPeriodStart} to ${dto.payrollPeriodEnd}, tenant ${tenantId}`,
     );
@@ -224,7 +225,7 @@ export class XeroPayrollJournalController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async getJournalStats(@CurrentUser() user: IUser): Promise<JournalStats> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(`Getting journal stats for tenant ${tenantId}`);
 
     return this.journalService.getJournalStats(tenantId);
@@ -250,7 +251,7 @@ export class XeroPayrollJournalController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async getPendingJournals(@CurrentUser() user: IUser) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(`Getting pending journals for tenant ${tenantId}`);
 
     return this.journalService.getPendingJournals(tenantId);
@@ -285,7 +286,7 @@ export class XeroPayrollJournalController {
     @Query('maxRetries', new DefaultValuePipe(undefined), ParseIntPipe)
     maxRetries?: number,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(
       `Getting failed journals for tenant ${tenantId}, maxRetries: ${maxRetries ?? 'unlimited'}`,
     );
@@ -321,7 +322,7 @@ export class XeroPayrollJournalController {
     @Param('payrollId') payrollId: string,
     @CurrentUser() user: IUser,
   ): Promise<JournalPreviewResponse> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Previewing journal for payroll ${payrollId}, tenant ${tenantId}`,
     );
@@ -353,7 +354,7 @@ export class XeroPayrollJournalController {
     @Param('journalId') journalId: string,
     @CurrentUser() user: IUser,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(`Getting journal ${journalId} for tenant ${tenantId}`);
 
     const journal = await this.journalService.getJournal(journalId, tenantId);
@@ -397,7 +398,7 @@ export class XeroPayrollJournalController {
     @Param('journalId') journalId: string,
     @CurrentUser() user: IUser,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Posting journal ${journalId} to Xero for tenant ${tenantId}`,
     );
@@ -437,7 +438,7 @@ export class XeroPayrollJournalController {
     @Param('journalId') journalId: string,
     @CurrentUser() user: IUser,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Retrying journal ${journalId} for tenant ${tenantId}`);
 
     return this.journalService.retryPosting(journalId, tenantId, user.id);
@@ -477,7 +478,7 @@ export class XeroPayrollJournalController {
     @CurrentUser() user: IUser,
     @Body() dto: CancelJournalDto,
   ): Promise<{ success: boolean; message: string }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Cancelling journal ${journalId} for tenant ${tenantId}: ${dto.reason}`,
     );
@@ -524,7 +525,7 @@ export class XeroPayrollJournalController {
     @Param('journalId') journalId: string,
     @CurrentUser() user: IUser,
   ): Promise<void> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Deleting journal ${journalId} for tenant ${tenantId}`);
 
     await this.journalService.deleteJournal(journalId, tenantId, user.id);
@@ -554,7 +555,7 @@ export class XeroPayrollJournalController {
     @CurrentUser() user: IUser,
     @Body() dto: BulkPostJournalsDto,
   ): Promise<BulkPostResult> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Bulk posting ${dto.journalIds.length} journals for tenant ${tenantId}`,
     );
@@ -596,7 +597,7 @@ export class XeroAccountMappingController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async getMappings(@CurrentUser() user: IUser) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(`Getting account mappings for tenant ${tenantId}`);
 
     return this.mappingService.getMappings(tenantId);
@@ -621,7 +622,7 @@ export class XeroAccountMappingController {
   async getMappingSummary(
     @CurrentUser() user: IUser,
   ): Promise<AccountMappingSummary> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(`Getting mapping summary for tenant ${tenantId}`);
 
     return this.mappingService.getMappingSummary(tenantId);
@@ -651,7 +652,7 @@ export class XeroAccountMappingController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async fetchXeroAccounts(@CurrentUser() user: IUser) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Fetching Xero accounts for tenant ${tenantId}`);
 
     return this.mappingService.fetchXeroAccounts(tenantId);
@@ -683,7 +684,7 @@ export class XeroAccountMappingController {
   async getSuggestions(
     @CurrentUser() user: IUser,
   ): Promise<SuggestedMapping[]> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Getting mapping suggestions for tenant ${tenantId}`);
 
     const xeroAccounts = await this.mappingService.fetchXeroAccounts(tenantId);
@@ -711,7 +712,7 @@ export class XeroAccountMappingController {
   async validateMappings(
     @CurrentUser() user: IUser,
   ): Promise<AccountMappingValidationResult> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Validating mappings for tenant ${tenantId}`);
 
     return this.mappingService.validateMappings(tenantId);
@@ -791,7 +792,7 @@ export class XeroAccountMappingController {
     @CurrentUser() user: IUser,
     @Param('accountType') accountType: XeroAccountType,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.debug(`Getting mapping for ${accountType}, tenant ${tenantId}`);
 
     return this.mappingService.getMappingByType(tenantId, accountType);
@@ -819,7 +820,7 @@ export class XeroAccountMappingController {
     @CurrentUser() user: IUser,
     @Body() dto: UpsertAccountMappingDto,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Upserting mapping for ${dto.accountType}, tenant ${tenantId}`,
     );
@@ -851,7 +852,7 @@ export class XeroAccountMappingController {
     @CurrentUser() user: IUser,
     @Body() dto: UpsertAccountMappingDto,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Updating mapping for ${dto.accountType}, tenant ${tenantId}`,
     );
@@ -882,7 +883,7 @@ export class XeroAccountMappingController {
     @CurrentUser() user: IUser,
     @Body() dto: BulkUpsertMappingsDto,
   ) {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(
       `Bulk upserting ${dto.mappings.length} mappings for tenant ${tenantId}`,
     );
@@ -932,7 +933,7 @@ export class XeroAccountMappingController {
     skipped: number;
     suggestions: SuggestedMapping[];
   }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     const shouldOverwrite = overwrite === 'true';
 
     this.logger.log(
@@ -978,7 +979,7 @@ export class XeroAccountMappingController {
     @CurrentUser() user: IUser,
     @Param('accountType') accountType: XeroAccountType,
   ): Promise<void> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     this.logger.log(`Deleting mapping for ${accountType}, tenant ${tenantId}`);
 
     await this.mappingService.deleteMapping(tenantId, accountType, user.id);

@@ -403,7 +403,11 @@ export class XeroInvoiceService {
 
     // Get all parents for this tenant (for matching)
     const parents = await this.prisma.parent.findMany({
-      where: { tenantId, isActive: true, deletedAt: null },
+      where: {
+        tenantId: tenantId ?? undefined,
+        isActive: true,
+        deletedAt: null,
+      },
       select: { id: true, email: true, firstName: true, lastName: true },
     });
     const parentsByEmail = new Map(
@@ -864,7 +868,7 @@ export class XeroInvoiceService {
   /**
    * Get sync mapping for an invoice.
    */
-  async getInvoiceMapping(tenantId: string, invoiceId: string) {
+  async getInvoiceMapping(tenantId: string = '', invoiceId: string) {
     return this.prisma.xeroInvoiceMapping.findUnique({
       where: { tenantId_invoiceId: { tenantId, invoiceId } },
     });
@@ -873,7 +877,7 @@ export class XeroInvoiceService {
   /**
    * Get all sync mappings for a tenant.
    */
-  async getInvoiceMappings(tenantId: string, status?: string) {
+  async getInvoiceMappings(tenantId: string = '', status?: string) {
     return this.prisma.xeroInvoiceMapping.findMany({
       where: {
         tenantId,

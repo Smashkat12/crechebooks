@@ -75,11 +75,11 @@ export class Emp201Service {
 
     // Step 2: Get tenant details
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+      where: { id: tenantId! },
     });
 
     if (!tenant) {
-      throw new SarsTenantNotFoundException(tenantId);
+      throw new SarsTenantNotFoundException(tenantId!);
     }
 
     // Step 3: Parse period dates
@@ -90,7 +90,7 @@ export class Emp201Service {
     // Step 4: Get approved payroll records for the month
     const payrolls = await this.prisma.payroll.findMany({
       where: {
-        tenantId,
+        tenantId: tenantId!,
         status: PayrollStatus.APPROVED,
         payPeriodStart: {
           gte: periodStart,
@@ -184,7 +184,7 @@ export class Emp201Service {
 
     // Step 9: Generate document
     const document = this.generateDocument(
-      tenantId,
+      tenantId!,
       tenant.registrationNumber,
       tenant.tradingName || tenant.name,
       periodMonth,
@@ -215,7 +215,7 @@ export class Emp201Service {
     // Step 12: Check for existing submission and upsert
     const existing = await this.prisma.sarsSubmission.findFirst({
       where: {
-        tenantId,
+        tenantId: tenantId!,
         submissionType: SubmissionType.EMP201,
         periodStart,
       },
@@ -249,7 +249,7 @@ export class Emp201Service {
     // Create new submission
     const submission = await this.prisma.sarsSubmission.create({
       data: {
-        tenantId,
+        tenantId: tenantId!,
         submissionType: SubmissionType.EMP201,
         periodStart,
         periodEnd,
@@ -290,7 +290,7 @@ export class Emp201Service {
 
     const payrolls = await this.prisma.payroll.findMany({
       where: {
-        tenantId,
+        tenantId: tenantId,
         status: PayrollStatus.APPROVED,
         payPeriodStart: {
           gte: periodStart,
@@ -388,7 +388,7 @@ export class Emp201Service {
   ): Emp201Document {
     return {
       submissionId: uuidv4(),
-      tenantId,
+      tenantId: tenantId,
       payeReference,
       tradingName,
       periodMonth,

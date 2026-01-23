@@ -28,7 +28,7 @@ export class StaffRepository {
     try {
       return await this.prisma.staff.create({
         data: {
-          tenantId: dto.tenantId,
+          tenantId: dto.tenantId!,
           employeeNumber: dto.employeeNumber ?? null,
           firstName: dto.firstName,
           lastName: dto.lastName,
@@ -58,11 +58,11 @@ export class StaffRepository {
         if (error.code === 'P2002') {
           throw new ConflictException(
             `Staff with idNumber '${dto.idNumber}' already exists for this tenant`,
-            { idNumber: dto.idNumber, tenantId: dto.tenantId },
+            { idNumber: dto.idNumber, tenantId: dto.tenantId! },
           );
         }
         if (error.code === 'P2003') {
-          throw new NotFoundException('Tenant', dto.tenantId);
+          throw new NotFoundException('Tenant', dto.tenantId!);
         }
       }
       throw new DatabaseException(

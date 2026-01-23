@@ -42,7 +42,7 @@ import {
 
 export class CreateParentDto {
   @IsUUID()
-  tenantId!: string;
+  tenantId?: string;
 
   @SanitizeName()
   @IsString()

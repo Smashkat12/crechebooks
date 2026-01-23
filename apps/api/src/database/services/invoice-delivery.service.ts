@@ -96,7 +96,7 @@ export class InvoiceDeliveryService {
 
     for (const invoiceId of dto.invoiceIds) {
       try {
-        await this.deliverInvoice(dto.tenantId, invoiceId, dto.method);
+        await this.deliverInvoice(dto.tenantId!, invoiceId, dto.method);
         result.sent++;
       } catch (error) {
         result.failed++;
@@ -398,7 +398,7 @@ export class InvoiceDeliveryService {
 
     // Get failed invoices
     const failedInvoices = await this.invoiceRepo.findByDeliveryStatus(
-      dto.tenantId,
+      dto.tenantId!,
       'FAILED',
       cutoffDate,
     );
@@ -424,13 +424,13 @@ export class InvoiceDeliveryService {
       // Increment retry count
       await this.invoiceRepo.incrementDeliveryRetryCount(
         invoice.id,
-        dto.tenantId,
+        dto.tenantId!,
       );
 
       try {
         // Retry delivery using invoice's configured method
         await this.deliverInvoice(
-          dto.tenantId,
+          dto.tenantId!,
           invoice.id,
           invoice.deliveryMethod as DeliveryMethod | undefined,
         );

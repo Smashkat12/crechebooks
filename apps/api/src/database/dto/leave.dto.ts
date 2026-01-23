@@ -23,7 +23,7 @@ import { LeaveRequestStatus } from '../entities/leave-request.entity';
 export class CreateLeaveRequestDto {
   @ApiProperty({ description: 'Tenant ID' })
   @IsUUID()
-  tenantId: string;
+  tenantId?: string;
 
   @ApiProperty({ description: 'Staff ID' })
   @IsUUID()
@@ -267,7 +267,7 @@ export class LeaveRequestResponseDto {
   id: string;
 
   @ApiProperty()
-  tenantId: string;
+  tenantId?: string;
 
   @ApiProperty()
   staffId: string;

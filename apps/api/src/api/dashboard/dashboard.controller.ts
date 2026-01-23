@@ -7,6 +7,7 @@ import {
   ApiUnauthorizedResponse,
   ApiQuery,
 } from '@nestjs/swagger';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import { DashboardService } from './dashboard.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -71,7 +72,7 @@ export class DashboardController {
     @Query('timeout') timeout?: string,
   ): Promise<DashboardMetricsResponseDto> {
     this.logger.debug(
-      `Getting metrics for tenant ${user.tenantId}, year=${year || 'auto'}, timeout=${timeout || 'default'}`,
+      `Getting metrics for tenant ${getTenantId(user)}, year=${year || 'auto'}, timeout=${timeout || 'default'}`,
     );
     const yearNum = year ? parseInt(year, 10) : undefined;
 
@@ -83,14 +84,14 @@ export class DashboardController {
         10000,
       );
       return this.dashboardService.getMetricsWithTimeout(
-        user.tenantId,
+        getTenantId(user),
         timeoutMs,
         period,
         yearNum,
       );
     }
 
-    return this.dashboardService.getMetrics(user.tenantId, period, yearNum);
+    return this.dashboardService.getMetrics(getTenantId(user), period, yearNum);
   }
 
   @Get('trends')
@@ -125,10 +126,10 @@ export class DashboardController {
     @Query('year') year?: string,
   ): Promise<DashboardTrendsResponseDto> {
     this.logger.debug(
-      `Getting trends for tenant ${user.tenantId}, year=${year || 'auto'}`,
+      `Getting trends for tenant ${getTenantId(user)}, year=${year || 'auto'}`,
     );
     const yearNum = year ? parseInt(year, 10) : undefined;
-    return this.dashboardService.getTrends(user.tenantId, period, yearNum);
+    return this.dashboardService.getTrends(getTenantId(user), period, yearNum);
   }
 
   @Get('available-periods')
@@ -145,8 +146,10 @@ export class DashboardController {
     description: 'Unauthorized - valid JWT token required',
   })
   async getAvailablePeriods(@CurrentUser() user: IUser) {
-    this.logger.debug(`Getting available periods for tenant ${user.tenantId}`);
-    return this.dashboardService.getAvailablePeriods(user.tenantId);
+    this.logger.debug(
+      `Getting available periods for tenant ${getTenantId(user)}`,
+    );
+    return this.dashboardService.getAvailablePeriods(getTenantId(user));
   }
 
   @Get('learning-mode')
@@ -166,8 +169,10 @@ export class DashboardController {
     @CurrentUser() user: IUser,
   ): Promise<LearningModeProgress> {
     this.logger.debug(
-      `Getting learning mode progress for tenant ${user.tenantId}`,
+      `Getting learning mode progress for tenant ${getTenantId(user)}`,
     );
-    return this.accuracyMetricsService.getLearningModeProgress(user.tenantId);
+    return this.accuracyMetricsService.getLearningModeProgress(
+      getTenantId(user),
+    );
   }
 }

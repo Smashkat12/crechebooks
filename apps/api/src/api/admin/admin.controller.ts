@@ -73,7 +73,8 @@ export class AdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Update contact submission status',
-    description: 'Allows administrators to mark contact submissions as contacted or resolved.',
+    description:
+      'Allows administrators to mark contact submissions as contacted or resolved.',
   })
   @ApiResponse({
     status: 200,
@@ -101,7 +102,8 @@ export class AdminController {
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Update demo request status',
-    description: 'Allows administrators to mark demo requests as contacted, scheduled, completed, or cancelled.',
+    description:
+      'Allows administrators to mark demo requests as contacted, scheduled, completed, or cancelled.',
   })
   @ApiResponse({
     status: 200,

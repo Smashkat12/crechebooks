@@ -8,7 +8,11 @@ import {
   Matches,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { SanitizeString, SanitizeEmail, SanitizeName } from '../../../../common/decorators';
+import {
+  SanitizeString,
+  SanitizeEmail,
+  SanitizeName,
+} from '../../../../common/decorators';
 
 export class SignupDto {
   @ApiProperty({
@@ -48,7 +52,8 @@ export class SignupDto {
   adminEmail: string;
 
   @ApiProperty({
-    description: 'Password (min 8 characters, must include uppercase, lowercase, number, and special character)',
+    description:
+      'Password (min 8 characters, must include uppercase, lowercase, number, and special character)',
     example: 'SecurePass123!',
     minLength: 8,
     maxLength: 128,

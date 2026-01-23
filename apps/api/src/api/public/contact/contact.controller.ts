@@ -28,7 +28,8 @@ export class ContactController {
   })
   @ApiOperation({
     summary: 'Submit contact form',
-    description: 'Public endpoint for submitting contact inquiries. Rate limited to 5 requests per 5 minutes.',
+    description:
+      'Public endpoint for submitting contact inquiries. Rate limited to 5 requests per 5 minutes.',
   })
   @ApiResponse({
     status: HttpStatus.OK,

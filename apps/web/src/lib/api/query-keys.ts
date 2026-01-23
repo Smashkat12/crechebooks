@@ -137,4 +137,10 @@ export const queryKeys = {
     summary: () => [...queryKeys.xeroSplits.all, 'summary'] as const,
     byXeroTransaction: (xeroTxnId: string) => [...queryKeys.xeroSplits.all, 'xero-txn', xeroTxnId] as const,
   },
+  // Admin Portal
+  admin: {
+    all: ['admin'] as const,
+    contactSubmissions: () => [...queryKeys.admin.all, 'contact-submissions'] as const,
+    demoRequests: () => [...queryKeys.admin.all, 'demo-requests'] as const,
+  },
 } as const;

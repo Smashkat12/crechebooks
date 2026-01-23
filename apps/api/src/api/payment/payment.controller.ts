@@ -21,6 +21,7 @@ import {
   StreamableFile,
   NotFoundException,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { Response } from 'express';
 import * as fs from 'fs';
 import {
@@ -109,12 +110,12 @@ export class PaymentController {
     @CurrentUser() user: IUser,
   ): Promise<AllocatePaymentResponseDto> {
     this.logger.log(
-      `Allocate payment: tenant=${user.tenantId}, transaction=${dto.transaction_id}, allocations=${dto.allocations.length}`,
+      `Allocate payment: tenant=${getTenantId(user)}, transaction=${dto.transaction_id}, allocations=${dto.allocations.length}`,
     );
 
     // Transform API snake_case to service camelCase, decimal to cents
     const result = await this.paymentAllocationService.allocatePayment({
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       transactionId: dto.transaction_id,
       allocations: dto.allocations.map((a) => ({
         invoiceId: a.invoice_id,
@@ -179,7 +180,7 @@ export class PaymentController {
     @CurrentUser() user: IUser,
   ): Promise<PaymentListResponseDto> {
     this.logger.log(
-      `List payments: tenant=${user.tenantId}, filters=${JSON.stringify(query)}`,
+      `List payments: tenant=${getTenantId(user)}, filters=${JSON.stringify(query)}`,
     );
 
     // Transform API snake_case to service camelCase filter
@@ -205,7 +206,7 @@ export class PaymentController {
 
     // Get all payments matching filter (repository handles tenant isolation)
     const allPayments = await this.paymentRepo.findByTenantId(
-      user.tenantId,
+      getTenantId(user),
       filter,
     );
 
@@ -221,7 +222,7 @@ export class PaymentController {
       paginatedPayments.map(async (p) => {
         const invoice = await this.invoiceRepo.findById(
           p.invoiceId,
-          user.tenantId,
+          getTenantId(user),
         );
         return {
           id: p.id,
@@ -284,12 +285,12 @@ export class PaymentController {
     @CurrentUser() user: IUser,
   ): Promise<ApiMatchingResultResponseDto> {
     this.logger.log(
-      `Match payments: tenant=${user.tenantId}, transactions=${dto.transaction_ids?.length ?? 'all'}`,
+      `Match payments: tenant=${getTenantId(user)}, transactions=${dto.transaction_ids?.length ?? 'all'}`,
     );
 
     // Transform API snake_case to service camelCase
     const result = await this.paymentMatchingService.matchPayments({
-      tenantId: user.tenantId,
+      tenantId: getTenantId(user),
       transactionIds: dto.transaction_ids, // snake_case -> camelCase
     });
 
@@ -374,18 +375,21 @@ export class PaymentController {
     @CurrentUser() user: IUser,
   ): Promise<ApiArrearsReportResponseDto> {
     this.logger.log(
-      `Get arrears report: tenant=${user.tenantId}, filters=${JSON.stringify(query)}`,
+      `Get arrears report: tenant=${getTenantId(user)}, filters=${JSON.stringify(query)}`,
     );
 
     // Transform API snake_case to service camelCase, decimal to cents
-    const report = await this.arrearsService.getArrearsReport(user.tenantId, {
-      dateFrom: query.date_from,
-      dateTo: query.date_to,
-      parentId: query.parent_id,
-      minAmountCents: query.min_amount
-        ? Math.round(query.min_amount * 100)
-        : undefined,
-    });
+    const report = await this.arrearsService.getArrearsReport(
+      getTenantId(user),
+      {
+        dateFrom: query.date_from,
+        dateTo: query.date_to,
+        parentId: query.parent_id,
+        minAmountCents: query.min_amount
+          ? Math.round(query.min_amount * 100)
+          : undefined,
+      },
+    );
 
     // Transform service camelCase to API snake_case, cents to decimal
     const formatDate = (date: Date) => date.toISOString().split('T')[0];
@@ -482,11 +486,11 @@ export class PaymentController {
     data: { receipt_number: string; download_url: string };
   }> {
     this.logger.log(
-      `Generate receipt: tenant=${user.tenantId}, payment=${paymentId}`,
+      `Generate receipt: tenant=${getTenantId(user)}, payment=${paymentId}`,
     );
 
     const result = await this.paymentReceiptService.generateReceipt(
-      user.tenantId,
+      getTenantId(user),
       paymentId,
     );
 
@@ -535,19 +539,19 @@ export class PaymentController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     this.logger.log(
-      `Download receipt: tenant=${user.tenantId}, payment=${paymentId}`,
+      `Download receipt: tenant=${getTenantId(user)}, payment=${paymentId}`,
     );
 
     // Check if receipt exists, generate if not
     let receipt = this.paymentReceiptService.findReceiptByPaymentId(
-      user.tenantId,
+      getTenantId(user),
       paymentId,
     );
 
     if (!receipt) {
       // Generate receipt on-the-fly if it doesn't exist
       receipt = await this.paymentReceiptService.generateReceipt(
-        user.tenantId,
+        getTenantId(user),
         paymentId,
       );
     }

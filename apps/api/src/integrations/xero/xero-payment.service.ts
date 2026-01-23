@@ -533,7 +533,7 @@ export class XeroPaymentService {
     tenantId: string,
   ): Promise<{ accessToken: string; xeroTenantId: string }> {
     const xeroToken = await this.prisma.xeroToken.findUnique({
-      where: { tenantId },
+      where: { tenantId: tenantId ?? undefined },
     });
 
     if (!xeroToken) {

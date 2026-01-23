@@ -14,8 +14,10 @@ import {
   managementNavLinks,
   complianceNavLinks,
   settingsNavLink,
+  adminNavLink,
   type NavLink,
 } from './nav-links';
+import { useAuth } from '@/hooks/use-auth';
 
 interface NavItemProps {
   link: NavLink;
@@ -98,9 +100,16 @@ function NavSection({ title, links, collapsed, pathname, prefetchHandlers }: Nav
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, setSidebarCollapsed } = useUIStore();
+  const { user } = useAuth();
 
   // UI-002: Prefetch dashboard data on hover for faster navigation
   const { onMouseEnter: prefetchDashboard } = useDashboardPrefetchOnHover();
+
+  // Check if user has required role for a nav link
+  const hasRequiredRole = (link: NavLink): boolean => {
+    if (!link.requiredRole) return true;
+    return user?.role === link.requiredRole;
+  };
 
   // Map of route paths to their prefetch handlers
   const prefetchHandlers: Record<string, () => void> = {
@@ -160,8 +169,16 @@ export function Sidebar() {
           />
         </div>
 
-        {/* Settings & Toggle */}
+        {/* Settings, Admin & Toggle */}
         <div className="border-t p-2 space-y-1">
+          {/* Admin Portal - Only for SUPER_ADMIN */}
+          {hasRequiredRole(adminNavLink) && (
+            <NavItem
+              link={adminNavLink}
+              collapsed={sidebarCollapsed}
+              isActive={pathname.startsWith('/admin')}
+            />
+          )}
           <NavItem
             link={settingsNavLink}
             collapsed={sidebarCollapsed}

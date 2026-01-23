@@ -48,10 +48,10 @@ export enum AuditAction {
 // User roles
 export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN', // CrecheBooks platform administrator
-  OWNER = 'OWNER',             // Creche/tenant owner
-  ADMIN = 'ADMIN',             // Tenant administrator
-  VIEWER = 'VIEWER',           // Read-only tenant user
-  ACCOUNTANT = 'ACCOUNTANT',   // Tenant accountant
+  OWNER = 'OWNER', // Creche/tenant owner
+  ADMIN = 'ADMIN', // Tenant administrator
+  VIEWER = 'VIEWER', // Read-only tenant user
+  ACCOUNTANT = 'ACCOUNTANT', // Tenant accountant
 }
 
 // Invoice statuses

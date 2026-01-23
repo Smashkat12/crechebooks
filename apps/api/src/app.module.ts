@@ -12,6 +12,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
+import { TenantGuard } from './api/auth/guards/tenant.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';
 import { CustomThrottlerGuard } from './common/guards/throttle.guard';
 import { LoggerModule } from './common/logger';
@@ -80,6 +81,11 @@ import { BankingModule } from './integrations/banking';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    // TASK-SEC-105: Apply TenantGuard globally - ensures tenant context for non-admin routes
+    {
+      provide: APP_GUARD,
+      useClass: TenantGuard,
     },
     // Apply RolesGuard globally - use @Roles() to require specific roles
     {

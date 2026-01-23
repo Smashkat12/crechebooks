@@ -14,6 +14,7 @@ import {
   Res,
   Header,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -98,7 +99,7 @@ export class TransactionController {
     @Query() query: ListTransactionsQueryDto,
     @CurrentUser() user: IUser,
   ): Promise<TransactionListResponseDto> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(
       `Listing transactions for tenant=${tenantId}, page=${query.page}, limit=${query.limit}`,
@@ -221,7 +222,7 @@ export class TransactionController {
     @CurrentUser() user: IUser,
     @Res() res: Response,
   ): Promise<void> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
 
     this.logger.debug(`Exporting transactions for tenant=${tenantId}`);
 
@@ -276,7 +277,7 @@ export class TransactionController {
       'Reconciled',
     ];
 
-    const escapeCSV = (val: string | null | undefined): string => {
+    const escapeCSV = (val: string | undefined): string => {
       if (val == null) return '';
       const str = String(val);
       if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -290,8 +291,8 @@ export class TransactionController {
       return [
         tx.date.toISOString().split('T')[0],
         escapeCSV(tx.description),
-        escapeCSV(tx.payeeName),
-        escapeCSV(tx.reference),
+        escapeCSV(tx.payeeName ?? undefined),
+        escapeCSV(tx.reference ?? undefined),
         (tx.amountCents / 100).toFixed(2),
         tx.isCredit ? 'Credit' : 'Debit',
         tx.status,
@@ -379,7 +380,7 @@ export class TransactionController {
     }
 
     this.logger.log(
-      `Import request: file=${file.originalname}, size=${file.size}, bank=${dto.bank_account}, tenant=${user.tenantId}`,
+      `Import request: file=${file.originalname}, size=${file.size}, bank=${dto.bank_account}, tenant=${getTenantId(user)}`,
     );
 
     // Map Express.Multer.File to ImportFile interface
@@ -393,7 +394,7 @@ export class TransactionController {
     const result = await this.importService.importFromFile(
       importFile,
       dto.bank_account,
-      user.tenantId,
+      getTenantId(user),
     );
 
     return {
@@ -445,7 +446,7 @@ export class TransactionController {
     @CurrentUser() user: IUser,
   ): Promise<UpdateCategorizationResponseDto> {
     this.logger.log(
-      `Update categorization: tx=${id}, account=${dto.account_code}, parent_id=${dto.parent_id ?? 'none'}, tenant=${user.tenantId}`,
+      `Update categorization: tx=${id}, account=${dto.account_code}, parent_id=${dto.parent_id ?? 'none'}, tenant=${getTenantId(user)}`,
     );
 
     // Map API DTO to service DTO
@@ -469,7 +470,7 @@ export class TransactionController {
       id,
       serviceDto,
       user.id,
-      user.tenantId,
+      getTenantId(user),
     );
 
     const transaction = result.transaction;
@@ -495,7 +496,7 @@ export class TransactionController {
     if (dto.parent_id && this.INCOME_CATEGORIES.includes(dto.account_code)) {
       // Get the full transaction to check if it's a credit
       const fullTransaction = await this.transactionRepo.findById(
-        user.tenantId,
+        getTenantId(user),
         id,
       );
 
@@ -508,7 +509,7 @@ export class TransactionController {
           // Get suggested allocations (FIFO - oldest invoices first)
           const suggestions =
             await this.paymentAllocationService.suggestAllocation(
-              user.tenantId,
+              getTenantId(user),
               id,
               dto.parent_id,
             );
@@ -517,7 +518,7 @@ export class TransactionController {
             // Allocate to outstanding invoices
             const allocationResult =
               await this.paymentAllocationService.allocatePayment({
-                tenantId: user.tenantId,
+                tenantId: getTenantId(user),
                 transactionId: id,
                 allocations: suggestions.map((s) => ({
                   invoiceId: s.invoiceId,
@@ -531,7 +532,7 @@ export class TransactionController {
             for (const payment of allocationResult.payments) {
               const invoice = await this.invoiceRepo.findById(
                 payment.invoiceId,
-                user.tenantId,
+                getTenantId(user),
               );
               response.data.payment_allocations.push({
                 payment_id: payment.id,
@@ -588,15 +589,18 @@ export class TransactionController {
 
     // If no IDs provided, get all PENDING transactions
     if (transactionIds.length === 0) {
-      const pending = await this.transactionRepo.findByTenant(user.tenantId, {
-        status: TransactionStatus.PENDING,
-        limit: 1000,
-      });
+      const pending = await this.transactionRepo.findByTenant(
+        getTenantId(user),
+        {
+          status: TransactionStatus.PENDING,
+          limit: 1000,
+        },
+      );
       transactionIds = pending.data.map((tx) => tx.id);
     }
 
     this.logger.log(
-      `Batch categorize: count=${transactionIds.length}, force=${dto.force_recategorize ?? false}, tenant=${user.tenantId}`,
+      `Batch categorize: count=${transactionIds.length}, force=${dto.force_recategorize ?? false}, tenant=${getTenantId(user)}`,
     );
 
     if (transactionIds.length === 0) {
@@ -618,7 +622,7 @@ export class TransactionController {
 
     const result = await this.categorizationService.categorizeTransactions(
       transactionIds,
-      user.tenantId,
+      getTenantId(user),
     );
 
     return {
@@ -665,7 +669,7 @@ export class TransactionController {
   ): Promise<SuggestionsResponseDto> {
     const suggestions = await this.categorizationService.getSuggestions(
       id,
-      user.tenantId,
+      getTenantId(user),
     );
 
     return {
@@ -704,7 +708,7 @@ export class TransactionController {
     @CurrentUser() user: IUser,
   ): Promise<CreateSplitTransactionResponseDto> {
     this.logger.log(
-      `Create split transaction: tx=${id}, splits=${dto.splits.length}, tenant=${user.tenantId}`,
+      `Create split transaction: tx=${id}, splits=${dto.splits.length}, tenant=${getTenantId(user)}`,
     );
 
     // Validate that we have at least 2 splits
@@ -715,7 +719,10 @@ export class TransactionController {
     }
 
     // Get the transaction to verify it exists and get the amount
-    const transaction = await this.transactionRepo.findById(user.tenantId, id);
+    const transaction = await this.transactionRepo.findById(
+      getTenantId(user),
+      id,
+    );
     if (!transaction) {
       throw new BadRequestException('Transaction not found');
     }
@@ -753,7 +760,7 @@ export class TransactionController {
       id,
       serviceDto,
       user.id,
-      user.tenantId,
+      getTenantId(user),
     );
 
     // Return success with split details

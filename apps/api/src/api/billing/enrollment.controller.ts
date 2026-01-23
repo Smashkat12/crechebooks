@@ -21,6 +21,7 @@ import {
   UseGuards,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
   ApiOperation,
@@ -105,7 +106,7 @@ export class EnrollmentController {
     data: EnrollmentResponse[];
     meta: { page: number; limit: number; total: number };
   }> {
-    const tenantId = user.tenantId;
+    const tenantId = getTenantId(user);
     const pageNum = parseInt(page || '1', 10);
     const limitNum = parseInt(limit || '20', 10);
 
@@ -201,24 +202,27 @@ export class EnrollmentController {
     @CurrentUser() user: IUser,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ success: boolean; data: EnrollmentResponse }> {
-    const enrollment = await this.enrollmentRepo.findById(id, user.tenantId);
+    const enrollment = await this.enrollmentRepo.findById(
+      id,
+      getTenantId(user),
+    );
     if (!enrollment) {
       throw new NotFoundException('Enrollment', id);
     }
 
     const child = await this.childRepo.findById(
       enrollment.childId,
-      user.tenantId,
+      getTenantId(user),
     );
     if (!child) throw new NotFoundException('Child', enrollment.childId);
 
     const parent = await this.parentRepo.findById(
       child.parentId,
-      user.tenantId,
+      getTenantId(user),
     );
     const feeStructure = await this.feeStructureRepo.findById(
       enrollment.feeStructureId,
-      user.tenantId,
+      getTenantId(user),
     );
 
     return {
@@ -258,7 +262,10 @@ export class EnrollmentController {
   ): Promise<{ success: boolean; data: EnrollmentResponse }> {
     this.logger.log(`Update enrollment status: ${id} -> ${body.status}`);
 
-    const enrollment = await this.enrollmentRepo.findById(id, user.tenantId);
+    const enrollment = await this.enrollmentRepo.findById(
+      id,
+      getTenantId(user),
+    );
     if (!enrollment) {
       throw new NotFoundException('Enrollment', id);
     }
@@ -272,20 +279,23 @@ export class EnrollmentController {
       );
     }
 
-    const updated = await this.enrollmentRepo.update(id, user.tenantId, {
+    const updated = await this.enrollmentRepo.update(id, getTenantId(user), {
       status: upperStatus as EnrollmentStatus,
     });
 
-    const child = await this.childRepo.findById(updated.childId, user.tenantId);
+    const child = await this.childRepo.findById(
+      updated.childId,
+      getTenantId(user),
+    );
     if (!child) throw new NotFoundException('Child', updated.childId);
 
     const parent = await this.parentRepo.findById(
       child.parentId,
-      user.tenantId,
+      getTenantId(user),
     );
     const feeStructure = await this.feeStructureRepo.findById(
       updated.feeStructureId,
-      user.tenantId,
+      getTenantId(user),
     );
 
     return {
@@ -336,9 +346,12 @@ export class EnrollmentController {
 
     let count = 0;
     for (const id of body.enrollment_ids) {
-      const enrollment = await this.enrollmentRepo.findById(id, user.tenantId);
+      const enrollment = await this.enrollmentRepo.findById(
+        id,
+        getTenantId(user),
+      );
       if (enrollment) {
-        await this.enrollmentRepo.update(id, user.tenantId, {
+        await this.enrollmentRepo.update(id, getTenantId(user), {
           status: upperStatus as EnrollmentStatus,
         });
         count++;
@@ -371,7 +384,7 @@ export class EnrollmentController {
     }
 
     const result = await this.enrollmentService.bulkGraduate(
-      user.tenantId,
+      getTenantId(user),
       body.enrollment_ids,
       endDate,
       user.id,
@@ -422,11 +435,11 @@ export class EnrollmentController {
     }
 
     this.logger.log(
-      `Year-end review requested for tenant ${user.tenantId}, year ${year}`,
+      `Year-end review requested for tenant ${getTenantId(user)}, year ${year}`,
     );
 
     const result = await this.enrollmentService.getYearEndReview(
-      user.tenantId,
+      getTenantId(user),
       year,
     );
 
@@ -471,7 +484,7 @@ export class EnrollmentController {
     );
 
     const settlement = await this.offboardingService.calculateAccountSettlement(
-      user.tenantId,
+      getTenantId(user),
       enrollmentId,
       endDate,
     );
@@ -518,7 +531,7 @@ export class EnrollmentController {
     );
 
     const result = await this.offboardingService.initiateOffboarding(
-      user.tenantId,
+      getTenantId(user),
       enrollmentId,
       endDate,
       body.reason,

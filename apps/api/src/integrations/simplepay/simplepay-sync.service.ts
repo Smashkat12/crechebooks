@@ -442,7 +442,7 @@ export class SimplePaySyncService implements OnModuleInit {
       message: 'Queued SimplePay sync job',
       jobId: job.id,
       type: data.type,
-      tenantId: data.tenantId,
+      tenantId: data.tenantId ?? undefined,
       correlationId: data.correlationId,
       priority: jobOptions.priority,
       delay: jobOptions.delay,

@@ -1,21 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
-import { Transporter } from 'nodemailer';
+import formData from 'form-data';
+import Mailgun from 'mailgun.js';
+import { IMailgunClient } from 'mailgun.js/Interfaces';
 
 export interface ContactSubmission {
   name: string;
   email: string;
   phone?: string;
+  subject?: string;
   message: string;
   submittedAt: Date;
 }
 
 export interface DemoRequest {
-  name: string;
+  fullName: string;
   email: string;
-  phone?: string;
-  crecheName?: string;
+  phone: string;
+  crecheName: string;
+  childrenCount: number;
+  province: string;
   submittedAt: Date;
 }
 
@@ -34,111 +38,161 @@ export interface Tenant {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: Transporter;
+  private mailgunClient: IMailgunClient;
   private readonly supportEmail: string;
   private readonly frontendUrl: string;
-  private readonly smtpFrom: string;
+  private readonly mailgunDomain: string;
+  private readonly mailgunFromEmail: string;
+  private readonly isConfigured: boolean;
 
   constructor(private readonly configService: ConfigService) {
     this.supportEmail = this.configService.get<string>('SUPPORT_EMAIL', 'hello@crechebooks.co.za');
-    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://crechebooks.co.za');
-    this.smtpFrom = this.configService.get<string>('SMTP_FROM', 'hello@crechebooks.co.za');
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'https://app.elleelephant.co.za');
+    this.mailgunDomain = this.configService.get<string>('MAILGUN_DOMAIN', '');
+    this.mailgunFromEmail = this.configService.get<string>('MAILGUN_FROM_EMAIL', 'CrecheBooks <noreply@crechebooks.co.za>');
 
-    this.initializeTransporter();
-  }
+    const mailgunApiKey = this.configService.get<string>('MAILGUN_API_KEY');
 
-  private initializeTransporter(): void {
-    const smtpHost = this.configService.get<string>('SMTP_HOST');
-    const smtpPort = this.configService.get<number>('SMTP_PORT');
-    const smtpUser = this.configService.get<string>('SMTP_USER');
-    const smtpPass = this.configService.get<string>('SMTP_PASS');
-
-    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass) {
-      this.logger.warn('Email service not configured. Email notifications will be disabled.');
+    if (!mailgunApiKey || !this.mailgunDomain) {
+      this.logger.warn('Mailgun not configured. Email notifications will be disabled. Set MAILGUN_API_KEY and MAILGUN_DOMAIN.');
+      this.isConfigured = false;
       return;
     }
 
     try {
-      this.transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
+      const mailgun = new Mailgun(formData);
+      this.mailgunClient = mailgun.client({
+        username: 'api',
+        key: mailgunApiKey,
       });
 
-      this.logger.log('Email service initialized successfully');
+      this.isConfigured = true;
+      this.logger.log('Mailgun email service initialized successfully');
     } catch (error) {
-      this.logger.error('Failed to initialize email service', error);
+      this.logger.error('Failed to initialize Mailgun email service', error);
+      this.isConfigured = false;
     }
   }
 
   async sendContactNotification(contact: ContactSubmission): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn('Email service not configured. Skipping contact notification.');
+    if (!this.isConfigured) {
+      this.logger.warn('Mailgun not configured. Skipping contact notification.');
       return;
     }
 
     try {
-      const mailOptions = {
-        from: this.smtpFrom,
+      const messageData = {
+        from: this.mailgunFromEmail,
         to: this.supportEmail,
-        subject: `New Contact Form Submission - ${contact.name}`,
+        subject: `🔔 New Contact Form - ${contact.name}`,
         html: `
-          <h2>New Contact Form Submission</h2>
-          <p><strong>Name:</strong> ${contact.name}</p>
-          <p><strong>Email:</strong> ${contact.email}</p>
-          ${contact.phone ? `<p><strong>Phone:</strong> ${contact.phone}</p>` : ''}
-          <p><strong>Message:</strong></p>
-          <p>${contact.message.replace(/\n/g, '<br>')}</p>
-          <p><strong>Submitted at:</strong> ${contact.submittedAt.toLocaleString('en-ZA')}</p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0EA5E9;">📧 New Contact Form Submission</h2>
+
+            <div style="background-color: #F0F9FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Name:</strong> ${contact.name}</p>
+              <p><strong>Email:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>
+              ${contact.phone ? `<p><strong>Phone:</strong> <a href="tel:${contact.phone}">${contact.phone}</a></p>` : ''}
+              ${contact.subject ? `<p><strong>Subject:</strong> ${contact.subject}</p>` : ''}
+            </div>
+
+            <div style="background-color: #FFFFFF; padding: 20px; border: 1px solid #E5E7EB; border-radius: 8px;">
+              <h3 style="margin-top: 0;">Message:</h3>
+              <p style="white-space: pre-wrap;">${contact.message}</p>
+            </div>
+
+            <p style="color: #6B7280; font-size: 14px; margin-top: 20px;">
+              <strong>Submitted:</strong> ${contact.submittedAt.toLocaleString('en-ZA', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
+
+            <p style="font-size: 12px; color: #6B7280;">
+              View all submissions in your <a href="${this.frontendUrl}/dashboard">CrecheBooks Dashboard</a>
+            </p>
+          </div>
         `,
       };
 
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Contact notification sent for ${contact.email}`);
+      await this.mailgunClient.messages.create(this.mailgunDomain, messageData);
+      this.logger.log(`✅ Contact notification sent for ${contact.email}`);
     } catch (error) {
-      this.logger.error('Failed to send contact notification', error);
-      throw error;
+      this.logger.error('Failed to send contact notification via Mailgun', error);
+      // Don't throw - we don't want to fail the request if email fails
     }
   }
 
   async sendDemoRequestNotification(demo: DemoRequest): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn('Email service not configured. Skipping demo request notification.');
+    if (!this.isConfigured) {
+      this.logger.warn('Mailgun not configured. Skipping demo request notification.');
       return;
     }
 
     try {
-      const mailOptions = {
-        from: this.smtpFrom,
+      const messageData = {
+        from: this.mailgunFromEmail,
         to: this.supportEmail,
-        subject: `New Demo Request - ${demo.name}`,
+        subject: `🎯 New Demo Request - ${demo.crecheName}`,
         html: `
-          <h2>New Demo Request</h2>
-          <p><strong>Name:</strong> ${demo.name}</p>
-          <p><strong>Email:</strong> ${demo.email}</p>
-          ${demo.phone ? `<p><strong>Phone:</strong> ${demo.phone}</p>` : ''}
-          ${demo.crecheName ? `<p><strong>Crèche Name:</strong> ${demo.crecheName}</p>` : ''}
-          <p><strong>Submitted at:</strong> ${demo.submittedAt.toLocaleString('en-ZA')}</p>
-          <hr>
-          <p><em>Please follow up with this demo request within 24 hours.</em></p>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0EA5E9;">🎯 New Demo Request</h2>
+
+            <div style="background-color: #FEF3C7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>⚡ Action Required:</strong> Please follow up within 24 hours!</p>
+            </div>
+
+            <div style="background-color: #F0F9FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Contact Information</h3>
+              <p><strong>Name:</strong> ${demo.fullName}</p>
+              <p><strong>Email:</strong> <a href="mailto:${demo.email}">${demo.email}</a></p>
+              <p><strong>Phone:</strong> <a href="tel:${demo.phone}">${demo.phone}</a></p>
+            </div>
+
+            <div style="background-color: #FFFFFF; padding: 20px; border: 1px solid #E5E7EB; border-radius: 8px;">
+              <h3 style="margin-top: 0;">Crèche Details</h3>
+              <p><strong>Crèche Name:</strong> ${demo.crecheName}</p>
+              <p><strong>Number of Children:</strong> ${demo.childrenCount}</p>
+              <p><strong>Province:</strong> ${demo.province}</p>
+            </div>
+
+            <p style="color: #6B7280; font-size: 14px; margin-top: 20px;">
+              <strong>Submitted:</strong> ${demo.submittedAt.toLocaleString('en-ZA', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
+
+            <p style="font-size: 12px; color: #6B7280;">
+              View all demo requests in your <a href="${this.frontendUrl}/dashboard">CrecheBooks Dashboard</a>
+            </p>
+          </div>
         `,
       };
 
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Demo request notification sent for ${demo.email}`);
+      await this.mailgunClient.messages.create(this.mailgunDomain, messageData);
+      this.logger.log(`✅ Demo request notification sent for ${demo.email}`);
     } catch (error) {
-      this.logger.error('Failed to send demo request notification', error);
-      throw error;
+      this.logger.error('Failed to send demo request notification via Mailgun', error);
+      // Don't throw - we don't want to fail the request if email fails
     }
   }
 
   async sendWelcomeEmail(user: User, tenant: Tenant, trialExpiresAt: Date): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn('Email service not configured. Skipping welcome email.');
+    if (!this.isConfigured) {
+      this.logger.warn('Mailgun not configured. Skipping welcome email.');
       return;
     }
 
@@ -146,8 +200,8 @@ export class EmailService {
     const trialDays = Math.ceil((trialExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
     try {
-      const mailOptions = {
-        from: this.smtpFrom,
+      const messageData = {
+        from: this.mailgunFromEmail,
         to: user.email,
         subject: `Welcome to CrecheBooks - Your ${trialDays}-Day Trial Starts Now!`,
         html: `
@@ -197,25 +251,25 @@ export class EmailService {
         `,
       };
 
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Welcome email sent to ${user.email}`);
+      await this.mailgunClient.messages.create(this.mailgunDomain, messageData);
+      this.logger.log(`✅ Welcome email sent to ${user.email}`);
     } catch (error) {
-      this.logger.error('Failed to send welcome email', error);
-      throw error;
+      this.logger.error('Failed to send welcome email via Mailgun', error);
+      // Don't throw - we don't want to fail signup if email fails
     }
   }
 
   async sendPasswordResetEmail(email: string, resetToken: string): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn('Email service not configured. Skipping password reset email.');
+    if (!this.isConfigured) {
+      this.logger.warn('Mailgun not configured. Skipping password reset email.');
       return;
     }
 
     const resetUrl = `${this.frontendUrl}/reset-password?token=${resetToken}`;
 
     try {
-      const mailOptions = {
-        from: this.smtpFrom,
+      const messageData = {
+        from: this.mailgunFromEmail,
         to: email,
         subject: 'Reset Your CrecheBooks Password',
         html: `
@@ -249,10 +303,10 @@ export class EmailService {
         `,
       };
 
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Password reset email sent to ${email}`);
+      await this.mailgunClient.messages.create(this.mailgunDomain, messageData);
+      this.logger.log(`✅ Password reset email sent to ${email}`);
     } catch (error) {
-      this.logger.error('Failed to send password reset email', error);
+      this.logger.error('Failed to send password reset email via Mailgun', error);
       throw error;
     }
   }

@@ -4,7 +4,6 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api/client';
 
 // Types matching backend DTOs
@@ -90,20 +89,20 @@ export function useTenantsForImpersonation(search?: string) {
  */
 export function useStartImpersonation() {
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   return useMutation({
     mutationFn: async (request: StartImpersonationRequest): Promise<ImpersonationResponse> => {
       const { data } = await apiClient.post('/admin/impersonate/start', request);
       return data;
     },
-    onSuccess: (data) => {
-      // Invalidate queries that might be affected by the new context
-      queryClient.invalidateQueries({ queryKey: ['admin', 'impersonate'] });
+    onSuccess: () => {
+      // Clear all cached queries to avoid using stale data with old context
+      // Don't refetch immediately - let the new page load fresh
+      queryClient.clear();
 
       // Navigate to dashboard with impersonation active
-      router.push('/dashboard');
-      router.refresh();
+      // Use window.location to ensure a full page reload with fresh cookies
+      window.location.href = '/dashboard';
     },
   });
 }
@@ -113,7 +112,6 @@ export function useStartImpersonation() {
  */
 export function useEndImpersonation() {
   const queryClient = useQueryClient();
-  const router = useRouter();
 
   return useMutation({
     mutationFn: async (): Promise<EndImpersonationResponse> => {
@@ -121,12 +119,12 @@ export function useEndImpersonation() {
       return data;
     },
     onSuccess: () => {
-      // Invalidate all queries since context has changed
-      queryClient.invalidateQueries();
+      // Clear all cached queries to avoid using stale data with old context
+      queryClient.clear();
 
-      // Navigate back to admin portal
-      router.push('/admin');
-      router.refresh();
+      // Navigate back to admin portal with full page reload
+      // This ensures fresh cookies are used for subsequent requests
+      window.location.href = '/admin';
     },
   });
 }

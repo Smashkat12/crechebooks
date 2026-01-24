@@ -120,7 +120,10 @@ export class AdminService {
       });
       this.logger.log(`Updated contact submission ${id} status to ${status}`);
     } catch (error) {
-      this.logger.error(`Failed to update contact submission ${id} status`, error);
+      this.logger.error(
+        `Failed to update contact submission ${id} status`,
+        error,
+      );
       throw error;
     }
   }
@@ -145,7 +148,9 @@ export class AdminService {
   // TENANT MANAGEMENT
   // ============================================
 
-  async listTenants(query: ListTenantsQueryDto): Promise<TenantsListResponseDto> {
+  async listTenants(
+    query: ListTenantsQueryDto,
+  ): Promise<TenantsListResponseDto> {
     const { search, subscriptionStatus, page = 1, limit = 20 } = query;
     const skip = (page - 1) * limit;
 
@@ -187,7 +192,9 @@ export class AdminService {
       phone: t.phone ?? undefined,
       subscriptionStatus: t.subscriptionStatus,
       trialExpiresAt: t.trialExpiresAt ?? undefined,
-      isActive: t.subscriptionStatus !== SubscriptionStatus.SUSPENDED && t.subscriptionStatus !== SubscriptionStatus.CANCELLED,
+      isActive:
+        t.subscriptionStatus !== SubscriptionStatus.SUSPENDED &&
+        t.subscriptionStatus !== SubscriptionStatus.CANCELLED,
       userCount: t._count.users,
       childrenCount: t._count.children,
       createdAt: t.createdAt,
@@ -234,7 +241,9 @@ export class AdminService {
       phone: tenant.phone ?? undefined,
       subscriptionStatus: tenant.subscriptionStatus,
       trialExpiresAt: tenant.trialExpiresAt ?? undefined,
-      isActive: tenant.subscriptionStatus !== SubscriptionStatus.SUSPENDED && tenant.subscriptionStatus !== SubscriptionStatus.CANCELLED,
+      isActive:
+        tenant.subscriptionStatus !== SubscriptionStatus.SUSPENDED &&
+        tenant.subscriptionStatus !== SubscriptionStatus.CANCELLED,
       userCount: tenant._count.users,
       childrenCount: tenant._count.children,
       createdAt: tenant.createdAt,
@@ -255,22 +264,27 @@ export class AdminService {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [totalTenants, activeTenants, trialTenants, suspendedTenants, newThisMonth] =
-      await Promise.all([
-        this.prisma.tenant.count(),
-        this.prisma.tenant.count({
-          where: { subscriptionStatus: SubscriptionStatus.ACTIVE },
-        }),
-        this.prisma.tenant.count({
-          where: { subscriptionStatus: SubscriptionStatus.TRIAL },
-        }),
-        this.prisma.tenant.count({
-          where: { subscriptionStatus: SubscriptionStatus.SUSPENDED },
-        }),
-        this.prisma.tenant.count({
-          where: { createdAt: { gte: startOfMonth } },
-        }),
-      ]);
+    const [
+      totalTenants,
+      activeTenants,
+      trialTenants,
+      suspendedTenants,
+      newThisMonth,
+    ] = await Promise.all([
+      this.prisma.tenant.count(),
+      this.prisma.tenant.count({
+        where: { subscriptionStatus: SubscriptionStatus.ACTIVE },
+      }),
+      this.prisma.tenant.count({
+        where: { subscriptionStatus: SubscriptionStatus.TRIAL },
+      }),
+      this.prisma.tenant.count({
+        where: { subscriptionStatus: SubscriptionStatus.SUSPENDED },
+      }),
+      this.prisma.tenant.count({
+        where: { createdAt: { gte: startOfMonth } },
+      }),
+    ]);
 
     return {
       totalTenants,
@@ -305,7 +319,10 @@ export class AdminService {
     return this.getTenant(tenant.id);
   }
 
-  async updateTenant(id: string, dto: UpdateTenantDto): Promise<TenantDetailDto> {
+  async updateTenant(
+    id: string,
+    dto: UpdateTenantDto,
+  ): Promise<TenantDetailDto> {
     const tenant = await this.prisma.tenant.findUnique({ where: { id } });
     if (!tenant) {
       throw new NotFoundException('Tenant', id);
@@ -317,7 +334,9 @@ export class AdminService {
         ...(dto.name && { name: dto.name }),
         ...(dto.email && { email: dto.email }),
         ...(dto.phone && { phone: dto.phone }),
-        ...(dto.subscriptionStatus && { subscriptionStatus: dto.subscriptionStatus }),
+        ...(dto.subscriptionStatus && {
+          subscriptionStatus: dto.subscriptionStatus,
+        }),
       },
     });
 
@@ -336,7 +355,9 @@ export class AdminService {
       data: { subscriptionStatus: SubscriptionStatus.SUSPENDED },
     });
 
-    this.logger.log(`Suspended tenant ${id}. Reason: ${reason ?? 'Not specified'}`);
+    this.logger.log(
+      `Suspended tenant ${id}. Reason: ${reason ?? 'Not specified'}`,
+    );
   }
 
   async activateTenant(id: string): Promise<void> {
@@ -424,16 +445,23 @@ export class AdminService {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [totalUsers, activeUsers, inactiveUsers, superAdmins, owners, admins, newThisMonth] =
-      await Promise.all([
-        this.prisma.user.count(),
-        this.prisma.user.count({ where: { isActive: true } }),
-        this.prisma.user.count({ where: { isActive: false } }),
-        this.prisma.user.count({ where: { role: UserRole.SUPER_ADMIN } }),
-        this.prisma.user.count({ where: { role: UserRole.OWNER } }),
-        this.prisma.user.count({ where: { role: UserRole.ADMIN } }),
-        this.prisma.user.count({ where: { createdAt: { gte: startOfMonth } } }),
-      ]);
+    const [
+      totalUsers,
+      activeUsers,
+      inactiveUsers,
+      superAdmins,
+      owners,
+      admins,
+      newThisMonth,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { isActive: true } }),
+      this.prisma.user.count({ where: { isActive: false } }),
+      this.prisma.user.count({ where: { role: UserRole.SUPER_ADMIN } }),
+      this.prisma.user.count({ where: { role: UserRole.OWNER } }),
+      this.prisma.user.count({ where: { role: UserRole.ADMIN } }),
+      this.prisma.user.count({ where: { createdAt: { gte: startOfMonth } } }),
+    ]);
 
     return {
       totalUsers,
@@ -496,16 +524,21 @@ export class AdminService {
   // ============================================
 
   async getPlatformMetrics(): Promise<PlatformMetricsDto> {
-    const [totalTenants, totalUsers, totalChildren, invoiceSum, totalTransactions] =
-      await Promise.all([
-        this.prisma.tenant.count(),
-        this.prisma.user.count(),
-        this.prisma.child.count(),
-        this.prisma.invoice.aggregate({
-          _sum: { totalCents: true },
-        }),
-        this.prisma.transaction.count(),
-      ]);
+    const [
+      totalTenants,
+      totalUsers,
+      totalChildren,
+      invoiceSum,
+      totalTransactions,
+    ] = await Promise.all([
+      this.prisma.tenant.count(),
+      this.prisma.user.count(),
+      this.prisma.child.count(),
+      this.prisma.invoice.aggregate({
+        _sum: { totalCents: true },
+      }),
+      this.prisma.transaction.count(),
+    ]);
 
     return {
       totalTenants,
@@ -526,7 +559,10 @@ export class AdminService {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const endDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
 
-      const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const monthName = date.toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+      });
 
       const count = await this.prisma.tenant.count({
         where: {
@@ -556,7 +592,9 @@ export class AdminService {
 
     return months.map((m, idx) => ({
       ...m,
-      cumulativeTenants: totalBefore + months.slice(0, idx + 1).reduce((sum, x) => sum + x.newTenants, 0),
+      cumulativeTenants:
+        totalBefore +
+        months.slice(0, idx + 1).reduce((sum, x) => sum + x.newTenants, 0),
     }));
   }
 
@@ -614,7 +652,12 @@ export class AdminService {
         where: { lastLoginAt: { not: null } },
         take: limit / 2,
         orderBy: { lastLoginAt: 'desc' },
-        select: { id: true, name: true, lastLoginAt: true, tenant: { select: { name: true } } },
+        select: {
+          id: true,
+          name: true,
+          lastLoginAt: true,
+          tenant: { select: { name: true } },
+        },
       }),
     ]);
 
@@ -645,8 +688,20 @@ export class AdminService {
   // AUDIT LOGS
   // ============================================
 
-  async listAuditLogs(query: ListAuditLogsQueryDto): Promise<AuditLogsListResponseDto> {
-    const { search, tenantId, userId, action, resourceType, startDate, endDate, page = 1, limit = 50 } = query;
+  async listAuditLogs(
+    query: ListAuditLogsQueryDto,
+  ): Promise<AuditLogsListResponseDto> {
+    const {
+      search,
+      tenantId,
+      userId,
+      action,
+      resourceType,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 50,
+    } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -692,7 +747,9 @@ export class AdminService {
     ]);
 
     // Fetch user and tenant info for the logs
-    const userIds = [...new Set(logs.map((l) => l.userId).filter(Boolean))] as string[];
+    const userIds = [
+      ...new Set(logs.map((l) => l.userId).filter(Boolean)),
+    ] as string[];
     const tenantIds = [...new Set(logs.map((l) => l.tenantId))];
 
     const [users, tenants] = await Promise.all([
@@ -710,11 +767,17 @@ export class AdminService {
         : [],
     ]);
 
-    const userMap = new Map<string, { id: string; name: string; email: string }>(
-      users.map((u) => [u.id, u] as [string, { id: string; name: string; email: string }])
+    const userMap = new Map<
+      string,
+      { id: string; name: string; email: string }
+    >(
+      users.map(
+        (u) =>
+          [u.id, u] as [string, { id: string; name: string; email: string }],
+      ),
     );
     const tenantMap = new Map<string, { id: string; name: string }>(
-      tenants.map((t) => [t.id, t] as [string, { id: string; name: string }])
+      tenants.map((t) => [t.id, t] as [string, { id: string; name: string }]),
     );
 
     const data: AuditLogEntryDto[] = logs.map((log) => {
@@ -730,7 +793,9 @@ export class AdminService {
         changeSummary: log.changeSummary ?? undefined,
         ipAddress: log.ipAddress ?? undefined,
         createdAt: log.createdAt,
-        user: userInfo ? { name: userInfo.name, email: userInfo.email } : undefined,
+        user: userInfo
+          ? { name: userInfo.name, email: userInfo.email }
+          : undefined,
         tenant: tenantInfo ? { name: tenantInfo.name } : undefined,
       };
     });
@@ -748,33 +813,51 @@ export class AdminService {
 
   async getAuditLogStats(): Promise<AuditLogStatsDto> {
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
+    const startOfWeek = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - now.getDay(),
+    );
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [total, todayCount, thisWeekCount, thisMonthCount, topActionsRaw] = await Promise.all([
-      this.prisma.auditLog.count(),
-      this.prisma.auditLog.count({ where: { createdAt: { gte: startOfDay } } }),
-      this.prisma.auditLog.count({ where: { createdAt: { gte: startOfWeek } } }),
-      this.prisma.auditLog.count({ where: { createdAt: { gte: startOfMonth } } }),
-      this.prisma.auditLog.groupBy({
-        by: ['action'],
-        _count: true,
-        orderBy: { _count: { action: 'desc' } },
-        take: 5,
-      }),
-    ]);
+    const [total, todayCount, thisWeekCount, thisMonthCount, topActionsRaw] =
+      await Promise.all([
+        this.prisma.auditLog.count(),
+        this.prisma.auditLog.count({
+          where: { createdAt: { gte: startOfDay } },
+        }),
+        this.prisma.auditLog.count({
+          where: { createdAt: { gte: startOfWeek } },
+        }),
+        this.prisma.auditLog.count({
+          where: { createdAt: { gte: startOfMonth } },
+        }),
+        this.prisma.auditLog.groupBy({
+          by: ['action'],
+          _count: true,
+          orderBy: { _count: { action: 'desc' } },
+          take: 5,
+        }),
+      ]);
 
     return {
       total,
       todayCount,
       thisWeekCount,
       thisMonthCount,
-      topActions: topActionsRaw.map((a) => ({ action: a.action, count: a._count })),
+      topActions: topActionsRaw.map((a) => ({
+        action: a.action,
+        count: a._count,
+      })),
     };
   }
 
-  async getAuditLogActions(): Promise<string[]> {
+  getAuditLogActions(): string[] {
     return Object.values(AuditAction);
   }
 

@@ -6,8 +6,9 @@ import { logger } from '@/lib/logger';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Debug logging only in development (filtered by logger)
-  logger.debug('Middleware processing', { pathname });
+  // Debug logging
+  console.log('[Middleware] Processing:', pathname);
+  console.log('[Middleware] NEXTAUTH_SECRET set:', !!process.env.NEXTAUTH_SECRET);
 
   // Get the JWT token from the request
   const token = await getToken({
@@ -16,7 +17,7 @@ export async function middleware(request: NextRequest) {
   });
 
   const isLoggedIn = !!token;
-  logger.debug('Auth check', { isLoggedIn, pathname });
+  console.log('[Middleware] Auth check:', { isLoggedIn, hasToken: !!token, pathname });
 
   // Define protected routes
   const protectedRoutes = [

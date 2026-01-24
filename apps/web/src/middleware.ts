@@ -10,14 +10,22 @@ export async function middleware(request: NextRequest) {
   console.log('[Middleware] Processing:', pathname);
   console.log('[Middleware] NEXTAUTH_SECRET set:', !!process.env.NEXTAUTH_SECRET);
 
+  // Log all cookies to debug
+  const allCookies = request.cookies.getAll();
+  console.log('[Middleware] All cookies:', allCookies.map(c => c.name));
+
   // Get the JWT token from the request
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: process.env.NODE_ENV === 'production',
+    cookieName: process.env.NODE_ENV === 'production'
+      ? '__Secure-authjs.session-token'
+      : 'authjs.session-token',
   });
 
   const isLoggedIn = !!token;
-  console.log('[Middleware] Auth check:', { isLoggedIn, hasToken: !!token, pathname });
+  console.log('[Middleware] Auth check:', { isLoggedIn, hasToken: !!token, pathname, tokenData: token ? 'exists' : 'null' });
 
   // Define protected routes
   const protectedRoutes = [

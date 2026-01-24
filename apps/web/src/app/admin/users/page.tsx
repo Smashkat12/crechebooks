@@ -142,12 +142,12 @@ export default function UsersPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
-        <Select value={role} onValueChange={setRole}>
+        <Select value={role || 'all'} onValueChange={(v) => setRole(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All Roles" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Roles</SelectItem>
+            <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
             <SelectItem value="OWNER">Owner</SelectItem>
             <SelectItem value="ADMIN">Admin</SelectItem>
@@ -155,12 +155,12 @@ export default function UsersPage() {
             <SelectItem value="VIEWER">Viewer</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={tenantId} onValueChange={setTenantId}>
+        <Select value={tenantId || 'all'} onValueChange={(v) => setTenantId(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-60">
             <SelectValue placeholder="All Tenants" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Tenants</SelectItem>
+            <SelectItem value="all">All Tenants</SelectItem>
             {tenantsData?.data?.map((t: any) => (
               <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
             ))}

@@ -122,12 +122,12 @@ export default function TenantsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
-        <Select value={subscriptionStatus} onValueChange={setSubscriptionStatus}>
+        <Select value={subscriptionStatus || 'all'} onValueChange={(v) => setSubscriptionStatus(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Status</SelectItem>
+            <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="ACTIVE">Active</SelectItem>
             <SelectItem value="TRIAL">Trial</SelectItem>
             <SelectItem value="SUSPENDED">Suspended</SelectItem>

@@ -88,23 +88,23 @@ export default function AuditLogsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
-        <Select value={action} onValueChange={setAction}>
+        <Select value={action || 'all'} onValueChange={(v) => setAction(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All Actions" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Actions</SelectItem>
+            <SelectItem value="all">All Actions</SelectItem>
             {filterOptions?.actions?.map((a: string) => (
               <SelectItem key={a} value={a}>{a}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={resourceType} onValueChange={setResourceType}>
+        <Select value={resourceType || 'all'} onValueChange={(v) => setResourceType(v === 'all' ? '' : v)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All Resources" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Resources</SelectItem>
+            <SelectItem value="all">All Resources</SelectItem>
             {filterOptions?.resourceTypes?.map((r: string) => (
               <SelectItem key={r} value={r}>{r}</SelectItem>
             ))}

@@ -30,6 +30,7 @@ export async function middleware(request: NextRequest) {
   // Define protected routes
   const protectedRoutes = [
     '/dashboard',
+    '/admin',
     '/transactions',
     '/invoices',
     '/payments',
@@ -65,6 +66,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     '/dashboard/:path*',
+    '/admin/:path*',
     '/transactions/:path*',
     '/invoices/:path*',
     '/payments/:path*',

@@ -23,6 +23,17 @@ import { PrismaService } from '../../../database/prisma/prisma.service';
  */
 const TOKEN_EXPIRY_WARNING_THRESHOLD_SECONDS = 300; // 5 minutes
 
+/**
+ * TASK-ADMIN-001: Impersonation context embedded in JWT
+ */
+export interface ImpersonationContext {
+  sessionId: string;
+  tenantId: string;
+  role: string;
+  startedAt: number;
+  expiresAt: number;
+}
+
 export interface JwtPayload {
   sub: string; // auth0Id or local userId
   email: string;
@@ -34,6 +45,10 @@ export interface JwtPayload {
   exp?: number;
   aud?: string | string[];
   iss?: string;
+  /**
+   * TASK-ADMIN-001: Impersonation context for SUPER_ADMIN users
+   */
+  impersonation?: ImpersonationContext;
 }
 
 /**
@@ -195,7 +210,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     this.logger.debug(`JWT validated successfully for user: ${user.id}`);
 
-    return {
+    // TASK-ADMIN-001: Include impersonation context if present
+    const baseUser = {
       id: user.id,
       tenantId: user.tenantId,
       auth0Id: user.auth0Id ?? '',
@@ -208,6 +224,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+
+    // If impersonation context exists in JWT, include it
+    if (payload.impersonation) {
+      this.logger.debug(
+        `User ${user.id} has impersonation context: tenant ${payload.impersonation.tenantId} as ${payload.impersonation.role}`,
+      );
+      return {
+        ...baseUser,
+        impersonation: {
+          sessionId: payload.impersonation.sessionId,
+          tenantId: payload.impersonation.tenantId,
+          role: payload.impersonation.role as UserRole,
+          startedAt: payload.impersonation.startedAt,
+          expiresAt: payload.impersonation.expiresAt,
+        },
+      };
+    }
+
+    return baseUser;
   }
 
   /**

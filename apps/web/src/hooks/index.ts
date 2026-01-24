@@ -24,3 +24,6 @@ export {
   useOrientation,
   useMobileUtils,
 } from './use-mobile';
+
+// TASK-ADMIN-001: Impersonation hooks
+export * from './use-impersonation';

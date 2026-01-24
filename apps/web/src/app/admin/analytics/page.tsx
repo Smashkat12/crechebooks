@@ -2,6 +2,8 @@
 
 import { useAdminAnalytics } from '@/hooks/use-admin-analytics';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { TenantGrowthChart } from '@/components/admin/TenantGrowthChart';
+import { PlatformMetricsChart } from '@/components/admin/PlatformMetricsChart';
 import { Building2, Users, Baby, Receipt, ArrowUpRight } from 'lucide-react';
 
 function formatCurrency(cents: number) {
@@ -82,24 +84,7 @@ export default function AnalyticsPage() {
             <CardDescription>New tenants over the last 12 months</CardDescription>
           </CardHeader>
           <CardContent>
-            {tenantGrowth && tenantGrowth.length > 0 ? (
-              <div className="space-y-2">
-                {tenantGrowth.map((item: any) => (
-                  <div key={item.month} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{item.month}</span>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-2 bg-primary rounded"
-                        style={{ width: `${Math.min(item.newTenants * 20, 200)}px` }}
-                      />
-                      <span className="font-medium">{item.newTenants}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">No growth data available</p>
-            )}
+            <TenantGrowthChart data={tenantGrowth || []} />
           </CardContent>
         </Card>
         <Card>
@@ -108,18 +93,7 @@ export default function AnalyticsPage() {
             <CardDescription>Tenants by subscription status</CardDescription>
           </CardHeader>
           <CardContent>
-            {subscriptions && subscriptions.length > 0 ? (
-              <div className="space-y-4">
-                {subscriptions.map((item: any) => (
-                  <div key={item.status} className="flex items-center justify-between">
-                    <span className="capitalize">{item.status?.toLowerCase() || 'Unknown'}</span>
-                    <span className="font-bold">{item.count}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-center py-8">No subscription data</p>
-            )}
+            <PlatformMetricsChart data={subscriptions || []} />
           </CardContent>
         </Card>
       </div>

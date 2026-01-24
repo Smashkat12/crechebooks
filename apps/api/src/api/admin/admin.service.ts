@@ -17,6 +17,7 @@ import {
 import {
   ListUsersQueryDto,
   UserSummaryDto,
+  UserDetailDto,
   UserStatsDto,
   UsersListResponseDto,
   UserActivityDto,
@@ -438,6 +439,36 @@ export class AdminService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async getUser(id: string): Promise<UserDetailDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        tenant: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User', id);
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt ?? undefined,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      tenantId: user.tenantId ?? undefined,
+      tenantName: user.tenant?.name ?? undefined,
+      auth0Id: user.auth0Id ?? undefined,
+      currentTenantId: user.currentTenantId ?? undefined,
     };
   }
 

@@ -35,6 +35,7 @@ import {
 } from './dto/tenants.dto';
 import {
   ListUsersQueryDto,
+  UserDetailDto,
   UserStatsDto,
   UsersListResponseDto,
   UserActivityDto,
@@ -363,6 +364,28 @@ export class AdminController {
   async getUserStats(): Promise<UserStatsDto> {
     this.logger.debug('Getting user stats');
     return this.adminService.getUserStats();
+  }
+
+  @Get('users/:id')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({
+    summary: 'Get user details',
+    description: 'Returns detailed information about a specific user.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User retrieved successfully',
+    type: UserDetailDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - SUPER_ADMIN role required',
+  })
+  async getUser(@Param('id') id: string): Promise<UserDetailDto> {
+    this.logger.debug(`Getting user ${id}`);
+    return this.adminService.getUser(id);
   }
 
   @Get('users/:id/activity')

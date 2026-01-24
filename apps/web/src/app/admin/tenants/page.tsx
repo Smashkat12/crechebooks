@@ -39,6 +39,13 @@ const statusColors: Record<string, string> = {
   CANCELLED: 'bg-gray-100 text-gray-800',
 };
 
+const planColors: Record<string, string> = {
+  FREE: 'bg-gray-100 text-gray-800',
+  STARTER: 'bg-purple-100 text-purple-800',
+  PROFESSIONAL: 'bg-indigo-100 text-indigo-800',
+  ENTERPRISE: 'bg-amber-100 text-amber-800',
+};
+
 export default function TenantsPage() {
   const [search, setSearch] = useState('');
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('');
@@ -173,11 +180,15 @@ export default function TenantsPage() {
                       {tenant.subscriptionStatus}
                     </Badge>
                   </TableCell>
-                  <TableCell>{tenant.subscriptionPlan || 'Free'}</TableCell>
+                  <TableCell>
+                    <Badge className={planColors[tenant.subscriptionPlan] || 'bg-gray-100'}>
+                      {tenant.subscriptionPlan || 'FREE'}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <Users className="h-3 w-3 text-muted-foreground" />
-                      {tenant._count?.users || 0}
+                      {tenant.userCount || 0}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">

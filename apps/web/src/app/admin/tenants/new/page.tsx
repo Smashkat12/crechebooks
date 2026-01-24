@@ -29,7 +29,8 @@ export default function CreateTenantPage() {
     phone: '',
     ownerName: '',
     ownerEmail: '',
-    subscriptionPlan: 'TRIAL',
+    subscriptionStatus: 'TRIAL',
+    subscriptionPlan: 'FREE',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,10 +105,10 @@ export default function CreateTenantPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="plan">Subscription Status</Label>
+                <Label htmlFor="status">Subscription Status</Label>
                 <Select
-                  value={formData.subscriptionPlan}
-                  onValueChange={(value) => setFormData({ ...formData, subscriptionPlan: value })}
+                  value={formData.subscriptionStatus}
+                  onValueChange={(value) => setFormData({ ...formData, subscriptionStatus: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -115,6 +116,25 @@ export default function CreateTenantPage() {
                   <SelectContent>
                     <SelectItem value="TRIAL">Trial (14 days)</SelectItem>
                     <SelectItem value="ACTIVE">Active</SelectItem>
+                    <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="plan">Subscription Plan</Label>
+                <Select
+                  value={formData.subscriptionPlan}
+                  onValueChange={(value) => setFormData({ ...formData, subscriptionPlan: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="FREE">Free</SelectItem>
+                    <SelectItem value="STARTER">Starter</SelectItem>
+                    <SelectItem value="PROFESSIONAL">Professional</SelectItem>
+                    <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -30,6 +30,13 @@ const statusColors: Record<string, string> = {
   CANCELLED: 'bg-gray-100 text-gray-800',
 };
 
+const planColors: Record<string, string> = {
+  FREE: 'bg-gray-100 text-gray-800',
+  STARTER: 'bg-purple-100 text-purple-800',
+  PROFESSIONAL: 'bg-indigo-100 text-indigo-800',
+  ENTERPRISE: 'bg-amber-100 text-amber-800',
+};
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }
@@ -222,12 +229,12 @@ export default function TenantDetailPage({ params }: PageProps) {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Status</CardTitle>
+            <CardTitle className="text-sm font-medium">Plan</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <Badge className={statusColors[tenant.subscriptionStatus] || 'bg-gray-100'}>
-              {tenant.subscriptionStatus}
+            <Badge className={planColors[tenant.subscriptionPlan] || 'bg-gray-100'}>
+              {tenant.subscriptionPlan || 'FREE'}
             </Badge>
           </CardContent>
         </Card>
@@ -333,14 +340,22 @@ export default function TenantDetailPage({ params }: PageProps) {
         <Card>
           <CardHeader>
             <CardTitle>Subscription & Integrations</CardTitle>
-            <CardDescription>Subscription status and connected services</CardDescription>
+            <CardDescription>Subscription status, plan, and connected services</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Subscription Status</p>
-              <Badge className={statusColors[tenant.subscriptionStatus] || 'bg-gray-100'}>
-                {tenant.subscriptionStatus}
-              </Badge>
+            <div className="flex gap-6">
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Badge className={statusColors[tenant.subscriptionStatus] || 'bg-gray-100'}>
+                  {tenant.subscriptionStatus}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Plan</p>
+                <Badge className={planColors[tenant.subscriptionPlan] || 'bg-gray-100'}>
+                  {tenant.subscriptionPlan || 'FREE'}
+                </Badge>
+              </div>
             </div>
             {tenant.trialExpiresAt && (
               <div>

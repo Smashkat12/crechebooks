@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma';
-import { SubscriptionStatus, UserRole, AuditAction } from '@prisma/client';
+import { SubscriptionStatus, SubscriptionPlan, UserRole, AuditAction } from '@prisma/client';
 import {
   ContactSubmissionsResponseDto,
   DemoRequestsResponseDto,
@@ -192,6 +192,7 @@ export class AdminService {
       email: t.email,
       phone: t.phone ?? undefined,
       subscriptionStatus: t.subscriptionStatus,
+      subscriptionPlan: t.subscriptionPlan,
       trialExpiresAt: t.trialExpiresAt ?? undefined,
       isActive:
         t.subscriptionStatus !== SubscriptionStatus.SUSPENDED &&
@@ -241,6 +242,7 @@ export class AdminService {
       email: tenant.email,
       phone: tenant.phone ?? undefined,
       subscriptionStatus: tenant.subscriptionStatus,
+      subscriptionPlan: tenant.subscriptionPlan,
       trialExpiresAt: tenant.trialExpiresAt ?? undefined,
       isActive:
         tenant.subscriptionStatus !== SubscriptionStatus.SUSPENDED &&
@@ -303,7 +305,8 @@ export class AdminService {
         name: dto.name,
         email: dto.email,
         phone: dto.phone ?? '',
-        subscriptionStatus: dto.subscriptionPlan ?? SubscriptionStatus.TRIAL,
+        subscriptionStatus: dto.subscriptionStatus ?? SubscriptionStatus.TRIAL,
+        subscriptionPlan: dto.subscriptionPlan ?? SubscriptionPlan.FREE,
         trialExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days trial
         addressLine1: 'To be updated',
         city: 'To be updated',
@@ -337,6 +340,9 @@ export class AdminService {
         ...(dto.phone && { phone: dto.phone }),
         ...(dto.subscriptionStatus && {
           subscriptionStatus: dto.subscriptionStatus,
+        }),
+        ...(dto.subscriptionPlan && {
+          subscriptionPlan: dto.subscriptionPlan,
         }),
       },
     });

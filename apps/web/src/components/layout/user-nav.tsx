@@ -29,9 +29,9 @@ export function UserNav() {
     .toUpperCase()
     .slice(0, 2) || user.email.slice(0, 2).toUpperCase();
 
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
+  const handleLogout = () => {
+    // Redirect to signout page which handles both NextAuth and Auth0 logout
+    router.push('/signout');
   };
 
   return (

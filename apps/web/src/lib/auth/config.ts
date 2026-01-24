@@ -1,14 +1,9 @@
 import type { NextAuthConfig } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
-// Debug: Log secret availability at module load
-console.log('[Auth Config] NEXTAUTH_SECRET set:', !!process.env.NEXTAUTH_SECRET);
-console.log('[Auth Config] AUTH_SECRET set:', !!process.env.AUTH_SECRET);
-
 export const authConfig: NextAuthConfig = {
   // Explicitly set secret to ensure it's available in all environments
   secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET,
-  debug: process.env.NODE_ENV !== 'production', // Enable debug in non-prod
   providers: [
     // Auth0 callback provider - receives user data after OAuth callback
     Credentials({
@@ -101,13 +96,11 @@ export const authConfig: NextAuthConfig = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      console.log('[Auth] JWT callback:', { hasUser: !!user, tokenId: token?.id });
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.tenantId = user.tenantId;
         token.accessToken = user.accessToken;
-        console.log('[Auth] JWT token created for user:', user.email);
       }
       return token;
     },

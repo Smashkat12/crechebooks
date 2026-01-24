@@ -95,6 +95,14 @@ import { XeroTransactionSplitService } from './services/xero-transaction-split.s
 import { InvoicePdfService } from './services/invoice-pdf.service';
 import { ParentWelcomePackPdfService } from './services/parent-welcome-pack-pdf.service';
 import { WelcomePackDeliveryService } from './services/welcome-pack-delivery.service';
+// TASK-ACCT: Accounting Parity Services
+import { ChartOfAccountService } from './services/chart-of-account.service';
+import { GeneralLedgerService } from './services/general-ledger.service';
+import { OpeningBalanceService } from './services/opening-balance.service';
+import { CashFlowService } from './services/cash-flow.service';
+import { SupplierService } from './services/supplier.service';
+import { QuoteService } from './services/quote.service';
+import { OnboardingService } from './services/onboarding.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
@@ -217,6 +225,14 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     InvoicePdfService, // TASK-BILL-042: PDF generation for invoice emails
     ParentWelcomePackPdfService, // TASK-ENROL-006: Parent Welcome Pack PDF
     WelcomePackDeliveryService, // TASK-ENROL-008: Welcome Pack Delivery Integration
+    // TASK-ACCT: Accounting Parity Services
+    ChartOfAccountService,
+    GeneralLedgerService,
+    OpeningBalanceService,
+    CashFlowService,
+    SupplierService,
+    QuoteService,
+    OnboardingService,
   ],
   exports: [
     PrismaService,
@@ -316,6 +332,14 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     InvoicePdfService, // TASK-BILL-042: PDF generation for invoice emails
     ParentWelcomePackPdfService, // TASK-ENROL-006: Parent Welcome Pack PDF
     WelcomePackDeliveryService, // TASK-ENROL-008: Welcome Pack Delivery Integration
+    // TASK-ACCT: Accounting Parity Services
+    ChartOfAccountService,
+    GeneralLedgerService,
+    OpeningBalanceService,
+    CashFlowService,
+    SupplierService,
+    QuoteService,
+    OnboardingService,
   ],
 })
 export class DatabaseModule {}

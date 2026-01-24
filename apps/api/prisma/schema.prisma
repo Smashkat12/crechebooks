@@ -33,10 +33,10 @@ enum SubscriptionPlan {
 
 enum UserRole {
   SUPER_ADMIN // CrecheBooks platform administrator (no tenant)
-  OWNER       // Creche/tenant owner
-  ADMIN       // Tenant administrator
-  VIEWER      // Read-only tenant user
-  ACCOUNTANT  // Tenant accountant
+  OWNER // Creche/tenant owner
+  ADMIN // Tenant administrator
+  VIEWER // Read-only tenant user
+  ACCOUNTANT // Tenant accountant
 }
 
 enum AuditAction {
@@ -362,6 +362,89 @@ enum UI19Status {
   OVERDUE
 }
 
+// TASK-ACCT-001: Chart of Accounts
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AccountSubType {
+  // Asset sub-types
+  CURRENT_ASSET
+  FIXED_ASSET
+  OTHER_ASSET
+  BANK
+  // Liability sub-types
+  CURRENT_LIABILITY
+  LONG_TERM_LIABILITY
+  // Equity sub-types
+  OWNER_EQUITY
+  RETAINED_EARNINGS
+  // Revenue sub-types
+  OPERATING_REVENUE
+  OTHER_REVENUE
+  // Expense sub-types
+  COST_OF_SALES
+  OPERATING_EXPENSE
+  OTHER_EXPENSE
+}
+
+// TASK-ACCT-012: Quotes System
+enum QuoteStatus {
+  DRAFT
+  SENT
+  VIEWED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CONVERTED
+}
+
+// TASK-ACCT-013: Supplier Management
+enum BillStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PARTIALLY_PAID
+  PAID
+  VOID
+  OVERDUE
+}
+
+// TASK-ACCT-011: Payment Gateway
+enum PaymentLinkStatus {
+  ACTIVE
+  EXPIRED
+  USED
+  CANCELLED
+}
+
+enum PaymentLinkType {
+  INVOICE
+  OUTSTANDING
+  CUSTOM
+  REGISTRATION
+}
+
+enum PaymentGatewayStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REFUNDED
+}
+
+// TASK-ACCT-003: Opening Balances
+enum OpeningBalanceImportStatus {
+  DRAFT
+  VALIDATING
+  VALIDATED
+  POSTING
+  POSTED
+  FAILED
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -393,21 +476,21 @@ model Tenant {
   matchingToleranceCents  Int                @default(0) @map("matching_tolerance_cents")
 
   // TASK-BILL-043: Bank details for invoice/statement PDF generation
-  bankName                String?            @map("bank_name") @db.VarChar(100)
-  bankAccountHolder       String?            @map("bank_account_holder") @db.VarChar(200)
-  bankAccountNumber       String?            @map("bank_account_number") @db.VarChar(50)
-  bankBranchCode          String?            @map("bank_branch_code") @db.VarChar(20)
-  bankAccountType         String?            @map("bank_account_type") @db.VarChar(30)
-  bankSwiftCode           String?            @map("bank_swift_code") @db.VarChar(20)
+  bankName          String? @map("bank_name") @db.VarChar(100)
+  bankAccountHolder String? @map("bank_account_holder") @db.VarChar(200)
+  bankAccountNumber String? @map("bank_account_number") @db.VarChar(50)
+  bankBranchCode    String? @map("bank_branch_code") @db.VarChar(20)
+  bankAccountType   String? @map("bank_account_type") @db.VarChar(30)
+  bankSwiftCode     String? @map("bank_swift_code") @db.VarChar(20)
 
   // TASK-ENROL-006: Parent welcome pack customization
-  parentWelcomeMessage    String?            @map("parent_welcome_message") @db.Text
-  operatingHours          String?            @map("operating_hours") @db.VarChar(200)
+  parentWelcomeMessage String? @map("parent_welcome_message") @db.Text
+  operatingHours       String? @map("operating_hours") @db.VarChar(200)
 
-  xeroConnectedAt         DateTime?          @map("xero_connected_at")
-  xeroTenantName          String?            @map("xero_tenant_name") @db.VarChar(200)
-  createdAt               DateTime           @default(now()) @map("created_at")
-  updatedAt               DateTime           @updatedAt @map("updated_at")
+  xeroConnectedAt DateTime? @map("xero_connected_at")
+  xeroTenantName  String?   @map("xero_tenant_name") @db.VarChar(200)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   users                 User[]
   userTenantRoles       UserTenantRole[]
@@ -431,7 +514,7 @@ model Tenant {
   xeroOAuthState        XeroOAuthState?
   invoiceDeliveryLogs   InvoiceDeliveryLog[]
   reminderTemplates     ReminderTemplate[]
-  reminderConfig        ReminderConfig?     // TASK-FEAT-102: Automated arrears config
+  reminderConfig        ReminderConfig? // TASK-FEAT-102: Automated arrears config
   creditBalances        CreditBalance[]
   statements            Statement[]
   staffDocuments        StaffDocument[]
@@ -529,6 +612,29 @@ model Tenant {
   // TASK-ADMIN-001: Impersonation Sessions (AWS SSO-style tenant switching)
   impersonationSessions ImpersonationSession[]
 
+  // TASK-ACCT-001: Chart of Accounts
+  chartOfAccounts ChartOfAccount[]
+
+  // TASK-ACCT-003: Opening Balances
+  openingBalances       OpeningBalance[]
+  openingBalanceImports OpeningBalanceImport[]
+
+  // TASK-ACCT-012: Quotes System
+  quotes              Quote[]
+  quoteNumberCounters QuoteNumberCounter[]
+
+  // TASK-ACCT-013: Supplier Management
+  suppliers            Supplier[]
+  supplierBills        SupplierBill[]
+  supplierBillPayments SupplierBillPayment[]
+
+  // TASK-ACCT-011: Payment Gateway
+  paymentLinks               PaymentLink[]
+  paymentGatewayTransactions PaymentGatewayTransaction[]
+
+  // TASK-ACCT-014: Onboarding Wizard
+  onboardingProgress OnboardingProgress?
+
   @@map("tenants")
 }
 
@@ -538,20 +644,20 @@ model Tenant {
 // ============================================
 
 model ImpersonationSession {
-  id              String    @id @default(uuid())
-  superAdminId    String    @map("super_admin_id")
-  targetTenantId  String    @map("target_tenant_id")
-  assumedRole     UserRole  @map("assumed_role")
-  startedAt       DateTime  @default(now()) @map("started_at")
-  endedAt         DateTime? @map("ended_at")
-  expiresAt       DateTime  @map("expires_at")
-  ipAddress       String?   @map("ip_address") @db.VarChar(45)
-  userAgent       String?   @map("user_agent")
-  reason          String?   @db.Text
-  isActive        Boolean   @default(true) @map("is_active")
+  id             String    @id @default(uuid())
+  superAdminId   String    @map("super_admin_id")
+  targetTenantId String    @map("target_tenant_id")
+  assumedRole    UserRole  @map("assumed_role")
+  startedAt      DateTime  @default(now()) @map("started_at")
+  endedAt        DateTime? @map("ended_at")
+  expiresAt      DateTime  @map("expires_at")
+  ipAddress      String?   @map("ip_address") @db.VarChar(45)
+  userAgent      String?   @map("user_agent")
+  reason         String?   @db.Text
+  isActive       Boolean   @default(true) @map("is_active")
 
-  superAdmin      User      @relation("SuperAdminSessions", fields: [superAdminId], references: [id])
-  targetTenant    Tenant    @relation(fields: [targetTenantId], references: [id])
+  superAdmin   User   @relation("SuperAdminSessions", fields: [superAdminId], references: [id])
+  targetTenant Tenant @relation(fields: [targetTenantId], references: [id])
 
   @@index([superAdminId, isActive])
   @@index([targetTenantId])
@@ -597,6 +703,16 @@ model User {
 
   // TASK-ADMIN-001: Impersonation Sessions (AWS SSO-style tenant switching)
   impersonationSessions ImpersonationSession[] @relation("SuperAdminSessions")
+
+  // TASK-ACCT-012: Quotes created by user
+  quotesCreated Quote[]
+
+  // TASK-ACCT-013: Supplier bills created by user
+  supplierBillsCreated SupplierBill[]
+
+  // TASK-ACCT-003: Opening balance verification
+  openingBalancesVerified        OpeningBalance[]
+  openingBalanceImportsProcessed OpeningBalanceImport[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -685,6 +801,11 @@ model Transaction {
   // TASK-RECON-037: Xero Transaction Splitting
   xeroSplitsAsBankTransaction XeroTransactionSplit[] @relation("XeroSplitBankTransaction")
 
+  // TASK-ACCT-013: Supplier Management
+  supplierId           String?               @map("supplier_id")
+  supplier             Supplier?             @relation(fields: [supplierId], references: [id])
+  supplierBillPayments SupplierBillPayment[]
+
   @@index([tenantId, date])
   @@index([tenantId, status])
   @@index([tenantId, payeeName])
@@ -763,6 +884,9 @@ model FeeStructure {
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   enrollments Enrollment[]
 
+  // TASK-ACCT-012: Quote lines linking to fee structure
+  quoteLines QuoteLine[]
+
   @@index([tenantId, isActive])
   @@index([tenantId, effectiveFrom])
   @@map("fee_structures")
@@ -826,6 +950,13 @@ model Parent {
 
   // TASK-WA-001: WhatsApp Message History
   whatsAppMessages WhatsAppMessage[]
+
+  // TASK-ACCT-012: Quotes for parent
+  quotes Quote[]
+
+  // TASK-ACCT-011: Payment links and gateway transactions
+  paymentLinks               PaymentLink[]
+  paymentGatewayTransactions PaymentGatewayTransaction[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -937,6 +1068,13 @@ model Invoice {
   // TASK-RECON-035: Split Transaction Matching
   splitMatchComponents SplitMatchComponent[]
 
+  // TASK-ACCT-012: Quotes converted to this invoice
+  quotesConverted Quote[]
+
+  // TASK-ACCT-011: Payment gateway
+  paymentLinks               PaymentLink[]
+  paymentGatewayTransactions PaymentGatewayTransaction[]
+
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, parentId])
   @@index([tenantId, status])
@@ -1032,6 +1170,9 @@ model Payment {
 
   // TASK-XERO-010: Xero Payment Mapping
   xeroPaymentMapping XeroPaymentMapping?
+
+  // TASK-ACCT-011: Payment gateway transactions linked to this payment
+  gatewayTransactions PaymentGatewayTransaction[]
 
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
@@ -1242,9 +1383,9 @@ model BankStatementMatch {
   discrepancyReason String?                  @map("discrepancy_reason")
 
   // TASK-RECON-036: Fee adjustment tracking
-  isFeeAdjustedMatch  Boolean @default(false) @map("is_fee_adjusted_match")
-  accruedFeeAmountCents Int?   @map("accrued_fee_amount_cents")
-  feeType              String? @map("fee_type") @db.VarChar(50) // ADT_DEPOSIT_FEE, CASH_DEPOSIT_FEE, etc.
+  isFeeAdjustedMatch    Boolean @default(false) @map("is_fee_adjusted_match")
+  accruedFeeAmountCents Int?    @map("accrued_fee_amount_cents")
+  feeType               String? @map("fee_type") @db.VarChar(50) // ADT_DEPOSIT_FEE, CASH_DEPOSIT_FEE, etc.
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1444,11 +1585,11 @@ model BankConnection {
 
 // TASK-INT-101: Open Banking Integration via Stitch API
 enum LinkedBankAccountStatus {
-  PENDING     // OAuth flow initiated, waiting for callback
-  ACTIVE      // Account linked and syncing
-  EXPIRED     // Consent expired (90 days)
-  REVOKED     // User revoked access
-  ERROR       // Sync error occurred
+  PENDING // OAuth flow initiated, waiting for callback
+  ACTIVE // Account linked and syncing
+  EXPIRED // Consent expired (90 days)
+  REVOKED // User revoked access
+  ERROR // Sync error occurred
 }
 
 // TASK-INT-101: Linked bank accounts for Open Banking (Stitch API)
@@ -1470,7 +1611,7 @@ model LinkedBankAccount {
   lastSyncError       String?                 @map("last_sync_error") @db.Text
   syncErrorCount      Int                     @default(0) @map("sync_error_count")
   status              LinkedBankAccountStatus @default(PENDING)
-  metadata            Json?                   // Additional bank-specific metadata
+  metadata            Json? // Additional bank-specific metadata
   createdAt           DateTime                @default(now()) @map("created_at")
   updatedAt           DateTime                @updatedAt @map("updated_at")
 
@@ -1486,19 +1627,19 @@ model LinkedBankAccount {
 // TASK-INT-101: Bank sync event audit log
 // Tracks all sync operations for compliance and debugging
 model LinkedBankSyncEvent {
-  id                    String   @id @default(uuid())
-  linkedBankAccountId   String   @map("linked_bank_account_id")
-  syncType              String   @map("sync_type") @db.VarChar(50) // SCHEDULED, MANUAL, REFRESH_TOKEN
-  startedAt             DateTime @default(now()) @map("started_at")
+  id                    String    @id @default(uuid())
+  linkedBankAccountId   String    @map("linked_bank_account_id")
+  syncType              String    @map("sync_type") @db.VarChar(50) // SCHEDULED, MANUAL, REFRESH_TOKEN
+  startedAt             DateTime  @default(now()) @map("started_at")
   completedAt           DateTime? @map("completed_at")
-  transactionsFetched   Int?     @map("transactions_fetched")
-  transactionsImported  Int?     @map("transactions_imported")
-  transactionsDuplicate Int?     @map("transactions_duplicate")
-  status                String   @map("status") @db.VarChar(20) // SUCCESS, FAILED, PARTIAL
-  errorMessage          String?  @map("error_message") @db.Text
-  errorCode             String?  @map("error_code") @db.VarChar(50)
-  durationMs            Int?     @map("duration_ms")
-  createdAt             DateTime @default(now()) @map("created_at")
+  transactionsFetched   Int?      @map("transactions_fetched")
+  transactionsImported  Int?      @map("transactions_imported")
+  transactionsDuplicate Int?      @map("transactions_duplicate")
+  status                String    @map("status") @db.VarChar(20) // SUCCESS, FAILED, PARTIAL
+  errorMessage          String?   @map("error_message") @db.Text
+  errorCode             String?   @map("error_code") @db.VarChar(50)
+  durationMs            Int?      @map("duration_ms")
+  createdAt             DateTime  @default(now()) @map("created_at")
 
   linkedBankAccount LinkedBankAccount @relation(fields: [linkedBankAccountId], references: [id], onDelete: Cascade)
 
@@ -1615,20 +1756,20 @@ model XeroOAuthState {
 // TASK-FEAT-102: Automated Arrears Reminders Configuration
 // Tenant-level settings for automated arrears reminders
 model ReminderConfig {
-  id              String   @id @default(uuid())
-  tenantId        String   @unique @map("tenant_id")
-  enabled         Boolean  @default(true)
-  level1Days      Int      @default(7) @map("level_1_days")
-  level2Days      Int      @default(14) @map("level_2_days")
-  level3Days      Int      @default(30) @map("level_3_days")
-  level4Days      Int      @default(60) @map("level_4_days")
-  ccAdminLevel    Int      @default(3) @map("cc_admin_level") // CC admin on level 3+
-  sendHoursStart  Int      @default(8) @map("send_hours_start") // 8 AM
-  sendHoursEnd    Int      @default(18) @map("send_hours_end") // 6 PM
-  maxPerDay       Int      @default(1) @map("max_per_day") // Max 1 reminder per invoice per day
-  adminEmail      String?  @map("admin_email") @db.VarChar(255) // Optional override for admin notifications
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  tenantId       String   @unique @map("tenant_id")
+  enabled        Boolean  @default(true)
+  level1Days     Int      @default(7) @map("level_1_days")
+  level2Days     Int      @default(14) @map("level_2_days")
+  level3Days     Int      @default(30) @map("level_3_days")
+  level4Days     Int      @default(60) @map("level_4_days")
+  ccAdminLevel   Int      @default(3) @map("cc_admin_level") // CC admin on level 3+
+  sendHoursStart Int      @default(8) @map("send_hours_start") // 8 AM
+  sendHoursEnd   Int      @default(18) @map("send_hours_end") // 6 PM
+  maxPerDay      Int      @default(1) @map("max_per_day") // Max 1 reminder per invoice per day
+  adminEmail     String?  @map("admin_email") @db.VarChar(255) // Optional override for admin notifications
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -2728,10 +2869,10 @@ model AccruedBankCharge {
   tenantId String @map("tenant_id")
 
   // Source transaction that attracted the fee (e.g., ADT Cash Deposit)
-  sourceTransactionId String?   @map("source_transaction_id")
-  sourceDescription   String    @map("source_description")
-  sourceDate          DateTime  @map("source_date") @db.Date
-  sourceAmountCents   Int       @map("source_amount_cents") // NET amount credited
+  sourceTransactionId String?  @map("source_transaction_id")
+  sourceDescription   String   @map("source_description")
+  sourceDate          DateTime @map("source_date") @db.Date
+  sourceAmountCents   Int      @map("source_amount_cents") // NET amount credited
 
   // The fee details
   accruedAmountCents Int                     @map("accrued_amount_cents") // Fee amount
@@ -2743,8 +2884,8 @@ model AccruedBankCharge {
   bankStatementMatchId String? @unique @map("bank_statement_match_id")
 
   // Link to Xero transaction (has GROSS amount including fee)
-  xeroTransactionId   String? @map("xero_transaction_id")
-  xeroAmountCents     Int?    @map("xero_amount_cents") // GROSS amount from Xero
+  xeroTransactionId String? @map("xero_transaction_id")
+  xeroAmountCents   Int?    @map("xero_amount_cents") // GROSS amount from Xero
 
   // When the fee is actually charged (matched to a real bank transaction)
   chargeTransactionId String?   @map("charge_transaction_id")
@@ -2897,36 +3038,36 @@ model PendingSync {
 // ============================================
 
 model WhatsAppMessage {
-  id              String                 @id @default(uuid())
-  tenantId        String                 @map("tenant_id")
-  parentId        String?                @map("parent_id")
-  recipientPhone  String                 @map("recipient_phone") @db.VarChar(20)
-  templateName    String                 @map("template_name") @db.VarChar(100)
-  templateParams  Json?                  @map("template_params")
+  id             String  @id @default(uuid())
+  tenantId       String  @map("tenant_id")
+  parentId       String? @map("parent_id")
+  recipientPhone String  @map("recipient_phone") @db.VarChar(20)
+  templateName   String  @map("template_name") @db.VarChar(100)
+  templateParams Json?   @map("template_params")
 
   // Message identifiers from Meta
-  wamid           String?                @unique @map("wamid") @db.VarChar(100) // WhatsApp Message ID
+  wamid String? @unique @map("wamid") @db.VarChar(100) // WhatsApp Message ID
 
   // Status tracking
-  status          WhatsAppMessageStatus  @default(PENDING)
-  statusUpdatedAt DateTime?              @map("status_updated_at")
-  errorCode       String?                @map("error_code") @db.VarChar(50)
-  errorMessage    String?                @map("error_message") @db.Text
+  status          WhatsAppMessageStatus @default(PENDING)
+  statusUpdatedAt DateTime?             @map("status_updated_at")
+  errorCode       String?               @map("error_code") @db.VarChar(50)
+  errorMessage    String?               @map("error_message") @db.Text
 
   // Context - links to invoices, statements, etc.
-  contextType     WhatsAppContextType    @map("context_type")
-  contextId       String?                @map("context_id") @db.VarChar(100)
+  contextType WhatsAppContextType @map("context_type")
+  contextId   String?             @map("context_id") @db.VarChar(100)
 
   // Timestamps
-  sentAt          DateTime?              @map("sent_at")
-  deliveredAt     DateTime?              @map("delivered_at")
-  readAt          DateTime?              @map("read_at")
-  createdAt       DateTime               @default(now()) @map("created_at")
-  updatedAt       DateTime               @updatedAt @map("updated_at")
+  sentAt      DateTime? @map("sent_at")
+  deliveredAt DateTime? @map("delivered_at")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
-  parent          Parent?                @relation(fields: [parentId], references: [id])
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  parent Parent? @relation(fields: [parentId], references: [id])
 
   @@index([tenantId, parentId])
   @@index([tenantId, status])
@@ -2941,42 +3082,42 @@ model WhatsAppMessage {
 // ============================================
 
 model BroadcastMessage {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
 
   // Message content
-  subject         String?  @db.VarChar(200) // For email
-  body            String   @db.Text // Plain text content
-  htmlBody        String?  @map("html_body") @db.Text // HTML for email
+  subject  String? @db.VarChar(200) // For email
+  body     String  @db.Text // Plain text content
+  htmlBody String? @map("html_body") @db.Text // HTML for email
 
   // Targeting
-  recipientType   String   @map("recipient_type") @db.VarChar(20) // parent, staff, custom
-  recipientFilter Json?    @map("recipient_filter") // Filter criteria
+  recipientType    String  @map("recipient_type") @db.VarChar(20) // parent, staff, custom
+  recipientFilter  Json?   @map("recipient_filter") // Filter criteria
   recipientGroupId String? @map("recipient_group_id") // Saved group
 
   // Channel selection
-  channel         String   @db.VarChar(20) // email, whatsapp, sms, all
+  channel String @db.VarChar(20) // email, whatsapp, sms, all
 
   // Scheduling
-  scheduledAt     DateTime? @map("scheduled_at")
-  sentAt          DateTime? @map("sent_at")
+  scheduledAt DateTime? @map("scheduled_at")
+  sentAt      DateTime? @map("sent_at")
 
   // Status
-  status          String   @default("draft") @db.VarChar(20) // draft, scheduled, sending, sent, partially_sent, failed, cancelled
-  totalRecipients Int      @default(0) @map("total_recipients")
-  sentCount       Int      @default(0) @map("sent_count")
-  failedCount     Int      @default(0) @map("failed_count")
+  status          String @default("draft") @db.VarChar(20) // draft, scheduled, sending, sent, partially_sent, failed, cancelled
+  totalRecipients Int    @default(0) @map("total_recipients")
+  sentCount       Int    @default(0) @map("sent_count")
+  failedCount     Int    @default(0) @map("failed_count")
 
   // Metadata
-  createdBy       String   @map("created_by") // User ID
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdBy String   @map("created_by") // User ID
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant          Tenant   @relation(fields: [tenantId], references: [id])
-  createdByUser   User     @relation("BroadcastMessageCreatedBy", fields: [createdBy], references: [id])
-  recipientGroup  RecipientGroup? @relation(fields: [recipientGroupId], references: [id])
-  recipients      MessageRecipient[]
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  createdByUser  User               @relation("BroadcastMessageCreatedBy", fields: [createdBy], references: [id])
+  recipientGroup RecipientGroup?    @relation(fields: [recipientGroupId], references: [id])
+  recipients     MessageRecipient[]
 
   @@index([tenantId, status])
   @@index([tenantId, recipientType])
@@ -2985,38 +3126,38 @@ model BroadcastMessage {
 }
 
 model MessageRecipient {
-  id              String   @id @default(uuid())
-  broadcastId     String   @map("broadcast_id")
+  id          String @id @default(uuid())
+  broadcastId String @map("broadcast_id")
 
   // Recipient info (copied for audit)
-  recipientId     String   @map("recipient_id") // Parent or Staff ID
-  recipientType   String   @map("recipient_type") @db.VarChar(20) // parent, staff
-  recipientName   String   @map("recipient_name") @db.VarChar(200)
-  recipientEmail  String?  @map("recipient_email") @db.VarChar(255)
-  recipientPhone  String?  @map("recipient_phone") @db.VarChar(20)
+  recipientId    String  @map("recipient_id") // Parent or Staff ID
+  recipientType  String  @map("recipient_type") @db.VarChar(20) // parent, staff
+  recipientName  String  @map("recipient_name") @db.VarChar(200)
+  recipientEmail String? @map("recipient_email") @db.VarChar(255)
+  recipientPhone String? @map("recipient_phone") @db.VarChar(20)
 
   // Delivery status per channel
-  emailStatus     String?  @map("email_status") @db.VarChar(20) // pending, sent, delivered, opened, failed, bounced
-  emailSentAt     DateTime? @map("email_sent_at")
-  emailMessageId  String?  @map("email_message_id") @db.VarChar(255) // Mailgun ID
+  emailStatus    String?   @map("email_status") @db.VarChar(20) // pending, sent, delivered, opened, failed, bounced
+  emailSentAt    DateTime? @map("email_sent_at")
+  emailMessageId String?   @map("email_message_id") @db.VarChar(255) // Mailgun ID
 
-  whatsappStatus  String?  @map("whatsapp_status") @db.VarChar(20) // pending, sent, delivered, read, failed
-  whatsappSentAt  DateTime? @map("whatsapp_sent_at")
-  whatsappWamid   String?  @map("whatsapp_wamid") @db.VarChar(100) // WhatsApp Message ID
+  whatsappStatus String?   @map("whatsapp_status") @db.VarChar(20) // pending, sent, delivered, read, failed
+  whatsappSentAt DateTime? @map("whatsapp_sent_at")
+  whatsappWamid  String?   @map("whatsapp_wamid") @db.VarChar(100) // WhatsApp Message ID
 
-  smsStatus       String?  @map("sms_status") @db.VarChar(20) // pending, sent, delivered, failed
-  smsSentAt       DateTime? @map("sms_sent_at")
-  smsMessageId    String?  @map("sms_message_id") @db.VarChar(255)
+  smsStatus    String?   @map("sms_status") @db.VarChar(20) // pending, sent, delivered, failed
+  smsSentAt    DateTime? @map("sms_sent_at")
+  smsMessageId String?   @map("sms_message_id") @db.VarChar(255)
 
   // Error tracking
-  lastError       String?  @map("last_error") @db.Text
-  retryCount      Int      @default(0) @map("retry_count")
+  lastError  String? @map("last_error") @db.Text
+  retryCount Int     @default(0) @map("retry_count")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  broadcast       BroadcastMessage @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  broadcast BroadcastMessage @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
 
   @@unique([broadcastId, recipientId])
   @@index([broadcastId, recipientType])
@@ -3026,25 +3167,25 @@ model MessageRecipient {
 }
 
 model RecipientGroup {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
+  id       String @id @default(uuid())
+  tenantId String @map("tenant_id")
 
-  name        String   @db.VarChar(100) // "All Active Parents", "Grade 1 Parents"
-  description String?  @db.VarChar(500)
+  name        String  @db.VarChar(100) // "All Active Parents", "Grade 1 Parents"
+  description String? @db.VarChar(500)
 
   // Filter criteria (stored as JSON)
-  recipientType String  @map("recipient_type") @db.VarChar(20) // parent, staff
+  recipientType  String @map("recipient_type") @db.VarChar(20) // parent, staff
   filterCriteria Json?  @map("filter_criteria")
 
   // Metadata
-  isSystem    Boolean  @default(false) @map("is_system") // Built-in groups
-  createdBy   String?  @map("created_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  isSystem  Boolean  @default(false) @map("is_system") // Built-in groups
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  broadcasts  BroadcastMessage[]
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  broadcasts BroadcastMessage[]
 
   @@unique([tenantId, name])
   @@index([tenantId, recipientType])
@@ -3062,41 +3203,464 @@ enum FormSubmissionStatus {
 // PUBLIC FORM SUBMISSIONS
 // ============================================
 model ContactSubmission {
-  id        String           @id @default(uuid())
-  name      String           @db.VarChar(100)
-  email     String           @db.VarChar(255)
-  phone     String?          @db.VarChar(20)
-  subject   String           @db.VarChar(200)
-  message   String           @db.Text
+  id        String               @id @default(uuid())
+  name      String               @db.VarChar(100)
+  email     String               @db.VarChar(255)
+  phone     String?              @db.VarChar(20)
+  subject   String               @db.VarChar(200)
+  message   String               @db.Text
   status    FormSubmissionStatus @default(PENDING)
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
 
-  @@map("contact_submissions")
   @@index([email])
   @@index([createdAt])
   @@index([status])
+  @@map("contact_submissions")
 }
 
 model DemoRequest {
-  id                 String           @id @default(uuid())
-  fullName           String           @map("full_name") @db.VarChar(100)
-  email              String           @db.VarChar(255)
-  phone              String           @db.VarChar(20)
-  crecheName         String           @map("creche_name") @db.VarChar(200)
-  childrenCount      Int              @map("children_count")
-  province           String           @db.VarChar(50)
-  currentSoftware    String?          @map("current_software") @db.VarChar(200)
-  challenges         String[]
-  preferredTime      String?          @map("preferred_time") @db.VarChar(20)
-  marketingConsent   Boolean          @default(false) @map("marketing_consent")
-  status             FormSubmissionStatus @default(PENDING)
-  createdAt          DateTime         @default(now()) @map("created_at")
-  updatedAt          DateTime         @updatedAt @map("updated_at")
+  id               String               @id @default(uuid())
+  fullName         String               @map("full_name") @db.VarChar(100)
+  email            String               @db.VarChar(255)
+  phone            String               @db.VarChar(20)
+  crecheName       String               @map("creche_name") @db.VarChar(200)
+  childrenCount    Int                  @map("children_count")
+  province         String               @db.VarChar(50)
+  currentSoftware  String?              @map("current_software") @db.VarChar(200)
+  challenges       String[]
+  preferredTime    String?              @map("preferred_time") @db.VarChar(20)
+  marketingConsent Boolean              @default(false) @map("marketing_consent")
+  status           FormSubmissionStatus @default(PENDING)
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
 
-  @@map("demo_requests")
   @@index([email])
   @@index([createdAt])
   @@index([status])
   @@index([province])
+  @@map("demo_requests")
+}
+
+// ============================================
+// TASK-ACCT-001: Chart of Accounts
+// ============================================
+model ChartOfAccount {
+  id          String          @id @default(uuid())
+  tenantId    String          @map("tenant_id")
+  code        String          @db.VarChar(20)
+  name        String          @db.VarChar(200)
+  type        AccountType
+  subType     AccountSubType?
+  description String?         @db.Text
+  parentId    String?         @map("parent_id")
+
+  // SA Tax Compliance - VAT Section 12(h) education services
+  isEducationExempt Boolean @default(false) @map("is_education_exempt")
+
+  // System flags
+  isSystem Boolean @default(false) @map("is_system")
+  isActive Boolean @default(true) @map("is_active")
+
+  // Xero integration
+  xeroAccountId String? @map("xero_account_id") @db.VarChar(50)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   ChartOfAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children ChartOfAccount[] @relation("AccountHierarchy")
+
+  openingBalances   OpeningBalance[]
+  supplierDefaults  Supplier[]         @relation("SupplierDefaultAccount")
+  supplierBillLines SupplierBillLine[]
+  quoteLines        QuoteLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, type])
+  @@index([tenantId, isActive])
+  @@map("chart_of_accounts")
+}
+
+// ============================================
+// TASK-ACCT-003: Opening Balances
+// ============================================
+model OpeningBalance {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  accountId    String    @map("account_id")
+  importId     String?   @map("import_id")
+  asOfDate     DateTime  @map("as_of_date") @db.Date
+  debitCents   Int?      @map("debit_cents")
+  creditCents  Int?      @map("credit_cents")
+  notes        String?   @db.Text
+  isVerified   Boolean   @default(false) @map("is_verified")
+  verifiedById String?   @map("verified_by_id")
+  verifiedAt   DateTime? @map("verified_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account    ChartOfAccount        @relation(fields: [accountId], references: [id])
+  import     OpeningBalanceImport? @relation(fields: [importId], references: [id])
+  verifiedBy User?                 @relation(fields: [verifiedById], references: [id])
+
+  @@unique([tenantId, accountId, asOfDate])
+  @@index([tenantId, asOfDate])
+  @@map("opening_balances")
+}
+
+model OpeningBalanceImport {
+  id            String                     @id @default(uuid())
+  tenantId      String                     @map("tenant_id")
+  asOfDate      DateTime                   @map("as_of_date") @db.Date
+  status        OpeningBalanceImportStatus @default(DRAFT)
+  sourceType    String?                    @map("source_type") @db.VarChar(50)
+  totalDebits   Int                        @default(0) @map("total_debits")
+  totalCredits  Int                        @default(0) @map("total_credits")
+  discrepancy   Int                        @default(0)
+  errorMessage  String?                    @map("error_message") @db.Text
+  processedAt   DateTime?                  @map("processed_at")
+  processedById String?                    @map("processed_by_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  processedBy     User?            @relation(fields: [processedById], references: [id])
+  openingBalances OpeningBalance[]
+
+  @@index([tenantId, status])
+  @@map("opening_balance_imports")
+}
+
+// ============================================
+// TASK-ACCT-012: Quotes System
+// ============================================
+model Quote {
+  id          String @id @default(uuid())
+  tenantId    String @map("tenant_id")
+  quoteNumber String @map("quote_number") @db.VarChar(20)
+
+  // Recipient (may not be a Parent yet)
+  parentId       String? @map("parent_id")
+  recipientName  String  @map("recipient_name") @db.VarChar(200)
+  recipientEmail String  @map("recipient_email") @db.VarChar(255)
+  recipientPhone String? @map("recipient_phone") @db.VarChar(20)
+
+  // Child info (for enrollment quotes)
+  childName         String?   @map("child_name") @db.VarChar(100)
+  childDob          DateTime? @map("child_dob") @db.Date
+  expectedStartDate DateTime? @map("expected_start_date") @db.Date
+
+  // Dates
+  quoteDate    DateTime @default(now()) @map("quote_date")
+  expiryDate   DateTime @map("expiry_date")
+  validityDays Int      @default(30) @map("validity_days")
+
+  // Amounts
+  subtotalCents  Int @map("subtotal_cents")
+  vatAmountCents Int @default(0) @map("vat_amount_cents")
+  totalCents     Int @map("total_cents")
+
+  // Status
+  status        QuoteStatus @default(DRAFT)
+  sentAt        DateTime?   @map("sent_at")
+  viewedAt      DateTime?   @map("viewed_at")
+  acceptedAt    DateTime?   @map("accepted_at")
+  declinedAt    DateTime?   @map("declined_at")
+  declineReason String?     @map("decline_reason") @db.Text
+
+  // Conversion
+  convertedToInvoiceId String?   @map("converted_to_invoice_id")
+  convertedAt          DateTime? @map("converted_at")
+
+  // Content
+  notes String? @db.Text
+
+  // Audit
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant           Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent           Parent?     @relation(fields: [parentId], references: [id])
+  convertedInvoice Invoice?    @relation(fields: [convertedToInvoiceId], references: [id])
+  createdBy        User        @relation(fields: [createdById], references: [id])
+  lines            QuoteLine[]
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, status])
+  @@index([recipientEmail])
+  @@map("quotes")
+}
+
+model QuoteLine {
+  id             String  @id @default(uuid())
+  quoteId        String  @map("quote_id")
+  lineNumber     Int     @map("line_number")
+  description    String  @db.VarChar(500)
+  quantity       Int     @default(1)
+  unitPriceCents Int     @map("unit_price_cents")
+  lineTotalCents Int     @map("line_total_cents")
+  vatType        VatType @default(EXEMPT) @map("vat_type")
+
+  // Link to fee structure (optional)
+  feeStructureId String?   @map("fee_structure_id")
+  lineType       LineType? @map("line_type")
+
+  // Account coding
+  accountId String? @map("account_id")
+
+  quote        Quote           @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  feeStructure FeeStructure?   @relation(fields: [feeStructureId], references: [id])
+  account      ChartOfAccount? @relation(fields: [accountId], references: [id])
+
+  @@index([quoteId])
+  @@map("quote_lines")
+}
+
+model QuoteNumberCounter {
+  id         String @id @default(uuid())
+  tenantId   String @map("tenant_id")
+  year       Int
+  lastNumber Int    @default(0) @map("last_number")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, year])
+  @@map("quote_number_counters")
+}
+
+// ============================================
+// TASK-ACCT-013: Supplier Management
+// ============================================
+model Supplier {
+  id                 String  @id @default(uuid())
+  tenantId           String  @map("tenant_id")
+  name               String  @db.VarChar(200)
+  tradingName        String? @map("trading_name") @db.VarChar(200)
+  email              String? @db.VarChar(255)
+  phone              String? @db.VarChar(20)
+  address            String? @db.Text
+  vatNumber          String? @map("vat_number") @db.VarChar(20)
+  registrationNumber String? @map("registration_number") @db.VarChar(50)
+  paymentTermsDays   Int     @default(30) @map("payment_terms_days")
+
+  // Bank details for EFT payments
+  bankName      String? @map("bank_name") @db.VarChar(100)
+  branchCode    String? @map("branch_code") @db.VarChar(20)
+  accountNumber String? @map("account_number") @db.VarChar(50)
+  accountType   String? @map("account_type") @db.VarChar(30)
+
+  // Default expense account for categorization
+  defaultAccountId String? @map("default_account_id")
+
+  // Status
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultAccount ChartOfAccount? @relation("SupplierDefaultAccount", fields: [defaultAccountId], references: [id])
+  bills          SupplierBill[]
+  transactions   Transaction[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("suppliers")
+}
+
+model SupplierBill {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  supplierId String   @map("supplier_id")
+  billNumber String   @map("bill_number") @db.VarChar(50)
+  billDate   DateTime @map("bill_date") @db.Date
+  dueDate    DateTime @map("due_date") @db.Date
+
+  // Amounts
+  subtotalCents   Int @map("subtotal_cents")
+  vatAmountCents  Int @default(0) @map("vat_amount_cents")
+  totalCents      Int @map("total_cents")
+  paidCents       Int @default(0) @map("paid_cents")
+  balanceDueCents Int @map("balance_due_cents")
+
+  // Status
+  status   BillStatus @default(DRAFT)
+  paidDate DateTime?  @map("paid_date") @db.Date
+
+  // Reference
+  purchaseOrderRef String? @map("purchase_order_ref") @db.VarChar(50)
+  notes            String? @db.Text
+
+  // Attachments
+  attachmentUrl String? @map("attachment_url") @db.VarChar(500)
+
+  // Audit
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier  Supplier              @relation(fields: [supplierId], references: [id])
+  createdBy User                  @relation(fields: [createdById], references: [id])
+  lines     SupplierBillLine[]
+  payments  SupplierBillPayment[]
+
+  @@unique([tenantId, supplierId, billNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@index([supplierId])
+  @@map("supplier_bills")
+}
+
+model SupplierBillLine {
+  id             String  @id @default(uuid())
+  billId         String  @map("bill_id")
+  lineNumber     Int     @map("line_number")
+  description    String  @db.VarChar(500)
+  quantity       Decimal @default(1) @db.Decimal(10, 2)
+  unitPriceCents Int     @map("unit_price_cents")
+  lineTotalCents Int     @map("line_total_cents")
+  vatType        VatType @default(STANDARD) @map("vat_type")
+
+  // Account coding
+  accountId String? @map("account_id")
+
+  bill    SupplierBill    @relation(fields: [billId], references: [id], onDelete: Cascade)
+  account ChartOfAccount? @relation(fields: [accountId], references: [id])
+
+  @@index([billId])
+  @@map("supplier_bill_lines")
+}
+
+model SupplierBillPayment {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  billId        String   @map("bill_id")
+  transactionId String?  @map("transaction_id")
+  amountCents   Int      @map("amount_cents")
+  paymentDate   DateTime @map("payment_date") @db.Date
+  paymentMethod String   @map("payment_method") @db.VarChar(30)
+  reference     String?  @db.VarChar(100)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bill        SupplierBill @relation(fields: [billId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([billId])
+  @@index([transactionId])
+  @@map("supplier_bill_payments")
+}
+
+// ============================================
+// TASK-ACCT-011: Payment Gateway (Yoco)
+// ============================================
+model PaymentLink {
+  id          String            @id @default(uuid())
+  tenantId    String            @map("tenant_id")
+  parentId    String            @map("parent_id")
+  invoiceId   String?           @map("invoice_id")
+  type        PaymentLinkType   @default(INVOICE)
+  amountCents Int               @map("amount_cents")
+  shortCode   String            @unique @map("short_code") @db.VarChar(20)
+  description String?           @db.VarChar(200)
+  status      PaymentLinkStatus @default(ACTIVE)
+  expiresAt   DateTime?         @map("expires_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant              Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent              Parent                      @relation(fields: [parentId], references: [id])
+  invoice             Invoice?                    @relation(fields: [invoiceId], references: [id])
+  gatewayTransactions PaymentGatewayTransaction[]
+
+  @@index([tenantId, status])
+  @@index([shortCode])
+  @@map("payment_links")
+}
+
+model PaymentGatewayTransaction {
+  id            String  @id @default(uuid())
+  tenantId      String  @map("tenant_id")
+  paymentLinkId String? @map("payment_link_id")
+  parentId      String  @map("parent_id")
+  invoiceId     String? @map("invoice_id")
+
+  // Gateway details
+  gateway           String               @db.VarChar(30)
+  gatewayId         String               @map("gateway_id") @db.VarChar(100)
+  gatewayCheckoutId String?              @map("gateway_checkout_id") @db.VarChar(100)
+  status            PaymentGatewayStatus @default(PENDING)
+
+  // Amounts
+  amountCents    Int  @map("amount_cents")
+  feeCents       Int? @map("fee_cents")
+  netAmountCents Int? @map("net_amount_cents")
+
+  // Card details (masked)
+  cardBrand       String? @map("card_brand") @db.VarChar(20)
+  cardLastFour    String? @map("card_last_four") @db.VarChar(4)
+  cardExpiryMonth Int?    @map("card_expiry_month")
+  cardExpiryYear  Int?    @map("card_expiry_year")
+
+  // Payment record
+  paymentId String? @map("payment_id")
+
+  // Metadata
+  metadata     Json?
+  errorMessage String? @map("error_message") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  paymentLink PaymentLink? @relation(fields: [paymentLinkId], references: [id])
+  parent      Parent       @relation(fields: [parentId], references: [id])
+  invoice     Invoice?     @relation(fields: [invoiceId], references: [id])
+  payment     Payment?     @relation(fields: [paymentId], references: [id])
+
+  @@unique([gateway, gatewayId])
+  @@index([tenantId, status])
+  @@index([paymentLinkId])
+  @@map("payment_gateway_transactions")
+}
+
+// ============================================
+// TASK-ACCT-014: Tenant Onboarding Wizard
+// ============================================
+model OnboardingProgress {
+  id       String @id @default(uuid())
+  tenantId String @unique @map("tenant_id")
+
+  // Step completion tracking
+  logoUploaded        Boolean @default(false) @map("logo_uploaded")
+  addressSet          Boolean @default(false) @map("address_set")
+  bankDetailsSet      Boolean @default(false) @map("bank_details_set")
+  vatConfigured       Boolean @default(false) @map("vat_configured")
+  feeStructureCreated Boolean @default(false) @map("fee_structure_created")
+  childEnrolled       Boolean @default(false) @map("child_enrolled")
+  firstInvoiceSent    Boolean @default(false) @map("first_invoice_sent")
+  bankConnected       Boolean @default(false) @map("bank_connected")
+
+  // Skipped steps
+  skippedSteps String[] @default([]) @map("skipped_steps")
+
+  // Completion
+  completedAt    DateTime? @map("completed_at")
+  lastActiveStep String?   @map("last_active_step") @db.VarChar(50)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("onboarding_progress")
 }

@@ -4,7 +4,13 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsEnum, IsOptional, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { UserRole } from '@prisma/client';
 
 // Available roles for impersonation (excludes SUPER_ADMIN)
@@ -65,7 +71,9 @@ export class StartImpersonationDto {
   })
   role: ImpersonationRole;
 
-  @ApiPropertyOptional({ description: 'Reason for impersonation (audit purposes)' })
+  @ApiPropertyOptional({
+    description: 'Reason for impersonation (audit purposes)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(500)

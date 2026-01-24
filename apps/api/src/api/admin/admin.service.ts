@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma';
-import { SubscriptionStatus, SubscriptionPlan, UserRole, AuditAction } from '@prisma/client';
+import {
+  SubscriptionStatus,
+  SubscriptionPlan,
+  UserRole,
+  AuditAction,
+} from '@prisma/client';
 import {
   ContactSubmissionsResponseDto,
   DemoRequestsResponseDto,

@@ -150,9 +150,11 @@ export function ContactSubmissionsList() {
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {formatDistanceToNow(new Date(submission.created_at), {
-                          addSuffix: true,
-                        })}
+                        {submission.created_at
+                          ? formatDistanceToNow(new Date(submission.created_at), {
+                              addSuffix: true,
+                            })
+                          : 'N/A'}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

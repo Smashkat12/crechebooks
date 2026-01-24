@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SubscriptionStatus } from '@prisma/client';
+import { SubscriptionStatus, SubscriptionPlan } from '@prisma/client';
 import {
   IsString,
   IsEmail,
@@ -70,7 +70,12 @@ export class CreateTenantDto {
   @ApiPropertyOptional({ enum: SubscriptionStatus, default: 'TRIAL' })
   @IsOptional()
   @IsEnum(SubscriptionStatus)
-  subscriptionPlan?: SubscriptionStatus;
+  subscriptionStatus?: SubscriptionStatus;
+
+  @ApiPropertyOptional({ enum: SubscriptionPlan, default: 'FREE' })
+  @IsOptional()
+  @IsEnum(SubscriptionPlan)
+  subscriptionPlan?: SubscriptionPlan;
 }
 
 export class UpdateTenantDto {
@@ -93,6 +98,11 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsEnum(SubscriptionStatus)
   subscriptionStatus?: SubscriptionStatus;
+
+  @ApiPropertyOptional({ enum: SubscriptionPlan })
+  @IsOptional()
+  @IsEnum(SubscriptionPlan)
+  subscriptionPlan?: SubscriptionPlan;
 }
 
 export class SuspendTenantDto {
@@ -121,6 +131,9 @@ export class TenantSummaryDto {
 
   @ApiProperty({ enum: SubscriptionStatus })
   subscriptionStatus: SubscriptionStatus;
+
+  @ApiProperty({ enum: SubscriptionPlan })
+  subscriptionPlan: SubscriptionPlan;
 
   @ApiPropertyOptional()
   trialExpiresAt?: Date;

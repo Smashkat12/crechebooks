@@ -24,6 +24,13 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum SubscriptionPlan {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
 enum UserRole {
   SUPER_ADMIN // CrecheBooks platform administrator (no tenant)
   OWNER       // Creche/tenant owner
@@ -377,6 +384,7 @@ model Tenant {
   email                   String             @unique @db.VarChar(255)
   xeroTenantId            String?            @unique @map("xero_tenant_id") @db.VarChar(50)
   subscriptionStatus      SubscriptionStatus @default(TRIAL) @map("subscription_status")
+  subscriptionPlan        SubscriptionPlan   @default(FREE) @map("subscription_plan")
   trialExpiresAt          DateTime?          @map("trial_expires_at")
   invoiceDayOfMonth       Int                @default(1) @map("invoice_day_of_month")
   invoiceDueDays          Int                @default(7) @map("invoice_due_days")

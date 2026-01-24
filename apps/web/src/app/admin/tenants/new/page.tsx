@@ -29,7 +29,7 @@ export default function CreateTenantPage() {
     phone: '',
     ownerName: '',
     ownerEmail: '',
-    subscriptionPlan: 'FREE',
+    subscriptionPlan: 'TRIAL',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,19 +104,17 @@ export default function CreateTenantPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="plan">Subscription Plan</Label>
+                <Label htmlFor="plan">Subscription Status</Label>
                 <Select
                   value={formData.subscriptionPlan}
                   onValueChange={(value) => setFormData({ ...formData, subscriptionPlan: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select plan" />
+                    <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FREE">Free</SelectItem>
-                    <SelectItem value="STARTER">Starter</SelectItem>
-                    <SelectItem value="PROFESSIONAL">Professional</SelectItem>
-                    <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
+                    <SelectItem value="TRIAL">Trial (14 days)</SelectItem>
+                    <SelectItem value="ACTIVE">Active</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

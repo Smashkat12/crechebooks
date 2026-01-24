@@ -39,12 +39,12 @@ RUN npm install --legacy-peer-deps
 
 # Copy prisma schema and generate client
 # ARG forces cache invalidation when changed
-ARG CACHEBUST=2026-01-24T21:35:00Z
+ARG CACHEBUST=2026-01-24T22:40:00Z
 COPY apps/api/prisma ./prisma
 RUN npx prisma generate
 
 # Copy source code (cache bust ensures new files are included)
-ARG SRCBUST=v2.0.2-run-demo-tenant-migration
+ARG SRCBUST=v2.0.3-fix-failed-migration
 COPY apps/api/src ./src
 COPY apps/api/scripts ./scripts
 COPY apps/api/tsconfig.json apps/api/tsconfig.build.json ./

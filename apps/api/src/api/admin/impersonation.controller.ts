@@ -54,16 +54,25 @@ export class ImpersonationController {
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'List tenants available for impersonation',
-    description: 'Returns all tenants with available roles that can be assumed.',
+    description:
+      'Returns all tenants with available roles that can be assumed.',
   })
-  @ApiQuery({ name: 'search', required: false, description: 'Search by name or email' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by name or email',
+  })
   @ApiResponse({
     status: 200,
     description: 'Tenants retrieved successfully',
     type: TenantsForImpersonationResponseDto,
   })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized - valid JWT token required' })
-  @ApiForbiddenResponse({ description: 'Forbidden - SUPER_ADMIN role required' })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - SUPER_ADMIN role required',
+  })
   async getTenants(
     @Query('search') search?: string,
   ): Promise<TenantsForImpersonationResponseDto> {
@@ -84,25 +93,32 @@ export class ImpersonationController {
     description: 'Impersonation session started',
     type: ImpersonationResponseDto,
   })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized - valid JWT token required' })
-  @ApiForbiddenResponse({ description: 'Forbidden - SUPER_ADMIN role required' })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - SUPER_ADMIN role required',
+  })
   async startImpersonation(
     @CurrentUser() user: IUser,
     @Body() dto: StartImpersonationDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<ImpersonationResponseDto> {
-    this.logger.debug(`Starting impersonation for admin ${user.id} -> tenant ${dto.tenantId}`);
+    this.logger.debug(
+      `Starting impersonation for admin ${user.id} -> tenant ${dto.tenantId}`,
+    );
 
     const ipAddress = this.getClientIp(req);
     const userAgent = req.headers['user-agent'];
 
-    const { response, accessToken } = await this.impersonationService.startImpersonation(
-      user.id,
-      dto,
-      ipAddress,
-      userAgent,
-    );
+    const { response, accessToken } =
+      await this.impersonationService.startImpersonation(
+        user.id,
+        dto,
+        ipAddress,
+        userAgent,
+      );
 
     // Store original admin token before setting impersonation token
     const originalToken = req.cookies?.[ACCESS_TOKEN_COOKIE];
@@ -140,8 +156,12 @@ export class ImpersonationController {
     description: 'Impersonation session ended',
     type: EndImpersonationResponseDto,
   })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized - valid JWT token required' })
-  @ApiForbiddenResponse({ description: 'Forbidden - SUPER_ADMIN role required' })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - SUPER_ADMIN role required',
+  })
   async endImpersonation(
     @CurrentUser() user: IUser,
     @Req() req: Request,
@@ -193,12 +213,18 @@ export class ImpersonationController {
     description: 'Current session retrieved',
     type: CurrentImpersonationResponseDto,
   })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized - valid JWT token required' })
-  @ApiForbiddenResponse({ description: 'Forbidden - SUPER_ADMIN role required' })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - SUPER_ADMIN role required',
+  })
   async getCurrentSession(
     @CurrentUser() user: IUser,
   ): Promise<CurrentImpersonationResponseDto> {
-    this.logger.debug(`Getting current impersonation session for admin ${user.id}`);
+    this.logger.debug(
+      `Getting current impersonation session for admin ${user.id}`,
+    );
     return this.impersonationService.getCurrentSession(user.id);
   }
 
@@ -206,15 +232,20 @@ export class ImpersonationController {
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get impersonation session history',
-    description: 'Returns a paginated list of past impersonation sessions for audit purposes.',
+    description:
+      'Returns a paginated list of past impersonation sessions for audit purposes.',
   })
   @ApiResponse({
     status: 200,
     description: 'Session history retrieved',
     type: ImpersonationSessionHistoryDto,
   })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized - valid JWT token required' })
-  @ApiForbiddenResponse({ description: 'Forbidden - SUPER_ADMIN role required' })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - SUPER_ADMIN role required',
+  })
   async getSessionHistory(
     @Query() query: ListImpersonationSessionsQueryDto,
   ): Promise<ImpersonationSessionHistoryDto> {

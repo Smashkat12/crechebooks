@@ -60,8 +60,12 @@ export class ImpersonationService {
     private readonly configService: ConfigService,
   ) {
     // Use shorter expiration for impersonation tokens (max 4 hours)
-    const configExpiration = this.configService.get<number>('JWT_EXPIRATION') || 28800;
-    this.jwtExpiration = Math.min(configExpiration, MAX_SESSION_DURATION_MS / 1000);
+    const configExpiration =
+      this.configService.get<number>('JWT_EXPIRATION') || 28800;
+    this.jwtExpiration = Math.min(
+      configExpiration,
+      MAX_SESSION_DURATION_MS / 1000,
+    );
   }
 
   /**
@@ -294,9 +298,7 @@ export class ImpersonationService {
       AuditAction.IMPERSONATION_END,
       {
         sessionId: session.id,
-        duration: Math.floor(
-          (Date.now() - session.startedAt.getTime()) / 1000,
-        ),
+        duration: Math.floor((Date.now() - session.startedAt.getTime()) / 1000),
       },
       ipAddress,
       userAgent,
@@ -371,7 +373,9 @@ export class ImpersonationService {
   /**
    * Get impersonation session by ID
    */
-  async getSessionById(sessionId: string): Promise<ImpersonationSessionDto | null> {
+  async getSessionById(
+    sessionId: string,
+  ): Promise<ImpersonationSessionDto | null> {
     const session = await this.prisma.impersonationSession.findUnique({
       where: { id: sessionId },
       include: {
@@ -409,17 +413,23 @@ export class ImpersonationService {
     });
 
     if (!session) {
-      this.logger.warn(`Impersonation session not found: ${impersonation.sessionId}`);
+      this.logger.warn(
+        `Impersonation session not found: ${impersonation.sessionId}`,
+      );
       return null;
     }
 
     if (!session.isActive) {
-      this.logger.warn(`Impersonation session no longer active: ${impersonation.sessionId}`);
+      this.logger.warn(
+        `Impersonation session no longer active: ${impersonation.sessionId}`,
+      );
       return null;
     }
 
     if (session.expiresAt < new Date()) {
-      this.logger.warn(`Impersonation session expired: ${impersonation.sessionId}`);
+      this.logger.warn(
+        `Impersonation session expired: ${impersonation.sessionId}`,
+      );
       // Auto-deactivate expired session
       await this.prisma.impersonationSession.update({
         where: { id: session.id },
@@ -492,7 +502,12 @@ export class ImpersonationService {
     userId: string,
     tenantId: string,
     action: AuditAction,
-    afterValue: { sessionId: string; assumedRole?: string; reason?: string; duration?: number },
+    afterValue: {
+      sessionId: string;
+      assumedRole?: string;
+      reason?: string;
+      duration?: number;
+    },
     ipAddress?: string,
     userAgent?: string,
   ): Promise<void> {

@@ -14,6 +14,7 @@ import { XeroModule } from '../integrations/xero/xero.module';
 import { XeroPayrollModule } from './xero/xero-payroll.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { CommunicationsApiModule } from './communications/communications-api.module';
+import { AccountingModule } from './accounting/accounting.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { CommunicationsApiModule } from './communications/communications-api.mod
     XeroPayrollModule,
     IntegrationsModule,
     CommunicationsApiModule,
+    AccountingModule, // TASK-ACCT: Accounting Parity Features
   ],
   exports: [
     AuthModule,
@@ -49,6 +51,7 @@ import { CommunicationsApiModule } from './communications/communications-api.mod
     XeroPayrollModule,
     IntegrationsModule,
     CommunicationsApiModule,
+    AccountingModule,
   ],
 })
 export class ApiModule {}

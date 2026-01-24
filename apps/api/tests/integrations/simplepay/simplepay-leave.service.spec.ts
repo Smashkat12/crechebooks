@@ -131,8 +131,8 @@ describe('SimplePayLeaveService', () => {
     await prisma.xeroAccount.deleteMany({});
     await prisma.tenant.deleteMany({});
 
-    // Clear leave type cache
-    service.clearCache();
+    // Note: Cache is cleared per-tenant when tenant is created
+    // No need to clear cache here before tenant exists
 
     // Create test tenant
     tenant = await prisma.tenant.create({
@@ -1022,7 +1022,7 @@ describe('SimplePayLeaveService', () => {
       await service.getLeaveTypes(tenant.id);
       expect(mockGet).toHaveBeenCalledTimes(1);
 
-      service.clearCache();
+      service.clearCache(tenant.id);
 
       await service.getLeaveTypes(tenant.id);
       expect(mockGet).toHaveBeenCalledTimes(2);

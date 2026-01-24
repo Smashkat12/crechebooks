@@ -145,8 +145,8 @@ describe('SimplePayPayRunService', () => {
   });
 
   beforeEach(async () => {
-    // Clear cache
-    service.clearWaveCache();
+    // Note: Wave cache is cleared per-tenant when tenant is created
+    // Cache will be cleared after tenant creation if needed
 
     // Reset mocks
     jest.clearAllMocks();
@@ -715,7 +715,7 @@ describe('SimplePayPayRunService', () => {
       );
 
       await service.getWaves(tenant.id);
-      service.clearWaveCache();
+      service.clearWaveCache(tenant.id);
 
       await service.getWaves(tenant.id);
 

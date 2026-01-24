@@ -236,7 +236,7 @@ describe('XeroController - Chart of Accounts', () => {
         isValid: true,
         account: {
           id: 'acc-1',
-          tenantId: mockUser.tenantId,
+          tenantId: mockUser.tenantId!,
           accountCode: '200',
           name: 'Sales Revenue',
           type: 'REVENUE',
@@ -278,7 +278,7 @@ describe('XeroController - Chart of Accounts', () => {
         isValid: false,
         account: {
           id: 'acc-1',
-          tenantId: mockUser.tenantId,
+          tenantId: mockUser.tenantId!,
           accountCode: '200',
           name: 'Sales Revenue',
           type: 'REVENUE',

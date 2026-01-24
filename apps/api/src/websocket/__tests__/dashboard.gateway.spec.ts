@@ -156,7 +156,7 @@ describe('DashboardGateway', () => {
     it('should join tenant room based on user tenantId', () => {
       gateway.handleJoin(mockSocket as AuthenticatedSocket, {});
 
-      const expectedRoom = getTenantRoom(mockUser.tenantId);
+      const expectedRoom = getTenantRoom(mockUser.tenantId!);
       expect(mockSocket.join).toHaveBeenCalledWith(expectedRoom);
     });
 
@@ -170,7 +170,7 @@ describe('DashboardGateway', () => {
           tenantId: mockUser.tenantId,
           data: expect.objectContaining({
             clientId: mockSocket.id,
-            room: getTenantRoom(mockUser.tenantId),
+            room: getTenantRoom(mockUser.tenantId!),
           }),
         }),
       );
@@ -192,7 +192,7 @@ describe('DashboardGateway', () => {
     it('should leave tenant room', () => {
       gateway.handleLeave(mockSocket as AuthenticatedSocket);
 
-      const expectedRoom = getTenantRoom(mockUser.tenantId);
+      const expectedRoom = getTenantRoom(mockUser.tenantId!);
       expect(mockSocket.leave).toHaveBeenCalledWith(expectedRoom);
     });
   });

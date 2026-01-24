@@ -28,7 +28,7 @@ export const authConfig: NextAuthConfig = {
           email: credentials.email as string,
           name: (credentials.name as string) || '',
           role: (credentials.role as string) || 'STAFF',
-          tenantId: (credentials.tenantId as string) || null,
+          tenantId: (credentials.tenantId as string) || '',
           accessToken: (credentials.accessToken as string) || '',
         };
       },
@@ -72,7 +72,7 @@ export const authConfig: NextAuthConfig = {
               email: data.user.email,
               name: data.user.name,
               role: data.user.role,
-              tenantId: data.user.tenant_id,
+              tenantId: data.user.tenant_id || '',
               accessToken: data.access_token,
             };
           } catch (error) {

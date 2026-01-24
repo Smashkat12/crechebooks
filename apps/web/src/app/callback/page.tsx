@@ -62,8 +62,9 @@ function CallbackContent() {
           throw new Error(result.error);
         }
 
-        // Redirect to dashboard on success
-        router.push('/dashboard');
+        // Redirect based on role - SUPER_ADMIN goes to admin portal, others to dashboard
+        const redirectPath = data.user.role === 'SUPER_ADMIN' ? '/admin' : '/dashboard';
+        router.push(redirectPath);
         router.refresh();
       } catch (err) {
         console.error('Callback error:', err);

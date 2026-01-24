@@ -29,9 +29,16 @@ export function UserNav() {
     .toUpperCase()
     .slice(0, 2) || user.email.slice(0, 2).toUpperCase();
 
-  const handleLogout = () => {
-    // Redirect to signout page which handles both NextAuth and Auth0 logout
-    router.push('/signout');
+  const handleLogout = async () => {
+    // Clear NextAuth session first
+    await logout();
+
+    // Then redirect to Auth0 logout to clear Auth0 session
+    const auth0Domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN;
+    const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID;
+    const returnTo = encodeURIComponent(window.location.origin + '/login');
+
+    window.location.href = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
   };
 
   return (

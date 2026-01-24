@@ -70,14 +70,18 @@ ADD COLUMN     "is_fee_adjusted_match" BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE "broadcast_messages" ALTER COLUMN "id" DROP DEFAULT;
 
 -- AlterTable
+-- First update any NULL subject values before making NOT NULL
+UPDATE "contact_submissions" SET "subject" = 'No Subject' WHERE "subject" IS NULL;
 ALTER TABLE "contact_submissions" ALTER COLUMN "name" SET DATA TYPE VARCHAR(100),
 ALTER COLUMN "subject" SET NOT NULL,
 ALTER COLUMN "subject" SET DATA TYPE VARCHAR(200);
 
 -- AlterTable
+-- First update any NULL children_count values to 0 before dropping
+UPDATE "demo_requests" SET "children_count" = '0' WHERE "children_count" IS NULL;
 ALTER TABLE "demo_requests" ALTER COLUMN "full_name" SET DATA TYPE VARCHAR(100),
 DROP COLUMN "children_count",
-ADD COLUMN     "children_count" INTEGER NOT NULL,
+ADD COLUMN     "children_count" INTEGER NOT NULL DEFAULT 0,
 ALTER COLUMN "current_software" SET DATA TYPE VARCHAR(200),
 ALTER COLUMN "preferred_time" SET DATA TYPE VARCHAR(20);
 
@@ -102,7 +106,7 @@ ALTER TABLE "recipient_groups" ALTER COLUMN "id" DROP DEFAULT;
 
 -- AlterTable
 ALTER TABLE "xero_invoice_mappings" DROP COLUMN "sync_direction",
-ADD COLUMN     "sync_direction" "InvoiceSyncDirection" NOT NULL,
+ADD COLUMN     "sync_direction" "InvoiceSyncDirection" NOT NULL DEFAULT 'PUSH',
 DROP COLUMN "sync_status",
 ADD COLUMN     "sync_status" "InvoiceSyncStatus" NOT NULL DEFAULT 'SYNCED';
 

@@ -1147,6 +1147,166 @@ graph TD
 
 ---
 
-**Last Updated**: 2026-01-21
+---
+
+## Admin Portal Traceability Matrix (Phase 24)
+
+Analysis Date: 2026-01-24
+Based on comprehensive SUPER_ADMIN portal requirements for multi-tenant SaaS administration.
+
+### Admin Portal API Mapping
+
+| Endpoint | HTTP Method | Purpose | Task ID | Status |
+|----------|-------------|---------|---------|--------|
+| GET /api/v1/admin/tenants | GET | List tenants with filters | TASK-ADMIN-002 | ⭕ Ready |
+| POST /api/v1/admin/tenants | POST | Create new tenant with owner | TASK-ADMIN-002 | ⭕ Ready |
+| GET /api/v1/admin/tenants/stats | GET | Tenant statistics | TASK-ADMIN-002 | ⭕ Ready |
+| GET /api/v1/admin/tenants/:id | GET | Get tenant details | TASK-ADMIN-002 | ⭕ Ready |
+| PATCH /api/v1/admin/tenants/:id | PATCH | Update tenant | TASK-ADMIN-002 | ⭕ Ready |
+| POST /api/v1/admin/tenants/:id/suspend | POST | Suspend tenant | TASK-ADMIN-002 | ⭕ Ready |
+| POST /api/v1/admin/tenants/:id/activate | POST | Activate tenant | TASK-ADMIN-002 | ⭕ Ready |
+| GET /api/v1/admin/users | GET | List users with filters | TASK-ADMIN-004 | ⭕ Ready |
+| GET /api/v1/admin/users/stats | GET | User statistics | TASK-ADMIN-004 | ⭕ Ready |
+| GET /api/v1/admin/users/:id | GET | Get user details | TASK-ADMIN-004 | ⭕ Ready |
+| GET /api/v1/admin/users/:id/activity | GET | Get user activity log | TASK-ADMIN-004 | ⭕ Ready |
+| PATCH /api/v1/admin/users/:id | PATCH | Update user role | TASK-ADMIN-004 | ⭕ Ready |
+| POST /api/v1/admin/users/:id/deactivate | POST | Deactivate user | TASK-ADMIN-004 | ⭕ Ready |
+| POST /api/v1/admin/users/:id/activate | POST | Activate user | TASK-ADMIN-004 | ⭕ Ready |
+| POST /api/v1/admin/users/:id/impersonate | POST | Impersonate user | TASK-ADMIN-004 | ⭕ Ready |
+| GET /api/v1/admin/analytics/metrics | GET | Platform metrics | TASK-ADMIN-006 | ⭕ Ready |
+| GET /api/v1/admin/analytics/tenant-growth | GET | Tenant growth over time | TASK-ADMIN-006 | ⭕ Ready |
+| GET /api/v1/admin/analytics/user-growth | GET | User growth over time | TASK-ADMIN-006 | ⭕ Ready |
+| GET /api/v1/admin/analytics/subscriptions | GET | Subscription breakdown | TASK-ADMIN-006 | ⭕ Ready |
+| GET /api/v1/admin/analytics/top-tenants | GET | Top tenants by children | TASK-ADMIN-006 | ⭕ Ready |
+| GET /api/v1/admin/analytics/activity | GET | Recent activity feed | TASK-ADMIN-006 | ⭕ Ready |
+| GET /api/v1/admin/audit-logs | GET | List audit logs | TASK-ADMIN-007 | ⭕ Ready |
+| GET /api/v1/admin/audit-logs/stats | GET | Audit log statistics | TASK-ADMIN-007 | ⭕ Ready |
+| GET /api/v1/admin/audit-logs/actions | GET | Distinct actions | TASK-ADMIN-007 | ⭕ Ready |
+| GET /api/v1/admin/audit-logs/resource-types | GET | Distinct resource types | TASK-ADMIN-007 | ⭕ Ready |
+| GET /api/v1/admin/audit-logs/:id | GET | Get audit log detail | TASK-ADMIN-007 | ⭕ Ready |
+
+### Admin Frontend Page Mapping
+
+| Route | Page | Purpose | Task ID | Status |
+|-------|------|---------|---------|--------|
+| /admin | AdminOverviewPage | Dashboard with stats and quick actions | TASK-ADMIN-008 | ⭕ Ready |
+| /admin/tenants | TenantsPage | Tenant list with filters | TASK-ADMIN-003 | ⭕ Ready |
+| /admin/tenants/new | CreateTenantPage | Create new tenant form | TASK-ADMIN-003 | ⭕ Ready |
+| /admin/tenants/:id | TenantDetailPage | Tenant details and config | TASK-ADMIN-003 | ⭕ Ready |
+| /admin/users | UsersPage | User list with filters | TASK-ADMIN-005 | ⭕ Ready |
+| /admin/users/:id | UserDetailPage | User details and activity | TASK-ADMIN-005 | ⭕ Ready |
+| /admin/analytics | AnalyticsPage | Platform analytics charts | TASK-ADMIN-006 | ⭕ Ready |
+| /admin/audit-logs | AuditLogsPage | Audit log viewer | TASK-ADMIN-007 | ⭕ Ready |
+| /admin/submissions | SubmissionsPage | Contact/Demo submissions | Existing | ✅ Complete |
+
+### Admin Component Mapping
+
+| Component | Purpose | Task ID | Status |
+|-----------|---------|---------|--------|
+| AdminSidebar | Navigation sidebar with sections | TASK-ADMIN-001 | ⭕ Ready |
+| AdminHeader | Header with user menu | TASK-ADMIN-001 | ⭕ Ready |
+| AdminBreadcrumb | Breadcrumb navigation | TASK-ADMIN-001 | ⭕ Ready |
+| TenantTable | Tenant list with actions | TASK-ADMIN-003 | ⭕ Ready |
+| TenantStatsCards | Tenant statistics cards | TASK-ADMIN-003 | ⭕ Ready |
+| CreateTenantForm | Tenant creation form | TASK-ADMIN-003 | ⭕ Ready |
+| TenantDetailCard | Tenant info display | TASK-ADMIN-003 | ⭕ Ready |
+| UserTable | User list with actions | TASK-ADMIN-005 | ⭕ Ready |
+| UserDetailCard | User info display | TASK-ADMIN-005 | ⭕ Ready |
+| UserActivityLog | User activity timeline | TASK-ADMIN-005 | ⭕ Ready |
+| PlatformMetricsChart | Subscription breakdown chart | TASK-ADMIN-006 | ⭕ Ready |
+| TenantGrowthChart | Tenant growth line chart | TASK-ADMIN-006 | ⭕ Ready |
+| AuditLogTable | Audit log list with pagination | TASK-ADMIN-007 | ⭕ Ready |
+| AuditLogFilters | Filter controls | TASK-ADMIN-007 | ⭕ Ready |
+| QuickStatsCards | Overview metrics cards | TASK-ADMIN-008 | ⭕ Ready |
+| RecentActivityFeed | Activity timeline | TASK-ADMIN-008 | ⭕ Ready |
+| QuickActionsPanel | Quick action buttons | TASK-ADMIN-008 | ⭕ Ready |
+
+### Admin Hook Mapping
+
+| Hook | Purpose | Task ID | Status |
+|------|---------|---------|--------|
+| useAdminTenants | List/filter tenants | TASK-ADMIN-003 | ⭕ Ready |
+| useAdminTenant | Single tenant details | TASK-ADMIN-003 | ⭕ Ready |
+| useAdminTenantStats | Tenant statistics | TASK-ADMIN-003 | ⭕ Ready |
+| useCreateTenant | Create tenant mutation | TASK-ADMIN-003 | ⭕ Ready |
+| useUpdateTenant | Update tenant mutation | TASK-ADMIN-003 | ⭕ Ready |
+| useSuspendTenant | Suspend tenant mutation | TASK-ADMIN-003 | ⭕ Ready |
+| useAdminUsers | List/filter users | TASK-ADMIN-005 | ⭕ Ready |
+| useAdminUser | Single user details | TASK-ADMIN-005 | ⭕ Ready |
+| useAdminUserStats | User statistics | TASK-ADMIN-005 | ⭕ Ready |
+| useUserActivity | User activity log | TASK-ADMIN-005 | ⭕ Ready |
+| useDeactivateUser | Deactivate user mutation | TASK-ADMIN-005 | ⭕ Ready |
+| useActivateUser | Activate user mutation | TASK-ADMIN-005 | ⭕ Ready |
+| useImpersonateUser | Impersonate mutation | TASK-ADMIN-005 | ⭕ Ready |
+| useAdminAnalytics | Platform analytics data | TASK-ADMIN-006 | ⭕ Ready |
+| useAdminAuditLogs | List audit logs | TASK-ADMIN-007 | ⭕ Ready |
+| useAuditLogStats | Audit log statistics | TASK-ADMIN-007 | ⭕ Ready |
+| useAuditLogFilters | Filter options | TASK-ADMIN-007 | ⭕ Ready |
+
+### Security Considerations
+
+| Concern | Implementation | Task ID |
+|---------|---------------|---------|
+| SUPER_ADMIN Only | RolesGuard('SUPER_ADMIN') on all endpoints | All |
+| Impersonation Audit | Logged to AuditLog with impersonatedBy | TASK-ADMIN-004 |
+| Cannot Deactivate Self | Service prevents self-deactivation | TASK-ADMIN-004 |
+| Cannot Demote SUPER_ADMIN | Service prevents role downgrade | TASK-ADMIN-004 |
+| Tenant Data Isolation | Admin sees all, but data scoped | TASK-ADMIN-002 |
+| Sensitive Data Masking | auth0Id excluded from responses | TASK-ADMIN-004 |
+
+### Task Dependencies (Phase 24)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        WEB001[TASK-WEB-001<br/>Next.js Setup]
+        WEB004[TASK-WEB-004<br/>NextAuth]
+        CORE002[TASK-CORE-002<br/>Prisma Setup]
+        CORE003[TASK-CORE-003<br/>User Entity]
+        CORE004[TASK-CORE-004<br/>AuditLog Entity]
+    end
+
+    subgraph "Phase 24 - Admin Portal"
+        ADMIN001[TASK-ADMIN-001<br/>Layout]
+        ADMIN002[TASK-ADMIN-002<br/>Tenant API]
+        ADMIN003[TASK-ADMIN-003<br/>Tenant UI]
+        ADMIN004[TASK-ADMIN-004<br/>User API]
+        ADMIN005[TASK-ADMIN-005<br/>User UI]
+        ADMIN006[TASK-ADMIN-006<br/>Analytics]
+        ADMIN007[TASK-ADMIN-007<br/>Audit Logs]
+        ADMIN008[TASK-ADMIN-008<br/>Overview]
+    end
+
+    WEB001 --> ADMIN001
+    WEB004 --> ADMIN001
+    CORE002 --> ADMIN002
+    CORE003 --> ADMIN002
+    CORE003 --> ADMIN004
+    ADMIN001 --> ADMIN003
+    ADMIN002 --> ADMIN003
+    ADMIN001 --> ADMIN005
+    ADMIN004 --> ADMIN005
+    ADMIN001 --> ADMIN006
+    ADMIN002 --> ADMIN006
+    CORE004 --> ADMIN007
+    ADMIN001 --> ADMIN007
+    ADMIN001 --> ADMIN008
+    ADMIN002 --> ADMIN008
+    ADMIN006 --> ADMIN008
+```
+
+### Implementation Coverage Summary
+
+| Category | Total Features | Implemented | Pending | Coverage |
+|----------|---------------|-------------|---------|----------|
+| API Endpoints | 26 | 0 | 26 | 0% |
+| Frontend Pages | 9 | 1 | 8 | 11% |
+| Components | 17 | 0 | 17 | 0% |
+| Hooks | 17 | 0 | 17 | 0% |
+| **Total** | **69** | **1** | **68** | **1%** |
+
+---
+
+**Last Updated**: 2026-01-24
 **Author**: Claude Code
-**Review Status**: Phase 23 (Public Pages & Self-Service Portals) Added
+**Review Status**: Phase 24 (Admin Portal) Added

@@ -1,7 +1,7 @@
 'use client';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ContactSubmissionsList } from './ContactSubmissionsList';
 import { DemoRequestsList } from './DemoRequestsList';
 import { useContactSubmissions, useDemoRequests } from '@/hooks/useAdminSubmissions';

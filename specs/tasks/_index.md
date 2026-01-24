@@ -2115,6 +2115,226 @@ Gap analysis triggered by user review identifying missing frontend areas:
 
 ---
 
-**Total Tasks**: 223 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals)
-**Overall Completion**: 192/223 (86.1%)
+## Phase 24: Admin Portal for SUPER_ADMIN (2026-01-24)
+
+**Analysis Date**: 2026-01-24
+**Source**: Admin portal capability analysis - identified need for comprehensive SUPER_ADMIN dashboard to manage tenants, users, view platform analytics, and audit logs.
+
+### Gap Analysis
+
+The admin portal at `/admin` was minimal - only showing contact submissions and demo requests. For a multi-tenant SaaS platform, SUPER_ADMIN users need comprehensive capabilities to:
+1. **Tenant Management** - Create, suspend, configure tenants with subscription management
+2. **User Management** - View all users across tenants, activate/deactivate, impersonate for support
+3. **Platform Analytics** - Growth metrics, subscription breakdown, top tenants
+4. **Audit Logs** - Platform-wide activity tracking with filtering
+5. **Dashboard Overview** - At-a-glance platform health with quick actions
+
+### Admin Portal Layout (TASK-ADMIN-001)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 320 | TASK-ADMIN-001 | Admin Portal Layout and Navigation | frontend | TASK-WEB-001, TASK-WEB-004 | P0-CRITICAL | ⭕ Ready |
+
+### Tenant Management (TASK-ADMIN-002, TASK-ADMIN-003)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 321 | TASK-ADMIN-002 | Tenant Management - API and Backend | backend | TASK-CORE-002, TASK-CORE-003 | P1-HIGH | ⭕ Ready |
+| 322 | TASK-ADMIN-003 | Tenant Management - Frontend UI | frontend | TASK-ADMIN-001, TASK-ADMIN-002 | P1-HIGH | ⭕ Ready |
+
+### User Management (TASK-ADMIN-004, TASK-ADMIN-005)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 323 | TASK-ADMIN-004 | User Management - API and Backend | backend | TASK-CORE-003 | P1-HIGH | ⭕ Ready |
+| 324 | TASK-ADMIN-005 | User Management - Frontend UI | frontend | TASK-ADMIN-001, TASK-ADMIN-004 | P1-HIGH | ⭕ Ready |
+
+### Platform Analytics (TASK-ADMIN-006)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 325 | TASK-ADMIN-006 | Platform Analytics Dashboard | fullstack | TASK-ADMIN-001, TASK-ADMIN-002 | P2-MEDIUM | ⭕ Ready |
+
+### Audit Log Viewer (TASK-ADMIN-007)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 326 | TASK-ADMIN-007 | Audit Log Viewer | fullstack | TASK-CORE-004, TASK-ADMIN-001 | P2-MEDIUM | ⭕ Ready |
+
+### Admin Overview Dashboard (TASK-ADMIN-008)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 327 | TASK-ADMIN-008 | Admin Portal Overview Dashboard | frontend | TASK-ADMIN-001, TASK-ADMIN-002, TASK-ADMIN-006 | P1-HIGH | ⭕ Ready |
+
+### Task Dependencies (Phase 24)
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        WEB001[TASK-WEB-001<br/>Next.js Setup]
+        WEB004[TASK-WEB-004<br/>NextAuth Setup]
+        CORE002[TASK-CORE-002<br/>Prisma Setup]
+        CORE003[TASK-CORE-003<br/>User Entity]
+        CORE004[TASK-CORE-004<br/>AuditLog Entity]
+    end
+
+    subgraph "Admin Layout"
+        ADMIN001[TASK-ADMIN-001<br/>Admin Layout]
+    end
+
+    subgraph "Tenant Management"
+        ADMIN002[TASK-ADMIN-002<br/>Tenant API]
+        ADMIN003[TASK-ADMIN-003<br/>Tenant UI]
+    end
+
+    subgraph "User Management"
+        ADMIN004[TASK-ADMIN-004<br/>User API]
+        ADMIN005[TASK-ADMIN-005<br/>User UI]
+    end
+
+    subgraph "Analytics & Audit"
+        ADMIN006[TASK-ADMIN-006<br/>Analytics]
+        ADMIN007[TASK-ADMIN-007<br/>Audit Logs]
+    end
+
+    subgraph "Overview"
+        ADMIN008[TASK-ADMIN-008<br/>Overview Dashboard]
+    end
+
+    WEB001 --> ADMIN001
+    WEB004 --> ADMIN001
+    CORE002 --> ADMIN002
+    CORE003 --> ADMIN002
+    ADMIN001 --> ADMIN003
+    ADMIN002 --> ADMIN003
+    CORE003 --> ADMIN004
+    ADMIN001 --> ADMIN005
+    ADMIN004 --> ADMIN005
+    ADMIN001 --> ADMIN006
+    ADMIN002 --> ADMIN006
+    CORE004 --> ADMIN007
+    ADMIN001 --> ADMIN007
+    ADMIN001 --> ADMIN008
+    ADMIN002 --> ADMIN008
+    ADMIN006 --> ADMIN008
+```
+
+### Key Deliverables
+
+**Admin Portal Layout (TASK-ADMIN-001)**:
+- Next.js `/admin` route group with protected layout
+- Collapsible sidebar with navigation sections
+- Breadcrumb navigation component
+- Admin header with user menu
+- Mobile-responsive design
+- Quick switch to dashboard
+
+**Tenant Management API (TASK-ADMIN-002)**:
+- TenantManagementService with CRUD operations
+- List tenants with search, filters, pagination
+- Create tenant with owner user
+- Update tenant configuration
+- Suspend/activate tenant with audit logging
+- Tenant statistics endpoint
+- Subscription status management
+
+**Tenant Management UI (TASK-ADMIN-003)**:
+- Tenant list page with stats cards
+- Tenant table with actions (view, edit, suspend)
+- Create tenant dialog/page
+- Tenant detail page with configuration
+- Subscription management UI
+
+**User Management API (TASK-ADMIN-004)**:
+- UserManagementService for cross-tenant user management
+- List users with tenant/role filters
+- Activate/deactivate users
+- User statistics (total, active, by role)
+- User activity log retrieval
+- Impersonate user for support (audit logged)
+
+**User Management UI (TASK-ADMIN-005)**:
+- User list page with stats dashboard
+- User table with search, filters, actions
+- Role badges and status indicators
+- User detail page with activity log
+- Impersonate button with confirmation
+
+**Platform Analytics (TASK-ADMIN-006)**:
+- AnalyticsService for platform metrics
+- Tenant growth over time
+- User growth over time
+- Subscription breakdown chart
+- Top tenants by children enrolled
+- Total invoiced amount
+
+**Audit Log Viewer (TASK-ADMIN-007)**:
+- AuditLogsService with filtering
+- List logs with action/resource/tenant/user filters
+- Date range filtering
+- Search functionality
+- Pagination
+- Log statistics
+
+**Admin Overview Dashboard (TASK-ADMIN-008)**:
+- QuickStatsCards component (tenants, users, children, revenue)
+- Alert banner for pending submissions
+- Quick actions panel
+- Pending submissions summary
+- Subscription overview
+- RecentActivityFeed component
+
+### Phase 24 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-CRITICAL | 1 | 0 | 1 | 0% |
+| P1-HIGH | 5 | 0 | 5 | 0% |
+| P2-MEDIUM | 2 | 0 | 2 | 0% |
+| **Total Phase 24** | **8** | **0** | **8** | **0%** |
+
+### Execution Order (Recommended)
+
+**Layer 1 - Foundation**:
+1. **TASK-ADMIN-001** (Layout) - Required for all other admin UI tasks
+
+**Layer 2 - Backend APIs** (can run in parallel):
+2. **TASK-ADMIN-002** (Tenant API)
+3. **TASK-ADMIN-004** (User API)
+
+**Layer 3 - Frontend UIs** (after APIs):
+4. **TASK-ADMIN-003** (Tenant UI) - Requires TASK-ADMIN-002
+5. **TASK-ADMIN-005** (User UI) - Requires TASK-ADMIN-004
+6. **TASK-ADMIN-006** (Analytics) - Requires TASK-ADMIN-002
+7. **TASK-ADMIN-007** (Audit Logs) - Can run after layout
+
+**Layer 4 - Dashboard**:
+8. **TASK-ADMIN-008** (Overview Dashboard) - Requires analytics, tenant stats
+
+### Admin Portal Coverage
+
+| Feature | Pre-Phase 24 | Post-Phase 24 | Change |
+|---------|--------------|---------------|--------|
+| Admin Layout | 0% | 100% | +100% |
+| Tenant Management | 0% | 100% | +100% |
+| User Management | 0% | 100% | +100% |
+| Platform Analytics | 0% | 100% | +100% |
+| Audit Log Viewer | 0% | 100% | +100% |
+| Overview Dashboard | 20% | 100% | +80% |
+| **Overall** | **3%** | **100%** | **+97%** |
+
+### Review Source
+
+Gap analysis triggered by user observation that admin portal only shows contact/demo submissions.
+- SUPER_ADMIN users need comprehensive platform management capabilities
+- Multi-tenant SaaS requires tenant and user administration
+- Platform analytics essential for business decisions
+- Audit logging critical for compliance and debugging
+- Phase 24 addresses all gaps with 8 comprehensive tasks
+
+---
+
+**Total Tasks**: 231 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal)
+**Overall Completion**: 192/231 (83.1%)
 

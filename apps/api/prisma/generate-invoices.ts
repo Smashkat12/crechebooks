@@ -22,7 +22,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 // Constants
-const DEMO_TENANT_ID = 'DEMO_TENANT_ID';
+const DEMO_TENANT_ID = 'ee937a14-3c81-4e74-ab10-8d2936c5bc2e';
 const VAT_RATE = new Decimal('0.15');
 const DEFAULT_DUE_DAYS = 7;
 const SCHOOL_FEES_ACCOUNT = '4000';

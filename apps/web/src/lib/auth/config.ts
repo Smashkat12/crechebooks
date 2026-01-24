@@ -3,6 +3,37 @@ import Credentials from 'next-auth/providers/credentials';
 
 export const authConfig: NextAuthConfig = {
   providers: [
+    // Auth0 callback provider - receives user data after OAuth callback
+    Credentials({
+      id: 'auth0-callback',
+      name: 'Auth0 Callback',
+      credentials: {
+        userId: { type: 'text' },
+        email: { type: 'email' },
+        name: { type: 'text' },
+        role: { type: 'text' },
+        tenantId: { type: 'text' },
+        accessToken: { type: 'text' },
+      },
+      async authorize(credentials) {
+        // This provider receives already-validated user data from the callback page
+        // The backend has already exchanged the code for tokens and validated the user
+        if (!credentials?.userId || !credentials?.email) {
+          console.error('Auth0 callback: Missing required credentials');
+          return null;
+        }
+
+        return {
+          id: credentials.userId as string,
+          email: credentials.email as string,
+          name: (credentials.name as string) || '',
+          role: (credentials.role as string) || 'STAFF',
+          tenantId: (credentials.tenantId as string) || null,
+          accessToken: (credentials.accessToken as string) || '',
+        };
+      },
+    }),
+    // Dev login provider - for development mode only
     Credentials({
       id: 'credentials',
       name: 'Credentials',
@@ -50,34 +81,10 @@ export const authConfig: NextAuthConfig = {
           }
         }
 
-        // Production mode - call API
-        try {
-          const response = await fetch(`${apiUrl}/api/v1/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: credentials.email,
-              password: credentials.password,
-            }),
-          });
-
-          if (!response.ok) {
-            return null;
-          }
-
-          const data = await response.json();
-          return {
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.name,
-            role: data.user.role,
-            tenantId: data.user.tenantId,
-            accessToken: data.accessToken,
-          };
-        } catch (error) {
-          console.error('Auth error:', error);
-          return null;
-        }
+        // Production mode - credentials login is not supported
+        // Use Auth0 Universal Login instead
+        console.error('Credentials login not supported in production. Use Auth0.');
+        return null;
       },
     }),
   ],

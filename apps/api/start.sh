@@ -10,6 +10,7 @@ echo "DATABASE_URL is set (length: ${#DATABASE_URL} characters)"
 
 echo "Resolving any failed migrations..."
 DATABASE_URL="$DATABASE_URL" npx prisma migrate resolve --rolled-back "20250123_add_public_api_tables" || true
+DATABASE_URL="$DATABASE_URL" npx prisma migrate resolve --rolled-back "20260124122937_add_impersonation_sessions" || true
 
 echo "Running database migrations..."
 DATABASE_URL="$DATABASE_URL" npx prisma migrate deploy

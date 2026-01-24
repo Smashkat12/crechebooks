@@ -19,7 +19,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 // Constants
-const DEMO_TENANT_ID = 'DEMO_TENANT_ID';
+const DEMO_TENANT_ID = 'ee937a14-3c81-4e74-ab10-8d2936c5bc2e';
 const BANK_ACCOUNT = '63061274808';
 const BANK_STATEMENTS_DIR = join(__dirname, '../../../bank-statements');
 

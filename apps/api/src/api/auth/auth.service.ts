@@ -440,10 +440,10 @@ export class AuthService {
     });
 
     if (!user) {
-      // Use the Demo Creche tenant (DEMO_TENANT_ID) which has our imported data
-      const DEMO_TENANT_ID = 'DEMO_TENANT_ID';
+      // Use the Elle Elephant Creche tenant which has our imported data
+      const ELLE_ELEPHANT_TENANT_ID = 'ee937a14-3c81-4e74-ab10-8d2936c5bc2e';
       let devTenant = await this.prisma.tenant.findUnique({
-        where: { id: DEMO_TENANT_ID },
+        where: { id: ELLE_ELEPHANT_TENANT_ID },
       });
 
       // Fallback: look for any existing dev tenant
@@ -456,17 +456,17 @@ export class AuthService {
       if (!devTenant) {
         devTenant = await this.prisma.tenant.create({
           data: {
-            id: DEMO_TENANT_ID,
-            name: 'Demo Creche',
-            email: 'demo@creche.example',
-            addressLine1: '123 Demo Street',
-            city: 'Johannesburg',
+            id: ELLE_ELEPHANT_TENANT_ID,
+            name: 'Elle Elephant Creche',
+            email: 'katlego@elleelephant.co.za',
+            addressLine1: '3215 H Swala',
+            city: 'Mabopane',
             province: 'Gauteng',
-            postalCode: '2000',
-            phone: '0110000000',
+            postalCode: '0190',
+            phone: '+27739356753',
           },
         });
-        this.logger.log(`Created demo tenant: ${devTenant.id}`);
+        this.logger.log(`Created Elle Elephant tenant: ${devTenant.id}`);
       }
 
       user = await this.prisma.user.create({

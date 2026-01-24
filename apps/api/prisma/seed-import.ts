@@ -15,8 +15,8 @@ const pool = new Pool({ connectionString: databaseUrl });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// Demo tenant ID - will be replaced with real tenant in production
-const DEMO_TENANT_ID = 'DEMO_TENANT_ID';
+// Demo tenant ID - Elle Elephant Creche
+const DEMO_TENANT_ID = 'ee937a14-3c81-4e74-ab10-8d2936c5bc2e';
 
 interface ParsedParent {
   name: string;

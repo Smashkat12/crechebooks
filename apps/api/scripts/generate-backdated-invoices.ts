@@ -35,7 +35,7 @@ const pool = new Pool({ connectionString: databaseUrl });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const TENANT_ID = 'DEMO_TENANT_ID';
+const TENANT_ID = 'ee937a14-3c81-4e74-ab10-8d2936c5bc2e';
 const SYSTEM_USER_ID = '01j9z7d695h6sq7jdc566rr4qf'; // Admin user
 
 // Business start date - Think M8 ECD T/A Elle Elephant started June 2023

@@ -15,7 +15,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 // Constants
-const DEMO_TENANT_ID = 'DEMO_TENANT_ID';
+const DEMO_TENANT_ID = 'ee937a14-3c81-4e74-ab10-8d2936c5bc2e';
 const AUTO_APPLY_THRESHOLD = 70; // Lower threshold since we match child names
 const CANDIDATE_THRESHOLD = 40;
 

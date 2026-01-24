@@ -15,7 +15,7 @@ import { AppModule } from '../src/app.module';
 import { PaymentMatchingService } from '../src/database/services/payment-matching.service';
 import { PrismaService } from '../src/database/prisma/prisma.service';
 
-const DEMO_TENANT_ID = 'DEMO_TENANT_ID';
+const DEMO_TENANT_ID = 'ee937a14-3c81-4e74-ab10-8d2936c5bc2e';
 
 async function runPaymentMatching(): Promise<void> {
   console.log('🚀 Starting Payment Matching Integration Test...\n');

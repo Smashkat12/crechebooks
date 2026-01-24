@@ -3,12 +3,14 @@
 /**
  * Dashboard Layout Component
  * TASK-UI-008: Fix Mobile Responsiveness
+ * TASK-ADMIN-001: Impersonation banner support
  *
  * Features:
  * - Responsive sidebar (hidden on mobile, collapsible on desktop)
  * - Improved touch targets (min 44px)
  * - Safe area padding for mobile devices
  * - Smooth transitions for layout changes
+ * - Impersonation banner for super admin users
  */
 
 import { cn } from '@/lib/utils';
@@ -18,6 +20,7 @@ import { useUIStore } from '@/stores/ui-store';
 import { useAuth } from '@/hooks/use-auth';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -31,6 +34,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* TASK-ADMIN-001: Impersonation banner shown when super admin is viewing as tenant */}
+      <ImpersonationBanner />
+
       {/* TASK-UI-008: Sidebar is hidden on mobile (< lg breakpoint) */}
       <Sidebar />
 

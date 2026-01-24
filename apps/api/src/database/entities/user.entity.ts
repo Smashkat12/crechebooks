@@ -1,6 +1,7 @@
 /**
  * User Entity Types
  * TASK-CORE-003: User Entity and Authentication Types
+ * TASK-ADMIN-001: Added impersonation context support
  *
  * @module database/entities/user
  * @description User entity interface matching Prisma schema exactly
@@ -9,6 +10,18 @@
 // Re-export UserRole from Prisma to ensure type compatibility
 import { UserRole } from '@prisma/client';
 export { UserRole };
+
+/**
+ * TASK-ADMIN-001: Impersonation context for SUPER_ADMIN users
+ * Embedded in JWT when a super admin is viewing as a tenant user
+ */
+export interface ImpersonationContext {
+  sessionId: string;
+  tenantId: string;
+  role: UserRole;
+  startedAt: number;
+  expiresAt: number;
+}
 
 /**
  * User entity interface
@@ -29,6 +42,7 @@ export { UserRole };
  * @property {string | null} currentTenantId - Currently active tenant in session
  * @property {Date} createdAt - Record creation timestamp
  * @property {Date} updatedAt - Record last update timestamp
+ * @property {ImpersonationContext} [impersonation] - Impersonation context (SUPER_ADMIN only)
  */
 export interface IUser {
   id: string;
@@ -42,4 +56,6 @@ export interface IUser {
   currentTenantId: string | null;
   createdAt: Date;
   updatedAt: Date;
+  /** TASK-ADMIN-001: Impersonation context when SUPER_ADMIN is viewing as tenant */
+  impersonation?: ImpersonationContext;
 }

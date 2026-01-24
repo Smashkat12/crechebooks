@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
+import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner';
 import { Shield } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-background">
+      {/* TASK-ADMIN-001: Impersonation banner - show if admin has active session */}
+      <ImpersonationBanner />
       <AdminHeader />
       <div className="flex">
         <AdminSidebar />

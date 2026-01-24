@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Shield, LayoutDashboard, LogOut, Menu, ChevronRight } from 'lucide-react';
+import { TenantSwitcher } from './TenantSwitcher';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
 
@@ -112,6 +113,9 @@ export function AdminHeader() {
 
         {/* Right side */}
         <div className="ml-auto flex items-center gap-4">
+          {/* TASK-ADMIN-001: Tenant Switcher for impersonation */}
+          <TenantSwitcher />
+
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard">
               <LayoutDashboard className="h-4 w-4 mr-2" />

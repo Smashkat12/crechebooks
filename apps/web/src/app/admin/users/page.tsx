@@ -70,8 +70,11 @@ export default function UsersPage() {
   const handleImpersonate = async (id: string, email: string) => {
     if (confirm(`Impersonate ${email}? You will be logged in as this user.`)) {
       const result = await impersonateMutation.mutateAsync(id);
-      localStorage.setItem('impersonation_token', result.token);
-      window.location.href = '/dashboard';
+      if (result.success) {
+        // Store the user ID for impersonation
+        localStorage.setItem('impersonation_user_id', result.userId);
+        toast({ title: 'Impersonation not yet fully implemented', description: 'This feature requires session management.' });
+      }
     }
   };
 
@@ -126,7 +129,7 @@ export default function UsersPage() {
             <TrendingUp className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.newUsersThisMonth || 0}</div>
+            <div className="text-2xl font-bold">{stats?.newThisMonth || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -200,7 +203,7 @@ export default function UsersPage() {
                   <TableCell>
                     <Badge className={roleColors[user.role]}>{user.role}</Badge>
                   </TableCell>
-                  <TableCell>{user.tenant?.name || '—'}</TableCell>
+                  <TableCell>{user.tenantName || '—'}</TableCell>
                   <TableCell>
                     <Badge variant={user.isActive ? 'default' : 'secondary'}>
                       {user.isActive ? 'Active' : 'Inactive'}

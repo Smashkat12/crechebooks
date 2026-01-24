@@ -170,9 +170,11 @@ export function DemoRequestsList() {
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {formatDistanceToNow(new Date(request.created_at), {
-                          addSuffix: true,
-                        })}
+                        {request.created_at
+                          ? formatDistanceToNow(new Date(request.created_at), {
+                              addSuffix: true,
+                            })
+                          : 'N/A'}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

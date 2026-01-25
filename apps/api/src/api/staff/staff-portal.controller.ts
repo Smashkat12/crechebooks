@@ -3,19 +3,27 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Param,
   Query,
   Body,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Logger,
   Res,
+  Req,
   Header,
   HttpCode,
   HttpStatus,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import * as path from 'path';
+import * as fs from 'fs';
 import {
   ApiTags,
   ApiOperation,
@@ -25,7 +33,7 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { StaffDashboardResponseDto } from './dto/staff-dashboard.dto';
@@ -52,6 +60,14 @@ import {
   ProfileUpdateSuccessDto,
   BankingDetailsDto,
 } from './dto/staff-profile.dto';
+import { StaffOnboardingService } from '../../database/services/staff-onboarding.service';
+import { StaffDocumentService } from '../../database/services/staff-document.service';
+import { PrismaService } from '../../database/prisma/prisma.service';
+import {
+  SignDocumentDto,
+  OnboardingStep,
+} from '../../database/dto/staff-onboarding.dto';
+import { DocumentType } from '../../database/entities/staff-onboarding.entity';
 
 interface UserPayload {
   sub: string;
@@ -67,6 +83,12 @@ export class StaffPortalController {
 
   // In-memory store for mock leave requests (will be replaced with DB)
   private mockLeaveRequests: Map<string, LeaveRequestDto[]> = new Map();
+
+  constructor(
+    private readonly onboardingService: StaffOnboardingService,
+    private readonly documentService: StaffDocumentService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get('dashboard')
   @UseGuards(JwtAuthGuard)
@@ -856,6 +878,467 @@ export class StaffPortalController {
       updateNote:
         'To update your banking details, please contact HR directly. Changes require verification for your protection.',
     };
+  }
+
+  // ============================================================================
+  // STAFF SELF-ONBOARDING ENDPOINTS
+  // ============================================================================
+
+  @Get('onboarding')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get staff onboarding status and progress' })
+  @ApiResponse({
+    status: 200,
+    description: 'Onboarding status retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getOnboardingStatus(@CurrentUser() user: UserPayload) {
+    this.logger.log(`Fetching onboarding status for staff: ${user.sub}`);
+
+    const onboarding = await this.onboardingService.getOnboardingByStaffId(
+      user.sub,
+    );
+
+    if (!onboarding) {
+      // No onboarding initiated - return NOT_STARTED status
+      return {
+        status: 'NOT_STARTED',
+        currentStep: 'PERSONAL_INFO',
+        percentComplete: 0,
+        completedSteps: [],
+        pendingSteps: [
+          'PERSONAL_INFO',
+          'EMPLOYMENT',
+          'TAX_INFO',
+          'BANKING',
+          'DOCUMENTS',
+          'SIGNATURES',
+        ],
+        requiredActions: [],
+      };
+    }
+
+    // Get generated documents for signatures step
+    const generatedDocs = await this.onboardingService.getGeneratedDocuments(
+      user.sub,
+    );
+
+    // Map checklist items to required actions for UI
+    const requiredActions = onboarding.checklistItems.map((item) => ({
+      id: item.itemKey.toLowerCase(),
+      title: item.title,
+      description: item.description || '',
+      category: item.category,
+      isRequired: item.isRequired,
+      isComplete: item.status === 'COMPLETED',
+    }));
+
+    // Add signature items from generated documents
+    if (generatedDocs.documents.length > 0) {
+      for (const doc of generatedDocs.documents) {
+        const existingAction = requiredActions.find(
+          (a) =>
+            a.id ===
+            (doc.documentType === 'EMPLOYMENT_CONTRACT'
+              ? 'employment_contract'
+              : 'popia_consent'),
+        );
+        if (!existingAction) {
+          requiredActions.push({
+            id:
+              doc.documentType === 'EMPLOYMENT_CONTRACT'
+                ? 'employment_contract'
+                : 'popia_consent',
+            title:
+              doc.documentType === 'EMPLOYMENT_CONTRACT'
+                ? 'Sign Employment Contract'
+                : 'Sign POPIA Consent',
+            description:
+              doc.documentType === 'EMPLOYMENT_CONTRACT'
+                ? 'Review and sign your employment contract'
+                : 'Consent to processing of personal information',
+            category: 'signatures',
+            isRequired: true,
+            isComplete: doc.acknowledged,
+          });
+        }
+      }
+    }
+
+    // Calculate completed/pending steps based on categories
+    const categoryStatus = onboarding.progress.byCategory;
+    const stepMapping: Record<string, string> = {
+      personal_info: 'PERSONAL_INFO',
+      employment: 'EMPLOYMENT',
+      tax_info: 'TAX_INFO',
+      banking: 'BANKING',
+      documents: 'DOCUMENTS',
+      dsd_compliance: 'DOCUMENTS',
+      signatures: 'SIGNATURES',
+    };
+
+    const completedSteps: string[] = [];
+    const pendingSteps: string[] = [];
+
+    for (const [category, status] of Object.entries(categoryStatus)) {
+      const step = stepMapping[category];
+      if (step && status.percentComplete === 100) {
+        if (!completedSteps.includes(step)) {
+          completedSteps.push(step);
+        }
+      } else if (step && !pendingSteps.includes(step)) {
+        pendingSteps.push(step);
+      }
+    }
+
+    // Calculate overall status
+    let status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' = 'IN_PROGRESS';
+    if (onboarding.onboarding.status === 'COMPLETED') {
+      status = 'COMPLETED';
+    } else if (onboarding.progress.percentComplete === 0) {
+      status = 'NOT_STARTED';
+    }
+
+    return {
+      status,
+      currentStep: onboarding.onboarding.currentStep || 'PERSONAL_INFO',
+      percentComplete: onboarding.progress.percentComplete,
+      completedSteps,
+      pendingSteps,
+      requiredActions,
+      generatedDocuments: generatedDocs.documents,
+    };
+  }
+
+  @Patch('onboarding/tax')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update tax information' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tax information updated successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateTaxInfo(
+    @CurrentUser() user: UserPayload,
+    @Body() body: { taxNumber?: string; taxStatus?: string },
+  ) {
+    this.logger.log(`Updating tax info for staff: ${user.sub}`);
+
+    // Update staff record directly
+    await this.prisma.staff.update({
+      where: { id: user.sub },
+      data: {
+        taxNumber: body.taxNumber,
+        taxStatus: body.taxStatus,
+      },
+    });
+
+    // Update onboarding step if exists
+    const onboarding = await this.onboardingService.getOnboardingByStaffId(
+      user.sub,
+    );
+    if (onboarding) {
+      await this.onboardingService.updateOnboardingStep(
+        user.sub,
+        {
+          step: 'TAX_INFO' as OnboardingStep,
+          data: body,
+        },
+        user.sub,
+        user.tenantId || '',
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Tax information updated successfully',
+    };
+  }
+
+  @Patch('onboarding/banking')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update banking details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Banking details updated successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async updateBankingDetails(
+    @CurrentUser() user: UserPayload,
+    @Body()
+    body: {
+      bankName?: string;
+      bankAccount?: string;
+      bankBranchCode?: string;
+      bankAccountType?: string;
+    },
+  ) {
+    this.logger.log(`Updating banking details for staff: ${user.sub}`);
+
+    // Update staff record directly
+    await this.prisma.staff.update({
+      where: { id: user.sub },
+      data: {
+        bankName: body.bankName,
+        bankAccount: body.bankAccount,
+        bankBranchCode: body.bankBranchCode,
+        bankAccountType: body.bankAccountType,
+      },
+    });
+
+    // Update onboarding step if exists
+    const onboarding = await this.onboardingService.getOnboardingByStaffId(
+      user.sub,
+    );
+    if (onboarding) {
+      await this.onboardingService.updateOnboardingStep(
+        user.sub,
+        {
+          step: 'BANKING' as OnboardingStep,
+          data: body,
+        },
+        user.sub,
+        user.tenantId || '',
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Banking details updated successfully',
+    };
+  }
+
+  @Get('onboarding/documents')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get uploaded documents for onboarding' })
+  @ApiResponse({
+    status: 200,
+    description: 'Documents retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getOnboardingDocuments(@CurrentUser() user: UserPayload) {
+    this.logger.log(`Fetching onboarding documents for staff: ${user.sub}`);
+
+    const documents = await this.documentService.getDocumentsByStaff(user.sub);
+
+    return {
+      documents: documents.map((doc) => ({
+        id: doc.id,
+        documentType: doc.documentType,
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        status: doc.status,
+        uploadedAt: doc.uploadedAt,
+        expiryDate: doc.expiryDate,
+      })),
+    };
+  }
+
+  @Post('onboarding/documents')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, _file, cb) => {
+          const staffId = (req as unknown as { user?: UserPayload }).user?.sub;
+          const tenantId = (req as unknown as { user?: UserPayload }).user
+            ?.tenantId;
+          const uploadPath = path.join(
+            process.cwd(),
+            'uploads',
+            'staff-documents',
+            tenantId || 'default',
+            staffId || 'unknown',
+          );
+          fs.mkdirSync(uploadPath, { recursive: true });
+          cb(null, uploadPath);
+        },
+        filename: (_req, file, cb) => {
+          const timestamp = Date.now();
+          const ext = path.extname(file.originalname);
+          const baseName = path.basename(file.originalname, ext);
+          cb(null, `${baseName}_${timestamp}${ext}`);
+        },
+      }),
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB limit
+      },
+      fileFilter: (_req, file, cb) => {
+        const allowedMimes = [
+          'application/pdf',
+          'image/jpeg',
+          'image/png',
+          'image/gif',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ];
+        if (allowedMimes.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new BadRequestException('Invalid file type'), false);
+        }
+      },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload a document for onboarding' })
+  @ApiResponse({
+    status: 201,
+    description: 'Document uploaded successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file or document type' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async uploadOnboardingDocument(
+    @CurrentUser() user: UserPayload,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('documentType') documentType: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    if (!documentType) {
+      throw new BadRequestException('Document type is required');
+    }
+
+    this.logger.log(
+      `Uploading document ${file.originalname} (${documentType}) for staff ${user.sub}`,
+    );
+
+    const document = await this.documentService.uploadDocument(
+      user.tenantId || '',
+      {
+        staffId: user.sub,
+        documentType: documentType as DocumentType,
+        fileName: file.originalname,
+        fileUrl: file.path,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      },
+      user.sub,
+    );
+
+    return {
+      success: true,
+      message: 'Document uploaded successfully',
+      data: {
+        id: document.id,
+        documentType: document.documentType,
+        fileName: document.fileName,
+        status: document.status,
+      },
+    };
+  }
+
+  @Get('onboarding/generated-documents')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get generated documents requiring signature' })
+  @ApiResponse({
+    status: 200,
+    description: 'Generated documents retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getGeneratedDocuments(@CurrentUser() user: UserPayload) {
+    this.logger.log(`Fetching generated documents for staff: ${user.sub}`);
+
+    const result = await this.onboardingService.getGeneratedDocuments(user.sub);
+
+    return {
+      documents: result.documents,
+      allDocumentsSigned: result.allDocumentsSigned,
+      pendingSignatures: result.pendingSignatures,
+    };
+  }
+
+  @Post('onboarding/signatures/:documentId/sign')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign a generated document' })
+  @ApiParam({ name: 'documentId', description: 'Generated document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Document signed successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Document already signed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  async signDocument(
+    @CurrentUser() user: UserPayload,
+    @Param('documentId') documentId: string,
+    @Body() body: { signedByName: string },
+    @Req() req: Request,
+  ) {
+    this.logger.log(`Signing document ${documentId} by staff ${user.sub}`);
+
+    // Get client IP
+    const clientIp =
+      req.headers['x-forwarded-for']?.toString().split(',')[0] ||
+      req.socket.remoteAddress ||
+      'unknown';
+
+    const dto: SignDocumentDto = {
+      documentId,
+      signedByName: body.signedByName,
+      signedByIp: clientIp,
+    };
+
+    const document = await this.onboardingService.signDocument(dto, clientIp);
+
+    return {
+      success: true,
+      message: 'Document signed successfully',
+      data: document,
+    };
+  }
+
+  @Get('onboarding/generated-documents/:documentId/download')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Download a generated document PDF' })
+  @ApiParam({ name: 'documentId', description: 'Generated document ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'PDF file',
+    content: {
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  async downloadGeneratedDocument(
+    @CurrentUser() user: UserPayload,
+    @Param('documentId') documentId: string,
+    @Res() res: Response,
+  ) {
+    this.logger.log(
+      `Downloading generated document ${documentId} for staff ${user.sub}`,
+    );
+
+    const document =
+      await this.onboardingService.getGeneratedDocumentById(documentId);
+
+    if (!fs.existsSync(document.filePath)) {
+      throw new NotFoundException('Document file not found');
+    }
+
+    const fileBuffer = fs.readFileSync(document.filePath);
+
+    res.setHeader('Content-Type', document.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${document.fileName}"`,
+    );
+    res.setHeader('Content-Length', fileBuffer.length);
+
+    res.send(fileBuffer);
   }
 
   private generateMockProfile(user: UserPayload): StaffProfileDto {

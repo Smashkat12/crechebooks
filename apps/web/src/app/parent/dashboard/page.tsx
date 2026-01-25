@@ -15,6 +15,12 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+interface OnboardingStatus {
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  percentComplete: number;
+  requiredActions: Array<{ id: string; isComplete: boolean; isRequired: boolean }>;
+}
+
 interface DashboardInvoice {
   id: string;
   invoiceNumber: string;
@@ -115,6 +121,7 @@ export default function ParentDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -123,6 +130,32 @@ export default function ParentDashboardPage() {
       if (!token) {
         router.push('/parent/login');
         return;
+      }
+
+      // First check onboarding status
+      try {
+        const onboardingResponse = await fetch(`${API_URL}/api/v1/parent-portal/onboarding`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (onboardingResponse.ok) {
+          const status = await onboardingResponse.json();
+          setOnboardingStatus(status);
+
+          // Redirect if required items are incomplete
+          if (status.status !== 'COMPLETED') {
+            const hasRequiredIncomplete = status.requiredActions?.some(
+              (action: { isRequired: boolean; isComplete: boolean }) =>
+                action.isRequired && !action.isComplete
+            );
+            if (hasRequiredIncomplete) {
+              router.push('/parent/onboarding');
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Onboarding check failed:', err);
       }
 
       try {

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   AlertCircle,
-  Loader2,
   Receipt,
   Calendar,
   FileText,
@@ -181,12 +180,19 @@ function DashboardSkeleton() {
   );
 }
 
+interface OnboardingStatus {
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  percentComplete: number;
+  requiredActions: Array<{ id: string; isComplete: boolean; isRequired: boolean }>;
+}
+
 export default function StaffDashboardPage() {
   const router = useRouter();
   const [staffName, setStaffName] = useState<string>('Staff Member');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('staff_session_token');
@@ -203,7 +209,38 @@ export default function StaffDashboardPage() {
     }
 
     fetchDashboardData(token);
+    fetchOnboardingStatus(token);
   }, [router]);
+
+  // Redirect to onboarding if required items are incomplete
+  useEffect(() => {
+    if (onboardingStatus && onboardingStatus.status !== 'COMPLETED') {
+      // Check if any required items are incomplete
+      const hasRequiredIncomplete = onboardingStatus.requiredActions?.some(
+        (action) => action.isRequired && !action.isComplete
+      );
+      if (hasRequiredIncomplete) {
+        router.push('/staff/onboarding');
+      }
+    }
+  }, [onboardingStatus, router]);
+
+  const fetchOnboardingStatus = async (token: string) => {
+    try {
+      const response = await fetch(`${API_URL}/api/staff-portal/onboarding`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setOnboardingStatus(data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch onboarding status:', err);
+    }
+  };
 
   const fetchDashboardData = async (token: string) => {
     setIsLoading(true);
@@ -301,6 +338,8 @@ export default function StaffDashboardPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Onboarding redirect handled in useEffect - staff with incomplete required items are redirected */}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -103,6 +103,9 @@ import { CashFlowService } from './services/cash-flow.service';
 import { SupplierService } from './services/supplier.service';
 import { QuoteService } from './services/quote.service';
 import { OnboardingService } from './services/onboarding.service';
+import { ParentFeeAgreementPdfService } from './services/parent-fee-agreement-pdf.service';
+import { ParentConsentFormsPdfService } from './services/parent-consent-forms-pdf.service';
+import { ParentOnboardingService } from './services/parent-onboarding.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
@@ -233,6 +236,10 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     SupplierService,
     QuoteService,
     OnboardingService,
+    // TASK-ONBOARD: Parent Onboarding Services
+    ParentFeeAgreementPdfService,
+    ParentConsentFormsPdfService,
+    ParentOnboardingService,
   ],
   exports: [
     PrismaService,
@@ -340,6 +347,10 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     SupplierService,
     QuoteService,
     OnboardingService,
+    // TASK-ONBOARD: Parent Onboarding Services
+    ParentFeeAgreementPdfService,
+    ParentConsentFormsPdfService,
+    ParentOnboardingService,
   ],
 })
 export class DatabaseModule {}

@@ -958,11 +958,41 @@ model Parent {
   paymentLinks               PaymentLink[]
   paymentGatewayTransactions PaymentGatewayTransaction[]
 
+  // TASK-ONBOARD: Parent onboarding documents
+  generatedDocuments ParentGeneratedDocument[]
+
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([tenantId, lastName, firstName])
   @@index([tenantId, deletedAt])
   @@map("parents")
+}
+
+// TASK-ONBOARD: Parent Generated Documents
+// Stores fee agreements, consent forms, and other onboarding documents
+model ParentGeneratedDocument {
+  id           String   @id @default(uuid())
+  parentId     String   @map("parent_id")
+  tenantId     String   @map("tenant_id")
+  documentType String   @map("document_type") @db.VarChar(50) // FEE_AGREEMENT, CONSENT_FORMS, WELCOME_PACK
+  fileName     String   @map("file_name") @db.VarChar(255)
+  filePath     String   @map("file_path") @db.VarChar(500)
+  mimeType     String   @default("application/pdf") @map("mime_type") @db.VarChar(100)
+  generatedAt  DateTime @default(now()) @map("generated_at")
+  signedAt     DateTime? @map("signed_at")
+  signedByName String?  @map("signed_by_name") @db.VarChar(200)
+  signedByIp   String?  @map("signed_by_ip") @db.VarChar(45)
+  acknowledged Boolean  @default(false)
+  metadata     String?  // JSON for media consent, authorized collectors, etc.
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([parentId])
+  @@index([parentId, documentType])
+  @@index([tenantId])
+  @@map("parent_generated_documents")
 }
 
 // TASK-PAY-018: Credit Balance for Overpayments

@@ -23,7 +23,10 @@ import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
     LeaveController,
     StaffPortalController,
   ],
-  providers: [StaffRepository, LeaveRequestRepository],
+  providers: [
+    StaffRepository,
+    LeaveRequestRepository,
+  ],
   exports: [StaffRepository, LeaveRequestRepository],
 })
 export class StaffModule {}

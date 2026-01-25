@@ -37,10 +37,17 @@ function formatCurrency(value: string | number): string {
 
 /**
  * Parses a formatted currency string to a number
+ * Handles en-ZA locale where comma is decimal separator and space is thousands separator
  */
 function parseCurrency(value: string): string {
-  // Remove R, spaces, and commas
-  const cleaned = value.replace(/[R\s,]/g, '');
+  // Remove R symbol and spaces (spaces are thousand separators in ZA locale)
+  let cleaned = value.replace(/[R\s]/g, '');
+
+  // In en-ZA locale, comma is the decimal separator - convert to period
+  const lastCommaIdx = cleaned.lastIndexOf(',');
+  if (lastCommaIdx !== -1) {
+    cleaned = cleaned.substring(0, lastCommaIdx) + '.' + cleaned.substring(lastCommaIdx + 1);
+  }
 
   // Validate that it's a valid number format
   if (!/^\d*\.?\d{0,2}$/.test(cleaned)) {
@@ -63,13 +70,14 @@ interface CurrencyInputFieldProps extends Omit<
 
 function CurrencyInputField({ field, ...inputProps }: CurrencyInputFieldProps) {
   const [displayValue, setDisplayValue] = React.useState('');
+  const [isFocused, setIsFocused] = React.useState(false);
 
-  // Initialize display value from field value
+  // Initialize/update display value from field value (only when not focused)
   React.useEffect(() => {
-    if (field.value !== undefined && field.value !== null && field.value !== '') {
+    if (!isFocused && field.value !== undefined && field.value !== null && field.value !== '') {
       setDisplayValue(formatCurrency(field.value));
     }
-  }, [field.value]);
+  }, [field.value, isFocused]);
 
   return (
     <div className="relative">
@@ -81,28 +89,49 @@ function CurrencyInputField({ field, ...inputProps }: CurrencyInputFieldProps) {
           const input = e.target.value;
 
           // Allow empty input
-          if (input === '' || input === 'R') {
+          if (input === '' || input === 'R' || input === 'R ') {
             setDisplayValue('');
             field.onChange(undefined);
             return;
           }
 
-          // Parse the input
-          const parsed = parseCurrency(input);
+          // When focused, allow raw numeric input without reformatting
+          if (isFocused) {
+            // Strip non-numeric chars except decimal point
+            const raw = input.replace(/[^\d.]/g, '');
+            setDisplayValue(raw);
+            const numValue = parseFloat(raw);
+            field.onChange(isNaN(numValue) ? undefined : numValue);
+            return;
+          }
 
+          // Parse the formatted input
+          const parsed = parseCurrency(input);
           if (parsed !== '') {
-            // Update the field value with the raw number (as number type)
             const numValue = parseFloat(parsed);
             field.onChange(isNaN(numValue) ? undefined : numValue);
-            // Update display with formatted version
             setDisplayValue(formatCurrency(parsed));
           }
         }}
+        onFocus={() => {
+          setIsFocused(true);
+          // Show raw number when focused for easier editing
+          if (field.value !== undefined && field.value !== null) {
+            const num = typeof field.value === 'string' ? parseFloat(String(field.value)) : field.value;
+            if (!isNaN(num as number) && num !== 0) {
+              setDisplayValue(String(num));
+            } else {
+              setDisplayValue('');
+            }
+          }
+        }}
         onBlur={() => {
-          // Format on blur
-          const parsed = parseCurrency(displayValue);
-          if (parsed !== '') {
-            setDisplayValue(formatCurrency(parsed));
+          setIsFocused(false);
+          // Format nicely on blur
+          if (field.value !== undefined && field.value !== null && field.value !== '' && field.value !== 0) {
+            setDisplayValue(formatCurrency(field.value));
+          } else {
+            setDisplayValue('');
           }
           field.onBlur();
         }}

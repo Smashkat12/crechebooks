@@ -216,14 +216,14 @@ export function SignupForm() {
         },
         body: JSON.stringify({
           crecheName: formData.crecheName,
-          tradingName: formData.tradingName || formData.crecheName,
-          province: formData.province,
-          childrenCount: parseInt(formData.childrenCount),
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
+          adminName: formData.fullName,
+          adminEmail: formData.email,
           password: formData.password,
-          marketingConsent: formData.marketingConsent,
+          phone: formData.phone,
+          addressLine1: 'To be updated', // Will be filled during onboarding
+          city: 'To be updated',
+          province: formData.province,
+          postalCode: '0000',
         }),
       });
 

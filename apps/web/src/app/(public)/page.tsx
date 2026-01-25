@@ -16,11 +16,11 @@ import {
 import {
   HeroSection,
   FeatureCard,
-  PricingCard,
   TestimonialCard,
   CtaSection,
   StatsCounter,
   FaqAccordion,
+  LandingPricingSection,
 } from '@/components/public';
 
 export const metadata: Metadata = {
@@ -117,45 +117,6 @@ const howItWorksSteps = [
   },
 ];
 
-const pricingTiers = [
-  {
-    tier: 'Starter',
-    price: 'R299',
-    features: [
-      'Up to 30 children',
-      'Basic invoicing',
-      'Payment tracking',
-      'Email support',
-    ],
-    cta: { text: 'Start Free Trial', href: '/signup?plan=starter' },
-  },
-  {
-    tier: 'Professional',
-    price: 'R599',
-    features: [
-      'Up to 100 children',
-      'Advanced invoicing',
-      'Automated reminders',
-      'Financial reports',
-      'Priority support',
-    ],
-    cta: { text: 'Start Free Trial', href: '/signup?plan=professional' },
-    highlighted: true,
-  },
-  {
-    tier: 'Enterprise',
-    price: 'Custom',
-    features: [
-      'Unlimited children',
-      'Multi-branch support',
-      'Custom integrations',
-      'Dedicated account manager',
-      'SLA guarantee',
-    ],
-    cta: { text: 'Contact Sales', href: '/contact?plan=enterprise' },
-  },
-];
-
 const testimonials = [
   {
     quote:
@@ -227,8 +188,8 @@ const jsonLd = {
   offers: {
     '@type': 'AggregateOffer',
     priceCurrency: 'ZAR',
-    lowPrice: '299',
-    highPrice: '599',
+    lowPrice: '399',
+    highPrice: '999',
     offerCount: '3',
   },
   aggregateRating: {
@@ -362,30 +323,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Section */}
-      <section
-        className="bg-muted/40 py-16 sm:py-20"
-        aria-labelledby="pricing-title"
-      >
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2
-              id="pricing-title"
-              className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl"
-            >
-              Simple, Transparent Pricing
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Choose the plan that fits your creche. All plans include a 14-day
-              free trial.
-            </p>
-          </div>
-          <div className="mt-12 grid gap-8 md:grid-cols-3">
-            {pricingTiers.map((tier, index) => (
-              <PricingCard key={index} {...tier} />
-            ))}
-          </div>
-        </div>
-      </section>
+      <LandingPricingSection />
 
       {/* FAQ Section */}
       <FaqAccordion items={faqItems} />

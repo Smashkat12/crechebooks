@@ -120,6 +120,7 @@ export class AuthService {
       scope: 'openid profile email offline_access',
       state,
       audience: this.auth0Audience,
+      prompt: 'login', // Force Auth0 to show login screen, allowing user to choose account
     });
 
     const authUrl = `https://${this.auth0Domain}/authorize?${params.toString()}`;
@@ -408,7 +409,79 @@ export class AuthService {
       );
     }
 
-    // Validate credentials from environment variables (never hardcoded)
+    // First, check for trial users (signed up via the public signup form)
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email },
+      include: { tenant: true },
+    });
+
+    if (existingUser) {
+      // Check if this is a trial user - look for password hash in audit log
+      const signupAuditLog = await this.prisma.auditLog.findFirst({
+        where: {
+          userId: existingUser.id,
+          action: 'TRIAL_SIGNUP',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (signupAuditLog?.afterValue) {
+        const afterValue = signupAuditLog.afterValue as { hashedPassword?: string };
+        if (afterValue.hashedPassword) {
+          // Verify password against stored hash
+          const isPasswordValid = await bcrypt.compare(
+            password,
+            afterValue.hashedPassword,
+          );
+
+          if (isPasswordValid) {
+            // Clear failed attempts on successful login
+            await this.clearFailedAttemptsOnSuccess(ipKey, emailKey);
+
+            // Generate JWT token for trial user
+            const payload = {
+              sub: existingUser.id,
+              email: existingUser.email,
+              tenantId: existingUser.tenantId,
+              role: existingUser.role,
+            };
+
+            const accessToken = this.jwtService.sign(payload, {
+              expiresIn: this.jwtExpiration,
+            });
+
+            // Update last login
+            await this.prisma.user.update({
+              where: { id: existingUser.id },
+              data: { lastLoginAt: new Date() },
+            });
+
+            this.logger.log(`Trial user login successful for: ${email}`);
+
+            return {
+              accessToken,
+              refreshToken: '',
+              expiresIn: this.jwtExpiration,
+              user: {
+                id: existingUser.id,
+                tenantId: existingUser.tenantId,
+                auth0Id: existingUser.auth0Id,
+                email: existingUser.email,
+                name: existingUser.name,
+                role: existingUser.role,
+                isActive: existingUser.isActive,
+                lastLoginAt: existingUser.lastLoginAt,
+                currentTenantId: existingUser.currentTenantId,
+                createdAt: existingUser.createdAt,
+                updatedAt: existingUser.updatedAt,
+              },
+            };
+          }
+        }
+      }
+    }
+
+    // Fall back to dev users from environment variables
     const validDevUsers = this.getDevUsersFromEnv();
 
     const devUser = validDevUsers.get(email);

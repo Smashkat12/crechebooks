@@ -2338,3 +2338,74 @@ Gap analysis triggered by user observation that admin portal only shows contact/
 **Total Tasks**: 231 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal)
 **Overall Completion**: 192/231 (83.1%)
 
+---
+
+## Phase 25: Accounting Parity (Stub Feature Parity)
+
+**Objective**: Achieve feature parity with Stub.africa for core accounting/bookkeeping functionality.
+
+**Gap Analysis Source**: Comparative analysis of Stub.africa features vs CrecheBooks capabilities.
+See: `/docs/analysis/stub-vs-crechebooks-accounting-analysis.md`
+
+### Phase 25 Tasks
+
+| Order | Task ID | Title | Layer | Dependencies | Status |
+|-------|---------|-------|-------|--------------|--------|
+| 401 | TASK-ACCT-001 | Native Chart of Accounts Foundation | foundation | TASK-CORE-002 | ⭕ Ready |
+| 402 | TASK-ACCT-002 | General Ledger View Service | logic | TASK-ACCT-001 | ⭕ Ready |
+| 403 | TASK-ACCT-003 | Opening Balances Wizard Service | feature | TASK-ACCT-001 | ⭕ Ready |
+| 404 | TASK-ACCT-004 | Cash Flow Report Service | logic | TASK-ACCT-001, TASK-ACCT-002, TASK-RECON-013 | ⭕ Ready |
+| 411 | TASK-ACCT-011 | Online Payment Gateway Integration (Yoco) | integration | TASK-BILL-003, TASK-CORE-002 | ⭕ Ready |
+| 412 | TASK-ACCT-012 | Quotes System Foundation | foundation | TASK-BILL-003, TASK-BILL-001 | ⭕ Ready |
+| 413 | TASK-ACCT-013 | Supplier Management Foundation | foundation | TASK-CORE-002, TASK-ACCT-001 | ⭕ Ready |
+| 414 | TASK-ACCT-014 | Tenant Onboarding Wizard | feature | Multiple | ⭕ Ready |
+
+### Execution Order
+
+**Layer 1 - Foundation** (Run First):
+1. **TASK-ACCT-001** (Chart of Accounts) - Required for all other accounting tasks
+2. **TASK-ACCT-012** (Quotes System) - Foundation for quotes workflow
+3. **TASK-ACCT-013** (Supplier Management) - Foundation for AP/expenses
+
+**Layer 2 - Logic Services** (After Foundation):
+4. **TASK-ACCT-002** (General Ledger) - Requires TASK-ACCT-001
+5. **TASK-ACCT-003** (Opening Balances) - Requires TASK-ACCT-001
+6. **TASK-ACCT-004** (Cash Flow Report) - Requires TASK-ACCT-001, TASK-ACCT-002
+
+**Layer 3 - Integrations** (Can run in parallel):
+7. **TASK-ACCT-011** (Yoco Payment Gateway) - Independent integration
+
+**Layer 4 - User Experience** (After Core Features):
+8. **TASK-ACCT-014** (Onboarding Wizard) - Requires all foundation features
+
+### Phase 25 Coverage
+
+| Feature | Pre-Phase 25 | Post-Phase 25 | Change |
+|---------|--------------|---------------|--------|
+| Chart of Accounts | 0% (via Xero) | 100% (Native) | +100% |
+| General Ledger View | 0% | 100% | +100% |
+| Opening Balances | 0% | 100% | +100% |
+| Cash Flow Report | 0% | 100% | +100% |
+| Online Payments | 0% | 100% | +100% |
+| Quotes/Proformas | 0% | 100% | +100% |
+| Supplier/Vendor Mgmt | 0% | 100% | +100% |
+| Onboarding Wizard | 20% | 100% | +80% |
+| **Overall** | **3%** | **100%** | **+97%** |
+
+### Review Source
+
+Gap analysis triggered by comparative analysis against Stub.africa accounting features:
+- CrecheBooks relies on Xero for chart of accounts (not native)
+- No general ledger view for transaction history
+- No opening balance import for migrations
+- No cash flow statement report
+- No online payment gateway (Yoco/PayGate)
+- No quotes/proforma invoices
+- No supplier/vendor management (AP)
+- Basic onboarding wizard only
+
+---
+
+**Total Tasks**: 239 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal + 8 Accounting Parity)
+**Overall Completion**: 192/239 (80.3%)
+

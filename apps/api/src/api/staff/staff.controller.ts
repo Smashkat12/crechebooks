@@ -40,6 +40,9 @@ import { ApiCreateStaffDto } from './dto';
 import { SimplePayEmployeeService } from '../../integrations/simplepay/simplepay-employee.service';
 import { SimplePayConnectionService } from '../../integrations/simplepay/simplepay-connection.service';
 import { StaffCreatedEvent } from '../../integrations/simplepay/handlers/staff-created.handler';
+import { EmployeeNumberService } from '../../database/services/employee-number.service';
+import { StaffMagicLinkService } from '../auth/services/staff-magic-link.service';
+import { StaffOnboardingService } from '../../database/services/staff-onboarding.service';
 import { Logger } from '@nestjs/common';
 
 /**
@@ -84,6 +87,9 @@ export class StaffController {
     private readonly simplePayEmployeeService: SimplePayEmployeeService,
     private readonly simplePayConnectionService: SimplePayConnectionService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly employeeNumberService: EmployeeNumberService,
+    private readonly staffMagicLinkService: StaffMagicLinkService,
+    private readonly staffOnboardingService: StaffOnboardingService,
   ) {}
 
   @Get()
@@ -156,45 +162,52 @@ export class StaffController {
     @Body() dto: ApiCreateStaffDto,
   ): Promise<Record<string, unknown>> {
     try {
-      // Transform API snake_case to service camelCase
-      // Note: isActive defaults to true in Prisma schema, no need to pass explicitly
+      const tenantId = getTenantId(user);
+
+      // TASK-ACCT-011: Auto-generate employee number
+      const employeeNumber =
+        await this.employeeNumberService.generateNextNumber(tenantId);
+
       const staff = await this.staffRepository.create({
-        tenantId: getTenantId(user),
-        employeeNumber: dto.employee_number,
+        tenantId,
+        employeeNumber,
         firstName: dto.first_name,
         lastName: dto.last_name,
         idNumber: dto.id_number,
-        taxNumber: dto.tax_number,
+        email: dto.email,
+        phone: dto.phone,
         dateOfBirth: new Date(dto.date_of_birth),
         startDate: new Date(dto.start_date),
         endDate: dto.end_date ? new Date(dto.end_date) : undefined,
-        employmentType: EmploymentType.PERMANENT, // Default to PERMANENT
-        payFrequency: PayFrequency.MONTHLY, // Default to MONTHLY
+        employmentType: (dto.employment_type as EmploymentType) ?? EmploymentType.PERMANENT,
+        payFrequency: (dto.pay_frequency as PayFrequency) ?? PayFrequency.MONTHLY,
         basicSalaryCents: dto.salary,
-        bankAccount: dto.bank_account_number,
-        bankBranchCode: dto.bank_branch_code,
+        position: dto.position,
+        department: dto.department,
       });
 
-      // TASK-STAFF-004 / TASK-SPAY-008: Emit staff.created event for SimplePay setup
-      // The StaffCreatedHandler will trigger comprehensive setup including:
-      // - Employee creation in SimplePay
-      // - Profile assignment
-      // - Leave initialization
-      // - Tax configuration
-      // - SA statutory calculations (PAYE, UIF, SDL)
+      // Emit staff.created event for SimplePay setup
       const event: StaffCreatedEvent = {
-        tenantId: getTenantId(user),
+        tenantId,
         staffId: staff.id,
         firstName: staff.firstName,
         lastName: staff.lastName,
         employmentType: staff.employmentType,
-        position: null,
+        position: dto.position ?? null,
         createdBy: user.id,
       };
       this.eventEmitter.emit('staff.created', event);
       this.logger.log(
         `Emitted staff.created event for ${staff.firstName} ${staff.lastName} (${staff.id})`,
       );
+
+      // TASK-ACCT-011: Auto-initiate onboarding record (non-blocking)
+      this.initiateOnboardingAsync(tenantId, staff.id, user.id);
+
+      // TASK-ACCT-011: Send welcome/magic link email (non-blocking)
+      if (staff.email) {
+        this.sendWelcomeEmailAsync(staff.email);
+      }
 
       return toSnakeCase(staff);
     } catch (error) {
@@ -203,6 +216,36 @@ export class StaffController {
       }
       throw error;
     }
+  }
+
+  @Post(':id/resend-onboarding-email')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend onboarding email with magic link to staff member' })
+  @ApiParam({ name: 'id', description: 'Staff ID' })
+  @ApiResponse({ status: 200, description: 'Onboarding email resent' })
+  @ApiResponse({ status: 404, description: 'Staff member not found' })
+  async resendOnboardingEmail(
+    @CurrentUser() user: IUser,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const staff = await this.staffRepository.findById(id, getTenantId(user));
+    if (!staff) {
+      throw new NotFoundException('Staff member not found');
+    }
+
+    if (!staff.email) {
+      throw new BadRequestException(
+        'Staff member does not have an email address. Please update their profile first.',
+      );
+    }
+
+    await this.staffMagicLinkService.generateMagicLink(staff.email);
+
+    return {
+      success: true,
+      message: `Onboarding email sent to ${staff.email}`,
+    };
   }
 
   @Put(':id')
@@ -243,5 +286,45 @@ export class StaffController {
     }
     // Use deactivate instead of hard delete to preserve payroll history
     await this.staffRepository.deactivate(id, getTenantId(user));
+  }
+
+  /**
+   * Auto-initiate onboarding record for newly created staff.
+   * Non-blocking: errors are logged but don't fail staff creation.
+   */
+  private initiateOnboardingAsync(
+    tenantId: string,
+    staffId: string,
+    userId: string,
+  ): void {
+    this.staffOnboardingService
+      .initiateOnboarding(tenantId, { staffId }, userId)
+      .then(() => {
+        this.logger.log(`Auto-initiated onboarding for staff ${staffId}`);
+      })
+      .catch((error) => {
+        // Don't fail staff creation if onboarding init fails
+        // (e.g. onboarding record may already exist)
+        this.logger.warn(
+          `Failed to auto-initiate onboarding for staff ${staffId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+  }
+
+  /**
+   * Send welcome magic link email to newly created staff.
+   * Non-blocking: errors are logged but don't fail staff creation.
+   */
+  private sendWelcomeEmailAsync(email: string): void {
+    this.staffMagicLinkService
+      .generateMagicLink(email)
+      .then(() => {
+        this.logger.log(`Welcome magic link email sent to ${email}`);
+      })
+      .catch((error) => {
+        this.logger.warn(
+          `Failed to send welcome email to ${email}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
   }
 }

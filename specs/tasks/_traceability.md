@@ -1307,6 +1307,128 @@ graph TD
 
 ---
 
-**Last Updated**: 2026-01-24
+## Accounting Parity Traceability Matrix (Phase 25)
+
+Analysis Date: 2026-01-25
+Based on comparative analysis with Stub.africa accounting features.
+
+### Stub Feature to CrecheBooks Task Mapping
+
+| Stub Feature | Description | Task ID | Status | Priority |
+|-------------|-------------|---------|--------|----------|
+| Chart of Accounts | Native account management | TASK-ACCT-001 | ⭕ Ready | P1-HIGH |
+| General Ledger | Transaction history view | TASK-ACCT-002 | ⭕ Ready | P1-HIGH |
+| Opening Balances | Migration wizard | TASK-ACCT-003 | ⭕ Ready | P1-HIGH |
+| Cash Flow Report | Cash flow statement | TASK-ACCT-004 | ⭕ Ready | P1-HIGH |
+| Online Payments | Yoco gateway integration | TASK-ACCT-011 | ⭕ Ready | P2-MEDIUM |
+| Quotes | Quote-to-invoice workflow | TASK-ACCT-012 | ⭕ Ready | P2-MEDIUM |
+| Suppliers/Bills | Accounts payable | TASK-ACCT-013 | ⭕ Ready | P2-MEDIUM |
+| Onboarding Wizard | Guided tenant setup | TASK-ACCT-014 | ⭕ Ready | P2-MEDIUM |
+
+### Feature Gap Analysis
+
+| Category | Stub Feature | CrecheBooks Status | Gap | Task |
+|----------|--------------|-------------------|-----|------|
+| **Chart of Accounts** | Native with defaults | Via Xero only | Full gap | TASK-ACCT-001 |
+| **General Ledger** | Full transaction view | Not implemented | Full gap | TASK-ACCT-002 |
+| **Opening Balances** | 7-step wizard | Not implemented | Full gap | TASK-ACCT-003 |
+| **Financial Reports** | Income, Balance, Cash Flow | Income, Balance only | Cash Flow missing | TASK-ACCT-004 |
+| **Quotes** | Full workflow + PDF | Not implemented | Full gap | TASK-ACCT-012 |
+| **Invoicing** | Full + recurring | Full + recurring | ✅ Parity | — |
+| **Credit Notes** | Full support | Partial | Partial gap | Future |
+| **Payments** | Manual + Yoco | Manual only | Yoco missing | TASK-ACCT-011 |
+| **Suppliers** | Full AP module | Not implemented | Full gap | TASK-ACCT-013 |
+| **Bills** | With payment tracking | Not implemented | Full gap | TASK-ACCT-013 |
+| **Bank Reconciliation** | Manual matching | AI-powered | ✅ Better | — |
+| **SA Tax Compliance** | VAT201, EMP201 | VAT201, EMP201, IRP5 | ✅ Better | — |
+| **Onboarding** | 7-step wizard | Basic tenant setup | Enhancement | TASK-ACCT-014 |
+
+### Prisma Model Dependencies
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        CORE002[TASK-CORE-002<br/>Prisma Setup]
+        BILL001[TASK-BILL-001<br/>Invoice Model]
+        BILL003[TASK-BILL-003<br/>Payment Model]
+        RECON013[TASK-RECON-013<br/>Bank Transaction]
+    end
+
+    subgraph "Phase 25 - Accounting Foundation"
+        ACCT001[TASK-ACCT-001<br/>Chart of Accounts]
+        ACCT012[TASK-ACCT-012<br/>Quotes System]
+        ACCT013[TASK-ACCT-013<br/>Supplier Mgmt]
+    end
+
+    subgraph "Phase 25 - Logic Services"
+        ACCT002[TASK-ACCT-002<br/>General Ledger]
+        ACCT003[TASK-ACCT-003<br/>Opening Balances]
+        ACCT004[TASK-ACCT-004<br/>Cash Flow Report]
+    end
+
+    subgraph "Phase 25 - Integration"
+        ACCT011[TASK-ACCT-011<br/>Yoco Gateway]
+    end
+
+    subgraph "Phase 25 - UX"
+        ACCT014[TASK-ACCT-014<br/>Onboarding Wizard]
+    end
+
+    CORE002 --> ACCT001
+    CORE002 --> ACCT013
+    BILL001 --> ACCT012
+    BILL003 --> ACCT012
+    BILL003 --> ACCT011
+    CORE002 --> ACCT011
+    ACCT001 --> ACCT002
+    ACCT001 --> ACCT003
+    ACCT001 --> ACCT004
+    ACCT002 --> ACCT004
+    RECON013 --> ACCT004
+    ACCT001 --> ACCT013
+    ACCT001 --> ACCT014
+    ACCT003 --> ACCT014
+    ACCT013 --> ACCT014
+```
+
+### SA VAT Compliance (Section 12(h) Education Exemption)
+
+| Account/Line Type | VAT Treatment | Rate | TASK-ACCT-001 Default |
+|------------------|---------------|------|----------------------|
+| Fee Income (4100) | EXEMPT | 0% | isEducationExempt: true |
+| Registration Income (4200) | EXEMPT | 0% | isEducationExempt: true |
+| Extra-Mural Income (4400) | EXEMPT | 0% | isEducationExempt: true |
+| After-Care Income (4300) | EXEMPT | 0% | isEducationExempt: true |
+| Uniform Sales (4500) | APPLICABLE | 15% | isEducationExempt: false |
+| Book Sales | APPLICABLE | 15% | isEducationExempt: false |
+| Meal Sales | APPLICABLE | 15% | isEducationExempt: false |
+
+### Payment Gateway Integration (Yoco)
+
+| Stub Pricing | CrecheBooks Implementation (TASK-ACCT-011) |
+|-------------|-------------------------------------------|
+| 3% + R2 (card-not-present) | Yoco standard rates apply |
+| 4.5% + R2 (Amex) | Yoco standard rates apply |
+| PayNow Link | PaymentLink model with shortCode |
+| Webhook notifications | YocoWebhookService with HMAC verification |
+| Auto-allocation | PaymentAllocationService on success |
+
+### Implementation Coverage Summary
+
+| Category | Total Features | Implemented | Pending | Coverage |
+|----------|---------------|-------------|---------|----------|
+| Chart of Accounts | 3 | 0 | 3 | 0% |
+| General Ledger | 4 | 0 | 4 | 0% |
+| Opening Balances | 3 | 0 | 3 | 0% |
+| Cash Flow Report | 4 | 0 | 4 | 0% |
+| Online Payments | 5 | 0 | 5 | 0% |
+| Quotes System | 6 | 0 | 6 | 0% |
+| Supplier Management | 5 | 0 | 5 | 0% |
+| Onboarding Wizard | 8 | 1 | 7 | 13% |
+| **Total** | **38** | **1** | **37** | **3%** |
+
+---
+
+**Last Updated**: 2026-01-25
 **Author**: Claude Code
-**Review Status**: Phase 24 (Admin Portal) Added
+**Review Status**: Phase 25 (Accounting Parity) Added

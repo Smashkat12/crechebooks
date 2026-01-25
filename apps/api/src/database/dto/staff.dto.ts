@@ -158,6 +158,16 @@ export class CreateStaffDto {
   bankBranchCode?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  position?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  department?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'Medical aid members must be an integer' })
   @Min(0, { message: 'Medical aid members cannot be negative' })

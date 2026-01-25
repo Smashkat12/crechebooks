@@ -20,6 +20,7 @@ import { XeroSyncService } from './services/xero-sync.service';
 import { EnrollmentService } from './services/enrollment.service';
 import { InvoiceGenerationService } from './services/invoice-generation.service';
 import { InvoiceNumberService } from './services/invoice-number.service';
+import { EmployeeNumberService } from './services/employee-number.service';
 import { InvoiceDeliveryService } from './services/invoice-delivery.service';
 import { InvoiceVatService } from './services/invoice-vat.service';
 import { ProRataService } from './services/pro-rata.service';
@@ -152,6 +153,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     EnrollmentService,
     InvoiceGenerationService,
     InvoiceNumberService,
+    EmployeeNumberService,
     InvoiceDeliveryService,
     InvoiceVatService,
     ProRataService,
@@ -263,6 +265,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
     EnrollmentService,
     InvoiceGenerationService,
     InvoiceNumberService,
+    EmployeeNumberService,
     InvoiceDeliveryService,
     InvoiceVatService,
     ProRataService,

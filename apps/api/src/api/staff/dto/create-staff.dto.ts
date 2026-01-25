@@ -1,18 +1,21 @@
 /**
  * API Create Staff DTO
- * TASK-STAFF-002: Added SA-specific validation decorators
+ * TASK-ACCT-011: Simplified staff creation — admin provides basics,
+ * staff complete banking/tax via self-service onboarding portal.
  *
- * Validates:
- * - SA ID Number (13 digits with Luhn checksum)
- * - SA Tax Number (10 digits)
- * - SA Bank Branch Code (6 digits)
- * - SA Bank Account Number (6-16 digits)
+ * Removed fields (now handled by staff self-service onboarding):
+ * - employee_number (auto-generated)
+ * - bank_account_number, bank_branch_code (staff provides via portal)
+ * - tax_number (staff provides via portal)
+ * - payment_method (staff provides via portal)
+ * - status (always ACTIVE on creation)
  */
 
 import {
   IsString,
   IsOptional,
   IsInt,
+  IsEmail,
   IsEnum,
   Min,
   MinLength,
@@ -20,23 +23,13 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-  IsSAIDNumber,
-  IsSATaxNumber,
-  IsSABranchCode,
-  IsSABankAccount,
-} from '../../../shared/validators';
+import { IsSAIDNumber } from '../../../shared/validators';
 
 /**
- * API DTO for creating staff - accepts snake_case from frontend
+ * API DTO for creating staff - accepts snake_case from frontend.
+ * Admin only needs to provide personal info and employment basics.
  */
 export class ApiCreateStaffDto {
-  @ApiPropertyOptional({ example: 'EMP001' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  employee_number?: string;
-
   @ApiProperty({ example: 'Jane' })
   @IsString()
   @MinLength(1)
@@ -50,6 +43,19 @@ export class ApiCreateStaffDto {
   last_name!: string;
 
   @ApiProperty({
+    example: 'jane@example.com',
+    description: 'Required for staff portal access (magic link login)',
+  })
+  @IsEmail({}, { message: 'A valid email address is required for staff portal access' })
+  email!: string;
+
+  @ApiPropertyOptional({ example: '+27821234567' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phone?: string;
+
+  @ApiProperty({
     example: '8001015009087',
     description: 'South African ID number (13 digits, Luhn validated)',
   })
@@ -59,17 +65,6 @@ export class ApiCreateStaffDto {
       'ID number must be a valid 13-digit South African ID number (Luhn checksum validated)',
   })
   id_number!: string;
-
-  @ApiPropertyOptional({
-    example: '1234567890',
-    description: 'South African tax reference number (10 digits)',
-  })
-  @IsOptional()
-  @IsString({ message: 'Tax number must be a string' })
-  @IsSATaxNumber({
-    message: 'Tax number must be a valid 10-digit South African tax number',
-  })
-  tax_number?: string;
 
   @ApiProperty({ example: '1992-02-20' })
   @IsString()
@@ -84,44 +79,39 @@ export class ApiCreateStaffDto {
   @IsString()
   end_date?: string;
 
-  @ApiProperty({ example: 1500000, description: 'Salary in cents' })
+  @ApiProperty({ example: 1500000, description: 'Monthly gross salary in cents' })
   @Type(() => Number)
   @IsInt({ message: 'Salary must be an integer (cents)' })
   @Min(0, { message: 'Salary cannot be negative' })
   salary!: number;
 
-  @ApiProperty({ example: 'EFT', enum: ['EFT', 'CASH'] })
-  @IsEnum(['EFT', 'CASH'])
-  payment_method!: 'EFT' | 'CASH';
-
   @ApiPropertyOptional({
-    example: '1234567890',
-    description: 'South African bank account number (6-16 digits)',
+    example: 'PERMANENT',
+    enum: ['PERMANENT', 'CONTRACT', 'PART_TIME'],
+    description: 'Defaults to PERMANENT if not specified',
   })
   @IsOptional()
-  @IsString({ message: 'Bank account number must be a string' })
-  @IsSABankAccount({
-    message:
-      'Bank account number must be a valid South African bank account (6-16 digits)',
-  })
-  bank_account_number?: string;
+  @IsEnum(['PERMANENT', 'CONTRACT', 'PART_TIME'])
+  employment_type?: 'PERMANENT' | 'CONTRACT' | 'PART_TIME';
 
   @ApiPropertyOptional({
-    example: '250655',
-    description: 'South African bank branch code (6 digits)',
+    example: 'MONTHLY',
+    enum: ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'],
+    description: 'Defaults to MONTHLY if not specified',
   })
   @IsOptional()
-  @IsString({ message: 'Bank branch code must be a string' })
-  @IsSABranchCode({
-    message:
-      'Bank branch code must be a valid 6-digit South African branch code',
-  })
-  bank_branch_code?: string;
+  @IsEnum(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'])
+  pay_frequency?: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY';
 
-  @ApiProperty({
-    example: 'ACTIVE',
-    enum: ['ACTIVE', 'INACTIVE', 'TERMINATED'],
-  })
-  @IsEnum(['ACTIVE', 'INACTIVE', 'TERMINATED'])
-  status!: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+  @ApiPropertyOptional({ example: 'Teacher' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  position?: string;
+
+  @ApiPropertyOptional({ example: 'Teaching' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  department?: string;
 }

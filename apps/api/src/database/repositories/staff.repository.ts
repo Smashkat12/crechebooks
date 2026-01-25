@@ -45,6 +45,8 @@ export class StaffRepository {
           bankName: dto.bankName ?? null,
           bankAccount: dto.bankAccount ?? null,
           bankBranchCode: dto.bankBranchCode ?? null,
+          position: dto.position ?? null,
+          department: dto.department ?? null,
           medicalAidMembers: dto.medicalAidMembers ?? 0,
         },
       });

@@ -22,10 +22,26 @@ interface OnboardingDashboardCtaProps {
 export function OnboardingDashboardCta({ className }: OnboardingDashboardCtaProps) {
   const router = useRouter();
   const [isDismissed, setIsDismissed] = useState(false);
-  const { data: cta, isLoading } = useOnboardingDashboardCta();
+  const { data: cta, isLoading, error } = useOnboardingDashboardCta();
 
-  // Don't show if dismissed, loading, or onboarding complete
-  if (isDismissed || isLoading || !cta?.showOnboarding) {
+  // Log for debugging
+  if (typeof window !== 'undefined') {
+    console.log('[Onboarding CTA]', { cta, isLoading, error: error?.message });
+  }
+
+  // Don't show if dismissed or loading
+  if (isDismissed || isLoading) {
+    return null;
+  }
+
+  // Show error state if API failed
+  if (error) {
+    console.error('[Onboarding CTA Error]', error);
+    return null; // Silently fail - don't block dashboard
+  }
+
+  // Don't show if onboarding complete
+  if (!cta?.showOnboarding) {
     return null;
   }
 

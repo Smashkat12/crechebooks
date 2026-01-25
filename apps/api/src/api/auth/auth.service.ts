@@ -210,13 +210,67 @@ export class AuthService {
       throw new UnauthorizedException('Failed to retrieve user information');
     }
 
-    // Find or validate user
-    const user = await this.prisma.user.findUnique({
+    // Find user by auth0Id first
+    let user = await this.prisma.user.findUnique({
       where: { auth0Id: userInfo.sub },
     });
 
+    // If not found by auth0Id, try to find by email and link the account
+    if (!user && userInfo.email) {
+      const userByEmail = await this.prisma.user.findFirst({
+        where: { email: userInfo.email },
+      });
+
+      if (userByEmail) {
+        // Check if this user has a temporary auth0Id (from signup before Auth0 integration)
+        const hasTempAuth0Id =
+          userByEmail.auth0Id?.startsWith('auth0|temp-') ||
+          userByEmail.auth0Id?.startsWith('dev-');
+
+        if (hasTempAuth0Id) {
+          // Link the existing account to the real Auth0 ID
+          this.logger.log(
+            `Linking existing user ${userByEmail.id} (${userByEmail.email}) ` +
+              `from temp auth0Id to real Auth0: ${userInfo.sub}`,
+          );
+
+          user = await this.prisma.user.update({
+            where: { id: userByEmail.id },
+            data: { auth0Id: userInfo.sub },
+          });
+
+          // Log the account linking for audit
+          if (user.tenantId) {
+            await this.prisma.auditLog.create({
+              data: {
+                tenantId: user.tenantId,
+                userId: user.id,
+                entityType: 'USER',
+                entityId: user.id,
+                action: 'UPDATE',
+                beforeValue: { auth0Id: userByEmail.auth0Id },
+                afterValue: { auth0Id: userInfo.sub, linkedAt: new Date().toISOString() },
+                changeSummary: 'Linked Auth0 account on first SSO login',
+              },
+            });
+          }
+        } else {
+          // User exists with a different auth0Id - could be a duplicate account
+          this.logger.warn(
+            `User found by email ${userInfo.email} but has different auth0Id: ` +
+              `database=${userByEmail.auth0Id}, auth0=${userInfo.sub}`,
+          );
+          throw new UnauthorizedException(
+            'User account configuration mismatch. Please contact support.',
+          );
+        }
+      }
+    }
+
     if (!user) {
-      this.logger.warn(`No user found for auth0Id: ${userInfo.sub}`);
+      this.logger.warn(
+        `No user found for auth0Id: ${userInfo.sub} or email: ${userInfo.email}`,
+      );
       throw new UnauthorizedException('User account not found');
     }
 

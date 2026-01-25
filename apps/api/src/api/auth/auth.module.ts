@@ -8,6 +8,7 @@ import { StaffAuthController } from './staff-auth.controller';
 import { AuthService } from './auth.service';
 import { MagicLinkService } from './services/magic-link.service';
 import { StaffMagicLinkService } from './services/staff-magic-link.service';
+import { Auth0ManagementService } from './services/auth0-management.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -86,6 +87,7 @@ export type AuthProvider = 'auth0' | 'jwt';
     AuthService,
     MagicLinkService,
     StaffMagicLinkService,
+    Auth0ManagementService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
@@ -99,6 +101,7 @@ export type AuthProvider = 'auth0' | 'jwt';
     AuthService,
     MagicLinkService,
     StaffMagicLinkService,
+    Auth0ManagementService,
     JwtAuthGuard,
     RolesGuard,
     ParentAuthGuard,

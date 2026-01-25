@@ -25,6 +25,12 @@ export interface IStaff {
   salary: number; // Monthly salary in cents (alias for basicSalaryCents)
   createdAt?: Date;
   updatedAt?: Date;
+  // Employment details
+  position?: string;
+  department?: string;
+  workSchedule?: string;
+  hoursPerWeek?: number;
+  reportingTo?: string;
   // Legacy fields for backward compatibility
   paymentMethod?: PaymentMethod;
   bankAccountNumber?: string;

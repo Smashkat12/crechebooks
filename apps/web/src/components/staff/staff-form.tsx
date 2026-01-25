@@ -35,6 +35,8 @@ const staffSchema = z.object({
   employeeNumber: z.string().min(1, 'Employee number is required').max(20),
   firstName: z.string().min(1, 'First name is required').max(50),
   lastName: z.string().min(1, 'Last name is required').max(50),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  phone: z.string().max(20).optional().or(z.literal('')),
   idNumber: z.string()
     .length(13, 'SA ID must be 13 digits')
     .regex(/^\d{13}$/, 'ID must contain only digits')
@@ -43,6 +45,10 @@ const staffSchema = z.object({
   dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
   startDate: z.date({ required_error: 'Start date is required' }),
   endDate: z.date().optional(),
+  // Employment details
+  position: z.string().min(1, 'Position is required').max(100),
+  department: z.string().max(100).optional().or(z.literal('')),
+  // Compensation
   salary: z.number().min(1, 'Salary is required'),
   paymentMethod: z.enum(['EFT', 'CASH']),
   bankAccountNumber: z.string().max(20).optional(),
@@ -70,6 +76,28 @@ const statusOptions = [
   { value: 'TERMINATED', label: 'Terminated' },
 ];
 
+// Common position options for creches
+const positionOptions = [
+  { value: 'Principal', label: 'Principal' },
+  { value: 'Teacher', label: 'Teacher' },
+  { value: 'Assistant Teacher', label: 'Assistant Teacher' },
+  { value: 'Cook', label: 'Cook' },
+  { value: 'Cleaner', label: 'Cleaner' },
+  { value: 'Administrator', label: 'Administrator' },
+  { value: 'Driver', label: 'Driver' },
+  { value: 'Security', label: 'Security' },
+  { value: 'Other', label: 'Other' },
+];
+
+const departmentOptions = [
+  { value: 'Management', label: 'Management' },
+  { value: 'Teaching', label: 'Teaching' },
+  { value: 'Kitchen', label: 'Kitchen' },
+  { value: 'Maintenance', label: 'Maintenance' },
+  { value: 'Administration', label: 'Administration' },
+  { value: 'Transport', label: 'Transport' },
+];
+
 export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffFormProps) {
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
@@ -77,11 +105,15 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
       employeeNumber: staff?.employeeNumber ?? '',
       firstName: staff?.firstName ?? '',
       lastName: staff?.lastName ?? '',
+      email: staff?.email ?? '',
+      phone: staff?.phone ?? '',
       idNumber: staff?.idNumber ?? '',
       taxNumber: staff?.taxNumber ?? '',
       dateOfBirth: staff?.dateOfBirth ? new Date(staff.dateOfBirth) : undefined,
       startDate: staff?.startDate ? new Date(staff.startDate) : new Date(),
       endDate: staff?.endDate ? new Date(staff.endDate) : undefined,
+      position: staff?.position ?? '',
+      department: staff?.department ?? '',
       salary: staff?.salary ? staff.salary / 100 : 0,
       paymentMethod: staff?.paymentMethod ?? 'EFT',
       bankAccountNumber: staff?.bankAccountNumber ?? '',
@@ -112,78 +144,124 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <FormInput
-            control={form.control}
-            name="employeeNumber"
-            label="Employee Number"
-            placeholder="EMP001"
-            required
-          />
-          <FormInput
-            control={form.control}
-            name="firstName"
-            label="First Name"
-            placeholder="Enter first name"
-            required
-          />
-          <FormInput
-            control={form.control}
-            name="lastName"
-            label="Last Name"
-            placeholder="Enter last name"
-            required
-          />
+        {/* Personal Information */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Personal Information</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <FormInput
+              control={form.control}
+              name="employeeNumber"
+              label="Employee Number"
+              placeholder="EMP001"
+              required
+            />
+            <FormInput
+              control={form.control}
+              name="firstName"
+              label="First Name"
+              placeholder="Enter first name"
+              required
+            />
+            <FormInput
+              control={form.control}
+              name="lastName"
+              label="Last Name"
+              placeholder="Enter last name"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormInput
+              control={form.control}
+              name="email"
+              label="Email Address"
+              placeholder="name@example.com"
+              description="Required for Staff Portal access"
+            />
+            <FormInput
+              control={form.control}
+              name="phone"
+              label="Phone Number"
+              placeholder="+27..."
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormInput
+              control={form.control}
+              name="idNumber"
+              label="SA ID Number"
+              placeholder="8501015800088"
+              description="13-digit South African ID number"
+              required
+            />
+            <FormInput
+              control={form.control}
+              name="taxNumber"
+              label="Tax Reference Number"
+              placeholder="1234567890"
+              description="10-digit SARS tax number"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <DatePicker
+              control={form.control}
+              name="dateOfBirth"
+              label="Date of Birth"
+              mode="dob"
+              required
+            />
+            <DatePicker
+              control={form.control}
+              name="startDate"
+              label="Start Date"
+              required
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormInput
-            control={form.control}
-            name="idNumber"
-            label="SA ID Number"
-            placeholder="8501015800088"
-            description="13-digit South African ID number"
-            required
-          />
-          <FormInput
-            control={form.control}
-            name="taxNumber"
-            label="Tax Reference Number"
-            placeholder="1234567890"
-            description="10-digit SARS tax number"
-          />
+        {/* Employment Details */}
+        <div className="space-y-4 pt-4 border-t">
+          <h3 className="text-lg font-medium">Employment Details</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormSelect
+              control={form.control}
+              name="position"
+              label="Position/Job Title"
+              options={positionOptions}
+              placeholder="Select position"
+              required
+            />
+            <FormSelect
+              control={form.control}
+              name="department"
+              label="Department"
+              options={departmentOptions}
+              placeholder="Select department"
+            />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <DatePicker
-            control={form.control}
-            name="dateOfBirth"
-            label="Date of Birth"
-            mode="dob"
-            required
-          />
-          <DatePicker
-            control={form.control}
-            name="startDate"
-            label="Start Date"
-            required
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <CurrencyInput
-            control={form.control}
-            name="salary"
-            label="Monthly Gross Salary"
-            required
-          />
-          <FormSelect
-            control={form.control}
-            name="paymentMethod"
-            label="Payment Method"
-            options={paymentMethodOptions}
-            required
-          />
+        {/* Compensation */}
+        <div className="space-y-4 pt-4 border-t">
+          <h3 className="text-lg font-medium">Compensation</h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <CurrencyInput
+              control={form.control}
+              name="salary"
+              label="Monthly Gross Salary"
+              required
+            />
+            <FormSelect
+              control={form.control}
+              name="paymentMethod"
+              label="Payment Method"
+              options={paymentMethodOptions}
+              required
+            />
+          </div>
         </div>
 
         {paymentMethod === 'EFT' && (
@@ -203,13 +281,17 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
           </div>
         )}
 
-        <FormSelect
-          control={form.control}
-          name="status"
-          label="Employment Status"
-          options={statusOptions}
-          required
-        />
+        {/* Status */}
+        <div className="space-y-4 pt-4 border-t">
+          <h3 className="text-lg font-medium">Status</h3>
+          <FormSelect
+            control={form.control}
+            name="status"
+            label="Employment Status"
+            options={statusOptions}
+            required
+          />
+        </div>
 
         {staff && (
           <DatePicker

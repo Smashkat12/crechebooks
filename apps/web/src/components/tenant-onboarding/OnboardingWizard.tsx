@@ -5,6 +5,7 @@
  * TASK-ACCT-014: Interactive onboarding checklist for new tenants
  *
  * Styled similar to stub.africa onboarding with expandable sections
+ * and inline forms for a seamless onboarding experience.
  */
 
 import { useState, useEffect } from 'react';
@@ -24,6 +25,7 @@ import {
   Link2,
   SkipForward,
   ArrowRight,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,6 +39,7 @@ import {
   OnboardingStepId,
   type OnboardingProgressResponse,
 } from '@/hooks/use-tenant-onboarding';
+import { BankDetailsForm, AddressForm, VatConfigForm } from './forms';
 
 // Step icons mapping
 const STEP_ICONS: Record<OnboardingStepId, React.ComponentType<{ className?: string }>> = {
@@ -50,7 +53,14 @@ const STEP_ICONS: Record<OnboardingStepId, React.ComponentType<{ className?: str
   [OnboardingStepId.BANK_CONNECT]: Link2,
 };
 
-// Step navigation links - routes are under (dashboard) group which doesn't add to URL
+// Steps that have inline forms vs ones that need navigation
+const INLINE_FORM_STEPS: OnboardingStepId[] = [
+  OnboardingStepId.ADDRESS,
+  OnboardingStepId.BANK_DETAILS,
+  OnboardingStepId.VAT_CONFIG,
+];
+
+// Step navigation links for steps without inline forms
 const STEP_LINKS: Record<OnboardingStepId, string> = {
   [OnboardingStepId.LOGO]: '/settings/organization',
   [OnboardingStepId.ADDRESS]: '/settings/organization',
@@ -80,6 +90,7 @@ interface StepItemProps {
   onToggle: () => void;
   onAction: () => void;
   onSkip: () => void;
+  onFormComplete: () => void;
   isUpdating: boolean;
 }
 
@@ -89,10 +100,26 @@ function StepItem({
   onToggle,
   onAction,
   onSkip,
+  onFormComplete,
   isUpdating,
 }: StepItemProps) {
   const Icon = STEP_ICONS[step.id];
   const isComplete = step.isComplete || step.isSkipped;
+  const hasInlineForm = INLINE_FORM_STEPS.includes(step.id);
+
+  // Render the appropriate inline form based on step ID
+  const renderInlineForm = () => {
+    switch (step.id) {
+      case OnboardingStepId.BANK_DETAILS:
+        return <BankDetailsForm onComplete={onFormComplete} />;
+      case OnboardingStepId.ADDRESS:
+        return <AddressForm onComplete={onFormComplete} />;
+      case OnboardingStepId.VAT_CONFIG:
+        return <VatConfigForm onComplete={onFormComplete} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div
@@ -146,18 +173,34 @@ function StepItem({
               {step.helpText}
             </p>
           )}
-          <div className="flex items-center gap-2 pl-11">
-            <Button onClick={onAction} disabled={isUpdating}>
-              {STEP_ACTIONS[step.id]}
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            {step.isSkippable && (
-              <Button variant="ghost" onClick={onSkip} disabled={isUpdating}>
-                <SkipForward className="mr-2 h-4 w-4" />
-                Skip for now
+
+          {/* Inline form or navigation button */}
+          {hasInlineForm ? (
+            <div className="pl-11 pt-2">
+              {renderInlineForm()}
+              {step.isSkippable && (
+                <div className="mt-4 pt-4 border-t">
+                  <Button variant="ghost" size="sm" onClick={onSkip} disabled={isUpdating}>
+                    <SkipForward className="mr-2 h-4 w-4" />
+                    Skip for now
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 pl-11">
+              <Button onClick={onAction} disabled={isUpdating}>
+                {STEP_ACTIONS[step.id]}
+                <ExternalLink className="ml-2 h-4 w-4" />
               </Button>
-            )}
-          </div>
+              {step.isSkippable && (
+                <Button variant="ghost" onClick={onSkip} disabled={isUpdating}>
+                  <SkipForward className="mr-2 h-4 w-4" />
+                  Skip for now
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -198,7 +241,30 @@ export function OnboardingWizard() {
   };
 
   const handleSkip = (stepId: OnboardingStepId) => {
-    updateStep.mutate({ stepId, action: 'skip' });
+    updateStep.mutate({ stepId, action: 'skip' }, {
+      onSuccess: () => {
+        // Auto-expand next incomplete step
+        const nextIncomplete = progress?.steps.find(
+          (s) => !s.isComplete && !s.isSkipped && s.id !== stepId
+        );
+        setExpandedStep(nextIncomplete?.id || null);
+      },
+    });
+  };
+
+  const handleFormComplete = (stepId: OnboardingStepId) => {
+    // Mark step as complete and move to next step
+    updateStep.mutate({ stepId, action: 'complete' }, {
+      onSuccess: () => {
+        // Auto-expand next incomplete step after a short delay for animation
+        setTimeout(() => {
+          const nextIncomplete = progress?.steps.find(
+            (s) => !s.isComplete && !s.isSkipped && s.id !== stepId
+          );
+          setExpandedStep(nextIncomplete?.id || null);
+        }, 300);
+      },
+    });
   };
 
   const handleGoToDashboard = () => {
@@ -292,6 +358,7 @@ export function OnboardingWizard() {
             onToggle={() => handleToggle(step.id)}
             onAction={() => handleAction(step.id)}
             onSkip={() => handleSkip(step.id)}
+            onFormComplete={() => handleFormComplete(step.id)}
             isUpdating={updateStep.isPending}
           />
         ))}

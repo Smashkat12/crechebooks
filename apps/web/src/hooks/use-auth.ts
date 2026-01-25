@@ -15,7 +15,7 @@
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
-import { resetAuthState } from '@/lib/api/client';
+import { resetAuthState, clearAuthState } from '@/lib/api/client';
 
 export function useAuth() {
   const { data: session, status } = useSession();
@@ -49,9 +49,12 @@ export function useAuth() {
   );
 
   const logout = useCallback(async () => {
-    // TASK-UI-001: Call backend logout to clear HttpOnly cookie
+    // Clear client-side auth state first
+    clearAuthState();
+
+    // TASK-UI-001: Call backend logout to clear HttpOnly cookies (access_token and admin_token)
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/v1/auth/logout`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/v1/auth/logout`, {
         method: 'POST',
         credentials: 'include', // Send HttpOnly cookie
       });

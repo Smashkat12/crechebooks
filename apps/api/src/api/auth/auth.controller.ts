@@ -272,11 +272,13 @@ export class AuthController {
   }
 
   /**
-   * TASK-UI-001: Clear HttpOnly cookie on logout
+   * TASK-UI-001: Clear HttpOnly cookies on logout
+   * Also clears admin_token cookie used during impersonation
    */
   private clearAccessTokenCookie(res: Response): void {
     const isProduction = process.env.NODE_ENV === 'production';
 
+    // Clear the main access token cookie
     res.clearCookie(ACCESS_TOKEN_COOKIE, {
       httpOnly: true,
       secure: isProduction,
@@ -284,6 +286,15 @@ export class AuthController {
       path: '/',
     });
 
-    this.logger.debug('TASK-UI-001: Cleared HttpOnly access_token cookie');
+    // Also clear the admin_token cookie (used during impersonation)
+    // This ensures clean state after logout even if user was impersonating
+    res.clearCookie('admin_token', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+    });
+
+    this.logger.debug('TASK-UI-001: Cleared HttpOnly access_token and admin_token cookies');
   }
 }

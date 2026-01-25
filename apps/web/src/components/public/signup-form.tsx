@@ -26,6 +26,9 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
+// API URL for public endpoints (no auth required)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 // South African provinces
 const SA_PROVINCES = [
   'Eastern Cape',
@@ -206,7 +209,7 @@ export function SignupForm() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/v1/public/signup', {
+      const response = await fetch(`${API_URL}/api/v1/public/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

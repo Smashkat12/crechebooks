@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Menu } from 'lucide-react';
+import { Menu, ChevronDown } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -14,12 +14,24 @@ import {
   SheetTrigger,
   SheetClose,
 } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const navLinks = [
   { href: '/features', label: 'Features' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/contact', label: 'Contact' },
-  { href: '/login', label: 'Login' },
+];
+
+// Portal links for staff and parents
+const portalLinks = [
+  { href: '/login', label: 'Admin Login' },
+  { href: '/staff/login', label: 'Staff Portal' },
+  { href: '/parent/login', label: 'Parent Portal' },
 ];
 
 export function PublicHeader() {
@@ -68,16 +80,31 @@ export function PublicHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className={cn(
-                'text-sm font-medium transition-colors hover:text-primary',
-                link.label === 'Login'
-                  ? 'text-muted-foreground'
-                  : 'text-foreground'
-              )}
+              className="text-sm font-medium text-foreground transition-colors hover:text-primary"
             >
               {link.label}
             </Link>
           ))}
+
+          {/* Login Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="text-sm font-medium">
+                Login
+                <ChevronDown className="ml-1 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {portalLinks.map((link) => (
+                <DropdownMenuItem key={link.href} asChild>
+                  <Link href={link.href} className="w-full cursor-pointer">
+                    {link.label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button asChild>
             <Link href="/signup">Get Started</Link>
           </Button>
@@ -112,6 +139,24 @@ export function PublicHeader() {
                   </Link>
                 </SheetClose>
               ))}
+
+              {/* Portal Links */}
+              <div className="border-t pt-4 mt-2">
+                <p className="px-4 text-sm font-medium text-muted-foreground mb-2">
+                  Portals
+                </p>
+                {portalLinks.map((link) => (
+                  <SheetClose asChild key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="block rounded-lg px-4 py-3 text-lg font-medium transition-colors hover:bg-accent"
+                    >
+                      {link.label}
+                    </Link>
+                  </SheetClose>
+                ))}
+              </div>
+
               <SheetClose asChild>
                 <Button asChild className="mt-4 w-full" size="lg">
                   <Link href="/signup">Get Started</Link>

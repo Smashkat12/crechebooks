@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { DollarSign, Receipt, AlertTriangle, Users, RefreshCw } from 'lucide-react';
 import {
   MetricCard,
@@ -12,10 +13,10 @@ import {
   DashboardWidgetSkeleton,
   MetricCardsGridSkeleton,
 } from '@/components/dashboard';
-import { OnboardingDashboardCta } from '@/components/tenant-onboarding';
 import { useDashboardMetrics, useDashboardTrends, useAvailablePeriods } from '@/hooks/use-dashboard';
 import { useDashboardData, useInvalidateDashboardCache } from '@/hooks/use-dashboard-data';
 import { useLearningMode } from '@/hooks/useLearningMode';
+import { useOnboardingDashboardCta } from '@/hooks/use-tenant-onboarding';
 import { FinancialYearSelector } from '@/components/common/financial-year-selector';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -32,8 +33,26 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
  * - Retry logic for failed requests
  */
 export default function DashboardPage() {
+  const router = useRouter();
+
   // Selected financial year (null = all time / auto-detect from latest transaction)
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+
+  // Check onboarding status - redirect if required steps incomplete
+  const { data: onboardingCta, isLoading: onboardingLoading } = useOnboardingDashboardCta();
+
+  useEffect(() => {
+    // Redirect to onboarding if required steps are not complete
+    if (!onboardingLoading && onboardingCta?.showOnboarding) {
+      // Check if required steps are incomplete (not just optional steps)
+      // Required steps: address, bankDetails, feeStructure
+      const hasRequiredIncomplete = onboardingCta.progressPercent < 38; // ~3/8 required steps
+      if (hasRequiredIncomplete || onboardingCta.progressPercent === 0) {
+        router.push('/dashboard/onboarding');
+        return;
+      }
+    }
+  }, [onboardingCta, onboardingLoading, router]);
 
   // Fetch available periods to populate the selector
   const { data: availablePeriods, isLoading: periodsLoading } = useAvailablePeriods();
@@ -81,8 +100,8 @@ export default function DashboardPage() {
     daysOverdue: 30,
   }] : [];
 
-  // Show skeleton during initial load
-  if (isInitialLoading) {
+  // Show skeleton during initial load or while checking onboarding
+  if (isInitialLoading || onboardingLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -136,8 +155,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Onboarding CTA for new tenants */}
-      <OnboardingDashboardCta />
+      {/* Onboarding redirect handled in useEffect - users with incomplete required steps are redirected */}
 
       {/* Partial loading indicator */}
       {hasError && partialDataLoaded > 0 && (

@@ -8,6 +8,7 @@ import {
   Calendar,
   FileText,
   User,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +16,7 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  badge?: string;
 }
 
 const navItems: NavItem[] = [
@@ -22,6 +24,11 @@ const navItems: NavItem[] = [
     href: '/staff/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
+  },
+  {
+    href: '/staff/onboarding',
+    label: 'Onboarding',
+    icon: ClipboardList,
   },
   {
     href: '/staff/payslips',

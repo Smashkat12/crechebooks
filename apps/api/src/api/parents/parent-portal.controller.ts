@@ -7,9 +7,11 @@ import {
   Param,
   Query,
   Res,
+  Req,
   UseGuards,
   Logger,
   NotFoundException,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,8 +20,9 @@ import {
   ApiResponse,
   ApiQuery,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 import { ParentAuthGuard } from '../auth/guards/parent-auth.guard';
 import type { ParentSession } from '../auth/decorators/current-parent.decorator';
 import { CurrentParent } from '../auth/decorators/current-parent.decorator';
@@ -42,6 +45,8 @@ import {
   DeleteAccountResponseDto,
 } from './dto/parent-dashboard.dto';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { ParentOnboardingService } from '../../database/services/parent-onboarding.service';
+import type { SignDocumentDto } from '../../database/services/parent-onboarding.service';
 import { InvoiceStatus } from '@prisma/client';
 
 @ApiTags('Parent Portal')
@@ -51,7 +56,109 @@ import { InvoiceStatus } from '@prisma/client';
 export class ParentPortalController {
   private readonly logger = new Logger(ParentPortalController.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly parentOnboarding: ParentOnboardingService,
+  ) {}
+
+  // ============================================================================
+  // Parent Onboarding Endpoints (Comprehensive)
+  // ============================================================================
+
+  @Get('onboarding')
+  @ApiOperation({ summary: 'Get comprehensive parent onboarding status' })
+  @ApiResponse({
+    status: 200,
+    description: 'Parent onboarding status with required actions and documents',
+  })
+  async getOnboardingStatus(@CurrentParent() session: ParentSession) {
+    return this.parentOnboarding.getOnboardingStatus(
+      session.parentId,
+      session.tenantId,
+    );
+  }
+
+  @Post('onboarding/documents/generate')
+  @ApiOperation({ summary: 'Generate onboarding documents (fee agreement, consent forms)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Documents generated successfully',
+  })
+  async generateOnboardingDocuments(@CurrentParent() session: ParentSession) {
+    return this.parentOnboarding.generateDocuments(
+      session.parentId,
+      session.tenantId,
+    );
+  }
+
+  @Post('onboarding/documents/sign')
+  @ApiOperation({ summary: 'Sign/acknowledge a document' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        documentType: { type: 'string', enum: ['FEE_AGREEMENT', 'CONSENT_FORMS'] },
+        signedByName: { type: 'string' },
+        mediaConsent: { type: 'string', enum: ['internal_only', 'website', 'social_media', 'all', 'none'] },
+        authorizedCollectors: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              idNumber: { type: 'string' },
+              relationship: { type: 'string' },
+            },
+          },
+        },
+      },
+      required: ['documentType', 'signedByName'],
+    },
+  })
+  async signDocument(
+    @CurrentParent() session: ParentSession,
+    @Body() dto: SignDocumentDto,
+    @Req() req: Request,
+  ) {
+    const clientIp = req.ip || req.socket.remoteAddress;
+    return this.parentOnboarding.signDocument(
+      session.parentId,
+      session.tenantId,
+      dto,
+      clientIp,
+    );
+  }
+
+  @Get('onboarding/documents/:documentId/download')
+  @ApiOperation({ summary: 'Download a generated document' })
+  @ApiParam({ name: 'documentId', description: 'Document ID' })
+  async downloadDocument(
+    @CurrentParent() session: ParentSession,
+    @Param('documentId') documentId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const { buffer, fileName, mimeType } = await this.parentOnboarding.downloadDocument(
+      documentId,
+      session.parentId,
+      session.tenantId,
+    );
+
+    res.set({
+      'Content-Type': mimeType,
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+    });
+
+    return new StreamableFile(buffer);
+  }
+
+  @Post('onboarding/complete')
+  @ApiOperation({ summary: 'Complete onboarding and trigger welcome pack' })
+  async completeOnboarding(@CurrentParent() session: ParentSession) {
+    return this.parentOnboarding.completeOnboarding(
+      session.parentId,
+      session.tenantId,
+    );
+  }
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get parent dashboard data' })

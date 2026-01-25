@@ -58,6 +58,19 @@ export class StaffMagicLinkService {
     private readonly mailgunService: MailgunService,
     private readonly configService: ConfigService,
   ) {
+    const portalBaseUrl =
+      this.configService.get<string>('STAFF_PORTAL_URL') ||
+      this.configService.get<string>('FRONTEND_URL') ||
+      this.configService.get<string>('APP_URL') ||
+      'http://localhost:3000';
+
+    if (portalBaseUrl === 'http://localhost:3000') {
+      this.logger.warn(
+        'No STAFF_PORTAL_URL, FRONTEND_URL, or APP_URL configured. ' +
+          'Magic links will point to localhost. Set FRONTEND_URL in production.',
+      );
+    }
+
     this.config = {
       expiresInMinutes: parseInt(
         this.configService.get<string>('STAFF_MAGIC_LINK_EXPIRY_MINUTES') ||
@@ -69,10 +82,7 @@ export class StaffMagicLinkService {
         this.configService.get<string>('STAFF_SESSION_EXPIRY_HOURS') || '24',
         10,
       ),
-      portalBaseUrl:
-        this.configService.get<string>('STAFF_PORTAL_URL') ||
-        this.configService.get<string>('FRONTEND_URL') ||
-        'http://localhost:3000',
+      portalBaseUrl,
     };
   }
 

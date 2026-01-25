@@ -38,10 +38,10 @@ export function UserNav() {
     const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID;
 
     if (auth0Domain && clientId) {
-      const returnTo = encodeURIComponent(window.location.origin + '/login');
+      const returnTo = encodeURIComponent(window.location.origin + '/');
       window.location.href = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
     }
-    // If Auth0 is not configured, logout() already redirects to /login
+    // If Auth0 is not configured, logout() already redirects to landing page
   };
 
   return (

@@ -63,7 +63,7 @@ export function useAuth() {
     }
     // Sign out from NextAuth session
     await signOut({ redirect: false });
-    router.push('/login');
+    router.push('/');
     router.refresh();
   }, [router]);
 

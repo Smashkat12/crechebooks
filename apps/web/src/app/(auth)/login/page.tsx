@@ -166,7 +166,8 @@ function LoginContent() {
         <CardFooter className="flex flex-col space-y-3">
           <Button
             onClick={() => {
-              const redirectPath = (session.user as any)?.role === 'SUPER_ADMIN' ? '/admin' : '/dashboard';
+              const user = session.user as { role?: string };
+              const redirectPath = user?.role === 'SUPER_ADMIN' ? '/admin' : '/dashboard';
               router.push(redirectPath);
             }}
             className="w-full"

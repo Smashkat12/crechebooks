@@ -12,6 +12,7 @@ import {
   DashboardWidgetSkeleton,
   MetricCardsGridSkeleton,
 } from '@/components/dashboard';
+import { OnboardingDashboardCta } from '@/components/tenant-onboarding';
 import { useDashboardMetrics, useDashboardTrends, useAvailablePeriods } from '@/hooks/use-dashboard';
 import { useDashboardData, useInvalidateDashboardCache } from '@/hooks/use-dashboard-data';
 import { useLearningMode } from '@/hooks/useLearningMode';
@@ -134,6 +135,9 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {/* Onboarding CTA for new tenants */}
+      <OnboardingDashboardCta />
 
       {/* Partial loading indicator */}
       {hasError && partialDataLoaded > 0 && (

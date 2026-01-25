@@ -154,6 +154,16 @@ export class SignupService {
           },
         });
 
+        // TASK-ACCT-014: Create onboarding progress record
+        // Address is already provided during signup, so mark it complete
+        await tx.onboardingProgress.create({
+          data: {
+            tenantId: tenant.id,
+            addressSet: true, // Signup form collects address
+            lastActiveStep: 'bankDetails', // Next step after address
+          },
+        });
+
         return { tenant, user };
       });
 

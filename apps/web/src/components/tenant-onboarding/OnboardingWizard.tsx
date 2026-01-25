@@ -50,16 +50,16 @@ const STEP_ICONS: Record<OnboardingStepId, React.ComponentType<{ className?: str
   [OnboardingStepId.BANK_CONNECT]: Link2,
 };
 
-// Step navigation links
+// Step navigation links - routes are under (dashboard) group which doesn't add to URL
 const STEP_LINKS: Record<OnboardingStepId, string> = {
-  [OnboardingStepId.LOGO]: '/dashboard/settings',
-  [OnboardingStepId.ADDRESS]: '/dashboard/settings',
-  [OnboardingStepId.BANK_DETAILS]: '/dashboard/settings',
-  [OnboardingStepId.VAT_CONFIG]: '/dashboard/settings',
-  [OnboardingStepId.FEE_STRUCTURE]: '/dashboard/settings',
-  [OnboardingStepId.ENROL_CHILD]: '/dashboard/enrollments/new',
-  [OnboardingStepId.FIRST_INVOICE]: '/dashboard/invoices/new',
-  [OnboardingStepId.BANK_CONNECT]: '/dashboard/reconciliation',
+  [OnboardingStepId.LOGO]: '/settings/organization',
+  [OnboardingStepId.ADDRESS]: '/settings/organization',
+  [OnboardingStepId.BANK_DETAILS]: '/settings/organization',
+  [OnboardingStepId.VAT_CONFIG]: '/settings/organization',
+  [OnboardingStepId.FEE_STRUCTURE]: '/settings/fees',
+  [OnboardingStepId.ENROL_CHILD]: '/enrollments',
+  [OnboardingStepId.FIRST_INVOICE]: '/invoices/generate',
+  [OnboardingStepId.BANK_CONNECT]: '/reconciliation',
 };
 
 // Step action labels

@@ -15,7 +15,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (isLoading) return;
     if (!isAuthenticated) {
-      router.push('/login?error=unauthorized&returnUrl=/admin');
+      // Redirect to landing page - user can click Sign In from there
+      router.push('/');
       return;
     }
     if (user?.role !== 'SUPER_ADMIN') {

@@ -79,20 +79,41 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    if (error.response?.status === 401 && !isHandling401) {
-      // Handle unauthorized - clear session and redirect
-      if (typeof window !== 'undefined') {
-        isHandling401 = true;
+    // Only handle 401 once, and only in browser
+    if (error.response?.status === 401 && !isHandling401 && typeof window !== 'undefined') {
+      isHandling401 = true;
 
-        // Clear next-auth session properly
-        try {
-          await signOut({ redirect: false });
-        } catch {
-          // Ignore signOut errors
+      try {
+        // Clear cached token
+        authToken = null;
+
+        // Try to refresh the session first
+        const session = await getSession();
+
+        if (session?.accessToken) {
+          // Session is still valid, update cached token and retry might work
+          authToken = session.accessToken as string;
+          isHandling401 = false;
+          // Don't redirect - let the caller handle the error
+          return Promise.reject(error);
         }
 
-        // Force redirect to login
-        window.location.href = '/login';
+        // No valid session - sign out and redirect to login
+        // Use a small delay to prevent race conditions with other requests
+        setTimeout(async () => {
+          try {
+            await signOut({ redirect: false });
+          } catch {
+            // Ignore signOut errors
+          }
+          // Force redirect to login
+          window.location.href = '/login';
+        }, 100);
+      } catch {
+        // If session check fails, redirect to login
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
       }
     }
     return Promise.reject(error);

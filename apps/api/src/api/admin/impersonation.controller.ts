@@ -203,10 +203,11 @@ export class ImpersonationController {
   }
 
   @Get('current')
-  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get current impersonation session',
-    description: 'Returns the current active impersonation session if any.',
+    description:
+      'Returns the current active impersonation session if any. ' +
+      'Non-SUPER_ADMIN users always receive { isImpersonating: false }.',
   })
   @ApiResponse({
     status: 200,
@@ -216,12 +217,14 @@ export class ImpersonationController {
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - valid JWT token required',
   })
-  @ApiForbiddenResponse({
-    description: 'Forbidden - SUPER_ADMIN role required',
-  })
   async getCurrentSession(
     @CurrentUser() user: IUser,
   ): Promise<CurrentImpersonationResponseDto> {
+    // Non-SUPER_ADMIN users can never impersonate, return early
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      return { isImpersonating: false };
+    }
+
     this.logger.debug(
       `Getting current impersonation session for admin ${user.id}`,
     );

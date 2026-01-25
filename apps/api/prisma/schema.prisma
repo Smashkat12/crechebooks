@@ -565,6 +565,9 @@ model Tenant {
   // TASK-BILL-041: Atomic Invoice Number Counters
   invoiceNumberCounters InvoiceNumberCounter[]
 
+  // TASK-ACCT-011: Atomic Employee Number Counters
+  employeeNumberCounters EmployeeNumberCounter[]
+
   // TASK-SARS-002: VAT201 Adjustment Fields
   vatAdjustments VatAdjustment[]
 
@@ -1171,6 +1174,20 @@ model InvoiceNumberCounter {
 
   @@id([tenantId, year])
   @@map("invoice_number_counters")
+}
+
+// TASK-ACCT-011: Atomic employee number counter for race condition prevention
+model EmployeeNumberCounter {
+  tenantId     String   @map("tenant_id")
+  year         Int
+  currentValue Int      @default(0) @map("current_value")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, year])
+  @@map("employee_number_counters")
 }
 
 model Payment {

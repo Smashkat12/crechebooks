@@ -106,19 +106,19 @@ interface ProcessPayrollParams {
 }
 
 interface CreateStaffParams {
-  employeeNumber: string;
   firstName: string;
   lastName: string;
+  email: string;
+  phone?: string;
   idNumber: string;
-  taxNumber?: string;
   dateOfBirth: Date;
   startDate: Date;
   endDate?: Date;
   salary: number; // in cents
-  paymentMethod: 'EFT' | 'CASH';
-  bankAccountNumber?: string;
-  bankBranchCode?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'TERMINATED';
+  employmentType?: 'PERMANENT' | 'CONTRACT' | 'PART_TIME';
+  payFrequency?: 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY';
+  position?: string;
+  department?: string;
 }
 
 // List staff with pagination and filters
@@ -183,33 +183,34 @@ export function useCreateStaff() {
 
   return useMutation<IStaff, AxiosError, CreateStaffParams>({
     mutationFn: async (params) => {
-      // Build payload with only defined optional fields
-      // DTO validators use @IsOptional() + @IsString() which rejects null
-      // So we omit empty optional fields entirely instead of sending null
       const payload: Record<string, unknown> = {
-        employee_number: params.employeeNumber,
         first_name: params.firstName,
         last_name: params.lastName,
+        email: params.email,
         id_number: params.idNumber,
         date_of_birth: params.dateOfBirth.toISOString().split('T')[0],
         start_date: params.startDate.toISOString().split('T')[0],
         salary: params.salary,
-        payment_method: params.paymentMethod,
-        status: params.status,
       };
 
       // Only add optional fields if they have values
-      if (params.taxNumber) {
-        payload.tax_number = params.taxNumber;
+      if (params.phone) {
+        payload.phone = params.phone;
       }
       if (params.endDate) {
         payload.end_date = params.endDate.toISOString().split('T')[0];
       }
-      if (params.bankAccountNumber) {
-        payload.bank_account_number = params.bankAccountNumber;
+      if (params.employmentType) {
+        payload.employment_type = params.employmentType;
       }
-      if (params.bankBranchCode) {
-        payload.bank_branch_code = params.bankBranchCode;
+      if (params.payFrequency) {
+        payload.pay_frequency = params.payFrequency;
+      }
+      if (params.position) {
+        payload.position = params.position;
+      }
+      if (params.department) {
+        payload.department = params.department;
       }
 
       const { data } = await apiClient.post<IStaff>(endpoints.staff.list, payload);
@@ -240,6 +241,18 @@ export function useProcessPayroll() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    },
+  });
+}
+
+// Resend onboarding email with magic link
+export function useResendOnboardingEmail() {
+  return useMutation<{ success: boolean; message: string }, AxiosError, string>({
+    mutationFn: async (staffId) => {
+      const { data } = await apiClient.post<{ success: boolean; message: string }>(
+        `${endpoints.staff.detail(staffId)}/resend-onboarding-email`
+      );
+      return data;
     },
   });
 }

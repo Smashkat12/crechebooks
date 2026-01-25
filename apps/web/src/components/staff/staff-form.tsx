@@ -9,6 +9,7 @@ import { FormInput } from '@/components/forms/form-input';
 import { FormSelect } from '@/components/forms/form-select';
 import { DatePicker } from '@/components/forms/date-picker';
 import { CurrencyInput } from '@/components/forms/currency-input';
+import { Info } from 'lucide-react';
 import type { IStaff } from '@crechebooks/types';
 
 // SA ID number validation using Luhn algorithm
@@ -32,28 +33,24 @@ function validateSAIdNumber(id: string): boolean {
 }
 
 const staffSchema = z.object({
-  employeeNumber: z.string().min(1, 'Employee number is required').max(20),
   firstName: z.string().min(1, 'First name is required').max(50),
   lastName: z.string().min(1, 'Last name is required').max(50),
-  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  email: z.string().email('A valid email is required for staff portal access'),
   phone: z.string().max(20).optional().or(z.literal('')),
   idNumber: z.string()
     .length(13, 'SA ID must be 13 digits')
     .regex(/^\d{13}$/, 'ID must contain only digits')
     .refine(validateSAIdNumber, 'Invalid SA ID number'),
-  taxNumber: z.string().regex(/^\d{10}$/, 'Tax number must be 10 digits').optional().or(z.literal('')),
   dateOfBirth: z.date({ required_error: 'Date of birth is required' }),
   startDate: z.date({ required_error: 'Start date is required' }),
   endDate: z.date().optional(),
   // Employment details
   position: z.string().min(1, 'Position is required').max(100),
   department: z.string().max(100).optional().or(z.literal('')),
+  employmentType: z.enum(['PERMANENT', 'CONTRACT', 'PART_TIME']),
+  payFrequency: z.enum(['WEEKLY', 'FORTNIGHTLY', 'MONTHLY']),
   // Compensation
   salary: z.number().min(1, 'Salary is required'),
-  paymentMethod: z.enum(['EFT', 'CASH']),
-  bankAccountNumber: z.string().max(20).optional(),
-  bankBranchCode: z.string().length(6, 'Branch code must be 6 digits').optional().or(z.literal('')),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'TERMINATED']),
 });
 
 type StaffFormValues = z.infer<typeof staffSchema>;
@@ -64,17 +61,6 @@ interface StaffFormProps {
   onCancel?: () => void;
   isLoading?: boolean;
 }
-
-const paymentMethodOptions = [
-  { value: 'EFT', label: 'Electronic Transfer (EFT)' },
-  { value: 'CASH', label: 'Cash' },
-];
-
-const statusOptions = [
-  { value: 'ACTIVE', label: 'Active' },
-  { value: 'INACTIVE', label: 'Inactive' },
-  { value: 'TERMINATED', label: 'Terminated' },
-];
 
 // Common position options for creches
 const positionOptions = [
@@ -98,31 +84,37 @@ const departmentOptions = [
   { value: 'Transport', label: 'Transport' },
 ];
 
+const employmentTypeOptions = [
+  { value: 'PERMANENT', label: 'Permanent' },
+  { value: 'CONTRACT', label: 'Contract' },
+  { value: 'PART_TIME', label: 'Part-Time' },
+];
+
+const payFrequencyOptions = [
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'FORTNIGHTLY', label: 'Fortnightly' },
+  { value: 'WEEKLY', label: 'Weekly' },
+];
+
 export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffFormProps) {
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffSchema),
     defaultValues: {
-      employeeNumber: staff?.employeeNumber ?? '',
       firstName: staff?.firstName ?? '',
       lastName: staff?.lastName ?? '',
       email: staff?.email ?? '',
       phone: staff?.phone ?? '',
       idNumber: staff?.idNumber ?? '',
-      taxNumber: staff?.taxNumber ?? '',
       dateOfBirth: staff?.dateOfBirth ? new Date(staff.dateOfBirth) : undefined,
       startDate: staff?.startDate ? new Date(staff.startDate) : new Date(),
       endDate: staff?.endDate ? new Date(staff.endDate) : undefined,
       position: staff?.position ?? '',
       department: staff?.department ?? '',
+      employmentType: (staff?.employmentType as 'PERMANENT' | 'CONTRACT' | 'PART_TIME') ?? 'PERMANENT',
+      payFrequency: (staff?.payFrequency as 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY') ?? 'MONTHLY',
       salary: staff?.salary ? staff.salary / 100 : 0,
-      paymentMethod: staff?.paymentMethod ?? 'EFT',
-      bankAccountNumber: staff?.bankAccountNumber ?? '',
-      bankBranchCode: staff?.bankBranchCode ?? '',
-      status: staff?.status ?? 'ACTIVE',
     },
   });
-
-  const paymentMethod = form.watch('paymentMethod');
 
   const onSubmit = async (data: StaffFormValues) => {
     try {
@@ -144,17 +136,25 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Auto-generation info banner (only for new staff) */}
+        {!staff && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium">Employee number will be auto-generated</p>
+                <p className="mt-1">
+                  Staff will receive an email to complete their own onboarding (banking details, tax info, documents, and signatures) via the Staff Portal.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Personal Information */}
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Personal Information</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <FormInput
-              control={form.control}
-              name="employeeNumber"
-              label="Employee Number"
-              placeholder="EMP001"
-              required
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormInput
               control={form.control}
               name="firstName"
@@ -177,7 +177,8 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
               name="email"
               label="Email Address"
               placeholder="name@example.com"
-              description="Required for Staff Portal access"
+              description="Required — staff will use this to access the Staff Portal"
+              required
             />
             <FormInput
               control={form.control}
@@ -196,27 +197,11 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
               description="13-digit South African ID number"
               required
             />
-            <FormInput
-              control={form.control}
-              name="taxNumber"
-              label="Tax Reference Number"
-              placeholder="1234567890"
-              description="10-digit SARS tax number"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <DatePicker
               control={form.control}
               name="dateOfBirth"
               label="Date of Birth"
               mode="dob"
-              required
-            />
-            <DatePicker
-              control={form.control}
-              name="startDate"
-              label="Start Date"
               required
             />
           </div>
@@ -242,6 +227,28 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
               placeholder="Select department"
             />
           </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <FormSelect
+              control={form.control}
+              name="employmentType"
+              label="Employment Type"
+              options={employmentTypeOptions}
+              required
+            />
+            <FormSelect
+              control={form.control}
+              name="payFrequency"
+              label="Pay Frequency"
+              options={payFrequencyOptions}
+              required
+            />
+            <DatePicker
+              control={form.control}
+              name="startDate"
+              label="Start Date"
+              required
+            />
+          </div>
         </div>
 
         {/* Compensation */}
@@ -254,43 +261,7 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
               label="Monthly Gross Salary"
               required
             />
-            <FormSelect
-              control={form.control}
-              name="paymentMethod"
-              label="Payment Method"
-              options={paymentMethodOptions}
-              required
-            />
           </div>
-        </div>
-
-        {paymentMethod === 'EFT' && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormInput
-              control={form.control}
-              name="bankAccountNumber"
-              label="Bank Account Number"
-              placeholder="Enter account number"
-            />
-            <FormInput
-              control={form.control}
-              name="bankBranchCode"
-              label="Branch Code"
-              placeholder="250655"
-            />
-          </div>
-        )}
-
-        {/* Status */}
-        <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-lg font-medium">Status</h3>
-          <FormSelect
-            control={form.control}
-            name="status"
-            label="Employment Status"
-            options={statusOptions}
-            required
-          />
         </div>
 
         {staff && (

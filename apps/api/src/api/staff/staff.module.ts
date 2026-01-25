@@ -12,9 +12,10 @@ import { LeaveRequestRepository } from '../../database/repositories/leave-reques
 import { DatabaseModule } from '../../database/database.module';
 import { EmailModule } from '../../integrations/email/email.module';
 import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [DatabaseModule, EmailModule, SimplePayModule],
+  imports: [DatabaseModule, EmailModule, SimplePayModule, AuthModule],
   controllers: [
     StaffController,
     StaffOnboardingController,

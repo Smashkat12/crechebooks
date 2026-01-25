@@ -33,12 +33,15 @@ export function UserNav() {
     // Clear NextAuth session first
     await logout();
 
-    // Then redirect to Auth0 logout to clear Auth0 session
+    // Only redirect to Auth0 logout if Auth0 is configured
     const auth0Domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN;
     const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID;
-    const returnTo = encodeURIComponent(window.location.origin + '/login');
 
-    window.location.href = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
+    if (auth0Domain && clientId) {
+      const returnTo = encodeURIComponent(window.location.origin + '/login');
+      window.location.href = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
+    }
+    // If Auth0 is not configured, logout() already redirects to /login
   };
 
   return (

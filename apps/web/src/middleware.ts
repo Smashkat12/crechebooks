@@ -46,9 +46,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect authenticated users from login to dashboard
+  // Redirect authenticated users from login to appropriate page based on role
   if (pathname === '/login' && isLoggedIn) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const userRole = token?.role as string | undefined;
+    const redirectPath = userRole === 'SUPER_ADMIN' ? '/admin' : '/dashboard';
+    return NextResponse.redirect(new URL(redirectPath, request.url));
+  }
+
+  // Redirect root path based on auth status and role
+  if (pathname === '/' && isLoggedIn) {
+    const userRole = token?.role as string | undefined;
+    const redirectPath = userRole === 'SUPER_ADMIN' ? '/admin' : '/dashboard';
+    return NextResponse.redirect(new URL(redirectPath, request.url));
   }
 
   return NextResponse.next();
@@ -56,6 +65,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/',
     '/dashboard/:path*',
     '/admin/:path*',
     '/transactions/:path*',

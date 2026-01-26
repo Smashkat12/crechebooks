@@ -228,6 +228,18 @@ export function useCreateChild() {
   });
 }
 
+// Send onboarding invite email with magic link
+export function useSendOnboardingInvite() {
+  return useMutation<{ success: boolean; message: string }, AxiosError, string>({
+    mutationFn: async (parentId) => {
+      const { data } = await apiClient.post<{ success: boolean; message: string }>(
+        endpoints.parents.sendOnboardingInvite(parentId)
+      );
+      return data;
+    },
+  });
+}
+
 // Update parent params
 interface UpdateParentParams {
   id: string;

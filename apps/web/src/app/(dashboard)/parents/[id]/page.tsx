@@ -2,12 +2,12 @@
 
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit, Mail, Phone, UserPlus, MessageSquare, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Edit, Mail, Phone, UserPlus, MessageSquare, CheckCircle2, XCircle, Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useParent, useParentChildren, useCreateChild } from '@/hooks/use-parents';
+import { useParent, useParentChildren, useCreateChild, useSendOnboardingInvite } from '@/hooks/use-parents';
 import { useFeeStructures } from '@/hooks/use-fee-structures';
 import { useSendInvoices } from '@/hooks/use-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,6 +32,7 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
   const { data: feeStructuresData } = useFeeStructures();
   const createChildMutation = useCreateChild();
   const sendInvoicesMutation = useSendInvoices();
+  const sendOnboardingInvite = useSendOnboardingInvite();
   const { toast } = useToast();
 
   const [isAddChildOpen, setIsAddChildOpen] = useState(false);
@@ -102,6 +103,22 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
       toast({
         title: 'Error',
         description: 'Failed to add child. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSendOnboardingInvite = async () => {
+    try {
+      await sendOnboardingInvite.mutateAsync(id);
+      toast({
+        title: 'Invite Sent',
+        description: 'Onboarding invite email has been sent to the parent.',
+      });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to send onboarding invite. Please try again.',
         variant: 'destructive',
       });
     }
@@ -179,12 +196,26 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
             </div>
           </div>
         </div>
-        <Link href={`/parents/${id}/edit`}>
-          <Button variant="outline">
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSendOnboardingInvite}
+            disabled={sendOnboardingInvite.isPending}
+          >
+            {sendOnboardingInvite.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            Send Onboarding Invite
           </Button>
-        </Link>
+          <Link href={`/parents/${id}/edit`}>
+            <Button variant="outline">
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

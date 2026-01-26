@@ -124,9 +124,7 @@ export class ShadowComparisonAggregator {
     ];
 
     return Promise.all(
-      agentTypes.map((type) =>
-        this.generateReport(type, tenantId, periodDays),
-      ),
+      agentTypes.map((type) => this.generateReport(type, tenantId, periodDays)),
     );
   }
 
@@ -267,9 +265,7 @@ export class ShadowComparisonAggregator {
     // Evaluate promotion criteria
     const promotionBlockers: string[] = [];
     const latencyMultiplier =
-      heuristicAvgLatencyMs > 0
-        ? sdkAvgLatencyMs / heuristicAvgLatencyMs
-        : 1;
+      heuristicAvgLatencyMs > 0 ? sdkAvgLatencyMs / heuristicAvgLatencyMs : 1;
 
     if (matchRate < criteria.minMatchRate) {
       promotionBlockers.push(

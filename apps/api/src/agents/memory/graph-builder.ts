@@ -34,7 +34,10 @@ const TYPE_EMBEDDING_DIM = 4;
 
 /** Total node embedding dimension: 384 + 50 + 10 + 4 = 448 */
 export const NODE_EMBEDDING_DIM =
-  PAYEE_EMBEDDING_DIM + ACCOUNT_EMBEDDING_DIM + AMOUNT_EMBEDDING_DIM + TYPE_EMBEDDING_DIM;
+  PAYEE_EMBEDDING_DIM +
+  ACCOUNT_EMBEDDING_DIM +
+  AMOUNT_EMBEDDING_DIM +
+  TYPE_EMBEDDING_DIM;
 
 @Injectable()
 export class GraphBuilder {
@@ -85,7 +88,8 @@ export class GraphBuilder {
       }
 
       // Create/get type node
-      const typeLabel = tx.transactionType ?? (tx.isCredit ? 'credit' : 'debit');
+      const typeLabel =
+        tx.transactionType ?? (tx.isCredit ? 'credit' : 'debit');
       const typeId = `type:${typeLabel}`;
       if (!nodes.has(typeId)) {
         nodes.set(typeId, {
@@ -137,7 +141,8 @@ export class GraphBuilder {
     offset += AMOUNT_EMBEDDING_DIM;
 
     // Transaction type embedding (4d)
-    const typeLabel = input.transactionType ?? (input.isCredit ? 'credit' : 'debit');
+    const typeLabel =
+      input.transactionType ?? (input.isCredit ? 'credit' : 'debit');
     const typeEmb = this.buildTypeEmbedding(typeLabel);
     embedding.set(typeEmb, offset);
 

@@ -129,11 +129,7 @@ describe('ShadowComparisonAggregator', () => {
         },
       ]);
 
-      const report = await aggregator.generateReport(
-        'matcher',
-        TEST_TENANT,
-        7,
-      );
+      const report = await aggregator.generateReport('matcher', TEST_TENANT, 7);
 
       expect(report.sdkAvgLatencyMs).toBe(250); // (200+300)/2
       expect(report.heuristicAvgLatencyMs).toBe(100); // (100+100)/2
@@ -190,11 +186,7 @@ describe('ShadowComparisonAggregator', () => {
 
       prisma.shadowComparison.findMany.mockResolvedValue(comparisons);
 
-      const report = await aggregator.generateReport(
-        'sars',
-        TEST_TENANT,
-        7,
-      );
+      const report = await aggregator.generateReport('sars', TEST_TENANT, 7);
 
       expect(report.meetsPromotionCriteria).toBe(false);
       expect(
@@ -259,9 +251,9 @@ describe('ShadowComparisonAggregator', () => {
       );
 
       expect(report.meetsPromotionCriteria).toBe(false);
-      expect(
-        report.promotionBlockers.some((b) => b.includes('Period')),
-      ).toBe(true);
+      expect(report.promotionBlockers.some((b) => b.includes('Period'))).toBe(
+        true,
+      );
     });
 
     it('should pass promotion criteria when all requirements met', async () => {
@@ -345,11 +337,7 @@ describe('ShadowComparisonAggregator', () => {
         },
       ]);
 
-      const report = await aggregator.generateReport(
-        'matcher',
-        TEST_TENANT,
-        7,
-      );
+      const report = await aggregator.generateReport('matcher', TEST_TENANT, 7);
 
       expect(report.heuristicBetter).toBe(1);
       expect(report.sdkBetter).toBe(0);
@@ -424,9 +412,7 @@ describe('ShadowComparisonAggregator', () => {
         providers: [ShadowComparisonAggregator],
       }).compile();
 
-      const noPrismaAggregator = noPrismaModule.get(
-        ShadowComparisonAggregator,
-      );
+      const noPrismaAggregator = noPrismaModule.get(ShadowComparisonAggregator);
 
       const report = await noPrismaAggregator.generateReport(
         'categorizer',

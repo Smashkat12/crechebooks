@@ -6,7 +6,10 @@
  * determinism, differentiation by payee/amount/type, and graph deduplication.
  */
 
-import { GraphBuilder, NODE_EMBEDDING_DIM } from '../../../src/agents/memory/graph-builder';
+import {
+  GraphBuilder,
+  NODE_EMBEDDING_DIM,
+} from '../../../src/agents/memory/graph-builder';
 
 describe('GraphBuilder', () => {
   let builder: GraphBuilder;
@@ -184,8 +187,18 @@ describe('GraphBuilder', () => {
   describe('buildGraph', () => {
     it('should create nodes for each unique entity', () => {
       const graph = builder.buildGraph([
-        { payeeName: 'Woolworths', accountCode: '5200', amountCents: 250000, isCredit: false },
-        { payeeName: 'Woolworths', accountCode: '5200', amountCents: 300000, isCredit: false },
+        {
+          payeeName: 'Woolworths',
+          accountCode: '5200',
+          amountCents: 250000,
+          isCredit: false,
+        },
+        {
+          payeeName: 'Woolworths',
+          accountCode: '5200',
+          amountCents: 300000,
+          isCredit: false,
+        },
       ]);
 
       // 1 payee + 1 account + amount buckets (both medium) + 1 type = at least 3
@@ -195,8 +208,18 @@ describe('GraphBuilder', () => {
 
     it('should not duplicate nodes for same payee', () => {
       const graph = builder.buildGraph([
-        { payeeName: 'Woolworths', accountCode: '5200', amountCents: 250000, isCredit: false },
-        { payeeName: 'Woolworths', accountCode: '5300', amountCents: 10000, isCredit: false },
+        {
+          payeeName: 'Woolworths',
+          accountCode: '5200',
+          amountCents: 250000,
+          isCredit: false,
+        },
+        {
+          payeeName: 'Woolworths',
+          accountCode: '5300',
+          amountCents: 10000,
+          isCredit: false,
+        },
       ]);
 
       const payeeNodes = graph.nodes.filter((n) => n.type === 'payee');
@@ -205,8 +228,18 @@ describe('GraphBuilder', () => {
 
     it('should create separate nodes for different payees', () => {
       const graph = builder.buildGraph([
-        { payeeName: 'Woolworths', accountCode: '5200', amountCents: 250000, isCredit: false },
-        { payeeName: 'Pick n Pay', accountCode: '5200', amountCents: 250000, isCredit: false },
+        {
+          payeeName: 'Woolworths',
+          accountCode: '5200',
+          amountCents: 250000,
+          isCredit: false,
+        },
+        {
+          payeeName: 'Pick n Pay',
+          accountCode: '5200',
+          amountCents: 250000,
+          isCredit: false,
+        },
       ]);
 
       const payeeNodes = graph.nodes.filter((n) => n.type === 'payee');
@@ -215,8 +248,18 @@ describe('GraphBuilder', () => {
 
     it('should create separate nodes for different account codes', () => {
       const graph = builder.buildGraph([
-        { payeeName: 'Woolworths', accountCode: '5200', amountCents: 250000, isCredit: false },
-        { payeeName: 'Woolworths', accountCode: '5300', amountCents: 250000, isCredit: false },
+        {
+          payeeName: 'Woolworths',
+          accountCode: '5200',
+          amountCents: 250000,
+          isCredit: false,
+        },
+        {
+          payeeName: 'Woolworths',
+          accountCode: '5300',
+          amountCents: 250000,
+          isCredit: false,
+        },
       ]);
 
       const accountNodes = graph.nodes.filter((n) => n.type === 'account');
@@ -253,7 +296,12 @@ describe('GraphBuilder', () => {
 
     it('should create edges linking payee to account, amount, and type', () => {
       const graph = builder.buildGraph([
-        { payeeName: 'Eskom', accountCode: '6100', amountCents: 500000, isCredit: false },
+        {
+          payeeName: 'Eskom',
+          accountCode: '6100',
+          amountCents: 500000,
+          isCredit: false,
+        },
       ]);
 
       expect(graph.edges).toHaveLength(3);
@@ -267,7 +315,12 @@ describe('GraphBuilder', () => {
 
     it('should embed all node types with Float32Array', () => {
       const graph = builder.buildGraph([
-        { payeeName: 'Test', accountCode: '5200', amountCents: 100000, isCredit: false },
+        {
+          payeeName: 'Test',
+          accountCode: '5200',
+          amountCents: 100000,
+          isCredit: false,
+        },
       ]);
 
       for (const node of graph.nodes) {
@@ -278,8 +331,18 @@ describe('GraphBuilder', () => {
 
     it('should set correct nodeCount and edgeCount', () => {
       const graph = builder.buildGraph([
-        { payeeName: 'A', accountCode: '5200', amountCents: 100000, isCredit: false },
-        { payeeName: 'B', accountCode: '5300', amountCents: 200000, isCredit: true },
+        {
+          payeeName: 'A',
+          accountCode: '5200',
+          amountCents: 100000,
+          isCredit: false,
+        },
+        {
+          payeeName: 'B',
+          accountCode: '5300',
+          amountCents: 200000,
+          isCredit: true,
+        },
       ]);
 
       expect(graph.nodeCount).toBe(graph.nodes.length);

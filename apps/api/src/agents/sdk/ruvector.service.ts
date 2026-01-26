@@ -63,7 +63,11 @@ interface VectorDbInstance {
  */
 interface EmbeddingServiceInstance {
   embedOne: (text: string, provider?: string) => Promise<number[]>;
-  registerProvider?: (provider: { name: string; embed: (texts: string[]) => Promise<number[][]>; getDimensions: () => number }) => void;
+  registerProvider?: (provider: {
+    name: string;
+    embed: (texts: string[]) => Promise<number[][]>;
+    getDimensions: () => number;
+  }) => void;
   selectProvider?: (name: string) => void;
 }
 
@@ -183,9 +187,8 @@ export class RuvectorService implements OnModuleInit {
       'ANTHROPIC_BASE_URL',
       'https://router.requesty.ai/v1',
     );
-    const providerOverride = this.configService.get<string>(
-      'EMBEDDING_PROVIDER',
-    );
+    const providerOverride =
+      this.configService.get<string>('EMBEDDING_PROVIDER');
 
     // Always register onnx-fallback
     const onnxProvider = new OnnxFallbackProvider();
@@ -208,7 +211,10 @@ export class RuvectorService implements OnModuleInit {
 
     // Select active provider
     let selectedProvider: EmbeddingProviderType;
-    if (providerOverride === 'onnx-fallback' || providerOverride === 'requesty') {
+    if (
+      providerOverride === 'onnx-fallback' ||
+      providerOverride === 'requesty'
+    ) {
       selectedProvider = providerOverride;
     } else if (apiKey) {
       selectedProvider = 'requesty';
@@ -217,8 +223,7 @@ export class RuvectorService implements OnModuleInit {
     }
 
     this.activeProvider = selectedProvider;
-    this.activeDimensions =
-      selectedProvider === 'requesty' ? 1024 : 384;
+    this.activeDimensions = selectedProvider === 'requesty' ? 1024 : 384;
 
     if (this.embeddingService.selectProvider) {
       this.embeddingService.selectProvider(selectedProvider);
@@ -309,9 +314,7 @@ export class RuvectorService implements OnModuleInit {
             fallbackError instanceof Error
               ? fallbackError.message
               : String(fallbackError);
-          this.logger.warn(
-            `Fallback provider ${provider.name} failed: ${msg}`,
-          );
+          this.logger.warn(`Fallback provider ${provider.name} failed: ${msg}`);
         }
       }
 
@@ -380,13 +383,11 @@ export class RuvectorService implements OnModuleInit {
       filter: { _collection: collection },
     });
 
-    return results
-      .slice(0, limit)
-      .map((result) => ({
-        id: result.id,
-        score: result.score,
-        metadata: result.metadata,
-      }));
+    return results.slice(0, limit).map((result) => ({
+      id: result.id,
+      score: result.score,
+      metadata: result.metadata,
+    }));
   }
 
   /**

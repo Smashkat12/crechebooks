@@ -41,9 +41,7 @@ describe('PaymentMatcherAgent', () => {
 
   beforeEach(async () => {
     // Clean up test data using TRUNCATE CASCADE to handle all FK constraints
-    await prisma.$executeRawUnsafe(
-      `TRUNCATE TABLE tenants CASCADE`,
-    );
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE tenants CASCADE`);
 
     // Create test tenant
     testTenant = await prisma.tenant.create({

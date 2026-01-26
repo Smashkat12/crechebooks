@@ -19,10 +19,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PersistenceConfig } from './persistence-config';
-import {
-  IntelligenceEngine,
-  IntelligenceConfig,
-} from 'ruvector';
+import { IntelligenceEngine, IntelligenceConfig } from 'ruvector';
 import type {
   IntelligenceRouteResult,
   IntelligenceRecallResult,
@@ -31,7 +28,9 @@ import type {
 } from './interfaces/intelligence-engine.interface';
 
 @Injectable()
-export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy {
+export class IntelligenceEngineService
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(IntelligenceEngineService.name);
   private engine: IntelligenceEngine | null = null;
   private initialized = false;
@@ -51,14 +50,14 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
       this.initialized = true;
       this.logger.log(
         'IntelligenceEngine initialized successfully ' +
-        `(embeddingDim=${config.embeddingDim}, sona=${config.enableSona}, ` +
-        `storagePath=${config.storagePath})`,
+          `(embeddingDim=${config.embeddingDim}, sona=${config.enableSona}, ` +
+          `storagePath=${config.storagePath})`,
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
         `IntelligenceEngine initialization failed (non-fatal): ${message}. ` +
-        'Agents will operate without unified intelligence.',
+          'Agents will operate without unified intelligence.',
       );
       this.initialized = false;
     }
@@ -107,14 +106,12 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
         'RUVECTOR_MAX_EPISODES',
         50_000,
       ),
-      enableSona: this.configService.get<string>(
-        'RUVECTOR_ENABLE_SONA',
+      enableSona:
+        this.configService.get<string>('RUVECTOR_ENABLE_SONA', 'true') ===
         'true',
-      ) === 'true',
-      enableAttention: this.configService.get<string>(
-        'RUVECTOR_ENABLE_ATTENTION',
-        'false',
-      ) === 'true',
+      enableAttention:
+        this.configService.get<string>('RUVECTOR_ENABLE_ATTENTION', 'false') ===
+        'true',
       storagePath,
       learningRate: this.configService.get<number>(
         'RUVECTOR_LEARNING_RATE',
@@ -146,8 +143,8 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
 
     this.logger.debug(
       `routeAgent: tenant=${tenantId.substring(0, 8)} agent=${agentType} ` +
-      `path=${result.recommendedPath} confidence=${result.confidence} ` +
-      `duration=${Date.now() - startTime}ms`,
+        `path=${result.recommendedPath} confidence=${result.confidence} ` +
+        `duration=${Date.now() - startTime}ms`,
     );
 
     return {
@@ -179,7 +176,7 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
 
     this.logger.debug(
       `storeMemory: tenant=${tenantId.substring(0, 8)} ` +
-      `key=${key} type=${type} contentLength=${content.length}`,
+        `key=${key} type=${type} contentLength=${content.length}`,
     );
   }
 
@@ -204,7 +201,7 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
 
     this.logger.debug(
       `recall: tenant=${tenantId.substring(0, 8)} query="${query.substring(0, 50)}" ` +
-      `results=${results.length} duration=${Date.now() - startTime}ms`,
+        `results=${results.length} duration=${Date.now() - startTime}ms`,
     );
 
     return results.map((r: Record<string, unknown>) => ({
@@ -243,7 +240,7 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
 
     this.logger.debug(
       `learn: tenant=${tenantId.substring(0, 8)} ` +
-      `action=${trajectory.action} quality=${trajectory.quality.toFixed(3)}`,
+        `action=${trajectory.action} quality=${trajectory.quality.toFixed(3)}`,
     );
   }
 
@@ -254,6 +251,7 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
   async getStats(): Promise<IntelligenceStats> {
     this.ensureAvailable('getStats');
 
+    // eslint-disable-next-line @typescript-eslint/await-thenable
     const stats = await this.engine!.getStats();
 
     return {
@@ -291,6 +289,7 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
       return false;
     }
     try {
+      // eslint-disable-next-line @typescript-eslint/await-thenable
       const stats = await this.engine.getStats();
       return stats !== null && stats !== undefined;
     } catch {
@@ -308,8 +307,8 @@ export class IntelligenceEngineService implements OnModuleInit, OnModuleDestroy 
     if (!this.initialized || !this.engine) {
       throw new Error(
         `IntelligenceEngine is not available. ` +
-        `Cannot call ${methodName}(). ` +
-        `Check RUVECTOR_DATA_DIR and initialization logs.`,
+          `Cannot call ${methodName}(). ` +
+          `Check RUVECTOR_DATA_DIR and initialization logs.`,
       );
     }
   }

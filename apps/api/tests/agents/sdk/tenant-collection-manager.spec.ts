@@ -60,11 +60,11 @@ describe('TenantCollectionManager', () => {
     }).compile();
 
     manager = testModule.get<TenantCollectionManager>(TenantCollectionManager);
-    await manager.onModuleInit();
+    manager.onModuleInit();
   });
 
-  afterEach(async () => {
-    await manager.onModuleDestroy();
+  afterEach(() => {
+    manager.onModuleDestroy();
   });
 
   describe('getCollection', () => {
@@ -378,7 +378,7 @@ describe('TenantCollectionManager', () => {
       await manager.getCollection(TEST_TENANT_ID, 'decisions');
       await manager.getCollection(TEST_TENANT_ID, 'reasoning');
 
-      await manager.onModuleDestroy();
+      manager.onModuleDestroy();
       expect(manager.getCacheSize()).toBe(0);
     });
 

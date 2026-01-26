@@ -345,9 +345,7 @@ describe('RolloutPromotionService', () => {
 
       const statuses = await service.getStatus(TEST_TENANT);
 
-      const statusMap = new Map(
-        statuses.map((s) => [s.agentType, s.mode]),
-      );
+      const statusMap = new Map(statuses.map((s) => [s.agentType, s.mode]));
       expect(statusMap.get('categorizer')).toBe('PRIMARY');
       expect(statusMap.get('matcher')).toBe('SHADOW');
       expect(statusMap.get('sars')).toBe('DISABLED');

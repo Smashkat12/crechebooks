@@ -132,7 +132,9 @@ export class GnnPatternAdapter implements GnnPatternInterface {
       return true;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`RuvectorLayer initialization failed (non-fatal): ${msg}`);
+      this.logger.warn(
+        `RuvectorLayer initialization failed (non-fatal): ${msg}`,
+      );
       return false;
     }
   }
@@ -180,7 +182,11 @@ export class GnnPatternAdapter implements GnnPatternInterface {
       );
 
       // Cache the graph-aware embedding for differentiable search
-      const cacheKey = this.buildCacheKey(input.tenantId, input.payeeName, input.accountCode);
+      const cacheKey = this.buildCacheKey(
+        input.tenantId,
+        input.payeeName,
+        input.accountCode,
+      );
       this.embeddingCache.set(cacheKey, graphAwareEmb);
       this.accessCounts.set(cacheKey, 0);
 
@@ -215,7 +221,10 @@ export class GnnPatternAdapter implements GnnPatternInterface {
       });
 
       // Get neighbor embeddings
-      const neighborEmbs = this.getNeighborEmbeddings(input.tenantId, input.payeeName);
+      const neighborEmbs = this.getNeighborEmbeddings(
+        input.tenantId,
+        input.payeeName,
+      );
 
       // Forward pass -> graph-aware query embedding
       const layer = this.ruvectorLayer!;
@@ -227,17 +236,17 @@ export class GnnPatternAdapter implements GnnPatternInterface {
 
       // Differentiable search over cached embeddings
       const ruvectorModule = await import('ruvector');
-      const differentiableSearchFn = (ruvectorModule as Record<string, unknown>)[
-        'differentiableSearch'
-      ] as (
+      const differentiableSearchFn = (
+        ruvectorModule as Record<string, unknown>
+      )['differentiableSearch'] as (
         query: Float32Array,
         candidates: Float32Array[],
         topK: number,
         temperature: number,
       ) => DifferentiableSearchResult[];
 
-      const candidates = Array.from(this.embeddingCache.entries()).filter(([key]) =>
-        key.startsWith(`${input.tenantId}:`),
+      const candidates = Array.from(this.embeddingCache.entries()).filter(
+        ([key]) => key.startsWith(`${input.tenantId}:`),
       );
 
       if (candidates.length === 0) return null;
@@ -313,7 +322,10 @@ export class GnnPatternAdapter implements GnnPatternInterface {
       if (!key.startsWith(`${tenantId}:`)) continue;
 
       const normalizedPayee = payeeName.toLowerCase().trim();
-      if (key.includes(normalizedPayee) || (accountCode && key.includes(accountCode))) {
+      if (
+        key.includes(normalizedPayee) ||
+        (accountCode && key.includes(accountCode))
+      ) {
         neighbors.push(emb);
         if (neighbors.length >= 10) break; // Cap neighbors
       }
@@ -325,7 +337,11 @@ export class GnnPatternAdapter implements GnnPatternInterface {
   /**
    * Build a cache key for a pattern embedding.
    */
-  private buildCacheKey(tenantId: string, payeeName: string, accountCode: string): string {
+  private buildCacheKey(
+    tenantId: string,
+    payeeName: string,
+    accountCode: string,
+  ): string {
     const normalizedPayee = payeeName.toLowerCase().trim();
     return `${tenantId}:${normalizedPayee}:${accountCode}`;
   }

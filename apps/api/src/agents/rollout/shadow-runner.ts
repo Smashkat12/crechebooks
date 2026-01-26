@@ -213,9 +213,7 @@ export class ShadowRunner {
    * Persist a comparison result to the shadow_comparisons table.
    * Non-blocking: errors are caught and logged, never thrown.
    */
-  private async persistComparison(
-    comparison: ComparisonResult,
-  ): Promise<void> {
+  private async persistComparison(comparison: ComparisonResult): Promise<void> {
     if (!this.prisma) {
       this.logger.debug(
         'PrismaService unavailable — skipping comparison persistence',
@@ -231,8 +229,10 @@ export class ShadowRunner {
           sdkResult: comparison.sdkResult as Record<string, unknown>,
           sdkConfidence: comparison.sdkConfidence ?? 0,
           sdkDurationMs: comparison.sdkDurationMs,
-          heuristicResult:
-            comparison.heuristicResult as Record<string, unknown>,
+          heuristicResult: comparison.heuristicResult as Record<
+            string,
+            unknown
+          >,
           heuristicConfidence: comparison.heuristicConfidence ?? 0,
           heuristicDurationMs: comparison.heuristicDurationMs,
           resultsMatch: comparison.resultsMatch,

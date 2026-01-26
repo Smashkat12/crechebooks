@@ -28,6 +28,11 @@ import { SdkAgentModule } from '../sdk';
     GnnPatternAdapter,
     { provide: GNN_PATTERN_TOKEN, useExisting: GnnPatternAdapter },
   ],
-  exports: [AgentMemoryService, PatternLearner, CorrectionHandler, GraphBuilder],
+  exports: [
+    AgentMemoryService,
+    PatternLearner,
+    CorrectionHandler,
+    GraphBuilder,
+  ],
 })
 export class AgentMemoryModule {}

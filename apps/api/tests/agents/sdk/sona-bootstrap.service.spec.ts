@@ -75,10 +75,19 @@ const mockIntelligence = {
   isAvailable: jest.fn().mockReturnValue(true),
   learn: jest.fn().mockResolvedValue(undefined),
   getStats: jest.fn().mockResolvedValue({
-    sona: { trajectoriesRecorded: 3, patternsLearned: 0, lastBackgroundRun: null, backgroundIntervalMs: 3600000 },
+    sona: {
+      trajectoriesRecorded: 3,
+      patternsLearned: 0,
+      lastBackgroundRun: null,
+      backgroundIntervalMs: 3600000,
+    },
     vectorDb: { totalVectors: 0, collections: 0, storageSizeBytes: 0 },
     fastAgentDb: { totalEpisodes: 0, totalMemories: 0 },
-    learningEngine: { totalDecisions: 0, averageConfidence: 0, routingAccuracy: 0 },
+    learningEngine: {
+      totalDecisions: 0,
+      averageConfidence: 0,
+      routingAccuracy: 0,
+    },
     initialized: true,
     uptimeMs: 1000,
   }),
@@ -152,14 +161,25 @@ describe('SonaBootstrapService', () => {
     mockIntelligence.isAvailable.mockReturnValue(true);
     mockIntelligence.learn.mockResolvedValue(undefined);
     mockIntelligence.getStats.mockResolvedValue({
-      sona: { trajectoriesRecorded: 3, patternsLearned: 0, lastBackgroundRun: null, backgroundIntervalMs: 3600000 },
+      sona: {
+        trajectoriesRecorded: 3,
+        patternsLearned: 0,
+        lastBackgroundRun: null,
+        backgroundIntervalMs: 3600000,
+      },
       vectorDb: { totalVectors: 0, collections: 0, storageSizeBytes: 0 },
       fastAgentDb: { totalEpisodes: 0, totalMemories: 0 },
-      learningEngine: { totalDecisions: 0, averageConfidence: 0, routingAccuracy: 0 },
+      learningEngine: {
+        totalDecisions: 0,
+        averageConfidence: 0,
+        routingAccuracy: 0,
+      },
       initialized: true,
       uptimeMs: 1000,
     });
-    mockPersistenceConfig.getConfig.mockReturnValue({ ...defaultPersistenceValues });
+    mockPersistenceConfig.getConfig.mockReturnValue({
+      ...defaultPersistenceValues,
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -204,10 +224,13 @@ describe('SonaBootstrapService', () => {
 
       // Verify learn() was called with quality between 0 and 1
       const learnCalls = mockIntelligence.learn.mock.calls as Array<
-        [string, { quality: number; state: Record<string, unknown>; action: string }]
+        [
+          string,
+          { quality: number; state: Record<string, unknown>; action: string },
+        ]
       >;
       for (const call of learnCalls) {
-        if ((call[1].state as Record<string, unknown>)['__command']) continue; // Skip forceLearning trajectory
+        if (call[1].state['__command']) continue; // Skip forceLearning trajectory
         expect(call[1].quality).toBeGreaterThanOrEqual(0);
         expect(call[1].quality).toBeLessThanOrEqual(1);
       }
@@ -217,7 +240,14 @@ describe('SonaBootstrapService', () => {
       await service.bootstrap();
 
       const learnCalls = mockIntelligence.learn.mock.calls as Array<
-        [string, { quality: number; action: string; metadata?: Record<string, unknown> }]
+        [
+          string,
+          {
+            quality: number;
+            action: string;
+            metadata?: Record<string, unknown>;
+          },
+        ]
       >;
 
       // FNB has matchCount=120 (max), so quality should be 1.0
@@ -492,7 +522,8 @@ describe('SonaBootstrapService', () => {
         ],
       }).compile();
 
-      serviceWithoutPrisma = module.get<SonaBootstrapService>(SonaBootstrapService);
+      serviceWithoutPrisma =
+        module.get<SonaBootstrapService>(SonaBootstrapService);
     });
 
     it('should skip bootstrap when Prisma is unavailable', async () => {

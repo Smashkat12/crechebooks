@@ -60,10 +60,8 @@ export class PersistenceConfig {
       backupDir: path.join(dataDir, 'backups'),
       isPersistent,
       bootstrapEnabled:
-        this.configService.get<string>(
-          'SONA_BOOTSTRAP_ENABLED',
-          'true',
-        ) === 'true',
+        this.configService.get<string>('SONA_BOOTSTRAP_ENABLED', 'true') ===
+        'true',
     };
 
     if (!isPersistent) {

@@ -515,10 +515,7 @@ describe('Stub Replacement E2E Validation', () => {
       // Empty comparison data -> should block promotion
       prisma.shadowComparison.findMany.mockResolvedValue([]);
 
-      const result = await promotionService.promote(
-        'categorizer',
-        TEST_TENANT,
-      );
+      const result = await promotionService.promote('categorizer', TEST_TENANT);
 
       expect(result.success).toBe(false);
       expect(result.reason).toContain('Promotion criteria not met');
@@ -624,10 +621,7 @@ describe('Stub Replacement E2E Validation', () => {
       expect(report.totalDecisions).toBe(150);
 
       // Step 2: Promote
-      const result = await promotionService.promote(
-        'categorizer',
-        TEST_TENANT,
-      );
+      const result = await promotionService.promote('categorizer', TEST_TENANT);
       expect(result.success).toBe(true);
       expect(result.newMode).toBe('PRIMARY');
 

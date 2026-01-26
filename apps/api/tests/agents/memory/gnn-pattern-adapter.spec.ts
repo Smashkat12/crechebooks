@@ -27,7 +27,9 @@ interface GnnPatternAdapterTestAccess {
  * Helper to access internal adapter properties for test setup.
  * Uses a typed interface instead of 'any'.
  */
-function getTestAccess(adapter: GnnPatternAdapter): GnnPatternAdapterTestAccess {
+function getTestAccess(
+  adapter: GnnPatternAdapter,
+): GnnPatternAdapterTestAccess {
   return adapter as unknown as GnnPatternAdapterTestAccess;
 }
 
@@ -208,8 +210,12 @@ describe('GnnPatternAdapter', () => {
         isCredit: false,
       });
 
-      expect(testAccess.embeddingCache.has('tenant-A:woolworths:5200')).toBe(true);
-      expect(testAccess.embeddingCache.has('tenant-B:woolworths:5200')).toBe(true);
+      expect(testAccess.embeddingCache.has('tenant-A:woolworths:5200')).toBe(
+        true,
+      );
+      expect(testAccess.embeddingCache.has('tenant-B:woolworths:5200')).toBe(
+        true,
+      );
     });
 
     it('should work without Prisma service', async () => {
@@ -300,7 +306,9 @@ describe('GnnPatternAdapter', () => {
       const testAccess = getTestAccess(adapter);
       testAccess.ruvectorLayer = {
         forward: jest.fn(),
-        computeFisherInformation: jest.fn().mockRejectedValue(new Error('EWC error')),
+        computeFisherInformation: jest
+          .fn()
+          .mockRejectedValue(new Error('EWC error')),
       };
       testAccess.initialized = true;
 

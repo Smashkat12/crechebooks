@@ -23,7 +23,10 @@ import { PatternLearner } from './pattern-learner';
 import { FastAgentDBAdapter } from './fast-agentdb.adapter';
 import { REASONING_BANK_TOKEN } from './vectordb-reasoning-bank';
 import type { AgentDBInterface } from './interfaces/fast-agentdb.interface';
-import type { ReasoningBankInterface, StoreChainParams } from './interfaces/reasoning-bank.interface';
+import type {
+  ReasoningBankInterface,
+  StoreChainParams,
+} from './interfaces/reasoning-bank.interface';
 import type {
   StoreDecisionParams,
   RecordCorrectionParams,
@@ -58,7 +61,10 @@ export function computeInputHash(params: {
 @Injectable()
 export class AgentMemoryService {
   private readonly logger = new Logger(AgentMemoryService.name);
-  private readonly agentDb: Pick<AgentDBInterface, 'store' | 'recordCorrection' | 'getAccuracyStats'>;
+  private readonly agentDb: Pick<
+    AgentDBInterface,
+    'store' | 'recordCorrection' | 'getAccuracyStats'
+  >;
   private readonly reasoningBank: ReasoningBankInterface;
 
   constructor(
@@ -266,7 +272,8 @@ export class AgentMemoryService {
     // Try ruvector semantic search first
     if (this.ruvector?.isAvailable() && inputText) {
       try {
-        const embeddingResult = await this.ruvector.generateEmbedding(inputText);
+        const embeddingResult =
+          await this.ruvector.generateEmbedding(inputText);
         const results = await this.ruvector.searchSimilar(
           embeddingResult.vector,
           `decisions-${agentType}`,

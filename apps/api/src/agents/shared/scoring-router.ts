@@ -27,6 +27,7 @@ import type { LearningRouterInterface } from './interfaces/learning-router.inter
 // ────────────────────────────────────────────────────────────────────────────
 
 class MultiModelRouter {
+  // eslint-disable-next-line @typescript-eslint/require-await
   async selectPath(_context: {
     tenantId: string;
     agentType: string;
@@ -83,9 +84,7 @@ export class ScoringRouter {
         }
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `LearningRouter failed, falling back: ${msg}`,
-        );
+        this.logger.warn(`LearningRouter failed, falling back: ${msg}`);
       }
     }
 

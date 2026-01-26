@@ -2651,6 +2651,170 @@ Analysis triggered by AI agent architecture review:
 
 ---
 
-**Total Tasks**: 251 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal + 8 Accounting Parity + 12 SDK Migration)
-**Overall Completion**: 192/251 (76.5%)
+---
+
+## Phase 27: Stub Replacement with ruvector/agentic-flow (2026-01-26)
+
+Analysis Date: 2026-01-26
+Source: Deep analysis of ruvnet/ruvector repository and agentic-flow integration.
+
+These tasks replace all 7 stub implementations created during Phase 26 (SDK Migration) with real ruvector v0.1.96 and agentic-flow v2.0.2-alpha integrations. The stubs provided safe placeholder behavior; these tasks wire in the actual Rust-native vector DB, SONA self-optimizing neural architecture, GNN pattern learning, and reinforcement learning engines.
+
+### 27.1 Foundation Layer (Sequences 801-802)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 270 | TASK-STUB-001 | EmbeddingService Real Provider Setup | foundation | TASK-SDK-001 | P0-CRITICAL | ⭕ Ready |
+| 271 | TASK-STUB-002 | FastAgentDB Stub Replacement | foundation | TASK-STUB-001 | P0-CRITICAL | ⭕ Ready |
+
+### 27.2 Agent Layer (Sequences 803-808)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 272 | TASK-STUB-003 | LearningEngine Router Replacement | agent | TASK-STUB-001 | P1-HIGH | ⭕ Ready |
+| 273 | TASK-STUB-004 | FeedbackLoop Real Integration | agent | TASK-STUB-002, TASK-STUB-003 | P1-HIGH | ⭕ Ready |
+| 274 | TASK-STUB-005 | SONA Scorer Adapter | agent | TASK-STUB-001 | P1-HIGH | ⭕ Ready |
+| 275 | TASK-STUB-006 | ReasoningBank VectorDB Store | agent | TASK-STUB-001, TASK-STUB-002 | P1-HIGH | ⭕ Ready |
+| 276 | TASK-STUB-007 | GNN Pattern Learner Integration | agent | TASK-STUB-001, TASK-STUB-004 | P2-MEDIUM | ⭕ Ready |
+| 277 | TASK-STUB-008 | Decision Hooks SONA Wiring | agent | TASK-STUB-005 | P2-MEDIUM | ⭕ Ready |
+
+### 27.3 Integration Layer (Sequences 809-811)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 278 | TASK-STUB-009 | IntelligenceEngine Full Stack Integration | integration | TASK-STUB-002 thru 006 | P1-HIGH | ⭕ Ready |
+| 279 | TASK-STUB-010 | Multi-Tenant Vector Collections | integration | TASK-STUB-001 | P1-HIGH | ⭕ Ready |
+| 280 | TASK-STUB-011 | Persistence & SONA Cold Start Bootstrap | integration | TASK-STUB-009 | P1-HIGH | ⭕ Ready |
+
+### 27.4 Validation Layer (Sequence 812)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 281 | TASK-STUB-012 | E2E Validation & Shadow Dashboard | validation | ALL TASK-STUB-* | P0-CRITICAL | ⭕ Ready |
+
+### Phase 27 Dependency Graph
+
+```mermaid
+graph TD
+    subgraph "Foundation"
+        STUB001[TASK-STUB-001<br/>EmbeddingService]
+        STUB002[TASK-STUB-002<br/>FastAgentDB]
+    end
+
+    subgraph "Agent Layer"
+        STUB003[TASK-STUB-003<br/>LearningRouter]
+        STUB004[TASK-STUB-004<br/>FeedbackLoop]
+        STUB005[TASK-STUB-005<br/>SONA Scorer]
+        STUB006[TASK-STUB-006<br/>ReasoningBank]
+        STUB007[TASK-STUB-007<br/>GNN Patterns]
+        STUB008[TASK-STUB-008<br/>Decision Hooks]
+    end
+
+    subgraph "Integration"
+        STUB009[TASK-STUB-009<br/>IntelligenceEngine]
+        STUB010[TASK-STUB-010<br/>Multi-Tenant Collections]
+        STUB011[TASK-STUB-011<br/>Persistence & Bootstrap]
+    end
+
+    subgraph "Validation"
+        STUB012[TASK-STUB-012<br/>E2E & Shadow Dashboard]
+    end
+
+    STUB001 --> STUB002
+    STUB001 --> STUB003
+    STUB001 --> STUB005
+    STUB001 --> STUB006
+    STUB001 --> STUB010
+    STUB002 --> STUB004
+    STUB003 --> STUB004
+    STUB001 --> STUB007
+    STUB004 --> STUB007
+    STUB005 --> STUB008
+    STUB002 --> STUB009
+    STUB003 --> STUB009
+    STUB004 --> STUB009
+    STUB005 --> STUB009
+    STUB006 --> STUB009
+    STUB009 --> STUB011
+    STUB011 --> STUB012
+    STUB010 --> STUB012
+```
+
+### Stub-to-Real Mapping
+
+| Stub | Real Implementation | Source Package |
+|------|--------------------|---------------|
+| AgentDBStub | FastAgentDB + ReflexionMemory | ruvector + agentic-flow/agentdb |
+| MultiModelRouter | LearningEngine (Double-Q RL) | ruvector |
+| FeedbackLoopStub | RealFeedbackLoop | ruvector LearningEngine |
+| SONAScorer | SonaEngine (MicroLoRA) | ruvector |
+| ReasoningBankStub | VectorDB semantic store | ruvector |
+| GnnPatternLearnerStub | RuvectorLayer (4-head attention) | ruvector |
+| AgenticFlowHooksStub | RealDecisionHooks + SONA | ruvector + agentic-flow |
+
+---
+
+## Phase 27 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-CRITICAL | 3 | 0 | 3 | 0% |
+| P1-HIGH | 7 | 0 | 7 | 0% |
+| P2-MEDIUM | 2 | 0 | 2 | 0% |
+| **Total Phase 27** | **12** | **0** | **12** | **0%** |
+
+### Execution Order (Recommended)
+
+**Layer 1 - Foundation** (Run First):
+1. **TASK-STUB-001** (EmbeddingService) — No stub dependencies, must complete first
+2. **TASK-STUB-002** (FastAgentDB) — Requires STUB-001
+
+**Layer 2 - Agent Components** (Can run in parallel after foundation):
+3. **TASK-STUB-003** (LearningRouter) — Requires STUB-001
+4. **TASK-STUB-005** (SONA Scorer) — Requires STUB-001
+5. **TASK-STUB-006** (ReasoningBank) — Requires STUB-001, STUB-002
+6. **TASK-STUB-010** (Multi-Tenant Collections) — Requires STUB-001
+
+**Layer 3 - Wired Agents** (After Layer 2):
+7. **TASK-STUB-004** (FeedbackLoop) — Requires STUB-002, STUB-003
+8. **TASK-STUB-007** (GNN Pattern Learner) — Requires STUB-001, STUB-004
+9. **TASK-STUB-008** (Decision Hooks) — Requires STUB-005
+
+**Layer 4 - Integration** (After all agent components):
+10. **TASK-STUB-009** (IntelligenceEngine) — Requires STUB-002 thru 006
+11. **TASK-STUB-011** (Persistence & Bootstrap) — Requires STUB-009
+
+**Layer 5 - Validation** (After all integration):
+12. **TASK-STUB-012** (E2E Validation & Shadow Dashboard) — Requires ALL
+
+### Phase 27 Coverage
+
+| Feature | Pre-Phase 27 (Stubs) | Post-Phase 27 (Real) | Change |
+|---------|---------------------|---------------------|--------|
+| Vector Embedding (semantic) | Stub (no-op) | Real (Requesty.ai + ONNX fallback) | +100% |
+| Episodic Memory (FastAgentDB) | Stub (in-memory, no persistence) | Real (HNSW + ACID persistence) | +100% |
+| Agent Routing (RL) | Stub (random) | Real (Double-Q Learning) | +100% |
+| Feedback Propagation | Stub (no-op) | Real (RL reward + SONA trajectory) | +100% |
+| Weight Optimization (SONA) | Stub (returns 1.0) | Real (MicroLoRA ~0.1ms) | +100% |
+| Reasoning Retrieval | Stub (returns empty) | Real (VectorDB semantic search) | +100% |
+| Pattern Recognition (GNN) | Stub (returns empty) | Real (4-head attention, 448d) | +100% |
+| Decision Auditing | Stub (logs only) | Real (SONA + audit correction check) | +100% |
+| Unified Intelligence | None | IntelligenceEngine (all systems) | +100% |
+| Multi-Tenant Isolation | None | Collection-per-tenant with LRU cache | +100% |
+| Persistence & Bootstrap | None | Railway volume + SONA seed from Prisma | +100% |
+| Shadow Dashboard | None | REST API + CLI + go/no-go criteria | +100% |
+| **Overall Intelligence** | **0%** (stubs only) | **100%** (real ruvector) | **+100%** |
+
+### Review Source
+
+Analysis triggered by ruvnet/ruvector deep code analysis:
+- 63+ Rust crates, 5 NPM packages in ruvector
+- All 5 integration gaps resolved via docs/guides analysis
+- EmbeddingService, multi-tenancy, persistence, SONA cold start, platform binaries — all documented
+- **Tooling**: ruvector v0.1.96 (NAPI prebuilts + WASM fallback), agentic-flow v2.0.2-alpha (agentdb sub-export)
+
+---
+
+**Total Tasks**: 263 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal + 8 Accounting Parity + 12 SDK Migration + 12 Stub Replacement)
+**Overall Completion**: 192/263 (73.0%)
 

@@ -1429,6 +1429,114 @@ graph TD
 
 ---
 
-**Last Updated**: 2026-01-25
+## SDK Migration Traceability Matrix
+
+### Overview
+
+This section maps the existing AI agent capabilities to their Claude Agent SDK migration tasks, ensuring comprehensive coverage of all agent functionality, new LLM capabilities, and cross-cutting integration concerns.
+
+### Agent-to-Task Mapping
+
+| Existing Agent | Lines | Current Approach | SDK Task | Enhancement |
+|---------------|-------|-----------------|----------|-------------|
+| TransactionCategorizerAgent | 325 | Pattern match → historical → fallback | TASK-SDK-003 | + LLM inference in hybrid flow |
+| PaymentMatcherAgent | 428 | 3-factor scoring (ref/amount/name) | TASK-SDK-004 | + LLM fuzzy matching for ambiguous cases |
+| SarsAgent | 386 | Heuristic-only tax calculations | TASK-SDK-005 | + LLM plain-English explanations |
+| ExtractionValidatorAgent | 400 | 5-check scoring (0–100) | TASK-SDK-006 | + 6th semantic check via LLM |
+| OrchestratorAgent | 465 | Sequential workflow routing | TASK-SDK-007 | + Subagent spawning, parallel execution |
+| *(New)* ConversationalAgent | — | Does not exist | TASK-SDK-008 | Natural language financial queries |
+
+### SDK Foundation Coverage
+
+| Foundation Component | Task ID | Dependencies | Status |
+|---------------------|---------|-------------|--------|
+| SDK Package Integration (`@anthropic-ai/claude-agent-sdk`) | TASK-SDK-001 | None | ⭕ Ready |
+| `SdkAgentModule` (NestJS Module) | TASK-SDK-001 | None | ⭕ Ready |
+| `BaseSdkAgent` Abstract Class | TASK-SDK-001 | None | ⭕ Ready |
+| `SdkAgentFactory` Service | TASK-SDK-001 | None | ⭕ Ready |
+| `SdkConfigService` (tenant-scoped) | TASK-SDK-001 | None | ⭕ Ready |
+| `CrecheBooksToolServer` (In-Process MCP) | TASK-SDK-002 | TASK-SDK-001 | ⭕ Ready |
+
+### MCP Tool Coverage
+
+| MCP Tool | Purpose | Data Source | Task ID | Tenant-Isolated |
+|----------|---------|-------------|---------|-----------------|
+| `get_patterns` | Retrieve categorization patterns | `categorization_pattern` table | TASK-SDK-002 | ✅ |
+| `get_history` | Retrieve transaction history | `transaction` table | TASK-SDK-002 | ✅ |
+| `get_invoices` | Retrieve invoice data | `invoice` + `invoice_line_item` tables | TASK-SDK-002 | ✅ |
+| `query_transactions` | Search/filter transactions | `transaction` table with filters | TASK-SDK-002 | ✅ |
+| `get_reports` | Retrieve financial summaries | Aggregated from multiple tables | TASK-SDK-002 | ✅ |
+
+### New Prisma Models
+
+| Model | Purpose | Task ID | Key Fields |
+|-------|---------|---------|------------|
+| `AgentDecision` | Record every agent decision | TASK-SDK-010 | agentName, input, output, confidence, tenantId |
+| `CorrectionFeedback` | Track human corrections | TASK-SDK-010 | decisionId, correctedOutput, reason |
+| `AgentAuditLog` | Structured audit trail | TASK-SDK-011 | agentName, action, metadata, timestamp, tenantId |
+| `FeatureFlag` | Per-tenant SDK rollout | TASK-SDK-012 | tenantId, flagName, mode (DISABLED/SHADOW/PRIMARY) |
+
+### Cross-Cutting Integration Matrix
+
+| Capability | Agent Tasks Using It | Integration Task | Status |
+|-----------|---------------------|-----------------|--------|
+| Hybrid Scoring (LLM + heuristic) | SDK-003, SDK-004, SDK-006 | TASK-SDK-009 | ⭕ Ready |
+| Persistent Learning (AgentDB) | SDK-003, SDK-004, SDK-005, SDK-006 | TASK-SDK-010 | ⭕ Ready |
+| Structured Audit Trail | All agent tasks | TASK-SDK-011 | ⭕ Ready |
+| Feature Flag Rollout | All agent tasks | TASK-SDK-012 | ⭕ Ready |
+| Shadow Mode Testing | All agent tasks | TASK-SDK-012 | ⭕ Ready |
+
+### Confidence Thresholds
+
+| Agent | Auto-Apply Threshold | Review Threshold | Reject Threshold | Override |
+|-------|---------------------|-----------------|------------------|----------|
+| TransactionCategorizer | ≥ 80% (L3) | 50–79% (L2) | < 50% (L1) | None |
+| PaymentMatcher | ≥ 80% (L3) | 50–79% (L2) | < 50% (L1) | R50K+ → always L2 |
+| SarsAgent | Never (always L2) | Always L2 | — | SARS always DRAFT_FOR_REVIEW |
+| ExtractionValidator | ≥ 80 score | 50–79 score | < 50 score | None |
+| Orchestrator | N/A (router) | N/A | N/A | None |
+| ConversationalAgent | N/A (read-only) | N/A | N/A | QueryValidator blocks writes |
+
+### Feature Flag Rollout Strategy
+
+| Phase | Mode | Behavior | Duration |
+|-------|------|----------|----------|
+| 1. Disabled | `DISABLED` | Heuristic-only (existing behavior) | Default |
+| 2. Shadow | `SHADOW` | SDK runs in parallel, results logged but not used | 2–4 weeks |
+| 3. Primary | `PRIMARY` | SDK results used, heuristic as fallback | Permanent |
+
+### Dependency Chain (Critical Path)
+
+```
+TASK-SDK-001 (Setup)
+  → TASK-SDK-002 (MCP Server)
+    → TASK-SDK-003 (Categorizer Pilot) ← CRITICAL: validates entire pattern
+      → TASK-SDK-004 (Matcher)
+      → TASK-SDK-005 (SARS)
+      → TASK-SDK-006 (Validator)
+        → TASK-SDK-007 (Orchestrator) ← requires all agents migrated
+      → TASK-SDK-009 (Hybrid Scoring)
+      → TASK-SDK-010 (AgentDB)
+        → TASK-SDK-011 (Audit Trail)
+          → TASK-SDK-012 (Tests & Rollout) ← final gate
+```
+
+### Implementation Coverage Summary
+
+| Category | Total Features | Implemented | Pending | Coverage |
+|----------|---------------|-------------|---------|----------|
+| SDK Foundation | 5 | 0 | 5 | 0% |
+| MCP Tools | 5 | 0 | 5 | 0% |
+| Agent Migrations | 5 | 0 | 5 | 0% |
+| New Agents | 1 | 0 | 1 | 0% |
+| Hybrid Scoring | 3 | 0 | 3 | 0% |
+| Persistent Learning | 3 | 0 | 3 | 0% |
+| Audit Trail | 3 | 0 | 3 | 0% |
+| Rollout System | 3 | 0 | 3 | 0% |
+| **Total** | **28** | **0** | **28** | **0%** |
+
+---
+
+**Last Updated**: 2026-01-26
 **Author**: Claude Code
-**Review Status**: Phase 25 (Accounting Parity) Added
+**Review Status**: Phase 26 (SDK Migration) Added

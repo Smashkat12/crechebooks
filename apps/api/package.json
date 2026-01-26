@@ -6,7 +6,7 @@
   "private": true,
   "license": "PROPRIETARY",
   "scripts": {
-    "build": "nest build",
+    "build": "node --stack-size=65536 ./node_modules/@nestjs/cli/bin/nest.js build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -87,7 +87,9 @@
     "winston": "^3.19.0",
     "xero-node": "^6.0.0",
     "@nestjs/event-emitter": "^3.0.0",
-    "mailgun.js": "^10.2.3"
+    "mailgun.js": "^10.2.3",
+    "agentic-flow": "^2.0.6",
+    "ruvector": "^0.1.96"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

@@ -11,7 +11,7 @@
  * CRITICAL: This agent sits between PDF parsing and transaction import.
  * Invalid extractions are escalated for human review.
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { ParsedBankStatement } from '../../database/entities/bank-statement-match.entity';
 import { BalanceReconciler } from './balance-reconciler';
 import { AmountSanityChecker } from './amount-sanity-checker';
@@ -22,6 +22,9 @@ import {
   ValidationFlag,
   ValidatedBankStatement,
 } from './interfaces/validator.interface';
+import type { SemanticValidationResult } from './interfaces/sdk-validator.interface';
+import { SdkSemanticValidator } from './sdk-validator';
+import { ShadowRunner } from '../rollout/shadow-runner';
 
 // Confidence thresholds
 const THRESHOLDS = {
@@ -38,6 +41,12 @@ export class ExtractionValidatorAgent {
     private readonly balanceReconciler: BalanceReconciler,
     private readonly sanityChecker: AmountSanityChecker,
     private readonly decisionLogger: ExtractionDecisionLogger,
+    @Optional()
+    @Inject(SdkSemanticValidator)
+    private readonly sdkValidator?: SdkSemanticValidator,
+    @Optional()
+    @Inject(ShadowRunner)
+    private readonly shadowRunner?: ShadowRunner,
   ) {}
 
   /**
@@ -143,6 +152,41 @@ export class ExtractionValidatorAgent {
       });
     }
 
+    // 6. Semantic validation via LLM (supplementary +5/-10 points)
+    let semanticValidation: SemanticValidationResult | undefined;
+    if (this.sdkValidator) {
+      try {
+        semanticValidation = await this.sdkValidator.validate(
+          statement,
+          tenantId,
+        );
+        if (
+          semanticValidation.isSemanticValid &&
+          semanticValidation.semanticConfidence >= 70
+        ) {
+          confidence += 5;
+          this.logger.log('Semantic validation: PASSED (+5 bonus)');
+        } else if (!semanticValidation.isSemanticValid) {
+          confidence -= 10;
+          flags.push(
+            ...semanticValidation.issues.map((issue) => ({
+              severity: issue.severity,
+              code: `SEMANTIC_${issue.code}`,
+              message: issue.description,
+            })),
+          );
+          this.logger.warn(
+            `Semantic validation: FAILED (-10 penalty, ${String(semanticValidation.issues.length)} issues)`,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Semantic validation skipped: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+    confidence = Math.max(0, Math.min(100, confidence));
+
     // Determine validity
     const isValid =
       confidence >= THRESHOLDS.AUTO_ACCEPT && reconciliation.reconciled;
@@ -162,6 +206,7 @@ export class ExtractionValidatorAgent {
       flags,
       reasoning,
       reconciliation,
+      semanticValidation,
     };
 
     // Log the decision

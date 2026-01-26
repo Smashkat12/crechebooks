@@ -640,6 +640,16 @@ model Tenant {
   // TASK-ACCT-014: Onboarding Wizard
   onboardingProgress OnboardingProgress?
 
+  // TASK-SDK-010: Agent Memory
+  agentDecisions     AgentDecision[]
+  correctionFeedback CorrectionFeedback[]
+
+  // TASK-SDK-011: Structured Audit Trail
+  agentAuditLogs     AgentAuditLog[]
+
+  // TASK-SDK-012: Feature Flags for SDK Rollout
+  featureFlags       FeatureFlag[]
+
   @@map("tenants")
 }
 
@@ -859,6 +869,8 @@ model PayeePattern {
   isRecurring           Boolean  @default(false) @map("is_recurring")
   expectedAmountCents   Int?     @map("expected_amount_cents")
   amountVariancePercent Decimal? @map("amount_variance_percent") @db.Decimal(5, 2)
+  source                String   @default("MANUAL") @map("source") @db.VarChar(20)
+  isActive              Boolean  @default(true) @map("is_active")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 
@@ -3712,4 +3724,101 @@ model OnboardingProgress {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("onboarding_progress")
+}
+
+// ============================================
+// TASK-SDK-010: Agent Memory - Decision Storage & Correction Feedback
+// ============================================
+
+model AgentDecision {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  agentType       String   @map("agent_type") @db.VarChar(30)
+  inputHash       String   @map("input_hash") @db.VarChar(64)
+  decision        Json
+  confidence      Int      // 0-100
+  source          String   @db.VarChar(20) // 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID'
+  wasCorrect      Boolean? @map("was_correct")
+  correctedTo     Json?    @map("corrected_to")
+  transactionId   String?  @map("transaction_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  corrections CorrectionFeedback[]
+
+  @@index([tenantId, agentType])
+  @@index([tenantId, inputHash])
+  @@index([agentType, wasCorrect])
+  @@index([transactionId])
+  @@map("agent_decisions")
+}
+
+model CorrectionFeedback {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  agentDecisionId String   @map("agent_decision_id")
+  originalValue   Json     @map("original_value")
+  correctedValue  Json     @map("corrected_value")
+  correctedBy     String   @map("corrected_by")
+  reason          String?
+  appliedToPattern Boolean @default(false) @map("applied_to_pattern")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  agentDecision AgentDecision @relation(fields: [agentDecisionId], references: [id], onDelete: Cascade)
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, appliedToPattern])
+  @@index([agentDecisionId])
+  @@map("correction_feedback")
+}
+
+// ============================================
+// TASK-SDK-011: Structured Audit Trail
+// ============================================
+
+model AgentAuditLog {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  agentType       String   @map("agent_type") @db.VarChar(30)
+  eventType       String   @map("event_type") @db.VarChar(30)
+  workflowId      String?  @map("workflow_id")
+  transactionId   String?  @map("transaction_id")
+  decision        String   @db.VarChar(50)
+  confidence      Int?
+  source          String?  @db.VarChar(20)
+  autoApplied     Boolean  @default(false) @map("auto_applied")
+  details         Json
+  reasoning       String?  @db.Text
+  durationMs      Int?     @map("duration_ms")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, agentType])
+  @@index([tenantId, eventType])
+  @@index([tenantId, createdAt])
+  @@index([workflowId])
+  @@index([transactionId])
+  @@map("agent_audit_logs")
+}
+
+// ============================================
+// TASK-SDK-012: Feature Flags for SDK Rollout
+// ============================================
+
+model FeatureFlag {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  flag        String   @db.VarChar(50)
+  enabled     Boolean  @default(false)
+  mode        String   @default("SHADOW") @db.VarChar(20)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, flag])
+  @@index([tenantId])
+  @@map("feature_flags")
 }

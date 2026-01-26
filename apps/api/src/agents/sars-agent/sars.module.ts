@@ -11,11 +11,20 @@ import { Module, forwardRef } from '@nestjs/common';
 import { SarsAgent } from './sars.agent';
 import { SarsDecisionLogger } from './decision-logger';
 import { SarsContextValidator } from './context-validator';
+import { SdkSarsExplainer } from './sdk-sars-explainer';
 import { DatabaseModule } from '../../database/database.module';
+import { SdkAgentModule } from '../sdk';
+import { AuditTrailModule } from '../audit/audit-trail.module';
+import { RolloutModule } from '../rollout/rollout.module';
 
 @Module({
-  imports: [forwardRef(() => DatabaseModule)],
-  providers: [SarsAgent, SarsDecisionLogger, SarsContextValidator],
+  imports: [forwardRef(() => DatabaseModule), SdkAgentModule, AuditTrailModule, RolloutModule],
+  providers: [
+    SarsAgent,
+    SarsDecisionLogger,
+    SarsContextValidator,
+    SdkSarsExplainer,
+  ],
   exports: [SarsAgent, SarsContextValidator],
 })
 export class SarsAgentModule {}

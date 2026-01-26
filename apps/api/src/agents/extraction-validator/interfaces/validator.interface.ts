@@ -5,6 +5,7 @@
  * Interfaces for PDF extraction validation agent
  */
 import { ParsedBankStatement } from '../../../database/entities/bank-statement-match.entity';
+import type { SemanticValidationResult } from './sdk-validator.interface';
 
 /**
  * Result of balance reconciliation check
@@ -65,6 +66,8 @@ export interface ValidationResult {
   flags: ValidationFlag[];
   reasoning: string; // Human-readable explanation
   reconciliation?: ReconciliationResult;
+  /** Semantic validation result from LLM (TASK-SDK-006) */
+  semanticValidation?: SemanticValidationResult;
 }
 
 /**

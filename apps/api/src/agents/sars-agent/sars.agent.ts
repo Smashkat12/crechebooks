@@ -13,12 +13,14 @@
  * - Tenant isolation on ALL operations
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PayeService } from '../../database/services/paye.service';
 import { UifService } from '../../database/services/uif.service';
 import { Emp201Service } from '../../database/services/emp201.service';
 import { Vat201Service } from '../../database/services/vat201.service';
 import { SarsDecisionLogger } from './decision-logger';
+import { SdkSarsExplainer } from './sdk-sars-explainer';
+import { ShadowRunner } from '../rollout/shadow-runner';
 import {
   SarsDecision,
   AgentPayeDto,
@@ -39,6 +41,12 @@ export class SarsAgent {
     private readonly emp201Service: Emp201Service,
     private readonly vat201Service: Vat201Service,
     private readonly decisionLogger: SarsDecisionLogger,
+    @Optional()
+    @Inject(SdkSarsExplainer)
+    private readonly sdkExplainer?: SdkSarsExplainer,
+    @Optional()
+    @Inject(ShadowRunner)
+    private readonly shadowRunner?: ShadowRunner,
   ) {}
 
   /**
@@ -113,7 +121,30 @@ export class SarsAgent {
       result.netPayeCents,
     );
 
-    return decision;
+    // Generate human-friendly explanation if SDK explainer is available
+    let humanExplanation: string | undefined;
+    if (this.sdkExplainer) {
+      try {
+        humanExplanation = await this.sdkExplainer.explain(
+          'PAYE',
+          decision.breakdown!,
+          {
+            tenantId,
+            period,
+            type: 'PAYE',
+          },
+        );
+      } catch (error) {
+        this.logger.warn(
+          `SDK explainer failed for PAYE: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return {
+      ...decision,
+      humanExplanation,
+    };
   }
 
   /**
@@ -170,7 +201,30 @@ export class SarsAgent {
       result.totalContributionCents,
     );
 
-    return decision;
+    // Generate human-friendly explanation if SDK explainer is available
+    let humanExplanation: string | undefined;
+    if (this.sdkExplainer) {
+      try {
+        humanExplanation = await this.sdkExplainer.explain(
+          'UIF',
+          decision.breakdown!,
+          {
+            tenantId,
+            period,
+            type: 'UIF',
+          },
+        );
+      } catch (error) {
+        this.logger.warn(
+          `SDK explainer failed for UIF: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return {
+      ...decision,
+      humanExplanation,
+    };
   }
 
   /**
@@ -253,7 +307,30 @@ export class SarsAgent {
       totalPayableCents,
     );
 
-    return decision;
+    // Generate human-friendly explanation if SDK explainer is available
+    let humanExplanation: string | undefined;
+    if (this.sdkExplainer) {
+      try {
+        humanExplanation = await this.sdkExplainer.explain(
+          'EMP201',
+          decision.breakdown!,
+          {
+            tenantId,
+            period: periodMonth,
+            type: 'EMP201',
+          },
+        );
+      } catch (error) {
+        this.logger.warn(
+          `SDK explainer failed for EMP201: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return {
+      ...decision,
+      humanExplanation,
+    };
   }
 
   /**
@@ -332,7 +409,30 @@ export class SarsAgent {
       netVatCents,
     );
 
-    return decision;
+    // Generate human-friendly explanation if SDK explainer is available
+    let humanExplanation: string | undefined;
+    if (this.sdkExplainer) {
+      try {
+        humanExplanation = await this.sdkExplainer.explain(
+          'VAT201',
+          decision.breakdown!,
+          {
+            tenantId,
+            period: periodStr,
+            type: 'VAT201',
+          },
+        );
+      } catch (error) {
+        this.logger.warn(
+          `SDK explainer failed for VAT201: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    return {
+      ...decision,
+      humanExplanation,
+    };
   }
 
   /**

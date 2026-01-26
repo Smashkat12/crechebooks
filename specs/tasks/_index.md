@@ -2409,3 +2409,248 @@ Gap analysis triggered by comparative analysis against Stub.africa accounting fe
 **Total Tasks**: 239 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal + 8 Accounting Parity)
 **Overall Completion**: 192/239 (80.3%)
 
+---
+
+## Phase 26: SDK Migration (AI Agent SDK Integration with agentic-flow & ruvector)
+
+**Objective**: Migrate CrecheBooks' 5 rule-based AI agents to the agentic-flow SDK (multi-model execution/orchestration with ReasoningBank, AgentDB, and SONA adaptive learning) and ruvector (Rust-native vector database with HNSW indexing and GNN self-improving index), adding LLM inference alongside existing heuristics with hybrid scoring, persistent learning, vector-based memory, structured audit trails, and gradual rollout via feature flags.
+
+**Analysis Source**: AI agent capability analysis and agentic-flow / ruvector architecture review.
+See: `/redesign AI Agents architecture.txt`
+
+### Phase 26 Dependency Graph
+
+```mermaid
+graph TD
+    subgraph Foundation["Foundation Layer"]
+        SDK001[TASK-SDK-001<br/>SDK TypeScript Setup]
+        SDK002[TASK-SDK-002<br/>In-Process MCP Server]
+    end
+
+    subgraph AgentMigration["Agent Migration Layer"]
+        SDK003[TASK-SDK-003<br/>TransactionCategorizer Pilot]
+        SDK004[TASK-SDK-004<br/>PaymentMatcher Migration]
+        SDK005[TASK-SDK-005<br/>SarsAgent Enhancement]
+        SDK006[TASK-SDK-006<br/>ExtractionValidator Enhancement]
+        SDK007[TASK-SDK-007<br/>Orchestrator Parent Agent]
+        SDK008[TASK-SDK-008<br/>ConversationalAgent NEW]
+    end
+
+    subgraph Integration["Integration Layer"]
+        SDK009[TASK-SDK-009<br/>Hybrid Scoring System]
+        SDK010[TASK-SDK-010<br/>AgentDB Persistent Learning]
+        SDK011[TASK-SDK-011<br/>Structured Audit Trail]
+        SDK012[TASK-SDK-012<br/>Integration Tests & Rollout]
+    end
+
+    SDK001 --> SDK002
+    SDK001 --> SDK003
+    SDK002 --> SDK003
+    SDK003 --> SDK004
+    SDK003 --> SDK005
+    SDK003 --> SDK006
+    SDK001 --> SDK007
+    SDK003 --> SDK007
+    SDK004 --> SDK007
+    SDK005 --> SDK007
+    SDK006 --> SDK007
+    SDK001 --> SDK008
+    SDK002 --> SDK008
+    SDK003 --> SDK009
+    SDK004 --> SDK009
+    SDK003 --> SDK010
+    SDK010 --> SDK011
+    SDK009 --> SDK012
+    SDK010 --> SDK012
+    SDK011 --> SDK012
+    SDK003 --> SDK012
+    SDK004 --> SDK012
+    SDK005 --> SDK012
+    SDK006 --> SDK012
+    SDK007 --> SDK012
+```
+
+### Phase 26 Tasks
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 701 | TASK-SDK-001 | Claude Agent SDK TypeScript Integration Setup | foundation | None | P0-CRITICAL | ⭕ Ready |
+| 702 | TASK-SDK-002 | CrecheBooks In-Process MCP Server | foundation | TASK-SDK-001 | P0-CRITICAL | ⭕ Ready |
+| 703 | TASK-SDK-003 | TransactionCategorizerAgent SDK Migration (Pilot) | agent | TASK-SDK-001, TASK-SDK-002 | P0-CRITICAL | ⭕ Ready |
+| 704 | TASK-SDK-004 | PaymentMatcherAgent SDK Migration | agent | TASK-SDK-003 | P1-HIGH | ⭕ Ready |
+| 705 | TASK-SDK-005 | SarsAgent SDK Enhancement (LLM Explanations) | agent | TASK-SDK-003 | P1-HIGH | ⭕ Ready |
+| 706 | TASK-SDK-006 | ExtractionValidatorAgent SDK Enhancement | agent | TASK-SDK-003 | P1-HIGH | ⭕ Ready |
+| 707 | TASK-SDK-007 | OrchestratorAgent SDK Parent Agent Migration | agent | TASK-SDK-001, TASK-SDK-003 thru 006 | P1-HIGH | ⭕ Ready |
+| 708 | TASK-SDK-008 | ConversationalAgent Implementation (NEW) | agent | TASK-SDK-001, TASK-SDK-002 | P2-MEDIUM | ⭕ Ready |
+| 709 | TASK-SDK-009 | Hybrid Scoring System | integration | TASK-SDK-003, TASK-SDK-004 | P1-HIGH | ⭕ Ready |
+| 710 | TASK-SDK-010 | AgentDB & Persistent Learning Memory | integration | TASK-SDK-003 | P1-HIGH | ⭕ Ready |
+| 711 | TASK-SDK-011 | Structured Audit Trail & Decision Hooks | integration | TASK-SDK-010 | P1-HIGH | ⭕ Ready |
+| 712 | TASK-SDK-012 | SDK Agent Integration Tests & Parallel Rollout | integration | TASK-SDK-009 thru 011, all agent tasks | P1-HIGH | ⭕ Ready |
+
+### Key Deliverables
+
+**SDK TypeScript Setup (TASK-SDK-001)**:
+- Install `agentic-flow` (includes claude-agent-sdk transitively) and `ruvector` packages
+- `SdkAgentModule` (NestJS module) with `SdkAgentFactory`, `SdkConfigService`
+- `BaseSdkAgent` abstract class with `executeWithFallback()` pattern
+- Multi-model routing configuration (Claude, Gemini, OpenRouter)
+- `RuvectorService` NestJS provider for vector operations
+- ruvector PostgreSQL extension migration
+- Tenant-scoped Claude client instantiation
+- Feature flag integration for SDK enable/disable per tenant
+
+**In-Process MCP Server (TASK-SDK-002)**:
+- `CrecheBooksToolServer` with 5+1 MCP tools (5 Prisma read-only + 1 ruvector semantic search)
+- Tools: `get_patterns`, `get_history`, `get_invoices`, `query_transactions`, `get_reports`, `semantic_search`
+- Built on agentic-flow's `fastmcp` library
+- Mandatory tenant isolation on every tool call
+- In-process transport (no HTTP overhead)
+- Integration with existing Prisma services
+
+**TransactionCategorizer Pilot (TASK-SDK-003)**:
+- Hybrid flow: pattern match → ruvector semantic pattern search → LLM inference → historical fallback → manual
+- SA chart of accounts embedded in system prompt
+- agentic-flow multi-model routing for cost optimization (Haiku for simple, Sonnet for complex)
+- ReasoningBank caching for LLM results (avoids re-inference on repeated patterns)
+- 95%+ accuracy target with < 2s p95 latency
+- Confidence threshold at 80% for auto-apply
+- First agent to validate the SDK integration pattern
+
+**PaymentMatcher Migration (TASK-SDK-004)**:
+- LLM fuzzy matching for ambiguous parent name / reference cases
+- ruvector embedding-based reference matching (supplements Levenshtein with semantic similarity)
+- R50,000 high-value guard requiring human review
+- Existing 3-factor scoring (reference/amount/name) preserved
+- SDK adds contextual reasoning for edge cases
+
+**SarsAgent Enhancement (TASK-SDK-005)**:
+- LLM generates plain-English explanations of tax calculations
+- Multi-model routing via agentic-flow (Sonnet primary, Gemini fallback)
+- NEVER calculates tax amounts (heuristic-only for numbers)
+- Always L2 (DRAFT_FOR_REVIEW) — no auto-submission
+- Explains PAYE brackets, UIF, SDL in human-readable language
+
+**ExtractionValidator Enhancement (TASK-SDK-006)**:
+- 6th validation check: semantic consistency via LLM (±10 points)
+- Multi-model routing via agentic-flow (cost-optimized model selection per validation)
+- PII sanitization before any data reaches the LLM
+- Existing 5 checks preserved (balance, amount, date, OCR, count)
+- Total score still 0–100 scale
+
+**Orchestrator Parent Agent (TASK-SDK-007)**:
+- agentic-flow orchestration engine with native dependency graphs (replaces manual subagent spawning)
+- `WorkflowResultAdaptor` for interface preservation with existing NestJS services
+- ruvector agent routing for dynamic optimization (selects best model/agent per task)
+- Parallel execution for BANK_IMPORT workflows
+- Error isolation: one agent failure doesn't crash the workflow
+- Sequential fallback for dependent workflows
+
+**ConversationalAgent (TASK-SDK-008)**:
+- New agent: natural language financial queries
+- agentic-flow conversational agent patterns as base (pre-built tool-use and context management)
+- ruvector semantic search over financial data (natural language to structured query)
+- `POST /api/conversational/ask` endpoint
+- `QueryValidator` ensures read-only queries only
+- Tenant-scoped data access with permission checks
+- Responds with formatted financial summaries
+
+**Hybrid Scoring System (TASK-SDK-009)**:
+- agentic-flow SONA (Self-Optimizing Neural Architecture) with Prisma dual-write for weight persistence
+- SONA replaces custom `HybridScorer` — adaptive weight calibration across LLM / heuristic scores
+- `AccuracyTracker` records outcomes feeding SONA's self-optimization loop
+- Minimum 50 samples threshold before SONA adjusts weights
+- Per-agent weight configuration
+
+**AgentDB & Persistent Learning (TASK-SDK-010)**:
+- agentic-flow AgentDB + ruvector vector memory with Prisma compliance dual-write
+- `AgentDecision` and `CorrectionFeedback` Prisma models (compliance layer)
+- ruvector GNN self-improving patterns (vector embeddings auto-cluster over time)
+- `PatternLearner`: 3+ corrections on same pattern → new rule (stored in both Prisma and ruvector)
+- Tenant-scoped learning (no cross-tenant data leakage)
+- Decision history queryable for audit and analytics (Prisma structured + ruvector semantic)
+
+**Structured Audit Trail (TASK-SDK-011)**:
+- `AgentAuditLog` Prisma model with full decision metadata
+- agentic-flow hook system integration (pre-decision, post-decision, error hooks)
+- ruvector vector-indexed audit search (semantic querying of audit history)
+- Unified `AuditTrailService` replacing per-agent JSONL files
+- Triple-write period: DB + legacy JSONL + ruvector for backwards compatibility and semantic search
+- Query API for audit log retrieval with filters (structured via Prisma, semantic via ruvector)
+
+**Integration Tests & Rollout (TASK-SDK-012)**:
+- `FeatureFlag` Prisma model for per-tenant SDK rollout
+- `ShadowRunner`: DISABLED → SHADOW → PRIMARY modes
+- agentic-flow multi-agent comparison for ShadowRunner (runs old + new in parallel, diffs results)
+- Integration tests for ruvector + agentic-flow (vector store lifecycle, model routing, SONA calibration)
+- E2E tests for all 6 agents (5 migrated + 1 new)
+- Shadow mode compares SDK vs heuristic results without affecting production
+- Rollout playbook with rollback procedures
+
+### Phase 26 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-CRITICAL | 3 | 0 | 3 | 0% |
+| P1-HIGH | 7 | 0 | 7 | 0% |
+| P2-MEDIUM | 2 | 0 | 2 | 0% |
+| **Total Phase 26** | **12** | **0** | **12** | **0%** |
+
+### Execution Order (Recommended)
+
+**Layer 1 - Foundation** (Run First):
+1. **TASK-SDK-001** (SDK Setup) — No dependencies, must complete first
+2. **TASK-SDK-002** (MCP Server) — Requires SDK-001
+
+**Layer 2 - Pilot Agent** (Validates Pattern):
+3. **TASK-SDK-003** (TransactionCategorizer Pilot) — Requires SDK-001, SDK-002
+
+**Layer 3 - Remaining Agents** (Can run in parallel after pilot):
+4. **TASK-SDK-004** (PaymentMatcher) — Requires SDK-003
+5. **TASK-SDK-005** (SarsAgent) — Requires SDK-003
+6. **TASK-SDK-006** (ExtractionValidator) — Requires SDK-003
+7. **TASK-SDK-008** (ConversationalAgent) — Requires SDK-001, SDK-002
+
+**Layer 4 - Integration Agent** (After all agents):
+8. **TASK-SDK-007** (Orchestrator) — Requires SDK-003 through SDK-006
+
+**Layer 5 - Cross-Cutting** (Can start after pilot):
+9. **TASK-SDK-009** (Hybrid Scoring) — Requires SDK-003, SDK-004
+10. **TASK-SDK-010** (AgentDB Learning) — Requires SDK-003
+
+**Layer 6 - Final Integration** (After cross-cutting):
+11. **TASK-SDK-011** (Audit Trail) — Requires SDK-010
+12. **TASK-SDK-012** (Tests & Rollout) — Requires SDK-009 through SDK-011 and all agents
+
+### Phase 26 Coverage
+
+| Feature | Pre-Phase 26 | Post-Phase 26 | Change |
+|---------|--------------|---------------|--------|
+| LLM-Powered Categorization | 0% (rule-based) | 100% (hybrid) | +100% |
+| LLM-Powered Matching | 0% (rule-based) | 100% (hybrid) | +100% |
+| Tax Calculation Explanations | 0% | 100% | +100% |
+| Semantic Validation | 0% | 100% | +100% |
+| Parent Agent Orchestration | 0% (sequential) | 100% (subagent) | +100% |
+| Natural Language Queries | 0% | 100% | +100% |
+| Hybrid Scoring Calibration | 0% | 100% | +100% |
+| Persistent Learning Memory | 0% | 100% | +100% |
+| Structured Audit Trail (DB) | 0% (JSONL files) | 100% (DB + JSONL) | +100% |
+| Feature Flag Rollout | 0% | 100% | +100% |
+| **Overall AI Agent Capability** | **15%** | **100%** | **+85%** |
+
+### Review Source
+
+Analysis triggered by AI agent architecture review:
+- 5 existing agents are rule-based only (~4,300 lines TypeScript)
+- No LLM inference capability (missed edge cases, no explanations)
+- No persistent learning from corrections
+- JSONL audit logs not queryable
+- Sequential orchestration limits throughput
+- No conversational interface for financial queries
+- Phase 26 addresses all gaps with 12 comprehensive SDK migration tasks
+- **Tooling**: agentic-flow v2.0.2-alpha (multi-model orchestration, ReasoningBank, AgentDB, SONA) + ruvector v0.1.96 (Rust-native HNSW vector DB, GNN self-improving index, PostgreSQL extension)
+
+---
+
+**Total Tasks**: 251 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal + 8 Accounting Parity + 12 SDK Migration)
+**Overall Completion**: 192/251 (76.5%)
+

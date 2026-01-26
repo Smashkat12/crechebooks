@@ -4,11 +4,12 @@
  *
  * Logs all validation decisions to .claude/logs/decisions.jsonl
  */
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ParsedBankStatement } from '../../database/entities/bank-statement-match.entity';
 import { ValidationResult } from './interfaces/validator.interface';
+import { AuditTrailService } from '../audit/audit-trail.service';
 
 interface ValidationDecision {
   timestamp: string;
@@ -49,7 +50,11 @@ export class ExtractionDecisionLogger {
   private readonly logger = new Logger(ExtractionDecisionLogger.name);
   private readonly logsDir: string;
 
-  constructor() {
+  constructor(
+    @Optional()
+    @Inject(AuditTrailService)
+    private readonly auditTrail?: AuditTrailService,
+  ) {
     // Use .claude/logs directory relative to project root
     this.logsDir = path.join(process.cwd(), '.claude', 'logs');
   }
@@ -123,6 +128,24 @@ export class ExtractionDecisionLogger {
       `Logged validation: decision=${decision}, confidence=${result.confidence}, ` +
         `reconciled=${result.balanceReconciled}, flags=${result.flags.length}`,
     );
+
+    // TASK-SDK-011: Write to database audit trail (non-blocking)
+    if (this.auditTrail) {
+      this.auditTrail.logDecision({
+        tenantId,
+        agentType: 'validator',
+        decision: decision,
+        confidence: result.confidence,
+        autoApplied: false,
+        details: {
+          balanceReconciled: result.balanceReconciled,
+          flagCount: result.flags.length,
+          correctionCount: result.corrections.length,
+          transactionCount: statement.transactions.length,
+        },
+        reasoning: result.reasoning,
+      }).catch((err: Error) => this.logger.warn(`Audit trail write failed: ${err.message}`));
+    }
   }
 
   /**
@@ -158,5 +181,20 @@ export class ExtractionDecisionLogger {
       `Logged escalation: tenant=${tenantId}, confidence=${result.confidence}, ` +
         `errors=${errorCodes.join(', ')}`,
     );
+
+    // TASK-SDK-011: Write escalation to database audit trail (non-blocking)
+    if (this.auditTrail) {
+      this.auditTrail.logEscalation({
+        tenantId,
+        agentType: 'validator',
+        reason: result.reasoning,
+        details: {
+          confidence: result.confidence,
+          balanceDifference: result.balanceDifference,
+          flagCount: result.flags.length,
+          errorCodes,
+        },
+      }).catch((err: Error) => this.logger.warn(`Audit escalation write failed: ${err.message}`));
+    }
   }
 }

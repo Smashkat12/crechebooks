@@ -173,11 +173,13 @@ enum MatchedBy {
 enum EmploymentType {
   PERMANENT
   CONTRACT
+  PART_TIME
   CASUAL
 }
 
 enum PayFrequency {
   MONTHLY
+  FORTNIGHTLY
   WEEKLY
   DAILY
   HOURLY

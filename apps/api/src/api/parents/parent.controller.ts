@@ -276,7 +276,9 @@ export class ParentController {
   @Post(':id/send-onboarding-invite')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send onboarding invite email with magic link to parent' })
+  @ApiOperation({
+    summary: 'Send onboarding invite email with magic link to parent',
+  })
   @ApiParam({ name: 'id', description: 'Parent ID' })
   @ApiResponse({ status: 200, description: 'Onboarding invite sent' })
   @ApiResponse({ status: 404, description: 'Parent not found' })

@@ -19,7 +19,9 @@ describe('ScoringRouter', () => {
     router = new ScoringRouter(tracker);
   });
 
-  const makeOutcome = (overrides: Partial<AccuracyOutcome> = {}): AccuracyOutcome => ({
+  const makeOutcome = (
+    overrides: Partial<AccuracyOutcome> = {},
+  ): AccuracyOutcome => ({
     tenantId: 'tenant-1',
     agentType: 'categorizer',
     llmPrediction: '4100',
@@ -49,11 +51,13 @@ describe('ScoringRouter', () => {
     it('should return LLM_PRIMARY when LLM has better accuracy', async () => {
       // Add 60 records: LLM correct 55/60, heuristic correct 30/60
       for (let i = 0; i < 60; i++) {
-        await tracker.recordOutcome(makeOutcome({
-          llmPrediction: i < 55 ? '4100' : '8100',
-          heuristicPrediction: i < 30 ? '4100' : '8100',
-          actualOutcome: '4100',
-        }));
+        await tracker.recordOutcome(
+          makeOutcome({
+            llmPrediction: i < 55 ? '4100' : '8100',
+            heuristicPrediction: i < 30 ? '4100' : '8100',
+            actualOutcome: '4100',
+          }),
+        );
       }
 
       const path = await router.getPreferredPath('tenant-1', 'categorizer');
@@ -63,11 +67,13 @@ describe('ScoringRouter', () => {
     it('should return HEURISTIC_PRIMARY when heuristic has better accuracy', async () => {
       // Add 60 records: heuristic correct 55/60, LLM correct 30/60
       for (let i = 0; i < 60; i++) {
-        await tracker.recordOutcome(makeOutcome({
-          llmPrediction: i < 30 ? '4100' : '8100',
-          heuristicPrediction: i < 55 ? '4100' : '8100',
-          actualOutcome: '4100',
-        }));
+        await tracker.recordOutcome(
+          makeOutcome({
+            llmPrediction: i < 30 ? '4100' : '8100',
+            heuristicPrediction: i < 55 ? '4100' : '8100',
+            actualOutcome: '4100',
+          }),
+        );
       }
 
       const path = await router.getPreferredPath('tenant-1', 'categorizer');

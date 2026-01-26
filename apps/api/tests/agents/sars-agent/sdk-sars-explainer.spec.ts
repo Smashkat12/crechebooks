@@ -380,7 +380,9 @@ describe('SdkSarsExplainer', () => {
     });
 
     it('should contain "accountant should review" instruction', () => {
-      expect(SARS_EXPLAINER_SYSTEM_PROMPT).toContain('accountant should review');
+      expect(SARS_EXPLAINER_SYSTEM_PROMPT).toContain(
+        'accountant should review',
+      );
     });
 
     it('should instruct plain text response format', () => {
@@ -389,7 +391,9 @@ describe('SdkSarsExplainer', () => {
     });
 
     it('should instruct not to suggest tax avoidance', () => {
-      expect(SARS_EXPLAINER_SYSTEM_PROMPT).toContain('Never suggest tax avoidance');
+      expect(SARS_EXPLAINER_SYSTEM_PROMPT).toContain(
+        'Never suggest tax avoidance',
+      );
     });
   });
 

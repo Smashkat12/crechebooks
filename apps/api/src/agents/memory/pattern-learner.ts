@@ -1,33 +1,29 @@
 /**
  * Pattern Learner
  * TASK-SDK-010: AgentDB & Persistent Learning Memory Integration
+ * TASK-STUB-007: GNN Pattern Learner Integration
  *
  * @module agents/memory/pattern-learner
  * @description Learns new PayeePattern entries from accumulated correction feedback.
  * Requires a minimum of 3 corrections for the same payee/account pair before
  * creating or upserting a PayeePattern.
  *
+ * GNN learning (via GnnPatternAdapter) is additive -- it supplements
+ * the threshold-based learning, not replaces it.
+ *
  * CRITICAL RULES:
  * - Min 3 corrections before creating a PayeePattern
  * - Tenant isolation on ALL queries
  * - No PII in pattern records
- * - Uses ruvector GNN stub for forward-compatible learning
+ * - GNN calls are fire-and-forget (never block main flow)
  */
 
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { RuvectorService } from '../sdk/ruvector.service';
+import { GNN_PATTERN_TOKEN } from './gnn-pattern-adapter';
+import type { GnnPatternInterface } from './interfaces/gnn-pattern.interface';
 import type { PatternLearnResult } from './interfaces/agent-memory.interface';
-
-// ────────────────────────────────────────────────────────────────────
-// Local stub: ruvector GNN methods don't exist yet
-// ────────────────────────────────────────────────────────────────────
-
-class GnnPatternLearnerStub {
-  async learnPattern(_data: Record<string, unknown>): Promise<void> {
-    /* stub — forward-compatible with future GNN integration */
-  }
-}
 
 // ────────────────────────────────────────────────────────────────────
 // In-memory fallback tracker (used when Prisma is unavailable)
@@ -43,7 +39,7 @@ interface InMemoryCorrection {
 @Injectable()
 export class PatternLearner {
   private readonly logger = new Logger(PatternLearner.name);
-  private readonly gnnStub = new GnnPatternLearnerStub();
+  private readonly gnnAdapter: GnnPatternInterface;
 
   /** In-memory correction tracker for when Prisma is unavailable */
   private readonly inMemoryCorrections: InMemoryCorrection[] = [];
@@ -57,13 +53,23 @@ export class PatternLearner {
     @Optional()
     @Inject(RuvectorService)
     private readonly ruvector?: RuvectorService,
-  ) {}
+    @Optional()
+    @Inject(GNN_PATTERN_TOKEN)
+    gnnAdapter?: GnnPatternInterface,
+  ) {
+    // Fallback to no-op when GNN is unavailable
+    this.gnnAdapter = gnnAdapter ?? {
+      learnPattern: () => Promise.resolve(),
+      predict: () => Promise.resolve(null),
+      consolidateEWC: () => Promise.resolve(),
+    };
+  }
 
   /**
    * Process a correction and determine if a new PayeePattern should be created.
    *
    * Flow:
-   * 1. Feed correction to ruvector GNN stub
+   * 1. Feed correction to GNN adapter (fire-and-forget)
    * 2. Count similar corrections for same payee/account in same tenant
    * 3. If count >= MIN_CORRECTIONS_FOR_PATTERN, upsert PayeePattern
    * 4. Mark corrections as applied
@@ -87,16 +93,19 @@ export class PatternLearner {
       };
     }
 
-    // 1. Feed to ruvector GNN stub (non-blocking, forward-compatible)
-    this.gnnStub
+    // 1. Feed to GNN adapter (non-blocking, fire-and-forget)
+    this.gnnAdapter
       .learnPattern({
         tenantId,
         payeeName,
         accountCode,
+        accountName,
+        amountCents: (correctedValue['amountCents'] as number) ?? 0,
+        isCredit: (correctedValue['isCredit'] as boolean) ?? false,
         agentDecisionId,
       })
       .catch((err: Error) => {
-        this.logger.warn(`GNN stub learnPattern failed: ${err.message}`);
+        this.logger.warn(`GNN learnPattern failed: ${err.message}`);
       });
 
     // 2. Count similar corrections

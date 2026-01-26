@@ -89,24 +89,43 @@ export class PaymentMatcherAgent {
       return this.shadowRunner.run<MatchDecision>({
         tenantId,
         agentType: 'matcher',
-        sdkFn: () => this._makeMatchDecisionCore(
-          transaction,
-          candidates.map(c => ({ ...c, invoice: { ...c.invoice }, matchReasons: [...c.matchReasons] })),
-          tenantId, autoApplyThreshold, false,
-        ),
-        heuristicFn: () => this._makeMatchDecisionCore(
-          transaction,
-          candidates.map(c => ({ ...c, invoice: { ...c.invoice }, matchReasons: [...c.matchReasons] })),
-          tenantId, autoApplyThreshold, true,
-        ),
-        compareFn: (sdk: MatchDecision, heuristic: MatchDecision): ComparisonResult => ({
+        sdkFn: () =>
+          this._makeMatchDecisionCore(
+            transaction,
+            candidates.map((c) => ({
+              ...c,
+              invoice: { ...c.invoice },
+              matchReasons: [...c.matchReasons],
+            })),
+            tenantId,
+            autoApplyThreshold,
+            false,
+          ),
+        heuristicFn: () =>
+          this._makeMatchDecisionCore(
+            transaction,
+            candidates.map((c) => ({
+              ...c,
+              invoice: { ...c.invoice },
+              matchReasons: [...c.matchReasons],
+            })),
+            tenantId,
+            autoApplyThreshold,
+            true,
+          ),
+        compareFn: (
+          sdk: MatchDecision,
+          heuristic: MatchDecision,
+        ): ComparisonResult => ({
           tenantId,
           agentType: 'matcher',
           sdkResult: sdk,
           heuristicResult: heuristic,
           sdkDurationMs: 0,
           heuristicDurationMs: 0,
-          resultsMatch: sdk.action === heuristic.action && sdk.invoiceId === heuristic.invoiceId,
+          resultsMatch:
+            sdk.action === heuristic.action &&
+            sdk.invoiceId === heuristic.invoiceId,
           sdkConfidence: sdk.confidence,
           heuristicConfidence: heuristic.confidence,
           details: {
@@ -118,7 +137,13 @@ export class PaymentMatcherAgent {
         }),
       });
     }
-    return this._makeMatchDecisionCore(transaction, candidates, tenantId, autoApplyThreshold, false);
+    return this._makeMatchDecisionCore(
+      transaction,
+      candidates,
+      tenantId,
+      autoApplyThreshold,
+      false,
+    );
   }
 
   private async _makeMatchDecisionCore(
@@ -202,27 +227,31 @@ export class PaymentMatcherAgent {
       // attempt ruvector boost and LLM resolution if sdkMatcher is available.
 
       // Phase 1: Ruvector boost (try to promote one candidate above threshold)
-      const ruvectorDecision = skipSdk ? null : await this.tryRuvectorBoost(
-        transaction,
-        candidates,
-        validCandidates,
-        tenantId,
-        autoApplyThreshold,
-        startTime,
-      );
+      const ruvectorDecision = skipSdk
+        ? null
+        : await this.tryRuvectorBoost(
+            transaction,
+            candidates,
+            validCandidates,
+            tenantId,
+            autoApplyThreshold,
+            startTime,
+          );
       if (ruvectorDecision) {
         return ruvectorDecision;
       }
 
       // Phase 2: LLM ambiguity resolution (for ambiguous or moderate-confidence cases)
-      const sdkDecision = skipSdk ? null : await this.trySdkResolution(
-        transaction,
-        candidates,
-        validCandidates,
-        tenantId,
-        autoApplyThreshold,
-        startTime,
-      );
+      const sdkDecision = skipSdk
+        ? null
+        : await this.trySdkResolution(
+            transaction,
+            candidates,
+            validCandidates,
+            tenantId,
+            autoApplyThreshold,
+            startTime,
+          );
       if (sdkDecision) {
         return sdkDecision;
       }

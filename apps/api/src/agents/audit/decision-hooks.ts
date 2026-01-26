@@ -1,44 +1,38 @@
 /**
  * Decision Hooks
  * TASK-SDK-011: Structured Audit Trail & Decision Hooks
+ * TASK-STUB-008: Decision Hooks SONA Wiring (Pre/Post Decision Lifecycle)
  *
  * @module agents/audit/decision-hooks
  * @description Pre- and post-decision hooks for agent audit coordination.
- * Integrates with AuditTrailService, RuvectorService, and a local
- * AgenticFlowHooks stub for triple-write logging.
+ * Integrates with AuditTrailService, RuvectorService, and RealDecisionHooks
+ * for correction history checking and SONA trajectory recording.
  *
  * CRITICAL RULES:
  * - ALL hooks are non-blocking — errors are caught, never thrown
  * - preDecision is fail-open when Prisma is unavailable
  * - ruvector embedding is optional and non-blocking
+ * - RealDecisionHooks integration is advisory only (never blocks)
  */
 
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { RuvectorService } from '../sdk/ruvector.service';
 import { AuditTrailService } from './audit-trail.service';
-import { LogDecisionParams, LogEscalationParams } from './interfaces/audit.interface';
-
-// ── AgenticFlowHooks Stub ──────────────────────────────────────────
-
-/**
- * Local stub for AgenticFlowHooks.
- * The agentic-flow package does not export a usable AgenticFlowHooks class,
- * so we stub it locally to maintain the triple-write pattern.
- */
-class AgenticFlowHooksStub {
-  async preTask(_context: Record<string, unknown>): Promise<void> {
-    /* stub */
-  }
-  async postTask(_context: Record<string, unknown>): Promise<void> {
-    /* stub */
-  }
-}
+import {
+  LogDecisionParams,
+  LogEscalationParams,
+} from './interfaces/audit.interface';
+import { DECISION_HOOKS_TOKEN } from './real-decision-hooks';
+import type {
+  DecisionHooksInterface,
+  PreDecisionWarning,
+} from './interfaces/decision-hooks.interface';
 
 @Injectable()
 export class DecisionHooks {
   private readonly logger = new Logger(DecisionHooks.name);
-  private readonly afHooks: AgenticFlowHooksStub;
+  private readonly realHooks: DecisionHooksInterface;
 
   constructor(
     @Optional()
@@ -50,23 +44,43 @@ export class DecisionHooks {
     @Optional()
     @Inject(RuvectorService)
     private readonly ruvector?: RuvectorService,
+    @Optional()
+    @Inject(DECISION_HOOKS_TOKEN)
+    realHooks?: DecisionHooksInterface,
   ) {
-    this.afHooks = new AgenticFlowHooksStub();
+    // Fallback to no-op when real hooks are unavailable
+    this.realHooks = realHooks ?? {
+      preDecision: () =>
+        Promise.resolve({
+          allowed: true,
+          warnings: [],
+          confidenceAdjustment: 0,
+        }),
+      postDecision: () => Promise.resolve(),
+    };
   }
 
   /**
    * Pre-decision validation hook.
-   * Validates that the tenant exists and subscription is not CANCELLED.
-   * Fail-open: returns allowed=true when Prisma is unavailable.
+   * 1. Validates that the tenant exists and subscription is not CANCELLED.
+   * 2. Calls RealDecisionHooks.preDecision() for correction history check.
+   * Fail-open: returns allowed=true when Prisma is unavailable or hooks fail.
    */
   async preDecision(context: {
     tenantId: string;
     agentType: string;
-  }): Promise<{ allowed: boolean; reason?: string }> {
+    inputText?: string;
+    payeeName?: string;
+    amountCents?: number;
+    isCredit?: boolean;
+  }): Promise<{
+    allowed: boolean;
+    reason?: string;
+    warnings?: PreDecisionWarning[];
+    confidenceAdjustment?: number;
+  }> {
     if (!this.prisma) {
-      this.logger.debug(
-        'Prisma unavailable — fail-open, allowing decision',
-      );
+      this.logger.debug('Prisma unavailable — fail-open, allowing decision');
       return { allowed: true };
     }
 
@@ -87,7 +101,21 @@ export class DecisionHooks {
         };
       }
 
-      return { allowed: true };
+      // Call real hooks for correction history check
+      const hookResult = await this.realHooks.preDecision({
+        tenantId: context.tenantId,
+        agentType: context.agentType,
+        inputText: context.inputText,
+        payeeName: context.payeeName,
+        amountCents: context.amountCents,
+        isCredit: context.isCredit,
+      });
+
+      return {
+        allowed: true,
+        warnings: hookResult.warnings,
+        confidenceAdjustment: hookResult.confidenceAdjustment,
+      };
     } catch (error) {
       this.logger.warn(
         `preDecision check failed (fail-open): ${error instanceof Error ? error.message : String(error)}`,
@@ -98,25 +126,31 @@ export class DecisionHooks {
 
   /**
    * Post-decision hook — triple-write pattern.
-   * 1. AgenticFlowHooks stub (postTask)
+   * 1. RealDecisionHooks (SONA trajectory + audit) — non-blocking
    * 2. Ruvector embedding (non-blocking, catch errors)
    * 3. AuditTrailService (non-blocking, catch errors)
    *
    * ALL writes are non-blocking.
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- intentionally fire-and-forget
   async postDecision(context: LogDecisionParams): Promise<void> {
-    // 1. AgenticFlowHooks stub
-    try {
-      await this.afHooks.postTask({
+    // 1. RealDecisionHooks (SONA trajectory + audit) — non-blocking
+    this.realHooks
+      .postDecision({
+        tenantId: context.tenantId,
         agentType: context.agentType,
         decision: context.decision,
-        tenantId: context.tenantId,
+        confidence: context.confidence ?? 0,
+        source: context.source ?? 'RULE_BASED',
+        autoApplied: context.autoApplied,
+        transactionId: context.transactionId,
+        reasoning: context.reasoning,
+        durationMs: context.durationMs,
+      })
+      .catch((error: unknown) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.debug(`RealDecisionHooks postDecision failed: ${msg}`);
       });
-    } catch (error) {
-      this.logger.debug(
-        `AgenticFlowHooks postTask failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
 
     // 2. Ruvector embedding (non-blocking)
     if (this.ruvector?.isAvailable() && context.reasoning) {
@@ -143,6 +177,7 @@ export class DecisionHooks {
    * Post-escalation hook — delegates to audit trail.
    * Non-blocking: errors are caught and logged.
    */
+  // eslint-disable-next-line @typescript-eslint/require-await -- intentionally fire-and-forget
   async postEscalation(params: LogEscalationParams): Promise<void> {
     if (this.auditTrail) {
       this.auditTrail
@@ -166,9 +201,9 @@ export class DecisionHooks {
     }
 
     try {
-      const embedding = await this.ruvector.generateEmbedding(query);
+      const embeddingResult = await this.ruvector.generateEmbedding(query);
       const results = await this.ruvector.searchSimilar(
-        embedding,
+        embeddingResult.vector,
         'audit-decisions',
         10,
       );

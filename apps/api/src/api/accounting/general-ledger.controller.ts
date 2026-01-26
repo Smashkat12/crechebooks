@@ -52,7 +52,9 @@ export class GeneralLedgerController {
     @Query('accountCode') accountCode?: string,
   ) {
     const tenantId = getTenantId(user);
-    this.logger.log(`Get GL: tenant=${tenantId}, from=${fromDate}, to=${toDate}`);
+    this.logger.log(
+      `Get GL: tenant=${tenantId}, from=${fromDate}, to=${toDate}`,
+    );
     return this.glService.getGeneralLedger({
       tenantId,
       startDate: new Date(fromDate),
@@ -75,7 +77,9 @@ export class GeneralLedgerController {
     @Query('toDate') toDate: string,
   ) {
     const tenantId = getTenantId(user);
-    this.logger.log(`Get account ledger: tenant=${tenantId}, account=${accountCode}`);
+    this.logger.log(
+      `Get account ledger: tenant=${tenantId}, account=${accountCode}`,
+    );
     return this.glService.getAccountLedger(
       tenantId,
       accountCode,

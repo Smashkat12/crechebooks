@@ -121,7 +121,8 @@ export class AuditTrailService {
           agentType: 'orchestrator',
           eventType: params.eventType,
           workflowId: params.workflowId,
-          decision: params.eventType === 'WORKFLOW_START' ? 'start' : 'complete',
+          decision:
+            params.eventType === 'WORKFLOW_START' ? 'start' : 'complete',
           autoApplied: false,
           details: params.details as unknown as Prisma.InputJsonValue,
           durationMs: params.durationMs ?? null,
@@ -143,7 +144,9 @@ export class AuditTrailService {
     filters: AuditFilters,
   ): Promise<unknown[]> {
     if (!this.prisma) {
-      this.logger.debug('Prisma unavailable — returning empty decision history');
+      this.logger.debug(
+        'Prisma unavailable — returning empty decision history',
+      );
       return [];
     }
 

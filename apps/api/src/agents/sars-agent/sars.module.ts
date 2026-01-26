@@ -18,7 +18,12 @@ import { AuditTrailModule } from '../audit/audit-trail.module';
 import { RolloutModule } from '../rollout/rollout.module';
 
 @Module({
-  imports: [forwardRef(() => DatabaseModule), SdkAgentModule, AuditTrailModule, RolloutModule],
+  imports: [
+    forwardRef(() => DatabaseModule),
+    SdkAgentModule,
+    AuditTrailModule,
+    RolloutModule,
+  ],
   providers: [
     SarsAgent,
     SarsDecisionLogger,

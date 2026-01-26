@@ -13,10 +13,29 @@ import { ConfigModule } from '@nestjs/config';
 import { SdkAgentFactory } from './sdk-agent.factory';
 import { SdkConfigService } from './sdk-config';
 import { RuvectorService } from './ruvector.service';
+import { IntelligenceEngineService } from './intelligence-engine.service';
+import { PersistenceConfig } from './persistence-config';
+import { SonaBootstrapService } from './sona-bootstrap.service';
 
 @Module({
+  // PrismaService is globally available via PrismaModule (@Global),
+  // so no need to import DatabaseModule (which would create circular deps).
   imports: [ConfigModule],
-  providers: [SdkAgentFactory, SdkConfigService, RuvectorService],
-  exports: [SdkAgentFactory, SdkConfigService, RuvectorService],
+  providers: [
+    SdkAgentFactory,
+    SdkConfigService,
+    RuvectorService,
+    IntelligenceEngineService,
+    PersistenceConfig,
+    SonaBootstrapService,
+  ],
+  exports: [
+    SdkAgentFactory,
+    SdkConfigService,
+    RuvectorService,
+    IntelligenceEngineService,
+    PersistenceConfig,
+    SonaBootstrapService,
+  ],
 })
 export class SdkAgentModule {}

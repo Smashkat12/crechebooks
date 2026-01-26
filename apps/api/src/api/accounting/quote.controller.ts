@@ -46,7 +46,19 @@ export class QuoteController {
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'List quotes' })
-  @ApiQuery({ name: 'status', required: false, enum: ['DRAFT', 'SENT', 'VIEWED', 'ACCEPTED', 'DECLINED', 'EXPIRED', 'CONVERTED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: [
+      'DRAFT',
+      'SENT',
+      'VIEWED',
+      'ACCEPTED',
+      'DECLINED',
+      'EXPIRED',
+      'CONVERTED',
+    ],
+  })
   @ApiQuery({ name: 'parentId', required: false })
   @ApiQuery({ name: 'recipientEmail', required: false })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -111,7 +123,9 @@ export class QuoteController {
   async create(@CurrentUser() user: IUser, @Body() body: CreateQuoteDto) {
     const tenantId = getTenantId(user);
     const userId = user.id;
-    this.logger.log(`Create quote: tenant=${tenantId}, recipient=${body.recipientEmail}`);
+    this.logger.log(
+      `Create quote: tenant=${tenantId}, recipient=${body.recipientEmail}`,
+    );
     return this.quoteService.createQuote(tenantId, userId, body);
   }
 

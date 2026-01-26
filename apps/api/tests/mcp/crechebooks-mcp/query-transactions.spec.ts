@@ -8,11 +8,15 @@
 
 import { queryTransactions } from '../../../src/mcp/crechebooks-mcp/tools/query-transactions';
 import type { PrismaService } from '../../../src/database/prisma/prisma.service';
-import type { McpToolResult, TransactionRecord } from '../../../src/mcp/crechebooks-mcp/types/index';
+import type {
+  McpToolResult,
+  TransactionRecord,
+} from '../../../src/mcp/crechebooks-mcp/types/index';
 
-function createMockPrisma(
-  findManyResult: unknown[] = [],
-): { prisma: PrismaService; findManySpy: jest.Mock } {
+function createMockPrisma(findManyResult: unknown[] = []): {
+  prisma: PrismaService;
+  findManySpy: jest.Mock;
+} {
   const findManySpy = jest.fn().mockResolvedValue(findManyResult);
   const prisma = {
     transaction: {
@@ -22,7 +26,9 @@ function createMockPrisma(
   return { prisma, findManySpy };
 }
 
-function createMockTransaction(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function createMockTransaction(
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
   return {
     id: 'tx-001',
     date: new Date('2025-01-15'),
@@ -64,7 +70,9 @@ describe('query_transactions tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.tenantId).toBe(TENANT_ID);
     expect(callArgs.where.isDeleted).toBe(false);
   });
@@ -74,7 +82,9 @@ describe('query_transactions tool', () => {
     const { prisma } = createMockPrisma([mockTx]);
     const tool = queryTransactions(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<TransactionRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(true);
     expect(result.data).toHaveLength(1);
@@ -92,7 +102,9 @@ describe('query_transactions tool', () => {
     const { prisma } = createMockPrisma([mockTx]);
     const tool = queryTransactions(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<TransactionRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.data![0].latestCategorization).toBeNull();
   });
@@ -103,7 +115,9 @@ describe('query_transactions tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, status: 'PENDING' });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.status).toBe('PENDING');
   });
 
@@ -113,7 +127,9 @@ describe('query_transactions tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, isCredit: true });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.isCredit).toBe(true);
   });
 
@@ -123,7 +139,9 @@ describe('query_transactions tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, payeeName: 'woolworths' });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.payeeName).toEqual({
       contains: 'woolworths',
       mode: 'insensitive',
@@ -140,7 +158,9 @@ describe('query_transactions tool', () => {
       toDate: '2025-01-31',
     });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.date).toEqual({
       gte: new Date('2025-01-01'),
       lte: new Date('2025-01-31'),
@@ -157,7 +177,9 @@ describe('query_transactions tool', () => {
       maxAmountCents: 50000,
     });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.amountCents).toEqual({
       gte: 1000,
       lte: 50000,
@@ -170,8 +192,14 @@ describe('query_transactions tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { include: { categorizations: { orderBy: Record<string, string>; take: number } } };
-    expect(callArgs.include.categorizations.orderBy).toEqual({ createdAt: 'desc' });
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      include: {
+        categorizations: { orderBy: Record<string, string>; take: number };
+      };
+    };
+    expect(callArgs.include.categorizations.orderBy).toEqual({
+      createdAt: 'desc',
+    });
     expect(callArgs.include.categorizations.take).toBe(1);
   });
 
@@ -181,18 +209,24 @@ describe('query_transactions tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { orderBy: Record<string, string> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      orderBy: Record<string, string>;
+    };
     expect(callArgs.orderBy).toEqual({ date: 'desc' });
   });
 
   it('should handle database errors gracefully', async () => {
-    const findManySpy = jest.fn().mockRejectedValue(new Error('Pool exhausted'));
+    const findManySpy = jest
+      .fn()
+      .mockRejectedValue(new Error('Pool exhausted'));
     const prisma = {
       transaction: { findMany: findManySpy },
     } as unknown as PrismaService;
     const tool = queryTransactions(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<TransactionRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Pool exhausted');
@@ -203,7 +237,9 @@ describe('query_transactions tool', () => {
     const { prisma } = createMockPrisma([mockTx]);
     const tool = queryTransactions(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<TransactionRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.data![0].date).toBe(new Date('2025-01-15').toISOString());
   });

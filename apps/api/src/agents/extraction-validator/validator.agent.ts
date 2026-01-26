@@ -64,14 +64,19 @@ export class ExtractionValidatorAgent {
         agentType: 'validator',
         sdkFn: () => this._validateCore(statement, tenantId, false),
         heuristicFn: () => this._validateCore(statement, tenantId, true),
-        compareFn: (sdk: ValidationResult, heuristic: ValidationResult): ComparisonResult => ({
+        compareFn: (
+          sdk: ValidationResult,
+          heuristic: ValidationResult,
+        ): ComparisonResult => ({
           tenantId,
           agentType: 'validator',
           sdkResult: sdk,
           heuristicResult: heuristic,
           sdkDurationMs: 0,
           heuristicDurationMs: 0,
-          resultsMatch: sdk.isValid === heuristic.isValid && sdk.confidence === heuristic.confidence,
+          resultsMatch:
+            sdk.isValid === heuristic.isValid &&
+            sdk.confidence === heuristic.confidence,
           sdkConfidence: sdk.confidence,
           heuristicConfidence: heuristic.confidence,
           details: {

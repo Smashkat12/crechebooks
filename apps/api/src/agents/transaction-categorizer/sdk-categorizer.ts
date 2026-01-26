@@ -195,12 +195,12 @@ export class SdkCategorizer extends BaseSdkAgent {
       const startTime = Date.now();
 
       // Generate embedding for the description
-      const embedding = await this.ruvector.generateEmbedding(description);
+      const embeddingResult = await this.ruvector.generateEmbedding(description);
 
       // Search for similar vectors in the tenant's categorization collection
       const collection = `categorizations:${tenantId}`;
       const results = await this.ruvector.searchSimilar(
-        embedding,
+        embeddingResult.vector,
         collection,
         3,
       );

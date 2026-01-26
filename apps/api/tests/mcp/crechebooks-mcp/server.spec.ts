@@ -90,9 +90,9 @@ describe('CrecheBooksMcpService', () => {
       const service = new CrecheBooksMcpService(prisma, undefined);
       service.onModuleInit();
 
-      await expect(
-        service.executeTool('nonexistent_tool', {}),
-      ).rejects.toThrow('Tool "nonexistent_tool" not found');
+      await expect(service.executeTool('nonexistent_tool', {})).rejects.toThrow(
+        'Tool "nonexistent_tool" not found',
+      );
     });
 
     it('should include available tools in error message', async () => {

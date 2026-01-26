@@ -14,7 +14,12 @@
  * - Always filter with isDeleted: false
  */
 
-import { Injectable, Optional, Inject, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Optional,
+  Inject,
+  BadRequestException,
+} from '@nestjs/common';
 import { BaseSdkAgent } from '../sdk/base-sdk-agent';
 import { SdkAgentFactory } from '../sdk/sdk-agent.factory';
 import { SdkConfigService } from '../sdk/sdk-config';
@@ -442,7 +447,9 @@ export class ConversationalAgent extends BaseSdkAgent {
     ];
 
     if (netCents >= 0) {
-      parts.push(`\nYour creche is currently in a positive financial position.`);
+      parts.push(
+        `\nYour creche is currently in a positive financial position.`,
+      );
     } else {
       parts.push(
         `\nYour expenses currently exceed your revenue. Consider reviewing outstanding invoices and following up on unpaid fees.`,

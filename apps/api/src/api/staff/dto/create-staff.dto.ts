@@ -46,7 +46,10 @@ export class ApiCreateStaffDto {
     example: 'jane@example.com',
     description: 'Required for staff portal access (magic link login)',
   })
-  @IsEmail({}, { message: 'A valid email address is required for staff portal access' })
+  @IsEmail(
+    {},
+    { message: 'A valid email address is required for staff portal access' },
+  )
   email!: string;
 
   @ApiPropertyOptional({ example: '+27821234567' })
@@ -79,7 +82,10 @@ export class ApiCreateStaffDto {
   @IsString()
   end_date?: string;
 
-  @ApiProperty({ example: 1500000, description: 'Monthly gross salary in cents' })
+  @ApiProperty({
+    example: 1500000,
+    description: 'Monthly gross salary in cents',
+  })
   @Type(() => Number)
   @IsInt({ message: 'Salary must be an integer (cents)' })
   @Min(0, { message: 'Salary cannot be negative' })

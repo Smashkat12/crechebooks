@@ -139,7 +139,10 @@ export class GeneralLedgerService {
   /**
    * Generate trial balance as of a specific date
    */
-  async getTrialBalance(tenantId: string, asOfDate: Date): Promise<TrialBalance> {
+  async getTrialBalance(
+    tenantId: string,
+    asOfDate: Date,
+  ): Promise<TrialBalance> {
     const accounts = await this.prisma.chartOfAccount.findMany({
       where: { tenantId, isActive: true },
       orderBy: { code: 'asc' },
@@ -189,8 +192,14 @@ export class GeneralLedgerService {
       (l) => l.debitBalanceCents !== 0 || l.creditBalanceCents !== 0,
     );
 
-    const totalDebitsCents = nonZeroLines.reduce((sum, l) => sum + l.debitBalanceCents, 0);
-    const totalCreditsCents = nonZeroLines.reduce((sum, l) => sum + l.creditBalanceCents, 0);
+    const totalDebitsCents = nonZeroLines.reduce(
+      (sum, l) => sum + l.debitBalanceCents,
+      0,
+    );
+    const totalCreditsCents = nonZeroLines.reduce(
+      (sum, l) => sum + l.creditBalanceCents,
+      0,
+    );
 
     return {
       asOfDate,
@@ -216,7 +225,10 @@ export class GeneralLedgerService {
         tenantId,
         createdAt: { gte: startDate, lte: endDate },
         ...(accountCode && {
-          OR: [{ fromAccountCode: accountCode }, { toAccountCode: accountCode }],
+          OR: [
+            { fromAccountCode: accountCode },
+            { toAccountCode: accountCode },
+          ],
         }),
       },
       include: {
@@ -241,7 +253,8 @@ export class GeneralLedgerService {
       // If isCredit is true: Credit from suspense, Debit to expense (income categorization)
       // If isCredit is false: Debit to expense, Credit from suspense (expense categorization)
       const description = journal.transaction?.description || journal.narration;
-      const reference = journal.transaction?.reference || journal.journalNumber || undefined;
+      const reference =
+        journal.transaction?.reference || journal.journalNumber || undefined;
 
       if (journal.isCredit) {
         // Credit entry (from suspense - decreasing asset)
@@ -416,22 +429,33 @@ export class GeneralLedgerService {
     });
 
     const totalDebitsCents = entries.reduce((sum, e) => sum + e.debitCents, 0);
-    const totalCreditsCents = entries.reduce((sum, e) => sum + e.creditCents, 0);
+    const totalCreditsCents = entries.reduce(
+      (sum, e) => sum + e.creditCents,
+      0,
+    );
 
     // Group by source type
-    const bySourceMap = new Map<string, { count: number; totalCents: number }>();
+    const bySourceMap = new Map<
+      string,
+      { count: number; totalCents: number }
+    >();
     for (const entry of entries) {
-      const existing = bySourceMap.get(entry.sourceType) || { count: 0, totalCents: 0 };
+      const existing = bySourceMap.get(entry.sourceType) || {
+        count: 0,
+        totalCents: 0,
+      };
       existing.count += 1;
       existing.totalCents += entry.debitCents + entry.creditCents;
       bySourceMap.set(entry.sourceType, existing);
     }
 
-    const bySourceType = Array.from(bySourceMap.entries()).map(([sourceType, data]) => ({
-      sourceType,
-      count: data.count,
-      totalCents: data.totalCents,
-    }));
+    const bySourceType = Array.from(bySourceMap.entries()).map(
+      ([sourceType, data]) => ({
+        sourceType,
+        count: data.count,
+        totalCents: data.totalCents,
+      }),
+    );
 
     return {
       totalTransactions: entries.length,

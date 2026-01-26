@@ -39,7 +39,8 @@ const WIZARD_STEPS = [
   {
     step: 1,
     title: 'Select Migration Date',
-    description: 'Choose the opening balance date (usually start of financial year)',
+    description:
+      'Choose the opening balance date (usually start of financial year)',
     accountTypes: [] as string[], // No accounts for this step
   },
   {
@@ -73,7 +74,8 @@ const WIZARD_STEPS = [
   {
     step: 6,
     title: 'Review & Verify',
-    description: 'Review all balances. System calculates retained earnings to balance.',
+    description:
+      'Review all balances. System calculates retained earnings to balance.',
     accountTypes: [],
   },
   {
@@ -146,7 +148,10 @@ export class OpeningBalanceService {
   /**
    * Get import by ID
    */
-  async getImportById(tenantId: string, importId: string): Promise<OpeningBalanceImport> {
+  async getImportById(
+    tenantId: string,
+    importId: string,
+  ): Promise<OpeningBalanceImport> {
     const importRecord = await this.prisma.openingBalanceImport.findFirst({
       where: { id: importId, tenantId },
     });
@@ -161,7 +166,10 @@ export class OpeningBalanceService {
   /**
    * Get full import summary with all balances
    */
-  async getImportSummary(tenantId: string, importId: string): Promise<ImportSummaryResponse> {
+  async getImportSummary(
+    tenantId: string,
+    importId: string,
+  ): Promise<ImportSummaryResponse> {
     const importRecord = await this.getImportById(tenantId, importId);
 
     const balances = await this.prisma.openingBalance.findMany({
@@ -185,12 +193,20 @@ export class OpeningBalanceService {
     // Group by account type
     const accountTypes = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
     const accountCategories = accountTypes.map((type) => {
-      const typeBalances = balanceResponses.filter((b) => b.accountType === type);
+      const typeBalances = balanceResponses.filter(
+        (b) => b.accountType === type,
+      );
       return {
         type,
         accounts: typeBalances,
-        totalDebits: typeBalances.reduce((sum, b) => sum + (b.debitCents || 0), 0),
-        totalCredits: typeBalances.reduce((sum, b) => sum + (b.creditCents || 0), 0),
+        totalDebits: typeBalances.reduce(
+          (sum, b) => sum + (b.debitCents || 0),
+          0,
+        ),
+        totalCredits: typeBalances.reduce(
+          (sum, b) => sum + (b.creditCents || 0),
+          0,
+        ),
       };
     });
 
@@ -244,7 +260,12 @@ export class OpeningBalanceService {
     }
 
     // Validate balance direction (debit or credit, not both unless zero)
-    if (data.debitCents && data.creditCents && data.debitCents > 0 && data.creditCents > 0) {
+    if (
+      data.debitCents &&
+      data.creditCents &&
+      data.debitCents > 0 &&
+      data.creditCents > 0
+    ) {
       throw new BadRequestException(
         'Cannot have both debit and credit balance. Use net balance for the account.',
       );
@@ -296,7 +317,12 @@ export class OpeningBalanceService {
     const results: OpeningBalance[] = [];
 
     for (const balance of balances) {
-      const result = await this.setAccountBalance(tenantId, userId, importId, balance);
+      const result = await this.setAccountBalance(
+        tenantId,
+        userId,
+        importId,
+        balance,
+      );
       results.push(result);
     }
 
@@ -317,8 +343,14 @@ export class OpeningBalanceService {
       where: { importId },
     });
 
-    const totalDebits = balances.reduce((sum, b) => sum + (b.debitCents || 0), 0);
-    const totalCredits = balances.reduce((sum, b) => sum + (b.creditCents || 0), 0);
+    const totalDebits = balances.reduce(
+      (sum, b) => sum + (b.debitCents || 0),
+      0,
+    );
+    const totalCredits = balances.reduce(
+      (sum, b) => sum + (b.creditCents || 0),
+      0,
+    );
     const discrepancy = totalDebits - totalCredits;
 
     await this.prisma.openingBalanceImport.update({
@@ -356,7 +388,11 @@ export class OpeningBalanceService {
     // Check for discrepancy
     if (updatedImport.discrepancy !== 0 && !forceBalance) {
       // Try to auto-balance using Retained Earnings
-      const autoBalanced = await this.tryAutoBalance(tenantId, importId, updatedImport.discrepancy);
+      const autoBalanced = await this.tryAutoBalance(
+        tenantId,
+        importId,
+        updatedImport.discrepancy,
+      );
 
       if (!autoBalanced) {
         throw new BadRequestException(
@@ -489,7 +525,9 @@ export class OpeningBalanceService {
     }
 
     if (importRecord.status !== 'VALIDATED') {
-      throw new BadRequestException('Import must be validated before completion');
+      throw new BadRequestException(
+        'Import must be validated before completion',
+      );
     }
 
     // Post the import
@@ -658,8 +696,7 @@ export class OpeningBalanceService {
 
     // Check if step is complete (all accounts have balances)
     const isComplete =
-      accounts.length === 0 ||
-      accounts.every((a) => balanceMap.has(a.id));
+      accounts.length === 0 || accounts.every((a) => balanceMap.has(a.id));
 
     return {
       step: stepNumber,

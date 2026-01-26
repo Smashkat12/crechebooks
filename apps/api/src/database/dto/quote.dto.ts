@@ -156,7 +156,10 @@ export class DeclineQuoteDto {
 }
 
 export class ConvertQuoteDto {
-  @ApiPropertyOptional({ description: 'Invoice due date', default: '14 days from now' })
+  @ApiPropertyOptional({
+    description: 'Invoice due date',
+    default: '14 days from now',
+  })
   @IsOptional()
   @IsDateString()
   dueDate?: string;

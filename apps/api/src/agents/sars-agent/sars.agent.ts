@@ -63,14 +63,18 @@ export class SarsAgent {
         agentType: 'sars',
         sdkFn: () => this._calculatePayeForReviewCore(dto, false),
         heuristicFn: () => this._calculatePayeForReviewCore(dto, true),
-        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+        compareFn: (
+          sdk: SarsDecision,
+          heuristic: SarsDecision,
+        ): ComparisonResult => ({
           tenantId: dto.tenantId,
           agentType: 'sars',
           sdkResult: sdk,
           heuristicResult: heuristic,
           sdkDurationMs: 0,
           heuristicDurationMs: 0,
-          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          resultsMatch:
+            sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
           details: {
             sdkHasExplanation: !!sdk.humanExplanation,
             heuristicHasExplanation: !!heuristic.humanExplanation,
@@ -81,7 +85,10 @@ export class SarsAgent {
     return this._calculatePayeForReviewCore(dto, false);
   }
 
-  private async _calculatePayeForReviewCore(dto: AgentPayeDto, skipSdk: boolean): Promise<SarsDecision> {
+  private async _calculatePayeForReviewCore(
+    dto: AgentPayeDto,
+    skipSdk: boolean,
+  ): Promise<SarsDecision> {
     const {
       tenantId,
       grossIncomeCents,
@@ -186,14 +193,18 @@ export class SarsAgent {
         agentType: 'sars',
         sdkFn: () => this._calculateUifForReviewCore(dto, false),
         heuristicFn: () => this._calculateUifForReviewCore(dto, true),
-        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+        compareFn: (
+          sdk: SarsDecision,
+          heuristic: SarsDecision,
+        ): ComparisonResult => ({
           tenantId: dto.tenantId,
           agentType: 'sars',
           sdkResult: sdk,
           heuristicResult: heuristic,
           sdkDurationMs: 0,
           heuristicDurationMs: 0,
-          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          resultsMatch:
+            sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
           details: {
             sdkHasExplanation: !!sdk.humanExplanation,
             heuristicHasExplanation: !!heuristic.humanExplanation,
@@ -204,7 +215,10 @@ export class SarsAgent {
     return this._calculateUifForReviewCore(dto, false);
   }
 
-  private async _calculateUifForReviewCore(dto: AgentUifDto, skipSdk: boolean): Promise<SarsDecision> {
+  private async _calculateUifForReviewCore(
+    dto: AgentUifDto,
+    skipSdk: boolean,
+  ): Promise<SarsDecision> {
     const { tenantId, grossRemunerationCents, period } = dto;
 
     this.logger.log(
@@ -291,14 +305,18 @@ export class SarsAgent {
         agentType: 'sars',
         sdkFn: () => this._generateEmp201ForReviewCore(dto, false),
         heuristicFn: () => this._generateEmp201ForReviewCore(dto, true),
-        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+        compareFn: (
+          sdk: SarsDecision,
+          heuristic: SarsDecision,
+        ): ComparisonResult => ({
           tenantId: dto.tenantId,
           agentType: 'sars',
           sdkResult: sdk,
           heuristicResult: heuristic,
           sdkDurationMs: 0,
           heuristicDurationMs: 0,
-          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          resultsMatch:
+            sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
           details: {
             sdkHasExplanation: !!sdk.humanExplanation,
             heuristicHasExplanation: !!heuristic.humanExplanation,
@@ -309,7 +327,10 @@ export class SarsAgent {
     return this._generateEmp201ForReviewCore(dto, false);
   }
 
-  private async _generateEmp201ForReviewCore(dto: AgentEmp201Dto, skipSdk: boolean): Promise<SarsDecision> {
+  private async _generateEmp201ForReviewCore(
+    dto: AgentEmp201Dto,
+    skipSdk: boolean,
+  ): Promise<SarsDecision> {
     const { tenantId, periodMonth } = dto;
 
     this.logger.log(
@@ -422,14 +443,18 @@ export class SarsAgent {
         agentType: 'sars',
         sdkFn: () => this._generateVat201ForReviewCore(dto, false),
         heuristicFn: () => this._generateVat201ForReviewCore(dto, true),
-        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+        compareFn: (
+          sdk: SarsDecision,
+          heuristic: SarsDecision,
+        ): ComparisonResult => ({
           tenantId: dto.tenantId,
           agentType: 'sars',
           sdkResult: sdk,
           heuristicResult: heuristic,
           sdkDurationMs: 0,
           heuristicDurationMs: 0,
-          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          resultsMatch:
+            sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
           details: {
             sdkHasExplanation: !!sdk.humanExplanation,
             heuristicHasExplanation: !!heuristic.humanExplanation,
@@ -440,7 +465,10 @@ export class SarsAgent {
     return this._generateVat201ForReviewCore(dto, false);
   }
 
-  private async _generateVat201ForReviewCore(dto: AgentVat201Dto, skipSdk: boolean): Promise<SarsDecision> {
+  private async _generateVat201ForReviewCore(
+    dto: AgentVat201Dto,
+    skipSdk: boolean,
+  ): Promise<SarsDecision> {
     const { tenantId, periodStart, periodEnd } = dto;
 
     this.logger.log(

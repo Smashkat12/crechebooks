@@ -8,11 +8,16 @@
 
 import { getPatterns } from '../../../src/mcp/crechebooks-mcp/tools/get-patterns';
 import type { PrismaService } from '../../../src/database/prisma/prisma.service';
-import type { GetPatternsInput, McpToolResult, PatternRecord } from '../../../src/mcp/crechebooks-mcp/types/index';
+import type {
+  GetPatternsInput,
+  McpToolResult,
+  PatternRecord,
+} from '../../../src/mcp/crechebooks-mcp/types/index';
 
-function createMockPrisma(
-  findManyResult: unknown[] = [],
-): { prisma: PrismaService; findManySpy: jest.Mock } {
+function createMockPrisma(findManyResult: unknown[] = []): {
+  prisma: PrismaService;
+  findManySpy: jest.Mock;
+} {
   const findManySpy = jest.fn().mockResolvedValue(findManyResult);
   const prisma = {
     payeePattern: {
@@ -22,7 +27,9 @@ function createMockPrisma(
   return { prisma, findManySpy };
 }
 
-function createMockPattern(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function createMockPattern(
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
   return {
     id: 'pat-001',
     payeePattern: 'WOOLWORTHS',
@@ -58,7 +65,9 @@ describe('get_patterns tool', () => {
     await tool.handler({ tenantId: TENANT_ID });
 
     expect(findManySpy).toHaveBeenCalledTimes(1);
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.tenantId).toBe(TENANT_ID);
   });
 
@@ -67,7 +76,9 @@ describe('get_patterns tool', () => {
     const { prisma } = createMockPrisma([mockPattern]);
     const tool = getPatterns(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<PatternRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(true);
     expect(result.data).toHaveLength(1);
@@ -86,7 +97,9 @@ describe('get_patterns tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, payeeName: 'woolworths' });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.payeePattern).toEqual({
       contains: 'woolworths',
       mode: 'insensitive',
@@ -99,7 +112,9 @@ describe('get_patterns tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, minConfidence: 10 });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.confidenceBoost).toEqual({ gte: 10 });
   });
 
@@ -135,18 +150,24 @@ describe('get_patterns tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { orderBy: Record<string, string> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      orderBy: Record<string, string>;
+    };
     expect(callArgs.orderBy).toEqual({ matchCount: 'desc' });
   });
 
   it('should handle database errors gracefully', async () => {
-    const findManySpy = jest.fn().mockRejectedValue(new Error('Connection refused'));
+    const findManySpy = jest
+      .fn()
+      .mockRejectedValue(new Error('Connection refused'));
     const prisma = {
       payeePattern: { findMany: findManySpy },
     } as unknown as PrismaService;
     const tool = getPatterns(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<PatternRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Connection refused');
@@ -155,11 +176,15 @@ describe('get_patterns tool', () => {
   });
 
   it('should convert Decimal confidenceBoost to number', async () => {
-    const mockPattern = createMockPattern({ confidenceBoost: { toNumber: () => 25.75, toString: () => '25.75' } });
+    const mockPattern = createMockPattern({
+      confidenceBoost: { toNumber: () => 25.75, toString: () => '25.75' },
+    });
     const { prisma } = createMockPrisma([mockPattern]);
     const tool = getPatterns(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<PatternRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(true);
     expect(typeof result.data![0].confidenceBoost).toBe('number');
@@ -169,7 +194,9 @@ describe('get_patterns tool', () => {
     const { prisma } = createMockPrisma([]);
     const tool = getPatterns(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<PatternRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(true);
     expect(result.data).toEqual([]);

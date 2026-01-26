@@ -80,7 +80,9 @@ export class Auth0ManagementService {
       'Username-Password-Authentication';
 
     if (!this.auth0Domain) {
-      this.logger.warn('AUTH0_DOMAIN not configured - Auth0 Management API disabled');
+      this.logger.warn(
+        'AUTH0_DOMAIN not configured - Auth0 Management API disabled',
+      );
     }
   }
 
@@ -157,24 +159,21 @@ export class Auth0ManagementService {
     this.logger.debug(`Creating Auth0 user: ${dto.email}`);
 
     try {
-      const response = await fetch(
-        `https://${this.auth0Domain}/api/v2/users`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({
-            email: dto.email,
-            password: dto.password,
-            name: dto.name,
-            connection: dto.connection || this.defaultConnection,
-            email_verified: false, // Require email verification
-            verify_email: true, // Send verification email
-          }),
+      const response = await fetch(`https://${this.auth0Domain}/api/v2/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
-      );
+        body: JSON.stringify({
+          email: dto.email,
+          password: dto.password,
+          name: dto.name,
+          connection: dto.connection || this.defaultConnection,
+          email_verified: false, // Require email verification
+          verify_email: true, // Send verification email
+        }),
+      });
 
       if (!response.ok) {
         const errorData = (await response.json()) as Auth0ErrorResponse;

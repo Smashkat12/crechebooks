@@ -17,10 +17,7 @@ describe('ShadowRunner', () => {
   const tenantId = 'tenant-1';
   const agentType = 'categorizer';
 
-  const mockCompare = (
-    sdk: string,
-    heuristic: string,
-  ): ComparisonResult => ({
+  const mockCompare = (sdk: string, heuristic: string): ComparisonResult => ({
     tenantId,
     agentType,
     sdkResult: sdk,
@@ -94,9 +91,7 @@ describe('ShadowRunner', () => {
     });
 
     it('should not affect heuristic result when SDK errors', async () => {
-      const sdkFn = jest
-        .fn()
-        .mockRejectedValue(new Error('SDK exploded'));
+      const sdkFn = jest.fn().mockRejectedValue(new Error('SDK exploded'));
       const heuristicFn = jest.fn().mockResolvedValue('heuristic-result');
 
       const result = await runner.run({
@@ -166,9 +161,7 @@ describe('ShadowRunner', () => {
     });
 
     it('should fall back to heuristic when SDK fails', async () => {
-      const sdkFn = jest
-        .fn()
-        .mockRejectedValue(new Error('SDK failed'));
+      const sdkFn = jest.fn().mockRejectedValue(new Error('SDK failed'));
       const heuristicFn = jest.fn().mockResolvedValue('fallback-result');
 
       const result = await runner.run({
@@ -305,9 +298,7 @@ describe('ShadowRunner', () => {
       };
 
       // Should not throw
-      await expect(
-        runner.logComparison(comparison),
-      ).resolves.toBeUndefined();
+      await expect(runner.logComparison(comparison)).resolves.toBeUndefined();
     });
   });
 });

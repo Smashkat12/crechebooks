@@ -50,7 +50,11 @@ export class ChartOfAccountController {
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'List accounts' })
-  @ApiQuery({ name: 'type', required: false, enum: ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'] })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'],
+  })
   @ApiQuery({ name: 'isActive', required: false, type: Boolean })
   @ApiQuery({ name: 'search', required: false })
   @ApiResponse({ status: 200, description: 'List of accounts' })
@@ -80,7 +84,9 @@ export class ChartOfAccountController {
 
   @Get('education-exempt')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get education VAT exempt accounts (Section 12(h))' })
+  @ApiOperation({
+    summary: 'Get education VAT exempt accounts (Section 12(h))',
+  })
   @ApiResponse({ status: 200, description: 'Education exempt accounts' })
   async getEducationExempt(@CurrentUser() user: IUser) {
     const tenantId = getTenantId(user);
@@ -120,7 +126,10 @@ export class ChartOfAccountController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create account' })
   @ApiResponse({ status: 201, description: 'Account created' })
-  async create(@CurrentUser() user: IUser, @Body() body: CreateChartOfAccountDto) {
+  async create(
+    @CurrentUser() user: IUser,
+    @Body() body: CreateChartOfAccountDto,
+  ) {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Create account: tenant=${tenantId}, code=${body.code}`);

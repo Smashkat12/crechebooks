@@ -22,7 +22,13 @@ import { ScoringRouter } from '../shared/scoring-router';
 import { RolloutModule } from '../rollout/rollout.module';
 
 @Module({
-  imports: [PrismaModule, SdkAgentModule, AgentMemoryModule, AuditTrailModule, RolloutModule],
+  imports: [
+    PrismaModule,
+    SdkAgentModule,
+    AgentMemoryModule,
+    AuditTrailModule,
+    RolloutModule,
+  ],
   providers: [
     PaymentMatcherAgent,
     MatchDecisionLogger,

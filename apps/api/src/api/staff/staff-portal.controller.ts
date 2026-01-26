@@ -40,7 +40,10 @@ import type { StaffSessionInfo } from '../auth/decorators/current-staff.decorato
 import { SimplePayPayslipService } from '../../integrations/simplepay/simplepay-payslip.service';
 import { SimplePayRepository } from '../../database/repositories/simplepay.repository';
 import { StaffDashboardResponseDto } from './dto/staff-dashboard.dto';
-import { PayslipsResponseDto, PayslipDetailDto } from './dto/staff-payslips.dto';
+import {
+  PayslipsResponseDto,
+  PayslipDetailDto,
+} from './dto/staff-payslips.dto';
 import {
   LeaveBalancesResponseDto,
   LeaveRequestsResponseDto,
@@ -136,7 +139,7 @@ export class StaffPortalController {
     }
 
     // Calculate YTD earnings from imported payslips
-    let ytdEarnings = {
+    const ytdEarnings = {
       grossEarnings: 0,
       netEarnings: 0,
       totalTax: 0,
@@ -276,8 +279,7 @@ export class StaffPortalController {
     );
 
     // Find the imported payslip record
-    const payslipImport =
-      await this.simplePayRepo.findPayslipImport(id);
+    const payslipImport = await this.simplePayRepo.findPayslipImport(id);
 
     if (!payslipImport || payslipImport.staffId !== session.staffId) {
       throw new NotFoundException('Payslip not found');
@@ -366,8 +368,7 @@ export class StaffPortalController {
     );
 
     // Find the imported payslip to get SimplePay ID
-    const payslipImport =
-      await this.simplePayRepo.findPayslipImport(id);
+    const payslipImport = await this.simplePayRepo.findPayslipImport(id);
 
     if (!payslipImport || payslipImport.staffId !== session.staffId) {
       throw new NotFoundException('Payslip not found');
@@ -407,8 +408,12 @@ export class StaffPortalController {
     type: LeaveBalancesResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getLeaveBalances(@CurrentStaff() session: StaffSessionInfo): LeaveBalancesResponseDto {
-    this.logger.log(`Fetching leave balances for staff: ${session.staff.email}`);
+  getLeaveBalances(
+    @CurrentStaff() session: StaffSessionInfo,
+  ): LeaveBalancesResponseDto {
+    this.logger.log(
+      `Fetching leave balances for staff: ${session.staff.email}`,
+    );
 
     const year = new Date().getFullYear();
 
@@ -486,7 +491,9 @@ export class StaffPortalController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ): LeaveRequestsResponseDto {
-    this.logger.log(`Fetching leave requests for staff: ${session.staff.email}`);
+    this.logger.log(
+      `Fetching leave requests for staff: ${session.staff.email}`,
+    );
 
     // Get or initialize user's leave requests
     let requests = this.mockLeaveRequests.get(session.staffId);
@@ -601,7 +608,9 @@ export class StaffPortalController {
     @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
   ): LeaveRequestSuccessDto {
-    this.logger.log(`Cancelling leave request ${id} for staff: ${session.staff.email}`);
+    this.logger.log(
+      `Cancelling leave request ${id} for staff: ${session.staff.email}`,
+    );
 
     const userRequests = this.mockLeaveRequests.get(session.staffId) || [];
     const requestIndex = userRequests.findIndex((r) => r.id === id);
@@ -774,7 +783,9 @@ export class StaffPortalController {
     @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
   ): void {
-    this.logger.log(`Downloading IRP5 PDF for staff: ${session.staff.email}, id: ${id}`);
+    this.logger.log(
+      `Downloading IRP5 PDF for staff: ${session.staff.email}, id: ${id}`,
+    );
 
     // IRP5 PDFs are not yet available via SimplePay integration
     throw new NotFoundException(
@@ -795,7 +806,9 @@ export class StaffPortalController {
     type: StaffProfileDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProfile(@CurrentStaff() session: StaffSessionInfo): Promise<StaffProfileDto> {
+  async getProfile(
+    @CurrentStaff() session: StaffSessionInfo,
+  ): Promise<StaffProfileDto> {
     this.logger.log(`Fetching profile for staff: ${session.staff.email}`);
 
     const staff = await this.prisma.staff.findUnique({
@@ -809,21 +822,20 @@ export class StaffPortalController {
     return {
       personal: {
         fullName: `${staff.firstName} ${staff.lastName}`,
-        idNumber: staff.idNumber
-          ? `******${staff.idNumber.slice(-4)}`
-          : '',
+        idNumber: staff.idNumber ? `******${staff.idNumber.slice(-4)}` : '',
         dateOfBirth: staff.dateOfBirth,
         phone: staff.phone || '',
         email: staff.email || '',
-        address: [
-          staff.address,
-          staff.suburb,
-          staff.city,
-          staff.province,
-          staff.postalCode,
-        ]
-          .filter(Boolean)
-          .join(', ') || '',
+        address:
+          [
+            staff.address,
+            staff.suburb,
+            staff.city,
+            staff.province,
+            staff.postalCode,
+          ]
+            .filter(Boolean)
+            .join(', ') || '',
       },
       employment: {
         position: staff.position || 'Staff Member',
@@ -925,8 +937,12 @@ export class StaffPortalController {
     type: BankingDetailsDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getBankingDetails(@CurrentStaff() session: StaffSessionInfo): Promise<BankingDetailsDto> {
-    this.logger.log(`Fetching banking details for staff: ${session.staff.email}`);
+  async getBankingDetails(
+    @CurrentStaff() session: StaffSessionInfo,
+  ): Promise<BankingDetailsDto> {
+    this.logger.log(
+      `Fetching banking details for staff: ${session.staff.email}`,
+    );
 
     const staff = await this.prisma.staff.findUnique({
       where: { id: session.staffId },
@@ -1189,9 +1205,13 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getOnboardingDocuments(@CurrentStaff() session: StaffSessionInfo) {
-    this.logger.log(`Fetching onboarding documents for staff: ${session.staffId}`);
+    this.logger.log(
+      `Fetching onboarding documents for staff: ${session.staffId}`,
+    );
 
-    const documents = await this.documentService.getDocumentsByStaff(session.staffId);
+    const documents = await this.documentService.getDocumentsByStaff(
+      session.staffId,
+    );
 
     return {
       documents: documents.map((doc) => ({
@@ -1213,7 +1233,9 @@ export class StaffPortalController {
     FileInterceptor('file', {
       storage: diskStorage({
         destination: (req, _file, cb) => {
-          const session = (req as unknown as { staffSession?: StaffSessionInfo }).staffSession;
+          const session = (
+            req as unknown as { staffSession?: StaffSessionInfo }
+          ).staffSession;
           const staffId = session?.staffId;
           const tenantId = session?.tenantId;
           const uploadPath = path.join(
@@ -1311,9 +1333,13 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getGeneratedDocuments(@CurrentStaff() session: StaffSessionInfo) {
-    this.logger.log(`Fetching generated documents for staff: ${session.staffId}`);
+    this.logger.log(
+      `Fetching generated documents for staff: ${session.staffId}`,
+    );
 
-    const result = await this.onboardingService.getGeneratedDocuments(session.staffId);
+    const result = await this.onboardingService.getGeneratedDocuments(
+      session.staffId,
+    );
 
     return {
       documents: result.documents,
@@ -1340,7 +1366,9 @@ export class StaffPortalController {
     @Body() body: { signedByName: string },
     @Req() req: Request,
   ) {
-    this.logger.log(`Signing document ${documentId} by staff ${session.staffId}`);
+    this.logger.log(
+      `Signing document ${documentId} by staff ${session.staffId}`,
+    );
 
     // Get client IP
     const clientIp =
@@ -1402,5 +1430,4 @@ export class StaffPortalController {
 
     res.send(fileBuffer);
   }
-
 }

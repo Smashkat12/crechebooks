@@ -295,6 +295,8 @@ export class AuthController {
       path: '/',
     });
 
-    this.logger.debug('TASK-UI-001: Cleared HttpOnly access_token and admin_token cookies');
+    this.logger.debug(
+      'TASK-UI-001: Cleared HttpOnly access_token and admin_token cookies',
+    );
   }
 }

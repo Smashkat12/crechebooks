@@ -111,12 +111,12 @@ export function searchSimilarTransactions(
         }
 
         // Generate embedding for the search query
-        const embedding =
+        const embeddingResult =
           await ruvector.generateEmbedding(sanitizedDescription);
 
         // Search for similar vectors
         const searchResults = await ruvector.searchSimilar(
-          embedding,
+          embeddingResult.vector,
           'transactions',
           effectiveLimit * 2, // Fetch extra to account for tenant filtering and similarity threshold
         );

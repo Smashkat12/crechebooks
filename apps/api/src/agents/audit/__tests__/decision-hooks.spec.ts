@@ -31,7 +31,12 @@ const mockPrisma = {
 
 const mockRuvector = {
   isAvailable: jest.fn().mockReturnValue(false),
-  generateEmbedding: jest.fn().mockResolvedValue([0.1, 0.2, 0.3]),
+  generateEmbedding: jest.fn().mockResolvedValue({
+    vector: [0.1, 0.2, 0.3],
+    provider: 'local-ngram',
+    dimensions: 3,
+    durationMs: 1,
+  }),
   searchSimilar: jest.fn().mockResolvedValue([]),
 };
 
@@ -129,9 +134,7 @@ describe('DecisionHooks', () => {
     });
 
     it('should fail-open on Prisma errors', async () => {
-      mockPrisma.tenant.findUnique.mockRejectedValueOnce(
-        new Error('DB down'),
-      );
+      mockPrisma.tenant.findUnique.mockRejectedValueOnce(new Error('DB down'));
       const hooks = createHooks();
 
       const result = await hooks.preDecision({
@@ -160,9 +163,7 @@ describe('DecisionHooks', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      mockAuditTrail.logDecision.mockRejectedValueOnce(
-        new Error('DB error'),
-      );
+      mockAuditTrail.logDecision.mockRejectedValueOnce(new Error('DB error'));
       const hooks = createHooks();
 
       // Should not throw

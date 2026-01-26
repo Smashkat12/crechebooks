@@ -2,11 +2,17 @@ import { IsDateString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class GetCashFlowStatementDto {
-  @ApiProperty({ description: 'Start date for the cash flow period', example: '2026-01-01' })
+  @ApiProperty({
+    description: 'Start date for the cash flow period',
+    example: '2026-01-01',
+  })
   @IsDateString()
   startDate: string;
 
-  @ApiProperty({ description: 'End date for the cash flow period', example: '2026-01-31' })
+  @ApiProperty({
+    description: 'End date for the cash flow period',
+    example: '2026-01-31',
+  })
   @IsDateString()
   endDate: string;
 

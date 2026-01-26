@@ -51,11 +51,17 @@ export class YocoService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditLogService,
   ) {
-    this.apiUrl = this.configService.get('YOCO_API_URL', 'https://payments.yoco.com/api');
+    this.apiUrl = this.configService.get(
+      'YOCO_API_URL',
+      'https://payments.yoco.com/api',
+    );
     this.secretKey = this.configService.get('YOCO_SECRET_KEY', '');
     this.publicKey = this.configService.get('YOCO_PUBLIC_KEY', '');
     this.webhookSecret = this.configService.get('YOCO_WEBHOOK_SECRET', '');
-    this.appUrl = this.configService.get('APP_URL', 'https://app.crechebooks.co.za');
+    this.appUrl = this.configService.get(
+      'APP_URL',
+      'https://app.crechebooks.co.za',
+    );
   }
 
   /**
@@ -78,7 +84,14 @@ export class YocoService {
     userId: string,
     params: CreatePaymentLinkParams,
   ): Promise<PaymentLinkResponse> {
-    const { parentId, amountCents, type, invoiceId, description, expiryDays = 7 } = params;
+    const {
+      parentId,
+      amountCents,
+      type,
+      invoiceId,
+      description,
+      expiryDays = 7,
+    } = params;
 
     // Verify parent exists
     const parent = await this.prisma.parent.findFirst({
@@ -150,10 +163,13 @@ export class YocoService {
   /**
    * Get payment link by short code
    */
-  async getPaymentLinkByShortCode(shortCode: string): Promise<PaymentLink & {
-    parent: { firstName: string; lastName: string; email: string };
-    invoice: { invoiceNumber: string } | null;
-  } | null> {
+  async getPaymentLinkByShortCode(shortCode: string): Promise<
+    | (PaymentLink & {
+        parent: { firstName: string; lastName: string; email: string };
+        invoice: { invoiceNumber: string } | null;
+      })
+    | null
+  > {
     return this.prisma.paymentLink.findUnique({
       where: { shortCode },
       include: {
@@ -186,7 +202,9 @@ export class YocoService {
     }
 
     if (paymentLink.status !== 'ACTIVE') {
-      throw new BadRequestException(`Payment link is ${paymentLink.status.toLowerCase()}`);
+      throw new BadRequestException(
+        `Payment link is ${paymentLink.status.toLowerCase()}`,
+      );
     }
 
     if (paymentLink.expiresAt && paymentLink.expiresAt < new Date()) {
@@ -242,7 +260,10 @@ export class YocoService {
   /**
    * Handle Yoco webhook
    */
-  async handleWebhook(payload: YocoWebhookPayload, signature: string): Promise<void> {
+  async handleWebhook(
+    payload: YocoWebhookPayload,
+    signature: string,
+  ): Promise<void> {
     // Verify webhook signature
     if (!this.verifyWebhookSignature(payload, signature)) {
       throw new UnauthorizedException('Invalid webhook signature');
@@ -267,7 +288,9 @@ export class YocoService {
 
     // Prevent duplicate processing
     if (gatewayTxn.status !== 'PENDING') {
-      this.logger.log(`Transaction ${data.id} already processed with status ${gatewayTxn.status}`);
+      this.logger.log(
+        `Transaction ${data.id} already processed with status ${gatewayTxn.status}`,
+      );
       return;
     }
 
@@ -290,7 +313,9 @@ export class YocoService {
     data: YocoWebhookPayload['payload'],
   ): Promise<void> {
     if (!gatewayTxn.paymentLink) {
-      this.logger.error(`Payment link not found for transaction ${gatewayTxn.id}`);
+      this.logger.error(
+        `Payment link not found for transaction ${gatewayTxn.id}`,
+      );
       return;
     }
 
@@ -383,7 +408,9 @@ export class YocoService {
       },
     });
 
-    this.logger.warn(`Payment failed for gateway ${gatewayTxn.gatewayId}: ${data.status}`);
+    this.logger.warn(
+      `Payment failed for gateway ${gatewayTxn.gatewayId}: ${data.status}`,
+    );
   }
 
   /**
@@ -442,7 +469,9 @@ export class YocoService {
     if (!response.ok) {
       const error = await response.text();
       this.logger.error(`Yoco API error: ${response.status} ${error}`);
-      throw new BadRequestException(`Payment gateway error: ${response.status}`);
+      throw new BadRequestException(
+        `Payment gateway error: ${response.status}`,
+      );
     }
 
     return response.json();
@@ -521,7 +550,9 @@ export class YocoService {
     }
 
     if (link.status !== 'ACTIVE') {
-      throw new BadRequestException(`Cannot cancel payment link with status ${link.status}`);
+      throw new BadRequestException(
+        `Cannot cancel payment link with status ${link.status}`,
+      );
     }
 
     const updated = await this.prisma.paymentLink.update({

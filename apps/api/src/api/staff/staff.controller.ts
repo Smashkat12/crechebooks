@@ -179,8 +179,10 @@ export class StaffController {
         dateOfBirth: new Date(dto.date_of_birth),
         startDate: new Date(dto.start_date),
         endDate: dto.end_date ? new Date(dto.end_date) : undefined,
-        employmentType: (dto.employment_type as EmploymentType) ?? EmploymentType.PERMANENT,
-        payFrequency: (dto.pay_frequency as PayFrequency) ?? PayFrequency.MONTHLY,
+        employmentType:
+          (dto.employment_type as EmploymentType) ?? EmploymentType.PERMANENT,
+        payFrequency:
+          (dto.pay_frequency as PayFrequency) ?? PayFrequency.MONTHLY,
         basicSalaryCents: dto.salary,
         position: dto.position,
         department: dto.department,
@@ -221,7 +223,9 @@ export class StaffController {
   @Post(':id/resend-onboarding-email')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Resend onboarding email with magic link to staff member' })
+  @ApiOperation({
+    summary: 'Resend onboarding email with magic link to staff member',
+  })
   @ApiParam({ name: 'id', description: 'Staff ID' })
   @ApiResponse({ status: 200, description: 'Onboarding email resent' })
   @ApiResponse({ status: 404, description: 'Staff member not found' })

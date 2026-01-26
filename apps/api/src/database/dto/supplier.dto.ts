@@ -202,7 +202,9 @@ export class CreateSupplierBillDto {
   @IsDateString()
   billDate: string;
 
-  @ApiPropertyOptional({ description: 'Due date (ISO format), defaults to payment terms' })
+  @ApiPropertyOptional({
+    description: 'Due date (ISO format), defaults to payment terms',
+  })
   @IsOptional()
   @IsDateString()
   dueDate?: string;
@@ -222,7 +224,10 @@ export class CreateSupplierBillDto {
   @IsString()
   attachmentUrl?: string;
 
-  @ApiProperty({ description: 'Bill line items', type: [CreateSupplierBillLineDto] })
+  @ApiProperty({
+    description: 'Bill line items',
+    type: [CreateSupplierBillLineDto],
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateSupplierBillLineDto)
@@ -239,7 +244,10 @@ export class RecordBillPaymentDto {
   @IsDateString()
   paymentDate: string;
 
-  @ApiProperty({ description: 'Payment method', enum: ['EFT', 'CASH', 'CARD', 'CHEQUE'] })
+  @ApiProperty({
+    description: 'Payment method',
+    enum: ['EFT', 'CASH', 'CARD', 'CHEQUE'],
+  })
   @IsString()
   paymentMethod: string;
 

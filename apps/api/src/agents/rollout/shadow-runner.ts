@@ -17,6 +17,7 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { FeatureFlagService } from './feature-flags.service';
 import { AuditTrailService } from '../audit/audit-trail.service';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import {
   SdkMode,
   ComparisonResult,
@@ -32,6 +33,9 @@ export class ShadowRunner {
     @Optional()
     @Inject(AuditTrailService)
     private readonly auditTrail?: AuditTrailService,
+    @Optional()
+    @Inject(PrismaService)
+    private readonly prisma?: PrismaService,
   ) {}
 
   /**
@@ -172,7 +176,12 @@ export class ShadowRunner {
     try {
       await this.auditTrail.logDecision({
         tenantId: comparison.tenantId,
-        agentType: comparison.agentType as 'categorizer' | 'matcher' | 'sars' | 'validator' | 'orchestrator',
+        agentType: comparison.agentType as
+          | 'categorizer'
+          | 'matcher'
+          | 'sars'
+          | 'validator'
+          | 'orchestrator',
         decision: 'shadow_comparison',
         autoApplied: false,
         details: {
@@ -191,6 +200,49 @@ export class ShadowRunner {
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Failed to log comparison to audit trail: ${msg}`);
+    }
+
+    // Persist to shadow_comparisons table (non-blocking, non-fatal)
+    this.persistComparison(comparison).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to persist shadow comparison: ${msg}`);
+    });
+  }
+
+  /**
+   * Persist a comparison result to the shadow_comparisons table.
+   * Non-blocking: errors are caught and logged, never thrown.
+   */
+  private async persistComparison(
+    comparison: ComparisonResult,
+  ): Promise<void> {
+    if (!this.prisma) {
+      this.logger.debug(
+        'PrismaService unavailable — skipping comparison persistence',
+      );
+      return;
+    }
+
+    try {
+      await this.prisma.shadowComparison.create({
+        data: {
+          tenantId: comparison.tenantId,
+          agentType: comparison.agentType,
+          sdkResult: comparison.sdkResult as Record<string, unknown>,
+          sdkConfidence: comparison.sdkConfidence ?? 0,
+          sdkDurationMs: comparison.sdkDurationMs,
+          heuristicResult:
+            comparison.heuristicResult as Record<string, unknown>,
+          heuristicConfidence: comparison.heuristicConfidence ?? 0,
+          heuristicDurationMs: comparison.heuristicDurationMs,
+          resultsMatch: comparison.resultsMatch,
+          matchDetails: comparison.details ?? null,
+        },
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Failed to persist shadow comparison: ${msg}`);
+      // Non-fatal: do not throw
     }
   }
 }

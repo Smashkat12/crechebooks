@@ -160,7 +160,8 @@ export class ParentFeeAgreementPdfService {
       // Convert cents to rands
       const monthlyFee = (feeStructure?.amountCents || 0) / 100;
       const registrationFee = (feeStructure?.registrationFeeCents || 0) / 100;
-      const reRegistrationFee = (feeStructure?.reRegistrationFeeCents || 0) / 100;
+      const reRegistrationFee =
+        (feeStructure?.reRegistrationFeeCents || 0) / 100;
       const siblingDiscount = feeStructure?.siblingDiscountPercent
         ? feeStructure.siblingDiscountPercent.toNumber()
         : 0;
@@ -222,7 +223,10 @@ export class ParentFeeAgreementPdfService {
           : 'N/A';
         childrenText += `${index + 1}. ${child.firstName} ${child.lastName} (DOB: ${dob})\n`;
       });
-      doc.fontSize(10).font('Helvetica').text(childrenText || 'To be specified');
+      doc
+        .fontSize(10)
+        .font('Helvetica')
+        .text(childrenText || 'To be specified');
 
       doc.moveDown(1);
 
@@ -240,8 +244,7 @@ export class ParentFeeAgreementPdfService {
         feeText += `• Sibling Discount: ${siblingDiscount}% off for additional children\n`;
       }
 
-      feeText +=
-        `\nFees are subject to annual review and may be increased with one calendar month's written notice.`;
+      feeText += `\nFees are subject to annual review and may be increased with one calendar month's written notice.`;
 
       doc.text(feeText, { align: 'left' });
 
@@ -255,7 +258,7 @@ export class ParentFeeAgreementPdfService {
         'Payment Conditions:\n\n' +
           '• Fees are payable in advance on or before the 1st of each month\n' +
           '• Payment must be made via EFT or debit order\n' +
-          '• A full month\'s fee is payable regardless of school holidays, sick days, or public holidays\n' +
+          "• A full month's fee is payable regardless of school holidays, sick days, or public holidays\n" +
           '• No pro-rata fees apply for late enrollment or early withdrawal within a month\n' +
           '• Fees must be paid for the notice period even if the child does not attend',
         { align: 'left' },
@@ -298,7 +301,7 @@ export class ParentFeeAgreementPdfService {
           'The Service Provider reserves the right to terminate this agreement with 30 days notice if:\n' +
           '• Fees remain unpaid for more than 60 days\n' +
           '• The Parent/Guardian breaches the terms of this agreement\n' +
-          '• The child\'s behavior poses a risk to other children or staff',
+          "• The child's behavior poses a risk to other children or staff",
         { align: 'left' },
       );
 
@@ -310,8 +313,8 @@ export class ParentFeeAgreementPdfService {
       doc.fontSize(10).font('Helvetica');
       doc.text(
         'The deposit is held as security and will be:\n\n' +
-          '• Used to offset the final month\'s fees (with approval)\n' +
-          '• Refunded within 30 days of the child\'s last day, after deducting:\n' +
+          "• Used to offset the final month's fees (with approval)\n" +
+          "• Refunded within 30 days of the child's last day, after deducting:\n" +
           '  - Any outstanding fees or charges\n' +
           '  - Damages to property (beyond normal wear and tear)\n' +
           '• Forfeited if proper notice is not given',
@@ -327,7 +330,7 @@ export class ParentFeeAgreementPdfService {
       doc.text(
         'Annual Fee Adjustments:\n\n' +
           '• Fees may be reviewed and adjusted annually, typically in January\n' +
-          '• The Service Provider will provide at least one month\'s written notice of any increase\n' +
+          "• The Service Provider will provide at least one month's written notice of any increase\n" +
           '• Fee increases are based on operational costs, inflation, and regulatory requirements\n' +
           '• Acceptance of the new fees is assumed unless written objection is received',
         { align: 'left' },
@@ -345,7 +348,7 @@ export class ParentFeeAgreementPdfService {
           '• Parties agree to attempt good-faith negotiation first\n' +
           '• If unresolved, mediation through an agreed mediator may be sought\n' +
           '• This agreement is governed by the laws of South Africa\n' +
-          '• The Magistrate\'s Court shall have jurisdiction for disputes',
+          "• The Magistrate's Court shall have jurisdiction for disputes",
         { align: 'left' },
       );
 
@@ -372,19 +375,28 @@ export class ParentFeeAgreementPdfService {
       const sigY = doc.y;
 
       // Parent signature
-      doc.fontSize(10).font('Helvetica-Bold').text('PARENT/GUARDIAN:', 50, sigY);
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('PARENT/GUARDIAN:', 50, sigY);
       doc.moveDown(2);
       doc.fontSize(10).font('Helvetica');
       doc.text('Signature: _________________________', 50);
       doc.moveDown(0.5);
       doc.text(`Full Name: ${parent.firstName} ${parent.lastName}`, 50);
       doc.moveDown(0.5);
-      doc.text(`ID Number: ${parent.idNumber || '_________________________'}`, 50);
+      doc.text(
+        `ID Number: ${parent.idNumber || '_________________________'}`,
+        50,
+      );
       doc.moveDown(0.5);
       doc.text('Date: _________________________', 50);
 
       // Service provider signature
-      doc.fontSize(10).font('Helvetica-Bold').text('SERVICE PROVIDER:', 320, sigY);
+      doc
+        .fontSize(10)
+        .font('Helvetica-Bold')
+        .text('SERVICE PROVIDER:', 320, sigY);
       doc.y = sigY + 30;
       doc.fontSize(10).font('Helvetica');
       doc.text('Signature: _________________________', 320);

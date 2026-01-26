@@ -17,13 +17,17 @@ import type {
   VatSummaryReport,
 } from '../../../src/mcp/crechebooks-mcp/types/index';
 
-function createMockPrisma(overrides: Partial<Record<string, { findMany: jest.Mock }>> = {}): {
+function createMockPrisma(
+  overrides: Partial<Record<string, { findMany: jest.Mock }>> = {},
+): {
   prisma: PrismaService;
   transactionFindMany: jest.Mock;
   categorizationFindMany: jest.Mock;
 } {
-  const transactionFindMany = overrides.transaction?.findMany ?? jest.fn().mockResolvedValue([]);
-  const categorizationFindMany = overrides.categorization?.findMany ?? jest.fn().mockResolvedValue([]);
+  const transactionFindMany =
+    overrides.transaction?.findMany ?? jest.fn().mockResolvedValue([]);
+  const categorizationFindMany =
+    overrides.categorization?.findMany ?? jest.fn().mockResolvedValue([]);
   const prisma = {
     transaction: { findMany: transactionFindMany },
     categorization: { findMany: categorizationFindMany },
@@ -66,7 +70,7 @@ describe('get_reports tool', () => {
         reportType: 'INCOME_EXPENSE',
         fromDate: FROM_DATE,
         toDate: TO_DATE,
-      }) as McpToolResult<ReportOutput>;
+      });
 
       expect(result.success).toBe(true);
       const report = result.data as IncomeExpenseReport;
@@ -88,7 +92,9 @@ describe('get_reports tool', () => {
         toDate: TO_DATE,
       });
 
-      const callArgs = transactionFindMany.mock.calls[0][0] as { where: Record<string, unknown> };
+      const callArgs = transactionFindMany.mock.calls[0][0] as {
+        where: Record<string, unknown>;
+      };
       expect(callArgs.where.tenantId).toBe(TENANT_ID);
       expect(callArgs.where.isDeleted).toBe(false);
       expect(callArgs.where.date).toEqual({
@@ -101,14 +107,32 @@ describe('get_reports tool', () => {
   describe('VAT_SUMMARY report', () => {
     it('should group by VAT type', async () => {
       const categorizations = [
-        { vatType: 'STANDARD', vatAmountCents: 1500, transaction: { amountCents: 10000 } },
-        { vatType: 'STANDARD', vatAmountCents: 3000, transaction: { amountCents: 20000 } },
-        { vatType: 'ZERO_RATED', vatAmountCents: 0, transaction: { amountCents: 5000 } },
-        { vatType: 'EXEMPT', vatAmountCents: null, transaction: { amountCents: 8000 } },
+        {
+          vatType: 'STANDARD',
+          vatAmountCents: 1500,
+          transaction: { amountCents: 10000 },
+        },
+        {
+          vatType: 'STANDARD',
+          vatAmountCents: 3000,
+          transaction: { amountCents: 20000 },
+        },
+        {
+          vatType: 'ZERO_RATED',
+          vatAmountCents: 0,
+          transaction: { amountCents: 5000 },
+        },
+        {
+          vatType: 'EXEMPT',
+          vatAmountCents: null,
+          transaction: { amountCents: 8000 },
+        },
       ];
 
       const { prisma } = createMockPrisma({
-        categorization: { findMany: jest.fn().mockResolvedValue(categorizations) },
+        categorization: {
+          findMany: jest.fn().mockResolvedValue(categorizations),
+        },
       });
       const tool = getReports(prisma);
 
@@ -117,7 +141,7 @@ describe('get_reports tool', () => {
         reportType: 'VAT_SUMMARY',
         fromDate: FROM_DATE,
         toDate: TO_DATE,
-      }) as McpToolResult<ReportOutput>;
+      });
 
       expect(result.success).toBe(true);
       const report = result.data as VatSummaryReport;
@@ -147,7 +171,9 @@ describe('get_reports tool', () => {
         toDate: TO_DATE,
       });
 
-      const callArgs = categorizationFindMany.mock.calls[0][0] as { where: { transaction: Record<string, unknown> } };
+      const callArgs = categorizationFindMany.mock.calls[0][0] as {
+        where: { transaction: Record<string, unknown> };
+      };
       expect(callArgs.where.transaction.tenantId).toBe(TENANT_ID);
       expect(callArgs.where.transaction.isDeleted).toBe(false);
     });
@@ -172,7 +198,7 @@ describe('get_reports tool', () => {
         reportType: 'MONTHLY_TOTALS',
         fromDate: FROM_DATE,
         toDate: TO_DATE,
-      }) as McpToolResult<ReportOutput>;
+      });
 
       expect(result.success).toBe(true);
       const report = result.data as MonthlyTotalsReport;
@@ -215,7 +241,9 @@ describe('get_reports tool', () => {
       ];
 
       const { prisma } = createMockPrisma({
-        categorization: { findMany: jest.fn().mockResolvedValue(categorizations) },
+        categorization: {
+          findMany: jest.fn().mockResolvedValue(categorizations),
+        },
       });
       const tool = getReports(prisma);
 
@@ -224,7 +252,7 @@ describe('get_reports tool', () => {
         reportType: 'ACCOUNT_BREAKDOWN',
         fromDate: FROM_DATE,
         toDate: TO_DATE,
-      }) as McpToolResult<ReportOutput>;
+      });
 
       expect(result.success).toBe(true);
       const report = result.data as AccountBreakdownReport;
@@ -237,7 +265,9 @@ describe('get_reports tool', () => {
       expect(costAccount!.totalCreditCents).toBe(0);
       expect(costAccount!.transactionCount).toBe(2);
 
-      const salesAccount = report.accounts.find((a) => a.accountCode === '4100');
+      const salesAccount = report.accounts.find(
+        (a) => a.accountCode === '4100',
+      );
       expect(salesAccount!.totalCreditCents).toBe(50000);
       expect(salesAccount!.totalDebitCents).toBe(0);
       expect(salesAccount!.netCents).toBe(50000);
@@ -246,7 +276,9 @@ describe('get_reports tool', () => {
 
   it('should handle errors gracefully', async () => {
     const { prisma } = createMockPrisma({
-      transaction: { findMany: jest.fn().mockRejectedValue(new Error('Timeout')) },
+      transaction: {
+        findMany: jest.fn().mockRejectedValue(new Error('Timeout')),
+      },
     });
     const tool = getReports(prisma);
 
@@ -255,7 +287,7 @@ describe('get_reports tool', () => {
       reportType: 'INCOME_EXPENSE',
       fromDate: FROM_DATE,
       toDate: TO_DATE,
-    }) as McpToolResult<ReportOutput>;
+    });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Timeout');

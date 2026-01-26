@@ -16,7 +16,10 @@ describe('HybridScorer', () => {
     scorer = new HybridScorer();
   });
 
-  const defaultContext = { tenantId: 'tenant-1', agentType: 'categorizer' as const };
+  const defaultContext = {
+    tenantId: 'tenant-1',
+    agentType: 'categorizer' as const,
+  };
 
   describe('when llmConfidence is null', () => {
     it('should return heuristic-only score', async () => {
@@ -127,7 +130,10 @@ describe('HybridScorer', () => {
 
   describe('matcher agent type', () => {
     it('should work with matcher agent type', async () => {
-      const matcherContext = { tenantId: 'tenant-1', agentType: 'matcher' as const };
+      const matcherContext = {
+        tenantId: 'tenant-1',
+        agentType: 'matcher' as const,
+      };
       const result = await scorer.combine(90, 80, matcherContext);
 
       // 90 * 0.6 + 80 * 0.4 = 54 + 32 = 86

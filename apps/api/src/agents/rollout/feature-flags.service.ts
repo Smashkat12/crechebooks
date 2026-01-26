@@ -155,9 +155,7 @@ export class FeatureFlagService {
   /**
    * Get all feature flags for a tenant.
    */
-  async getAllFlags(
-    tenantId: string,
-  ): Promise<
+  async getAllFlags(tenantId: string): Promise<
     Array<{
       flag: string;
       enabled: boolean;

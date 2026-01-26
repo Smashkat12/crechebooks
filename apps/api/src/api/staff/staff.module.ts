@@ -24,10 +24,7 @@ import { AuthModule } from '../auth/auth.module';
     LeaveController,
     StaffPortalController,
   ],
-  providers: [
-    StaffRepository,
-    LeaveRequestRepository,
-  ],
+  providers: [StaffRepository, LeaveRequestRepository],
   exports: [StaffRepository, LeaveRequestRepository],
 })
 export class StaffModule {}

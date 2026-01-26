@@ -24,7 +24,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 
 export function SimplepayConnectionForm() {
-  const { status, isLoading: loadingStatus, mutate } = useSimplePayStatus();
+  const { status, isLoading: loadingStatus, isError, error: statusError, mutate } = useSimplePayStatus();
   const connectMutation = useSimplePayConnect();
   const testMutation = useTestSimplePayConnection();
   const disconnectMutation = useSimplePayDisconnect();
@@ -73,6 +73,32 @@ export function SimplepayConnectionForm() {
       <Card>
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Error state — don't show the connection form if we can't verify status
+  if (isError && !status) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-blue-600" />
+            SimplePay Connection
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert variant="destructive">
+            <AlertDescription>
+              Unable to check connection status. Your connection may still be active.
+              {statusError instanceof Error ? ` (${statusError.message})` : ''}
+            </AlertDescription>
+          </Alert>
+          <Button variant="outline" onClick={() => mutate()}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry
+          </Button>
         </CardContent>
       </Card>
     );

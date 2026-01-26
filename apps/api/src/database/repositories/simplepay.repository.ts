@@ -44,7 +44,7 @@ export class SimplePayRepository {
       update: {
         clientId: data.clientId,
         apiKey: data.apiKey,
-        isActive: data.isActive,
+        isActive: data.isActive ?? true,
       },
     });
   }

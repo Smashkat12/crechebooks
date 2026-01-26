@@ -34,6 +34,7 @@ import { SdkOrchestrator } from './sdk-orchestrator';
 import { isMultiStepWorkflow } from './workflow-definitions';
 import { AuditTrailService } from '../audit/audit-trail.service';
 import { ShadowRunner } from '../rollout/shadow-runner';
+import type { ComparisonResult } from '../rollout/interfaces/rollout.interface';
 
 @Injectable()
 export class OrchestratorAgent {
@@ -68,6 +69,33 @@ export class OrchestratorAgent {
    * @returns Workflow result with aggregated agent results
    */
   async executeWorkflow(request: WorkflowRequest): Promise<WorkflowResult> {
+    if (this.shadowRunner && this.sdkOrchestrator) {
+      return this.shadowRunner.run<WorkflowResult>({
+        tenantId: request.tenantId,
+        agentType: 'orchestrator',
+        sdkFn: () => this._executeWorkflowCore(request, false),
+        heuristicFn: () => this._executeWorkflowCore(request, true),
+        compareFn: (sdk: WorkflowResult, heuristic: WorkflowResult): ComparisonResult => ({
+          tenantId: request.tenantId,
+          agentType: 'orchestrator',
+          sdkResult: sdk,
+          heuristicResult: heuristic,
+          sdkDurationMs: 0,
+          heuristicDurationMs: 0,
+          resultsMatch: sdk.status === heuristic.status,
+          details: {
+            sdkStatus: sdk.status,
+            heuristicStatus: heuristic.status,
+            sdkResultCount: sdk.results.length,
+            heuristicResultCount: heuristic.results.length,
+          },
+        }),
+      });
+    }
+    return this._executeWorkflowCore(request, false);
+  }
+
+  private async _executeWorkflowCore(request: WorkflowRequest, skipSdk: boolean): Promise<WorkflowResult> {
     const workflowId = uuidv4();
     const startedAt = new Date().toISOString();
 
@@ -101,7 +129,7 @@ export class OrchestratorAgent {
 
     try {
       // Try SDK orchestration for multi-step workflows (BANK_IMPORT, MONTHLY_CLOSE)
-      if (this.sdkOrchestrator && isMultiStepWorkflow(request.type)) {
+      if (!skipSdk && this.sdkOrchestrator && isMultiStepWorkflow(request.type)) {
         try {
           const sdkResult = await this.sdkOrchestrator.execute(request);
           if (sdkResult) {

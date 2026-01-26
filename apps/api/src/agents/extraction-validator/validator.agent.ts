@@ -25,6 +25,7 @@ import {
 import type { SemanticValidationResult } from './interfaces/sdk-validator.interface';
 import { SdkSemanticValidator } from './sdk-validator';
 import { ShadowRunner } from '../rollout/shadow-runner';
+import type { ComparisonResult } from '../rollout/interfaces/rollout.interface';
 
 // Confidence thresholds
 const THRESHOLDS = {
@@ -56,6 +57,39 @@ export class ExtractionValidatorAgent {
   async validate(
     statement: ParsedBankStatement,
     tenantId: string,
+  ): Promise<ValidationResult> {
+    if (this.shadowRunner && this.sdkValidator) {
+      return this.shadowRunner.run<ValidationResult>({
+        tenantId,
+        agentType: 'validator',
+        sdkFn: () => this._validateCore(statement, tenantId, false),
+        heuristicFn: () => this._validateCore(statement, tenantId, true),
+        compareFn: (sdk: ValidationResult, heuristic: ValidationResult): ComparisonResult => ({
+          tenantId,
+          agentType: 'validator',
+          sdkResult: sdk,
+          heuristicResult: heuristic,
+          sdkDurationMs: 0,
+          heuristicDurationMs: 0,
+          resultsMatch: sdk.isValid === heuristic.isValid && sdk.confidence === heuristic.confidence,
+          sdkConfidence: sdk.confidence,
+          heuristicConfidence: heuristic.confidence,
+          details: {
+            sdkIsValid: sdk.isValid,
+            heuristicIsValid: heuristic.isValid,
+            sdkFlags: sdk.flags.length,
+            heuristicFlags: heuristic.flags.length,
+          },
+        }),
+      });
+    }
+    return this._validateCore(statement, tenantId, false);
+  }
+
+  private async _validateCore(
+    statement: ParsedBankStatement,
+    tenantId: string,
+    skipSdk: boolean,
   ): Promise<ValidationResult> {
     this.logger.log(
       `Validating statement: account=${statement.accountNumber}, ` +
@@ -154,7 +188,7 @@ export class ExtractionValidatorAgent {
 
     // 6. Semantic validation via LLM (supplementary +5/-10 points)
     let semanticValidation: SemanticValidationResult | undefined;
-    if (this.sdkValidator) {
+    if (!skipSdk && this.sdkValidator) {
       try {
         semanticValidation = await this.sdkValidator.validate(
           statement,

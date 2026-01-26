@@ -13,6 +13,7 @@ import {
   GraduationCap,
   ClipboardList,
   Shield,
+  Megaphone,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -39,6 +40,7 @@ export const managementNavLinks: NavLink[] = [
   { title: 'Parents', href: '/parents', icon: UsersRound },
   { title: 'Staff', href: '/staff', icon: Users },
   { title: 'Payroll', href: '/staff/payroll', icon: FileSpreadsheet },
+  { title: 'Communications', href: '/communications', icon: Megaphone },
 ];
 
 export const complianceNavLinks: NavLink[] = [

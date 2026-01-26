@@ -40,6 +40,9 @@ export { PaymentDetail } from './payment-detail';
 export { BankDetailsCard } from './bank-details-card';
 export { PaymentReference } from './payment-reference';
 
+// Onboarding Components
+export { StepIndicator, ContactStep, FeeAgreementStep, ConsentsStep, CompletionStep } from './onboarding';
+
 // Profile Components (TASK-PORTAL-016)
 export { ProfileForm } from './profile-form';
 export { ChildCard } from './child-card';

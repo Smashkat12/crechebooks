@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
@@ -36,6 +37,7 @@ import {
 } from '../../database/dto/parent.dto';
 import { Parent } from '@prisma/client';
 import { XeroSyncService } from '../../database/services/xero-sync.service';
+import { MagicLinkService } from '../auth/services/magic-link.service';
 
 /**
  * Transform parent to camelCase response matching IParent interface
@@ -73,6 +75,7 @@ export class ParentController {
   constructor(
     private readonly parentRepository: ParentRepository,
     private readonly xeroSyncService: XeroSyncService,
+    private readonly magicLinkService: MagicLinkService,
   ) {}
 
   @Get()
@@ -268,6 +271,37 @@ export class ParentController {
       dto,
     );
     return toResponse(parent);
+  }
+
+  @Post(':id/send-onboarding-invite')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send onboarding invite email with magic link to parent' })
+  @ApiParam({ name: 'id', description: 'Parent ID' })
+  @ApiResponse({ status: 200, description: 'Onboarding invite sent' })
+  @ApiResponse({ status: 404, description: 'Parent not found' })
+  @ApiResponse({ status: 400, description: 'Parent has no email address' })
+  async sendOnboardingInvite(
+    @CurrentUser() user: IUser,
+    @Param('id') id: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const parent = await this.parentRepository.findById(id, getTenantId(user));
+    if (!parent) {
+      throw new NotFoundException('Parent not found');
+    }
+
+    if (!parent.email) {
+      throw new BadRequestException(
+        'Parent does not have an email address. Please update their profile first.',
+      );
+    }
+
+    await this.magicLinkService.generateMagicLink(parent.email);
+
+    return {
+      success: true,
+      message: `Onboarding invite sent to ${parent.email}`,
+    };
   }
 
   @Delete(':id')

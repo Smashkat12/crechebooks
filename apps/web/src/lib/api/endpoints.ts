@@ -39,6 +39,7 @@ export const endpoints = {
     list: '/parents',
     detail: (id: string) => `/parents/${id}`,
     children: (id: string) => `/parents/${id}/children`,
+    sendOnboardingInvite: (id: string) => `/parents/${id}/send-onboarding-invite`,
   },
   children: {
     list: '/children',

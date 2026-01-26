@@ -37,9 +37,7 @@ Implement the task from /home/smash/Documents/dev-env/Playground/ruv/crechebooks
 /home/smash/Documents/dev-env/Playground/ruv/crechebooks/claudeflow.md
 /home/smash/Documents/dev-env/Playground/ruv/crechebooks/specs/tasks/_index.md
 /home/smash/Documents/dev-env/Playground/ruv/crechebooks/specs/tasks/_traceability.md
-/home/smash/Documents/dev-env/Playground/ruv/crechebooks/CrecheBookkeeper-PRD.md
-/home/smash/Documents/dev-env/Playground/ruv/crechebooks/activeContext.md
-/home/smash/Documents/dev-env/Playground/ruv/crechebooks/AI-Agent-SpecTaskCreator.md
+
 ```
 
 ### TASK IMPLEMENTATION PROCESS:

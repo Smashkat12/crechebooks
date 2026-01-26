@@ -19,7 +19,7 @@
  * - Tenant isolation on ALL queries
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Transaction } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { MatchDecisionLogger } from './decision-logger';
@@ -27,12 +27,26 @@ import {
   MatchDecision,
   InvoiceCandidate,
 } from './interfaces/matcher.interface';
+import { SdkPaymentMatcher } from './sdk-matcher';
+import type { MatchSource } from './interfaces/sdk-matcher.interface';
+import { HybridScorer } from '../shared/hybrid-scorer';
+import { AgentMemoryService } from '../memory/agent-memory.service';
+import { ShadowRunner } from '../rollout/shadow-runner';
 
 /** Confidence threshold for auto-apply */
 const AUTO_APPLY_THRESHOLD = 80;
 
 /** Minimum confidence to include as candidate */
 const CANDIDATE_THRESHOLD = 20;
+
+/**
+ * High-value threshold in cents (R50,000).
+ * Transactions above this amount force REVIEW_REQUIRED even if SDK is confident.
+ */
+const HIGH_VALUE_THRESHOLD_CENTS = 5_000_000;
+
+/** Maximum additive boost from ruvector similarity */
+const RUVECTOR_MAX_BOOST = 10;
 
 @Injectable()
 export class PaymentMatcherAgent {
@@ -41,6 +55,18 @@ export class PaymentMatcherAgent {
   constructor(
     private readonly prisma: PrismaService,
     private readonly decisionLogger: MatchDecisionLogger,
+    @Optional()
+    @Inject(SdkPaymentMatcher)
+    private readonly sdkMatcher?: SdkPaymentMatcher,
+    @Optional()
+    @Inject(HybridScorer)
+    private readonly hybridScorer?: HybridScorer,
+    @Optional()
+    @Inject(AgentMemoryService)
+    private readonly agentMemory?: AgentMemoryService,
+    @Optional()
+    @Inject(ShadowRunner)
+    private readonly shadowRunner?: ShadowRunner,
   ) {}
 
   /**
@@ -58,6 +84,8 @@ export class PaymentMatcherAgent {
     tenantId: string,
     autoApplyThreshold: number = AUTO_APPLY_THRESHOLD,
   ): Promise<MatchDecision> {
+    const startTime = Date.now();
+
     const highConfidenceCandidates = candidates.filter(
       (c) => c.confidence >= autoApplyThreshold,
     );
@@ -66,6 +94,7 @@ export class PaymentMatcherAgent {
     );
 
     let decision: MatchDecision;
+    let source: MatchSource = 'deterministic';
 
     if (candidates.length === 0) {
       // No candidates at all
@@ -86,9 +115,11 @@ export class PaymentMatcherAgent {
         autoApplied: false,
         reasoning: 'No matching invoices found',
         candidateCount: 0,
+        source,
+        durationMs: Date.now() - startTime,
       });
     } else if (highConfidenceCandidates.length === 1) {
-      // Single high-confidence match - AUTO APPLY
+      // Single high-confidence match - AUTO APPLY (fast path, unchanged)
       const best = highConfidenceCandidates[0];
       decision = {
         transactionId: transaction.id,
@@ -118,86 +149,372 @@ export class PaymentMatcherAgent {
         autoApplied: true,
         reasoning: best.matchReasons.join('; '),
         candidateCount: validCandidates.length,
+        source,
+        durationMs: Date.now() - startTime,
       });
-    } else if (highConfidenceCandidates.length > 1) {
-      // Multiple high-confidence matches - AMBIGUOUS, need review
-      const best = candidates.sort((a, b) => b.confidence - a.confidence)[0];
-      decision = {
-        transactionId: transaction.id,
-        invoiceId: best.invoice.id,
-        invoiceNumber: best.invoice.invoiceNumber,
-        confidence: best.confidence,
-        action: 'REVIEW_REQUIRED',
-        reasoning: `Ambiguous: ${highConfidenceCandidates.length} high-confidence matches found`,
-        alternatives: validCandidates.slice(0, 5).map((c) => ({
-          invoiceId: c.invoice.id,
-          invoiceNumber: c.invoice.invoiceNumber,
-          confidence: c.confidence,
-        })),
-      };
-
-      await this.decisionLogger.logDecision({
-        tenantId,
-        transactionId: transaction.id,
-        transactionAmountCents: transaction.amountCents,
-        decision: 'escalate',
-        invoiceId: best.invoice.id,
-        invoiceNumber: best.invoice.invoiceNumber,
-        confidence: best.confidence,
-        autoApplied: false,
-        reasoning: `Ambiguous: ${highConfidenceCandidates.length} high-confidence matches`,
-        candidateCount: validCandidates.length,
-      });
-
-      await this.decisionLogger.logEscalation(
-        tenantId,
-        transaction.id,
-        'AMBIGUOUS_MATCH',
-        `${highConfidenceCandidates.length} invoices with confidence >= ${autoApplyThreshold}%`,
-        highConfidenceCandidates.map((c) => c.invoice.id),
-        highConfidenceCandidates.map((c) => c.invoice.invoiceNumber),
-      );
     } else {
-      // No high-confidence match - LOW CONFIDENCE, need review
-      const best = candidates.sort((a, b) => b.confidence - a.confidence)[0];
-      decision = {
-        transactionId: transaction.id,
-        invoiceId: best.invoice.id,
-        invoiceNumber: best.invoice.invoiceNumber,
-        confidence: best.confidence,
-        action: 'REVIEW_REQUIRED',
-        reasoning: `Confidence ${best.confidence}% below threshold ${autoApplyThreshold}%`,
-        alternatives: validCandidates.slice(0, 5).map((c) => ({
-          invoiceId: c.invoice.id,
-          invoiceNumber: c.invoice.invoiceNumber,
-          confidence: c.confidence,
-        })),
-      };
+      // ── SDK-004: Hybrid matching flow ──────────────────────────────
+      // Before falling through to existing ambiguous/low-confidence logic,
+      // attempt ruvector boost and LLM resolution if sdkMatcher is available.
 
-      await this.decisionLogger.logDecision({
+      // Phase 1: Ruvector boost (try to promote one candidate above threshold)
+      const ruvectorDecision = await this.tryRuvectorBoost(
+        transaction,
+        candidates,
+        validCandidates,
         tenantId,
-        transactionId: transaction.id,
-        transactionAmountCents: transaction.amountCents,
-        decision: 'escalate',
-        invoiceId: best.invoice.id,
-        invoiceNumber: best.invoice.invoiceNumber,
-        confidence: best.confidence,
-        autoApplied: false,
-        reasoning: `Confidence ${best.confidence}% below threshold`,
-        candidateCount: validCandidates.length,
-      });
-
-      await this.decisionLogger.logEscalation(
-        tenantId,
-        transaction.id,
-        'LOW_CONFIDENCE',
-        `Best match ${best.invoice.invoiceNumber} at ${best.confidence}%`,
-        validCandidates.map((c) => c.invoice.id),
-        validCandidates.map((c) => c.invoice.invoiceNumber),
+        autoApplyThreshold,
+        startTime,
       );
+      if (ruvectorDecision) {
+        return ruvectorDecision;
+      }
+
+      // Phase 2: LLM ambiguity resolution (for ambiguous or moderate-confidence cases)
+      const sdkDecision = await this.trySdkResolution(
+        transaction,
+        candidates,
+        validCandidates,
+        tenantId,
+        autoApplyThreshold,
+        startTime,
+      );
+      if (sdkDecision) {
+        return sdkDecision;
+      }
+
+      // ── Fallback: existing deterministic logic (unchanged) ──────────
+      // Re-compute high-confidence after any boost attempts
+      const currentHighConfidence = candidates.filter(
+        (c) => c.confidence >= autoApplyThreshold,
+      );
+      source = 'deterministic';
+
+      if (currentHighConfidence.length > 1) {
+        // Multiple high-confidence matches - AMBIGUOUS, need review
+        const best = candidates.sort((a, b) => b.confidence - a.confidence)[0];
+        decision = {
+          transactionId: transaction.id,
+          invoiceId: best.invoice.id,
+          invoiceNumber: best.invoice.invoiceNumber,
+          confidence: best.confidence,
+          action: 'REVIEW_REQUIRED',
+          reasoning: `Ambiguous: ${currentHighConfidence.length} high-confidence matches found`,
+          alternatives: validCandidates.slice(0, 5).map((c) => ({
+            invoiceId: c.invoice.id,
+            invoiceNumber: c.invoice.invoiceNumber,
+            confidence: c.confidence,
+          })),
+        };
+
+        await this.decisionLogger.logDecision({
+          tenantId,
+          transactionId: transaction.id,
+          transactionAmountCents: transaction.amountCents,
+          decision: 'escalate',
+          invoiceId: best.invoice.id,
+          invoiceNumber: best.invoice.invoiceNumber,
+          confidence: best.confidence,
+          autoApplied: false,
+          reasoning: `Ambiguous: ${currentHighConfidence.length} high-confidence matches`,
+          candidateCount: validCandidates.length,
+          source,
+          durationMs: Date.now() - startTime,
+        });
+
+        await this.decisionLogger.logEscalation(
+          tenantId,
+          transaction.id,
+          'AMBIGUOUS_MATCH',
+          `${currentHighConfidence.length} invoices with confidence >= ${autoApplyThreshold}%`,
+          currentHighConfidence.map((c) => c.invoice.id),
+          currentHighConfidence.map((c) => c.invoice.invoiceNumber),
+        );
+      } else {
+        // No high-confidence match - LOW CONFIDENCE, need review
+        const best = candidates.sort((a, b) => b.confidence - a.confidence)[0];
+        decision = {
+          transactionId: transaction.id,
+          invoiceId: best.invoice.id,
+          invoiceNumber: best.invoice.invoiceNumber,
+          confidence: best.confidence,
+          action: 'REVIEW_REQUIRED',
+          reasoning: `Confidence ${best.confidence}% below threshold ${autoApplyThreshold}%`,
+          alternatives: validCandidates.slice(0, 5).map((c) => ({
+            invoiceId: c.invoice.id,
+            invoiceNumber: c.invoice.invoiceNumber,
+            confidence: c.confidence,
+          })),
+        };
+
+        await this.decisionLogger.logDecision({
+          tenantId,
+          transactionId: transaction.id,
+          transactionAmountCents: transaction.amountCents,
+          decision: 'escalate',
+          invoiceId: best.invoice.id,
+          invoiceNumber: best.invoice.invoiceNumber,
+          confidence: best.confidence,
+          autoApplied: false,
+          reasoning: `Confidence ${best.confidence}% below threshold`,
+          candidateCount: validCandidates.length,
+          source,
+          durationMs: Date.now() - startTime,
+        });
+
+        await this.decisionLogger.logEscalation(
+          tenantId,
+          transaction.id,
+          'LOW_CONFIDENCE',
+          `Best match ${best.invoice.invoiceNumber} at ${best.confidence}%`,
+          validCandidates.map((c) => c.invoice.id),
+          validCandidates.map((c) => c.invoice.invoiceNumber),
+        );
+      }
     }
 
     return decision;
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // SDK-004: Hybrid matching helper methods
+  // ────────────────────────────────────────────────────────────────────
+
+  /**
+   * Phase 1: Attempt ruvector similarity boost on candidate confidence.
+   *
+   * If sdkMatcher is available and the transaction has a reference,
+   * searches for similar invoice references and boosts matching candidates
+   * by up to RUVECTOR_MAX_BOOST points (additive). If a single candidate
+   * is then promoted above the auto-apply threshold, returns an AUTO_APPLY decision.
+   *
+   * @returns MatchDecision if ruvector boost produces a clear winner, otherwise null
+   */
+  private async tryRuvectorBoost(
+    transaction: Transaction,
+    candidates: InvoiceCandidate[],
+    validCandidates: InvoiceCandidate[],
+    tenantId: string,
+    autoApplyThreshold: number,
+    startTime: number,
+  ): Promise<MatchDecision | null> {
+    if (!this.sdkMatcher || !transaction.reference) {
+      return null;
+    }
+
+    try {
+      const similarRefs = await this.sdkMatcher.findSimilarReferences(
+        transaction.reference,
+        tenantId,
+      );
+
+      if (similarRefs.length === 0) {
+        return null;
+      }
+
+      // Build a lookup of invoiceId → similarity score
+      const similarityMap = new Map<string, number>();
+      for (const ref of similarRefs) {
+        similarityMap.set(ref.invoiceId, ref.similarity);
+      }
+
+      // Boost candidate confidence (additive, capped at +RUVECTOR_MAX_BOOST, total max 100)
+      for (const candidate of candidates) {
+        const similarity = similarityMap.get(candidate.invoice.id);
+        if (similarity !== undefined) {
+          const boost = Math.round(similarity * RUVECTOR_MAX_BOOST);
+          candidate.confidence = Math.min(100, candidate.confidence + boost);
+          candidate.matchReasons.push(
+            `Ruvector similarity boost +${String(boost)}`,
+          );
+        }
+      }
+
+      // Re-check: did the boost produce a single clear winner?
+      const boostedHigh = candidates.filter(
+        (c) => c.confidence >= autoApplyThreshold,
+      );
+
+      if (boostedHigh.length === 1) {
+        const best = boostedHigh[0];
+        const source: MatchSource = 'deterministic+ruvector';
+
+        const decision: MatchDecision = {
+          transactionId: transaction.id,
+          invoiceId: best.invoice.id,
+          invoiceNumber: best.invoice.invoiceNumber,
+          confidence: best.confidence,
+          action: 'AUTO_APPLY',
+          reasoning: best.matchReasons.join('; '),
+          alternatives: validCandidates
+            .filter((c) => c.invoice.id !== best.invoice.id)
+            .slice(0, 4)
+            .map((c) => ({
+              invoiceId: c.invoice.id,
+              invoiceNumber: c.invoice.invoiceNumber,
+              confidence: c.confidence,
+            })),
+        };
+
+        await this.decisionLogger.logDecision({
+          tenantId,
+          transactionId: transaction.id,
+          transactionAmountCents: transaction.amountCents,
+          decision: 'match',
+          invoiceId: best.invoice.id,
+          invoiceNumber: best.invoice.invoiceNumber,
+          confidence: best.confidence,
+          autoApplied: true,
+          reasoning: best.matchReasons.join('; '),
+          candidateCount: validCandidates.length,
+          source,
+          durationMs: Date.now() - startTime,
+        });
+
+        this.logger.log(
+          `Ruvector boost resolved match for ${transaction.id} → ${best.invoice.invoiceNumber} (${String(best.confidence)}%)`,
+        );
+
+        return decision;
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Ruvector boost failed for ${transaction.id}, continuing with deterministic: ${msg}`,
+      );
+    }
+
+    return null;
+  }
+
+  /**
+   * Phase 2: Attempt LLM-based ambiguity resolution via SDK.
+   *
+   * Called when deterministic + ruvector boost did not produce a single
+   * high-confidence match. Uses the LLM to analyze candidates and resolve
+   * ambiguity.
+   *
+   * Conditions for attempting SDK resolution:
+   * - sdkMatcher is available
+   * - Multiple candidates at >= autoApplyThreshold (ambiguous), OR
+   * - Best candidate is in moderate range (40-79%)
+   *
+   * HIGH VALUE CHECK: If |amountCents| > HIGH_VALUE_THRESHOLD_CENTS,
+   * forces REVIEW_REQUIRED even if the LLM is confident.
+   *
+   * @returns MatchDecision if SDK resolution succeeds, otherwise null
+   */
+  private async trySdkResolution(
+    transaction: Transaction,
+    candidates: InvoiceCandidate[],
+    validCandidates: InvoiceCandidate[],
+    tenantId: string,
+    autoApplyThreshold: number,
+    startTime: number,
+  ): Promise<MatchDecision | null> {
+    if (!this.sdkMatcher) {
+      return null;
+    }
+
+    const currentHighConfidence = candidates.filter(
+      (c) => c.confidence >= autoApplyThreshold,
+    );
+    const bestCandidate = [...candidates].sort(
+      (a, b) => b.confidence - a.confidence,
+    )[0];
+
+    // Only attempt SDK if ambiguous (multiple high) or moderate confidence (40-79)
+    const isAmbiguous = currentHighConfidence.length > 1;
+    const isModerate =
+      bestCandidate &&
+      bestCandidate.confidence >= 40 &&
+      bestCandidate.confidence < autoApplyThreshold;
+
+    if (!isAmbiguous && !isModerate) {
+      return null;
+    }
+
+    try {
+      const sdkResult = await this.sdkMatcher.resolveAmbiguity(
+        transaction,
+        candidates,
+        tenantId,
+      );
+
+      // If SDK returned no match or zero confidence, let fallback handle it
+      if (!sdkResult.bestMatchInvoiceId || sdkResult.confidence === 0) {
+        return null;
+      }
+
+      // HIGH VALUE CHECK: force REVIEW_REQUIRED for high-value transactions
+      const isHighValue =
+        Math.abs(transaction.amountCents) > HIGH_VALUE_THRESHOLD_CENTS;
+
+      const matchedCandidate = candidates.find(
+        (c) => c.invoice.id === sdkResult.bestMatchInvoiceId,
+      );
+
+      const action: MatchDecision['action'] =
+        isHighValue || sdkResult.confidence < autoApplyThreshold
+          ? 'REVIEW_REQUIRED'
+          : 'AUTO_APPLY';
+
+      const reasonParts = [sdkResult.reasoning];
+      if (isHighValue) {
+        reasonParts.push(
+          `High-value transaction (${String(Math.abs(transaction.amountCents))} cents) forced to review`,
+        );
+      }
+
+      const source: MatchSource = 'sdk';
+      const decision: MatchDecision = {
+        transactionId: transaction.id,
+        invoiceId: sdkResult.bestMatchInvoiceId,
+        invoiceNumber: matchedCandidate?.invoice.invoiceNumber,
+        confidence: sdkResult.confidence,
+        action,
+        reasoning: reasonParts.join('; '),
+        alternatives: validCandidates
+          .filter((c) => c.invoice.id !== sdkResult.bestMatchInvoiceId)
+          .slice(0, 4)
+          .map((c) => ({
+            invoiceId: c.invoice.id,
+            invoiceNumber: c.invoice.invoiceNumber,
+            confidence: c.confidence,
+          })),
+      };
+
+      const logDecision: 'match' | 'escalate' =
+        action === 'AUTO_APPLY' ? 'match' : 'escalate';
+
+      await this.decisionLogger.logDecision({
+        tenantId,
+        transactionId: transaction.id,
+        transactionAmountCents: transaction.amountCents,
+        decision: logDecision,
+        invoiceId: sdkResult.bestMatchInvoiceId,
+        invoiceNumber: matchedCandidate?.invoice.invoiceNumber,
+        confidence: sdkResult.confidence,
+        autoApplied: action === 'AUTO_APPLY',
+        reasoning: reasonParts.join('; '),
+        candidateCount: validCandidates.length,
+        source,
+        durationMs: Date.now() - startTime,
+      });
+
+      this.logger.log(
+        `SDK resolved match for ${transaction.id} → ${matchedCandidate?.invoice.invoiceNumber ?? 'unknown'} (${String(sdkResult.confidence)}%, action=${action}, source=sdk)`,
+      );
+
+      return decision;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `SDK resolution failed for ${transaction.id}, falling through to deterministic: ${msg}`,
+      );
+    }
+
+    return null;
   }
 
   /**

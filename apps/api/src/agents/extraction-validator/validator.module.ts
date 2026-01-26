@@ -9,13 +9,19 @@ import { ExtractionValidatorAgent } from './validator.agent';
 import { BalanceReconciler } from './balance-reconciler';
 import { AmountSanityChecker } from './amount-sanity-checker';
 import { ExtractionDecisionLogger } from './decision-logger';
+import { SdkAgentModule } from '../sdk';
+import { SdkSemanticValidator } from './sdk-validator';
+import { AuditTrailModule } from '../audit/audit-trail.module';
+import { RolloutModule } from '../rollout/rollout.module';
 
 @Module({
+  imports: [SdkAgentModule, AuditTrailModule, RolloutModule],
   providers: [
     ExtractionValidatorAgent,
     BalanceReconciler,
     AmountSanityChecker,
     ExtractionDecisionLogger,
+    SdkSemanticValidator,
   ],
   exports: [ExtractionValidatorAgent, BalanceReconciler, AmountSanityChecker],
 })

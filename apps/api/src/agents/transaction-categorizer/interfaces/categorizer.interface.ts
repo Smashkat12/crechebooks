@@ -78,10 +78,12 @@ export interface DecisionLogEntry {
   accountCode?: string;
   accountName?: string;
   confidence: number;
-  source: 'PATTERN' | 'HISTORICAL' | 'FALLBACK';
+  source: 'PATTERN' | 'HISTORICAL' | 'FALLBACK' | 'LLM';
   autoApplied: boolean;
   reasoning: string;
   patternId?: string;
+  model?: string;
+  durationMs?: number;
 }
 
 /**

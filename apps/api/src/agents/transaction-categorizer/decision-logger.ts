@@ -7,17 +7,24 @@
  * to .claude/logs/escalations.jsonl. These files are gitignored.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
   DecisionLogEntry,
   EscalationLogEntry,
 } from './interfaces/categorizer.interface';
+import { AuditTrailService } from '../audit/audit-trail.service';
 
 @Injectable()
 export class DecisionLogger {
   private readonly logger = new Logger(DecisionLogger.name);
+
+  constructor(
+    @Optional()
+    @Inject(AuditTrailService)
+    private readonly auditTrail?: AuditTrailService,
+  ) {}
   private readonly logsPath = path.join(process.cwd(), '.claude/logs');
   private readonly decisionsPath = path.join(this.logsPath, 'decisions.jsonl');
   private readonly escalationsPath = path.join(
@@ -70,6 +77,26 @@ export class DecisionLogger {
         `Failed to write decision log for ${entry.transactionId}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+
+    // TASK-SDK-011: Write to database audit trail (non-blocking)
+    if (this.auditTrail) {
+      this.auditTrail.logDecision({
+        tenantId: entry.tenantId,
+        agentType: 'categorizer',
+        transactionId: entry.transactionId,
+        decision: entry.decision,
+        confidence: entry.confidence,
+        source: entry.source as 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID' | 'RULE_BASED' | undefined,
+        autoApplied: entry.autoApplied,
+        details: {
+          accountCode: entry.accountCode,
+          accountName: entry.accountName,
+          patternId: entry.patternId,
+        },
+        reasoning: entry.reasoning,
+        durationMs: entry.durationMs,
+      }).catch((err: Error) => this.logger.warn(`Audit trail write failed: ${err.message}`));
+    }
   }
 
   /**
@@ -116,6 +143,17 @@ export class DecisionLogger {
       this.logger.error(
         `Failed to write escalation log for ${transactionId}: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+
+    // TASK-SDK-011: Write escalation to database audit trail (non-blocking)
+    if (this.auditTrail) {
+      this.auditTrail.logEscalation({
+        tenantId,
+        agentType: 'categorizer',
+        transactionId,
+        reason,
+        details: { type, suggestedAccount, suggestedAccountName, confidence },
+      }).catch((err: Error) => this.logger.warn(`Audit escalation write failed: ${err.message}`));
     }
   }
 

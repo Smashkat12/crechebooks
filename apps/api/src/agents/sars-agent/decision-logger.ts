@@ -7,17 +7,24 @@
  * All SARS submissions require human review (L2 autonomy).
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
   SarsDecisionLog,
   SarsEscalationLog,
 } from './interfaces/sars.interface';
+import { AuditTrailService } from '../audit/audit-trail.service';
 
 @Injectable()
 export class SarsDecisionLogger {
   private readonly logger = new Logger(SarsDecisionLogger.name);
+
+  constructor(
+    @Optional()
+    @Inject(AuditTrailService)
+    private readonly auditTrail?: AuditTrailService,
+  ) {}
   private readonly logsPath = path.join(process.cwd(), '.claude/logs');
   private readonly decisionsPath = path.join(this.logsPath, 'decisions.jsonl');
   private readonly escalationsPath = path.join(
@@ -76,6 +83,18 @@ export class SarsDecisionLogger {
         `Failed to write SARS decision log: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+
+    // TASK-SDK-011: Write to database audit trail (non-blocking)
+    if (this.auditTrail) {
+      this.auditTrail.logDecision({
+        tenantId,
+        agentType: 'sars',
+        decision: type,
+        autoApplied: false,
+        details: { type, period, amountCents },
+        reasoning,
+      }).catch((err: Error) => this.logger.warn(`Audit trail write failed: ${err.message}`));
+    }
   }
 
   /**
@@ -113,6 +132,16 @@ export class SarsDecisionLogger {
       this.logger.error(
         `Failed to write SARS escalation log: ${error instanceof Error ? error.message : String(error)}`,
       );
+    }
+
+    // TASK-SDK-011: Write escalation to database audit trail (non-blocking)
+    if (this.auditTrail) {
+      this.auditTrail.logEscalation({
+        tenantId,
+        agentType: 'sars',
+        reason,
+        details: { subType, period, amountCents, requiresHumanApproval: true },
+      }).catch((err: Error) => this.logger.warn(`Audit escalation write failed: ${err.message}`));
     }
   }
 }

@@ -15,7 +15,7 @@
  * - Tenant isolation on ALL operations
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -30,6 +30,10 @@ import {
   WorkflowResult,
   OrchestratorDecisionLog,
 } from './interfaces/orchestrator.interface';
+import { SdkOrchestrator } from './sdk-orchestrator';
+import { isMultiStepWorkflow } from './workflow-definitions';
+import { AuditTrailService } from '../audit/audit-trail.service';
+import { ShadowRunner } from '../rollout/shadow-runner';
 
 @Injectable()
 export class OrchestratorAgent {
@@ -46,6 +50,15 @@ export class OrchestratorAgent {
     private readonly workflowRouter: WorkflowRouter,
     private readonly escalationManager: EscalationManager,
     private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(SdkOrchestrator)
+    private readonly sdkOrchestrator?: SdkOrchestrator,
+    @Optional()
+    @Inject(AuditTrailService)
+    private readonly auditTrail?: AuditTrailService,
+    @Optional()
+    @Inject(ShadowRunner)
+    private readonly shadowRunner?: ShadowRunner,
   ) {}
 
   /**
@@ -62,6 +75,16 @@ export class OrchestratorAgent {
       `Starting workflow ${workflowId}: ${request.type} for tenant ${request.tenantId}`,
     );
 
+    // TASK-SDK-011: Log workflow start (non-blocking)
+    if (this.auditTrail) {
+      this.auditTrail.logWorkflow({
+        tenantId: request.tenantId,
+        workflowId,
+        eventType: 'WORKFLOW_START',
+        details: { type: request.type, parameters: request.parameters },
+      }).catch((err: Error) => this.logger.warn(`Audit workflow start failed: ${err.message}`));
+    }
+
     // Log routing decision
     this.workflowRouter.logRoutingDecision(request.type, request.tenantId);
 
@@ -77,6 +100,32 @@ export class OrchestratorAgent {
     };
 
     try {
+      // Try SDK orchestration for multi-step workflows (BANK_IMPORT, MONTHLY_CLOSE)
+      if (this.sdkOrchestrator && isMultiStepWorkflow(request.type)) {
+        try {
+          const sdkResult = await this.sdkOrchestrator.execute(request);
+          if (sdkResult) {
+            // SDK handled it - preserve our workflowId and startedAt
+            sdkResult.workflowId = workflowId;
+            sdkResult.startedAt = startedAt;
+            // Still log escalations and decisions
+            await this.escalationManager.logMultipleEscalations(
+              workflowId,
+              request.type,
+              request.tenantId,
+              sdkResult.escalations,
+            );
+            await this.logWorkflowDecision(sdkResult);
+            return sdkResult;
+          }
+        } catch (sdkError) {
+          this.logger.warn(
+            `SDK orchestrator failed, falling back to sequential: ${sdkError instanceof Error ? sdkError.message : String(sdkError)}`,
+          );
+          // Fall through to existing sequential logic
+        }
+      }
+
       switch (request.type) {
         case 'CATEGORIZE_TRANSACTIONS':
           await this.executeCategorization(request, result);
@@ -140,6 +189,18 @@ export class OrchestratorAgent {
 
     // Log workflow decision
     await this.logWorkflowDecision(result);
+
+    // TASK-SDK-011: Log workflow end (non-blocking)
+    if (this.auditTrail) {
+      const durationMs = Date.now() - new Date(startedAt).getTime();
+      this.auditTrail.logWorkflow({
+        tenantId: request.tenantId,
+        workflowId,
+        eventType: 'WORKFLOW_END',
+        details: { type: request.type, status: result.status, resultCount: result.results.length },
+        durationMs,
+      }).catch((err: Error) => this.logger.warn(`Audit workflow end failed: ${err.message}`));
+    }
 
     this.logger.log(
       `Workflow ${workflowId} completed: ${result.status} ` +

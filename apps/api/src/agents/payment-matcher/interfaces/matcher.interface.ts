@@ -40,6 +40,12 @@ export interface MatchDecisionLog {
   autoApplied: boolean;
   reasoning: string;
   candidateCount: number;
+  /** Source of the match decision (added by SDK-004) */
+  source?: 'deterministic' | 'deterministic+ruvector' | 'sdk';
+  /** Model used for SDK-based decisions */
+  model?: string;
+  /** Duration of the match decision in milliseconds */
+  durationMs?: number;
 }
 
 /**

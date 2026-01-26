@@ -7,4 +7,6 @@ export { ExtractionValidatorAgent } from './validator.agent';
 export { BalanceReconciler } from './balance-reconciler';
 export { AmountSanityChecker } from './amount-sanity-checker';
 export { ExtractionDecisionLogger } from './decision-logger';
+export { SdkSemanticValidator } from './sdk-validator';
 export * from './interfaces/validator.interface';
+export * from './interfaces/sdk-validator.interface';

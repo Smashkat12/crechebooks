@@ -111,25 +111,33 @@ import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { SarsModule } from '../integrations/sars/sars.module';
+import { AgentMemoryModule } from '../agents/memory/agent-memory.module';
+import { AuditTrailModule } from '../agents/audit/audit-trail.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
 import { PaymentMatcherModule } from '../agents/payment-matcher/matcher.module';
 import { SarsAgentModule } from '../agents/sars-agent/sars.module';
 import { OrchestratorModule } from '../agents/orchestrator/orchestrator.module';
 import { ExtractionValidatorModule } from '../agents/extraction-validator/validator.module';
 import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
+import { ConversationalModule } from '../agents/conversational/conversational.module';
+import { RolloutModule } from '../agents/rollout/rollout.module';
 
 @Module({
   imports: [
     EmailModule,
     forwardRef(() => WhatsAppModule),
     SarsModule,
+    forwardRef(() => AgentMemoryModule),
+    forwardRef(() => AuditTrailModule), // TASK-SDK-011: Structured Audit Trail
     TransactionCategorizerModule,
     PaymentMatcherModule,
     forwardRef(() => SarsAgentModule),
     forwardRef(() => OrchestratorModule), // TASK-AGENT-005: Orchestrator Agent
     ExtractionValidatorModule, // TASK-AGENT-006: PDF Extraction Validation Agent
+    forwardRef(() => ConversationalModule), // TASK-SDK-008: Conversational Agent
     forwardRef(() => NotificationModule),
     forwardRef(() => SimplePayModule), // TASK-STAFF-006: For SimplePay offboarding integration
+    forwardRef(() => RolloutModule), // TASK-SDK-012: Parallel Rollout Framework
   ],
   providers: [
     PrismaService,

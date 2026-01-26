@@ -56,8 +56,10 @@ export function useSimplePayStatus() {
   const query = useQuery({
     queryKey: simplePayKeys.status(),
     queryFn: simplePayApi.getStatus,
+    staleTime: 30000, // Consider fresh for 30 seconds to avoid flicker
     refetchInterval: 60000, // Refresh every minute
     refetchOnWindowFocus: true,
+    retry: 2, // Retry twice on failure before showing error
   });
 
   return {

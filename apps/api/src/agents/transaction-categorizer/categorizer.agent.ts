@@ -38,6 +38,7 @@ import { SdkCategorizer } from './sdk-categorizer';
 import { HybridScorer } from '../shared/hybrid-scorer';
 import { AgentMemoryService, computeInputHash } from '../memory/agent-memory.service';
 import { ShadowRunner } from '../rollout/shadow-runner';
+import type { ComparisonResult } from '../rollout/interfaces/rollout.interface';
 
 @Injectable()
 export class TransactionCategorizerAgent {
@@ -80,6 +81,39 @@ export class TransactionCategorizerAgent {
   async categorize(
     transaction: Transaction,
     tenantId: string,
+  ): Promise<CategorizationResult> {
+    if (this.shadowRunner && this.sdkCategorizer) {
+      return this.shadowRunner.run<CategorizationResult>({
+        tenantId,
+        agentType: 'categorizer',
+        sdkFn: () => this._categorizeCore(transaction, tenantId, false),
+        heuristicFn: () => this._categorizeCore(transaction, tenantId, true),
+        compareFn: (sdk: CategorizationResult, heuristic: CategorizationResult): ComparisonResult => ({
+          tenantId,
+          agentType: 'categorizer',
+          sdkResult: sdk,
+          heuristicResult: heuristic,
+          sdkDurationMs: 0,
+          heuristicDurationMs: 0,
+          resultsMatch: sdk.accountCode === heuristic.accountCode && sdk.autoApplied === heuristic.autoApplied,
+          sdkConfidence: sdk.confidenceScore,
+          heuristicConfidence: heuristic.confidenceScore,
+          details: {
+            sdkAccountCode: sdk.accountCode,
+            heuristicAccountCode: heuristic.accountCode,
+            sdkReasoning: sdk.reasoning,
+            heuristicReasoning: heuristic.reasoning,
+          },
+        }),
+      });
+    }
+    return this._categorizeCore(transaction, tenantId, false);
+  }
+
+  private async _categorizeCore(
+    transaction: Transaction,
+    tenantId: string,
+    skipSdk: boolean,
   ): Promise<CategorizationResult> {
     const context = this.contextLoader.getContext();
     const payee = transaction.payeeName || '';
@@ -134,6 +168,7 @@ export class TransactionCategorizerAgent {
     // Determine if we should try SDK paths:
     // Only when sdkCategorizer is available AND pattern match is absent or low confidence
     const shouldTrySdk =
+      !skipSdk &&
       this.sdkCategorizer !== undefined &&
       (!patternMatch || patternMatch.confidence < 80);
 

@@ -21,6 +21,7 @@ import { Vat201Service } from '../../database/services/vat201.service';
 import { SarsDecisionLogger } from './decision-logger';
 import { SdkSarsExplainer } from './sdk-sars-explainer';
 import { ShadowRunner } from '../rollout/shadow-runner';
+import type { ComparisonResult } from '../rollout/interfaces/rollout.interface';
 import {
   SarsDecision,
   AgentPayeDto,
@@ -56,6 +57,31 @@ export class SarsAgent {
    * @returns SARS decision with DRAFT_FOR_REVIEW action
    */
   async calculatePayeForReview(dto: AgentPayeDto): Promise<SarsDecision> {
+    if (this.shadowRunner && this.sdkExplainer) {
+      return this.shadowRunner.run<SarsDecision>({
+        tenantId: dto.tenantId,
+        agentType: 'sars',
+        sdkFn: () => this._calculatePayeForReviewCore(dto, false),
+        heuristicFn: () => this._calculatePayeForReviewCore(dto, true),
+        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+          tenantId: dto.tenantId,
+          agentType: 'sars',
+          sdkResult: sdk,
+          heuristicResult: heuristic,
+          sdkDurationMs: 0,
+          heuristicDurationMs: 0,
+          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          details: {
+            sdkHasExplanation: !!sdk.humanExplanation,
+            heuristicHasExplanation: !!heuristic.humanExplanation,
+          },
+        }),
+      });
+    }
+    return this._calculatePayeForReviewCore(dto, false);
+  }
+
+  private async _calculatePayeForReviewCore(dto: AgentPayeDto, skipSdk: boolean): Promise<SarsDecision> {
     const {
       tenantId,
       grossIncomeCents,
@@ -123,7 +149,7 @@ export class SarsAgent {
 
     // Generate human-friendly explanation if SDK explainer is available
     let humanExplanation: string | undefined;
-    if (this.sdkExplainer) {
+    if (!skipSdk && this.sdkExplainer) {
       try {
         humanExplanation = await this.sdkExplainer.explain(
           'PAYE',
@@ -154,6 +180,31 @@ export class SarsAgent {
    * @returns SARS decision with DRAFT_FOR_REVIEW action
    */
   async calculateUifForReview(dto: AgentUifDto): Promise<SarsDecision> {
+    if (this.shadowRunner && this.sdkExplainer) {
+      return this.shadowRunner.run<SarsDecision>({
+        tenantId: dto.tenantId,
+        agentType: 'sars',
+        sdkFn: () => this._calculateUifForReviewCore(dto, false),
+        heuristicFn: () => this._calculateUifForReviewCore(dto, true),
+        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+          tenantId: dto.tenantId,
+          agentType: 'sars',
+          sdkResult: sdk,
+          heuristicResult: heuristic,
+          sdkDurationMs: 0,
+          heuristicDurationMs: 0,
+          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          details: {
+            sdkHasExplanation: !!sdk.humanExplanation,
+            heuristicHasExplanation: !!heuristic.humanExplanation,
+          },
+        }),
+      });
+    }
+    return this._calculateUifForReviewCore(dto, false);
+  }
+
+  private async _calculateUifForReviewCore(dto: AgentUifDto, skipSdk: boolean): Promise<SarsDecision> {
     const { tenantId, grossRemunerationCents, period } = dto;
 
     this.logger.log(
@@ -203,7 +254,7 @@ export class SarsAgent {
 
     // Generate human-friendly explanation if SDK explainer is available
     let humanExplanation: string | undefined;
-    if (this.sdkExplainer) {
+    if (!skipSdk && this.sdkExplainer) {
       try {
         humanExplanation = await this.sdkExplainer.explain(
           'UIF',
@@ -234,6 +285,31 @@ export class SarsAgent {
    * @returns SARS decision with DRAFT_FOR_REVIEW action
    */
   async generateEmp201ForReview(dto: AgentEmp201Dto): Promise<SarsDecision> {
+    if (this.shadowRunner && this.sdkExplainer) {
+      return this.shadowRunner.run<SarsDecision>({
+        tenantId: dto.tenantId,
+        agentType: 'sars',
+        sdkFn: () => this._generateEmp201ForReviewCore(dto, false),
+        heuristicFn: () => this._generateEmp201ForReviewCore(dto, true),
+        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+          tenantId: dto.tenantId,
+          agentType: 'sars',
+          sdkResult: sdk,
+          heuristicResult: heuristic,
+          sdkDurationMs: 0,
+          heuristicDurationMs: 0,
+          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          details: {
+            sdkHasExplanation: !!sdk.humanExplanation,
+            heuristicHasExplanation: !!heuristic.humanExplanation,
+          },
+        }),
+      });
+    }
+    return this._generateEmp201ForReviewCore(dto, false);
+  }
+
+  private async _generateEmp201ForReviewCore(dto: AgentEmp201Dto, skipSdk: boolean): Promise<SarsDecision> {
     const { tenantId, periodMonth } = dto;
 
     this.logger.log(
@@ -309,7 +385,7 @@ export class SarsAgent {
 
     // Generate human-friendly explanation if SDK explainer is available
     let humanExplanation: string | undefined;
-    if (this.sdkExplainer) {
+    if (!skipSdk && this.sdkExplainer) {
       try {
         humanExplanation = await this.sdkExplainer.explain(
           'EMP201',
@@ -340,6 +416,31 @@ export class SarsAgent {
    * @returns SARS decision with DRAFT_FOR_REVIEW action
    */
   async generateVat201ForReview(dto: AgentVat201Dto): Promise<SarsDecision> {
+    if (this.shadowRunner && this.sdkExplainer) {
+      return this.shadowRunner.run<SarsDecision>({
+        tenantId: dto.tenantId,
+        agentType: 'sars',
+        sdkFn: () => this._generateVat201ForReviewCore(dto, false),
+        heuristicFn: () => this._generateVat201ForReviewCore(dto, true),
+        compareFn: (sdk: SarsDecision, heuristic: SarsDecision): ComparisonResult => ({
+          tenantId: dto.tenantId,
+          agentType: 'sars',
+          sdkResult: sdk,
+          heuristicResult: heuristic,
+          sdkDurationMs: 0,
+          heuristicDurationMs: 0,
+          resultsMatch: sdk.calculatedAmountCents === heuristic.calculatedAmountCents,
+          details: {
+            sdkHasExplanation: !!sdk.humanExplanation,
+            heuristicHasExplanation: !!heuristic.humanExplanation,
+          },
+        }),
+      });
+    }
+    return this._generateVat201ForReviewCore(dto, false);
+  }
+
+  private async _generateVat201ForReviewCore(dto: AgentVat201Dto, skipSdk: boolean): Promise<SarsDecision> {
     const { tenantId, periodStart, periodEnd } = dto;
 
     this.logger.log(
@@ -411,7 +512,7 @@ export class SarsAgent {
 
     // Generate human-friendly explanation if SDK explainer is available
     let humanExplanation: string | undefined;
-    if (this.sdkExplainer) {
+    if (!skipSdk && this.sdkExplainer) {
       try {
         humanExplanation = await this.sdkExplainer.explain(
           'VAT201',

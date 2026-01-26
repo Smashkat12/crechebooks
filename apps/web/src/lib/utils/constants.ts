@@ -86,6 +86,80 @@ export const ALLOWED_FILE_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 ] as const;
 
+// South African banks with universal branch codes and SWIFT/BIC codes
+export const SA_BANKS = [
+  { name: 'ABSA', branchCode: '632005', swiftCode: 'ABSAZAJJ' },
+  { name: 'African Bank', branchCode: '430000', swiftCode: '' },
+  { name: 'Bidvest Bank', branchCode: '462005', swiftCode: 'BILOAJJX' },
+  { name: 'Capitec Bank', branchCode: '470010', swiftCode: 'CABLZAJJ' },
+  { name: 'Discovery Bank', branchCode: '679000', swiftCode: '' },
+  { name: 'First National Bank (FNB)', branchCode: '250655', swiftCode: 'FIRNZAJJ' },
+  { name: 'Grindrod Bank', branchCode: '584000', swiftCode: '' },
+  { name: 'Investec', branchCode: '580105', swiftCode: 'IVESZAJJ' },
+  { name: 'Nedbank', branchCode: '198765', swiftCode: 'NEDSZAJJ' },
+  { name: 'Old Mutual', branchCode: '462005', swiftCode: '' },
+  { name: 'Rand Merchant Bank', branchCode: '261251', swiftCode: '' },
+  { name: 'SA Post Bank (Postbank)', branchCode: '460005', swiftCode: '' },
+  { name: 'Sasfin Bank', branchCode: '683000', swiftCode: '' },
+  { name: 'Standard Bank', branchCode: '051001', swiftCode: 'SBZAZAJJ' },
+  { name: 'TymeBank', branchCode: '678910', swiftCode: '' },
+] as const;
+
+// South African provinces
+export const SA_PROVINCES = [
+  'Eastern Cape',
+  'Free State',
+  'Gauteng',
+  'KwaZulu-Natal',
+  'Limpopo',
+  'Mpumalanga',
+  'North West',
+  'Northern Cape',
+  'Western Cape',
+] as const;
+
+// Bank account types in South Africa
+export const SA_ACCOUNT_TYPES = [
+  'Cheque Account',
+  'Savings Account',
+  'Current Account',
+  'Transmission Account',
+] as const;
+
+/**
+ * Extract date of birth from a South African ID number.
+ * SA ID format: YYMMDD GSSS C A Z
+ * Returns a Date object or null if the ID is invalid/too short.
+ */
+export function extractDobFromSaId(idNumber: string): Date | null {
+  if (!idNumber || idNumber.length < 6) return null;
+  const digits = idNumber.replace(/\D/g, '');
+  if (digits.length < 6) return null;
+
+  const yy = parseInt(digits.substring(0, 2), 10);
+  const mm = parseInt(digits.substring(2, 4), 10);
+  const dd = parseInt(digits.substring(4, 6), 10);
+
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+
+  // Determine century: if YY > current 2-digit year, assume 1900s
+  const currentTwoDigitYear = new Date().getFullYear() % 100;
+  const century = yy > currentTwoDigitYear ? 1900 : 2000;
+  const fullYear = century + yy;
+
+  const date = new Date(fullYear, mm - 1, dd);
+  // Validate the date is real (e.g., Feb 30 would roll over)
+  if (
+    date.getFullYear() !== fullYear ||
+    date.getMonth() !== mm - 1 ||
+    date.getDate() !== dd
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
 // API endpoints base paths
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 export const API_ENDPOINTS = {

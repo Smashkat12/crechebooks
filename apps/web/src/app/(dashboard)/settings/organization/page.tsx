@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,16 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTenant, useUpdateTenant, type ClosureDate } from '@/hooks/useTenant';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Loader2, Plus, Trash2, Calendar, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { SA_BANKS, SA_PROVINCES, SA_ACCOUNT_TYPES } from '@/lib/utils/constants';
 
 const organizationSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -59,10 +67,28 @@ export default function OrganizationSettingsPage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<OrganizationFormData>({
     resolver: zodResolver(organizationSchema),
   });
+
+  // Track whether form has finished initial load to avoid overwriting existing data
+  const formLoaded = useRef(false);
+
+  // Auto-populate branch code and SWIFT code when bank name changes (user action only)
+  const selectedBankName = watch('bankName');
+  useEffect(() => {
+    if (!selectedBankName || !formLoaded.current) return;
+    const bank = SA_BANKS.find((b) => b.name === selectedBankName);
+    if (bank) {
+      setValue('bankBranchCode', bank.branchCode, { shouldDirty: true });
+      if (bank.swiftCode) {
+        setValue('bankSwiftCode', bank.swiftCode, { shouldDirty: true });
+      }
+    }
+  }, [selectedBankName, setValue]);
 
   // Load tenant data into form when it arrives
   useEffect(() => {
@@ -98,6 +124,9 @@ export default function OrganizationSettingsPage() {
         });
         setClosureDates(normalized);
       }
+
+      // Mark form as loaded so auto-populate only triggers on user actions
+      setTimeout(() => { formLoaded.current = true; }, 100);
     }
   }, [tenant, reset]);
 
@@ -264,7 +293,21 @@ export default function OrganizationSettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="province">Province *</Label>
-                <Input id="province" {...register('province')} />
+                <Select
+                  value={watch('province') || ''}
+                  onValueChange={(value) => setValue('province', value, { shouldDirty: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select province" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SA_PROVINCES.map((province) => (
+                      <SelectItem key={province} value={province}>
+                        {province}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {errors.province && (
                   <p className="text-sm text-destructive">{errors.province.message}</p>
                 )}
@@ -310,8 +353,22 @@ export default function OrganizationSettingsPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="bankName">Bank Name</Label>
-                <Input id="bankName" {...register('bankName')} placeholder="e.g., Standard Bank, FNB, ABSA" />
-                <p className="text-xs text-muted-foreground">The name of your bank</p>
+                <Select
+                  value={watch('bankName') || ''}
+                  onValueChange={(value) => setValue('bankName', value, { shouldDirty: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SA_BANKS.map((bank) => (
+                      <SelectItem key={bank.name} value={bank.name}>
+                        {bank.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Branch code and SWIFT code will be auto-filled</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bankAccountHolder">Account Holder Name</Label>
@@ -329,7 +386,21 @@ export default function OrganizationSettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bankAccountType">Account Type</Label>
-                <Input id="bankAccountType" {...register('bankAccountType')} placeholder="e.g., Cheque, Savings, Current" />
+                <Select
+                  value={watch('bankAccountType') || ''}
+                  onValueChange={(value) => setValue('bankAccountType', value, { shouldDirty: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select account type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SA_ACCOUNT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="bankSwiftCode">SWIFT/BIC Code</Label>

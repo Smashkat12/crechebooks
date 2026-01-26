@@ -8,11 +8,13 @@
 export enum EmploymentType {
   PERMANENT = 'PERMANENT',
   CONTRACT = 'CONTRACT',
+  PART_TIME = 'PART_TIME',
   CASUAL = 'CASUAL',
 }
 
 export enum PayFrequency {
   MONTHLY = 'MONTHLY',
+  FORTNIGHTLY = 'FORTNIGHTLY',
   WEEKLY = 'WEEKLY',
   DAILY = 'DAILY',
   HOURLY = 'HOURLY',

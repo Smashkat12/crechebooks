@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,6 +12,7 @@ import { DatePicker } from '@/components/forms/date-picker';
 import { CurrencyInput } from '@/components/forms/currency-input';
 import { Info } from 'lucide-react';
 import type { IStaff } from '@crechebooks/types';
+import { extractDobFromSaId } from '@/lib/utils/constants';
 
 // SA ID number validation using Luhn algorithm
 function validateSAIdNumber(id: string): boolean {
@@ -116,6 +118,16 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
     },
   });
 
+  // Auto-populate date of birth from SA ID number
+  const watchedIdNumber = form.watch('idNumber');
+  useEffect(() => {
+    if (!watchedIdNumber || watchedIdNumber.length < 6) return;
+    const dob = extractDobFromSaId(watchedIdNumber);
+    if (dob) {
+      form.setValue('dateOfBirth', dob, { shouldValidate: true });
+    }
+  }, [watchedIdNumber]);
+
   const onSubmit = async (data: StaffFormValues) => {
     try {
       // Convert salary to cents before saving
@@ -201,6 +213,7 @@ export function StaffForm({ staff, onSave, onCancel, isLoading = false }: StaffF
               control={form.control}
               name="dateOfBirth"
               label="Date of Birth"
+              description="Auto-filled from ID number"
               mode="dob"
               required
             />

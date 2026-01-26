@@ -8,11 +8,16 @@
 
 import { getHistory } from '../../../src/mcp/crechebooks-mcp/tools/get-history';
 import type { PrismaService } from '../../../src/database/prisma/prisma.service';
-import type { GetHistoryInput, HistoryRecord, McpToolResult } from '../../../src/mcp/crechebooks-mcp/types/index';
+import type {
+  GetHistoryInput,
+  HistoryRecord,
+  McpToolResult,
+} from '../../../src/mcp/crechebooks-mcp/types/index';
 
-function createMockPrisma(
-  findManyResult: unknown[] = [],
-): { prisma: PrismaService; findManySpy: jest.Mock } {
+function createMockPrisma(findManyResult: unknown[] = []): {
+  prisma: PrismaService;
+  findManySpy: jest.Mock;
+} {
   const findManySpy = jest.fn().mockResolvedValue(findManyResult);
   const prisma = {
     categorization: {
@@ -22,7 +27,9 @@ function createMockPrisma(
   return { prisma, findManySpy };
 }
 
-function createMockCategorization(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function createMockCategorization(
+  overrides: Partial<Record<string, unknown>> = {},
+): Record<string, unknown> {
   return {
     id: 'cat-001',
     accountCode: '7200',
@@ -59,7 +66,9 @@ describe('get_history tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: { transaction: { tenantId: string } } };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: { transaction: { tenantId: string } };
+    };
     expect(callArgs.where.transaction.tenantId).toBe(TENANT_ID);
   });
 
@@ -68,7 +77,9 @@ describe('get_history tool', () => {
     const { prisma } = createMockPrisma([mockCat]);
     const tool = getHistory(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<HistoryRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(true);
     expect(result.data).toHaveLength(1);
@@ -89,7 +100,9 @@ describe('get_history tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, accountCode: '7200' });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.accountCode).toBe('7200');
   });
 
@@ -99,7 +112,9 @@ describe('get_history tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, payeeName: 'woolworths' });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: { transaction: Record<string, unknown> } };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: { transaction: Record<string, unknown> };
+    };
     expect(callArgs.where.transaction.payeeName).toEqual({
       contains: 'woolworths',
       mode: 'insensitive',
@@ -116,7 +131,9 @@ describe('get_history tool', () => {
       toDate: '2025-01-31',
     });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: { transaction: Record<string, unknown> } };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: { transaction: Record<string, unknown> };
+    };
     expect(callArgs.where.transaction.date).toEqual({
       gte: new Date('2025-01-01'),
       lte: new Date('2025-01-31'),
@@ -129,7 +146,9 @@ describe('get_history tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID, source: 'USER_OVERRIDE' });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.source).toBe('USER_OVERRIDE');
   });
 
@@ -139,7 +158,9 @@ describe('get_history tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { include: { transaction: { select: Record<string, boolean> } } };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      include: { transaction: { select: Record<string, boolean> } };
+    };
     expect(callArgs.include.transaction.select).toEqual({
       description: true,
       payeeName: true,
@@ -154,7 +175,9 @@ describe('get_history tool', () => {
 
     await tool.handler({ tenantId: TENANT_ID });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { orderBy: Record<string, string> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      orderBy: Record<string, string>;
+    };
     expect(callArgs.orderBy).toEqual({ createdAt: 'desc' });
   });
 
@@ -175,7 +198,9 @@ describe('get_history tool', () => {
     } as unknown as PrismaService;
     const tool = getHistory(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<HistoryRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('DB error');
@@ -186,7 +211,9 @@ describe('get_history tool', () => {
     const { prisma } = createMockPrisma([mockCat]);
     const tool = getHistory(prisma);
 
-    const result = await tool.handler({ tenantId: TENANT_ID }) as McpToolResult<HistoryRecord[]>;
+    const result = await tool.handler({
+      tenantId: TENANT_ID,
+    });
 
     expect(result.data![0].createdAt).toBe('2025-01-15T10:00:00.000Z');
   });

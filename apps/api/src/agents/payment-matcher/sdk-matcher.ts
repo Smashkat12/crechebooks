@@ -133,9 +133,9 @@ export class SdkPaymentMatcher extends BaseSdkAgent {
     }
 
     try {
-      const embedding = await this.ruvector.generateEmbedding(reference);
+      const embeddingResult = await this.ruvector.generateEmbedding(reference);
       const results = await this.ruvector.searchSimilar(
-        embedding,
+        embeddingResult.vector,
         'invoice_references',
         10,
       );

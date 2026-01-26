@@ -75,7 +75,10 @@ export class OrchestratorAgent {
         agentType: 'orchestrator',
         sdkFn: () => this._executeWorkflowCore(request, false),
         heuristicFn: () => this._executeWorkflowCore(request, true),
-        compareFn: (sdk: WorkflowResult, heuristic: WorkflowResult): ComparisonResult => ({
+        compareFn: (
+          sdk: WorkflowResult,
+          heuristic: WorkflowResult,
+        ): ComparisonResult => ({
           tenantId: request.tenantId,
           agentType: 'orchestrator',
           sdkResult: sdk,
@@ -95,7 +98,10 @@ export class OrchestratorAgent {
     return this._executeWorkflowCore(request, false);
   }
 
-  private async _executeWorkflowCore(request: WorkflowRequest, skipSdk: boolean): Promise<WorkflowResult> {
+  private async _executeWorkflowCore(
+    request: WorkflowRequest,
+    skipSdk: boolean,
+  ): Promise<WorkflowResult> {
     const workflowId = uuidv4();
     const startedAt = new Date().toISOString();
 
@@ -105,12 +111,16 @@ export class OrchestratorAgent {
 
     // TASK-SDK-011: Log workflow start (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logWorkflow({
-        tenantId: request.tenantId,
-        workflowId,
-        eventType: 'WORKFLOW_START',
-        details: { type: request.type, parameters: request.parameters },
-      }).catch((err: Error) => this.logger.warn(`Audit workflow start failed: ${err.message}`));
+      this.auditTrail
+        .logWorkflow({
+          tenantId: request.tenantId,
+          workflowId,
+          eventType: 'WORKFLOW_START',
+          details: { type: request.type, parameters: request.parameters },
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit workflow start failed: ${err.message}`),
+        );
     }
 
     // Log routing decision
@@ -129,7 +139,11 @@ export class OrchestratorAgent {
 
     try {
       // Try SDK orchestration for multi-step workflows (BANK_IMPORT, MONTHLY_CLOSE)
-      if (!skipSdk && this.sdkOrchestrator && isMultiStepWorkflow(request.type)) {
+      if (
+        !skipSdk &&
+        this.sdkOrchestrator &&
+        isMultiStepWorkflow(request.type)
+      ) {
         try {
           const sdkResult = await this.sdkOrchestrator.execute(request);
           if (sdkResult) {
@@ -221,13 +235,21 @@ export class OrchestratorAgent {
     // TASK-SDK-011: Log workflow end (non-blocking)
     if (this.auditTrail) {
       const durationMs = Date.now() - new Date(startedAt).getTime();
-      this.auditTrail.logWorkflow({
-        tenantId: request.tenantId,
-        workflowId,
-        eventType: 'WORKFLOW_END',
-        details: { type: request.type, status: result.status, resultCount: result.results.length },
-        durationMs,
-      }).catch((err: Error) => this.logger.warn(`Audit workflow end failed: ${err.message}`));
+      this.auditTrail
+        .logWorkflow({
+          tenantId: request.tenantId,
+          workflowId,
+          eventType: 'WORKFLOW_END',
+          details: {
+            type: request.type,
+            status: result.status,
+            resultCount: result.results.length,
+          },
+          durationMs,
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit workflow end failed: ${err.message}`),
+        );
     }
 
     this.logger.log(

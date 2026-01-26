@@ -155,7 +155,10 @@ describe('QueryValidator', () => {
 
   describe('valid query acceptance', () => {
     it('should accept a simple revenue question', () => {
-      const result = validator.validate('What is my total revenue?', VALID_TENANT_ID);
+      const result = validator.validate(
+        'What is my total revenue?',
+        VALID_TENANT_ID,
+      );
       expect(result.isValid).toBe(true);
       expect(result.sanitizedQuestion).toBe('What is my total revenue?');
     });
@@ -199,13 +202,19 @@ describe('QueryValidator', () => {
 
   describe('sanitization', () => {
     it('should trim leading whitespace', () => {
-      const result = validator.validate('  What is my revenue?', VALID_TENANT_ID);
+      const result = validator.validate(
+        '  What is my revenue?',
+        VALID_TENANT_ID,
+      );
       expect(result.isValid).toBe(true);
       expect(result.sanitizedQuestion).toBe('What is my revenue?');
     });
 
     it('should trim trailing whitespace', () => {
-      const result = validator.validate('What is my revenue?  ', VALID_TENANT_ID);
+      const result = validator.validate(
+        'What is my revenue?  ',
+        VALID_TENANT_ID,
+      );
       expect(result.isValid).toBe(true);
       expect(result.sanitizedQuestion).toBe('What is my revenue?');
     });

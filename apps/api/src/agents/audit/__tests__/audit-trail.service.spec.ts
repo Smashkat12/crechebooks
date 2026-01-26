@@ -304,10 +304,7 @@ describe('AuditTrailService', () => {
 
       const service = createService(mockPrisma);
 
-      const perf = await service.getAgentPerformance(
-        'tenant-1',
-        'categorizer',
-      );
+      const perf = await service.getAgentPerformance('tenant-1', 'categorizer');
 
       expect(perf.totalDecisions).toBe(3);
       // avg confidence: (90+80+60)/3 = 76.67
@@ -325,10 +322,7 @@ describe('AuditTrailService', () => {
       mockPrisma.agentAuditLog.count.mockResolvedValueOnce(0);
       const service = createService(mockPrisma);
 
-      const perf = await service.getAgentPerformance(
-        'tenant-1',
-        'categorizer',
-      );
+      const perf = await service.getAgentPerformance('tenant-1', 'categorizer');
 
       expect(perf.totalDecisions).toBe(0);
       expect(perf.avgConfidence).toBe(0);
@@ -339,10 +333,7 @@ describe('AuditTrailService', () => {
 
     it('should return zero stats when Prisma unavailable', async () => {
       const service = createService(undefined);
-      const perf = await service.getAgentPerformance(
-        'tenant-1',
-        'categorizer',
-      );
+      const perf = await service.getAgentPerformance('tenant-1', 'categorizer');
       expect(perf.totalDecisions).toBe(0);
     });
   });

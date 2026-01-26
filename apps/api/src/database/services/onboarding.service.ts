@@ -230,7 +230,9 @@ export class OnboardingService {
    * Auto-detect completed steps based on tenant data
    * Useful when tenant has set up data before onboarding
    */
-  async autoDetectProgress(tenantId: string): Promise<OnboardingProgressResponse> {
+  async autoDetectProgress(
+    tenantId: string,
+  ): Promise<OnboardingProgressResponse> {
     // Get tenant basic info
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -241,13 +243,21 @@ export class OnboardingService {
     }
 
     // Query related data separately to properly check existence
-    const [feeStructureCount, childCount, sentInvoiceCount, activeBankConnectionCount] =
-      await Promise.all([
-        this.prisma.feeStructure.count({ where: { tenantId } }),
-        this.prisma.child.count({ where: { tenantId } }),
-        this.prisma.invoice.count({ where: { tenantId, deliveredAt: { not: null } } }),
-        this.prisma.bankConnection.count({ where: { tenantId, status: 'ACTIVE' } }),
-      ]);
+    const [
+      feeStructureCount,
+      childCount,
+      sentInvoiceCount,
+      activeBankConnectionCount,
+    ] = await Promise.all([
+      this.prisma.feeStructure.count({ where: { tenantId } }),
+      this.prisma.child.count({ where: { tenantId } }),
+      this.prisma.invoice.count({
+        where: { tenantId, deliveredAt: { not: null } },
+      }),
+      this.prisma.bankConnection.count({
+        where: { tenantId, status: 'ACTIVE' },
+      }),
+    ]);
 
     const updates: Partial<OnboardingProgress> = {};
 
@@ -327,7 +337,7 @@ export class OnboardingService {
       0: "Let's get started setting up your creche!",
       1: "Great start! Let's keep going.",
       2: "You're making progress!",
-      3: "Halfway there!",
+      3: 'Halfway there!',
       4: 'Almost done!',
       5: 'Just a few more steps!',
       6: 'Nearly complete!',

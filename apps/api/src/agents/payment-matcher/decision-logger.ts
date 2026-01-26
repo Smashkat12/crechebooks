@@ -77,23 +77,33 @@ export class MatchDecisionLogger {
 
     // TASK-SDK-011: Write to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logDecision({
-        tenantId: entry.tenantId,
-        agentType: 'matcher',
-        transactionId: entry.transactionId,
-        decision: entry.decision,
-        confidence: entry.confidence,
-        source: entry.source as 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID' | 'RULE_BASED' | undefined,
-        autoApplied: entry.autoApplied,
-        details: {
-          invoiceId: entry.invoiceId,
-          invoiceNumber: entry.invoiceNumber,
-          candidateCount: entry.candidateCount,
-          transactionAmountCents: entry.transactionAmountCents,
-        },
-        reasoning: entry.reasoning,
-        durationMs: entry.durationMs,
-      }).catch((err: Error) => this.logger.warn(`Audit trail write failed: ${err.message}`));
+      this.auditTrail
+        .logDecision({
+          tenantId: entry.tenantId,
+          agentType: 'matcher',
+          transactionId: entry.transactionId,
+          decision: entry.decision,
+          confidence: entry.confidence,
+          source: entry.source as
+            | 'LLM'
+            | 'PATTERN'
+            | 'HISTORICAL'
+            | 'HYBRID'
+            | 'RULE_BASED'
+            | undefined,
+          autoApplied: entry.autoApplied,
+          details: {
+            invoiceId: entry.invoiceId,
+            invoiceNumber: entry.invoiceNumber,
+            candidateCount: entry.candidateCount,
+            transactionAmountCents: entry.transactionAmountCents,
+          },
+          reasoning: entry.reasoning,
+          durationMs: entry.durationMs,
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit trail write failed: ${err.message}`),
+        );
     }
   }
 
@@ -135,13 +145,17 @@ export class MatchDecisionLogger {
 
     // TASK-SDK-011: Write escalation to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logEscalation({
-        tenantId,
-        agentType: 'matcher',
-        transactionId,
-        reason,
-        details: { type, candidateInvoiceIds, candidateInvoiceNumbers },
-      }).catch((err: Error) => this.logger.warn(`Audit escalation write failed: ${err.message}`));
+      this.auditTrail
+        .logEscalation({
+          tenantId,
+          agentType: 'matcher',
+          transactionId,
+          reason,
+          details: { type, candidateInvoiceIds, candidateInvoiceNumbers },
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit escalation write failed: ${err.message}`),
+        );
     }
   }
 }

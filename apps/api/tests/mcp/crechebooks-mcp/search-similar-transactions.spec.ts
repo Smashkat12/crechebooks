@@ -12,9 +12,14 @@ import {
 } from '../../../src/mcp/crechebooks-mcp/tools/search-similar-transactions';
 import type { PrismaService } from '../../../src/database/prisma/prisma.service';
 import type { RuvectorService } from '../../../src/agents/sdk/ruvector.service';
-import type { McpToolResult, SimilarTransactionRecord } from '../../../src/mcp/crechebooks-mcp/types/index';
+import type {
+  McpToolResult,
+  SimilarTransactionRecord,
+} from '../../../src/mcp/crechebooks-mcp/types/index';
 
-function createMockRuvector(overrides: Partial<Record<string, unknown>> = {}): RuvectorService {
+function createMockRuvector(
+  overrides: Partial<Record<string, unknown>> = {},
+): RuvectorService {
   return {
     isAvailable: jest.fn().mockReturnValue(true),
     generateEmbedding: jest.fn().mockResolvedValue([0.1, 0.2, 0.3]),
@@ -23,9 +28,10 @@ function createMockRuvector(overrides: Partial<Record<string, unknown>> = {}): R
   } as unknown as RuvectorService;
 }
 
-function createMockPrisma(
-  findManyResult: unknown[] = [],
-): { prisma: PrismaService; findManySpy: jest.Mock } {
+function createMockPrisma(findManyResult: unknown[] = []): {
+  prisma: PrismaService;
+  findManySpy: jest.Mock;
+} {
   const findManySpy = jest.fn().mockResolvedValue(findManyResult);
   const prisma = {
     transaction: {
@@ -43,7 +49,9 @@ describe('sanitizeSearchInput', () => {
   });
 
   it('should strip phone numbers', () => {
-    expect(sanitizeSearchInput('Call 021-555-1234')).toBe('Call [REDACTED_PHONE]');
+    expect(sanitizeSearchInput('Call 021-555-1234')).toBe(
+      'Call [REDACTED_PHONE]',
+    );
   });
 
   it('should strip SA ID numbers (13 digits)', () => {
@@ -51,11 +59,14 @@ describe('sanitizeSearchInput', () => {
   });
 
   it('should strip bank account numbers (8-12 digits)', () => {
-    expect(sanitizeSearchInput('Account 12345678')).toBe('Account [REDACTED_ACCOUNT]');
+    expect(sanitizeSearchInput('Account 12345678')).toBe(
+      'Account [REDACTED_ACCOUNT]',
+    );
   });
 
   it('should handle multiple PII patterns', () => {
-    const input = 'Payment from user@test.com, phone +27-82-555-1234, ID 9001015009087';
+    const input =
+      'Payment from user@test.com, phone +27-82-555-1234, ID 9001015009087';
     const result = sanitizeSearchInput(input);
     expect(result).not.toContain('user@test.com');
     expect(result).not.toContain('9001015009087');
@@ -66,7 +77,9 @@ describe('sanitizeSearchInput', () => {
   });
 
   it('should return text unchanged if no PII present', () => {
-    expect(sanitizeSearchInput('WOOLWORTHS PURCHASE')).toBe('WOOLWORTHS PURCHASE');
+    expect(sanitizeSearchInput('WOOLWORTHS PURCHASE')).toBe(
+      'WOOLWORTHS PURCHASE',
+    );
   });
 });
 
@@ -97,7 +110,9 @@ describe('search_similar_transactions tool', () => {
       description: 'Payment from user@example.com',
     });
 
-    expect(generateEmbedding).toHaveBeenCalledWith('Payment from [REDACTED_EMAIL]');
+    expect(generateEmbedding).toHaveBeenCalledWith(
+      'Payment from [REDACTED_EMAIL]',
+    );
   });
 
   it('should return error when description is empty after sanitization', async () => {
@@ -151,7 +166,7 @@ describe('search_similar_transactions tool', () => {
       tenantId: TENANT_ID,
       description: 'woolworths purchase',
       minSimilarity: 0.5,
-    }) as McpToolResult<SimilarTransactionRecord[]>;
+    });
 
     expect(result.success).toBe(true);
     expect(result.data).toHaveLength(2);
@@ -159,9 +174,9 @@ describe('search_similar_transactions tool', () => {
   });
 
   it('should enforce tenant isolation on transaction fetch', async () => {
-    const searchSimilar = jest.fn().mockResolvedValue([
-      { id: 'tx-001', score: 0.9, metadata: {} },
-    ]);
+    const searchSimilar = jest
+      .fn()
+      .mockResolvedValue([{ id: 'tx-001', score: 0.9, metadata: {} }]);
     const ruvector = createMockRuvector({ searchSimilar });
     const { prisma, findManySpy } = createMockPrisma([
       {
@@ -180,7 +195,9 @@ describe('search_similar_transactions tool', () => {
       description: 'test transaction',
     });
 
-    const callArgs = findManySpy.mock.calls[0][0] as { where: Record<string, unknown> };
+    const callArgs = findManySpy.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
     expect(callArgs.where.tenantId).toBe(TENANT_ID);
     expect(callArgs.where.isDeleted).toBe(false);
   });
@@ -216,7 +233,7 @@ describe('search_similar_transactions tool', () => {
     const result = await tool.handler({
       tenantId: TENANT_ID,
       description: 'test',
-    }) as McpToolResult<SimilarTransactionRecord[]>;
+    });
 
     expect(result.data![0].similarityScore).toBe(0.9);
     expect(result.data![1].similarityScore).toBe(0.7);
@@ -231,7 +248,7 @@ describe('search_similar_transactions tool', () => {
     const result = await tool.handler({
       tenantId: TENANT_ID,
       description: 'random search',
-    }) as McpToolResult<SimilarTransactionRecord[]>;
+    });
 
     expect(result.success).toBe(true);
     expect(result.data).toEqual([]);
@@ -239,7 +256,9 @@ describe('search_similar_transactions tool', () => {
 
   it('should handle ruvector errors gracefully', async () => {
     const ruvector = createMockRuvector({
-      generateEmbedding: jest.fn().mockRejectedValue(new Error('Embedding service down')),
+      generateEmbedding: jest
+        .fn()
+        .mockRejectedValue(new Error('Embedding service down')),
     });
     const { prisma } = createMockPrisma();
     const tool = searchSimilarTransactions(prisma, ruvector);
@@ -247,7 +266,7 @@ describe('search_similar_transactions tool', () => {
     const result = await tool.handler({
       tenantId: TENANT_ID,
       description: 'test',
-    }) as McpToolResult<SimilarTransactionRecord[]>;
+    });
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Embedding service down');
@@ -274,7 +293,7 @@ describe('search_similar_transactions tool', () => {
     const result = await tool.handler({
       tenantId: TENANT_ID,
       description: 'test',
-    }) as McpToolResult<SimilarTransactionRecord[]>;
+    });
 
     // Only tx-002 should be included (score 0.6 >= 0.5)
     expect(result.data).toHaveLength(1);

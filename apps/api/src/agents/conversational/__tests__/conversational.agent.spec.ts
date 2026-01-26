@@ -136,10 +136,7 @@ describe('ConversationalAgent', () => {
 
   describe('ask - valid query', () => {
     it('should return a ConversationalResponse with answer and metadata', async () => {
-      const response = await agent.ask(
-        'What is my total revenue?',
-        TENANT_ID,
-      );
+      const response = await agent.ask('What is my total revenue?', TENANT_ID);
 
       expect(response).toBeDefined();
       expect(response.answer).toBeDefined();
@@ -153,10 +150,7 @@ describe('ConversationalAgent', () => {
     });
 
     it('should return metadata with correct query type for expenses', async () => {
-      const response = await agent.ask(
-        'How much have I spent?',
-        TENANT_ID,
-      );
+      const response = await agent.ask('How much have I spent?', TENANT_ID);
       expect(response.metadata.queryType).toBe('EXPENSE');
       expect(response.metadata.dataSourcesQueried).toContain('transactions');
     });
@@ -216,7 +210,10 @@ describe('ConversationalAgent', () => {
 
   describe('tax question redirect', () => {
     it('should redirect tax questions to SARS agent', async () => {
-      const response = await agent.ask('Tell me about my tax obligations', TENANT_ID);
+      const response = await agent.ask(
+        'Tell me about my tax obligations',
+        TENANT_ID,
+      );
       expect(response.metadata.queryType).toBe('TAX');
       expect(response.answer).toContain('SARS agent');
       expect(response.answer).toContain('tax advice');
@@ -367,7 +364,9 @@ describe('ConversationalAgent', () => {
 
   describe('classifyQueryComplexity', () => {
     it('should classify summary as complex', () => {
-      expect(classifyQueryComplexity('show me a summary', 'SUMMARY')).toBe('complex');
+      expect(classifyQueryComplexity('show me a summary', 'SUMMARY')).toBe(
+        'complex',
+      );
     });
 
     it('should classify tax as complex', () => {
@@ -375,19 +374,27 @@ describe('ConversationalAgent', () => {
     });
 
     it('should classify compare question as complex', () => {
-      expect(classifyQueryComplexity('compare revenue months', 'REVENUE')).toBe('complex');
+      expect(classifyQueryComplexity('compare revenue months', 'REVENUE')).toBe(
+        'complex',
+      );
     });
 
     it('should classify trend question as complex', () => {
-      expect(classifyQueryComplexity('show me the trend', 'REVENUE')).toBe('complex');
+      expect(classifyQueryComplexity('show me the trend', 'REVENUE')).toBe(
+        'complex',
+      );
     });
 
     it('should classify simple revenue as simple', () => {
-      expect(classifyQueryComplexity('what is my revenue', 'REVENUE')).toBe('simple');
+      expect(classifyQueryComplexity('what is my revenue', 'REVENUE')).toBe(
+        'simple',
+      );
     });
 
     it('should classify simple expense as simple', () => {
-      expect(classifyQueryComplexity('show expenses', 'EXPENSE')).toBe('simple');
+      expect(classifyQueryComplexity('show expenses', 'EXPENSE')).toBe(
+        'simple',
+      );
     });
   });
 
@@ -459,7 +466,10 @@ describe('ConversationalAgent', () => {
     it('should handle zero children gracefully', async () => {
       mockPrisma.child.count.mockResolvedValue(0);
 
-      const response = await agent.ask('How many children are enrolled?', TENANT_ID);
+      const response = await agent.ask(
+        'How many children are enrolled?',
+        TENANT_ID,
+      );
       expect(response.answer).toContain('No children');
     });
 
@@ -469,7 +479,10 @@ describe('ConversationalAgent', () => {
         _count: 0,
       });
 
-      const response = await agent.ask('What payments have I received?', TENANT_ID);
+      const response = await agent.ask(
+        'What payments have I received?',
+        TENANT_ID,
+      );
       expect(response.answer).toContain('No payments');
     });
   });
@@ -590,7 +603,10 @@ describe('ConversationalAgent', () => {
     it('should report enrollment count correctly', async () => {
       mockPrisma.child.count.mockResolvedValue(42);
 
-      const response = await agent.ask('How many children enrolled?', TENANT_ID);
+      const response = await agent.ask(
+        'How many children enrolled?',
+        TENANT_ID,
+      );
       expect(response.answer).toContain('42');
       expect(response.answer).toContain('children');
     });

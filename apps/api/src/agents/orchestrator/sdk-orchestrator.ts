@@ -20,7 +20,13 @@
  * - Error isolation: one step failing does NOT abort other steps
  */
 
-import { Injectable, Optional, Inject, forwardRef, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Optional,
+  Inject,
+  forwardRef,
+  Logger,
+} from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { BaseSdkAgent } from '../sdk/base-sdk-agent';
 import { SdkAgentFactory } from '../sdk/sdk-agent.factory';
@@ -43,9 +49,7 @@ import {
   SubagentResult,
   WorkflowStepDefinition,
 } from './interfaces/sdk-orchestrator.interface';
-import {
-  getWorkflowDefinition,
-} from './workflow-definitions';
+import { getWorkflowDefinition } from './workflow-definitions';
 import { WorkflowResultAdaptor } from './workflow-result-adaptor';
 
 @Injectable()
@@ -103,9 +107,7 @@ export class SdkOrchestrator extends BaseSdkAgent {
   async execute(request: WorkflowRequest): Promise<WorkflowResult | undefined> {
     const definition = getWorkflowDefinition(request.type);
     if (!definition) {
-      this.logger.debug(
-        `No SDK workflow definition for ${request.type}`,
-      );
+      this.logger.debug(`No SDK workflow definition for ${request.type}`);
       return undefined;
     }
 
@@ -207,7 +209,7 @@ export class SdkOrchestrator extends BaseSdkAgent {
       workflowId,
       stepId: step.stepId,
       agentType: step.agentType,
-      input: (request.parameters as Record<string, unknown>) ?? {},
+      input: request.parameters ?? {},
     };
 
     try {
@@ -217,11 +219,7 @@ export class SdkOrchestrator extends BaseSdkAgent {
         case 'payment-matcher':
           return await this.executePaymentMatching(context, request, startTime);
         case 'sars-agent':
-          return await this.executeSarsStep(
-            context,
-            request,
-            startTime,
-          );
+          return await this.executeSarsStep(context, request, startTime);
         default:
           return {
             status: 'FAILED',
@@ -234,8 +232,7 @@ export class SdkOrchestrator extends BaseSdkAgent {
       return {
         status: 'FAILED',
         agentType: step.agentType,
-        error:
-          error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : String(error),
         durationMs: Date.now() - startTime,
       };
     }
@@ -300,7 +297,10 @@ export class SdkOrchestrator extends BaseSdkAgent {
     }
 
     return {
-      status: errors === transactions.length && transactions.length > 0 ? 'FAILED' : 'SUCCESS',
+      status:
+        errors === transactions.length && transactions.length > 0
+          ? 'FAILED'
+          : 'SUCCESS',
       agentType: 'transaction-categorizer',
       processed: transactions.length,
       autoApplied,
@@ -379,7 +379,8 @@ export class SdkOrchestrator extends BaseSdkAgent {
     }
 
     return {
-      status: errors === credits.length && credits.length > 0 ? 'FAILED' : 'SUCCESS',
+      status:
+        errors === credits.length && credits.length > 0 ? 'FAILED' : 'SUCCESS',
       agentType: 'payment-matcher',
       processed: credits.length,
       autoApplied,
@@ -413,7 +414,7 @@ export class SdkOrchestrator extends BaseSdkAgent {
       };
     }
 
-    const params = request.parameters as Record<string, unknown>;
+    const params = request.parameters;
     const escalations: SubagentResult['escalations'] = [];
 
     switch (context.stepId) {

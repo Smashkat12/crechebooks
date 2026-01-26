@@ -168,6 +168,11 @@ export class SupplierController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Record bill payment: bill=${billId}, tenant=${tenantId}`);
-    return this.supplierService.recordBillPayment(tenantId, userId, billId, body);
+    return this.supplierService.recordBillPayment(
+      tenantId,
+      userId,
+      billId,
+      body,
+    );
   }
 }

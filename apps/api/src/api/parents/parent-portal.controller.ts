@@ -79,7 +79,9 @@ export class ParentPortalController {
   }
 
   @Post('onboarding/documents/generate')
-  @ApiOperation({ summary: 'Generate onboarding documents (fee agreement, consent forms)' })
+  @ApiOperation({
+    summary: 'Generate onboarding documents (fee agreement, consent forms)',
+  })
   @ApiResponse({
     status: 201,
     description: 'Documents generated successfully',
@@ -97,9 +99,15 @@ export class ParentPortalController {
     schema: {
       type: 'object',
       properties: {
-        documentType: { type: 'string', enum: ['FEE_AGREEMENT', 'CONSENT_FORMS'] },
+        documentType: {
+          type: 'string',
+          enum: ['FEE_AGREEMENT', 'CONSENT_FORMS'],
+        },
         signedByName: { type: 'string' },
-        mediaConsent: { type: 'string', enum: ['internal_only', 'website', 'social_media', 'all', 'none'] },
+        mediaConsent: {
+          type: 'string',
+          enum: ['internal_only', 'website', 'social_media', 'all', 'none'],
+        },
         authorizedCollectors: {
           type: 'array',
           items: {
@@ -137,11 +145,12 @@ export class ParentPortalController {
     @Param('documentId') documentId: string,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const { buffer, fileName, mimeType } = await this.parentOnboarding.downloadDocument(
-      documentId,
-      session.parentId,
-      session.tenantId,
-    );
+    const { buffer, fileName, mimeType } =
+      await this.parentOnboarding.downloadDocument(
+        documentId,
+        session.parentId,
+        session.tenantId,
+      );
 
     res.set({
       'Content-Type': mimeType,

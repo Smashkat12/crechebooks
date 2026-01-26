@@ -30,5 +30,24 @@ export { BaseSdkAgent } from './base-sdk-agent';
 export { RuvectorService } from './ruvector.service';
 export type { RuvectorSearchResult, RuvectorModule } from './ruvector.service';
 
+// IntelligenceEngine Service
+export { IntelligenceEngineService } from './intelligence-engine.service';
+export type {
+  IntelligenceRouteResult,
+  IntelligenceMemoryEntry,
+  IntelligenceRecallResult,
+  IntelligenceTrajectory,
+  IntelligenceStats,
+  IntelligenceEngineServiceConfig,
+} from './interfaces/intelligence-engine.interface';
+
+// Persistence Config
+export { PersistenceConfig } from './persistence-config';
+export type { PersistenceConfigValues } from './persistence-config';
+
+// SONA Bootstrap Service
+export { SonaBootstrapService } from './sona-bootstrap.service';
+export type { BootstrapStats } from './sona-bootstrap.service';
+
 // Module
 export { SdkAgentModule } from './sdk-agent.module';

@@ -14,7 +14,11 @@
  */
 
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
-import type { HybridScore, ScoringWeights } from './interfaces/hybrid-scoring.interface';
+import type {
+  HybridScore,
+  ScoringWeights,
+} from './interfaces/hybrid-scoring.interface';
+import type { LearningRouterInterface } from './interfaces/learning-router.interface';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Local stub for SONAScorer (agentic-flow not installed)
@@ -27,9 +31,10 @@ interface SONAScorerWeights {
 }
 
 class SONAScorer {
-  async getOptimalWeights(
-    _context: { tenantId: string; agentType: string },
-  ): Promise<SONAScorerWeights | null> {
+  async getOptimalWeights(_context: {
+    tenantId: string;
+    agentType: string;
+  }): Promise<SONAScorerWeights | null> {
     // Stub: agentic-flow not installed. Returns null to trigger default weights.
     return null;
   }
@@ -49,13 +54,17 @@ const MIN_HEURISTIC_WEIGHT = 0.2;
 export class HybridScorer {
   private readonly logger = new Logger(HybridScorer.name);
   private readonly sonaScorer: SONAScorer;
+  private readonly learningRouter?: LearningRouterInterface;
 
   constructor(
     @Optional()
     @Inject(SONA_SCORER_TOKEN)
     sonaScorer?: SONAScorer,
+    @Optional()
+    learningRouter?: LearningRouterInterface,
   ) {
     this.sonaScorer = sonaScorer ?? new SONAScorer();
+    this.learningRouter = learningRouter;
   }
 
   /**
@@ -93,7 +102,8 @@ export class HybridScorer {
     weights = this.enforceMinHeuristicWeight(weights);
 
     // Compute weighted combination
-    const rawScore = llmConfidence * weights.llm + heuristicConfidence * weights.heuristic;
+    const rawScore =
+      llmConfidence * weights.llm + heuristicConfidence * weights.heuristic;
 
     // Round and clamp to 0-100
     const score = Math.min(100, Math.max(0, Math.round(rawScore)));
@@ -109,11 +119,28 @@ export class HybridScorer {
   }
 
   /**
-   * Get weights from SONA or fall back to defaults.
+   * Get weights from LearningRouter → SONA → defaults.
    */
-  private async getWeights(
-    context: { tenantId: string; agentType: string },
-  ): Promise<ScoringWeights> {
+  private async getWeights(context: {
+    tenantId: string;
+    agentType: string;
+  }): Promise<ScoringWeights> {
+    // Try LearningRouter first (if available)
+    if (this.learningRouter?.isAvailable()) {
+      try {
+        const lrWeights = await this.learningRouter.getOptimalWeights(
+          context as { tenantId: string; agentType: 'categorizer' | 'matcher' },
+        );
+        if (lrWeights !== null) {
+          return { llm: lrWeights.llm, heuristic: lrWeights.heuristic };
+        }
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(`LearningRouter weight lookup failed: ${msg}`);
+      }
+    }
+
+    // Try SONA next
     try {
       const sonaWeights = await this.sonaScorer.getOptimalWeights(context);
       if (sonaWeights !== null) {

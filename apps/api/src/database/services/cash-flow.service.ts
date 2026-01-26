@@ -150,10 +150,18 @@ export class CashFlowService {
     endDate: Date,
   ): Promise<OperatingActivitiesResponse> {
     // 1. Calculate Net Income
-    const netIncomeCents = await this.calculateNetIncome(tenantId, startDate, endDate);
+    const netIncomeCents = await this.calculateNetIncome(
+      tenantId,
+      startDate,
+      endDate,
+    );
 
     // 2. Calculate adjustments for non-cash items
-    const depreciation = await this.getDepreciationExpense(tenantId, startDate, endDate);
+    const depreciation = await this.getDepreciationExpense(
+      tenantId,
+      startDate,
+      endDate,
+    );
 
     // 3. Calculate working capital changes
     const receivablesChange = await this.calculateBalanceChange(
@@ -359,7 +367,10 @@ export class CashFlowService {
     );
 
     const netCashFromFinancingCents =
-      loanProceedsCents - loanRepaymentsCents + ownerContributionsCents - ownerDrawingsCents;
+      loanProceedsCents -
+      loanRepaymentsCents +
+      ownerContributionsCents -
+      ownerDrawingsCents;
 
     return {
       loanProceedsCents,
@@ -381,9 +392,14 @@ export class CashFlowService {
     netCashFromInvesting: number,
     netCashFromFinancing: number,
   ): Promise<CashFlowSummaryResponse> {
-    const openingCashBalanceCents = await this.getCashBalance(tenantId, startDate);
-    const netCashChangeCents = netCashFromOperating + netCashFromInvesting + netCashFromFinancing;
-    const calculatedClosingBalance = openingCashBalanceCents + netCashChangeCents;
+    const openingCashBalanceCents = await this.getCashBalance(
+      tenantId,
+      startDate,
+    );
+    const netCashChangeCents =
+      netCashFromOperating + netCashFromInvesting + netCashFromFinancing;
+    const calculatedClosingBalance =
+      openingCashBalanceCents + netCashChangeCents;
 
     // Get actual closing balance for reconciliation
     const actualClosingBalance = await this.getCashBalance(
@@ -393,7 +409,8 @@ export class CashFlowService {
 
     // Check if cash reconciles (within a small tolerance for rounding)
     const tolerance = 100; // 1 Rand tolerance
-    const cashReconciles = Math.abs(calculatedClosingBalance - actualClosingBalance) <= tolerance;
+    const cashReconciles =
+      Math.abs(calculatedClosingBalance - actualClosingBalance) <= tolerance;
 
     return {
       netCashChangeCents,
@@ -434,7 +451,8 @@ export class CashFlowService {
           endDate,
         );
         // Revenue is credit-normal, so closing - opening gives period activity
-        const periodActivity = ledger.closingBalanceCents - ledger.openingBalanceCents;
+        const periodActivity =
+          ledger.closingBalanceCents - ledger.openingBalanceCents;
         totalRevenue += periodActivity;
       } catch {
         // Account may not have transactions
@@ -451,7 +469,8 @@ export class CashFlowService {
           endDate,
         );
         // Expenses are debit-normal
-        const periodActivity = ledger.closingBalanceCents - ledger.openingBalanceCents;
+        const periodActivity =
+          ledger.closingBalanceCents - ledger.openingBalanceCents;
         totalExpenses += periodActivity;
       } catch {
         // Account may not have transactions
@@ -539,7 +558,9 @@ export class CashFlowService {
         accountCode,
       });
 
-      return entries.filter((e) => e.debitCents > 0).reduce((sum, e) => sum + e.debitCents, 0);
+      return entries
+        .filter((e) => e.debitCents > 0)
+        .reduce((sum, e) => sum + e.debitCents, 0);
     } catch {
       return 0;
     }
@@ -568,7 +589,9 @@ export class CashFlowService {
         accountCode,
       });
 
-      return entries.filter((e) => e.creditCents > 0).reduce((sum, e) => sum + e.creditCents, 0);
+      return entries
+        .filter((e) => e.creditCents > 0)
+        .reduce((sum, e) => sum + e.creditCents, 0);
     } catch {
       return 0;
     }
@@ -577,7 +600,10 @@ export class CashFlowService {
   /**
    * Get total cash balance as of a date
    */
-  private async getCashBalance(tenantId: string, asOfDate: Date): Promise<number> {
+  private async getCashBalance(
+    tenantId: string,
+    asOfDate: Date,
+  ): Promise<number> {
     let totalCash = 0;
 
     // Bank account
@@ -622,15 +648,35 @@ export class CashFlowService {
     // Generate monthly periods
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
-      const periodStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const periodEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      const periodStart = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      );
+      const periodEnd = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        0,
+      );
 
       // Cap at the overall end date
       const effectiveEnd = periodEnd > endDate ? endDate : periodEnd;
 
-      const operating = await this.calculateOperatingActivities(tenantId, periodStart, effectiveEnd);
-      const investing = await this.calculateInvestingActivities(tenantId, periodStart, effectiveEnd);
-      const financing = await this.calculateFinancingActivities(tenantId, periodStart, effectiveEnd);
+      const operating = await this.calculateOperatingActivities(
+        tenantId,
+        periodStart,
+        effectiveEnd,
+      );
+      const investing = await this.calculateInvestingActivities(
+        tenantId,
+        periodStart,
+        effectiveEnd,
+      );
+      const financing = await this.calculateFinancingActivities(
+        tenantId,
+        periodStart,
+        effectiveEnd,
+      );
 
       const netChange =
         operating.netCashFromOperatingCents +
@@ -674,7 +720,12 @@ export class CashFlowService {
     closingBalanceCents: number;
     isPositive: boolean;
   }> {
-    const statement = await this.generateCashFlowStatement(tenantId, startDate, endDate, false);
+    const statement = await this.generateCashFlowStatement(
+      tenantId,
+      startDate,
+      endDate,
+      false,
+    );
 
     return {
       operatingCents: statement.operatingActivities.netCashFromOperatingCents,

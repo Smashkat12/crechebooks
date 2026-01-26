@@ -19,7 +19,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from './audit-log.service';
-import { Supplier, SupplierBill, SupplierBillPayment, BillStatus, VatType } from '@prisma/client';
+import {
+  Supplier,
+  SupplierBill,
+  SupplierBillPayment,
+  BillStatus,
+  VatType,
+} from '@prisma/client';
 import {
   CreateSupplierDto,
   UpdateSupplierDto,
@@ -51,7 +57,9 @@ export class SupplierService {
     });
 
     if (existing) {
-      throw new ConflictException(`Supplier with name "${data.name}" already exists`);
+      throw new ConflictException(
+        `Supplier with name "${data.name}" already exists`,
+      );
     }
 
     const supplier = await this.prisma.supplier.create({
@@ -86,7 +94,9 @@ export class SupplierService {
         vatNumber: supplier.vatNumber,
         paymentTermsDays: supplier.paymentTermsDays,
         // Mask account number for security
-        accountNumber: data.accountNumber ? `****${data.accountNumber.slice(-4)}` : null,
+        accountNumber: data.accountNumber
+          ? `****${data.accountNumber.slice(-4)}`
+          : null,
       },
     });
 
@@ -116,7 +126,9 @@ export class SupplierService {
         where: { tenantId, name: data.name, id: { not: supplierId } },
       });
       if (duplicate) {
-        throw new ConflictException(`Supplier with name "${data.name}" already exists`);
+        throw new ConflictException(
+          `Supplier with name "${data.name}" already exists`,
+        );
       }
     }
 
@@ -163,7 +175,10 @@ export class SupplierService {
   /**
    * Get a supplier by ID
    */
-  async getSupplierById(tenantId: string, supplierId: string): Promise<Supplier> {
+  async getSupplierById(
+    tenantId: string,
+    supplierId: string,
+  ): Promise<Supplier> {
     const supplier = await this.prisma.supplier.findFirst({
       where: { id: supplierId, tenantId },
     });
@@ -193,7 +208,12 @@ export class SupplierService {
       ...(options?.search && {
         OR: [
           { name: { contains: options.search, mode: 'insensitive' as const } },
-          { tradingName: { contains: options.search, mode: 'insensitive' as const } },
+          {
+            tradingName: {
+              contains: options.search,
+              mode: 'insensitive' as const,
+            },
+          },
           { email: { contains: options.search, mode: 'insensitive' as const } },
         ],
       }),
@@ -310,7 +330,9 @@ export class SupplierService {
     const billDate = new Date(data.billDate);
     const dueDate = data.dueDate
       ? new Date(data.dueDate)
-      : new Date(billDate.getTime() + supplier.paymentTermsDays * 24 * 60 * 60 * 1000);
+      : new Date(
+          billDate.getTime() + supplier.paymentTermsDays * 24 * 60 * 60 * 1000,
+        );
 
     const bill = await this.prisma.supplierBill.create({
       data: {
@@ -366,7 +388,9 @@ export class SupplierService {
   async getBillById(
     tenantId: string,
     billId: string,
-  ): Promise<SupplierBill & { lines: any[]; supplier: Supplier; payments: any[] }> {
+  ): Promise<
+    SupplierBill & { lines: any[]; supplier: Supplier; payments: any[] }
+  > {
     const bill = await this.prisma.supplierBill.findFirst({
       where: { id: billId, tenantId },
       include: {
@@ -511,7 +535,11 @@ export class SupplierService {
   /**
    * Void a bill (must have no payments)
    */
-  async voidBill(tenantId: string, userId: string, billId: string): Promise<SupplierBill> {
+  async voidBill(
+    tenantId: string,
+    userId: string,
+    billId: string,
+  ): Promise<SupplierBill> {
     const bill = await this.prisma.supplierBill.findFirst({
       where: { id: billId, tenantId },
       include: { payments: true },
@@ -639,7 +667,10 @@ export class SupplierService {
       select: { balanceDueCents: true },
     });
 
-    const openingBalanceCents = openingBills.reduce((sum, b) => sum + b.balanceDueCents, 0);
+    const openingBalanceCents = openingBills.reduce(
+      (sum, b) => sum + b.balanceDueCents,
+      0,
+    );
 
     // Get bills in period
     const bills = await this.prisma.supplierBill.findMany({

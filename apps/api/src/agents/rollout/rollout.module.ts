@@ -10,12 +10,24 @@
 import { Module } from '@nestjs/common';
 import { FeatureFlagService } from './feature-flags.service';
 import { ShadowRunner } from './shadow-runner';
+import { ShadowComparisonAggregator } from './shadow-comparison-aggregator';
+import { RolloutPromotionService } from './rollout-promotion.service';
 import { PrismaModule } from '../../database/prisma';
 import { AuditTrailModule } from '../audit/audit-trail.module';
 
 @Module({
   imports: [PrismaModule, AuditTrailModule],
-  providers: [FeatureFlagService, ShadowRunner],
-  exports: [FeatureFlagService, ShadowRunner],
+  providers: [
+    FeatureFlagService,
+    ShadowRunner,
+    ShadowComparisonAggregator,
+    RolloutPromotionService,
+  ],
+  exports: [
+    FeatureFlagService,
+    ShadowRunner,
+    ShadowComparisonAggregator,
+    RolloutPromotionService,
+  ],
 })
 export class RolloutModule {}

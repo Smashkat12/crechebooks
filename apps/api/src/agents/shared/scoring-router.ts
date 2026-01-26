@@ -13,9 +13,13 @@
  * - MultiModelRouter stub returns null to trigger accuracy-based fallback
  */
 
-import { Injectable, Logger } from '@nestjs/common';
-import type { ScoringPath, ScoringWeights } from './interfaces/hybrid-scoring.interface';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import type {
+  ScoringPath,
+  ScoringWeights,
+} from './interfaces/hybrid-scoring.interface';
 import { AccuracyTracker } from './accuracy-tracker';
+import type { LearningRouterInterface } from './interfaces/learning-router.interface';
 
 // ────────────────────────────────────────────────────────────────────────────
 // Local stub for MultiModelRouter (agentic-flow not installed)
@@ -23,9 +27,10 @@ import { AccuracyTracker } from './accuracy-tracker';
 // ────────────────────────────────────────────────────────────────────────────
 
 class MultiModelRouter {
-  async selectPath(
-    _context: { tenantId: string; agentType: string },
-  ): Promise<string | null> {
+  async selectPath(_context: {
+    tenantId: string;
+    agentType: string;
+  }): Promise<string | null> {
     // Stub: returns null to trigger fallback
     return null;
   }
@@ -42,15 +47,20 @@ const PATH_WEIGHTS: Record<ScoringPath, ScoringWeights> = {
 export class ScoringRouter {
   private readonly logger = new Logger(ScoringRouter.name);
   private readonly multiModelRouter: MultiModelRouter;
+  private readonly learningRouter?: LearningRouterInterface;
 
-  constructor(private readonly accuracyTracker: AccuracyTracker) {
+  constructor(
+    private readonly accuracyTracker: AccuracyTracker,
+    @Optional()
+    learningRouter?: LearningRouterInterface,
+  ) {
     this.multiModelRouter = new MultiModelRouter();
+    this.learningRouter = learningRouter;
   }
 
   /**
    * Get the preferred scoring path for a tenant/agent pair.
-   * Tries MultiModelRouter first (returns null from stub),
-   * then falls back to accuracy-based recommendation.
+   * Priority: LearningRouter → MultiModelRouter → AccuracyTracker.
    *
    * @param tenantId - Tenant ID
    * @param agentType - Agent type
@@ -60,7 +70,26 @@ export class ScoringRouter {
     tenantId: string,
     agentType: 'categorizer' | 'matcher',
   ): Promise<ScoringPath> {
-    // Try MultiModelRouter first
+    // Try LearningRouter first (if available)
+    if (this.learningRouter?.isAvailable()) {
+      try {
+        const decision = await this.learningRouter.selectPath({
+          tenantId,
+          agentType,
+        });
+
+        if (decision) {
+          return decision.path;
+        }
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `LearningRouter failed, falling back: ${msg}`,
+        );
+      }
+    }
+
+    // Try MultiModelRouter second
     try {
       const routerPath = await this.multiModelRouter.selectPath({
         tenantId,

@@ -80,22 +80,32 @@ export class DecisionLogger {
 
     // TASK-SDK-011: Write to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logDecision({
-        tenantId: entry.tenantId,
-        agentType: 'categorizer',
-        transactionId: entry.transactionId,
-        decision: entry.decision,
-        confidence: entry.confidence,
-        source: entry.source as 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID' | 'RULE_BASED' | undefined,
-        autoApplied: entry.autoApplied,
-        details: {
-          accountCode: entry.accountCode,
-          accountName: entry.accountName,
-          patternId: entry.patternId,
-        },
-        reasoning: entry.reasoning,
-        durationMs: entry.durationMs,
-      }).catch((err: Error) => this.logger.warn(`Audit trail write failed: ${err.message}`));
+      this.auditTrail
+        .logDecision({
+          tenantId: entry.tenantId,
+          agentType: 'categorizer',
+          transactionId: entry.transactionId,
+          decision: entry.decision,
+          confidence: entry.confidence,
+          source: entry.source as
+            | 'LLM'
+            | 'PATTERN'
+            | 'HISTORICAL'
+            | 'HYBRID'
+            | 'RULE_BASED'
+            | undefined,
+          autoApplied: entry.autoApplied,
+          details: {
+            accountCode: entry.accountCode,
+            accountName: entry.accountName,
+            patternId: entry.patternId,
+          },
+          reasoning: entry.reasoning,
+          durationMs: entry.durationMs,
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit trail write failed: ${err.message}`),
+        );
     }
   }
 
@@ -147,13 +157,17 @@ export class DecisionLogger {
 
     // TASK-SDK-011: Write escalation to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logEscalation({
-        tenantId,
-        agentType: 'categorizer',
-        transactionId,
-        reason,
-        details: { type, suggestedAccount, suggestedAccountName, confidence },
-      }).catch((err: Error) => this.logger.warn(`Audit escalation write failed: ${err.message}`));
+      this.auditTrail
+        .logEscalation({
+          tenantId,
+          agentType: 'categorizer',
+          transactionId,
+          reason,
+          details: { type, suggestedAccount, suggestedAccountName, confidence },
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit escalation write failed: ${err.message}`),
+        );
     }
   }
 

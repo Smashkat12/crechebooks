@@ -19,7 +19,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from './audit-log.service';
-import { Quote, QuoteLine, QuoteStatus, VatType, LineType } from '@prisma/client';
+import {
+  Quote,
+  QuoteLine,
+  QuoteStatus,
+  VatType,
+  LineType,
+} from '@prisma/client';
 import {
   CreateQuoteDto,
   UpdateQuoteDto,
@@ -91,7 +97,9 @@ export class QuoteService {
 
     // Calculate expiry date
     const validityDays = data.validityDays ?? 30;
-    const expiryDate = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
+    const expiryDate = new Date(
+      Date.now() + validityDays * 24 * 60 * 60 * 1000,
+    );
 
     const quote = await this.prisma.quote.create({
       data: {
@@ -103,7 +111,9 @@ export class QuoteService {
         parentId: data.parentId,
         childName: data.childName,
         childDob: data.childDob ? new Date(data.childDob) : null,
-        expectedStartDate: data.expectedStartDate ? new Date(data.expectedStartDate) : null,
+        expectedStartDate: data.expectedStartDate
+          ? new Date(data.expectedStartDate)
+          : null,
         expiryDate,
         validityDays,
         subtotalCents,
@@ -230,7 +240,11 @@ export class QuoteService {
   /**
    * Send a quote to recipient
    */
-  async sendQuote(tenantId: string, userId: string, quoteId: string): Promise<Quote> {
+  async sendQuote(
+    tenantId: string,
+    userId: string,
+    quoteId: string,
+  ): Promise<Quote> {
     const quote = await this.getQuoteById(tenantId, quoteId);
 
     if (quote.status !== 'DRAFT') {
@@ -273,7 +287,9 @@ export class QuoteService {
     const quote = await this.getQuoteById(tenantId, quoteId);
 
     if (!['SENT', 'VIEWED'].includes(quote.status)) {
-      throw new BadRequestException('Quote must be sent before it can be viewed');
+      throw new BadRequestException(
+        'Quote must be sent before it can be viewed',
+      );
     }
 
     // Only update if not already viewed
@@ -297,7 +313,9 @@ export class QuoteService {
     const quote = await this.getQuoteById(tenantId, quoteId);
 
     if (!['SENT', 'VIEWED'].includes(quote.status)) {
-      throw new BadRequestException(`Cannot accept quote with status ${quote.status}`);
+      throw new BadRequestException(
+        `Cannot accept quote with status ${quote.status}`,
+      );
     }
 
     // Check expiry
@@ -329,7 +347,9 @@ export class QuoteService {
     const quote = await this.getQuoteById(tenantId, quoteId);
 
     if (!['SENT', 'VIEWED'].includes(quote.status)) {
-      throw new BadRequestException(`Cannot decline quote with status ${quote.status}`);
+      throw new BadRequestException(
+        `Cannot decline quote with status ${quote.status}`,
+      );
     }
 
     return this.prisma.quote.update({
@@ -444,7 +464,9 @@ export class QuoteService {
       tenantId,
       ...(statusArray && { status: { in: statusArray } }),
       ...(options?.parentId && { parentId: options.parentId }),
-      ...(options?.recipientEmail && { recipientEmail: options.recipientEmail }),
+      ...(options?.recipientEmail && {
+        recipientEmail: options.recipientEmail,
+      }),
       ...(options?.fromDate && { quoteDate: { gte: options.fromDate } }),
       ...(options?.toDate && { quoteDate: { lte: options.toDate } }),
     };
@@ -513,7 +535,9 @@ export class QuoteService {
     const respondedCount =
       statusCounts.ACCEPTED + statusCounts.DECLINED + statusCounts.CONVERTED;
     const conversionRate =
-      sentCount > 0 ? (statusCounts.ACCEPTED + statusCounts.CONVERTED) / sentCount : 0;
+      sentCount > 0
+        ? (statusCounts.ACCEPTED + statusCounts.CONVERTED) / sentCount
+        : 0;
 
     return {
       totalQuotes,
@@ -532,7 +556,11 @@ export class QuoteService {
   /**
    * Delete a draft quote
    */
-  async deleteQuote(tenantId: string, userId: string, quoteId: string): Promise<void> {
+  async deleteQuote(
+    tenantId: string,
+    userId: string,
+    quoteId: string,
+  ): Promise<void> {
     const quote = await this.getQuoteById(tenantId, quoteId);
 
     if (quote.status !== 'DRAFT') {
@@ -570,7 +598,9 @@ export class QuoteService {
       parentId: original.parentId || undefined,
       childName: original.childName || undefined,
       childDob: original.childDob?.toISOString().split('T')[0],
-      expectedStartDate: original.expectedStartDate?.toISOString().split('T')[0],
+      expectedStartDate: original.expectedStartDate
+        ?.toISOString()
+        .split('T')[0],
       validityDays: original.validityDays,
       notes: original.notes || undefined,
       lines: original.lines.map((line) => ({

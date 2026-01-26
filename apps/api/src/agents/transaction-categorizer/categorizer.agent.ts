@@ -36,7 +36,10 @@ import {
 } from './interfaces/categorizer.interface';
 import { SdkCategorizer } from './sdk-categorizer';
 import { HybridScorer } from '../shared/hybrid-scorer';
-import { AgentMemoryService, computeInputHash } from '../memory/agent-memory.service';
+import {
+  AgentMemoryService,
+  computeInputHash,
+} from '../memory/agent-memory.service';
 import { ShadowRunner } from '../rollout/shadow-runner';
 import type { ComparisonResult } from '../rollout/interfaces/rollout.interface';
 
@@ -88,14 +91,19 @@ export class TransactionCategorizerAgent {
         agentType: 'categorizer',
         sdkFn: () => this._categorizeCore(transaction, tenantId, false),
         heuristicFn: () => this._categorizeCore(transaction, tenantId, true),
-        compareFn: (sdk: CategorizationResult, heuristic: CategorizationResult): ComparisonResult => ({
+        compareFn: (
+          sdk: CategorizationResult,
+          heuristic: CategorizationResult,
+        ): ComparisonResult => ({
           tenantId,
           agentType: 'categorizer',
           sdkResult: sdk,
           heuristicResult: heuristic,
           sdkDurationMs: 0,
           heuristicDurationMs: 0,
-          resultsMatch: sdk.accountCode === heuristic.accountCode && sdk.autoApplied === heuristic.autoApplied,
+          resultsMatch:
+            sdk.accountCode === heuristic.accountCode &&
+            sdk.autoApplied === heuristic.autoApplied,
           sdkConfidence: sdk.confidenceScore,
           heuristicConfidence: heuristic.confidenceScore,
           details: {
@@ -309,7 +317,11 @@ export class TransactionCategorizerAgent {
     }
 
     // 5b. If HybridScorer is available, use it for the final confidence (SDK-009)
-    if (this.hybridScorer && source === 'LLM' && sdkLlmConfidence !== undefined) {
+    if (
+      this.hybridScorer &&
+      source === 'LLM' &&
+      sdkLlmConfidence !== undefined
+    ) {
       try {
         const hybridResult = await this.hybridScorer.combine(
           sdkLlmConfidence,

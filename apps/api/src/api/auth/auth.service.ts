@@ -249,7 +249,10 @@ export class AuthService {
                 entityId: user.id,
                 action: 'UPDATE',
                 beforeValue: { auth0Id: userByEmail.auth0Id },
-                afterValue: { auth0Id: userInfo.sub, linkedAt: new Date().toISOString() },
+                afterValue: {
+                  auth0Id: userInfo.sub,
+                  linkedAt: new Date().toISOString(),
+                },
                 changeSummary: 'Linked Auth0 account on first SSO login',
               },
             });
@@ -480,7 +483,9 @@ export class AuthService {
       });
 
       if (signupAuditLog?.afterValue) {
-        const afterValue = signupAuditLog.afterValue as { hashedPassword?: string };
+        const afterValue = signupAuditLog.afterValue as {
+          hashedPassword?: string;
+        };
         if (afterValue.hashedPassword) {
           // Verify password against stored hash
           const isPasswordValid = await bcrypt.compare(

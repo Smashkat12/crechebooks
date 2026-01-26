@@ -1,9 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  IsBoolean,
-  IsEnum,
-} from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AccountType, AccountSubType } from '@prisma/client';
 
@@ -30,7 +25,19 @@ export class CreateChartOfAccountDto {
 
   @ApiPropertyOptional({
     description: 'Account sub-type',
-    enum: ['BANK', 'CURRENT_ASSET', 'FIXED_ASSET', 'CURRENT_LIABILITY', 'LONG_TERM_LIABILITY', 'EQUITY', 'OPERATING_REVENUE', 'OTHER_REVENUE', 'COST_OF_SALES', 'OPERATING_EXPENSE', 'OTHER_EXPENSE'],
+    enum: [
+      'BANK',
+      'CURRENT_ASSET',
+      'FIXED_ASSET',
+      'CURRENT_LIABILITY',
+      'LONG_TERM_LIABILITY',
+      'EQUITY',
+      'OPERATING_REVENUE',
+      'OTHER_REVENUE',
+      'COST_OF_SALES',
+      'OPERATING_EXPENSE',
+      'OTHER_EXPENSE',
+    ],
   })
   @IsOptional()
   @IsEnum(AccountSubType)
@@ -46,7 +53,10 @@ export class CreateChartOfAccountDto {
   @IsString()
   parentId?: string;
 
-  @ApiPropertyOptional({ description: 'Is this account education VAT exempt under Section 12(h)', default: false })
+  @ApiPropertyOptional({
+    description: 'Is this account education VAT exempt under Section 12(h)',
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   isEducationExempt?: boolean;
@@ -70,7 +80,19 @@ export class UpdateChartOfAccountDto {
 
   @ApiPropertyOptional({
     description: 'Account sub-type',
-    enum: ['BANK', 'CURRENT_ASSET', 'FIXED_ASSET', 'CURRENT_LIABILITY', 'LONG_TERM_LIABILITY', 'EQUITY', 'OPERATING_REVENUE', 'OTHER_REVENUE', 'COST_OF_SALES', 'OPERATING_EXPENSE', 'OTHER_EXPENSE'],
+    enum: [
+      'BANK',
+      'CURRENT_ASSET',
+      'FIXED_ASSET',
+      'CURRENT_LIABILITY',
+      'LONG_TERM_LIABILITY',
+      'EQUITY',
+      'OPERATING_REVENUE',
+      'OTHER_REVENUE',
+      'COST_OF_SALES',
+      'OPERATING_EXPENSE',
+      'OTHER_EXPENSE',
+    ],
   })
   @IsOptional()
   @IsEnum(AccountSubType)
@@ -81,7 +103,9 @@ export class UpdateChartOfAccountDto {
   @IsString()
   parentId?: string | null;
 
-  @ApiPropertyOptional({ description: 'Is this account education VAT exempt under Section 12(h)' })
+  @ApiPropertyOptional({
+    description: 'Is this account education VAT exempt under Section 12(h)',
+  })
   @IsOptional()
   @IsBoolean()
   isEducationExempt?: boolean;

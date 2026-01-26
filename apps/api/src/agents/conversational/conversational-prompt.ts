@@ -14,7 +14,10 @@
  * - SA-specific financial context (ZAR, tax year Mar-Feb, VAT 15%)
  */
 
-import type { QueryComplexity, QueryType } from './interfaces/conversational.interface';
+import type {
+  QueryComplexity,
+  QueryType,
+} from './interfaces/conversational.interface';
 
 /**
  * System prompt for the conversational agent LLM.

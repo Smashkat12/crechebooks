@@ -29,9 +29,7 @@ import type {
 // ────────────────────────────────────────────────────────────────────────────
 
 class AgentDB {
-  async recordAccuracyOutcome(
-    _data: Record<string, unknown>,
-  ): Promise<void> {
+  async recordAccuracyOutcome(_data: Record<string, unknown>): Promise<void> {
     // Stub: agentic-flow not installed
   }
 
@@ -71,7 +69,8 @@ export class AccuracyTracker {
    */
   async recordOutcome(params: AccuracyOutcome): Promise<void> {
     const llmCorrect = params.llmPrediction === params.actualOutcome;
-    const heuristicCorrect = params.heuristicPrediction === params.actualOutcome;
+    const heuristicCorrect =
+      params.heuristicPrediction === params.actualOutcome;
 
     const record: AccuracyRecord = {
       ...params,
@@ -99,7 +98,9 @@ export class AccuracyTracker {
       });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`AgentDB write failed (continuing with in-memory): ${msg}`);
+      this.logger.warn(
+        `AgentDB write failed (continuing with in-memory): ${msg}`,
+      );
     }
 
     // Dual-write 2: In-memory store (audit)
@@ -121,7 +122,10 @@ export class AccuracyTracker {
   ): Promise<AccuracyStats> {
     // Try AgentDB first
     try {
-      const agentDbStats = await this.agentDb.getAccuracyStats(tenantId, agentType);
+      const agentDbStats = await this.agentDb.getAccuracyStats(
+        tenantId,
+        agentType,
+      );
       if (agentDbStats !== null) {
         return agentDbStats;
       }
@@ -178,10 +182,14 @@ export class AccuracyTracker {
     }
 
     const llmCorrectCount = recent.filter((r) => r.llmCorrect).length;
-    const heuristicCorrectCount = recent.filter((r) => r.heuristicCorrect).length;
+    const heuristicCorrectCount = recent.filter(
+      (r) => r.heuristicCorrect,
+    ).length;
 
     const llmAccuracy = Math.round((llmCorrectCount / sampleSize) * 100);
-    const heuristicAccuracy = Math.round((heuristicCorrectCount / sampleSize) * 100);
+    const heuristicAccuracy = Math.round(
+      (heuristicCorrectCount / sampleSize) * 100,
+    );
 
     const recommendation = this.computeRecommendation(
       llmAccuracy,

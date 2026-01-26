@@ -3822,3 +3822,27 @@ model FeatureFlag {
   @@index([tenantId])
   @@map("feature_flags")
 }
+
+// TASK-STUB-012: Shadow Comparison persistence for SHADOW mode analysis
+model ShadowComparison {
+  id                  String   @id @default(uuid())
+  tenantId            String   @map("tenant_id")
+  agentType           String   @map("agent_type")
+  sdkResult           Json     @map("sdk_result")
+  sdkConfidence       Int      @map("sdk_confidence")
+  sdkDurationMs       Int      @map("sdk_duration_ms")
+  heuristicResult     Json     @map("heuristic_result")
+  heuristicConfidence Int      @map("heuristic_confidence")
+  heuristicDurationMs Int      @map("heuristic_duration_ms")
+  resultsMatch        Boolean  @map("results_match")
+  matchDetails        Json?    @map("match_details")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  // NOTE: No foreign keys — intentional for immutability (audit data)
+  // NOTE: No @updatedAt — this table is APPEND-ONLY
+
+  @@map("shadow_comparisons")
+  @@index([tenantId, agentType, createdAt])
+  @@index([agentType, createdAt])
+  @@index([resultsMatch, agentType])
+}

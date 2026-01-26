@@ -11,11 +11,15 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateOpeningBalanceImportDto {
-  @ApiProperty({ description: 'Opening balance date (start of financial year)' })
+  @ApiProperty({
+    description: 'Opening balance date (start of financial year)',
+  })
   @IsDateString()
   asOfDate: string;
 
-  @ApiPropertyOptional({ description: 'Source type (e.g., MANUAL, XERO, SAGE)' })
+  @ApiPropertyOptional({
+    description: 'Source type (e.g., MANUAL, XERO, SAGE)',
+  })
   @IsOptional()
   @IsString()
   sourceType?: string;
@@ -26,12 +30,16 @@ export class SetAccountBalanceDto {
   @IsString()
   accountId: string;
 
-  @ApiPropertyOptional({ description: 'Debit balance in cents (for debit-normal accounts)' })
+  @ApiPropertyOptional({
+    description: 'Debit balance in cents (for debit-normal accounts)',
+  })
   @IsOptional()
   @IsInt()
   debitCents?: number;
 
-  @ApiPropertyOptional({ description: 'Credit balance in cents (for credit-normal accounts)' })
+  @ApiPropertyOptional({
+    description: 'Credit balance in cents (for credit-normal accounts)',
+  })
   @IsOptional()
   @IsInt()
   creditCents?: number;
@@ -43,7 +51,10 @@ export class SetAccountBalanceDto {
 }
 
 export class BulkSetAccountBalancesDto {
-  @ApiProperty({ description: 'Array of account balances to set', type: [SetAccountBalanceDto] })
+  @ApiProperty({
+    description: 'Array of account balances to set',
+    type: [SetAccountBalanceDto],
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SetAccountBalanceDto)
@@ -52,7 +63,8 @@ export class BulkSetAccountBalancesDto {
 
 export class VerifyImportDto {
   @ApiPropertyOptional({
-    description: 'Force verification even with small discrepancy (for rounding)',
+    description:
+      'Force verification even with small discrepancy (for rounding)',
     default: false,
   })
   @IsOptional()

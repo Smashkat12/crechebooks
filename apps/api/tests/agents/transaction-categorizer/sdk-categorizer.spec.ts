@@ -51,18 +51,16 @@ describe('SdkCategorizer', () => {
   describe('categorize()', () => {
     it('should return structured categorization result', async () => {
       // Mock the SDK inference to return a valid JSON response
-      jest
-        .spyOn(sdkCategorizer, 'executeSdkInference')
-        .mockResolvedValue(
-          JSON.stringify({
-            accountCode: '5200',
-            accountName: 'Food & Catering Costs',
-            vatType: 'STANDARD',
-            confidence: 88,
-            reasoning:
-              'Woolworths is a grocery retailer, categorized as food expense',
-          }),
-        );
+      jest.spyOn(sdkCategorizer, 'executeSdkInference').mockResolvedValue(
+        JSON.stringify({
+          accountCode: '5200',
+          accountName: 'Food & Catering Costs',
+          vatType: 'STANDARD',
+          confidence: 88,
+          reasoning:
+            'Woolworths is a grocery retailer, categorized as food expense',
+        }),
+      );
 
       const result = await sdkCategorizer.categorize(
         {
@@ -110,9 +108,7 @@ describe('SdkCategorizer', () => {
     it('should throw on malformed response', async () => {
       jest
         .spyOn(sdkCategorizer, 'executeSdkInference')
-        .mockResolvedValue(
-          'Sorry, I cannot categorize this transaction.',
-        );
+        .mockResolvedValue('Sorry, I cannot categorize this transaction.');
 
       await expect(
         sdkCategorizer.categorize(
@@ -129,17 +125,15 @@ describe('SdkCategorizer', () => {
     });
 
     it('should clamp confidence to 0-100', async () => {
-      jest
-        .spyOn(sdkCategorizer, 'executeSdkInference')
-        .mockResolvedValue(
-          JSON.stringify({
-            accountCode: '4000',
-            accountName: 'Tuition Fees',
-            vatType: 'EXEMPT',
-            confidence: 150, // Over 100
-            reasoning: 'test',
-          }),
-        );
+      jest.spyOn(sdkCategorizer, 'executeSdkInference').mockResolvedValue(
+        JSON.stringify({
+          accountCode: '4000',
+          accountName: 'Tuition Fees',
+          vatType: 'EXEMPT',
+          confidence: 150, // Over 100
+          reasoning: 'test',
+        }),
+      );
 
       const result = await sdkCategorizer.categorize(
         {
@@ -156,17 +150,15 @@ describe('SdkCategorizer', () => {
     });
 
     it('should clamp negative confidence to 0', async () => {
-      jest
-        .spyOn(sdkCategorizer, 'executeSdkInference')
-        .mockResolvedValue(
-          JSON.stringify({
-            accountCode: '4000',
-            accountName: 'Tuition Fees',
-            vatType: 'EXEMPT',
-            confidence: -10,
-            reasoning: 'test',
-          }),
-        );
+      jest.spyOn(sdkCategorizer, 'executeSdkInference').mockResolvedValue(
+        JSON.stringify({
+          accountCode: '4000',
+          accountName: 'Tuition Fees',
+          vatType: 'EXEMPT',
+          confidence: -10,
+          reasoning: 'test',
+        }),
+      );
 
       const result = await sdkCategorizer.categorize(
         {
@@ -183,17 +175,15 @@ describe('SdkCategorizer', () => {
     });
 
     it('should cache successful reasoning in ReasoningBank', async () => {
-      jest
-        .spyOn(sdkCategorizer, 'executeSdkInference')
-        .mockResolvedValue(
-          JSON.stringify({
-            accountCode: '6100',
-            accountName: 'Utilities - Electricity',
-            vatType: 'STANDARD',
-            confidence: 90,
-            reasoning: 'Eskom electricity payment',
-          }),
-        );
+      jest.spyOn(sdkCategorizer, 'executeSdkInference').mockResolvedValue(
+        JSON.stringify({
+          accountCode: '6100',
+          accountName: 'Utilities - Electricity',
+          vatType: 'STANDARD',
+          confidence: 90,
+          reasoning: 'Eskom electricity payment',
+        }),
+      );
 
       // First call - should hit LLM
       const result1 = await sdkCategorizer.categorize(
@@ -305,9 +295,7 @@ describe('SdkCategorizer', () => {
 
     it('should throw on missing JSON', () => {
       expect(() =>
-        sdkCategorizer.parseCategorizationResponse(
-          'No JSON here at all.',
-        ),
+        sdkCategorizer.parseCategorizationResponse('No JSON here at all.'),
       ).toThrow('SDK response parsing failed');
     });
 
@@ -332,9 +320,7 @@ describe('SdkCategorizer', () => {
     });
 
     it('should validate ZERO_RATED', () => {
-      expect(sdkCategorizer.validateVatType('ZERO_RATED')).toBe(
-        'ZERO_RATED',
-      );
+      expect(sdkCategorizer.validateVatType('ZERO_RATED')).toBe('ZERO_RATED');
     });
 
     it('should validate EXEMPT', () => {
@@ -350,15 +336,11 @@ describe('SdkCategorizer', () => {
     });
 
     it('should handle mixed case', () => {
-      expect(sdkCategorizer.validateVatType('Zero_Rated')).toBe(
-        'ZERO_RATED',
-      );
+      expect(sdkCategorizer.validateVatType('Zero_Rated')).toBe('ZERO_RATED');
     });
 
     it('should handle hyphens', () => {
-      expect(sdkCategorizer.validateVatType('zero-rated')).toBe(
-        'ZERO_RATED',
-      );
+      expect(sdkCategorizer.validateVatType('zero-rated')).toBe('ZERO_RATED');
     });
 
     it('should default invalid types to STANDARD', () => {

@@ -72,9 +72,7 @@ export class EmployeeNumberService {
    * @returns Formatted employee number (e.g., "EMP-2026-001")
    */
   formatEmployeeNumber(year: number, sequential: number): string {
-    const sequentialPadded = sequential
-      .toString()
-      .padStart(this.PADDING, '0');
+    const sequentialPadded = sequential.toString().padStart(this.PADDING, '0');
     return `${this.PREFIX}-${year}-${sequentialPadded}`;
   }
 

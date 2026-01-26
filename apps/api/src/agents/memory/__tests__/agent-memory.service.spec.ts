@@ -264,7 +264,11 @@ describe('AgentMemoryService', () => {
     });
 
     it('should return empty array when both ruvector and Prisma unavailable', async () => {
-      const serviceNone = new AgentMemoryService(undefined, undefined, undefined);
+      const serviceNone = new AgentMemoryService(
+        undefined,
+        undefined,
+        undefined,
+      );
 
       const results = await serviceNone.getSimilarDecisions(
         'tenant-1',
@@ -294,9 +298,16 @@ describe('AgentMemoryService', () => {
     });
 
     it('should return zero stats when Prisma unavailable', async () => {
-      const serviceNone = new AgentMemoryService(undefined, undefined, undefined);
+      const serviceNone = new AgentMemoryService(
+        undefined,
+        undefined,
+        undefined,
+      );
 
-      const stats = await serviceNone.getAccuracyStats('tenant-1', 'categorizer');
+      const stats = await serviceNone.getAccuracyStats(
+        'tenant-1',
+        'categorizer',
+      );
 
       expect(stats.totalDecisions).toBe(0);
       expect(stats.accuracyRate).toBe(0);

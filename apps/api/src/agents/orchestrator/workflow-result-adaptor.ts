@@ -115,10 +115,7 @@ export class WorkflowResultAdaptor {
     const anyFailed = subResults.some((sr) => sr.status === 'FAILED');
     if (anyFailed) return 'PARTIAL';
 
-    if (
-      escalations.length > 0 ||
-      agentResults.some((r) => r.escalated > 0)
-    ) {
+    if (escalations.length > 0 || agentResults.some((r) => r.escalated > 0)) {
       return 'ESCALATED';
     }
 

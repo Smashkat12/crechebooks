@@ -30,10 +30,7 @@ describe('Rollout Integration', () => {
 
   const tenantId = 'tenant-integration-1';
 
-  const mockCompare = (
-    sdk: string,
-    heuristic: string,
-  ): ComparisonResult => ({
+  const mockCompare = (sdk: string, heuristic: string): ComparisonResult => ({
     tenantId,
     agentType: 'categorizer',
     sdkResult: sdk,
@@ -210,10 +207,7 @@ describe('Rollout Integration', () => {
         tenantId,
         SdkFlag.MATCHER,
       );
-      const sarsMode = await featureFlagService.getMode(
-        tenantId,
-        SdkFlag.SARS,
-      );
+      const sarsMode = await featureFlagService.getMode(tenantId, SdkFlag.SARS);
 
       expect(categorizerMode).toBe(SdkMode.SHADOW);
       expect(matcherMode).toBe(SdkMode.PRIMARY);

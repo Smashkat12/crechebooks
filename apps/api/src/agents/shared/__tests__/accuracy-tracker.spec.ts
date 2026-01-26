@@ -16,7 +16,9 @@ describe('AccuracyTracker', () => {
     tracker = new AccuracyTracker();
   });
 
-  const makeOutcome = (overrides: Partial<AccuracyOutcome> = {}): AccuracyOutcome => ({
+  const makeOutcome = (
+    overrides: Partial<AccuracyOutcome> = {},
+  ): AccuracyOutcome => ({
     tenantId: 'tenant-1',
     agentType: 'categorizer',
     llmPrediction: '4100',
@@ -36,40 +38,48 @@ describe('AccuracyTracker', () => {
     });
 
     it('should compute llmCorrect correctly when prediction matches', async () => {
-      await tracker.recordOutcome(makeOutcome({
-        llmPrediction: '4100',
-        actualOutcome: '4100',
-      }));
+      await tracker.recordOutcome(
+        makeOutcome({
+          llmPrediction: '4100',
+          actualOutcome: '4100',
+        }),
+      );
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
       expect(stats.llmAccuracy).toBe(100);
     });
 
     it('should compute llmCorrect correctly when prediction does not match', async () => {
-      await tracker.recordOutcome(makeOutcome({
-        llmPrediction: '4100',
-        actualOutcome: '8100',
-      }));
+      await tracker.recordOutcome(
+        makeOutcome({
+          llmPrediction: '4100',
+          actualOutcome: '8100',
+        }),
+      );
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
       expect(stats.llmAccuracy).toBe(0);
     });
 
     it('should compute heuristicCorrect correctly when prediction matches', async () => {
-      await tracker.recordOutcome(makeOutcome({
-        heuristicPrediction: '4100',
-        actualOutcome: '4100',
-      }));
+      await tracker.recordOutcome(
+        makeOutcome({
+          heuristicPrediction: '4100',
+          actualOutcome: '4100',
+        }),
+      );
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
       expect(stats.heuristicAccuracy).toBe(100);
     });
 
     it('should compute heuristicCorrect correctly when prediction does not match', async () => {
-      await tracker.recordOutcome(makeOutcome({
-        heuristicPrediction: '4100',
-        actualOutcome: '8100',
-      }));
+      await tracker.recordOutcome(
+        makeOutcome({
+          heuristicPrediction: '4100',
+          actualOutcome: '8100',
+        }),
+      );
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
       expect(stats.heuristicAccuracy).toBe(0);
@@ -98,11 +108,13 @@ describe('AccuracyTracker', () => {
     it('should return HYBRID when sampleSize < 50', async () => {
       // Add 30 records (< 50 threshold)
       for (let i = 0; i < 30; i++) {
-        await tracker.recordOutcome(makeOutcome({
-          llmPrediction: '4100',
-          heuristicPrediction: '8100',
-          actualOutcome: '4100',
-        }));
+        await tracker.recordOutcome(
+          makeOutcome({
+            llmPrediction: '4100',
+            heuristicPrediction: '8100',
+            actualOutcome: '4100',
+          }),
+        );
       }
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
@@ -115,11 +127,13 @@ describe('AccuracyTracker', () => {
       for (let i = 0; i < 60; i++) {
         const llmCorrect = i < 50;
         const heuristicCorrect = i < 25;
-        await tracker.recordOutcome(makeOutcome({
-          llmPrediction: llmCorrect ? '4100' : '8100',
-          heuristicPrediction: heuristicCorrect ? '4100' : '8100',
-          actualOutcome: '4100',
-        }));
+        await tracker.recordOutcome(
+          makeOutcome({
+            llmPrediction: llmCorrect ? '4100' : '8100',
+            heuristicPrediction: heuristicCorrect ? '4100' : '8100',
+            actualOutcome: '4100',
+          }),
+        );
       }
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
@@ -135,11 +149,13 @@ describe('AccuracyTracker', () => {
       for (let i = 0; i < 60; i++) {
         const llmCorrect = i < 25;
         const heuristicCorrect = i < 50;
-        await tracker.recordOutcome(makeOutcome({
-          llmPrediction: llmCorrect ? '4100' : '8100',
-          heuristicPrediction: heuristicCorrect ? '4100' : '8100',
-          actualOutcome: '4100',
-        }));
+        await tracker.recordOutcome(
+          makeOutcome({
+            llmPrediction: llmCorrect ? '4100' : '8100',
+            heuristicPrediction: heuristicCorrect ? '4100' : '8100',
+            actualOutcome: '4100',
+          }),
+        );
       }
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
@@ -152,18 +168,22 @@ describe('AccuracyTracker', () => {
       for (let i = 0; i < 60; i++) {
         const llmCorrect = i < 40;
         const heuristicCorrect = i < 38;
-        await tracker.recordOutcome(makeOutcome({
-          llmPrediction: llmCorrect ? '4100' : '8100',
-          heuristicPrediction: heuristicCorrect ? '4100' : '8100',
-          actualOutcome: '4100',
-        }));
+        await tracker.recordOutcome(
+          makeOutcome({
+            llmPrediction: llmCorrect ? '4100' : '8100',
+            heuristicPrediction: heuristicCorrect ? '4100' : '8100',
+            actualOutcome: '4100',
+          }),
+        );
       }
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');
       // llmAccuracy = round(40/60 * 100) = 67
       // heuristicAccuracy = round(38/60 * 100) = 63
       // Margin = 4, which is <= 5
-      expect(Math.abs(stats.llmAccuracy - stats.heuristicAccuracy)).toBeLessThanOrEqual(5);
+      expect(
+        Math.abs(stats.llmAccuracy - stats.heuristicAccuracy),
+      ).toBeLessThanOrEqual(5);
       expect(stats.recommendation).toBe('HYBRID');
     });
 
@@ -171,11 +191,13 @@ describe('AccuracyTracker', () => {
       // Add 250 records: first 150 = LLM wrong, last 100 = LLM correct
       for (let i = 0; i < 250; i++) {
         const llmCorrect = i >= 150;
-        await tracker.recordOutcome(makeOutcome({
-          llmPrediction: llmCorrect ? '4100' : '8100',
-          heuristicPrediction: '8100', // always wrong
-          actualOutcome: '4100',
-        }));
+        await tracker.recordOutcome(
+          makeOutcome({
+            llmPrediction: llmCorrect ? '4100' : '8100',
+            heuristicPrediction: '8100', // always wrong
+            actualOutcome: '4100',
+          }),
+        );
       }
 
       const stats = await tracker.getAccuracy('tenant-1', 'categorizer');

@@ -131,20 +131,24 @@ export class ExtractionDecisionLogger {
 
     // TASK-SDK-011: Write to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logDecision({
-        tenantId,
-        agentType: 'validator',
-        decision: decision,
-        confidence: result.confidence,
-        autoApplied: false,
-        details: {
-          balanceReconciled: result.balanceReconciled,
-          flagCount: result.flags.length,
-          correctionCount: result.corrections.length,
-          transactionCount: statement.transactions.length,
-        },
-        reasoning: result.reasoning,
-      }).catch((err: Error) => this.logger.warn(`Audit trail write failed: ${err.message}`));
+      this.auditTrail
+        .logDecision({
+          tenantId,
+          agentType: 'validator',
+          decision: decision,
+          confidence: result.confidence,
+          autoApplied: false,
+          details: {
+            balanceReconciled: result.balanceReconciled,
+            flagCount: result.flags.length,
+            correctionCount: result.corrections.length,
+            transactionCount: statement.transactions.length,
+          },
+          reasoning: result.reasoning,
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit trail write failed: ${err.message}`),
+        );
     }
   }
 
@@ -184,17 +188,21 @@ export class ExtractionDecisionLogger {
 
     // TASK-SDK-011: Write escalation to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logEscalation({
-        tenantId,
-        agentType: 'validator',
-        reason: result.reasoning,
-        details: {
-          confidence: result.confidence,
-          balanceDifference: result.balanceDifference,
-          flagCount: result.flags.length,
-          errorCodes,
-        },
-      }).catch((err: Error) => this.logger.warn(`Audit escalation write failed: ${err.message}`));
+      this.auditTrail
+        .logEscalation({
+          tenantId,
+          agentType: 'validator',
+          reason: result.reasoning,
+          details: {
+            confidence: result.confidence,
+            balanceDifference: result.balanceDifference,
+            flagCount: result.flags.length,
+            errorCodes,
+          },
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit escalation write failed: ${err.message}`),
+        );
     }
   }
 }

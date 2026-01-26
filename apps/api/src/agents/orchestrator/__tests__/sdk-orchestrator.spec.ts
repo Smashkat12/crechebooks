@@ -21,9 +21,7 @@ import {
   getWorkflowDefinition,
   isMultiStepWorkflow,
 } from '../workflow-definitions';
-import {
-  SubagentResult,
-} from '../interfaces/sdk-orchestrator.interface';
+import { SubagentResult } from '../interfaces/sdk-orchestrator.interface';
 import {
   WorkflowRequest,
   WorkflowResult,
@@ -87,9 +85,9 @@ function createMockTransactionCategorizer(): jest.Mocked<TransactionCategorizerA
 
 function createMockPaymentMatcher(): jest.Mocked<PaymentMatcherAgent> {
   return {
-    findCandidates: jest.fn().mockResolvedValue([
-      { invoiceId: 'inv-001', confidence: 90 },
-    ]),
+    findCandidates: jest
+      .fn()
+      .mockResolvedValue([{ invoiceId: 'inv-001', confidence: 90 }]),
     makeMatchDecision: jest.fn().mockResolvedValue({
       action: 'AUTO_APPLY',
       confidence: 90,
@@ -168,7 +166,9 @@ function createRequest(
   };
 }
 
-function createMockTransaction(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+function createMockTransaction(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     id: 'txn-001',
     tenantId: MOCK_TENANT_ID,
@@ -207,29 +207,53 @@ describe('WorkflowDefinitions', () => {
     });
 
     it('should mark SARS workflows with containsSars=true', () => {
-      expect(SDK_WORKFLOW_DEFINITIONS['CALCULATE_PAYE'].containsSars).toBe(true);
-      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_EMP201'].containsSars).toBe(true);
-      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_VAT201'].containsSars).toBe(true);
+      expect(SDK_WORKFLOW_DEFINITIONS['CALCULATE_PAYE'].containsSars).toBe(
+        true,
+      );
+      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_EMP201'].containsSars).toBe(
+        true,
+      );
+      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_VAT201'].containsSars).toBe(
+        true,
+      );
       expect(SDK_WORKFLOW_DEFINITIONS['MONTHLY_CLOSE'].containsSars).toBe(true);
     });
 
     it('should mark non-SARS workflows with containsSars=false', () => {
-      expect(SDK_WORKFLOW_DEFINITIONS['CATEGORIZE_TRANSACTIONS'].containsSars).toBe(false);
-      expect(SDK_WORKFLOW_DEFINITIONS['MATCH_PAYMENTS'].containsSars).toBe(false);
+      expect(
+        SDK_WORKFLOW_DEFINITIONS['CATEGORIZE_TRANSACTIONS'].containsSars,
+      ).toBe(false);
+      expect(SDK_WORKFLOW_DEFINITIONS['MATCH_PAYMENTS'].containsSars).toBe(
+        false,
+      );
       expect(SDK_WORKFLOW_DEFINITIONS['BANK_IMPORT'].containsSars).toBe(false);
     });
 
     it('should set SARS workflows to L2_DRAFT autonomy', () => {
-      expect(SDK_WORKFLOW_DEFINITIONS['CALCULATE_PAYE'].autonomyLevel).toBe('L2_DRAFT');
-      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_EMP201'].autonomyLevel).toBe('L2_DRAFT');
-      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_VAT201'].autonomyLevel).toBe('L2_DRAFT');
-      expect(SDK_WORKFLOW_DEFINITIONS['MONTHLY_CLOSE'].autonomyLevel).toBe('L2_DRAFT');
+      expect(SDK_WORKFLOW_DEFINITIONS['CALCULATE_PAYE'].autonomyLevel).toBe(
+        'L2_DRAFT',
+      );
+      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_EMP201'].autonomyLevel).toBe(
+        'L2_DRAFT',
+      );
+      expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_VAT201'].autonomyLevel).toBe(
+        'L2_DRAFT',
+      );
+      expect(SDK_WORKFLOW_DEFINITIONS['MONTHLY_CLOSE'].autonomyLevel).toBe(
+        'L2_DRAFT',
+      );
     });
 
     it('should set non-SARS workflows to L3_FULL_AUTO autonomy', () => {
-      expect(SDK_WORKFLOW_DEFINITIONS['CATEGORIZE_TRANSACTIONS'].autonomyLevel).toBe('L3_FULL_AUTO');
-      expect(SDK_WORKFLOW_DEFINITIONS['MATCH_PAYMENTS'].autonomyLevel).toBe('L3_FULL_AUTO');
-      expect(SDK_WORKFLOW_DEFINITIONS['BANK_IMPORT'].autonomyLevel).toBe('L3_FULL_AUTO');
+      expect(
+        SDK_WORKFLOW_DEFINITIONS['CATEGORIZE_TRANSACTIONS'].autonomyLevel,
+      ).toBe('L3_FULL_AUTO');
+      expect(SDK_WORKFLOW_DEFINITIONS['MATCH_PAYMENTS'].autonomyLevel).toBe(
+        'L3_FULL_AUTO',
+      );
+      expect(SDK_WORKFLOW_DEFINITIONS['BANK_IMPORT'].autonomyLevel).toBe(
+        'L3_FULL_AUTO',
+      );
     });
 
     it('should define BANK_IMPORT with parallel steps', () => {
@@ -250,7 +274,9 @@ describe('WorkflowDefinitions', () => {
     });
 
     it('should have single-step definitions for simple workflows', () => {
-      expect(SDK_WORKFLOW_DEFINITIONS['CATEGORIZE_TRANSACTIONS'].steps).toHaveLength(1);
+      expect(
+        SDK_WORKFLOW_DEFINITIONS['CATEGORIZE_TRANSACTIONS'].steps,
+      ).toHaveLength(1);
       expect(SDK_WORKFLOW_DEFINITIONS['MATCH_PAYMENTS'].steps).toHaveLength(1);
       expect(SDK_WORKFLOW_DEFINITIONS['CALCULATE_PAYE'].steps).toHaveLength(1);
       expect(SDK_WORKFLOW_DEFINITIONS['GENERATE_EMP201'].steps).toHaveLength(1);
@@ -314,7 +340,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'CATEGORIZE_TRANSACTIONS', 'L3_FULL_AUTO', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'CATEGORIZE_TRANSACTIONS',
+      'L3_FULL_AUTO',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
 
     expect(wr.workflowId).toBe('wf-001');
     expect(wr.type).toBe('CATEGORIZE_TRANSACTIONS');
@@ -344,7 +376,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'CATEGORIZE_TRANSACTIONS', 'L3_FULL_AUTO', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'CATEGORIZE_TRANSACTIONS',
+      'L3_FULL_AUTO',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.status).toBe('COMPLETED');
   });
 
@@ -364,7 +402,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'BANK_IMPORT', 'L3_FULL_AUTO', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'BANK_IMPORT',
+      'L3_FULL_AUTO',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.status).toBe('FAILED');
   });
 
@@ -387,7 +431,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'BANK_IMPORT', 'L3_FULL_AUTO', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'BANK_IMPORT',
+      'L3_FULL_AUTO',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.status).toBe('PARTIAL');
   });
 
@@ -411,7 +461,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'GENERATE_EMP201', 'L2_DRAFT', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'GENERATE_EMP201',
+      'L2_DRAFT',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.status).toBe('ESCALATED');
     expect(wr.escalations).toHaveLength(1);
     expect(wr.escalations[0].type).toBe('SARS_EMP201');
@@ -427,7 +483,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'MATCH_PAYMENTS', 'L3_FULL_AUTO', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'MATCH_PAYMENTS',
+      'L3_FULL_AUTO',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.escalations).toHaveLength(1);
     expect(wr.escalations[0].type).toBe('WORKFLOW_ERROR');
     expect(wr.escalations[0].reason).toBe('Connection timeout');
@@ -444,7 +506,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'CATEGORIZE_TRANSACTIONS', 'L3_FULL_AUTO', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'CATEGORIZE_TRANSACTIONS',
+      'L3_FULL_AUTO',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.results[0].errors).toBe(1);
   });
 
@@ -457,7 +525,13 @@ describe('WorkflowResultAdaptor', () => {
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'CATEGORIZE_TRANSACTIONS', 'L3_FULL_AUTO', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'CATEGORIZE_TRANSACTIONS',
+      'L3_FULL_AUTO',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.results[0].processed).toBe(0);
     expect(wr.results[0].autoApplied).toBe(0);
     expect(wr.results[0].escalated).toBe(0);
@@ -469,22 +543,24 @@ describe('WorkflowResultAdaptor', () => {
       {
         status: 'SUCCESS',
         agentType: 'transaction-categorizer',
-        escalations: [
-          { type: 'LOW_CONFIDENCE', reason: 'low', details: {} },
-        ],
+        escalations: [{ type: 'LOW_CONFIDENCE', reason: 'low', details: {} }],
         durationMs: 100,
       },
       {
         status: 'SUCCESS',
         agentType: 'sars-agent',
-        escalations: [
-          { type: 'SARS_EMP201', reason: 'review', details: {} },
-        ],
+        escalations: [{ type: 'SARS_EMP201', reason: 'review', details: {} }],
         durationMs: 200,
       },
     ];
 
-    const wr = adaptor.adapt('wf-001', 'MONTHLY_CLOSE', 'L2_DRAFT', results, '2024-01-01T00:00:00Z');
+    const wr = adaptor.adapt(
+      'wf-001',
+      'MONTHLY_CLOSE',
+      'L2_DRAFT',
+      results,
+      '2024-01-01T00:00:00Z',
+    );
     expect(wr.escalations).toHaveLength(2);
   });
 });
@@ -533,7 +609,9 @@ describe('SdkOrchestrator', () => {
       const def = sdkOrchestrator.getAgentDefinition(MOCK_TENANT_ID);
       expect(def).toBeDefined();
       expect(def.description).toBe('test orchestrator');
-      expect(mockFactory.createOrchestratorAgent).toHaveBeenCalledWith(MOCK_TENANT_ID);
+      expect(mockFactory.createOrchestratorAgent).toHaveBeenCalledWith(
+        MOCK_TENANT_ID,
+      );
     });
   });
 
@@ -571,7 +649,11 @@ describe('SdkOrchestrator', () => {
   describe('execute - BANK_IMPORT (parallel)', () => {
     it('should execute categorize and match in parallel', async () => {
       const tx1 = createMockTransaction({ id: 'txn-001', status: 'PENDING' });
-      const tx2 = createMockTransaction({ id: 'txn-002', isCredit: true, status: 'PENDING' });
+      const tx2 = createMockTransaction({
+        id: 'txn-002',
+        isCredit: true,
+        status: 'PENDING',
+      });
 
       (mockPrisma.transaction.findMany as jest.Mock)
         .mockResolvedValueOnce([tx1]) // categorization query
@@ -599,7 +681,7 @@ describe('SdkOrchestrator', () => {
       expect(result).toBeDefined();
       expect(result?.status).toBe('PARTIAL');
       // One step failed, one succeeded
-      const failedStep = result?.results.find(r => r.errors > 0);
+      const failedStep = result?.results.find((r) => r.errors > 0);
       expect(failedStep).toBeDefined();
     });
 
@@ -618,14 +700,23 @@ describe('SdkOrchestrator', () => {
 
   describe('execute - MONTHLY_CLOSE (sequential)', () => {
     it('should execute categorize -> match -> emp201 sequentially', async () => {
-      const txPending = createMockTransaction({ id: 'txn-001', status: 'PENDING' });
-      const txCredit = createMockTransaction({ id: 'txn-002', isCredit: true, status: 'PENDING' });
+      const txPending = createMockTransaction({
+        id: 'txn-001',
+        status: 'PENDING',
+      });
+      const txCredit = createMockTransaction({
+        id: 'txn-002',
+        isCredit: true,
+        status: 'PENDING',
+      });
 
       (mockPrisma.transaction.findMany as jest.Mock)
         .mockResolvedValueOnce([txPending]) // categorization
         .mockResolvedValueOnce([txCredit]); // payment matching
 
-      const request = createRequest('MONTHLY_CLOSE', { periodMonth: '2024-01' });
+      const request = createRequest('MONTHLY_CLOSE', {
+        periodMonth: '2024-01',
+      });
       const result = await sdkOrchestrator.execute(request);
 
       expect(result).toBeDefined();
@@ -639,7 +730,9 @@ describe('SdkOrchestrator', () => {
     it('should enforce L2_DRAFT for MONTHLY_CLOSE (contains SARS)', async () => {
       (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue([]);
 
-      const request = createRequest('MONTHLY_CLOSE', { periodMonth: '2024-01' });
+      const request = createRequest('MONTHLY_CLOSE', {
+        periodMonth: '2024-01',
+      });
       const result = await sdkOrchestrator.execute(request);
 
       expect(result).toBeDefined();
@@ -649,13 +742,19 @@ describe('SdkOrchestrator', () => {
     it('should include SARS escalation in MONTHLY_CLOSE result', async () => {
       (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue([]);
 
-      const request = createRequest('MONTHLY_CLOSE', { periodMonth: '2024-01' });
+      const request = createRequest('MONTHLY_CLOSE', {
+        periodMonth: '2024-01',
+      });
       const result = await sdkOrchestrator.execute(request);
 
       expect(result).toBeDefined();
-      const sarsEscalation = result?.escalations.find(e => e.type === 'SARS_EMP201');
+      const sarsEscalation = result?.escalations.find(
+        (e) => e.type === 'SARS_EMP201',
+      );
       expect(sarsEscalation).toBeDefined();
-      expect(sarsEscalation?.reason).toBe('EMP201 submission requires human review');
+      expect(sarsEscalation?.reason).toBe(
+        'EMP201 submission requires human review',
+      );
     });
   });
 
@@ -665,7 +764,9 @@ describe('SdkOrchestrator', () => {
         createMockTransaction({ id: 'txn-001' }),
         createMockTransaction({ id: 'txn-002' }),
       ];
-      (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue(transactions);
+      (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue(
+        transactions,
+      );
 
       const request = createRequest('CATEGORIZE_TRANSACTIONS');
       const result = await sdkOrchestrator.execute(request);
@@ -720,7 +821,9 @@ describe('SdkOrchestrator', () => {
 
       expect(result).toBeDefined();
       expect(result?.autonomyLevel).toBe('L2_DRAFT');
-      expect(result?.escalations.find(e => e.type === 'SARS_EMP201')).toBeDefined();
+      expect(
+        result?.escalations.find((e) => e.type === 'SARS_EMP201'),
+      ).toBeDefined();
     });
 
     it('should handle GENERATE_VAT201', async () => {
@@ -733,7 +836,9 @@ describe('SdkOrchestrator', () => {
 
       expect(result).toBeDefined();
       expect(result?.autonomyLevel).toBe('L2_DRAFT');
-      expect(result?.escalations.find(e => e.type === 'SARS_VAT201')).toBeDefined();
+      expect(
+        result?.escalations.find((e) => e.type === 'SARS_VAT201'),
+      ).toBeDefined();
     });
   });
 
@@ -784,7 +889,7 @@ describe('SdkOrchestrator', () => {
       const result = await orchestratorNoSars.execute(request);
 
       expect(result).toBeDefined();
-      const sarsResult = result?.results.find(r => r.agent === 'sars-agent');
+      const sarsResult = result?.results.find((r) => r.agent === 'sars-agent');
       expect(sarsResult?.errors).toBe(1);
     });
 
@@ -815,12 +920,24 @@ describe('SdkOrchestrator', () => {
         createMockTransaction({ id: 'txn-002' }),
         createMockTransaction({ id: 'txn-003' }),
       ];
-      (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue(transactions);
+      (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue(
+        transactions,
+      );
 
       mockCategorizer.categorize
-        .mockResolvedValueOnce({ autoApplied: true, confidenceScore: 95, reasoning: 'ok', accountCode: '6100' })
+        .mockResolvedValueOnce({
+          autoApplied: true,
+          confidenceScore: 95,
+          reasoning: 'ok',
+          accountCode: '6100',
+        })
         .mockRejectedValueOnce(new Error('AI timeout'))
-        .mockResolvedValueOnce({ autoApplied: false, confidenceScore: 40, reasoning: 'unsure', accountCode: '9999' });
+        .mockResolvedValueOnce({
+          autoApplied: false,
+          confidenceScore: 40,
+          reasoning: 'unsure',
+          accountCode: '9999',
+        });
 
       const request = createRequest('CATEGORIZE_TRANSACTIONS');
       const result = await sdkOrchestrator.execute(request);
@@ -874,7 +991,9 @@ describe('SdkOrchestrator', () => {
       mockRouter.getAutonomyLevel.mockReturnValue('L3_FULL_AUTO');
       (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue([]);
 
-      const request = createRequest('MONTHLY_CLOSE', { periodMonth: '2024-01' });
+      const request = createRequest('MONTHLY_CLOSE', {
+        periodMonth: '2024-01',
+      });
       const result = await sdkOrchestrator.execute(request);
 
       expect(result?.autonomyLevel).toBe('L2_DRAFT');
@@ -981,8 +1100,12 @@ describe('SdkOrchestrator', () => {
       // Verify all WorkflowResult fields
       expect(typeof result?.workflowId).toBe('string');
       expect(result?.type).toBe('BANK_IMPORT');
-      expect(['COMPLETED', 'PARTIAL', 'ESCALATED', 'FAILED']).toContain(result?.status);
-      expect(['L1_SUGGEST', 'L2_DRAFT', 'L3_FULL_AUTO']).toContain(result?.autonomyLevel);
+      expect(['COMPLETED', 'PARTIAL', 'ESCALATED', 'FAILED']).toContain(
+        result?.status,
+      );
+      expect(['L1_SUGGEST', 'L2_DRAFT', 'L3_FULL_AUTO']).toContain(
+        result?.autonomyLevel,
+      );
       expect(Array.isArray(result?.results)).toBe(true);
       expect(Array.isArray(result?.escalations)).toBe(true);
       expect(typeof result?.startedAt).toBe('string');
@@ -1116,12 +1239,14 @@ describe('SdkOrchestrator', () => {
       // but we can verify error handling by checking a MONTHLY_CLOSE with correct stepIds
       (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue([]);
 
-      const request = createRequest('MONTHLY_CLOSE', { periodMonth: '2024-01' });
+      const request = createRequest('MONTHLY_CLOSE', {
+        periodMonth: '2024-01',
+      });
       const result = await sdkOrchestrator.execute(request);
 
       expect(result).toBeDefined();
       // The emp201 step should have succeeded
-      const sarsResult = result?.results.find(r => r.agent === 'sars-agent');
+      const sarsResult = result?.results.find((r) => r.agent === 'sars-agent');
       expect(sarsResult).toBeDefined();
       expect(sarsResult?.errors).toBe(0);
     });

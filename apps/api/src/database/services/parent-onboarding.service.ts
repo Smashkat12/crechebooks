@@ -103,8 +103,12 @@ export class ParentOnboardingService {
 
     // Get existing generated documents
     const documents = await this.getGeneratedDocuments(parentId, tenantId);
-    const feeAgreement = documents.find(d => d.documentType === 'FEE_AGREEMENT');
-    const consentForms = documents.find(d => d.documentType === 'CONSENT_FORMS');
+    const feeAgreement = documents.find(
+      (d) => d.documentType === 'FEE_AGREEMENT',
+    );
+    const consentForms = documents.find(
+      (d) => d.documentType === 'CONSENT_FORMS',
+    );
 
     // Define all onboarding actions
     const requiredActions: OnboardingAction[] = [
@@ -143,7 +147,8 @@ export class ParentOnboardingService {
       {
         id: 'consent_forms',
         title: 'Consent Forms',
-        description: 'POPIA consent, medical consent, media consent, and indemnity',
+        description:
+          'POPIA consent, medical consent, media consent, and indemnity',
         category: 'consents',
         isRequired: true,
         isComplete: consentForms?.acknowledged ?? false,
@@ -151,10 +156,12 @@ export class ParentOnboardingService {
     ];
 
     // Calculate progress
-    const requiredItems = requiredActions.filter(a => a.isRequired);
-    const completedRequired = requiredItems.filter(a => a.isComplete).length;
-    const completedAll = requiredActions.filter(a => a.isComplete).length;
-    const percentComplete = Math.round((completedAll / requiredActions.length) * 100);
+    const requiredItems = requiredActions.filter((a) => a.isRequired);
+    const completedRequired = requiredItems.filter((a) => a.isComplete).length;
+    const completedAll = requiredActions.filter((a) => a.isComplete).length;
+    const percentComplete = Math.round(
+      (completedAll / requiredActions.length) * 100,
+    );
 
     // Determine status
     let status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' = 'NOT_STARTED';
@@ -215,7 +222,9 @@ export class ParentOnboardingService {
     );
     documents.push(consentDoc);
 
-    this.logger.log(`Generated ${documents.length} documents for parent ${parentId}`);
+    this.logger.log(
+      `Generated ${documents.length} documents for parent ${parentId}`,
+    );
 
     return documents;
   }
@@ -232,7 +241,7 @@ export class ParentOnboardingService {
       orderBy: { generatedAt: 'asc' },
     });
 
-    return docs.map(d => ({
+    return docs.map((d) => ({
       id: d.id,
       documentType: d.documentType as GeneratedDocument['documentType'],
       fileName: d.fileName,
@@ -289,16 +298,19 @@ export class ParentOnboardingService {
         signedAt: new Date(),
         signedByName: dto.signedByName,
         signedByIp: clientIp || dto.signedByIp || null,
-        metadata: dto.mediaConsent || dto.authorizedCollectors
-          ? JSON.stringify({
-              mediaConsent: dto.mediaConsent,
-              authorizedCollectors: dto.authorizedCollectors,
-            })
-          : null,
+        metadata:
+          dto.mediaConsent || dto.authorizedCollectors
+            ? JSON.stringify({
+                mediaConsent: dto.mediaConsent,
+                authorizedCollectors: dto.authorizedCollectors,
+              })
+            : null,
       },
     });
 
-    this.logger.log(`Document ${dto.documentType} signed by ${dto.signedByName}`);
+    this.logger.log(
+      `Document ${dto.documentType} signed by ${dto.signedByName}`,
+    );
 
     // Check if all documents are now signed
     await this.checkAndTriggerWelcomePack(parentId, tenantId);
@@ -365,8 +377,8 @@ export class ParentOnboardingService {
 
     if (status.status !== 'COMPLETED') {
       const incompleteItems = status.requiredActions
-        .filter(a => a.isRequired && !a.isComplete)
-        .map(a => a.title);
+        .filter((a) => a.isRequired && !a.isComplete)
+        .map((a) => a.title);
 
       return {
         success: false,
@@ -524,7 +536,10 @@ export class ParentOnboardingService {
 
       if (enrollment) {
         try {
-          await this.welcomePackDelivery.sendWelcomePack(enrollment.id, tenantId);
+          await this.welcomePackDelivery.sendWelcomePack(
+            enrollment.id,
+            tenantId,
+          );
           this.logger.log(`Auto-triggered welcome pack for parent ${parentId}`);
         } catch (error) {
           this.logger.warn(`Failed to auto-send welcome pack: ${error}`);

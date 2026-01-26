@@ -5,6 +5,7 @@
  * CRITICAL: Uses REAL PostgreSQL database - NO MOCKS
  * ALL monetary values in CENTS (integers)
  */
+jest.setTimeout(30000);
 import 'dotenv/config';
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -39,26 +40,10 @@ describe('PaymentMatcherAgent', () => {
   });
 
   beforeEach(async () => {
-    // Clean up test data in correct order (respecting foreign keys)
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.parent.deleteMany({
-      where: { email: { contains: 'matcher-test' } },
-    });
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({
-      where: { email: { contains: 'matcher-test' } },
-    });
+    // Clean up test data using TRUNCATE CASCADE to handle all FK constraints
+    await prisma.$executeRawUnsafe(
+      `TRUNCATE TABLE tenants CASCADE`,
+    );
 
     // Create test tenant
     testTenant = await prisma.tenant.create({
@@ -95,29 +80,11 @@ describe('PaymentMatcherAgent', () => {
         parentId: testParent.id,
       },
     });
-  });
+  }, 15000);
 
   afterAll(async () => {
-    // Clean up
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.parent.deleteMany({
-      where: { email: { contains: 'matcher-test' } },
-    });
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({
-      where: { email: { contains: 'matcher-test' } },
-    });
+    // Clean up using TRUNCATE CASCADE to handle all FK constraints
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE tenants CASCADE`);
     await prisma.onModuleDestroy();
   });
 

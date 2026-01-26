@@ -86,14 +86,18 @@ export class SarsDecisionLogger {
 
     // TASK-SDK-011: Write to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logDecision({
-        tenantId,
-        agentType: 'sars',
-        decision: type,
-        autoApplied: false,
-        details: { type, period, amountCents },
-        reasoning,
-      }).catch((err: Error) => this.logger.warn(`Audit trail write failed: ${err.message}`));
+      this.auditTrail
+        .logDecision({
+          tenantId,
+          agentType: 'sars',
+          decision: type,
+          autoApplied: false,
+          details: { type, period, amountCents },
+          reasoning,
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit trail write failed: ${err.message}`),
+        );
     }
   }
 
@@ -136,12 +140,21 @@ export class SarsDecisionLogger {
 
     // TASK-SDK-011: Write escalation to database audit trail (non-blocking)
     if (this.auditTrail) {
-      this.auditTrail.logEscalation({
-        tenantId,
-        agentType: 'sars',
-        reason,
-        details: { subType, period, amountCents, requiresHumanApproval: true },
-      }).catch((err: Error) => this.logger.warn(`Audit escalation write failed: ${err.message}`));
+      this.auditTrail
+        .logEscalation({
+          tenantId,
+          agentType: 'sars',
+          reason,
+          details: {
+            subType,
+            period,
+            amountCents,
+            requiresHumanApproval: true,
+          },
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit escalation write failed: ${err.message}`),
+        );
     }
   }
 }

@@ -4,6 +4,7 @@
  *
  * CRITICAL: Tests use REAL PostgreSQL database - NO MOCKS.
  */
+jest.setTimeout(30000);
 import 'dotenv/config';
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -26,6 +27,7 @@ import { PayeService } from '../../../src/database/services/paye.service';
 import { UifService } from '../../../src/database/services/uif.service';
 import { Emp201Service } from '../../../src/database/services/emp201.service';
 import { Vat201Service } from '../../../src/database/services/vat201.service';
+import { VatAdjustmentService } from '../../../src/database/services/vat-adjustment.service';
 import { VatService } from '../../../src/database/services/vat.service';
 import { Tenant, TaxStatus, TransactionStatus } from '@prisma/client';
 
@@ -62,6 +64,7 @@ describe('OrchestratorAgent', () => {
         UifService,
         Emp201Service,
         Vat201Service,
+        VatAdjustmentService,
         VatService,
       ],
     }).compile();
@@ -74,35 +77,8 @@ describe('OrchestratorAgent', () => {
   });
 
   beforeEach(async () => {
-    // Clean up test data
-    await prisma.sarsSubmission.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.payrollJournalLine.deleteMany({});
-    await prisma.payrollJournal.deleteMany({});
-    await prisma.payroll.deleteMany({});
-    await prisma.payRunSync.deleteMany({});
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.payrollAdjustment.deleteMany({});
-    await prisma.employeeSetupLog.deleteMany({});
-    await prisma.staff.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.reportRequest.deleteMany({});
-    await prisma.bulkOperationLog.deleteMany({});
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    // Clean up test data using TRUNCATE CASCADE to handle all FK constraints
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE tenants CASCADE`);
 
     // Create test tenant
     testTenant = await prisma.tenant.create({
@@ -118,7 +94,7 @@ describe('OrchestratorAgent', () => {
         phone: '0211234567',
       },
     });
-  });
+  }, 15000);
 
   afterAll(async () => {
     await prisma.onModuleDestroy();

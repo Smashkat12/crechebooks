@@ -165,7 +165,9 @@ describe('SdkSemanticValidator', () => {
 
       const sanitised = validator.sanitizeForLlm(statement);
 
-      expect(sanitised.sampleTransactions[0].description.length).toBeLessThanOrEqual(83); // 80 + "..."
+      expect(
+        sanitised.sampleTransactions[0].description.length,
+      ).toBeLessThanOrEqual(83); // 80 + "..."
       expect(sanitised.sampleTransactions[0].description).toContain('...');
     });
 
@@ -479,11 +481,23 @@ describe('SdkSemanticValidator', () => {
         semanticConfidence: 80,
         documentType: 'bank_statement',
         issues: [
-          { severity: 'INFO', code: 'FOREIGN_CURRENCY', description: 'Valid issue' },
-          { severity: 'INVALID', code: 'NONEXISTENT', description: 'Invalid issue' },
+          {
+            severity: 'INFO',
+            code: 'FOREIGN_CURRENCY',
+            description: 'Valid issue',
+          },
+          {
+            severity: 'INVALID',
+            code: 'NONEXISTENT',
+            description: 'Invalid issue',
+          },
           'not an object',
           null,
-          { severity: 'WARNING', code: 'SUSPICIOUS_AMOUNTS', description: 'Another valid' },
+          {
+            severity: 'WARNING',
+            code: 'SUSPICIOUS_AMOUNTS',
+            description: 'Another valid',
+          },
         ],
         summary: 'Mixed issues.',
       });
@@ -652,9 +666,9 @@ describe('ExtractionValidatorAgent + SdkSemanticValidator integration', () => {
 
     it('should not affect confidence if LLM throws an error', async () => {
       // Mock the SDK validator to throw
-      jest.spyOn(sdkValidator, 'validate').mockRejectedValue(
-        new Error('LLM service unavailable'),
-      );
+      jest
+        .spyOn(sdkValidator, 'validate')
+        .mockRejectedValue(new Error('LLM service unavailable'));
 
       const statement = createStatement({
         openingBalance: 0,

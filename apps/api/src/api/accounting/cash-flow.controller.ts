@@ -2,13 +2,7 @@
  * Cash Flow Controller
  * TASK-ACCT-004: Cash Flow Reports API
  */
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-  Logger,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Logger } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
@@ -48,7 +42,9 @@ export class CashFlowController {
     @Query('includeComparative') includeComparative?: string,
   ) {
     const tenantId = getTenantId(user);
-    this.logger.log(`Generate cash flow statement: tenant=${tenantId}, from=${fromDate}, to=${toDate}`);
+    this.logger.log(
+      `Generate cash flow statement: tenant=${tenantId}, from=${fromDate}, to=${toDate}`,
+    );
     return this.cashFlowService.generateCashFlowStatement(
       tenantId,
       new Date(fromDate),

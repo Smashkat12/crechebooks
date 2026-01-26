@@ -20,6 +20,10 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { RuvectorService } from '../sdk/ruvector.service';
 import { PatternLearner } from './pattern-learner';
+import { FastAgentDBAdapter } from './fast-agentdb.adapter';
+import { REASONING_BANK_TOKEN } from './vectordb-reasoning-bank';
+import type { AgentDBInterface } from './interfaces/fast-agentdb.interface';
+import type { ReasoningBankInterface, StoreChainParams } from './interfaces/reasoning-bank.interface';
 import type {
   StoreDecisionParams,
   RecordCorrectionParams,
@@ -27,41 +31,6 @@ import type {
   MemoryAccuracyStats,
   SimilarDecision,
 } from './interfaces/agent-memory.interface';
-
-// ────────────────────────────────────────────────────────────────────
-// Local stubs for agentic-flow imports that don't exist yet
-// ────────────────────────────────────────────────────────────────────
-
-class AgentDBStub {
-  async store(_data: Record<string, unknown>): Promise<void> {
-    /* stub */
-  }
-  async recordCorrection(_data: Record<string, unknown>): Promise<void> {
-    /* stub */
-  }
-  async getAccuracyStats(
-    _tenantId: string,
-    _agentType: string,
-  ): Promise<MemoryAccuracyStats | null> {
-    return null; // Trigger Prisma fallback
-  }
-}
-
-class ReasoningBankStub {
-  private readonly chains = new Map<string, string>();
-
-  async store(params: {
-    decisionId: string;
-    chain: string;
-    tenantId: string;
-  }): Promise<void> {
-    this.chains.set(params.decisionId, params.chain);
-  }
-
-  async get(decisionId: string): Promise<string | null> {
-    return this.chains.get(decisionId) ?? null;
-  }
-}
 
 // ────────────────────────────────────────────────────────────────────
 // Utility: input hash computation
@@ -89,8 +58,8 @@ export function computeInputHash(params: {
 @Injectable()
 export class AgentMemoryService {
   private readonly logger = new Logger(AgentMemoryService.name);
-  private readonly agentDb = new AgentDBStub();
-  private readonly reasoningBank = new ReasoningBankStub();
+  private readonly agentDb: Pick<AgentDBInterface, 'store' | 'recordCorrection' | 'getAccuracyStats'>;
+  private readonly reasoningBank: ReasoningBankInterface;
 
   constructor(
     @Optional()
@@ -102,7 +71,23 @@ export class AgentMemoryService {
     @Optional()
     @Inject(PatternLearner)
     private readonly patternLearner?: PatternLearner,
-  ) {}
+    @Optional()
+    @Inject(FastAgentDBAdapter)
+    agentDb?: AgentDBInterface,
+    @Optional()
+    @Inject(REASONING_BANK_TOKEN)
+    reasoningBank?: ReasoningBankInterface,
+  ) {
+    this.agentDb = agentDb ?? {
+      store: () => Promise.resolve(),
+      recordCorrection: () => Promise.resolve(),
+      getAccuracyStats: () => Promise.resolve(null),
+    };
+    this.reasoningBank = reasoningBank ?? {
+      store: () => Promise.resolve(),
+      get: () => Promise.resolve(null),
+    };
+  }
 
   /**
    * Store an agent decision. Dual-writes to AgentDB stub and Prisma.
@@ -212,7 +197,9 @@ export class AgentMemoryService {
         correctedBy,
       })
       .catch((err: Error) => {
-        this.logger.warn(`AgentDB stub correction write failed: ${err.message}`);
+        this.logger.warn(
+          `AgentDB stub correction write failed: ${err.message}`,
+        );
       });
 
     // 2. Update Prisma agentDecision (wasCorrect=false, correctedTo)
@@ -279,22 +266,24 @@ export class AgentMemoryService {
     // Try ruvector semantic search first
     if (this.ruvector?.isAvailable() && inputText) {
       try {
-        const embedding = await this.ruvector.generateEmbedding(inputText);
+        const embeddingResult = await this.ruvector.generateEmbedding(inputText);
         const results = await this.ruvector.searchSimilar(
-          embedding,
+          embeddingResult.vector,
           `decisions-${agentType}`,
           5,
         );
         return results.map((r) => ({
           id: r.id,
-          decision: (r.metadata ?? {}) as Record<string, unknown>,
+          decision: r.metadata ?? {},
           confidence: Math.round(r.score * 100),
           source: 'SEMANTIC',
           similarity: r.score,
         }));
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Ruvector search failed, falling back to Prisma: ${msg}`);
+        this.logger.warn(
+          `Ruvector search failed, falling back to Prisma: ${msg}`,
+        );
       }
     }
 

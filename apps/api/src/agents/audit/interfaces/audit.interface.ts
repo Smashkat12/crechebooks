@@ -41,7 +41,8 @@ export const DecisionSource = {
   RULE_BASED: 'RULE_BASED',
 } as const;
 
-export type DecisionSource = (typeof DecisionSource)[keyof typeof DecisionSource];
+export type DecisionSource =
+  (typeof DecisionSource)[keyof typeof DecisionSource];
 
 // ── Log Parameters ──────────────────────────────────────────────────
 

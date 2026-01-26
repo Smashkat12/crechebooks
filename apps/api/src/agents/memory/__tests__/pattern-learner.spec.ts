@@ -54,10 +54,7 @@ describe('PatternLearner', () => {
     mockRuvector.generateEmbedding.mockResolvedValue([0.1, 0.2]);
     mockRuvector.searchSimilar.mockResolvedValue([]);
 
-    learner = new PatternLearner(
-      mockPrisma as never,
-      mockRuvector as never,
-    );
+    learner = new PatternLearner(mockPrisma as never, mockRuvector as never);
   });
 
   describe('processCorrection', () => {

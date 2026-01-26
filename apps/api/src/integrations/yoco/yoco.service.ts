@@ -170,7 +170,7 @@ export class YocoService {
       })
     | null
   > {
-    return this.prisma.paymentLink.findUnique({
+    return (await this.prisma.paymentLink.findUnique({
       where: { shortCode },
       include: {
         parent: {
@@ -183,7 +183,7 @@ export class YocoService {
           select: { name: true, email: true },
         },
       },
-    }) as any;
+    })) as any;
   }
 
   /**

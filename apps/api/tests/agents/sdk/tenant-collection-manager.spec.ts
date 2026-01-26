@@ -385,9 +385,9 @@ describe('TenantCollectionManager', () => {
     it('should clear cleanup interval on destroy', async () => {
       // onModuleInit already ran in beforeEach, setting up the interval
       // Destroying should clear it without error
-      await manager.onModuleDestroy();
+      manager.onModuleDestroy();
       // Calling destroy again should be safe (idempotent)
-      await expect(manager.onModuleDestroy()).resolves.not.toThrow();
+      expect(() => manager.onModuleDestroy()).not.toThrow();
     });
   });
 

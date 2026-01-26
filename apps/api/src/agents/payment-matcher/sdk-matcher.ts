@@ -88,6 +88,7 @@ export class SdkPaymentMatcher extends BaseSdkAgent {
     );
 
     const result = await this.executeWithFallback<SdkMatchResult>(
+      // eslint-disable-next-line @typescript-eslint/require-await
       async () => {
         const message = this.buildMatchMessage(transaction, candidates);
 
@@ -97,6 +98,7 @@ export class SdkPaymentMatcher extends BaseSdkAgent {
           `SDK call not yet implemented for model=${routedModel}, tenant=${tenantId}, message length=${String(message.length)}`,
         );
       },
+      // eslint-disable-next-line @typescript-eslint/require-await
       async () => {
         // Fallback: return a no-match result so the caller can continue
         // with existing deterministic logic.

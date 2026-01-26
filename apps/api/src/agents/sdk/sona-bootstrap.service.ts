@@ -61,7 +61,9 @@ export class SonaBootstrapService implements OnModuleInit {
     const config = this.persistenceConfig.getConfig();
 
     if (!config.bootstrapEnabled) {
-      this.logger.log('SONA bootstrap is disabled (SONA_BOOTSTRAP_ENABLED=false)');
+      this.logger.log(
+        'SONA bootstrap is disabled (SONA_BOOTSTRAP_ENABLED=false)',
+      );
       this.bootstrapStats = {
         patternTrajectories: 0,
         auditTrajectories: 0,
@@ -91,9 +93,7 @@ export class SonaBootstrapService implements OnModuleInit {
     }
 
     if (!this.prisma) {
-      this.logger.warn(
-        'SONA bootstrap skipped: PrismaService not available',
-      );
+      this.logger.warn('SONA bootstrap skipped: PrismaService not available');
       this.bootstrapStats = {
         patternTrajectories: 0,
         auditTrajectories: 0,
@@ -334,6 +334,7 @@ export class SonaBootstrapService implements OnModuleInit {
             source: log.source,
             ...decisionData,
           },
+          // eslint-disable-next-line @typescript-eslint/no-base-to-string
           action: `${log.agentType}:${String(decisionData['accountCode'] ?? decisionData['result'] ?? 'unknown')}`,
           quality: Math.max(0, Math.min(1, quality)), // Clamp 0-1
           metadata: {

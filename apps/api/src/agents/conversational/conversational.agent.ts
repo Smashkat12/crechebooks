@@ -100,6 +100,7 @@ export class ConversationalAgent extends BaseSdkAgent {
     // 3. Execute with SDK fallback
     const result = await this.executeWithFallback<string>(
       // SDK path - would use LLM for natural language generation
+      // eslint-disable-next-line @typescript-eslint/require-await
       async () => {
         // SDK path not yet implemented - will be wired when SDK is available
         throw new Error('SDK not yet wired for conversational agent');
@@ -463,10 +464,7 @@ export class ConversationalAgent extends BaseSdkAgent {
    * Build a general answer for unclassified questions.
    * Provides helpful guidance on what the agent can answer.
    */
-  private async buildGeneralAnswer(
-    _tenantId: string,
-    question: string,
-  ): Promise<string> {
+  private buildGeneralAnswer(_tenantId: string, question: string): string {
     return (
       `I received your question: "${question}"\n\n` +
       `I can help you with the following types of financial queries:\n` +

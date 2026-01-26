@@ -449,6 +449,7 @@ describe('AmountVariationService', () => {
       reversesTransactionId: null,
       isReversal: false,
       xeroAccountCode: null,
+      supplierId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     }));

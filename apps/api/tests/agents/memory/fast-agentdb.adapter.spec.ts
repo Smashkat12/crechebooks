@@ -78,9 +78,10 @@ function injectMocks(
   reflexionMemory: MockReflexionMemory,
 ): void {
   // Access private fields via bracket notation (standard test pattern)
-  (adapter as Record<string, unknown>)['fastAgentDB'] = fastAgentDB;
-  (adapter as Record<string, unknown>)['reflexionMemory'] = reflexionMemory;
-  (adapter as Record<string, unknown>)['initialized'] = true;
+  (adapter as unknown as Record<string, unknown>)['fastAgentDB'] = fastAgentDB;
+  (adapter as unknown as Record<string, unknown>)['reflexionMemory'] =
+    reflexionMemory;
+  (adapter as unknown as Record<string, unknown>)['initialized'] = true;
 }
 
 // ────────────────────────────────────────────────────────────────────

@@ -50,6 +50,8 @@ describe('PayeeAlias Integration', () => {
     confidenceBoost: new Decimal(10),
     matchCount: 5,
     isRecurring: false,
+    isActive: true,
+    source: 'MANUAL',
     expectedAmountCents: null,
     amountVariancePercent: null,
     createdAt: new Date('2024-01-01'),
@@ -80,6 +82,7 @@ describe('PayeeAlias Integration', () => {
     reversesTransactionId: null,
     isReversal: false,
     xeroAccountCode: null,
+    supplierId: null,
     createdAt: new Date('2024-01-15'),
     updatedAt: new Date('2024-01-15'),
   };

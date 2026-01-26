@@ -67,8 +67,8 @@ function createInitializedRouter(
   const configService = createMockConfigService(configOverrides);
   const router = new LearningRouter(configService);
   // Directly inject the mock engine to bypass dynamic import('ruvector')
-  (router as Record<string, unknown>)['learningEngine'] = engine;
-  (router as Record<string, unknown>)['initialized'] = true;
+  (router as unknown as Record<string, unknown>)['learningEngine'] = engine;
+  (router as unknown as Record<string, unknown>)['initialized'] = true;
   return router;
 }
 

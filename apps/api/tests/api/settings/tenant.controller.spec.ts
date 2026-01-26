@@ -54,6 +54,7 @@ describe('TenantController', () => {
     xeroConnectedAt: null,
     xeroTenantName: null,
     trialExpiresAt: null,
+    subscriptionPlan: 'FREE' as any,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

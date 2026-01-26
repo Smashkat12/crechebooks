@@ -227,12 +227,10 @@ export class SonaBootstrapService implements OnModuleInit {
       where: { isActive: true },
       select: {
         tenantId: true,
-        payeeName: true,
-        description: true,
-        accountCode: true,
-        accountName: true,
-        vatType: true,
-        confidence: true,
+        payeePattern: true,
+        defaultAccountCode: true,
+        defaultAccountName: true,
+        confidenceBoost: true,
         matchCount: true,
       },
       orderBy: { matchCount: 'desc' },
@@ -247,24 +245,24 @@ export class SonaBootstrapService implements OnModuleInit {
 
     for (const pattern of patterns) {
       try {
+        const confidence = Number(pattern.confidenceBoost);
         const quality =
           maxMatchCount > 0
             ? pattern.matchCount / maxMatchCount
-            : pattern.confidence / 100;
+            : confidence / 100;
 
         const trajectory: IntelligenceTrajectory = {
           state: {
-            payeeName: pattern.payeeName,
-            description: pattern.description ?? '',
-            vatType: pattern.vatType,
+            payeeName: pattern.payeePattern,
+            description: '',
           },
-          action: `categorize:${pattern.accountCode}:${pattern.accountName}`,
+          action: `categorize:${pattern.defaultAccountCode}:${pattern.defaultAccountName}`,
           quality: Math.max(0, Math.min(1, quality)), // Clamp 0-1
           metadata: {
             source: 'bootstrap:payee-pattern',
-            confidence: pattern.confidence,
+            confidence,
             matchCount: pattern.matchCount,
-            accountCode: pattern.accountCode,
+            accountCode: pattern.defaultAccountCode,
           },
         };
 
@@ -273,7 +271,7 @@ export class SonaBootstrapService implements OnModuleInit {
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         this.logger.warn(
-          `Failed to seed pattern "${pattern.payeeName}": ${msg}`,
+          `Failed to seed pattern "${pattern.payeePattern}": ${msg}`,
         );
       }
     }
@@ -315,7 +313,7 @@ export class SonaBootstrapService implements OnModuleInit {
 
     for (const log of logs) {
       try {
-        const quality = log.confidence / 100; // Normalize to 0-1
+        const quality = (log.confidence ?? 0) / 100; // Normalize to 0-1
 
         // Parse decision JSON safely
         let decisionData: Record<string, unknown> = {};

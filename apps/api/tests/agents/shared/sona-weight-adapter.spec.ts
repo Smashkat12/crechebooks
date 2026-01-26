@@ -40,7 +40,7 @@ describe('SonaWeightAdapter', () => {
         endTrajectory: jest.fn(),
         forceLearn: jest.fn(),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -56,7 +56,7 @@ describe('SonaWeightAdapter', () => {
           .fn()
           .mockReturnValue([{ quality: 0.8 }, { quality: 0.7 }]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -69,7 +69,7 @@ describe('SonaWeightAdapter', () => {
       const mockEngine = {
         findPatterns: jest.fn().mockReturnValue(null),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -88,7 +88,7 @@ describe('SonaWeightAdapter', () => {
             { quality: 0.7 },
           ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -111,7 +111,7 @@ describe('SonaWeightAdapter', () => {
             { quality: 0.25 },
           ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -133,7 +133,7 @@ describe('SonaWeightAdapter', () => {
             { quality: 0.55 },
           ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -155,7 +155,7 @@ describe('SonaWeightAdapter', () => {
             { quality: 0.97 },
           ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -176,7 +176,7 @@ describe('SonaWeightAdapter', () => {
             { quality: 0.03 },
           ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -193,7 +193,7 @@ describe('SonaWeightAdapter', () => {
           throw new Error('engine error');
         }),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -205,7 +205,7 @@ describe('SonaWeightAdapter', () => {
     it('should pass correct patternSearchK to findPatterns', async () => {
       const findPatternsMock = jest.fn().mockReturnValue([]);
       const mockEngine = { findPatterns: findPatternsMock };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -231,7 +231,8 @@ describe('SonaWeightAdapter', () => {
           { quality: 0.6 },
         ]);
       const mockEngine = { findPatterns: findPatternsMock };
-      (customAdapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (customAdapter as unknown as Record<string, unknown>).sonaEngine =
+        mockEngine;
 
       // 3 patterns is below the custom minPatternsForAdaptation of 5
       const result = await customAdapter.getOptimalWeights({
@@ -255,7 +256,7 @@ describe('SonaWeightAdapter', () => {
           { quality: 0.2, avgQuality: 0.7 },
         ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 'tenant-123',
@@ -294,7 +295,7 @@ describe('SonaWeightAdapter', () => {
         addStep: addStepMock,
         endTrajectory: endMock,
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       await adapter.recordOutcome(
         { tenantId: 't1', agentType: 'categorizer' },
@@ -327,7 +328,7 @@ describe('SonaWeightAdapter', () => {
         addStep: addStepMock,
         endTrajectory: jest.fn(),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       await adapter.recordOutcome(
         { tenantId: 't1', agentType: 'matcher' },
@@ -354,7 +355,7 @@ describe('SonaWeightAdapter', () => {
         addStep: addStepMock,
         endTrajectory: jest.fn(),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       await adapter.recordOutcome(
         { tenantId: 't1', agentType: 'categorizer' },
@@ -380,7 +381,7 @@ describe('SonaWeightAdapter', () => {
         addStep: addStepMock,
         endTrajectory: jest.fn(),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       await adapter.recordOutcome(
         { tenantId: 't1', agentType: 'categorizer' },
@@ -406,7 +407,7 @@ describe('SonaWeightAdapter', () => {
         addStep: jest.fn(),
         endTrajectory: jest.fn(),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       await expect(
         adapter.recordOutcome(
@@ -428,7 +429,7 @@ describe('SonaWeightAdapter', () => {
         addStep: jest.fn(),
         endTrajectory: endMock,
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       // confidence=50 -> quality = abs(0.5 - 0.5) * 2 = 0.0 (maximally uncertain)
       await adapter.recordOutcome(
@@ -451,7 +452,7 @@ describe('SonaWeightAdapter', () => {
         addStep: jest.fn(),
         endTrajectory: endMock,
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       // confidence=100 -> quality = abs(1.0 - 0.5) * 2 = 1.0 (maximally decisive)
       await adapter.recordOutcome(
@@ -599,7 +600,7 @@ describe('SonaWeightAdapter', () => {
 
     it('should call engine.forceLearn when available', async () => {
       const forceMock = jest.fn().mockReturnValue('learning complete');
-      (adapter as Record<string, unknown>).sonaEngine = {
+      (adapter as unknown as Record<string, unknown>).sonaEngine = {
         forceLearn: forceMock,
       };
 
@@ -611,7 +612,7 @@ describe('SonaWeightAdapter', () => {
       const forceMock = jest.fn().mockImplementation(() => {
         throw new Error('learning error');
       });
-      (adapter as Record<string, unknown>).sonaEngine = {
+      (adapter as unknown as Record<string, unknown>).sonaEngine = {
         forceLearn: forceMock,
       };
 
@@ -667,7 +668,8 @@ describe('SonaWeightAdapter', () => {
             .mockReturnValue([{ quality }, { quality }, { quality }]),
         };
         const testAdapter = new SonaWeightAdapter();
-        (testAdapter as Record<string, unknown>).sonaEngine = mockEngine;
+        (testAdapter as unknown as Record<string, unknown>).sonaEngine =
+          mockEngine;
 
         const result = await testAdapter.getOptimalWeights({
           tenantId: 't1',
@@ -690,7 +692,7 @@ describe('SonaWeightAdapter', () => {
             { quality: 0.61 },
           ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 't1',
@@ -712,7 +714,7 @@ describe('SonaWeightAdapter', () => {
             { quality: 0.39 },
           ]),
       };
-      (adapter as Record<string, unknown>).sonaEngine = mockEngine;
+      (adapter as unknown as Record<string, unknown>).sonaEngine = mockEngine;
 
       const result = await adapter.getOptimalWeights({
         tenantId: 't1',

@@ -19,7 +19,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PersistenceConfig } from './persistence-config';
-import { IntelligenceEngine, IntelligenceConfig } from 'ruvector';
+import { IntelligenceEngine } from 'ruvector';
+import type { IntelligenceConfig } from 'ruvector';
 import type {
   IntelligenceRouteResult,
   IntelligenceRecallResult,
@@ -32,7 +33,10 @@ export class IntelligenceEngineService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(IntelligenceEngineService.name);
-  private engine: IntelligenceEngine | null = null;
+  // Engine typed as any because the ruvector IntelligenceEngine API is extended
+  // beyond the current type definitions (TASK-STUB-009)
+
+  private engine: any = null;
   private initialized = false;
 
   constructor(
@@ -251,7 +255,6 @@ export class IntelligenceEngineService
   async getStats(): Promise<IntelligenceStats> {
     this.ensureAvailable('getStats');
 
-    // eslint-disable-next-line @typescript-eslint/await-thenable
     const stats = await this.engine!.getStats();
 
     return {
@@ -289,7 +292,6 @@ export class IntelligenceEngineService
       return false;
     }
     try {
-      // eslint-disable-next-line @typescript-eslint/await-thenable
       const stats = await this.engine.getStats();
       return stats !== null && stats !== undefined;
     } catch {

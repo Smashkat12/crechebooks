@@ -199,7 +199,7 @@ export class AgentMemoryService {
         tenantId,
         agentDecisionId,
         originalValue,
-        correctedValue,
+        correctedValue: correctedValue as unknown as Record<string, unknown>,
         correctedBy,
       })
       .catch((err: Error) => {
@@ -215,7 +215,7 @@ export class AgentMemoryService {
           where: { id: agentDecisionId },
           data: {
             wasCorrect: false,
-            correctedTo: correctedValue as unknown as Prisma.InputJsonValue,
+            correctedTo: correctedValue as never,
           },
         });
       } catch (err: unknown) {

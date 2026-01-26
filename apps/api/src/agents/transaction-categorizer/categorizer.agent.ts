@@ -167,7 +167,7 @@ export class TransactionCategorizerAgent {
     let accountName: string;
     let vatType: VatType;
     let reasoning: string;
-    let source: 'PATTERN' | 'HISTORICAL' | 'FALLBACK' | 'LLM';
+    let source: 'PATTERN' | 'HISTORICAL' | 'FALLBACK' | 'LLM' = 'FALLBACK';
     let patternId: string | undefined;
     let sdkModel: string | undefined;
     let sdkDurationMs: number | undefined;

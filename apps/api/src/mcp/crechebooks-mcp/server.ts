@@ -42,7 +42,8 @@ export interface McpServerInfo {
 @Injectable()
 export class CrecheBooksMcpService implements OnModuleInit {
   private readonly logger = new Logger(CrecheBooksMcpService.name);
-  private readonly tools: Map<string, McpToolDefinition> = new Map();
+
+  private readonly tools: Map<string, McpToolDefinition<any, any>> = new Map();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -90,7 +91,8 @@ export class CrecheBooksMcpService implements OnModuleInit {
   /**
    * Register a tool definition in the internal map.
    */
-  private registerTool(tool: McpToolDefinition): void {
+
+  private registerTool(tool: McpToolDefinition<any, any>): void {
     if (this.tools.has(tool.name)) {
       this.logger.warn(
         `Tool "${tool.name}" is already registered, overwriting`,

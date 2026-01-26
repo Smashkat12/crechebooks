@@ -226,17 +226,14 @@ export class ShadowRunner {
         data: {
           tenantId: comparison.tenantId,
           agentType: comparison.agentType,
-          sdkResult: comparison.sdkResult as Record<string, unknown>,
+          sdkResult: comparison.sdkResult as never,
           sdkConfidence: comparison.sdkConfidence ?? 0,
           sdkDurationMs: comparison.sdkDurationMs,
-          heuristicResult: comparison.heuristicResult as Record<
-            string,
-            unknown
-          >,
+          heuristicResult: comparison.heuristicResult as never,
           heuristicConfidence: comparison.heuristicConfidence ?? 0,
           heuristicDurationMs: comparison.heuristicDurationMs,
           resultsMatch: comparison.resultsMatch,
-          matchDetails: comparison.details ?? null,
+          matchDetails: (comparison.details ?? null) as never,
         },
       });
     } catch (error: unknown) {

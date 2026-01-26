@@ -2,12 +2,33 @@
 # CrecheBooks API - Production Dockerfile
 # ============================================
 # Multi-stage build for optimized production image
-# Using npm for flat node_modules structure (simpler than pnpm in Docker)
+# Using pnpm for workspace-aware dependency management
 
-# Stage 1: Builder
-FROM node:20-slim AS builder
+# Stage 1: Dependencies
+FROM node:20-slim AS deps
 
 # Install required system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
+
+# Copy workspace configuration
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/types/package.json ./packages/types/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile --prod=false
+
+# Stage 2: Builder
+FROM node:20-slim AS builder
+
+# Install required system dependencies (python3/make/g++ needed for native modules like hnswlib-node)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ca-certificates \
@@ -18,43 +39,49 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# First build the shared types package
-WORKDIR /app/packages/types
-COPY packages/types/package.json ./
-COPY packages/types/tsconfig.json ./
-COPY packages/types/src ./src
-RUN npm install && npm run build
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Now build the API
-WORKDIR /app/api
+# Copy workspace configuration for pnpm
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/types/package.json ./packages/types/
 
-# Copy API package.json and modify to use local types path
-COPY apps/api/package.json ./package.json.orig
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
 
-# Replace workspace:* dependency with file path to built types
-RUN sed 's|"@crechebooks/types": "workspace:\*"|"@crechebooks/types": "file:../packages/types"|' package.json.orig > package.json
+# Copy source code
+# Build timestamp to force fresh build: 2026-01-27T00:00:00Z
+COPY . .
 
-# Install dependencies with npm (creates flat node_modules)
-RUN npm install --legacy-peer-deps
+# Reinstall to set up workspace symlinks (uses cached node_modules)
+RUN pnpm install --frozen-lockfile --offline || pnpm install --frozen-lockfile
 
-# Copy prisma schema and generate client
-# ARG forces cache invalidation when changed
-ARG CACHEBUST=2026-01-24T22:40:00Z
-COPY apps/api/prisma ./prisma
-RUN npx prisma generate
+# Build shared types package first (required by API)
+RUN pnpm --filter @crechebooks/types build
 
-# Copy source code (cache bust ensures new files are included)
-ARG SRCBUST=v2.0.3-fix-failed-migration
-COPY apps/api/src ./src
-COPY apps/api/scripts ./scripts
-COPY apps/api/tsconfig.json apps/api/tsconfig.build.json ./
-COPY apps/api/nest-cli.json ./
-COPY apps/api/prisma.config.ts ./
+# Generate Prisma client
+ARG CACHEBUST=2026-01-27T00:00:00Z
+RUN cd apps/api && pnpm exec prisma generate
 
-# Build the application
-RUN npm run build
+# Build the API application
+RUN pnpm --filter @crechebooks/api build
 
-# Stage 2: Production Runner
+# Create production deployment directory using pnpm deploy
+# (resolves workspace deps and creates a self-contained node_modules)
+RUN pnpm --filter @crechebooks/api deploy /app/deploy
+
+# Copy built artifacts and runtime files into deploy directory
+RUN cp -r /app/apps/api/dist /app/deploy/dist && \
+    cp -r /app/apps/api/prisma /app/deploy/prisma && \
+    cp /app/apps/api/tsconfig.json /app/deploy/tsconfig.json && \
+    (cp /app/apps/api/prisma.config.ts /app/deploy/prisma.config.ts 2>/dev/null || true) && \
+    (cp -r /app/apps/api/scripts /app/deploy/scripts 2>/dev/null || true)
+
+# Regenerate Prisma client in the deploy directory
+RUN cd /app/deploy && npx prisma generate
+
+# Stage 3: Production Runner
 FROM node:20-slim AS runner
 
 # Install required system dependencies and dumb-init
@@ -71,14 +98,8 @@ WORKDIR /app
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nestjs nestjs
 
-# Copy built application and dependencies from builder
-COPY --from=builder /app/api/dist ./dist
-COPY --from=builder /app/api/node_modules ./node_modules
-COPY --from=builder /app/api/package.json ./
-COPY --from=builder /app/api/prisma ./prisma
-COPY --from=builder /app/api/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/api/scripts ./scripts
-COPY --from=builder /app/api/tsconfig.json ./tsconfig.json
+# Copy production deployment from builder
+COPY --from=builder /app/deploy ./
 
 # Copy startup script
 COPY apps/api/start.sh ./start.sh

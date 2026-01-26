@@ -34,14 +34,13 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { StaffAuthGuard } from '../auth/guards/staff-auth.guard';
+import { CurrentStaff } from '../auth/decorators/current-staff.decorator';
+import type { StaffSessionInfo } from '../auth/decorators/current-staff.decorator';
+import { SimplePayPayslipService } from '../../integrations/simplepay/simplepay-payslip.service';
+import { SimplePayRepository } from '../../database/repositories/simplepay.repository';
 import { StaffDashboardResponseDto } from './dto/staff-dashboard.dto';
-import {
-  PayslipsResponseDto,
-  PayslipDetailDto,
-  PayslipSummaryDto,
-} from './dto/staff-payslips.dto';
+import { PayslipsResponseDto, PayslipDetailDto } from './dto/staff-payslips.dto';
 import {
   LeaveBalancesResponseDto,
   LeaveRequestsResponseDto,
@@ -52,9 +51,7 @@ import {
   LeaveStatus,
 } from './dto/staff-leave.dto';
 import {
-  IRP5DocumentDto,
   IRP5ListResponseDto,
-  IRP5Status,
   StaffProfileDto,
   UpdateProfileDto,
   ProfileUpdateSuccessDto,
@@ -69,14 +66,8 @@ import {
 } from '../../database/dto/staff-onboarding.dto';
 import { DocumentType } from '../../database/entities/staff-onboarding.entity';
 
-interface UserPayload {
-  sub: string;
-  email: string;
-  name?: string;
-  tenantId?: string;
-}
-
 @ApiTags('Staff Portal')
+@UseGuards(StaffAuthGuard)
 @Controller('staff-portal')
 export class StaffPortalController {
   private readonly logger = new Logger(StaffPortalController.name);
@@ -88,10 +79,11 @@ export class StaffPortalController {
     private readonly onboardingService: StaffOnboardingService,
     private readonly documentService: StaffDocumentService,
     private readonly prisma: PrismaService,
+    private readonly payslipService: SimplePayPayslipService,
+    private readonly simplePayRepo: SimplePayRepository,
   ) {}
 
   @Get('dashboard')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get staff dashboard data' })
   @ApiResponse({
@@ -100,81 +92,104 @@ export class StaffPortalController {
     type: StaffDashboardResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getDashboard(@CurrentUser() user: UserPayload): StaffDashboardResponseDto {
-    this.logger.log(`Fetching dashboard for staff: ${user.email}`);
+  async getDashboard(@CurrentStaff() session: StaffSessionInfo) {
+    this.logger.log(`Fetching dashboard for staff: ${session.staff.email}`);
 
-    // Mock data for now - will integrate with SimplePay later
+    // Fetch real staff data from database
+    const staff = await this.prisma.staff.findUnique({
+      where: { id: session.staffId },
+      include: { simplePayMapping: true },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff record not found');
+    }
+
+    // Fetch recent imported payslips from SimplePay
+    let recentPayslips: Array<{
+      id: string;
+      payDate: Date;
+      period: string;
+      grossPay: number;
+      netPay: number;
+    }> = [];
+
+    try {
+      const { data: imports } = await this.payslipService.getImportedPayslips(
+        session.tenantId,
+        session.staffId,
+        { limit: 3 },
+      );
+
+      recentPayslips = imports.map((p) => ({
+        id: p.id,
+        payDate: p.payPeriodEnd,
+        period: new Date(p.payPeriodStart).toLocaleString('default', {
+          month: 'long',
+          year: 'numeric',
+        }),
+        grossPay: p.grossSalaryCents / 100,
+        netPay: p.netSalaryCents / 100,
+      }));
+    } catch (err) {
+      this.logger.warn(`Failed to fetch payslips for dashboard: ${err}`);
+    }
+
+    // Calculate YTD earnings from imported payslips
+    let ytdEarnings = {
+      grossEarnings: 0,
+      netEarnings: 0,
+      totalTax: 0,
+      totalDeductions: 0,
+    };
+
+    try {
+      const yearStart = new Date(new Date().getFullYear(), 0, 1);
+      const { data: ytdImports } =
+        await this.payslipService.getImportedPayslips(
+          session.tenantId,
+          session.staffId,
+          { fromDate: yearStart, limit: 100 },
+        );
+
+      for (const p of ytdImports) {
+        ytdEarnings.grossEarnings += p.grossSalaryCents / 100;
+        ytdEarnings.netEarnings += p.netSalaryCents / 100;
+        ytdEarnings.totalTax += (p.payeCents || 0) / 100;
+        ytdEarnings.totalDeductions +=
+          (p.grossSalaryCents - p.netSalaryCents) / 100;
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to calculate YTD earnings: ${err}`);
+    }
+
     const today = new Date();
     const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 25);
 
     return {
       employmentStatus: {
-        position: 'Early Childhood Development Practitioner',
-        department: 'Education',
-        startDate: new Date('2023-03-15'),
-        status: 'active',
-        employeeNumber: 'EMP-001',
+        position: staff.position || 'Staff Member',
+        department: staff.department || undefined,
+        startDate: staff.startDate,
+        status: staff.isActive ? 'active' : 'terminated',
+        employeeNumber: staff.employeeNumber || undefined,
       },
-      recentPayslips: [
-        {
-          id: 'ps-001',
-          payDate: new Date(today.getFullYear(), today.getMonth(), 25),
-          period: `${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
-          grossPay: 18500,
-          netPay: 15234.56,
-        },
-        {
-          id: 'ps-002',
-          payDate: new Date(today.getFullYear(), today.getMonth() - 1, 25),
-          period: `${new Date(today.getFullYear(), today.getMonth() - 1).toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
-          grossPay: 18500,
-          netPay: 15234.56,
-        },
-        {
-          id: 'ps-003',
-          payDate: new Date(today.getFullYear(), today.getMonth() - 2, 25),
-          period: `${new Date(today.getFullYear(), today.getMonth() - 2).toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
-          grossPay: 18500,
-          netPay: 15234.56,
-        },
-      ],
+      recentPayslips,
       leaveBalance: {
         annual: 15,
-        annualUsed: 5,
+        annualUsed: 0,
         sick: 10,
-        sickUsed: 2,
+        sickUsed: 0,
         family: 3,
         familyUsed: 0,
       },
       nextPayDate: nextMonth,
-      ytdEarnings: {
-        grossEarnings: 111000,
-        netEarnings: 91407.36,
-        totalTax: 14850,
-        totalDeductions: 4742.64,
-      },
-      announcements: [
-        {
-          id: 'ann-001',
-          title: 'School Closure - Public Holiday',
-          content:
-            'The school will be closed on Monday for the public holiday. Normal operations resume on Tuesday.',
-          createdAt: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000),
-          priority: 'high',
-        },
-        {
-          id: 'ann-002',
-          title: 'Staff Meeting Reminder',
-          content: 'Monthly staff meeting this Friday at 2pm in the main hall.',
-          createdAt: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000),
-          priority: 'medium',
-        },
-      ],
+      ytdEarnings,
+      announcements: [],
     };
   }
 
   @Get('payslips')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get staff payslips' })
   @ApiQuery({ name: 'year', required: false, description: 'Filter by year' })
@@ -190,34 +205,58 @@ export class StaffPortalController {
     type: PayslipsResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getPayslips(
-    @CurrentUser() user: UserPayload,
+  async getPayslips(
+    @CurrentStaff() session: StaffSessionInfo,
     @Query('year') year?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-  ): PayslipsResponseDto {
+  ) {
     this.logger.log(
-      `Fetching payslips for staff: ${user.email}, year: ${year || 'current'}`,
+      `Fetching payslips for staff: ${session.staff.email}, year: ${year || 'current'}`,
     );
 
-    const currentYear = year ? parseInt(year) : new Date().getFullYear();
-    const mockPayslips = this.generateMockPayslips(currentYear);
     const pageNum = parseInt(page || '1');
     const limitNum = parseInt(limit || '12');
 
+    // Build date range for year filter
+    const targetYear = year ? parseInt(year) : new Date().getFullYear();
+    const fromDate = new Date(targetYear, 0, 1);
+    const toDate = new Date(targetYear, 11, 31);
+
+    const { data: imports, total } =
+      await this.payslipService.getImportedPayslips(
+        session.tenantId,
+        session.staffId,
+        { fromDate, toDate, page: pageNum, limit: limitNum },
+      );
+
+    const payslips = imports.map((p) => ({
+      id: p.id,
+      payDate: p.payPeriodEnd,
+      period: new Date(p.payPeriodStart).toLocaleString('default', {
+        month: 'long',
+        year: 'numeric',
+      }),
+      periodStart: p.payPeriodStart,
+      periodEnd: p.payPeriodEnd,
+      grossPay: p.grossSalaryCents / 100,
+      netPay: p.netSalaryCents / 100,
+      totalDeductions: (p.grossSalaryCents - p.netSalaryCents) / 100,
+      status: 'paid' as const,
+    }));
+
     return {
-      data: mockPayslips,
+      data: payslips,
       meta: {
-        total: mockPayslips.length,
+        total,
         page: pageNum,
         limit: limitNum,
-        totalPages: Math.ceil(mockPayslips.length / limitNum),
+        totalPages: Math.ceil(total / limitNum),
       },
     };
   }
 
   @Get('payslips/:id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get payslip detail' })
   @ApiParam({ name: 'id', description: 'Payslip ID' })
@@ -228,19 +267,85 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Payslip not found' })
-  getPayslipDetail(
-    @CurrentUser() user: UserPayload,
+  async getPayslipDetail(
+    @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
-  ): PayslipDetailDto {
+  ) {
     this.logger.log(
-      `Fetching payslip detail for staff: ${user.email}, id: ${id}`,
+      `Fetching payslip detail for staff: ${session.staff.email}, id: ${id}`,
     );
 
-    return this.generateMockPayslipDetail(id);
+    // Find the imported payslip record
+    const payslipImport =
+      await this.simplePayRepo.findPayslipImport(id);
+
+    if (!payslipImport || payslipImport.staffId !== session.staffId) {
+      throw new NotFoundException('Payslip not found');
+    }
+
+    // Parse stored SimplePay payslip data for detailed breakdown
+    const spData = payslipImport.payslipData as Record<string, unknown> | null;
+
+    return {
+      id: payslipImport.id,
+      payDate: payslipImport.payPeriodEnd,
+      period: new Date(payslipImport.payPeriodStart).toLocaleString('default', {
+        month: 'long',
+        year: 'numeric',
+      }),
+      periodStart: payslipImport.payPeriodStart,
+      periodEnd: payslipImport.payPeriodEnd,
+      grossPay: payslipImport.grossSalaryCents / 100,
+      netPay: payslipImport.netSalaryCents / 100,
+      totalDeductions:
+        (payslipImport.grossSalaryCents - payslipImport.netSalaryCents) / 100,
+      status: 'paid',
+      earnings: [
+        {
+          name: 'Basic Salary',
+          amount: payslipImport.grossSalaryCents / 100,
+        },
+      ],
+      deductions: [
+        ...(payslipImport.payeCents
+          ? [
+              {
+                name: 'PAYE Tax',
+                amount: payslipImport.payeCents / 100,
+                type: 'tax',
+              },
+            ]
+          : []),
+        ...(payslipImport.uifEmployeeCents
+          ? [
+              {
+                name: 'UIF (Employee)',
+                amount: payslipImport.uifEmployeeCents / 100,
+                type: 'uif',
+              },
+            ]
+          : []),
+      ],
+      employerContributions: [
+        ...(payslipImport.uifEmployerCents
+          ? [
+              {
+                name: 'UIF (Employer)',
+                amount: payslipImport.uifEmployerCents / 100,
+              },
+            ]
+          : []),
+      ],
+      totalEarnings: payslipImport.grossSalaryCents / 100,
+      totalTax: (payslipImport.payeCents || 0) / 100,
+      totalEmployerContributions: (payslipImport.uifEmployerCents || 0) / 100,
+      paymentMethod: 'Bank Transfer',
+      simplePayPayslipId: payslipImport.simplePayPayslipId,
+      rawData: spData,
+    };
   }
 
   @Get('payslips/:id/pdf')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Download payslip PDF' })
   @ApiParam({ name: 'id', description: 'Payslip ID' })
@@ -251,91 +356,42 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Payslip not found' })
-  downloadPayslipPdf(
-    @CurrentUser() user: UserPayload,
+  async downloadPayslipPdf(
+    @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
     @Res() res: Response,
-  ): void {
+  ): Promise<void> {
     this.logger.log(
-      `Downloading payslip PDF for staff: ${user.email}, id: ${id}`,
+      `Downloading payslip PDF for staff: ${session.staff.email}, id: ${id}`,
     );
 
-    // Return mock PDF for now - will integrate with SimplePay later
-    res.set({
-      'Content-Disposition': `attachment; filename="payslip-${id}.pdf"`,
-      'Content-Type': 'application/pdf',
-    });
+    // Find the imported payslip to get SimplePay ID
+    const payslipImport =
+      await this.simplePayRepo.findPayslipImport(id);
 
-    // Create a simple mock PDF (in production, this would come from SimplePay)
-    const mockPdfContent = Buffer.from(
-      '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj xref 0 4 0000000000 65535 f 0000000009 00000 n 0000000052 00000 n 0000000101 00000 n trailer<</Size 4/Root 1 0 R>>startxref 178 %%EOF',
-      'utf-8',
-    );
+    if (!payslipImport || payslipImport.staffId !== session.staffId) {
+      throw new NotFoundException('Payslip not found');
+    }
 
-    res.send(mockPdfContent);
-  }
+    try {
+      const pdfBuffer = await this.payslipService.getPayslipPdf(
+        session.tenantId,
+        payslipImport.simplePayPayslipId,
+      );
 
-  private generateMockPayslips(year: number): PayslipSummaryDto[] {
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const months = year === currentYear ? currentMonth + 1 : 12;
+      res.set({
+        'Content-Disposition': `attachment; filename="payslip-${payslipImport.simplePayPayslipId}.pdf"`,
+        'Content-Type': 'application/pdf',
+        'Content-Length': pdfBuffer.length.toString(),
+      });
 
-    return Array.from({ length: months }, (_, i) => ({
-      id: `ps-${year}-${String(i + 1).padStart(2, '0')}`,
-      payDate: new Date(year, i, 25),
-      period: new Date(year, i).toLocaleString('default', {
-        month: 'long',
-        year: 'numeric',
-      }),
-      periodStart: new Date(year, i, 1),
-      periodEnd: new Date(year, i + 1, 0),
-      grossPay: 18500,
-      netPay: 15234.56,
-      totalDeductions: 3265.44,
-      status: 'paid' as const,
-    })).reverse();
-  }
-
-  private generateMockPayslipDetail(id: string): PayslipDetailDto {
-    const parts = id.split('-');
-    const year = parseInt(parts[1]) || new Date().getFullYear();
-    const month = parseInt(parts[2]) - 1 || new Date().getMonth();
-
-    return {
-      id,
-      payDate: new Date(year, month, 25),
-      period: new Date(year, month).toLocaleString('default', {
-        month: 'long',
-        year: 'numeric',
-      }),
-      periodStart: new Date(year, month, 1),
-      periodEnd: new Date(year, month + 1, 0),
-      grossPay: 18500,
-      netPay: 15234.56,
-      totalDeductions: 3265.44,
-      status: 'paid',
-      earnings: [
-        { name: 'Basic Salary', amount: 17000 },
-        { name: 'Housing Allowance', amount: 1000 },
-        { name: 'Transport Allowance', amount: 500 },
-      ],
-      deductions: [
-        { name: 'PAYE Tax', amount: 2475, type: 'tax' },
-        { name: 'UIF (Employee)', amount: 148.5, type: 'uif' },
-        { name: 'Pension Fund', amount: 555, type: 'pension' },
-        { name: 'Medical Aid', amount: 86.94, type: 'medical' },
-      ],
-      employerContributions: [
-        { name: 'UIF (Employer)', amount: 148.5 },
-        { name: 'SDL', amount: 185 },
-        { name: 'Pension (Employer)', amount: 555 },
-      ],
-      totalEarnings: 18500,
-      totalTax: 2475,
-      totalEmployerContributions: 888.5,
-      paymentMethod: 'Bank Transfer',
-      bankAccount: '****4521',
-    };
+      res.send(pdfBuffer);
+    } catch (error) {
+      this.logger.error(
+        `Failed to download payslip PDF: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new NotFoundException('Payslip PDF not available');
+    }
   }
 
   // ============================================================================
@@ -343,7 +399,6 @@ export class StaffPortalController {
   // ============================================================================
 
   @Get('leave/balances')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get leave balances' })
   @ApiResponse({
@@ -352,13 +407,13 @@ export class StaffPortalController {
     type: LeaveBalancesResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getLeaveBalances(@CurrentUser() user: UserPayload): LeaveBalancesResponseDto {
-    this.logger.log(`Fetching leave balances for staff: ${user.email}`);
+  getLeaveBalances(@CurrentStaff() session: StaffSessionInfo): LeaveBalancesResponseDto {
+    this.logger.log(`Fetching leave balances for staff: ${session.staff.email}`);
 
     const year = new Date().getFullYear();
 
     // Calculate pending days from mock requests
-    const userRequests = this.mockLeaveRequests.get(user.sub) || [];
+    const userRequests = this.mockLeaveRequests.get(session.staffId) || [];
     const pendingByType = userRequests
       .filter((r) => r.status === LeaveStatus.PENDING)
       .reduce(
@@ -410,7 +465,6 @@ export class StaffPortalController {
   }
 
   @Get('leave/requests')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get leave request history' })
   @ApiQuery({
@@ -427,18 +481,18 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getLeaveRequests(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ): LeaveRequestsResponseDto {
-    this.logger.log(`Fetching leave requests for staff: ${user.email}`);
+    this.logger.log(`Fetching leave requests for staff: ${session.staff.email}`);
 
     // Get or initialize user's leave requests
-    let requests = this.mockLeaveRequests.get(user.sub);
+    let requests = this.mockLeaveRequests.get(session.staffId);
     if (!requests) {
       requests = this.generateMockLeaveRequests();
-      this.mockLeaveRequests.set(user.sub, requests);
+      this.mockLeaveRequests.set(session.staffId, requests);
     }
 
     // Filter by status if provided
@@ -464,7 +518,6 @@ export class StaffPortalController {
   }
 
   @Post('leave/requests')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit new leave request' })
@@ -477,10 +530,10 @@ export class StaffPortalController {
   @ApiResponse({ status: 400, description: 'Invalid request data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   createLeaveRequest(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Body() createDto: CreateLeaveRequestDto,
   ): LeaveRequestSuccessDto {
-    this.logger.log(`Creating leave request for staff: ${user.email}`);
+    this.logger.log(`Creating leave request for staff: ${session.staff.email}`);
 
     const startDate = new Date(createDto.startDate);
     const endDate = new Date(createDto.endDate);
@@ -521,9 +574,9 @@ export class StaffPortalController {
     };
 
     // Store the request
-    const userRequests = this.mockLeaveRequests.get(user.sub) || [];
+    const userRequests = this.mockLeaveRequests.get(session.staffId) || [];
     userRequests.unshift(newRequest);
-    this.mockLeaveRequests.set(user.sub, userRequests);
+    this.mockLeaveRequests.set(session.staffId, userRequests);
 
     return {
       message: 'Leave request submitted successfully',
@@ -532,7 +585,6 @@ export class StaffPortalController {
   }
 
   @Delete('leave/requests/:id')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cancel pending leave request' })
@@ -546,12 +598,12 @@ export class StaffPortalController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Leave request not found' })
   cancelLeaveRequest(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
   ): LeaveRequestSuccessDto {
-    this.logger.log(`Cancelling leave request ${id} for staff: ${user.email}`);
+    this.logger.log(`Cancelling leave request ${id} for staff: ${session.staff.email}`);
 
-    const userRequests = this.mockLeaveRequests.get(user.sub) || [];
+    const userRequests = this.mockLeaveRequests.get(session.staffId) || [];
     const requestIndex = userRequests.findIndex((r) => r.id === id);
 
     if (requestIndex === -1) {
@@ -570,7 +622,7 @@ export class StaffPortalController {
     request.status = LeaveStatus.CANCELLED;
     request.updatedAt = new Date();
 
-    this.mockLeaveRequests.set(user.sub, userRequests);
+    this.mockLeaveRequests.set(session.staffId, userRequests);
 
     return {
       message: 'Leave request cancelled successfully',
@@ -675,7 +727,6 @@ export class StaffPortalController {
   // ============================================================================
 
   @Get('documents/irp5')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get IRP5 tax certificates' })
   @ApiQuery({
@@ -690,40 +741,25 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getIRP5Documents(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Query('taxYear') taxYear?: string,
   ): IRP5ListResponseDto {
     this.logger.log(
-      `Fetching IRP5 documents for staff: ${user.email}, taxYear: ${taxYear || 'all'}`,
+      `Fetching IRP5 documents for staff: ${session.staff.email}, taxYear: ${taxYear || 'all'}`,
     );
 
+    // IRP5 documents are not yet available via SimplePay integration.
+    // They will be populated once SARS tax year processing is implemented.
     const currentYear = new Date().getFullYear();
-    const availableYears = [
-      currentYear,
-      currentYear - 1,
-      currentYear - 2,
-      currentYear - 3,
-      currentYear - 4,
-    ];
-
-    // Generate mock IRP5 documents
-    let documents = this.generateMockIRP5Documents(availableYears);
-
-    // Filter by tax year if provided
-    if (taxYear) {
-      const year = parseInt(taxYear);
-      documents = documents.filter((doc) => doc.taxYear === year);
-    }
 
     return {
-      data: documents,
-      total: documents.length,
-      availableYears,
+      data: [],
+      total: 0,
+      availableYears: [currentYear, currentYear - 1],
     };
   }
 
   @Get('documents/irp5/:id/pdf')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Download IRP5 PDF' })
   @ApiParam({ name: 'id', description: 'IRP5 document ID' })
@@ -735,47 +771,15 @@ export class StaffPortalController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'IRP5 document not found' })
   downloadIRP5Pdf(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
-    @Res() res: Response,
   ): void {
-    this.logger.log(`Downloading IRP5 PDF for staff: ${user.email}, id: ${id}`);
+    this.logger.log(`Downloading IRP5 PDF for staff: ${session.staff.email}, id: ${id}`);
 
-    // Extract tax year from ID (e.g., irp5-2024-001 -> 2024)
-    const parts = id.split('-');
-    const taxYear =
-      parts.length >= 2 ? parts[1] : new Date().getFullYear().toString();
-
-    res.set({
-      'Content-Disposition': `attachment; filename="IRP5-${taxYear}.pdf"`,
-      'Content-Type': 'application/pdf',
-    });
-
-    // Create a mock PDF (in production, this would come from SimplePay)
-    const mockPdfContent = Buffer.from(
-      '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj xref 0 4 0000000000 65535 f 0000000009 00000 n 0000000052 00000 n 0000000101 00000 n trailer<</Size 4/Root 1 0 R>>startxref 178 %%EOF',
-      'utf-8',
+    // IRP5 PDFs are not yet available via SimplePay integration
+    throw new NotFoundException(
+      'IRP5 documents are not yet available. They will be available after tax year processing.',
     );
-
-    res.send(mockPdfContent);
-  }
-
-  private generateMockIRP5Documents(years: number[]): IRP5DocumentDto[] {
-    const currentYear = new Date().getFullYear();
-
-    return years.map((year, index) => ({
-      id: `irp5-${year}-001`,
-      taxYear: year,
-      taxYearPeriod: `${year - 1}/${year}`,
-      status: year === currentYear ? IRP5Status.PENDING : IRP5Status.AVAILABLE,
-      availableDate: new Date(year, 2, 1), // March 1st of tax year
-      referenceNumber:
-        year !== currentYear
-          ? `IRP5/${year}/${100000 + index * 12345}`
-          : undefined,
-      lastDownloadDate:
-        index > 0 && index < 3 ? new Date(year, 3 + index, 15) : undefined,
-    }));
   }
 
   // ============================================================================
@@ -783,7 +787,6 @@ export class StaffPortalController {
   // ============================================================================
 
   @Get('profile')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get staff profile' })
   @ApiResponse({
@@ -792,14 +795,69 @@ export class StaffPortalController {
     type: StaffProfileDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getProfile(@CurrentUser() user: UserPayload): StaffProfileDto {
-    this.logger.log(`Fetching profile for staff: ${user.email}`);
+  async getProfile(@CurrentStaff() session: StaffSessionInfo): Promise<StaffProfileDto> {
+    this.logger.log(`Fetching profile for staff: ${session.staff.email}`);
 
-    return this.generateMockProfile(user);
+    const staff = await this.prisma.staff.findUnique({
+      where: { id: session.staffId },
+    });
+
+    if (!staff) {
+      throw new NotFoundException('Staff record not found');
+    }
+
+    return {
+      personal: {
+        fullName: `${staff.firstName} ${staff.lastName}`,
+        idNumber: staff.idNumber
+          ? `******${staff.idNumber.slice(-4)}`
+          : '',
+        dateOfBirth: staff.dateOfBirth,
+        phone: staff.phone || '',
+        email: staff.email || '',
+        address: [
+          staff.address,
+          staff.suburb,
+          staff.city,
+          staff.province,
+          staff.postalCode,
+        ]
+          .filter(Boolean)
+          .join(', ') || '',
+      },
+      employment: {
+        position: staff.position || 'Staff Member',
+        department: staff.department || '',
+        startDate: staff.startDate,
+        employmentType: staff.employmentType || 'PERMANENT',
+        employeeNumber: staff.employeeNumber || '',
+      },
+      banking: {
+        bankName: staff.bankName || '',
+        accountNumber: staff.bankAccount
+          ? `****${staff.bankAccount.slice(-4)}`
+          : '',
+        branchCode: staff.bankBranchCode || '',
+        accountType: staff.bankAccountType || '',
+        updateNote:
+          'To update your banking details, please use the onboarding section or contact HR.',
+      },
+      emergency: {
+        contactName: staff.emergencyContactName || '',
+        relationship: staff.emergencyContactRelation || '',
+        contactPhone: staff.emergencyContactPhone || '',
+      },
+      preferences: {
+        emailPayslipNotifications: true,
+        emailLeaveNotifications: true,
+        emailTaxDocNotifications: true,
+        preferredLanguage: 'en-ZA',
+      },
+      lastUpdated: staff.updatedAt,
+    };
   }
 
   @Put('profile')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update staff profile' })
@@ -811,45 +869,46 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 400, description: 'Invalid update data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  updateProfile(
-    @CurrentUser() user: UserPayload,
+  async updateProfile(
+    @CurrentStaff() session: StaffSessionInfo,
     @Body() updateDto: UpdateProfileDto,
-  ): ProfileUpdateSuccessDto {
-    this.logger.log(`Updating profile for staff: ${user.email}`);
+  ): Promise<ProfileUpdateSuccessDto> {
+    this.logger.log(`Updating profile for staff: ${session.staff.email}`);
 
-    // In production, this would update the database
-    const profile = this.generateMockProfile(user);
+    const updateData: Record<string, unknown> = {};
 
-    // Apply updates
     if (updateDto.phone) {
-      profile.personal.phone = updateDto.phone;
+      updateData.phone = updateDto.phone;
     }
     if (updateDto.email) {
-      profile.personal.email = updateDto.email;
+      updateData.email = updateDto.email;
     }
     if (updateDto.address) {
       const addr = updateDto.address;
-      profile.personal.address = [
-        addr.streetAddress,
-        addr.streetAddress2,
-        addr.suburb,
-        addr.city,
-        addr.province,
-        addr.postalCode,
-      ]
-        .filter(Boolean)
-        .join(', ');
+      if (addr.streetAddress) updateData.address = addr.streetAddress;
+      if (addr.suburb) updateData.suburb = addr.suburb;
+      if (addr.city) updateData.city = addr.city;
+      if (addr.province) updateData.province = addr.province;
+      if (addr.postalCode) updateData.postalCode = addr.postalCode;
     }
     if (updateDto.emergency) {
-      profile.emergency = {
-        contactName: updateDto.emergency.contactName,
-        relationship: updateDto.emergency.relationship,
-        contactPhone: updateDto.emergency.contactPhone,
-        alternatePhone: updateDto.emergency.alternatePhone,
-      };
+      if (updateDto.emergency.contactName)
+        updateData.emergencyContactName = updateDto.emergency.contactName;
+      if (updateDto.emergency.relationship)
+        updateData.emergencyContactRelation = updateDto.emergency.relationship;
+      if (updateDto.emergency.contactPhone)
+        updateData.emergencyContactPhone = updateDto.emergency.contactPhone;
     }
 
-    profile.lastUpdated = new Date();
+    if (Object.keys(updateData).length > 0) {
+      await this.prisma.staff.update({
+        where: { id: session.staffId },
+        data: updateData,
+      });
+    }
+
+    // Return updated profile
+    const profile = await this.getProfile(session);
 
     return {
       message: 'Profile updated successfully',
@@ -858,7 +917,6 @@ export class StaffPortalController {
   }
 
   @Get('banking')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get banking details (masked)' })
   @ApiResponse({
@@ -867,16 +925,28 @@ export class StaffPortalController {
     type: BankingDetailsDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getBankingDetails(@CurrentUser() user: UserPayload): BankingDetailsDto {
-    this.logger.log(`Fetching banking details for staff: ${user.email}`);
+  async getBankingDetails(@CurrentStaff() session: StaffSessionInfo): Promise<BankingDetailsDto> {
+    this.logger.log(`Fetching banking details for staff: ${session.staff.email}`);
+
+    const staff = await this.prisma.staff.findUnique({
+      where: { id: session.staffId },
+      select: {
+        bankName: true,
+        bankAccount: true,
+        bankBranchCode: true,
+        bankAccountType: true,
+      },
+    });
 
     return {
-      bankName: 'First National Bank',
-      accountNumber: '****4521',
-      branchCode: '250655',
-      accountType: 'Cheque Account',
+      bankName: staff?.bankName || '',
+      accountNumber: staff?.bankAccount
+        ? `****${staff.bankAccount.slice(-4)}`
+        : '',
+      branchCode: staff?.bankBranchCode || '',
+      accountType: staff?.bankAccountType || '',
       updateNote:
-        'To update your banking details, please contact HR directly. Changes require verification for your protection.',
+        'To update your banking details, please use the onboarding section or contact HR.',
     };
   }
 
@@ -885,7 +955,6 @@ export class StaffPortalController {
   // ============================================================================
 
   @Get('onboarding')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get staff onboarding status and progress' })
   @ApiResponse({
@@ -893,11 +962,11 @@ export class StaffPortalController {
     description: 'Onboarding status retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getOnboardingStatus(@CurrentUser() user: UserPayload) {
-    this.logger.log(`Fetching onboarding status for staff: ${user.sub}`);
+  async getOnboardingStatus(@CurrentStaff() session: StaffSessionInfo) {
+    this.logger.log(`Fetching onboarding status for staff: ${session.staffId}`);
 
     const onboarding = await this.onboardingService.getOnboardingByStaffId(
-      user.sub,
+      session.staffId,
     );
 
     if (!onboarding) {
@@ -921,7 +990,7 @@ export class StaffPortalController {
 
     // Get generated documents for signatures step
     const generatedDocs = await this.onboardingService.getGeneratedDocuments(
-      user.sub,
+      session.staffId,
     );
 
     // Map checklist items to required actions for UI
@@ -1012,7 +1081,6 @@ export class StaffPortalController {
   }
 
   @Patch('onboarding/tax')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update tax information' })
@@ -1022,14 +1090,14 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async updateTaxInfo(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Body() body: { taxNumber?: string; taxStatus?: string },
   ) {
-    this.logger.log(`Updating tax info for staff: ${user.sub}`);
+    this.logger.log(`Updating tax info for staff: ${session.staffId}`);
 
     // Update staff record directly
     await this.prisma.staff.update({
-      where: { id: user.sub },
+      where: { id: session.staffId },
       data: {
         taxNumber: body.taxNumber,
         taxStatus: body.taxStatus,
@@ -1038,17 +1106,17 @@ export class StaffPortalController {
 
     // Update onboarding step if exists
     const onboarding = await this.onboardingService.getOnboardingByStaffId(
-      user.sub,
+      session.staffId,
     );
     if (onboarding) {
       await this.onboardingService.updateOnboardingStep(
-        user.sub,
+        session.staffId,
         {
           step: 'TAX_INFO' as OnboardingStep,
           data: body,
         },
-        user.sub,
-        user.tenantId || '',
+        session.staffId,
+        session.tenantId || '',
       );
     }
 
@@ -1059,7 +1127,6 @@ export class StaffPortalController {
   }
 
   @Patch('onboarding/banking')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update banking details' })
@@ -1069,7 +1136,7 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async updateBankingDetails(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Body()
     body: {
       bankName?: string;
@@ -1078,11 +1145,11 @@ export class StaffPortalController {
       bankAccountType?: string;
     },
   ) {
-    this.logger.log(`Updating banking details for staff: ${user.sub}`);
+    this.logger.log(`Updating banking details for staff: ${session.staffId}`);
 
     // Update staff record directly
     await this.prisma.staff.update({
-      where: { id: user.sub },
+      where: { id: session.staffId },
       data: {
         bankName: body.bankName,
         bankAccount: body.bankAccount,
@@ -1093,17 +1160,17 @@ export class StaffPortalController {
 
     // Update onboarding step if exists
     const onboarding = await this.onboardingService.getOnboardingByStaffId(
-      user.sub,
+      session.staffId,
     );
     if (onboarding) {
       await this.onboardingService.updateOnboardingStep(
-        user.sub,
+        session.staffId,
         {
           step: 'BANKING' as OnboardingStep,
           data: body,
         },
-        user.sub,
-        user.tenantId || '',
+        session.staffId,
+        session.tenantId || '',
       );
     }
 
@@ -1114,7 +1181,6 @@ export class StaffPortalController {
   }
 
   @Get('onboarding/documents')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get uploaded documents for onboarding' })
   @ApiResponse({
@@ -1122,10 +1188,10 @@ export class StaffPortalController {
     description: 'Documents retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getOnboardingDocuments(@CurrentUser() user: UserPayload) {
-    this.logger.log(`Fetching onboarding documents for staff: ${user.sub}`);
+  async getOnboardingDocuments(@CurrentStaff() session: StaffSessionInfo) {
+    this.logger.log(`Fetching onboarding documents for staff: ${session.staffId}`);
 
-    const documents = await this.documentService.getDocumentsByStaff(user.sub);
+    const documents = await this.documentService.getDocumentsByStaff(session.staffId);
 
     return {
       documents: documents.map((doc) => ({
@@ -1141,16 +1207,15 @@ export class StaffPortalController {
   }
 
   @Post('onboarding/documents')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
         destination: (req, _file, cb) => {
-          const staffId = (req as unknown as { user?: UserPayload }).user?.sub;
-          const tenantId = (req as unknown as { user?: UserPayload }).user
-            ?.tenantId;
+          const session = (req as unknown as { staffSession?: StaffSessionInfo }).staffSession;
+          const staffId = session?.staffId;
+          const tenantId = session?.tenantId;
           const uploadPath = path.join(
             process.cwd(),
             'uploads',
@@ -1196,7 +1261,7 @@ export class StaffPortalController {
   @ApiResponse({ status: 400, description: 'Invalid file or document type' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async uploadOnboardingDocument(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @UploadedFile() file: Express.Multer.File,
     @Body('documentType') documentType: string,
   ) {
@@ -1209,20 +1274,20 @@ export class StaffPortalController {
     }
 
     this.logger.log(
-      `Uploading document ${file.originalname} (${documentType}) for staff ${user.sub}`,
+      `Uploading document ${file.originalname} (${documentType}) for staff ${session.staffId}`,
     );
 
     const document = await this.documentService.uploadDocument(
-      user.tenantId || '',
+      session.tenantId || '',
       {
-        staffId: user.sub,
+        staffId: session.staffId,
         documentType: documentType as DocumentType,
         fileName: file.originalname,
         fileUrl: file.path,
         fileSize: file.size,
         mimeType: file.mimetype,
       },
-      user.sub,
+      session.staffId,
     );
 
     return {
@@ -1238,7 +1303,6 @@ export class StaffPortalController {
   }
 
   @Get('onboarding/generated-documents')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get generated documents requiring signature' })
   @ApiResponse({
@@ -1246,10 +1310,10 @@ export class StaffPortalController {
     description: 'Generated documents retrieved successfully',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getGeneratedDocuments(@CurrentUser() user: UserPayload) {
-    this.logger.log(`Fetching generated documents for staff: ${user.sub}`);
+  async getGeneratedDocuments(@CurrentStaff() session: StaffSessionInfo) {
+    this.logger.log(`Fetching generated documents for staff: ${session.staffId}`);
 
-    const result = await this.onboardingService.getGeneratedDocuments(user.sub);
+    const result = await this.onboardingService.getGeneratedDocuments(session.staffId);
 
     return {
       documents: result.documents,
@@ -1259,7 +1323,6 @@ export class StaffPortalController {
   }
 
   @Post('onboarding/signatures/:documentId/sign')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign a generated document' })
@@ -1272,12 +1335,12 @@ export class StaffPortalController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Document not found' })
   async signDocument(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Param('documentId') documentId: string,
     @Body() body: { signedByName: string },
     @Req() req: Request,
   ) {
-    this.logger.log(`Signing document ${documentId} by staff ${user.sub}`);
+    this.logger.log(`Signing document ${documentId} by staff ${session.staffId}`);
 
     // Get client IP
     const clientIp =
@@ -1301,7 +1364,6 @@ export class StaffPortalController {
   }
 
   @Get('onboarding/generated-documents/:documentId/download')
-  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Download a generated document PDF' })
   @ApiParam({ name: 'documentId', description: 'Generated document ID' })
@@ -1314,12 +1376,12 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 404, description: 'Document not found' })
   async downloadGeneratedDocument(
-    @CurrentUser() user: UserPayload,
+    @CurrentStaff() session: StaffSessionInfo,
     @Param('documentId') documentId: string,
     @Res() res: Response,
   ) {
     this.logger.log(
-      `Downloading generated document ${documentId} for staff ${user.sub}`,
+      `Downloading generated document ${documentId} for staff ${session.staffId}`,
     );
 
     const document =
@@ -1341,45 +1403,4 @@ export class StaffPortalController {
     res.send(fileBuffer);
   }
 
-  private generateMockProfile(user: UserPayload): StaffProfileDto {
-    return {
-      personal: {
-        fullName: user.name || 'Thandi Nkosi',
-        idNumber: '******1234085',
-        dateOfBirth: new Date(1990, 4, 15),
-        phone: '+27 82 123 4567',
-        email: user.email,
-        address: '123 Main Street, Sandton, Johannesburg, Gauteng, 2196',
-      },
-      employment: {
-        position: 'Early Childhood Development Practitioner',
-        department: 'Education',
-        startDate: new Date(2023, 2, 15),
-        employmentType: 'Full-time',
-        employeeNumber: 'EMP-001',
-        managerName: 'Sarah Manager',
-      },
-      banking: {
-        bankName: 'First National Bank',
-        accountNumber: '****4521',
-        branchCode: '250655',
-        accountType: 'Cheque Account',
-        updateNote:
-          'To update your banking details, please contact HR directly. Changes require verification for your protection.',
-      },
-      emergency: {
-        contactName: 'Sipho Nkosi',
-        relationship: 'Spouse',
-        contactPhone: '+27 83 987 6543',
-        alternatePhone: '+27 11 123 4567',
-      },
-      preferences: {
-        emailPayslipNotifications: true,
-        emailLeaveNotifications: true,
-        emailTaxDocNotifications: true,
-        preferredLanguage: 'en-ZA',
-      },
-      lastUpdated: new Date(),
-    };
-  }
 }

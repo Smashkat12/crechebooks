@@ -137,27 +137,35 @@ export class TransactionController {
       { isSplit: boolean; splitCount: number }
     >();
 
+    // Wrap categorization fetch in try-catch so it doesn't fail the whole list
     for (const txId of transactionIds) {
-      const cats = await this.categorizationRepo.findByTransaction(txId);
-      if (cats.length > 0) {
-        // Check if transaction has splits
-        const splitCats = cats.filter((c) => c.isSplit);
-        const isSplit = splitCats.length > 0;
-        splitInfoMap.set(txId, {
-          isSplit,
-          splitCount: isSplit ? splitCats.length : 0,
-        });
+      try {
+        const cats = await this.categorizationRepo.findByTransaction(txId);
+        if (cats.length > 0) {
+          // Check if transaction has splits
+          const splitCats = cats.filter((c) => c.isSplit);
+          const isSplit = splitCats.length > 0;
+          splitInfoMap.set(txId, {
+            isSplit,
+            splitCount: isSplit ? splitCats.length : 0,
+          });
 
-        // Use most recent non-split categorization, or first if all are splits
-        const primary = cats.find((c) => !c.isSplit) ?? cats[0];
-        categorizationMap.set(txId, {
-          account_code: primary.accountCode,
-          account_name: primary.accountName,
-          confidence_score: Number(primary.confidenceScore),
-          source: primary.source as unknown as CategorizationSourceEnum,
-          reviewed_at: primary.reviewedAt ?? undefined,
-        });
-      } else {
+          // Use most recent non-split categorization, or first if all are splits
+          const primary = cats.find((c) => !c.isSplit) ?? cats[0];
+          categorizationMap.set(txId, {
+            account_code: primary.accountCode,
+            account_name: primary.accountName,
+            confidence_score: Number(primary.confidenceScore),
+            source: primary.source as unknown as CategorizationSourceEnum,
+            reviewed_at: primary.reviewedAt ?? undefined,
+          });
+        } else {
+          splitInfoMap.set(txId, { isSplit: false, splitCount: 0 });
+        }
+      } catch (catError) {
+        this.logger.warn(
+          `Failed to fetch categorization for transaction ${txId}: ${catError instanceof Error ? catError.message : String(catError)}`,
+        );
         splitInfoMap.set(txId, { isSplit: false, splitCount: 0 });
       }
     }

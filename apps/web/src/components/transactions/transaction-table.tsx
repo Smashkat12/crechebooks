@@ -18,7 +18,8 @@ import { SplitTransactionModal, SplitRow } from './SplitTransactionModal';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { useTransactionsList } from '@/hooks/use-transactions';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertCircle, Loader2, Upload, FileSpreadsheet } from 'lucide-react';
 
 interface TransactionTableProps {
   tenantId: string;
@@ -115,12 +116,32 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
 
   if (isError) {
     return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Failed to load transactions: {error instanceof Error ? error.message : 'Unknown error'}
-        </AlertDescription>
-      </Alert>
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <AlertCircle className="h-10 w-10 text-destructive mb-4" />
+        <h3 className="text-lg font-medium mb-1">Unable to load transactions</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Something went wrong while fetching your transactions. Please try again.
+        </p>
+        <Button variant="outline" onClick={() => refetch()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const hasTransactions = (data?.transactions?.length ?? 0) > 0;
+  const hasActiveFilters = filters.status !== 'all' || filters.search || filters.categoryCode || filters.dateRange;
+
+  // Empty state when no transactions exist at all
+  if (!hasTransactions && !hasActiveFilters) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <FileSpreadsheet className="h-12 w-12 text-muted-foreground/50 mb-4" />
+        <h3 className="text-lg font-medium mb-1">No transactions yet</h3>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Import a bank statement to get started. Once imported, transactions will appear here for categorization and reconciliation.
+        </p>
+      </div>
     );
   }
 

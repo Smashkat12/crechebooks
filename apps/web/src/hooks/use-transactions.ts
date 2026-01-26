@@ -134,12 +134,13 @@ export function useTransactionsList(params?: TransactionListParams) {
         params,
       });
       return {
-        transactions: data.data.map(transformTransaction),
-        total: data.meta.total,
-        page: data.meta.page,
-        limit: data.meta.limit,
+        transactions: (data.data ?? []).map(transformTransaction),
+        total: data.meta?.total ?? 0,
+        page: data.meta?.page ?? 1,
+        limit: data.meta?.limit ?? 20,
       };
     },
+    retry: 1,
   });
 }
 

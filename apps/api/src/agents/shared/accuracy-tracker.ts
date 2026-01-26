@@ -33,6 +33,7 @@ class AgentDB {
     // Stub: agentic-flow not installed
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getAccuracyStats(
     _tenantId: string,
     _agentType: string,

@@ -76,7 +76,7 @@ export class TenantCollectionManager implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async onModuleInit(): Promise<void> {
+  onModuleInit(): void {
     this.logger.log(
       `TenantCollectionManager initialized ` +
         `(maxCache=${String(this.maxCacheSize)}, dataDir=${this.dataDir}, ` +
@@ -90,7 +90,7 @@ export class TenantCollectionManager implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  async onModuleDestroy(): Promise<void> {
+  onModuleDestroy(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
       this.cleanupInterval = null;
@@ -115,6 +115,7 @@ export class TenantCollectionManager implements OnModuleInit, OnModuleDestroy {
    * @param purpose - Collection purpose (decisions, reasoning, patterns, embeddings)
    * @returns VectorDBInstance scoped to this tenant+purpose
    */
+  // eslint-disable-next-line @typescript-eslint/require-await
   async getCollection(
     tenantId: string,
     purpose: CollectionPurpose,

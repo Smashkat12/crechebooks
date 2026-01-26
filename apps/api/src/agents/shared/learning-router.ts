@@ -89,6 +89,7 @@ export class LearningRouter implements OnModuleInit, LearningRouterInterface {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async onModuleInit(): Promise<void> {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports

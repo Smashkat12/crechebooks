@@ -1022,25 +1022,26 @@ export class StaffPortalController {
     // Add signature items from generated documents
     if (generatedDocs.documents.length > 0) {
       for (const doc of generatedDocs.documents) {
+        const docType = doc.documentType as string;
         const existingAction = requiredActions.find(
           (a) =>
             a.id ===
-            (doc.documentType === 'EMPLOYMENT_CONTRACT'
+            (docType === 'EMPLOYMENT_CONTRACT'
               ? 'employment_contract'
               : 'popia_consent'),
         );
         if (!existingAction) {
           requiredActions.push({
             id:
-              doc.documentType === 'EMPLOYMENT_CONTRACT'
+              docType === 'EMPLOYMENT_CONTRACT'
                 ? 'employment_contract'
                 : 'popia_consent',
             title:
-              doc.documentType === 'EMPLOYMENT_CONTRACT'
+              docType === 'EMPLOYMENT_CONTRACT'
                 ? 'Sign Employment Contract'
                 : 'Sign POPIA Consent',
             description:
-              doc.documentType === 'EMPLOYMENT_CONTRACT'
+              docType === 'EMPLOYMENT_CONTRACT'
                 ? 'Review and sign your employment contract'
                 : 'Consent to processing of personal information',
             category: 'signatures',

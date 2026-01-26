@@ -32,7 +32,11 @@ jest.mock('ruvector', () => ({
     ]),
     learn: jest.fn().mockResolvedValue(undefined),
     getStats: jest.fn().mockResolvedValue({
-      vectorDb: { totalVectors: 1500, collections: 4, storageSizeBytes: 2048000 },
+      vectorDb: {
+        totalVectors: 1500,
+        collections: 4,
+        storageSizeBytes: 2048000,
+      },
       sona: {
         trajectoriesRecorded: 350,
         patternsLearned: 42,
@@ -59,15 +63,17 @@ describe('IntelligenceEngineService', () => {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
-          load: [() => ({
-            RUVECTOR_DATA_DIR: './data/test-ruvector',
-            RUVECTOR_EMBEDDING_DIM: 384,
-            RUVECTOR_MAX_MEMORIES: 100000,
-            RUVECTOR_MAX_EPISODES: 50000,
-            RUVECTOR_ENABLE_SONA: 'true',
-            RUVECTOR_ENABLE_ATTENTION: 'false',
-            RUVECTOR_LEARNING_RATE: 0.1,
-          })],
+          load: [
+            () => ({
+              RUVECTOR_DATA_DIR: './data/test-ruvector',
+              RUVECTOR_EMBEDDING_DIM: 384,
+              RUVECTOR_MAX_MEMORIES: 100000,
+              RUVECTOR_MAX_EPISODES: 50000,
+              RUVECTOR_ENABLE_SONA: 'true',
+              RUVECTOR_ENABLE_ATTENTION: 'false',
+              RUVECTOR_LEARNING_RATE: 0.1,
+            }),
+          ],
         }),
       ],
       providers: [IntelligenceEngineService],
@@ -85,9 +91,12 @@ describe('IntelligenceEngineService', () => {
 
     it('should handle initialization failure gracefully', async () => {
       // Override mock to throw on initialize
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { IntelligenceEngine } = require('ruvector');
       IntelligenceEngine.mockImplementationOnce(() => ({
-        initialize: jest.fn().mockRejectedValue(new Error('Storage unavailable')),
+        initialize: jest
+          .fn()
+          .mockRejectedValue(new Error('Storage unavailable')),
       }));
 
       const failService = new IntelligenceEngineService(configService);

@@ -153,7 +153,9 @@ describe('GnnPatternAdapter', () => {
       testAccess.ruvectorLayer = mockLayer;
       testAccess.initialized = true;
 
-      mockPrisma.payeePattern.upsert.mockRejectedValue(new Error('DB down'));
+      (
+        mockPrisma.payeePattern.upsert as unknown as jest.Mock
+      ).mockRejectedValue(new Error('DB down'));
 
       // Should not throw
       await expect(

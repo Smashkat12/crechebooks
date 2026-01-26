@@ -930,6 +930,9 @@ describe('SdkOrchestrator', () => {
           confidenceScore: 95,
           reasoning: 'ok',
           accountCode: '6100',
+          accountName: 'Salaries',
+          vatType: 'EXEMPT' as any,
+          isSplit: false,
         })
         .mockRejectedValueOnce(new Error('AI timeout'))
         .mockResolvedValueOnce({
@@ -937,6 +940,9 @@ describe('SdkOrchestrator', () => {
           confidenceScore: 40,
           reasoning: 'unsure',
           accountCode: '9999',
+          accountName: 'Suspense',
+          vatType: 'NO_VAT' as any,
+          isSplit: false,
         });
 
       const request = createRequest('CATEGORIZE_TRANSACTIONS');
@@ -957,7 +963,21 @@ describe('SdkOrchestrator', () => {
       (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue(credits);
 
       mockMatcher.findCandidates
-        .mockResolvedValueOnce([{ invoiceId: 'inv-001', confidence: 90 }])
+        .mockResolvedValueOnce([
+          {
+            invoice: {
+              id: 'inv-001',
+              invoiceNumber: 'INV-001',
+              totalCents: 100000,
+              amountPaidCents: 0,
+              parentId: 'parent-001',
+              parent: { firstName: 'John', lastName: 'Doe' },
+              child: { firstName: 'Jane' },
+            },
+            confidence: 90,
+            matchReasons: ['Exact amount match'],
+          },
+        ])
         .mockRejectedValueOnce(new Error('Search failed'));
 
       const request = createRequest('MATCH_PAYMENTS');
@@ -1138,11 +1158,15 @@ describe('SdkOrchestrator', () => {
       (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue([tx]);
 
       mockMatcher.makeMatchDecision.mockResolvedValue({
+        transactionId: 'txn-review',
         action: 'REVIEW_REQUIRED',
         confidence: 60,
         reasoning: 'Multiple possible matches',
         invoiceId: 'inv-001',
-        alternatives: [{ invoiceId: 'inv-002' }],
+        invoiceNumber: 'INV-001',
+        alternatives: [
+          { invoiceId: 'inv-002', invoiceNumber: 'INV-002', confidence: 50 },
+        ],
       });
 
       const request = createRequest('MATCH_PAYMENTS');
@@ -1166,9 +1190,11 @@ describe('SdkOrchestrator', () => {
       (mockPrisma.transaction.findMany as jest.Mock).mockResolvedValue([tx]);
 
       mockMatcher.makeMatchDecision.mockResolvedValue({
+        transactionId: 'txn-nomatch',
         action: 'NO_MATCH',
         confidence: 0,
         reasoning: 'No matching invoices found',
+        alternatives: [],
       });
 
       const request = createRequest('MATCH_PAYMENTS');
@@ -1190,6 +1216,9 @@ describe('SdkOrchestrator', () => {
         confidenceScore: 40,
         reasoning: 'Cannot determine category',
         accountCode: '9999',
+        accountName: 'Suspense',
+        vatType: 'NO_VAT' as any,
+        isSplit: false,
       });
 
       const request = createRequest('CATEGORIZE_TRANSACTIONS');

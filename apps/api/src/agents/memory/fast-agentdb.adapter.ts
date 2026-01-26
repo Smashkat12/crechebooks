@@ -111,10 +111,9 @@ export class FastAgentDBAdapter implements AgentDBInterface {
     try {
       // Dynamic import to avoid hard dependency on ruvector
       const { FastAgentDB } = await import('ruvector');
-      this.fastAgentDB = new FastAgentDB({
-        maxEpisodes:
-          this.configService?.get<number>('AGENTDB_MAX_EPISODES') ?? 50_000,
-      }) as FastAgentDBInstance;
+      this.fastAgentDB = new FastAgentDB(
+        this.configService?.get<number>('AGENTDB_MAX_EPISODES') ?? 50_000,
+      ) as unknown as FastAgentDBInstance;
 
       // Dynamic import to avoid hard dependency on agentic-flow
       const { ReflexionMemory } = await import('agentic-flow/agentdb');

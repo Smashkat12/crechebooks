@@ -86,12 +86,12 @@ export class FeatureFlagService {
         flag,
         enabled: true,
         mode: SdkMode.SHADOW,
-        metadata: metadata ?? undefined,
+        metadata: (metadata ?? undefined) as never,
       },
       update: {
         enabled: true,
         mode: SdkMode.SHADOW,
-        metadata: metadata ?? undefined,
+        metadata: (metadata ?? undefined) as never,
       },
     });
   }
@@ -117,12 +117,12 @@ export class FeatureFlagService {
         flag,
         enabled: true,
         mode: SdkMode.PRIMARY,
-        metadata: metadata ?? undefined,
+        metadata: (metadata ?? undefined) as never,
       },
       update: {
         enabled: true,
         mode: SdkMode.PRIMARY,
-        metadata: metadata ?? undefined,
+        metadata: (metadata ?? undefined) as never,
       },
     });
   }

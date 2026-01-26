@@ -30,6 +30,8 @@ describe('PayeeAliasService', () => {
     confidenceBoost: new Decimal(10),
     matchCount: 5,
     isRecurring: false,
+    isActive: true,
+    source: 'MANUAL',
     expectedAmountCents: null,
     amountVariancePercent: null,
     createdAt: new Date('2024-01-01'),

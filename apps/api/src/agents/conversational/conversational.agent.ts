@@ -320,7 +320,7 @@ export class ConversationalAgent extends BaseSdkAgent {
     for (const inv of invoices) {
       totalCents += inv.totalCents ?? 0;
       paidCents += inv.amountPaidCents ?? 0;
-      if (inv.status !== 'PAID' && inv.status !== 'CANCELLED') {
+      if (inv.status !== 'PAID' && inv.status !== 'VOID') {
         outstandingCount++;
       }
     }
@@ -383,7 +383,7 @@ export class ConversationalAgent extends BaseSdkAgent {
     }
 
     const childCount = await this.prisma.child.count({
-      where: { tenantId, isDeleted: false },
+      where: { tenantId, deletedAt: null },
     });
 
     if (childCount === 0) {
@@ -418,7 +418,7 @@ export class ConversationalAgent extends BaseSdkAgent {
 
     // Children enrolled
     const childCount = await this.prisma.child.count({
-      where: { tenantId, isDeleted: false },
+      where: { tenantId, deletedAt: null },
     });
 
     // Outstanding invoices
@@ -433,7 +433,7 @@ export class ConversationalAgent extends BaseSdkAgent {
 
     let outstandingCents = 0;
     for (const inv of invoices) {
-      if (inv.status !== 'PAID' && inv.status !== 'CANCELLED') {
+      if (inv.status !== 'PAID' && inv.status !== 'VOID') {
         outstandingCents += (inv.totalCents ?? 0) - (inv.amountPaidCents ?? 0);
       }
     }

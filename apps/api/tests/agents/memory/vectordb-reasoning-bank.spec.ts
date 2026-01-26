@@ -68,8 +68,8 @@ function injectMocks(
   bank: VectorDBReasoningBank,
   vectorDb: MockVectorDb,
 ): void {
-  (bank as Record<string, unknown>)['vectorDb'] = vectorDb;
-  (bank as Record<string, unknown>)['initialized'] = true;
+  (bank as unknown as Record<string, unknown>)['vectorDb'] = vectorDb;
+  (bank as unknown as Record<string, unknown>)['initialized'] = true;
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ describe('VectorDBReasoningBank', () => {
     it('should not throw when VectorDB is unavailable', async () => {
       mockRuvector.isAvailable.mockReturnValue(false);
       // Reset initialized to trigger ensureInitialized
-      (bank as Record<string, unknown>)['initialized'] = false;
+      (bank as unknown as Record<string, unknown>)['initialized'] = false;
 
       await expect(
         bank.store({
@@ -258,7 +258,7 @@ describe('VectorDBReasoningBank', () => {
     });
 
     it('should return without storing when ruvector is not available after init', async () => {
-      (bank as Record<string, unknown>)['initialized'] = false;
+      (bank as unknown as Record<string, unknown>)['initialized'] = false;
       mockRuvector.isAvailable.mockReturnValue(false);
 
       await bank.store({
@@ -278,7 +278,7 @@ describe('VectorDBReasoningBank', () => {
 
   describe('get', () => {
     it('should return null when VectorDB is unavailable', async () => {
-      (bank as Record<string, unknown>)['initialized'] = false;
+      (bank as unknown as Record<string, unknown>)['initialized'] = false;
       mockRuvector.isAvailable.mockReturnValue(false);
 
       const result = await bank.get('dec-1');
@@ -354,7 +354,7 @@ describe('VectorDBReasoningBank', () => {
 
   describe('findSimilarReasoning', () => {
     it('should return empty array when VectorDB unavailable', async () => {
-      (bank as Record<string, unknown>)['initialized'] = false;
+      (bank as unknown as Record<string, unknown>)['initialized'] = false;
       mockRuvector.isAvailable.mockReturnValue(false);
 
       const results = await bank.findSimilarReasoning('test', 't1');
@@ -363,7 +363,8 @@ describe('VectorDBReasoningBank', () => {
 
     it('should return empty array when ruvector is not provided', async () => {
       const bankNoRuvector = new VectorDBReasoningBank();
-      (bankNoRuvector as Record<string, unknown>)['initialized'] = false;
+      (bankNoRuvector as unknown as Record<string, unknown>)['initialized'] =
+        false;
 
       const results = await bankNoRuvector.findSimilarReasoning('test', 't1');
       expect(results).toEqual([]);

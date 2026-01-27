@@ -145,7 +145,7 @@ jobs:
           NEXT_PUBLIC_API_URL: http://localhost:3000
 
       - name: Upload Web coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./apps/web/coverage/lcov.info
           flags: web

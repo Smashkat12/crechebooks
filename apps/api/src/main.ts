@@ -6,12 +6,14 @@
  * TASK-INFRA-007: Added shutdown hooks for graceful Bull queue shutdown
  * TASK-INFRA-008: Added request payload size limits
  * TASK-SEC-103: Enhanced CSP with environment configuration and report-only mode
+ * TASK-SEC-106: Protect Swagger API docs with Basic Auth and environment toggle
  */
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
+import basicAuth from 'express-basic-auth';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -186,39 +188,72 @@ async function bootstrap(): Promise<void> {
     exclude: ['health'],
   });
 
-  // Swagger configuration
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('CrecheBooks API')
-    .setDescription(
-      'AI-powered bookkeeping system for South African creches and pre-schools',
-    )
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Enter your Auth0 JWT token',
-      },
-      'JWT-auth',
-    )
-    .addTag('Authentication', 'OAuth2 authentication endpoints')
-    .addTag('Health', 'Health check endpoints')
-    .build();
+  // TASK-SEC-106: Conditionally enable Swagger with Basic Auth protection
+  // In production, docs are disabled by default. Set SWAGGER_ENABLED=true to enable.
+  // When enabled, SWAGGER_USER and SWAGGER_PASSWORD are required for access.
+  const swaggerEnabled =
+    process.env.SWAGGER_ENABLED === 'true' || !isProduction;
+  const swaggerUser = process.env.SWAGGER_USER;
+  const swaggerPassword = process.env.SWAGGER_PASSWORD;
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+  if (swaggerEnabled) {
+    // In production, require credentials — refuse to expose docs without auth
+    if (isProduction && (!swaggerUser || !swaggerPassword)) {
+      logger.warn(
+        'Swagger docs disabled in production: SWAGGER_USER and SWAGGER_PASSWORD must be set when SWAGGER_ENABLED=true',
+      );
+    } else {
+      // Apply HTTP Basic Auth middleware to docs path when credentials are configured
+      if (swaggerUser && swaggerPassword) {
+        const docsAuth = basicAuth({
+          users: { [swaggerUser]: swaggerPassword },
+          challenge: true,
+          realm: 'CrecheBooks API Documentation',
+        });
+        app.use('/api/docs', docsAuth);
+        logger.log('Swagger docs protected with HTTP Basic Auth');
+      } else {
+        logger.warn(
+          'Swagger docs enabled WITHOUT authentication (development mode)',
+        );
+      }
+
+      const swaggerConfig = new DocumentBuilder()
+        .setTitle('CrecheBooks API')
+        .setDescription(
+          'AI-powered bookkeeping system for South African creches and pre-schools',
+        )
+        .setVersion('1.0')
+        .addBearerAuth(
+          {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+            description: 'Enter your Auth0 JWT token',
+          },
+          'JWT-auth',
+        )
+        .addTag('Authentication', 'OAuth2 authentication endpoints')
+        .addTag('Health', 'Health check endpoints')
+        .build();
+
+      const document = SwaggerModule.createDocument(app, swaggerConfig);
+      SwaggerModule.setup('api/docs', app, document, {
+        swaggerOptions: {
+          persistAuthorization: true,
+        },
+      });
+
+      logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
+    }
+  } else {
+    logger.log('Swagger docs disabled (production default)');
+  }
 
   await app.listen(port);
   logger.log(`CrecheBooks API running on port ${port}`);
-  logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
   logger.log(`Health check: http://localhost:${port}/health`);
   logger.log(`Auth login: http://localhost:${port}/api/v1/auth/login`);
-  logger.log(`✅ Railway GitHub integration - deployment test`);
 }
 
 void bootstrap();

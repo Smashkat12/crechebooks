@@ -7,9 +7,13 @@
 # Stage 1: Dependencies
 FROM node:20-slim AS deps
 
-# Install required system dependencies
+# Install required system dependencies (python3/make/g++ needed for native modules like hnswlib-node)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssl \
     ca-certificates \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

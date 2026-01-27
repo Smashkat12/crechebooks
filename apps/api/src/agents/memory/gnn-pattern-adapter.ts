@@ -30,6 +30,9 @@ import type {
 /** Injection token for GNN pattern learner */
 export const GNN_PATTERN_TOKEN = 'GNN_PATTERN_LEARNER';
 
+/** Injection token for optional GNN adapter config */
+export const GNN_ADAPTER_CONFIG = 'GNN_ADAPTER_CONFIG';
+
 /** GNN hidden dimension (output of RuvectorLayer) */
 const GNN_HIDDEN_DIM = 256;
 /** GNN attention heads */
@@ -94,6 +97,8 @@ export class GnnPatternAdapter implements GnnPatternInterface {
     @Optional()
     @Inject(PrismaService)
     private readonly prisma?: PrismaService,
+    @Optional()
+    @Inject(GNN_ADAPTER_CONFIG)
     config?: Partial<GnnAdapterConfig>,
   ) {
     this.config = { ...DEFAULT_GNN_CONFIG, ...config };

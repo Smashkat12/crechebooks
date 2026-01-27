@@ -14,7 +14,7 @@
     "start:prod": "node dist/main",
     "start:prod:migrate": "npx prisma migrate deploy && npx tsx scripts/create-super-admin.ts && node dist/main",
     "lint": "eslint \"{src,test,tests}/**/*.ts\" --fix",
-    "test": "jest --runInBand",
+    "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",

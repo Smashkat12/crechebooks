@@ -99,7 +99,7 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
 
       - name: Run API unit tests (parallel)
-        run: pnpm --filter @crechebooks/api test:unit -- --coverage
+        run: pnpm --filter @crechebooks/api test:unit:cov
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
           JWT_SECRET: test-secret-key-for-ci

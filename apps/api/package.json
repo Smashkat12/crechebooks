@@ -16,6 +16,7 @@
     "lint": "eslint \"{src,test,tests}/**/*.ts\" --fix",
     "test": "jest",
     "test:unit": "jest --testPathIgnorePatterns tests/",
+    "test:unit:cov": "jest --testPathIgnorePatterns tests/ --coverage",
     "test:integration": "jest --runInBand --testPathPattern tests/",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

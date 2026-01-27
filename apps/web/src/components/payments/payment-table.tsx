@@ -48,12 +48,10 @@ export function PaymentTable({ tenantId, className }: PaymentTableProps) {
 
   const handleView = (payment: IPayment) => {
     // TODO: Implement view details modal or navigate to detail page
-    console.log('View payment:', payment);
   };
 
   const handleUnmatch = async (payment: IPayment) => {
     // TODO: Implement unmatch confirmation and mutation
-    console.log('Unmatch payment:', payment);
   };
 
   const handleMatchSuccess = () => {

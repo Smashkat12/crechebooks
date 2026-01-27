@@ -79,10 +79,23 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
 
-    // TODO: Send to error tracking service (e.g., Sentry)
-    // if (typeof window !== 'undefined' && window.Sentry) {
-    //   window.Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
-    // }
+    // Report to error tracking endpoint if configured
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_ERROR_REPORTING_URL) {
+      try {
+        fetch(process.env.NEXT_PUBLIC_ERROR_REPORTING_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            componentStack: errorInfo.componentStack,
+            url: window.location.href,
+            timestamp: new Date().toISOString(),
+          }),
+        }).catch(() => { /* silently fail - don't cascade errors */ });
+      } catch { /* silently fail */ }
+    }
   }
 
   handleReset = (): void => {

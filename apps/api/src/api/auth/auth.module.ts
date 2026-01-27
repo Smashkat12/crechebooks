@@ -199,14 +199,16 @@ export class AuthModule implements OnModuleInit {
           throw new Error(errorMsg);
         }
 
-        // With JWT provider, DEV_AUTH_ENABLED controls the login endpoint availability
+        // Block DEV_AUTH_ENABLED in production - dev login bypass must never be active in prod
         const devAuthEnabled =
           this.configService.get<string>('DEV_AUTH_ENABLED');
         if (devAuthEnabled === 'true') {
-          this.logger.warn(
-            'JWT auth mode with DEV_AUTH_ENABLED=true in production. ' +
-              'Ensure dev user credentials are properly secured.',
-          );
+          const errorMsg =
+            'FATAL: DEV_AUTH_ENABLED=true is not allowed in production. ' +
+            'The dev-login endpoint bypasses production authentication. ' +
+            'Set DEV_AUTH_ENABLED=false or remove it from your production environment.';
+          this.logger.error(errorMsg);
+          throw new Error(errorMsg);
         }
 
         this.logger.log(

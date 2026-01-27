@@ -52,11 +52,10 @@ jobs:
       - name: Type check Web
         run: pnpm --filter @crechebooks/web exec tsc --noEmit
 
-  # API Tests (temporarily disabled - tests take too long)
+  # API Tests
   test-api:
     name: Test API
     runs-on: ubuntu-latest
-    if: false  # Disabled temporarily
     services:
       postgres:
         image: postgres:16-alpine
@@ -164,7 +163,7 @@ jobs:
   build:
     name: Build Applications
     runs-on: ubuntu-latest
-    needs: [lint, test-web]  # test-api temporarily removed
+    needs: [lint, test-api, test-web]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

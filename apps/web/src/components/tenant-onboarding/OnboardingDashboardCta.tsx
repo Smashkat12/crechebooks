@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useOnboardingDashboardCta } from '@/hooks/use-tenant-onboarding';
 import { useState } from 'react';
+import { logger } from '@/lib/logger';
 
 interface OnboardingDashboardCtaProps {
   className?: string;
@@ -26,7 +27,7 @@ export function OnboardingDashboardCta({ className }: OnboardingDashboardCtaProp
 
   // Log for debugging
   if (typeof window !== 'undefined') {
-    console.log('[Onboarding CTA]', { cta, isLoading, error: error?.message });
+    logger.debug('Onboarding CTA state', { showOnboarding: cta?.showOnboarding, isLoading, error: error?.message });
   }
 
   // Don't show if dismissed or loading

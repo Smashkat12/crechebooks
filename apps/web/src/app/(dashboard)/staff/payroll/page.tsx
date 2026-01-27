@@ -15,7 +15,6 @@ export default function PayrollPage() {
   const now = new Date();
 
   const handleComplete = async (selectedStaff: string[], payrollEntries: IPayrollEntry[]): Promise<void> => {
-    console.log('Processing payroll for:', selectedStaff, payrollEntries);
     // TODO: Implement actual payroll processing
     router.push('/staff');
   };

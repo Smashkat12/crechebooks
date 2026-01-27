@@ -74,7 +74,6 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
 
   const handleDelete = async (transaction: ITransaction) => {
     // TODO: Implement delete confirmation and mutation
-    console.log('Delete transaction:', transaction);
   };
 
   const handleSplit = (transaction: ITransaction) => {
@@ -84,7 +83,6 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
 
   const handleSplitSave = async (splits: SplitRow[]) => {
     // Split save is handled by the modal's hook
-    console.log('Split saved:', splits);
     await refetch();
   };
 

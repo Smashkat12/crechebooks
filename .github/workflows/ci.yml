@@ -56,6 +56,7 @@ jobs:
   test-api:
     name: Test API
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16-alpine
@@ -97,8 +98,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
 
-      - name: Run API unit tests
-        run: pnpm --filter @crechebooks/api test
+      - name: Run API unit tests with coverage
+        run: pnpm --filter @crechebooks/api test:cov
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
           JWT_SECRET: test-secret-key-for-ci
@@ -106,13 +107,6 @@ jobs:
 
       - name: Run API e2e tests
         run: pnpm --filter @crechebooks/api test:e2e
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
-          JWT_SECRET: test-secret-key-for-ci
-          NODE_ENV: test
-
-      - name: Generate test coverage
-        run: pnpm --filter @crechebooks/api test:cov
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
           JWT_SECRET: test-secret-key-for-ci

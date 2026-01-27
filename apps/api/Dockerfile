@@ -51,7 +51,7 @@ COPY packages/types/package.json ./packages/types/
 COPY --from=deps /app/node_modules ./node_modules
 
 # Copy source code
-# Build timestamp to force fresh build: 2026-01-27T00:00:00Z
+# Build timestamp to force fresh build: 2026-01-27T00:45:00Z
 COPY . .
 
 # Reinstall to set up workspace symlinks (uses cached node_modules)

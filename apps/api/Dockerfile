@@ -71,18 +71,14 @@ RUN cd apps/api && pnpm exec prisma generate
 # Build the API application
 RUN pnpm --filter @crechebooks/api build
 
-# Create standalone production node_modules for the runner.
+# Create standalone node_modules for the runner.
 # Replace workspace:* with file path to the built types package,
-# then install production deps with npm (creates flat node_modules).
+# then install all deps with npm (creates flat node_modules).
+# All deps needed because start.sh runs prisma CLI for migrations.
 WORKDIR /app/prod
 RUN sed 's|"@crechebooks/types": "workspace:\*"|"@crechebooks/types": "file:../packages/types"|' \
     /app/apps/api/package.json > package.json && \
-    npm install --omit=dev --legacy-peer-deps
-
-# Generate Prisma client in production node_modules
-RUN cp -r /app/apps/api/prisma ./prisma && \
-    (cp /app/apps/api/prisma.config.ts ./prisma.config.ts 2>/dev/null || true) && \
-    npx prisma generate
+    npm install --legacy-peer-deps
 
 # Stage 3: Production Runner
 FROM node:20-slim AS runner
@@ -107,7 +103,7 @@ COPY --from=builder /app/prod/node_modules ./node_modules
 COPY --from=builder /app/prod/package.json ./
 COPY --from=builder /app/apps/api/prisma ./prisma
 COPY --from=builder /app/apps/api/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/prod/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/apps/api/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/apps/api/scripts ./scripts
 
 # Copy startup script

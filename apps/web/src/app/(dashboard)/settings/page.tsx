@@ -34,7 +34,7 @@ export default function ProfileSettingsPage() {
   });
 
   const onSubmit = async (data: ProfileFormData) => {
-    console.log('Update profile:', data);
+    // TODO: Implement profile update API call
   };
 
   // Check if user is OWNER or ADMIN

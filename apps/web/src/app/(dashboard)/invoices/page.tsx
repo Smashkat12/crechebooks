@@ -83,7 +83,6 @@ export default function InvoicesPage() {
 
   const handleDelete = (invoice: Invoice) => {
     // TODO: Confirm and delete
-    console.log('Delete invoice:', invoice.id);
   };
 
   return (

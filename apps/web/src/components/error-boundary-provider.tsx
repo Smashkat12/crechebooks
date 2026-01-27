@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import { ErrorBoundary } from './error-boundary';
+import { logger } from '@/lib/logger';
 
 interface ErrorBoundaryProviderProps {
   children: ReactNode;
@@ -32,7 +33,7 @@ export function ErrorBoundaryProvider({ children }: ErrorBoundaryProviderProps) 
 
   const handleReset = () => {
     // Optionally refresh the page or clear state on reset
-    console.log('[App Error] Error boundary reset triggered');
+    logger.info('Error boundary reset triggered');
   };
 
   return (

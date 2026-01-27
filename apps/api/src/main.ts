@@ -186,39 +186,55 @@ async function bootstrap(): Promise<void> {
     exclude: ['health'],
   });
 
-  // Swagger configuration
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('CrecheBooks API')
-    .setDescription(
-      'AI-powered bookkeeping system for South African creches and pre-schools',
-    )
-    .setVersion('1.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Enter your Auth0 JWT token',
-      },
-      'JWT-auth',
-    )
-    .addTag('Authentication', 'OAuth2 authentication endpoints')
-    .addTag('Health', 'Health check endpoints')
-    .build();
+  // Swagger configuration - disabled in production to avoid exposing API schema
+  if (!isProduction) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('CrecheBooks API')
+      .setDescription(
+        'AI-powered bookkeeping system for South African creches and pre-schools',
+      )
+      .setVersion('1.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Enter your Auth0 JWT token',
+        },
+        'JWT-auth',
+      )
+      .addTag('Authentication', 'OAuth2 authentication endpoints')
+      .addTag('Health', 'Health check endpoints')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-    },
-  });
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
+    logger.log(`Swagger docs available at http://localhost:${port}/api/docs`);
+  } else {
+    logger.log('Swagger docs disabled in production');
+  }
 
   await app.listen(port);
   logger.log(`CrecheBooks API running on port ${port}`);
-  logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
   logger.log(`Health check: http://localhost:${port}/health`);
   logger.log(`Auth login: http://localhost:${port}/api/v1/auth/login`);
-  logger.log(`✅ Railway GitHub integration - deployment test`);
 }
 
-void bootstrap();
+// Handle fatal process errors that escape NestJS error handling
+process.on('unhandledRejection', (reason: unknown) => {
+  console.error('FATAL: Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error('FATAL: Uncaught Exception:', error.message, error.stack);
+  process.exit(1);
+});
+
+bootstrap().catch((error: Error) => {
+  console.error('FATAL: Bootstrap failed:', error.message, error.stack);
+  process.exit(1);
+});

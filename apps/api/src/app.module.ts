@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerStorage } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { ConfigModule } from './config/config.module';
 import { HealthModule } from './health/health.module';
@@ -21,6 +21,7 @@ import { CircuitBreakerModule } from './integrations/circuit-breaker';
 import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
 import { BankingModule } from './integrations/banking';
+import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
 
 @Module({
   imports: [
@@ -53,9 +54,7 @@ import { BankingModule } from './integrations/banking';
             limit: config.get<number>('THROTTLE_LONG_LIMIT', 1000), // 1000 per hour
           },
         ],
-        // Note: Redis storage can be enabled in production via env config
-        // To enable Redis storage, install @nestjs/throttler-redis and configure:
-        // storage: new ThrottlerStorageRedisService(redisConfig),
+        // Redis storage is configured via the ThrottlerStorage provider below
       }),
     }),
     PrismaModule,
@@ -72,6 +71,11 @@ import { BankingModule } from './integrations/banking';
   ],
   controllers: [],
   providers: [
+    // Redis-backed throttler storage for distributed rate limiting across replicas
+    {
+      provide: ThrottlerStorage,
+      useClass: RedisThrottlerStorageService,
+    },
     // TASK-INFRA-003: Apply throttler guard globally (first to block abusive traffic early)
     {
       provide: APP_GUARD,

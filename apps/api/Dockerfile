@@ -71,20 +71,6 @@ RUN cd apps/api && pnpm exec prisma generate
 # Build the API application
 RUN pnpm --filter @crechebooks/api build
 
-# Create production deployment directory using pnpm deploy
-# (resolves workspace deps and creates a self-contained node_modules)
-RUN pnpm --filter @crechebooks/api deploy /app/deploy
-
-# Copy built artifacts and runtime files into deploy directory
-RUN cp -r /app/apps/api/dist /app/deploy/dist && \
-    cp -r /app/apps/api/prisma /app/deploy/prisma && \
-    cp /app/apps/api/tsconfig.json /app/deploy/tsconfig.json && \
-    (cp /app/apps/api/prisma.config.ts /app/deploy/prisma.config.ts 2>/dev/null || true) && \
-    (cp -r /app/apps/api/scripts /app/deploy/scripts 2>/dev/null || true)
-
-# Regenerate Prisma client in the deploy directory
-RUN cd /app/deploy && npx prisma generate
-
 # Stage 3: Production Runner
 FROM node:20-slim AS runner
 
@@ -102,8 +88,16 @@ WORKDIR /app
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nestjs nestjs
 
-# Copy production deployment from builder
-COPY --from=builder /app/deploy ./
+# Copy built application and node_modules from builder
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/apps/api/prisma ./prisma
+COPY --from=builder /app/apps/api/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy optional files (may not exist in all configurations)
+COPY --from=builder /app/apps/api/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/apps/api/scripts ./scripts
 
 # Copy startup script
 COPY apps/api/start.sh ./start.sh

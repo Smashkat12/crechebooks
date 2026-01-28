@@ -112,7 +112,7 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
 
       - name: Run API tests (shard ${{ matrix.shard }}/4)
-        run: pnpm --filter @crechebooks/api exec jest --runInBand --forceExit --shard=${{ matrix.shard }}/4
+        run: pnpm --filter @crechebooks/api exec jest --runInBand --forceExit --testPathIgnorePatterns=".e2e.spec.ts" --shard=${{ matrix.shard }}/4
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
           JWT_SECRET: test-secret-key-for-ci

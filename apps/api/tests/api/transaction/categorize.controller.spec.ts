@@ -103,7 +103,7 @@ describe('TransactionController Categorization Endpoints', () => {
     it('should update categorization with manual override', async () => {
       categorizationService.categorizeAndSync.mockResolvedValue({
         transaction: mockTransaction,
-        xeroSyncStatus: 'NOT_APPLICABLE',
+        xeroSyncStatus: 'not_attempted',
         xeroSyncError: undefined,
       });
 
@@ -136,7 +136,7 @@ describe('TransactionController Categorization Endpoints', () => {
     it('should handle split transactions', async () => {
       categorizationService.categorizeAndSync.mockResolvedValue({
         transaction: mockTransaction,
-        xeroSyncStatus: 'NOT_APPLICABLE',
+        xeroSyncStatus: 'not_attempted',
         xeroSyncError: undefined,
       });
 
@@ -172,7 +172,7 @@ describe('TransactionController Categorization Endpoints', () => {
     it('should respect create_pattern flag', async () => {
       categorizationService.categorizeAndSync.mockResolvedValue({
         transaction: mockTransaction,
-        xeroSyncStatus: 'NOT_APPLICABLE',
+        xeroSyncStatus: 'not_attempted',
         xeroSyncError: undefined,
       });
 

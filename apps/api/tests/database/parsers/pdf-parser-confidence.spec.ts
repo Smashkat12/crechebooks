@@ -138,6 +138,11 @@ describe('PdfParser - Confidence Scoring', () => {
 
   describe('confidence scoring factors', () => {
     it('should penalize short descriptions', async () => {
+      if (!fs.existsSync(bankStatementsDir)) {
+        console.warn(`Test directory not found at ${bankStatementsDir}`);
+        return;
+      }
+
       const pdfFiles = fs
         .readdirSync(bankStatementsDir)
         .filter((f) => f.endsWith('.pdf'))

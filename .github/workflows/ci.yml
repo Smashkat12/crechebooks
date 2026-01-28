@@ -123,6 +123,8 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           XERO_STATE_KEY: test-xero-state-key-for-ci-32ch!
+          XERO_CLIENT_ID: test-xero-client-id
+          XERO_CLIENT_SECRET: test-xero-client-secret
           NODE_ENV: test
 
       - name: Run API e2e tests
@@ -138,6 +140,8 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           XERO_STATE_KEY: test-xero-state-key-for-ci-32ch!
+          XERO_CLIENT_ID: test-xero-client-id
+          XERO_CLIENT_SECRET: test-xero-client-secret
           NODE_ENV: test
 
   # Web Tests

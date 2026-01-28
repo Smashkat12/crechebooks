@@ -107,6 +107,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
           JWT_SECRET: test-secret-key-for-ci
+          TOKEN_ENCRYPTION_KEY: test-encryption-key-32chars!!
           NODE_ENV: test
 
       - name: Run API e2e tests
@@ -115,6 +116,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
           JWT_SECRET: test-secret-key-for-ci
+          TOKEN_ENCRYPTION_KEY: test-encryption-key-32chars!!
           NODE_ENV: test
 
   # Web Tests

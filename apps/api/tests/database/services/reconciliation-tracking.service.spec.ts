@@ -20,6 +20,8 @@ import {
   BankMatchType,
   ParsedBankTransaction,
 } from '../../../src/database/entities/bank-statement-match.entity';
+import { AccruedBankChargeService } from '../../../src/database/services/accrued-bank-charge.service';
+import { BankFeeService } from '../../../src/database/services/bank-fee.service';
 import { BusinessException } from '../../../src/shared/exceptions';
 
 describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
@@ -87,6 +89,8 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
         { provide: ReconciliationRepository, useValue: {} },
         { provide: LLMWhispererParser, useValue: {} },
         { provide: ToleranceConfigService, useValue: mockToleranceConfig },
+        { provide: AccruedBankChargeService, useValue: { getAccruedCharges: jest.fn().mockResolvedValue([]), createAccruedCharge: jest.fn().mockResolvedValue({}) } },
+        { provide: BankFeeService, useValue: { detectBankFees: jest.fn().mockResolvedValue([]), categorizeBankFee: jest.fn().mockResolvedValue({}) } },
       ],
     }).compile();
 

@@ -13,6 +13,12 @@ import { FinancialReportService } from '../../../src/database/services/financial
 import { BalanceSheetService } from '../../../src/database/services/balance-sheet.service';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { DiscrepancyService } from '../../../src/database/services/discrepancy.service';
+import { BankStatementReconciliationService } from '../../../src/database/services/bank-statement-reconciliation.service';
+import { ComparativeBalanceSheetService } from '../../../src/database/services/comparative-balance-sheet.service';
+import { SplitTransactionMatcherService } from '../../../src/database/services/split-transaction-matcher.service';
+import { AccruedBankChargeService } from '../../../src/database/services/accrued-bank-charge.service';
+import { XeroTransactionSplitService } from '../../../src/database/services/xero-transaction-split.service';
+import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { ReconcileResult } from '../../../src/database/dto/reconciliation-service.dto';
@@ -93,6 +99,30 @@ describe('ReconciliationController - reconcile', () => {
         {
           provide: DiscrepancyService,
           useValue: { detectDiscrepancies: jest.fn() },
+        },
+        {
+          provide: BankStatementReconciliationService,
+          useValue: { reconcileStatement: jest.fn() },
+        },
+        {
+          provide: ComparativeBalanceSheetService,
+          useValue: { generate: jest.fn() },
+        },
+        {
+          provide: SplitTransactionMatcherService,
+          useValue: { suggestMatch: jest.fn(), confirmMatch: jest.fn() },
+        },
+        {
+          provide: AccruedBankChargeService,
+          useValue: { createCharge: jest.fn(), matchCharge: jest.fn() },
+        },
+        {
+          provide: XeroTransactionSplitService,
+          useValue: { splitTransaction: jest.fn() },
+        },
+        {
+          provide: PrismaService,
+          useValue: {},
         },
       ],
     }).compile();

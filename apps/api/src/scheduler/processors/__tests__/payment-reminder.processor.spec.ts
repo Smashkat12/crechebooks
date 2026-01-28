@@ -177,9 +177,9 @@ describe('PaymentReminderProcessor', () => {
       expect(mockReminderService.sendReminders).not.toHaveBeenCalled();
     });
 
-    it('should escalate invoices at 45+ days overdue', async () => {
+    it('should escalate invoices at 60+ days overdue', async () => {
       const mockJob = createMockJob();
-      const overdueInvoices = [createOverdueInvoice('inv-1', 50)]; // ESCALATED stage
+      const overdueInvoices = [createOverdueInvoice('inv-1', 65)]; // ESCALATED stage
 
       mockPrisma.invoice.findMany.mockResolvedValue(overdueInvoices);
       mockPrisma.reminder.findFirst.mockResolvedValue(null);
@@ -244,7 +244,7 @@ describe('PaymentReminderProcessor', () => {
         createOverdueInvoice('inv-1', 7), // FIRST: 7 days
         createOverdueInvoice('inv-2', 14), // SECOND: 14 days
         createOverdueInvoice('inv-3', 30), // FINAL: 30 days
-        createOverdueInvoice('inv-4', 45), // ESCALATED: 45 days
+        createOverdueInvoice('inv-4', 60), // ESCALATED: 60 days
       ];
 
       mockPrisma.invoice.findMany.mockResolvedValue(overdueInvoices);
@@ -397,16 +397,16 @@ describe('Reminder Stage Detection', () => {
     expect(getStageForDaysOverdue(29)).toBe('SECOND');
   });
 
-  it('should return FINAL for 30-44 days overdue', () => {
+  it('should return FINAL for 30-59 days overdue', () => {
     expect(getStageForDaysOverdue(30)).toBe('FINAL');
-    expect(getStageForDaysOverdue(35)).toBe('FINAL');
-    expect(getStageForDaysOverdue(44)).toBe('FINAL');
+    expect(getStageForDaysOverdue(45)).toBe('FINAL');
+    expect(getStageForDaysOverdue(59)).toBe('FINAL');
   });
 
-  it('should return ESCALATED for 45+ days overdue', () => {
-    expect(getStageForDaysOverdue(45)).toBe('ESCALATED');
+  it('should return ESCALATED for 60+ days overdue', () => {
     expect(getStageForDaysOverdue(60)).toBe('ESCALATED');
     expect(getStageForDaysOverdue(90)).toBe('ESCALATED');
+    expect(getStageForDaysOverdue(120)).toBe('ESCALATED');
   });
 });
 
@@ -433,7 +433,7 @@ describe('Default Reminder Schedule', () => {
       { stage: 'FIRST', days: 7 },
       { stage: 'SECOND', days: 14 },
       { stage: 'FINAL', days: 30 },
-      { stage: 'ESCALATED', days: 45 },
+      { stage: 'ESCALATED', days: 60 },
     ]);
   });
 

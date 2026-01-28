@@ -13,9 +13,11 @@ import { UserRole } from '@prisma/client';
 import { XeroController } from '../xero.controller';
 import { XeroSyncGateway } from '../xero.gateway';
 import { BankFeedService } from '../bank-feed.service';
+import { XeroAuthService } from '../xero-auth.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { TransactionRepository } from '../../../database/repositories/transaction.repository';
 import { AuditLogService } from '../../../database/services/audit-log.service';
+import { XeroSyncService } from '../../../database/services/xero-sync.service';
 import type { IUser } from '../../../database/entities/user.entity';
 import { BusinessException } from '../../../shared/exceptions';
 
@@ -41,6 +43,29 @@ describe('XeroController', () => {
         XeroSyncGateway,
         TransactionRepository,
         AuditLogService,
+        {
+          provide: XeroSyncService,
+          useValue: {
+            syncTransactions: jest.fn(),
+            pushToXero: jest.fn(),
+            pullFromXero: jest.fn(),
+            syncChartOfAccounts: jest.fn(),
+            hasValidConnection: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: XeroAuthService,
+          useValue: {
+            encryptState: jest.fn().mockReturnValue('encrypted-state'),
+            decryptState: jest.fn().mockReturnValue('{}'),
+            validateStateKey: jest.fn(),
+            generateState: jest.fn().mockReturnValue('mock-state-string'),
+            getAccessToken: jest.fn().mockResolvedValue('mock-token'),
+            isConnected: jest.fn().mockResolvedValue(true),
+            getAuthUrl: jest.fn().mockReturnValue('http://mock-auth-url'),
+            handleCallback: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

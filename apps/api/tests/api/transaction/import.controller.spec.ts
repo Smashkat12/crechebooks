@@ -7,6 +7,7 @@ import { InvoiceRepository } from '../../../src/database/repositories/invoice.re
 import { TransactionImportService } from '../../../src/database/services/transaction-import.service';
 import { CategorizationService } from '../../../src/database/services/categorization.service';
 import { PaymentAllocationService } from '../../../src/database/services/payment-allocation.service';
+import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { ImportResult } from '../../../src/database/dto/import.dto';
 import type { IUser } from '../../../src/database/entities/user.entity';
 
@@ -52,6 +53,12 @@ describe('TransactionController.importTransactions', () => {
         { provide: TransactionImportService, useValue: mockImportService },
         { provide: CategorizationService, useValue: {} },
         { provide: PaymentAllocationService, useValue: {} },
+        {
+          provide: PrismaService,
+          useValue: {
+            transaction: { findMany: jest.fn() },
+          },
+        },
       ],
     }).compile();
 

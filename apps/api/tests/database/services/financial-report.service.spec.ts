@@ -33,6 +33,7 @@ import {
   VatType,
 } from '../../../src/database/entities/categorization.entity';
 import { FeeType } from '../../../src/database/entities/fee-structure.entity';
+import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('FinancialReportService (Integration)', () => {
   let service: FinancialReportService;
@@ -94,6 +95,8 @@ describe('FinancialReportService (Integration)', () => {
   });
 
   beforeEach(async () => {
+    await cleanDatabase(prisma);
+
     // Create test tenant
     const tenant = await tenantRepo.create({
       name: 'Financial Test Creche',
@@ -108,27 +111,7 @@ describe('FinancialReportService (Integration)', () => {
   });
 
   afterEach(async () => {
-    // Cleanup test data only if tenant was created
-    if (testTenantId) {
-      await prisma.categorization.deleteMany({
-        where: { transaction: { tenantId: testTenantId } },
-      });
-      await prisma.payment.deleteMany({ where: { tenantId: testTenantId } });
-      await prisma.transaction.deleteMany({
-        where: { tenantId: testTenantId },
-      });
-      await prisma.invoiceLine.deleteMany({
-        where: { invoice: { tenantId: testTenantId } },
-      });
-      await prisma.invoice.deleteMany({ where: { tenantId: testTenantId } });
-      await prisma.enrollment.deleteMany({ where: { tenantId: testTenantId } });
-      await prisma.child.deleteMany({ where: { tenantId: testTenantId } });
-      await prisma.parent.deleteMany({ where: { tenantId: testTenantId } });
-      await prisma.feeStructure.deleteMany({
-        where: { tenantId: testTenantId },
-      });
-      await prisma.tenant.delete({ where: { id: testTenantId } });
-    }
+    // cleanDatabase is called in beforeEach, no per-test cleanup needed
   });
 
   describe('generateIncomeStatement', () => {
@@ -152,6 +135,7 @@ describe('FinancialReportService (Integration)', () => {
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
         vatType: VatType.STANDARD,
+        vatAmountCents: 6522,
       });
 
       // Generate income statement
@@ -300,6 +284,7 @@ describe('FinancialReportService (Integration)', () => {
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
         vatType: VatType.STANDARD,
+        vatAmountCents: 6522,
       });
 
       const debitTx = await transactionRepo.create({
@@ -320,6 +305,7 @@ describe('FinancialReportService (Integration)', () => {
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
         vatType: VatType.STANDARD,
+        vatAmountCents: 6522,
       });
 
       const asOfDate = new Date('2025-01-15');
@@ -353,6 +339,7 @@ describe('FinancialReportService (Integration)', () => {
         source: CategorizationSource.USER_OVERRIDE,
         isSplit: false,
         vatType: VatType.STANDARD,
+        vatAmountCents: 6522,
       });
 
       const asOfDate = new Date('2025-01-10');

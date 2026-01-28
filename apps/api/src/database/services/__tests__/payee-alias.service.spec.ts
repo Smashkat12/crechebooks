@@ -149,7 +149,7 @@ describe('PayeeAliasService', () => {
 
       expect(result.alias).toBe('WOOLIES');
       expect(result.canonicalName).toBe('WOOLWORTHS');
-      expect(patternRepo.update).toHaveBeenCalledWith(mockPattern.id, {
+      expect(patternRepo.update).toHaveBeenCalledWith(mockPattern.id, mockTenantId, {
         payeeAliases: ['WOOLWORTHS SANDTON', 'W/WORTHS', 'WOOLIES'],
       });
     });
@@ -252,7 +252,7 @@ describe('PayeeAliasService', () => {
 
       await service.deleteAlias(mockTenantId, 'pattern-1:W/WORTHS');
 
-      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', {
+      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', mockTenantId, {
         payeeAliases: ['WOOLWORTHS SANDTON'],
       });
     });
@@ -266,7 +266,7 @@ describe('PayeeAliasService', () => {
 
       await service.deleteAlias(mockTenantId, 'pattern-1:w/worths');
 
-      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', {
+      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', mockTenantId, {
         payeeAliases: ['WOOLWORTHS SANDTON'],
       });
     });
@@ -284,7 +284,7 @@ describe('PayeeAliasService', () => {
 
       await service.deleteAlias(mockTenantId, 'pattern-1:STORE:BRANCH1');
 
-      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', {
+      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', mockTenantId, {
         payeeAliases: [],
       });
     });
@@ -312,10 +312,9 @@ describe('PayeeAliasService', () => {
     });
 
     it('should enforce tenant isolation', async () => {
-      patternRepo.findById.mockResolvedValue({
-        ...mockPattern,
-        tenantId: 'different-tenant',
-      });
+      // findById(id, tenantId) now filters by tenantId at the repository level,
+      // so when called with the wrong tenant, it returns null (pattern not found)
+      patternRepo.findById.mockResolvedValue(null);
 
       await expect(
         service.deleteAlias(mockTenantId, 'pattern-1:W/WORTHS'),

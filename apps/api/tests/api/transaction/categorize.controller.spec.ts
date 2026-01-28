@@ -6,6 +6,7 @@ import { InvoiceRepository } from '../../../src/database/repositories/invoice.re
 import { TransactionImportService } from '../../../src/database/services/transaction-import.service';
 import { CategorizationService } from '../../../src/database/services/categorization.service';
 import { PaymentAllocationService } from '../../../src/database/services/payment-allocation.service';
+import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { Transaction } from '@prisma/client';
 import type {
@@ -68,6 +69,7 @@ describe('TransactionController Categorization Endpoints', () => {
       updateCategorization: jest.fn(),
       categorizeTransactions: jest.fn(),
       getSuggestions: jest.fn(),
+      categorizeAndSync: jest.fn(),
     };
 
     const mockTransactionRepo = {
@@ -83,6 +85,12 @@ describe('TransactionController Categorization Endpoints', () => {
         { provide: TransactionImportService, useValue: {} },
         { provide: CategorizationService, useValue: mockCategorizationService },
         { provide: PaymentAllocationService, useValue: {} },
+        {
+          provide: PrismaService,
+          useValue: {
+            transaction: { findMany: jest.fn() },
+          },
+        },
       ],
     }).compile();
 
@@ -93,9 +101,11 @@ describe('TransactionController Categorization Endpoints', () => {
 
   describe('PUT /:id/categorize', () => {
     it('should update categorization with manual override', async () => {
-      categorizationService.updateCategorization.mockResolvedValue(
-        mockTransaction,
-      );
+      categorizationService.categorizeAndSync.mockResolvedValue({
+        transaction: mockTransaction,
+        xeroSyncStatus: 'NOT_APPLICABLE',
+        xeroSyncError: undefined,
+      });
 
       const result = await controller.updateCategorization(
         'tx-001',
@@ -112,7 +122,7 @@ describe('TransactionController Categorization Endpoints', () => {
       expect(result.data.account_code).toBe('5100');
       expect(result.data.source).toBe('USER_OVERRIDE');
       expect(result.data.pattern_created).toBe(true);
-      expect(categorizationService.updateCategorization).toHaveBeenCalledWith(
+      expect(categorizationService.categorizeAndSync).toHaveBeenCalledWith(
         'tx-001',
         expect.objectContaining({
           accountCode: '5100',
@@ -124,9 +134,11 @@ describe('TransactionController Categorization Endpoints', () => {
     });
 
     it('should handle split transactions', async () => {
-      categorizationService.updateCategorization.mockResolvedValue(
-        mockTransaction,
-      );
+      categorizationService.categorizeAndSync.mockResolvedValue({
+        transaction: mockTransaction,
+        xeroSyncStatus: 'NOT_APPLICABLE',
+        xeroSyncError: undefined,
+      });
 
       const result = await controller.updateCategorization(
         'tx-001',
@@ -158,9 +170,11 @@ describe('TransactionController Categorization Endpoints', () => {
     });
 
     it('should respect create_pattern flag', async () => {
-      categorizationService.updateCategorization.mockResolvedValue(
-        mockTransaction,
-      );
+      categorizationService.categorizeAndSync.mockResolvedValue({
+        transaction: mockTransaction,
+        xeroSyncStatus: 'NOT_APPLICABLE',
+        xeroSyncError: undefined,
+      });
 
       const result = await controller.updateCategorization(
         'tx-001',

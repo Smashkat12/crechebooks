@@ -11,6 +11,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 import { JwtStrategy } from '../../src/api/auth/strategies/jwt.strategy';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import {
   createTestTenant,
   createTestUser,
@@ -20,6 +21,7 @@ import {
   TestUser,
   TestJwtStrategy,
 } from '../helpers';
+import { cleanDatabase } from '../helpers/clean-database';
 import { TaxStatus, PayrollStatus } from '@prisma/client';
 import Decimal from 'decimal.js';
 
@@ -50,6 +52,8 @@ describe('E2E: SARS Submission Flow', () => {
     })
       .overrideProvider(JwtStrategy)
       .useClass(TestJwtStrategy)
+      .overrideProvider(ThrottlerStorage)
+      .useValue({ increment: jest.fn().mockResolvedValue({ totalHits: 0, timeToExpire: 60, isBlocked: false, timeToBlockExpire: 0 }) })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -86,38 +90,9 @@ describe('E2E: SARS Submission Flow', () => {
   }, 60000);
 
   afterAll(async () => {
-    // Cleanup in reverse order of creation
+    // Cleanup all test data
     if (testTenant?.id) {
-      // Delete SARS submissions
-      await prisma.sarsSubmission.deleteMany({
-        where: { tenantId: testTenant.id },
-      });
-
-      // Delete payroll and staff
-      await prisma.payroll.deleteMany({
-        where: { tenantId: testTenant.id },
-      });
-      await prisma.staff.deleteMany({
-        where: { tenantId: testTenant.id },
-      });
-
-      // Delete transactions and categorizations
-      await prisma.categorization.deleteMany({
-        where: { transaction: { tenantId: testTenant.id } },
-      });
-      await prisma.transaction.deleteMany({
-        where: { tenantId: testTenant.id },
-      });
-
-      // Delete invoices
-      await prisma.invoiceLine.deleteMany({
-        where: { invoice: { tenantId: testTenant.id } },
-      });
-      await prisma.invoice.deleteMany({
-        where: { tenantId: testTenant.id },
-      });
-
-      await cleanupTestData(prisma, testTenant.id);
+      await cleanDatabase(prisma);
     }
     await app?.close();
   }, 30000);

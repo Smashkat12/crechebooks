@@ -8,6 +8,7 @@ process.env.WHATSAPP_ACCESS_TOKEN = 'test-access-token';
 process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-number-id';
 process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = 'test-business-account-id';
 process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN = 'test-webhook-verify-token';
+process.env.WHATSAPP_APP_SECRET = 'test-app-secret';
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { WhatsAppService } from '../whatsapp.service';

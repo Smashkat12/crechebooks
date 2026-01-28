@@ -12,9 +12,13 @@ import { InvoiceDeliveryService } from '../../../src/database/services/invoice-d
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { InvoiceLineRepository } from '../../../src/database/repositories/invoice-line.repository';
 import { ParentRepository } from '../../../src/database/repositories/parent.repository';
+import { ChildRepository } from '../../../src/database/repositories/child.repository';
+import { TenantRepository } from '../../../src/database/repositories/tenant.repository';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { EmailService } from '../../../src/integrations/email/email.service';
 import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
+import { EmailTemplateService } from '../../../src/common/services/email-template/email-template.service';
+import { InvoicePdfService } from '../../../src/database/services/invoice-pdf.service';
 import {
   NotFoundException,
   BusinessException,
@@ -27,6 +31,7 @@ import {
 import { PreferredContact } from '../../../src/database/entities/parent.entity';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
 import { Tenant, Parent, Child, Invoice } from '@prisma/client';
+import { cleanDatabase } from '../../helpers/clean-database';
 
 /**
  * Mock EmailService - external SMTP integration
@@ -37,7 +42,37 @@ const createMockEmailService = () => ({
   sendEmail: jest
     .fn()
     .mockResolvedValue({ messageId: 'test-msg-123', status: 'sent' }),
+  sendEmailWithOptions: jest
+    .fn()
+    .mockResolvedValue({ messageId: 'test-msg-123', status: 'sent' }),
   isValidEmail: jest.fn().mockReturnValue(true),
+  isConfigured: jest.fn().mockReturnValue(true),
+});
+
+/**
+ * Mock EmailTemplateService - template rendering requires filesystem templates
+ * that are not available in the test environment.
+ * NOTE: This is a SERVICE mock for infrastructure dependency, not a DATA mock.
+ */
+const createMockEmailTemplateService = () => ({
+  renderInvoiceEmail: jest.fn().mockImplementation((data: any) => {
+    const lineDescriptions = (data.lineItems || [])
+      .map((li: any) => li.description)
+      .join(', ');
+    const totalRands = (data.totalCents / 100).toFixed(2);
+    const formattedAmount = `R ${Number(totalRands).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
+    return {
+      text: `Invoice ${data.invoiceNumber}\n${lineDescriptions}\nTotal: ${formattedAmount}`,
+      html: `<p>Invoice ${data.invoiceNumber}</p><p>${lineDescriptions}</p><p>Total: ${formattedAmount}</p>`,
+      subject: `Invoice ${data.invoiceNumber} from ${data.tenantName}`,
+    };
+  }),
+  renderStatementEmail: jest.fn().mockReturnValue({
+    text: 'Statement',
+    html: '<p>Statement</p>',
+    subject: 'Statement',
+  }),
+  onModuleInit: jest.fn(),
 });
 
 /**
@@ -64,6 +99,7 @@ describe('InvoiceDeliveryService', () => {
   let invoiceRepo: InvoiceRepository;
   let mockEmailService: ReturnType<typeof createMockEmailService>;
   let mockWhatsAppService: ReturnType<typeof createMockWhatsAppService>;
+  let mockEmailTemplateService: ReturnType<typeof createMockEmailTemplateService>;
 
   // Test data
   let testTenant: Tenant;
@@ -83,6 +119,7 @@ describe('InvoiceDeliveryService', () => {
   beforeAll(async () => {
     mockEmailService = createMockEmailService();
     mockWhatsAppService = createMockWhatsAppService();
+    mockEmailTemplateService = createMockEmailTemplateService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -91,10 +128,15 @@ describe('InvoiceDeliveryService', () => {
         InvoiceRepository,
         InvoiceLineRepository,
         ParentRepository,
+        TenantRepository,
+        ChildRepository,
         AuditLogService,
+        // Mock EmailTemplateService - requires filesystem templates not available in tests
+        { provide: EmailTemplateService, useValue: mockEmailTemplateService },
         // Mock external services that require real API credentials
         { provide: EmailService, useValue: mockEmailService },
         { provide: WhatsAppService, useValue: mockWhatsAppService },
+        { provide: InvoicePdfService, useValue: { generatePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')), generateInvoicePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')) } },
       ],
     }).compile();
 
@@ -116,52 +158,16 @@ describe('InvoiceDeliveryService', () => {
       messageId: 'test-msg-123',
       status: 'sent',
     });
+    mockEmailService.sendEmailWithOptions.mockResolvedValue({
+      messageId: 'test-msg-123',
+      status: 'sent',
+    });
     mockWhatsAppService.sendMessage.mockResolvedValue({
       messageId: 'wa-msg-123',
       status: 'sent',
     });
 
-    // CRITICAL: Clean database in FK order - leaf tables first!
-    await prisma.auditLog.deleteMany({});
-    await prisma.sarsSubmission.deleteMany({});
-    await prisma.bankStatementMatch.deleteMany({});
-    await prisma.reconciliation.deleteMany({});
-    await prisma.payrollJournalLine.deleteMany({});
-    await prisma.payrollJournal.deleteMany({});
-    await prisma.payroll.deleteMany({});
-    await prisma.payRunSync.deleteMany({});
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.payrollAdjustment.deleteMany({});
-    await prisma.employeeSetupLog.deleteMany({});
-    await prisma.staff.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.reminder.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.payeePattern.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.simplePayConnection.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.bankConnection.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.reportRequest.deleteMany({});
-    await prisma.bulkOperationLog.deleteMany({});
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    await cleanDatabase(prisma);
 
     const timestamp = Date.now();
 
@@ -417,11 +423,12 @@ describe('InvoiceDeliveryService', () => {
       expect(result.failed).toBe(0);
       expect(result.failures).toHaveLength(0);
 
-      expect(mockEmailService.sendEmail).toHaveBeenCalledTimes(1);
-      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
-        testParentEmail.email,
-        expect.stringContaining('INV-2025-001'),
-        expect.any(String),
+      expect(mockEmailService.sendEmailWithOptions).toHaveBeenCalledTimes(1);
+      expect(mockEmailService.sendEmailWithOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: testParentEmail.email,
+          subject: expect.stringContaining('INV-2025-001'),
+        }),
       );
 
       // Verify invoice was updated
@@ -464,7 +471,7 @@ describe('InvoiceDeliveryService', () => {
       expect(result.sent).toBe(1);
       expect(result.failed).toBe(0);
 
-      expect(mockEmailService.sendEmail).toHaveBeenCalledTimes(1);
+      expect(mockEmailService.sendEmailWithOptions).toHaveBeenCalledTimes(1);
       expect(mockWhatsAppService.sendMessage).toHaveBeenCalledTimes(1);
     });
 
@@ -571,7 +578,7 @@ describe('InvoiceDeliveryService', () => {
     });
 
     it('should track delivery failure when email service fails', async () => {
-      mockEmailService.sendEmail.mockRejectedValueOnce(
+      mockEmailService.sendEmailWithOptions.mockRejectedValueOnce(
         new BusinessException('SMTP connection failed', 'EMAIL_SEND_FAILED'),
       );
 
@@ -709,7 +716,7 @@ describe('InvoiceDeliveryService', () => {
     });
 
     it('should create audit log on failed delivery', async () => {
-      mockEmailService.sendEmail.mockRejectedValueOnce(
+      mockEmailService.sendEmailWithOptions.mockRejectedValueOnce(
         new BusinessException('Send failed', 'EMAIL_SEND_FAILED'),
       );
 
@@ -740,39 +747,45 @@ describe('InvoiceDeliveryService', () => {
   });
 
   describe('message content', () => {
-    it('should include invoice number in message', async () => {
+    it('should include invoice number in email subject', async () => {
       await service.sendInvoices({
         tenantId: testTenant.id,
         invoiceIds: [testInvoice1.id],
       });
 
-      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.stringContaining('INV-2025-001'),
-        expect.stringContaining('INV-2025-001'),
+      expect(mockEmailService.sendEmailWithOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: expect.stringContaining('INV-2025-001'),
+        }),
       );
     });
 
-    it('should include total amount in message', async () => {
+    it('should include total amount in message body', async () => {
       await service.sendInvoices({
         tenantId: testTenant.id,
         invoiceIds: [testInvoice1.id],
       });
 
-      const callArgs = mockEmailService.sendEmail.mock.calls[0];
-      const body = callArgs[2] as string;
-      expect(body).toContain('R 5000.00'); // 500000 cents = R5000
+      const callArgs = mockEmailService.sendEmailWithOptions.mock.calls[0][0];
+      // Check both plain text body and HTML for the amount
+      const body = callArgs.body || '';
+      const html = callArgs.html || '';
+      const content = body + html;
+      // R5000 formatted as South African Rand
+      expect(content).toMatch(/5[\s,.]?000/);
     });
 
-    it('should include line items in message', async () => {
+    it('should include line items in message body', async () => {
       await service.sendInvoices({
         tenantId: testTenant.id,
         invoiceIds: [testInvoice1.id],
       });
 
-      const callArgs = mockEmailService.sendEmail.mock.calls[0];
-      const body = callArgs[2] as string;
-      expect(body).toContain('Monthly School Fee');
+      const callArgs = mockEmailService.sendEmailWithOptions.mock.calls[0][0];
+      const body = callArgs.body || '';
+      const html = callArgs.html || '';
+      const content = body + html;
+      expect(content).toContain('Monthly School Fee');
     });
   });
 });

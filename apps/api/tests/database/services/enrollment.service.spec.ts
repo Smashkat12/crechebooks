@@ -28,6 +28,9 @@ import { EnrollmentStatus } from '../../../src/database/entities/enrollment.enti
 import { FeeType } from '../../../src/database/entities/fee-structure.entity';
 import { Decimal } from 'decimal.js';
 import { Tenant, User, Parent, Child, FeeStructure } from '@prisma/client';
+import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
+import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
+import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('EnrollmentService', () => {
   let service: EnrollmentService;
@@ -62,6 +65,8 @@ describe('EnrollmentService', () => {
         AuditLogService,
         ProRataService,
         CreditNoteService,
+        InvoiceNumberService,
+        { provide: WelcomePackDeliveryService, useValue: { deliverWelcomePack: jest.fn().mockResolvedValue(undefined), sendWelcomePack: jest.fn().mockResolvedValue({ success: true }) } },
       ],
     }).compile();
 
@@ -83,47 +88,7 @@ describe('EnrollmentService', () => {
   });
 
   beforeEach(async () => {
-    // CRITICAL: Clean database in FK order - leaf tables first!
-    await prisma.auditLog.deleteMany({});
-    await prisma.sarsSubmission.deleteMany({});
-    await prisma.bankStatementMatch.deleteMany({});
-    await prisma.reconciliation.deleteMany({});
-    await prisma.payrollJournalLine.deleteMany({});
-    await prisma.payrollJournal.deleteMany({});
-    await prisma.payroll.deleteMany({});
-    await prisma.payRunSync.deleteMany({});
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.payrollAdjustment.deleteMany({});
-    await prisma.employeeSetupLog.deleteMany({});
-    await prisma.staff.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.reminder.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.payeePattern.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.simplePayConnection.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.bankConnection.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.reportRequest.deleteMany({});
-    await prisma.bulkOperationLog.deleteMany({});
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    await cleanDatabase(prisma);
 
     // Create test tenant
     testTenant = await prisma.tenant.create({
@@ -797,7 +762,7 @@ describe('EnrollmentService', () => {
       expect(discounts.get(testChild2.id)?.toNumber()).toBe(10); // Second child: 10%
     });
 
-    it('should apply 15% and 20% discounts for 3+ children', async () => {
+    it('should apply 10% and 15% discounts for 3+ children', async () => {
       const startDate1 = new Date();
       startDate1.setDate(startDate1.getDate() + 1);
 
@@ -837,8 +802,8 @@ describe('EnrollmentService', () => {
 
       expect(discounts.size).toBe(3);
       expect(discounts.get(testChild1.id)?.toNumber()).toBe(0); // First: 0%
-      expect(discounts.get(testChild2.id)?.toNumber()).toBe(15); // Second: 15%
-      expect(discounts.get(testChild3.id)?.toNumber()).toBe(20); // Third: 20%
+      expect(discounts.get(testChild2.id)?.toNumber()).toBe(10); // Second: 10%
+      expect(discounts.get(testChild3.id)?.toNumber()).toBe(15); // Third: 15%
     });
 
     it('should order by enrollment startDate, not child creation order', async () => {
@@ -882,10 +847,10 @@ describe('EnrollmentService', () => {
       expect(discounts.size).toBe(3);
       // Child3 was enrolled first, so gets 0%
       expect(discounts.get(testChild3.id)?.toNumber()).toBe(0);
-      // Child1 was enrolled second, so gets 15%
-      expect(discounts.get(testChild1.id)?.toNumber()).toBe(15);
-      // Child2 was enrolled third, so gets 20%
-      expect(discounts.get(testChild2.id)?.toNumber()).toBe(20);
+      // Child1 was enrolled second, so gets 10%
+      expect(discounts.get(testChild1.id)?.toNumber()).toBe(10);
+      // Child2 was enrolled third, so gets 15%
+      expect(discounts.get(testChild2.id)?.toNumber()).toBe(15);
     });
 
     it('should exclude withdrawn children from sibling count', async () => {

@@ -138,7 +138,7 @@ describe('TASK-SEC-001: Auth Security - No Hardcoded Credentials', () => {
 
       // Should check DEV_AUTH_ENABLED environment variable
       expect(content).toContain('DEV_AUTH_ENABLED');
-      expect(content).toContain("devAuthEnabled !== 'true'");
+      expect(content).toContain("devAuthEnabled === 'true'");
     });
 
     it('should validate environment configuration on module init', () => {
@@ -156,7 +156,7 @@ describe('TASK-SEC-001: Auth Security - No Hardcoded Credentials', () => {
 
       // Should block DEV_AUTH_ENABLED in production
       expect(content).toContain(
-        'DEV_AUTH_ENABLED must not be true in production',
+        'DEV_AUTH_ENABLED=true is not allowed in production',
       );
     });
 

@@ -120,6 +120,14 @@ export class TransactionDateService {
       try {
         const parsed = parse(trimmed, formatString, new Date());
         if (isValid(parsed)) {
+          // Reject dates with unreasonable years from 4-digit year formats
+          // date-fns v4 leniently accepts 2-digit input for yyyy tokens,
+          // which can cause formats like 'yyyy/MM/dd' to incorrectly match
+          // short-year inputs like '15/01/24' (giving year 15 CE).
+          const year = parsed.getFullYear();
+          if (formatString.includes('yyyy') && year < 100) {
+            continue;
+          }
           return {
             date: this.normalizeToStartOfDay(parsed),
             originalValue: dateString,

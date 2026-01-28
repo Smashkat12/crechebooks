@@ -27,6 +27,7 @@ import { ProRataService } from '../../../src/database/services/pro-rata.service'
 import { CreditBalanceService } from '../../../src/database/services/credit-balance.service';
 import { CreditNoteService } from '../../../src/database/services/credit-note.service';
 import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
+import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
 import { ConflictException } from '../../../src/shared/exceptions';
 import {
   withSerializableTransaction,
@@ -91,6 +92,7 @@ describe('Batch Invoice Transaction Isolation (TASK-BILL-002)', () => {
         CreditBalanceService,
         CreditNoteService,
         { provide: XeroSyncService, useValue: mockXeroSyncService },
+        { provide: WelcomePackDeliveryService, useValue: { deliverWelcomePack: jest.fn().mockResolvedValue(undefined), sendWelcomePack: jest.fn().mockResolvedValue({ success: true }) } },
       ],
     }).compile();
 
@@ -375,7 +377,7 @@ describe('Batch Invoice Transaction Isolation (TASK-BILL-002)', () => {
       expect(createdUser).toBeNull();
 
       // Clean up
-      await prisma.tenant.delete({ where: { id: testTenant.id } });
+      await prisma.tenant.delete({ where: { id: testTenant.id } }).catch(() => {});
     });
 
     it('should use serializable isolation level', async () => {

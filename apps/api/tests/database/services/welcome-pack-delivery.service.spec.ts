@@ -29,6 +29,21 @@ import {
   FeeStructure,
   Enrollment,
 } from '@prisma/client';
+import { cleanDatabase } from '../../helpers/clean-database';
+
+/**
+ * Mock EmailTemplateService - template rendering requires filesystem templates
+ * that are not available in the test environment.
+ * NOTE: This is a SERVICE mock for infrastructure dependency, not a DATA mock.
+ */
+const createMockEmailTemplateService = () => ({
+  renderWelcomePackEmail: jest.fn().mockImplementation((data: any) => ({
+    text: `Welcome ${data.childName} to ${data.tenantName}! Starting ${data.startDate}. Fee: R${(data.monthlyFeeCents / 100).toFixed(2)}.`,
+    html: `<p>Welcome ${data.childName} to ${data.tenantName}!</p>`,
+    subject: `Welcome Pack - ${data.childName} - ${data.tenantName}`,
+  })),
+  onModuleInit: jest.fn(),
+});
 
 /**
  * Mock EmailService - external SMTP/Mailgun integration
@@ -64,6 +79,7 @@ describe('WelcomePackDeliveryService', () => {
   let enrollmentRepo: EnrollmentRepository;
   let mockEmailService: ReturnType<typeof createMockEmailService>;
   let mockPdfService: ReturnType<typeof createMockPdfService>;
+  let mockEmailTemplateService: ReturnType<typeof createMockEmailTemplateService>;
 
   // Test data
   let testTenant: Tenant;
@@ -78,12 +94,14 @@ describe('WelcomePackDeliveryService', () => {
   beforeAll(async () => {
     mockEmailService = createMockEmailService();
     mockPdfService = createMockPdfService();
+    mockEmailTemplateService = createMockEmailTemplateService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PrismaService,
         WelcomePackDeliveryService,
-        EmailTemplateService,
+        // Mock EmailTemplateService - requires filesystem templates not available in tests
+        { provide: EmailTemplateService, useValue: mockEmailTemplateService },
         EnrollmentRepository,
         ChildRepository,
         ParentRepository,
@@ -120,45 +138,7 @@ describe('WelcomePackDeliveryService', () => {
       generatedAt: new Date(),
     });
 
-    // CRITICAL: Clean database in FK order - leaf tables first!
-    await prisma.auditLog.deleteMany({});
-    await prisma.sarsSubmission.deleteMany({});
-    await prisma.bankStatementMatch.deleteMany({});
-    await prisma.reconciliation.deleteMany({});
-    await prisma.payrollJournalLine.deleteMany({});
-    await prisma.payrollJournal.deleteMany({});
-    await prisma.payroll.deleteMany({});
-    await prisma.payRunSync.deleteMany({});
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.payrollAdjustment.deleteMany({});
-    await prisma.employeeSetupLog.deleteMany({});
-    await prisma.staff.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.reminder.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.payeePattern.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.simplePayConnection.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.bankConnection.deleteMany({});
-    await prisma.reportRequest.deleteMany({});
-    await prisma.bulkOperationLog.deleteMany({});
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    await cleanDatabase(prisma);
 
     const timestamp = Date.now();
 

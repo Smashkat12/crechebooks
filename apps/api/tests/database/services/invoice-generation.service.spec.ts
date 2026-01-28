@@ -72,6 +72,8 @@ import {
   FeeStructure,
   Enrollment,
 } from '@prisma/client';
+import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
+import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('InvoiceGenerationService', () => {
   let service: InvoiceGenerationService;
@@ -118,6 +120,7 @@ describe('InvoiceGenerationService', () => {
         // Mock XeroSyncService because it requires external Xero API credentials
         // This is a SERVICE mock for external integration, not a DATA mock
         { provide: XeroSyncService, useValue: mockXeroSyncService },
+        { provide: WelcomePackDeliveryService, useValue: { deliverWelcomePack: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
@@ -136,48 +139,7 @@ describe('InvoiceGenerationService', () => {
   });
 
   beforeEach(async () => {
-    // CRITICAL: Clean database in FK order - leaf tables first!
-    await prisma.auditLog.deleteMany({});
-    await prisma.sarsSubmission.deleteMany({});
-    await prisma.bankStatementMatch.deleteMany({});
-    await prisma.reconciliation.deleteMany({});
-    await prisma.payrollJournalLine.deleteMany({});
-    await prisma.payrollJournal.deleteMany({});
-    await prisma.payroll.deleteMany({});
-    await prisma.payRunSync.deleteMany({});
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.payrollAdjustment.deleteMany({});
-    await prisma.employeeSetupLog.deleteMany({});
-    await prisma.staff.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.reminder.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.invoiceNumberCounter.deleteMany({}); // TASK-BILL-003: Clean up counters
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.payeePattern.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.simplePayConnection.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.bankConnection.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.reportRequest.deleteMany({});
-    await prisma.bulkOperationLog.deleteMany({});
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    await cleanDatabase(prisma);
 
     const timestamp = Date.now();
 
@@ -593,17 +555,17 @@ describe('InvoiceGenerationService', () => {
       expect(lines1).toHaveLength(1);
       expect(lines1[0].subtotalCents).toBe(500000);
 
-      // Second child: 15% discount on R5000 = R750 discount
+      // Second child: 10% discount on R5000 = R500 discount
       // Fee line + discount line
       expect(lines2).toHaveLength(2);
       expect(lines2[0].subtotalCents).toBe(500000); // Full fee
-      expect(lines2[1].subtotalCents).toBe(-75000); // Discount (15% of 500000)
+      expect(lines2[1].subtotalCents).toBe(-50000); // Discount (10% of 500000)
       expect(lines2[1].lineType).toBe(LineType.DISCOUNT);
 
-      // Third child: 20% discount on R3000 = R600 discount
+      // Third child: 15% discount on R3000 = R450 discount
       expect(lines3).toHaveLength(2);
       expect(lines3[0].subtotalCents).toBe(300000); // Full fee (half day)
-      expect(lines3[1].subtotalCents).toBe(-60000); // Discount (20% of 300000)
+      expect(lines3[1].subtotalCents).toBe(-45000); // Discount (15% of 300000)
     });
 
     it('should NOT calculate VAT for non-VAT-registered tenant', async () => {

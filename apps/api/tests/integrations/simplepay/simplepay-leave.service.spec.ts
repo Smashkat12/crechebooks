@@ -4,6 +4,7 @@
  */
 
 import 'dotenv/config';
+import { cleanDatabase } from '../../helpers/clean-database';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SimplePayLeaveService } from '../../../src/integrations/simplepay/simplepay-leave.service';
 import { SimplePayApiClient } from '../../../src/integrations/simplepay/simplepay-api.client';
@@ -90,46 +91,8 @@ describe('SimplePayLeaveService', () => {
     jest.clearAllMocks();
     mockInitializeForTenant.mockResolvedValue(undefined);
 
-    // Clean database in exact order
-    await prisma.reportRequest.deleteMany({});
-    await prisma.bankStatementMatch.deleteMany({});
-    await prisma.reconciliation.deleteMany({});
-    await prisma.sarsSubmission.deleteMany({});
-    await prisma.payrollJournalLine.deleteMany({});
-    await prisma.payrollJournal.deleteMany({});
-    await prisma.payroll.deleteMany({});
-    await prisma.payRunSync.deleteMany({});
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.payrollAdjustment.deleteMany({});
-    await prisma.employeeSetupLog.deleteMany({});
-    await prisma.staffOffboarding.deleteMany({});
-    await prisma.staff.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.reminder.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.payeePattern.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.simplePayEmployeeMapping.deleteMany({});
-    await prisma.simplePayConnection.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.bankConnection.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.bulkOperationLog.deleteMany({});
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    // Clean database using TRUNCATE CASCADE
+    await cleanDatabase(prisma);
 
     // Note: Cache is cleared per-tenant when tenant is created
     // No need to clear cache here before tenant exists
@@ -174,50 +137,16 @@ describe('SimplePayLeaveService', () => {
   });
 
   describe('getLeaveTypes', () => {
-    const mockLeaveTypes: { leave_type: SimplePayLeaveType }[] = [
-      {
-        leave_type: {
-          id: 1,
-          name: 'Annual Leave',
-          accrual_type: 'annual',
-          accrual_rate: 15,
-          accrual_cap: 30,
-          carry_over_cap: 10,
-          units: 'days',
-          requires_approval: true,
-          is_active: true,
-        },
-      },
-      {
-        leave_type: {
-          id: 2,
-          name: 'Sick Leave',
-          accrual_type: 'sick',
-          accrual_rate: 30,
-          accrual_cap: 60,
-          carry_over_cap: null,
-          units: 'days',
-          requires_approval: false,
-          is_active: true,
-        },
-      },
-      {
-        leave_type: {
-          id: 3,
-          name: 'Family Responsibility Leave',
-          accrual_type: 'family_responsibility',
-          accrual_rate: 3,
-          accrual_cap: 3,
-          carry_over_cap: null,
-          units: 'days',
-          requires_approval: true,
-          is_active: true,
-        },
-      },
-    ];
+    // The implementation calls apiClient.get<Record<string, string>>() which
+    // returns SimplePay's format: { "leaveTypeId": "name", ... }
+    const mockLeaveTypesResponse: Record<string, string> = {
+      '1': 'Annual Leave',
+      '2': 'Sick Leave',
+      '3': 'Family Responsibility Leave',
+    };
 
     it('should fetch leave types from SimplePay API', async () => {
-      mockGet.mockResolvedValue(mockLeaveTypes);
+      mockGet.mockResolvedValue(mockLeaveTypesResponse);
 
       const leaveTypes = await service.getLeaveTypes(tenant.id);
 
@@ -227,11 +156,16 @@ describe('SimplePayLeaveService', () => {
       );
       expect(leaveTypes).toHaveLength(3);
       expect(leaveTypes[0].name).toBe('Annual Leave');
+      expect(leaveTypes[0].id).toBe(1);
+      expect(leaveTypes[0].accrual_type).toBe('annual');
       expect(leaveTypes[1].name).toBe('Sick Leave');
+      expect(leaveTypes[1].accrual_type).toBe('sick');
+      expect(leaveTypes[2].name).toBe('Family Responsibility Leave');
+      expect(leaveTypes[2].accrual_type).toBe('family_responsibility');
     });
 
     it('should cache leave types for 15 minutes', async () => {
-      mockGet.mockResolvedValue(mockLeaveTypes);
+      mockGet.mockResolvedValue(mockLeaveTypesResponse);
 
       // First call should fetch from API
       await service.getLeaveTypes(tenant.id);
@@ -243,7 +177,7 @@ describe('SimplePayLeaveService', () => {
     });
 
     it('should force refresh cache when specified', async () => {
-      mockGet.mockResolvedValue(mockLeaveTypes);
+      mockGet.mockResolvedValue(mockLeaveTypesResponse);
 
       await service.getLeaveTypes(tenant.id);
       expect(mockGet).toHaveBeenCalledTimes(1);
@@ -262,47 +196,41 @@ describe('SimplePayLeaveService', () => {
   });
 
   describe('getLeaveBalances', () => {
-    const mockLeaveBalances: { leave_balance: SimplePayLeaveBalance }[] = [
-      {
-        leave_balance: {
-          leave_type_id: 1,
-          leave_type_name: 'Annual Leave',
-          opening_balance: 0,
-          accrued: 15,
-          taken: 5,
-          pending: 2,
-          adjustment: 0,
-          current_balance: 8,
-          units: 'days',
-        },
-      },
-      {
-        leave_balance: {
-          leave_type_id: 2,
-          leave_type_name: 'Sick Leave',
-          opening_balance: 10,
-          accrued: 20,
-          taken: 3,
-          pending: 0,
-          adjustment: 0,
-          current_balance: 27,
-          units: 'days',
-        },
-      },
-    ];
+    // The implementation makes two API calls:
+    // 1. GET /employees/{id}/leave_balances?date={date} -> Record<string, number>
+    // 2. GET /clients/{id}/leave_types -> Record<string, string>
+    const mockBalanceResponse: Record<string, number> = {
+      '1': 8,
+      '2': 27,
+    };
+
+    const mockLeaveTypeNamesResponse: Record<string, string> = {
+      '1': 'Annual Leave',
+      '2': 'Sick Leave',
+    };
 
     it('should fetch leave balances for an employee', async () => {
-      mockGet.mockResolvedValue(mockLeaveBalances);
+      mockGet.mockImplementation((endpoint: string) => {
+        if (endpoint.includes('/leave_balances')) {
+          return Promise.resolve(mockBalanceResponse);
+        }
+        if (endpoint.includes('/leave_types')) {
+          return Promise.resolve(mockLeaveTypeNamesResponse);
+        }
+        return Promise.resolve({});
+      });
 
       const balances = await service.getLeaveBalances(tenant.id, 'sp-emp-123');
 
       expect(mockInitializeForTenant).toHaveBeenCalledWith(tenant.id);
       expect(mockGet).toHaveBeenCalledWith(
-        '/employees/sp-emp-123/leave_balances',
+        expect.stringContaining('/employees/sp-emp-123/leave_balances'),
       );
       expect(balances).toHaveLength(2);
       expect(balances[0].current_balance).toBe(8);
+      expect(balances[0].leave_type_name).toBe('Annual Leave');
       expect(balances[1].current_balance).toBe(27);
+      expect(balances[1].leave_type_name).toBe('Sick Leave');
     });
 
     it('should handle API errors', async () => {
@@ -916,23 +844,18 @@ describe('SimplePayLeaveService', () => {
     });
 
     it('should get leave balances by staff ID', async () => {
-      const mockBalances: { leave_balance: SimplePayLeaveBalance }[] = [
-        {
-          leave_balance: {
-            leave_type_id: 1,
-            leave_type_name: 'Annual Leave',
-            opening_balance: 0,
-            accrued: 15,
-            taken: 5,
-            pending: 0,
-            adjustment: 0,
-            current_balance: 10,
-            units: 'days',
-          },
-        },
-      ];
-
-      mockGet.mockResolvedValue(mockBalances);
+      // The implementation calls getLeaveBalances which makes two API calls:
+      // 1. GET /employees/{id}/leave_balances?date={date} -> Record<string, number>
+      // 2. GET /clients/{id}/leave_types -> Record<string, string>
+      mockGet.mockImplementation((endpoint: string) => {
+        if (endpoint.includes('/leave_balances')) {
+          return Promise.resolve({ '1': 10 } as Record<string, number>);
+        }
+        if (endpoint.includes('/leave_types')) {
+          return Promise.resolve({ '1': 'Annual Leave' } as Record<string, string>);
+        }
+        return Promise.resolve({});
+      });
 
       const balances = await service.getLeaveBalancesByStaff(
         tenant.id,
@@ -940,7 +863,7 @@ describe('SimplePayLeaveService', () => {
       );
 
       expect(mockGet).toHaveBeenCalledWith(
-        '/employees/sp-emp-456/leave_balances',
+        expect.stringContaining('/employees/sp-emp-456/leave_balances'),
       );
       expect(balances).toHaveLength(1);
       expect(balances[0].current_balance).toBe(10);
@@ -970,23 +893,12 @@ describe('SimplePayLeaveService', () => {
 
   describe('clearCache', () => {
     it('should clear cache for specific tenant', async () => {
-      const mockLeaveTypes: { leave_type: SimplePayLeaveType }[] = [
-        {
-          leave_type: {
-            id: 1,
-            name: 'Annual Leave',
-            accrual_type: 'annual',
-            accrual_rate: 15,
-            accrual_cap: 30,
-            carry_over_cap: 10,
-            units: 'days',
-            requires_approval: true,
-            is_active: true,
-          },
-        },
-      ];
+      // SimplePay returns Record<string, string> for leave types
+      const mockLeaveTypesResponse: Record<string, string> = {
+        '1': 'Annual Leave',
+      };
 
-      mockGet.mockResolvedValue(mockLeaveTypes);
+      mockGet.mockResolvedValue(mockLeaveTypesResponse);
 
       // Populate cache
       await service.getLeaveTypes(tenant.id);
@@ -1001,23 +913,11 @@ describe('SimplePayLeaveService', () => {
     });
 
     it('should clear all caches when no tenant specified', async () => {
-      const mockLeaveTypes: { leave_type: SimplePayLeaveType }[] = [
-        {
-          leave_type: {
-            id: 1,
-            name: 'Annual Leave',
-            accrual_type: 'annual',
-            accrual_rate: 15,
-            accrual_cap: 30,
-            carry_over_cap: 10,
-            units: 'days',
-            requires_approval: true,
-            is_active: true,
-          },
-        },
-      ];
+      const mockLeaveTypesResponse: Record<string, string> = {
+        '1': 'Annual Leave',
+      };
 
-      mockGet.mockResolvedValue(mockLeaveTypes);
+      mockGet.mockResolvedValue(mockLeaveTypesResponse);
 
       await service.getLeaveTypes(tenant.id);
       expect(mockGet).toHaveBeenCalledTimes(1);

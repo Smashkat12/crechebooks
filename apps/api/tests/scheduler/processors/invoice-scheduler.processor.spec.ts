@@ -23,6 +23,8 @@ import { XeroSyncService } from '../../../src/database/services/xero-sync.servic
 import { ProRataService } from '../../../src/database/services/pro-rata.service';
 import { CreditBalanceService } from '../../../src/database/services/credit-balance.service';
 import { CreditNoteService } from '../../../src/database/services/credit-note.service';
+import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
+import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { EnrollmentStatus } from '../../../src/database/entities/enrollment.entity';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
@@ -110,6 +112,13 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
         ProRataService,
         CreditBalanceService,
         CreditNoteService,
+        InvoiceNumberService,
+        {
+          provide: WelcomePackDeliveryService,
+          useValue: {
+            deliverWelcomePack: jest.fn().mockResolvedValue(undefined),
+          },
+        },
         { provide: XeroSyncService, useValue: mockXeroSyncService },
       ],
     }).compile();

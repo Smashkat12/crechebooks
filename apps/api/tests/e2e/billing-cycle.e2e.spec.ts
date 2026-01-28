@@ -11,6 +11,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 import { JwtStrategy } from '../../src/api/auth/strategies/jwt.strategy';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import {
   createTestTenant,
   createTestUser,
@@ -20,6 +21,7 @@ import {
   TestJwtStrategy,
 } from '../helpers';
 import Decimal from 'decimal.js';
+import { cleanDatabase } from '../helpers/clean-database';
 
 // Helper types for test data
 interface TestParent {
@@ -322,18 +324,8 @@ function calculateVAT(subtotalCents: number, vatRate: number = 0.15): number {
  */
 async function cleanupBillingTestData(
   prisma: PrismaService,
-  tenantId: string,
 ): Promise<void> {
-  // Delete in order respecting foreign keys
-  await prisma.payment.deleteMany({ where: { tenantId } });
-  await prisma.invoiceLine.deleteMany({ where: { invoice: { tenantId } } });
-  await prisma.invoice.deleteMany({ where: { tenantId } });
-  await prisma.enrollment.deleteMany({ where: { tenantId } });
-  await prisma.child.deleteMany({ where: { tenantId } });
-  await prisma.parent.deleteMany({ where: { tenantId } });
-  await prisma.feeStructure.deleteMany({ where: { tenantId } });
-  await prisma.user.deleteMany({ where: { tenantId } });
-  await prisma.tenant.delete({ where: { id: tenantId } });
+  await cleanDatabase(prisma);
 }
 
 describe('E2E: Billing Cycle Flow', () => {
@@ -357,6 +349,8 @@ describe('E2E: Billing Cycle Flow', () => {
     })
       .overrideProvider(JwtStrategy)
       .useClass(TestJwtStrategy)
+      .overrideProvider(ThrottlerStorage)
+      .useValue({ increment: jest.fn().mockResolvedValue({ totalHits: 0, timeToExpire: 60, isBlocked: false, timeToBlockExpire: 0 }) })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -380,7 +374,7 @@ describe('E2E: Billing Cycle Flow', () => {
   afterAll(async () => {
     // Cleanup in reverse order of creation
     if (testTenant?.id) {
-      await cleanupBillingTestData(prisma, testTenant.id);
+      await cleanupBillingTestData(prisma);
     }
     await app?.close();
   }, 30000);

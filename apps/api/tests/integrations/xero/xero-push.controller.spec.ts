@@ -11,6 +11,7 @@ import { XeroController } from '../../../src/integrations/xero/xero.controller';
 import { BankFeedService } from '../../../src/integrations/xero/bank-feed.service';
 import { XeroSyncGateway } from '../../../src/integrations/xero/xero.gateway';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
+import { XeroAuthService } from '../../../src/integrations/xero/xero-auth.service';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { TokenManager } from '../../../src/mcp/xero-mcp/auth/token-manager';
 import { IUser, UserRole } from '../../../src/database/entities/user.entity';
@@ -176,6 +177,13 @@ describe('XeroController - Push Categorizations', () => {
           useValue: {
             syncTransactions: jest.fn(),
             pushToXero: jest.fn(),
+          },
+        },
+        {
+          provide: XeroAuthService,
+          useValue: {
+            getAccessToken: jest.fn().mockResolvedValue('mock-token'),
+            isConnected: jest.fn().mockResolvedValue(true),
           },
         },
       ],

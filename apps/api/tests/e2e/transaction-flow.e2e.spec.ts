@@ -17,11 +17,11 @@ import {
   createTestUser,
   getAuthToken,
   seedChartOfAccounts,
-  cleanupTestData,
   TestTenant,
   TestUser,
   TestJwtStrategy,
 } from '../helpers';
+import { cleanDatabase } from '../helpers/clean-database';
 import { XeroMockServer } from '../helpers/xero-mock';
 
 describe('E2E: Transaction Categorization Flow', () => {
@@ -86,9 +86,9 @@ describe('E2E: Transaction Categorization Flow', () => {
   }, 60000); // 60s timeout for setup
 
   afterAll(async () => {
-    // Cleanup in reverse order of creation
+    // Cleanup all test data
     if (testTenant?.id) {
-      await cleanupTestData(prisma, testTenant.id);
+      await cleanDatabase(prisma);
     }
     await xeroMock?.stop();
     await app?.close();

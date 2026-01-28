@@ -20,6 +20,7 @@ import { AuditLogService } from '../audit-log.service';
 import { XeroSyncService } from '../xero-sync.service';
 import { ProRataService } from '../pro-rata.service';
 import { CreditBalanceService } from '../credit-balance.service';
+import { InvoiceNumberService } from '../invoice-number.service';
 import { LineType } from '../../entities/invoice-line.entity';
 
 describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () => {
@@ -39,14 +40,57 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
   const MONTHLY_FEE_CENTS = 500000; // R5000.00
 
   beforeEach(async () => {
+    const defaultInvoice = {
+      id: 'invoice-001',
+      tenantId: TENANT_ID,
+      invoiceNumber: 'INV-2025-001',
+      parentId: PARENT_ID,
+      childId: CHILD_ID,
+      subtotalCents: 0,
+      vatCents: 0,
+      totalCents: 0,
+      status: 'DRAFT',
+      amountPaidCents: 0,
+      xeroInvoiceId: null,
+      isDeleted: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockInvoice = {
+      create: jest.fn().mockResolvedValue(defaultInvoice),
+      update: jest.fn().mockResolvedValue(defaultInvoice),
+      findMany: jest.fn(),
+    };
+    const mockInvoiceLine = {
+      create: jest.fn().mockImplementation(async (data: any) => ({
+        id: `line-${Date.now()}`,
+        ...data.data,
+        createdAt: new Date(),
+      })),
+    };
+    const mockAdHocCharge = {
+      findMany: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn(),
+    };
+    const mockTx = {
+      invoice: mockInvoice,
+      invoiceLine: mockInvoiceLine,
+      adHocCharge: mockAdHocCharge,
+    };
     const mockPrisma = {
       enrollment: {
         findMany: jest.fn(),
       },
-      adHocCharge: {
-        findMany: jest.fn().mockResolvedValue([]),
-        updateMany: jest.fn(),
-      },
+      invoice: mockInvoice,
+      invoiceLine: mockInvoiceLine,
+      adHocCharge: mockAdHocCharge,
+      $queryRaw: jest.fn().mockResolvedValue([{ pg_try_advisory_lock: true }]),
+      $transaction: jest.fn().mockImplementation(async (cb: any) => {
+        if (typeof cb === 'function') {
+          return cb(mockTx);
+        }
+        return cb;
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -120,6 +164,12 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
               appliedCreditCents: 0,
               creditCount: 0,
             }),
+          },
+        },
+        {
+          provide: InvoiceNumberService,
+          useValue: {
+            generateNextNumber: jest.fn().mockResolvedValue('INV-2025-001'),
           },
         },
       ],
@@ -267,7 +317,9 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       expect(endDate.getDate()).toBe(31);
 
       // Line item should have pro-rata amount and description
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      // Line items created inside $transaction via tx.invoiceLine.create
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
       expect(lineItemCall.description).toContain('Pro-rata');
       expect(lineItemCall.description).toContain('15 Jan');
@@ -303,7 +355,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
 
       // Assert
       expect(proRataService.calculateProRata).toHaveBeenCalled();
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
       expect(lineItemCall.description).toContain('27 Jan');
     });
@@ -356,8 +409,9 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       expect(startDate.getDate()).toBe(1); // Billing period start
       expect(endDate.getDate()).toBe(15); // Enrollment end
 
-      // Line item should have pro-rata description
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      // Line item should have pro-rata description (created inside $transaction)
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
       expect(lineItemCall.description).toContain('Pro-rata');
       expect(lineItemCall.description).toContain('1 Jan');
@@ -396,7 +450,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
 
       // Assert
       expect(proRataService.calculateProRata).toHaveBeenCalled();
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
       expect(lineItemCall.description).toContain('3 Jan');
     });
@@ -436,8 +491,9 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       // ProRataService should NOT be called for full month
       expect(proRataService.calculateProRata).not.toHaveBeenCalled();
 
-      // Line item should have full monthly fee
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      // Line item should have full monthly fee (created inside $transaction)
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(MONTHLY_FEE_CENTS);
       expect(lineItemCall.description).toBe('Monthly Fee - Standard');
       expect(lineItemCall.description).not.toContain('Pro-rata');
@@ -469,7 +525,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       // Assert
       expect(proRataService.calculateProRata).not.toHaveBeenCalled();
 
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(MONTHLY_FEE_CENTS);
       expect(lineItemCall.description).not.toContain('Pro-rata');
     });
@@ -503,7 +560,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       // Assert
       expect(proRataService.calculateProRata).not.toHaveBeenCalled();
 
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(MONTHLY_FEE_CENTS);
     });
   });
@@ -548,7 +606,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       expect(startDate.getDate()).toBe(10);
       expect(endDate.getDate()).toBe(20);
 
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.description).toContain('10 Jan');
       expect(lineItemCall.description).toContain('20 Jan');
     });
@@ -588,16 +647,17 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       // Act
       await service.generateMonthlyInvoices(TENANT_ID, '2025-01', USER_ID);
 
-      // Assert - should create two line items
-      expect(invoiceLineRepo.create).toHaveBeenCalledTimes(2);
+      // Assert - should create two line items (inside $transaction)
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      expect(txLineCreate).toHaveBeenCalledTimes(2);
 
       // First line: Pro-rata monthly fee
-      const feeLineCall = invoiceLineRepo.create.mock.calls[0][0];
+      const feeLineCall = txLineCreate.mock.calls[0][0].data;
       expect(feeLineCall.unitPriceCents).toBe(proRataAmount);
       expect(feeLineCall.lineType).toBe(LineType.MONTHLY_FEE);
 
       // Second line: Discount (10% of pro-rata, not full fee)
-      const discountLineCall = invoiceLineRepo.create.mock.calls[1][0];
+      const discountLineCall = txLineCreate.mock.calls[1][0].data;
       expect(discountLineCall.lineType).toBe(LineType.DISCOUNT);
 
       // Discount should be 10% of pro-rata amount (295455 * 0.10 = 29546 with banker's rounding)
@@ -646,7 +706,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
         TENANT_ID,
       );
 
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
     });
   });
@@ -719,7 +780,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       // Assert
       expect(proRataService.calculateProRata).toHaveBeenCalled();
 
-      const lineItemCall = invoiceLineRepo.create.mock.calls[0][0];
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.description).toContain('Feb');
       expect(lineItemCall.description).toContain('15 Feb');
       expect(lineItemCall.description).toContain('28 Feb');
@@ -783,13 +845,14 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       // ProRataService should only be called once (for child 2)
       expect(proRataService.calculateProRata).toHaveBeenCalledTimes(1);
 
-      // First invoice (full month) - no pro-rata
-      const firstInvoiceLineCall = invoiceLineRepo.create.mock.calls[0][0];
+      // First invoice (full month) - no pro-rata (created inside $transaction)
+      const txLineCreate = (prisma as any).invoiceLine.create;
+      const firstInvoiceLineCall = txLineCreate.mock.calls[0][0].data;
       expect(firstInvoiceLineCall.unitPriceCents).toBe(MONTHLY_FEE_CENTS);
       expect(firstInvoiceLineCall.description).not.toContain('Pro-rata');
 
       // Second invoice (mid-month) - with pro-rata
-      const secondInvoiceLineCall = invoiceLineRepo.create.mock.calls[1][0];
+      const secondInvoiceLineCall = txLineCreate.mock.calls[1][0].data;
       expect(secondInvoiceLineCall.unitPriceCents).toBe(295455);
       expect(secondInvoiceLineCall.description).toContain('Pro-rata');
     });

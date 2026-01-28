@@ -17,15 +17,16 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 import { JwtStrategy } from '../../src/api/auth/strategies/jwt.strategy';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import {
   createTestTenant,
   createTestUser,
   getAuthToken,
-  cleanupTestData,
   TestTenant,
   TestUser,
   TestJwtStrategy,
 } from '../helpers';
+import { cleanDatabase } from '../helpers/clean-database';
 import Decimal from 'decimal.js';
 
 // Configure Decimal.js for banker's rounding
@@ -54,11 +55,14 @@ describe('E2E: Reconciliation Flow', () => {
 
   beforeAll(async () => {
     // Create NestJS app with TestJwtStrategy override
+    // Increased timeout for CI where resource contention can slow module compilation
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(JwtStrategy)
       .useClass(TestJwtStrategy)
+      .overrideProvider(ThrottlerStorage)
+      .useValue({ increment: jest.fn().mockResolvedValue({ totalHits: 0, timeToExpire: 60, isBlocked: false, timeToBlockExpire: 0 }) })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -104,33 +108,12 @@ describe('E2E: Reconciliation Flow', () => {
       },
     });
     childId = child.id;
-  }, 60000);
+  }, 120000);
 
   afterAll(async () => {
-    // Cleanup in reverse order of creation
+    // Cleanup all test data
     if (testTenant?.id) {
-      // Delete reconciliations
-      await prisma.bankStatementMatch.deleteMany({});
-      await prisma.reconciliation.deleteMany({
-        where: { tenantId: testTenant.id },
-      });
-
-      // Delete payments and invoices
-      await prisma.payment.deleteMany({ where: { tenantId: testTenant.id } });
-      await prisma.invoiceLine.deleteMany({
-        where: { invoice: { tenantId: testTenant.id } },
-      });
-      await prisma.invoice.deleteMany({ where: { tenantId: testTenant.id } });
-
-      // Delete transactions and categorizations
-      await prisma.categorization.deleteMany({
-        where: { transaction: { tenantId: testTenant.id } },
-      });
-      await prisma.transaction.deleteMany({
-        where: { tenantId: testTenant.id },
-      });
-
-      await cleanupTestData(prisma, testTenant.id);
+      await cleanDatabase(prisma);
     }
     await app?.close();
   }, 30000);

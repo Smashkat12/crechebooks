@@ -309,8 +309,8 @@ describe('CorrectionConflictService', () => {
         conflict,
       );
 
-      // Verify pattern was updated
-      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', {
+      // Verify pattern was updated (with tenantId as second parameter)
+      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', mockTenantId, {
         defaultAccountCode: '400',
         defaultAccountName: 'Clothing',
       });
@@ -377,7 +377,7 @@ describe('CorrectionConflictService', () => {
       expect(categorizationRepo.findByTransaction).toHaveBeenCalledWith(
         mockTransactionId,
       );
-      expect(categorizationRepo.update).toHaveBeenCalledWith('cat-1', {
+      expect(categorizationRepo.update).toHaveBeenCalledWith('cat-1', mockTenantId, {
         accountCode: '400',
         accountName: 'Clothing',
         source: 'USER_OVERRIDE',

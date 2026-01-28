@@ -15,6 +15,7 @@ import { HealthCheckService, HealthCheckResult } from '@nestjs/terminus';
 import { HealthController } from '../../src/health/health.controller';
 import { DatabaseHealthIndicator } from '../../src/health/indicators/database.health';
 import { RedisHealthIndicator } from '../../src/health/indicators/redis.health';
+import { PoolHealthIndicator } from '../../src/database/monitoring/pool-health.indicator';
 import { ShutdownService } from '../../src/common/shutdown';
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 import { RedisService } from '../../src/common/redis/redis.service';
@@ -63,6 +64,14 @@ describe('HealthController', () => {
             new RedisHealthIndicator(
               mockRedisService as unknown as RedisService,
             ),
+        },
+        {
+          provide: PoolHealthIndicator,
+          useValue: {
+            isHealthy: jest.fn().mockReturnValue({
+              database_pool: { status: 'up' },
+            }),
+          },
         },
         {
           provide: ShutdownService,
@@ -147,6 +156,14 @@ describe('HealthController', () => {
                 mockRedisService as unknown as RedisService,
               ),
           },
+          {
+            provide: PoolHealthIndicator,
+            useValue: {
+              isHealthy: jest.fn().mockReturnValue({
+                database_pool: { status: 'up' },
+              }),
+            },
+          },
           { provide: PrismaService, useValue: mockPrismaService },
           { provide: RedisService, useValue: mockRedisService },
           // Note: No ShutdownService provided
@@ -180,6 +197,7 @@ describe('HealthController', () => {
       const result = await controller.checkReadiness();
 
       expect(healthCheckService.check).toHaveBeenCalledWith([
+        expect.any(Function),
         expect.any(Function),
         expect.any(Function),
       ]);
@@ -279,7 +297,7 @@ describe('DatabaseHealthIndicator', () => {
         const healthError = error as { causes: Record<string, unknown> };
         expect(healthError.causes.database).toMatchObject({
           status: 'disconnected',
-          error: 'Unknown database error',
+          error: 'Unknown string error',
         });
       }
     });

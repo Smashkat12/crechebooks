@@ -16,6 +16,7 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 import { JwtStrategy } from '../../src/api/auth/strategies/jwt.strategy';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import {
   createTestTenant,
   createTestUser,
@@ -24,6 +25,7 @@ import {
   TestUser,
   TestJwtStrategy,
 } from '../helpers';
+import { cleanDatabase } from '../helpers/clean-database';
 
 // Helper types for test data
 interface TestParent {
@@ -230,18 +232,8 @@ async function createTestCreditTransaction(
  */
 async function cleanupPaymentTestData(
   prisma: PrismaService,
-  tenantId: string,
 ): Promise<void> {
-  // Delete in order respecting foreign keys
-  await prisma.payment.deleteMany({ where: { tenantId } });
-  await prisma.categorizationJournal.deleteMany({ where: { tenantId } });
-  await prisma.transaction.deleteMany({ where: { tenantId } });
-  await prisma.invoiceLine.deleteMany({ where: { invoice: { tenantId } } });
-  await prisma.invoice.deleteMany({ where: { tenantId } });
-  await prisma.child.deleteMany({ where: { tenantId } });
-  await prisma.parent.deleteMany({ where: { tenantId } });
-  await prisma.user.deleteMany({ where: { tenantId } });
-  await prisma.tenant.delete({ where: { id: tenantId } });
+  await cleanDatabase(prisma);
 }
 
 describe('E2E: Payment Matching Flow', () => {
@@ -265,6 +257,8 @@ describe('E2E: Payment Matching Flow', () => {
     })
       .overrideProvider(JwtStrategy)
       .useClass(TestJwtStrategy)
+      .overrideProvider(ThrottlerStorage)
+      .useValue({ increment: jest.fn().mockResolvedValue({ totalHits: 0, timeToExpire: 60, isBlocked: false, timeToBlockExpire: 0 }) })
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -316,7 +310,7 @@ describe('E2E: Payment Matching Flow', () => {
   afterAll(async () => {
     // Cleanup in reverse order of creation
     if (testTenant?.id) {
-      await cleanupPaymentTestData(prisma, testTenant.id);
+      await cleanupPaymentTestData(prisma);
     }
     await app?.close();
   }, 30000);
@@ -802,8 +796,10 @@ describe('E2E: Payment Matching Flow', () => {
     it('should calculate aging buckets correctly', async () => {
       const now = new Date();
 
-      // Create invoices with different aging
-      // Current (0-7 days overdue)
+      // Create invoices with different aging matching TASK-BILL-006 bucket boundaries:
+      // current: 1-30 days, days_30: 31-60 days, days_60: 61-90 days, days_90_plus: >90 days
+
+      // Current bucket (1-30 days overdue)
       await createTestInvoice(
         prisma,
         testTenant.id,
@@ -816,7 +812,7 @@ describe('E2E: Payment Matching Flow', () => {
         },
       );
 
-      // 30 days bucket (8-30 days overdue)
+      // 31-60 days bucket
       await createTestInvoice(
         prisma,
         testTenant.id,
@@ -824,12 +820,12 @@ describe('E2E: Payment Matching Flow', () => {
         testChild1.id,
         {
           totalCents: 200000, // R2,000
-          dueDate: new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000), // 20 days ago
+          dueDate: new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000), // 45 days ago
           status: 'SENT',
         },
       );
 
-      // 60 days bucket (31-60 days overdue)
+      // 61-90 days bucket
       await createTestInvoice(
         prisma,
         testTenant.id,
@@ -837,12 +833,12 @@ describe('E2E: Payment Matching Flow', () => {
         testChild2.id,
         {
           totalCents: 300000, // R3,000
-          dueDate: new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000), // 45 days ago
+          dueDate: new Date(now.getTime() - 75 * 24 * 60 * 60 * 1000), // 75 days ago
           status: 'SENT',
         },
       );
 
-      // 90+ days bucket (61+ days overdue)
+      // 90+ days bucket (>90 days overdue)
       await createTestInvoice(
         prisma,
         testTenant.id,

@@ -269,6 +269,7 @@ describe('PayeeAlias Integration', () => {
       expect(result.accountCode).toBe('5100');
       expect(patternRepo.incrementMatchCount).toHaveBeenCalledWith(
         mockPattern.id,
+        mockTenantId,
       );
     });
   });
@@ -382,7 +383,7 @@ describe('PayeeAlias Integration', () => {
         `${mockPattern.id}:${aliasPayee}`,
       );
 
-      expect(patternRepo.update).toHaveBeenCalledWith(mockPattern.id, {
+      expect(patternRepo.update).toHaveBeenCalledWith(mockPattern.id, mockTenantId, {
         payeeAliases: ['WOOLIES'],
       });
     });

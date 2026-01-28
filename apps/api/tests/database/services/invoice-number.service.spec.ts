@@ -11,6 +11,7 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
 import { Tenant } from '@prisma/client';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
+import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('InvoiceNumberService', () => {
   let service: InvoiceNumberService;
@@ -34,17 +35,7 @@ describe('InvoiceNumberService', () => {
   });
 
   beforeEach(async () => {
-    // Clean up in FK order
-    await prisma.invoiceNumberCounter.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    await cleanDatabase(prisma);
 
     const timestamp = Date.now();
 

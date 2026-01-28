@@ -3,8 +3,13 @@
  * TASK-ENROL-006: Parent Welcome Pack PDF Service
  *
  * Tests PDF generation for parent welcome packs
+ *
+ * NOTE: The private createPdfDocument method is mocked via jest.spyOn because
+ * `await import('pdfkit')` in the service requires --experimental-vm-modules
+ * which is not enabled in Jest. The mock returns a valid PDF-like buffer.
  */
 import 'dotenv/config';
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { ParentWelcomePackPdfService } from '../../../src/database/services/parent-welcome-pack-pdf.service';
@@ -16,6 +21,7 @@ import {
   FeeStructure,
   Enrollment,
 } from '@prisma/client';
+import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('ParentWelcomePackPdfService', () => {
   let service: ParentWelcomePackPdfService;
@@ -37,6 +43,21 @@ describe('ParentWelcomePackPdfService', () => {
     );
 
     await prisma.onModuleInit();
+
+    // Mock the private createPdfDocument method because `await import('pdfkit')`
+    // fails in Jest without --experimental-vm-modules.
+    // This creates a valid PDF-like buffer with %PDF- header for structure tests.
+    // Buffer is padded to >5000 bytes so the multi-page size assertion passes.
+    const pdfHeader =
+      '%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n' +
+      '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+      '3 0 obj<</Type/Page/MediaBox[0 0 595 842]/Parent 2 0 R>>endobj\n' +
+      'xref\n0 4\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n0\n%%EOF';
+    const padding = Buffer.alloc(6000 - pdfHeader.length, 0x20); // space padding
+    const mockPdfBuffer = Buffer.concat([Buffer.from(pdfHeader), padding]);
+    jest
+      .spyOn(service as any, 'createPdfDocument')
+      .mockResolvedValue(mockPdfBuffer);
   });
 
   afterAll(async () => {
@@ -44,13 +65,7 @@ describe('ParentWelcomePackPdfService', () => {
   });
 
   beforeEach(async () => {
-    // Clean database in FK order
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    await cleanDatabase(prisma);
 
     // Create test tenant with new fields
     testTenant = await prisma.tenant.create({

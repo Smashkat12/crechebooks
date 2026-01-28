@@ -18,6 +18,7 @@ import { AuditLogService } from '../audit-log.service';
 import { XeroSyncService } from '../xero-sync.service';
 import { ProRataService } from '../pro-rata.service';
 import { CreditBalanceService } from '../credit-balance.service';
+import { InvoiceNumberService } from '../invoice-number.service';
 import { LineType } from '../../entities/invoice-line.entity';
 
 describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
@@ -35,14 +36,57 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
   const USER_ID = 'user-001';
 
   beforeEach(async () => {
+    const defaultInvoice = {
+      id: 'invoice-001',
+      tenantId: TENANT_ID,
+      invoiceNumber: 'INV-2025-001',
+      parentId: PARENT_ID,
+      childId: CHILD_ID,
+      subtotalCents: 0,
+      vatCents: 0,
+      totalCents: 0,
+      status: 'DRAFT',
+      amountPaidCents: 0,
+      xeroInvoiceId: null,
+      isDeleted: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const mockInvoice = {
+      create: jest.fn().mockResolvedValue(defaultInvoice),
+      update: jest.fn().mockResolvedValue(defaultInvoice),
+      findMany: jest.fn(),
+    };
+    const mockInvoiceLine = {
+      create: jest.fn().mockImplementation(async (data: any) => ({
+        id: `line-${Date.now()}`,
+        ...data.data,
+        createdAt: new Date(),
+      })),
+    };
+    const mockAdHocCharge = {
+      findMany: jest.fn(),
+      updateMany: jest.fn(),
+    };
+    const mockTx = {
+      invoice: mockInvoice,
+      invoiceLine: mockInvoiceLine,
+      adHocCharge: mockAdHocCharge,
+    };
     const mockPrisma = {
       enrollment: {
         findMany: jest.fn(),
       },
-      adHocCharge: {
-        findMany: jest.fn(),
-        updateMany: jest.fn(),
-      },
+      invoice: mockInvoice,
+      invoiceLine: mockInvoiceLine,
+      adHocCharge: mockAdHocCharge,
+      $queryRaw: jest.fn().mockResolvedValue([{ pg_try_advisory_lock: true }]),
+      $transaction: jest.fn().mockImplementation(async (cb: any) => {
+        if (typeof cb === 'function') {
+          return cb(mockTx);
+        }
+        return cb;
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -116,6 +160,12 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
               appliedCreditCents: 0,
               creditCount: 0,
             }),
+          },
+        },
+        {
+          provide: InvoiceNumberService,
+          useValue: {
+            generateNextNumber: jest.fn().mockResolvedValue('INV-2025-001'),
           },
         },
       ],
@@ -279,22 +329,24 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
         orderBy: { chargeDate: 'asc' },
       });
 
-      // Should create line items including ad-hoc charges
+      // Should create line items including ad-hoc charges via $transaction
       // Line 1: Monthly fee, Line 2: Field Trip, Line 3: Late Fee
-      expect(invoiceLineRepo.create).toHaveBeenCalledTimes(3);
+      // Note: createInvoiceAtomic uses tx.invoiceLine.create (Prisma-level), not invoiceLineRepo.create
+      const txInvoiceLineCreate = (prisma as any).invoiceLine.create;
+      expect(txInvoiceLineCreate).toHaveBeenCalledTimes(3);
 
-      // Verify ad-hoc line items
-      const lineItemCalls = invoiceLineRepo.create.mock.calls;
+      // Verify ad-hoc line items (Prisma calls use { data: {...} } wrapper)
+      const lineItemCalls = txInvoiceLineCreate.mock.calls;
 
       // Second call should be field trip
-      expect(lineItemCalls[1][0]).toMatchObject({
+      expect(lineItemCalls[1][0].data).toMatchObject({
         description: 'Field Trip - Zoo Visit',
         unitPriceCents: 15000,
         lineType: LineType.AD_HOC,
       });
 
       // Third call should be late fee
-      expect(lineItemCalls[2][0]).toMatchObject({
+      expect(lineItemCalls[2][0].data).toMatchObject({
         description: 'Late Pickup Fee',
         unitPriceCents: 5000,
         lineType: LineType.AD_HOC,
@@ -354,10 +406,11 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
 
       // Assert
       expect(result.invoicesCreated).toBe(1);
-      // Only monthly fee line item
-      expect(invoiceLineRepo.create).toHaveBeenCalledTimes(1);
-      // Should not call updateMany since no charges
-      expect(prisma.adHocCharge.updateMany).not.toHaveBeenCalled();
+      // Only monthly fee line item (created via tx.invoiceLine.create inside $transaction)
+      expect((prisma as any).invoiceLine.create).toHaveBeenCalledTimes(1);
+      // Ad-hoc charges are now marked inside the $transaction, but there were none
+      // so updateMany should still not be called for ad-hoc marking
+      expect((prisma as any).adHocCharge.updateMany).not.toHaveBeenCalled();
     });
 
     it('should only include charges within billing period', async () => {
@@ -530,14 +583,19 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
 
       enrollmentService.applySiblingDiscount.mockResolvedValue(new Map());
 
+      // The $transaction mock uses prisma.invoiceLine.create (tx.invoiceLine.create)
+      // Override it to track VAT application on AD_HOC lines
       let vatApplied = false;
-      invoiceLineRepo.create.mockImplementation(async (data: any) => {
+      const txInvoiceLineCreate = (prisma as any).invoiceLine.create as jest.Mock;
+      txInvoiceLineCreate.mockImplementation(async (args: any) => {
+        const data = args.data;
         if (data.lineType === LineType.AD_HOC && data.vatCents > 0) {
           vatApplied = true;
         }
         return {
           id: `line-${Date.now()}`,
           ...data,
+          createdAt: new Date(),
         };
       });
 

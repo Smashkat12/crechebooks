@@ -115,18 +115,22 @@ describe('InvoiceController', () => {
           provide: InvoiceRepository,
           useValue: {
             findByTenant: jest.fn(),
+            findById: jest.fn(),
+            findByIdWithLines: jest.fn(),
           },
         },
         {
           provide: ParentRepository,
           useValue: {
             findById: jest.fn(),
+            findByIds: jest.fn().mockResolvedValue([]),
           },
         },
         {
           provide: ChildRepository,
           useValue: {
             findById: jest.fn(),
+            findByIds: jest.fn().mockResolvedValue([]),
           },
         },
         {
@@ -166,8 +170,8 @@ describe('InvoiceController', () => {
   describe('listInvoices', () => {
     it('should return paginated invoices with default params', async () => {
       jest.spyOn(invoiceRepo, 'findByTenant').mockResolvedValue([mockInvoice]);
-      jest.spyOn(parentRepo, 'findById').mockResolvedValue(mockParent);
-      jest.spyOn(childRepo, 'findById').mockResolvedValue(mockChild);
+      jest.spyOn(parentRepo, 'findByIds').mockResolvedValue([mockParent]);
+      jest.spyOn(childRepo, 'findByIds').mockResolvedValue([mockChild]);
 
       const result = await controller.listInvoices({}, mockUser);
 
@@ -251,8 +255,8 @@ describe('InvoiceController', () => {
       jest
         .spyOn(invoiceRepo, 'findByTenant')
         .mockResolvedValue([invoice1, invoice2, invoice3]);
-      jest.spyOn(parentRepo, 'findById').mockResolvedValue(mockParent);
-      jest.spyOn(childRepo, 'findById').mockResolvedValue(mockChild);
+      jest.spyOn(parentRepo, 'findByIds').mockResolvedValue([mockParent]);
+      jest.spyOn(childRepo, 'findByIds').mockResolvedValue([mockChild]);
 
       const result = await controller.listInvoices(
         {
@@ -268,8 +272,8 @@ describe('InvoiceController', () => {
 
     it('should include parent and child summary in response', async () => {
       jest.spyOn(invoiceRepo, 'findByTenant').mockResolvedValue([mockInvoice]);
-      jest.spyOn(parentRepo, 'findById').mockResolvedValue(mockParent);
-      jest.spyOn(childRepo, 'findById').mockResolvedValue(mockChild);
+      jest.spyOn(parentRepo, 'findByIds').mockResolvedValue([mockParent]);
+      jest.spyOn(childRepo, 'findByIds').mockResolvedValue([mockChild]);
 
       const result = await controller.listInvoices({}, mockUser);
 
@@ -286,8 +290,8 @@ describe('InvoiceController', () => {
 
     it('should convert cents to decimal amounts', async () => {
       jest.spyOn(invoiceRepo, 'findByTenant').mockResolvedValue([mockInvoice]);
-      jest.spyOn(parentRepo, 'findById').mockResolvedValue(mockParent);
-      jest.spyOn(childRepo, 'findById').mockResolvedValue(mockChild);
+      jest.spyOn(parentRepo, 'findByIds').mockResolvedValue([mockParent]);
+      jest.spyOn(childRepo, 'findByIds').mockResolvedValue([mockChild]);
 
       const result = await controller.listInvoices({}, mockUser);
 
@@ -314,8 +318,8 @@ describe('InvoiceController', () => {
 
     it('should format dates as YYYY-MM-DD strings', async () => {
       jest.spyOn(invoiceRepo, 'findByTenant').mockResolvedValue([mockInvoice]);
-      jest.spyOn(parentRepo, 'findById').mockResolvedValue(mockParent);
-      jest.spyOn(childRepo, 'findById').mockResolvedValue(mockChild);
+      jest.spyOn(parentRepo, 'findByIds').mockResolvedValue([mockParent]);
+      jest.spyOn(childRepo, 'findByIds').mockResolvedValue([mockChild]);
 
       const result = await controller.listInvoices({}, mockUser);
 
@@ -333,8 +337,8 @@ describe('InvoiceController', () => {
       }));
 
       jest.spyOn(invoiceRepo, 'findByTenant').mockResolvedValue(invoices);
-      jest.spyOn(parentRepo, 'findById').mockResolvedValue(mockParent);
-      jest.spyOn(childRepo, 'findById').mockResolvedValue(mockChild);
+      jest.spyOn(parentRepo, 'findByIds').mockResolvedValue([mockParent]);
+      jest.spyOn(childRepo, 'findByIds').mockResolvedValue([mockChild]);
 
       const resultPage1 = await controller.listInvoices(
         { page: 1, limit: 10 },

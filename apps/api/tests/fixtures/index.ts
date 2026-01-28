@@ -12,6 +12,7 @@ import {
   TestTenant,
   TestUser,
 } from '../helpers';
+import { cleanDatabase } from '../helpers/clean-database';
 import { UserRole } from '@prisma/client';
 
 // Import generateUniqueId from utils for local use
@@ -77,55 +78,9 @@ export async function cleanupTestData(
   prisma: PrismaService,
   tenantId: string,
 ): Promise<void> {
-  // Delete in reverse order of dependencies
   try {
-    // Payments first (references invoices)
-    await prisma.payment.deleteMany({ where: { tenantId } });
-
-    // Invoice lines (references invoices)
-    await prisma.invoiceLine.deleteMany({ where: { invoice: { tenantId } } });
-
-    // Invoices (references parents, children)
-    await prisma.invoice.deleteMany({ where: { tenantId } });
-
-    // Enrollments (references children, fee structures)
-    await prisma.enrollment.deleteMany({ where: { tenantId } });
-
-    // Children (references parents)
-    await prisma.child.deleteMany({ where: { tenantId } });
-
-    // Parents
-    await prisma.parent.deleteMany({ where: { tenantId } });
-
-    // Fee structures
-    await prisma.feeStructure.deleteMany({ where: { tenantId } });
-
-    // Categorization journals (must be before transactions due to FK)
-    await prisma.categorizationJournal.deleteMany({ where: { tenantId } });
-
-    // Transactions
-    await prisma.transaction.deleteMany({ where: { tenantId } });
-
-    // Bank connections
-    await prisma.bankConnection.deleteMany({ where: { tenantId } });
-
-    // Reconciliations
-    await prisma.bankStatementMatch.deleteMany({});
-    await prisma.reconciliation.deleteMany({ where: { tenantId } });
-
-    // SARS submissions
-    await prisma.sarsSubmission.deleteMany({ where: { tenantId } });
-
-    // Audit logs
-    await prisma.auditLog.deleteMany({ where: { tenantId } });
-
-    // Users (before tenant)
-    await prisma.user.deleteMany({ where: { tenantId } });
-
-    // Finally, delete the tenant
-    await prisma.tenant.delete({ where: { id: tenantId } });
+    await cleanDatabase(prisma);
   } catch (error) {
-    // Log but don't fail - data might already be deleted
     console.warn(`Cleanup warning for tenant ${tenantId}:`, error);
   }
 }

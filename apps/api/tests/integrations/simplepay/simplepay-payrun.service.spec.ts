@@ -4,6 +4,7 @@
  */
 
 import 'dotenv/config';
+import { cleanDatabase } from '../../helpers/clean-database';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
@@ -145,51 +146,16 @@ describe('SimplePayPayRunService', () => {
   });
 
   beforeEach(async () => {
-    // Note: Wave cache is cleared per-tenant when tenant is created
-    // Cache will be cleared after tenant creation if needed
+    // Clear all wave caches to prevent accumulation across tests
+    // (each test creates a new tenant with a different ID, which would
+    // create separate cache entries and inflate waveCacheSize)
+    service.clearWaveCache('');
 
     // Reset mocks
     jest.clearAllMocks();
 
-    // Clean database in FK order
-    await prisma.payRunSync.deleteMany({});
-    await prisma.bankStatementMatch.deleteMany({});
-    await prisma.reconciliation.deleteMany({});
-    await prisma.sarsSubmission.deleteMany({});
-    await prisma.payrollJournalLine.deleteMany({});
-    await prisma.payrollJournal.deleteMany({});
-    await prisma.payroll.deleteMany({});
-    await prisma.leaveRequest.deleteMany({});
-    await prisma.payrollAdjustment.deleteMany({});
-    await prisma.employeeSetupLog.deleteMany({});
-    await prisma.staffOffboarding.deleteMany({});
-    await prisma.staff.deleteMany({});
-    await prisma.payment.deleteMany({});
-    await prisma.invoiceLine.deleteMany({});
-    await prisma.reminder.deleteMany({});
-    await prisma.statementLine.deleteMany({});
-    await prisma.statement.deleteMany({});
-    await prisma.invoice.deleteMany({});
-    await prisma.enrollment.deleteMany({});
-    await prisma.feeStructure.deleteMany({});
-    await prisma.child.deleteMany({});
-    await prisma.creditBalance.deleteMany({});
-    await prisma.parent.deleteMany({});
-    await prisma.payeePattern.deleteMany({});
-    await prisma.categorization.deleteMany({});
-    await prisma.categorizationMetric.deleteMany({});
-    await prisma.categorizationJournal.deleteMany({});
-    await prisma.transaction.deleteMany({});
-    await prisma.calculationItemCache.deleteMany({});
-    await prisma.simplePayConnection.deleteMany({});
-    await prisma.user.deleteMany({});
-    await prisma.bankConnection.deleteMany({});
-    await prisma.xeroAccountMapping.deleteMany({});
-    await prisma.xeroToken.deleteMany({});
-    await prisma.reportRequest.deleteMany({});
-    await prisma.bulkOperationLog.deleteMany({});
-    await prisma.xeroAccount.deleteMany({});
-    await prisma.tenant.deleteMany({});
+    // Clean database using TRUNCATE CASCADE
+    await cleanDatabase(prisma);
 
     // Create test tenant
     tenant = await prisma.tenant.create({

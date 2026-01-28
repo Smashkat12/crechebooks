@@ -439,8 +439,8 @@ describe('FailedAttemptsService', () => {
   });
 
   describe('onModuleInit', () => {
-    it('should initialize without errors', async () => {
-      await expect(service.onModuleInit()).resolves.not.toThrow();
+    it('should initialize without errors', () => {
+      expect(() => service.onModuleInit()).not.toThrow();
     });
   });
 

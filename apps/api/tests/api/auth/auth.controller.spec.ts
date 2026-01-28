@@ -4,9 +4,12 @@
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { Response } from 'express';
 import { AuthController } from '../../../src/api/auth/auth.controller';
 import { AuthService } from '../../../src/api/auth/auth.service';
+import { RateLimitGuard } from '../../../src/common/guards/rate-limit.guard';
+import { RateLimitService } from '../../../src/common/rate-limit/rate-limit.service';
 import { LoginRequestDto } from '../../../src/api/auth/dto/login.dto';
 import { CallbackRequestDto } from '../../../src/api/auth/dto/callback.dto';
 import { RefreshRequestDto } from '../../../src/api/auth/dto/refresh.dto';
@@ -42,6 +45,18 @@ describe('AuthController', () => {
           provide: AuthService,
           useValue: mockAuthService,
         },
+        {
+          provide: RateLimitService,
+          useValue: {
+            checkRateLimit: jest.fn(),
+            isAccountLocked: jest.fn(),
+            getLockoutRemaining: jest.fn(),
+            trackFailedAttempt: jest.fn(),
+            clearFailedAttempts: jest.fn(),
+            unlockAccount: jest.fn(),
+          },
+        },
+        Reflector,
       ],
     }).compile();
 
@@ -54,7 +69,7 @@ describe('AuthController', () => {
   });
 
   describe('POST /auth/login', () => {
-    it('should return auth_url with valid redirect_uri', () => {
+    it('should return auth_url with valid redirect_uri', async () => {
       const loginDto: LoginRequestDto = {
         redirect_uri: 'http://localhost:3000/callback',
       };
@@ -62,9 +77,9 @@ describe('AuthController', () => {
       const expectedAuthUrl =
         'https://auth0.com/authorize?client_id=test&redirect_uri=http://localhost:3000/callback&state=random-state';
 
-      mockAuthService.getAuthorizationUrl.mockReturnValue(expectedAuthUrl);
+      mockAuthService.getAuthorizationUrl.mockResolvedValue(expectedAuthUrl);
 
-      const result = controller.login(loginDto);
+      const result = await controller.login(loginDto);
 
       expect(result).toEqual({ auth_url: expectedAuthUrl });
       expect(authService.getAuthorizationUrl).toHaveBeenCalledWith(
@@ -92,16 +107,18 @@ describe('AuthController', () => {
       expect(loginDto.redirect_uri).toBe('');
     });
 
-    it('should handle service errors gracefully', () => {
+    it('should handle service errors gracefully', async () => {
       const loginDto: LoginRequestDto = {
         redirect_uri: 'http://localhost:3000/callback',
       };
 
-      mockAuthService.getAuthorizationUrl.mockImplementation(() => {
-        throw new BadRequestException('Invalid redirect URI');
-      });
+      mockAuthService.getAuthorizationUrl.mockRejectedValue(
+        new BadRequestException('Invalid redirect URI'),
+      );
 
-      expect(() => controller.login(loginDto)).toThrow(BadRequestException);
+      await expect(controller.login(loginDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

@@ -102,7 +102,7 @@ describe('PaymentReminderProcessor Integration Tests', () => {
   let invoice7DaysOverdue: Invoice;
   let invoice14DaysOverdue: Invoice;
   let invoice30DaysOverdue: Invoice;
-  let invoice45DaysOverdue: Invoice;
+  let invoice60DaysOverdue: Invoice;
   let invoiceNotOverdue: Invoice;
   let invoicePaid: Invoice;
 
@@ -254,11 +254,11 @@ describe('PaymentReminderProcessor Integration Tests', () => {
       },
     });
 
-    // 45 days overdue - ESCALATED stage
-    const dueDate45Days = new Date(today);
-    dueDate45Days.setDate(dueDate45Days.getDate() - 45);
+    // 60 days overdue - ESCALATED stage
+    const dueDate60Days = new Date(today);
+    dueDate60Days.setDate(dueDate60Days.getDate() - 60);
 
-    invoice45DaysOverdue = await prisma.invoice.create({
+    invoice60DaysOverdue = await prisma.invoice.create({
       data: {
         tenantId: testTenant.id,
         invoiceNumber: 'INV-TEST-004',
@@ -266,8 +266,8 @@ describe('PaymentReminderProcessor Integration Tests', () => {
         childId: testChild.id,
         billingPeriodStart: new Date('2024-10-01'),
         billingPeriodEnd: new Date('2024-10-31'),
-        issueDate: new Date(dueDate45Days.getTime() - 7 * 24 * 60 * 60 * 1000),
-        dueDate: dueDate45Days,
+        issueDate: new Date(dueDate60Days.getTime() - 7 * 24 * 60 * 60 * 1000),
+        dueDate: dueDate60Days,
         subtotalCents: 350000,
         vatCents: 0,
         totalCents: 350000,
@@ -337,7 +337,7 @@ describe('PaymentReminderProcessor Integration Tests', () => {
       expect(getStageForDaysOverdue(29)).toBe('SECOND');
       expect(getStageForDaysOverdue(30)).toBe('FINAL');
       expect(getStageForDaysOverdue(44)).toBe('FINAL');
-      expect(getStageForDaysOverdue(45)).toBe('ESCALATED');
+      expect(getStageForDaysOverdue(60)).toBe('ESCALATED');
       expect(getStageForDaysOverdue(100)).toBe('ESCALATED');
     });
   });
@@ -365,7 +365,7 @@ describe('PaymentReminderProcessor Integration Tests', () => {
       });
 
       // Should have sent reminders for 4 overdue invoices
-      // (7, 14, 30, 45 days overdue - not paid, not future)
+      // (7, 14, 30, 60 days overdue - not paid, not future)
       expect(reminders.length).toBeGreaterThanOrEqual(1);
 
       // Verify job completed
@@ -425,7 +425,7 @@ describe('PaymentReminderProcessor Integration Tests', () => {
       expect(futureInvoiceReminders.length).toBe(0);
     });
 
-    it('should escalate 45+ days overdue invoices', async () => {
+    it('should escalate 60+ days overdue invoices', async () => {
       const mockJob = createMockJob({
         tenantId: testTenant.id,
         triggeredBy: 'cron',
@@ -435,9 +435,9 @@ describe('PaymentReminderProcessor Integration Tests', () => {
 
       await processor.processJob(mockJob as any);
 
-      // Check if 45-day invoice was updated with escalation note
+      // Check if 60-day invoice was updated with escalation note
       const escalatedInvoice = await prisma.invoice.findUnique({
-        where: { id: invoice45DaysOverdue.id },
+        where: { id: invoice60DaysOverdue.id },
       });
 
       // Invoice should be marked as OVERDUE and may have escalation note

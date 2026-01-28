@@ -97,7 +97,7 @@ describe('PoolHealthIndicator', () => {
         }),
       );
 
-      await expect(indicator.isHealthy('database_pool')).rejects.toThrow(
+      expect(() => indicator.isHealthy('database_pool')).toThrow(
         HealthCheckError,
       );
     });
@@ -152,12 +152,12 @@ describe('PoolHealthIndicator', () => {
       );
 
       // With default critical threshold (95%), 85% should not throw
-      await expect(indicator.isHealthy('pool')).resolves.toBeDefined();
+      expect(indicator.isHealthy('pool')).toBeDefined();
 
       // With custom critical threshold of 80%, 85% should throw
-      await expect(
+      expect(() =>
         indicator.isHealthy('pool', { criticalThreshold: 80 }),
-      ).rejects.toThrow(HealthCheckError);
+      ).toThrow(HealthCheckError);
     });
 
     it('should mark as degraded when there are waiting requests', async () => {
@@ -215,7 +215,7 @@ describe('PoolHealthIndicator', () => {
         createMockMetrics({ utilizationPercent: 95 }),
       );
 
-      await expect(indicator.isHealthy('pool')).rejects.toThrow(
+      expect(() => indicator.isHealthy('pool')).toThrow(
         HealthCheckError,
       );
     });
@@ -243,7 +243,7 @@ describe('PoolHealthIndicator', () => {
         createMockMetrics({ utilizationPercent: 100 }),
       );
 
-      await expect(indicator.isHealthy('pool')).rejects.toThrow(
+      expect(() => indicator.isHealthy('pool')).toThrow(
         HealthCheckError,
       );
     });

@@ -282,7 +282,7 @@ describe('ConversationalAgent', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             tenantId: TENANT_ID,
-            isDeleted: false,
+            deletedAt: null,
           }),
         }),
       );
@@ -709,7 +709,7 @@ describe('ConversationalAgent', () => {
       expect(mockPrisma.child.count).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            isDeleted: false,
+            deletedAt: null,
           }),
         }),
       );

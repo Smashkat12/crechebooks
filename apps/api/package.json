@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@crechebooks/types": "workspace:*",
-    "@modelcontextprotocol/sdk": "^0.6.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^11.0.1",

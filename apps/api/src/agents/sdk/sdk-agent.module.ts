@@ -13,6 +13,7 @@ import { ConfigModule } from '@nestjs/config';
 import { SdkAgentFactory } from './sdk-agent.factory';
 import { SdkConfigService } from './sdk-config';
 import { RuvectorService } from './ruvector.service';
+import { ClaudeClientService } from './claude-client.service';
 import { IntelligenceEngineService } from './intelligence-engine.service';
 import { PersistenceConfig } from './persistence-config';
 import { SonaBootstrapService } from './sona-bootstrap.service';
@@ -25,6 +26,7 @@ import { SonaBootstrapService } from './sona-bootstrap.service';
     SdkAgentFactory,
     SdkConfigService,
     RuvectorService,
+    ClaudeClientService,
     IntelligenceEngineService,
     PersistenceConfig,
     SonaBootstrapService,
@@ -33,6 +35,7 @@ import { SonaBootstrapService } from './sona-bootstrap.service';
     SdkAgentFactory,
     SdkConfigService,
     RuvectorService,
+    ClaudeClientService,
     IntelligenceEngineService,
     PersistenceConfig,
     SonaBootstrapService,

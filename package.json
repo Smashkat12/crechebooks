@@ -38,9 +38,17 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "deploy": "./scripts/deploy-railway.sh"
+    "dev:start": "./scripts/dev-start.sh",
+    "dev:infra": "docker compose -f docker-compose.dev.yml up -d",
+    "dev:infra:down": "docker compose -f docker-compose.dev.yml down",
+    "dev:infra:reset": "docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d",
+    "deploy": "./scripts/deploy-railway.sh",
+    "cli": "pnpm --filter @crechebooks/cli start",
+    "cli:dev": "pnpm --filter @crechebooks/cli dev",
+    "cli:build": "pnpm --filter @crechebooks/cli build"
   },
   "devDependencies": {
+    "better-sqlite3": "^12.6.2",
     "prettier": "^3.4.2",
     "turbo": "^2.3.3"
   },

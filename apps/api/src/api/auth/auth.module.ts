@@ -5,15 +5,18 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { ParentAuthController } from './parent-auth.controller';
 import { StaffAuthController } from './staff-auth.controller';
+import { ApiKeyController } from './api-key.controller';
 import { AuthService } from './auth.service';
 import { MagicLinkService } from './services/magic-link.service';
 import { StaffMagicLinkService } from './services/staff-magic-link.service';
 import { Auth0ManagementService } from './services/auth0-management.service';
+import { ApiKeyService } from './services/api-key.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { ParentAuthGuard } from './guards/parent-auth.guard';
 import { StaffAuthGuard } from './guards/staff-auth.guard';
+import { ApiKeyAuthGuard, CombinedAuthGuard } from './guards/api-key-auth.guard';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { RedisModule } from '../../common/redis/redis.module';
 import { RateLimitModule } from '../../common/rate-limit/rate-limit.module';
@@ -82,17 +85,20 @@ export type AuthProvider = 'auth0' | 'jwt';
     RateLimitModule,
     MailgunModule,
   ],
-  controllers: [AuthController, ParentAuthController, StaffAuthController],
+  controllers: [AuthController, ParentAuthController, StaffAuthController, ApiKeyController],
   providers: [
     AuthService,
     MagicLinkService,
     StaffMagicLinkService,
     Auth0ManagementService,
+    ApiKeyService,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
     ParentAuthGuard,
     StaffAuthGuard,
+    ApiKeyAuthGuard,
+    CombinedAuthGuard,
     RateLimitGuard,
     CsrfStoreService,
     FailedAttemptsService,
@@ -102,10 +108,13 @@ export type AuthProvider = 'auth0' | 'jwt';
     MagicLinkService,
     StaffMagicLinkService,
     Auth0ManagementService,
+    ApiKeyService,
     JwtAuthGuard,
     RolesGuard,
     ParentAuthGuard,
     StaffAuthGuard,
+    ApiKeyAuthGuard,
+    CombinedAuthGuard,
     RateLimitGuard,
     CsrfStoreService,
     FailedAttemptsService,

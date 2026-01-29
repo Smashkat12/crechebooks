@@ -125,8 +125,8 @@ export function registerDocumentsCommands(staffCommand: Command): void {
         }
 
         let documentType = options.type as DocumentType;
-        let documentName = options.name || path.basename(resolvedPath);
-        let expiresAt = options.expires;
+        const documentName = options.name || path.basename(resolvedPath);
+        const expiresAt = options.expires;
 
         if (!options.type) {
           // Interactive mode for document type

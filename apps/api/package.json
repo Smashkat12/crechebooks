@@ -71,7 +71,7 @@
     "ioredis": "^5.4.1",
     "joi": "^18.0.2",
     "jwks-rsa": "^3.2.0",
-    "mailgun.js": "^10.2.3",
+    "mailgun.js": "^12.7.0",
     "nodemailer": "^7.0.11",
     "opossum": "^9.0.0",
     "passport": "^0.7.0",

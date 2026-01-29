@@ -78,12 +78,12 @@ interface EmbeddingServiceInstance {
 export interface RuvectorModule {
   VectorDb?: new (opts: {
     dimensions: number;
-    distanceMetric: string;
+    distanceMetric?: string;
     storagePath?: string;
   }) => VectorDbInstance;
   VectorDB?: new (opts: {
     dimensions: number;
-    distanceMetric: string;
+    distanceMetric?: string;
     storagePath?: string;
   }) => VectorDbInstance;
   EmbeddingService?: new () => EmbeddingServiceInstance;
@@ -146,8 +146,9 @@ export class RuvectorService implements OnModuleInit {
 
       this.vectorDb = new VectorDbClass({
         dimensions: 384,
-        distanceMetric: 'cosine',
         storagePath,
+        // Note: distanceMetric omitted - using default (cosine)
+        // The ruvector WASM binding has enum compatibility issues with string values
       });
 
       // Initialize the embedding service

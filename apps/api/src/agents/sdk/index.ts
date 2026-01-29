@@ -30,6 +30,14 @@ export { BaseSdkAgent } from './base-sdk-agent';
 export { RuvectorService } from './ruvector.service';
 export type { RuvectorSearchResult, RuvectorModule } from './ruvector.service';
 
+// Claude Client Service
+export { ClaudeClientService } from './claude-client.service';
+export type {
+  ClaudeMessage,
+  ClaudeRequestOptions,
+  ClaudeResponse,
+} from './claude-client.service';
+
 // IntelligenceEngine Service
 export { IntelligenceEngineService } from './intelligence-engine.service';
 export type {

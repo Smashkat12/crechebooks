@@ -1,350 +1,312 @@
-# Claude Code Configuration - SPARC Development Environment
+# CrecheBooks - claude-flow v3 Project
 
-## 🚨 CRITICAL: CONCURRENT EXECUTION & FILE MANAGEMENT
+## Project Identity
 
-**ABSOLUTE RULES**:
-1. ALL operations MUST be concurrent/parallel in a single message
-2. **NEVER save working files, text/mds and tests to the root folder**
-3. ALWAYS organize files in appropriate subdirectories
-4. **USE CLAUDE CODE'S TASK TOOL** for spawning agents concurrently, not just MCP
+CrecheBooks is an AI-powered bookkeeping system for South African creches and pre-schools.
 
-### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
+- **Monorepo**: pnpm workspace with `apps/api` (NestJS 11) and `apps/web` (Next.js 15)
+- **Database**: PostgreSQL 16 via Prisma 7 ORM
+- **Cache/Queue**: Redis 7
+- **Node**: >= 20, pnpm >= 9
+- **License**: Proprietary
 
-**MANDATORY PATTERNS:**
-- **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ todos minimum)
-- **Task tool (Claude Code)**: ALWAYS spawn ALL agents in ONE message with full instructions
-- **File operations**: ALWAYS batch ALL reads/writes/edits in ONE message
-- **Bash commands**: ALWAYS batch ALL terminal operations in ONE message
-- **Memory operations**: ALWAYS batch ALL memory store/retrieve in ONE message
+## claude-flow v3
 
-### 🎯 CRITICAL: Claude Code Task Tool for Agent Execution
+This project uses **claude-flow v3** (`npx claude-flow@alpha` resolves to `3.0.0-alpha`).
 
-**Claude Code's Task tool is the PRIMARY way to spawn agents:**
-```javascript
-// ✅ CORRECT: Use Claude Code's Task tool for parallel agent execution
-[Single Message]:
-  Task("Research agent", "Analyze requirements and patterns...", "researcher")
-  Task("Coder agent", "Implement core features...", "coder")
-  Task("Tester agent", "Create comprehensive tests...", "tester")
-  Task("Reviewer agent", "Review code quality...", "reviewer")
-  Task("Architect agent", "Design system architecture...", "system-architect")
-```
+### v3 Features Enabled
+- **SONA Learning**: Adaptive learning profiles (default: `balanced`)
+- **Flash Attention**: 2.5x target acceleration
+- **GNN-Enhanced Search**: HNSW-indexed vector search (384 dimensions)
+- **sql.js Backend**: Memory storage via sql.js
 
-**MCP tools are ONLY for coordination setup:**
-- `mcp__claude-flow__swarm_init` - Initialize coordination topology
-- `mcp__claude-flow__agent_spawn` - Define agent types for coordination
-- `mcp__claude-flow__task_orchestrate` - Orchestrate high-level workflows
+### Configuration Files
+| File | Purpose |
+|------|---------|
+| `.claude-flow/config.yaml` | v3 runtime config (SONA, workers, domain settings) |
+| `.claude/config.json` | Project metadata, feature flags, agent categories |
+| `.claude/settings.json` | Permissions, hooks, env vars, MCP servers |
+| `.mcp.json` | MCP server definitions (claude-flow@alpha, ruv-swarm, flow-nexus) |
+| `.claude-flow/daemon-state.json` | Daemon worker state (reset on setup) |
 
-### 📁 File Organization Rules
+### MCP Server
+The primary MCP server key is `claude-flow@alpha` (matches `.mcp.json`). The `enabledMcpjsonServers` in settings.json uses this exact key.
 
-**NEVER save to root folder. Use these directories:**
-- `/src` - Source code files
-- `/tests` - Test files
-- `/docs` - Documentation and markdown files
-- `/config` - Configuration files
-- `/scripts` - Utility scripts
-- `/examples` - Example code
+### Daemon Workers
+| Worker | Status | Notes |
+|--------|--------|-------|
+| `map` | Enabled | Codebase mapping (12/12 success historically) |
+| `consolidate` | Enabled | Memory consolidation (6/6 success) |
+| `audit` | Disabled | 1/12 success rate -- investigate before re-enabling |
+| `optimize` | Disabled | 0/8 success rate -- investigate before re-enabling |
+| `testgaps` | Disabled | 0/6 success rate -- investigate before re-enabling |
+| `predict` | Disabled | Not yet configured |
+| `document` | Disabled | Not yet configured |
 
-## Project Overview
+## CrecheBooks Domain Rules
 
-This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Completion) methodology with Claude-Flow orchestration for systematic Test-Driven Development.
+- **Currency**: South African Rand (ZAR)
+- **Amounts**: Always stored as integers in cents. Use `Decimal.js` for calculations, convert to cents for storage.
+- **Tax Authority**: SARS (South African Revenue Service)
+- **Tenant Isolation**: All queries MUST be scoped to `tenantId`. Never expose data across tenants.
+- **Audit Logging**: All financial mutations must be audit-logged with userId, timestamp, and before/after values.
+- **Date Format**: ISO 8601. Tax year runs March to February.
 
-## SPARC Commands
+## Development Workflow
 
-### Core Commands
-- `npx claude-flow sparc modes` - List available modes
-- `npx claude-flow sparc run <mode> "<task>"` - Execute specific mode
-- `npx claude-flow sparc tdd "<feature>"` - Run complete TDD workflow
-- `npx claude-flow sparc info <mode>` - Get mode details
-
-### Batchtools Commands
-- `npx claude-flow sparc batch <modes> "<task>"` - Parallel execution
-- `npx claude-flow sparc pipeline "<task>"` - Full pipeline processing
-- `npx claude-flow sparc concurrent <mode> "<tasks-file>"` - Multi-task processing
-
-### Build Commands
-- `npm run build` - Build project
-- `npm run test` - Run tests
-- `npm run lint` - Linting
-- `npm run typecheck` - Type checking
-
-## SPARC Workflow Phases
-
-1. **Specification** - Requirements analysis (`sparc run spec-pseudocode`)
-2. **Pseudocode** - Algorithm design (`sparc run spec-pseudocode`)
-3. **Architecture** - System design (`sparc run architect`)
-4. **Refinement** - TDD implementation (`sparc tdd`)
-5. **Completion** - Integration (`sparc run integration`)
-
-## Code Style & Best Practices
-
-- **Modular Design**: Files under 500 lines
-- **Environment Safety**: Never hardcode secrets
-- **Test-First**: Write tests before implementation
-- **Clean Architecture**: Separate concerns
-- **Documentation**: Keep updated
-
-## 🚀 Available Agents (54 Total)
-
-### Core Development
-`coder`, `reviewer`, `tester`, `planner`, `researcher`
-
-### Swarm Coordination
-`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`, `collective-intelligence-coordinator`, `swarm-memory-manager`
-
-### Consensus & Distributed
-`byzantine-coordinator`, `raft-manager`, `gossip-coordinator`, `consensus-builder`, `crdt-synchronizer`, `quorum-manager`, `security-manager`
-
-### Performance & Optimization
-`perf-analyzer`, `performance-benchmarker`, `task-orchestrator`, `memory-coordinator`, `smart-agent`
-
-### GitHub & Repository
-`github-modes`, `pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`, `workflow-automation`, `project-board-sync`, `repo-architect`, `multi-repo-swarm`
-
-### SPARC Methodology
-`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`, `refinement`
-
-### Specialized Development
-`backend-dev`, `mobile-dev`, `ml-developer`, `cicd-engineer`, `api-docs`, `system-architect`, `code-analyzer`, `base-template-generator`
-
-### Testing & Validation
-`tdd-london-swarm`, `production-validator`
-
-### Migration & Planning
-`migration-planner`, `swarm-init`
-
-## 🎯 Claude Code vs MCP Tools
-
-### Claude Code Handles ALL EXECUTION:
-- **Task tool**: Spawn and run agents concurrently for actual work
-- File operations (Read, Write, Edit, MultiEdit, Glob, Grep)
-- Code generation and programming
-- Bash commands and system operations
-- Implementation work
-- Project navigation and analysis
-- TodoWrite and task management
-- Git operations
-- Package management
-- Testing and debugging
-
-### MCP Tools ONLY COORDINATE:
-- Swarm initialization (topology setup)
-- Agent type definitions (coordination patterns)
-- Task orchestration (high-level planning)
-- Memory management
-- Neural features
-- Performance tracking
-- GitHub integration
-
-**KEY**: MCP coordinates the strategy, Claude Code's Task tool executes with real agents.
-
-## 🚀 Quick Setup
-
+### Quick Start
 ```bash
-# Add MCP servers (Claude Flow required, others optional)
-claude mcp add claude-flow npx claude-flow@alpha mcp start
-claude mcp add ruv-swarm npx ruv-swarm mcp start  # Optional: Enhanced coordination
-claude mcp add flow-nexus npx flow-nexus@latest mcp start  # Optional: Cloud features
+./scripts/dev-start.sh        # Full setup: Docker infra + install + migrate + dev servers
 ```
 
-## MCP Tool Categories
-
-### Coordination
-`swarm_init`, `agent_spawn`, `task_orchestrate`
-
-### Monitoring
-`swarm_status`, `agent_list`, `agent_metrics`, `task_status`, `task_results`
-
-### Memory & Neural
-`memory_usage`, `neural_status`, `neural_train`, `neural_patterns`
-
-### GitHub Integration
-`github_swarm`, `repo_analyze`, `pr_enhance`, `issue_triage`, `code_review`
-
-### System
-`benchmark_run`, `features_detect`, `swarm_monitor`
-
-### Flow-Nexus MCP Tools (Optional Advanced Features)
-Flow-Nexus extends MCP capabilities with 70+ cloud-based orchestration tools:
-
-**Key MCP Tool Categories:**
-- **Swarm & Agents**: `swarm_init`, `swarm_scale`, `agent_spawn`, `task_orchestrate`
-- **Sandboxes**: `sandbox_create`, `sandbox_execute`, `sandbox_upload` (cloud execution)
-- **Templates**: `template_list`, `template_deploy` (pre-built project templates)
-- **Neural AI**: `neural_train`, `neural_patterns`, `seraphina_chat` (AI assistant)
-- **GitHub**: `github_repo_analyze`, `github_pr_manage` (repository management)
-- **Real-time**: `execution_stream_subscribe`, `realtime_subscribe` (live monitoring)
-- **Storage**: `storage_upload`, `storage_list` (cloud file management)
-
-**Authentication Required:**
-- Register: `mcp__flow-nexus__user_register` or `npx flow-nexus@latest register`
-- Login: `mcp__flow-nexus__user_login` or `npx flow-nexus@latest login`
-- Access 70+ specialized MCP tools for advanced orchestration
-
-## 🚀 Agent Execution Flow with Claude Code
-
-### The Correct Pattern:
-
-1. **Optional**: Use MCP tools to set up coordination topology
-2. **REQUIRED**: Use Claude Code's Task tool to spawn agents that do actual work
-3. **REQUIRED**: Each agent runs hooks for coordination
-4. **REQUIRED**: Batch all operations in single messages
-
-### Example Full-Stack Development:
-
-```javascript
-// Single message with all agent spawning via Claude Code's Task tool
-[Parallel Agent Execution]:
-  Task("Backend Developer", "Build REST API with Express. Use hooks for coordination.", "backend-dev")
-  Task("Frontend Developer", "Create React UI. Coordinate with backend via memory.", "coder")
-  Task("Database Architect", "Design PostgreSQL schema. Store schema in memory.", "code-analyzer")
-  Task("Test Engineer", "Write Jest tests. Check memory for API contracts.", "tester")
-  Task("DevOps Engineer", "Setup Docker and CI/CD. Document in memory.", "cicd-engineer")
-  Task("Security Auditor", "Review authentication. Report findings via hooks.", "reviewer")
-  
-  // All todos batched together
-  TodoWrite { todos: [...8-10 todos...] }
-  
-  // All file operations together
-  Write "backend/server.js"
-  Write "frontend/App.jsx"
-  Write "database/schema.sql"
+### Individual Commands
+```bash
+pnpm dev:infra                # Start PostgreSQL + Redis (Docker)
+pnpm dev:infra:down           # Stop infrastructure
+pnpm dev:infra:reset          # Wipe data and restart infrastructure
+pnpm dev                      # Start API (:3000) + Web (:3001)
+pnpm dev:api                  # Start API only
+pnpm dev:web                  # Start Web only
 ```
 
-## 📋 Agent Coordination Protocol
+### Build & Test
+```bash
+pnpm build                    # Build all packages
+pnpm test                     # Run all tests
+pnpm test:api                 # API tests only
+pnpm test:web                 # Web tests only
+pnpm test:e2e                 # End-to-end tests
+pnpm test:cov                 # Coverage report
+pnpm lint                     # Lint all packages
+```
 
-### Every Agent Spawned via Task Tool MUST:
+### Prisma
+```bash
+pnpm prisma:generate          # Generate Prisma client
+pnpm prisma:migrate           # Run migrations
+pnpm prisma:push              # Push schema (dev only)
+pnpm prisma:studio            # Open Prisma Studio
+```
 
-**1️⃣ BEFORE Work:**
+### Docker (Production)
+```bash
+pnpm docker:build             # Build all containers
+pnpm docker:up                # Start production stack
+pnpm docker:down              # Stop production stack
+```
+
+## Agent Coordination (claude-flow v3 Hooks)
+
+### Protocol for Spawned Agents
+
+**Before work:**
 ```bash
 npx claude-flow@alpha hooks pre-task --description "[task]"
-npx claude-flow@alpha hooks session-restore --session-id "swarm-[id]"
 ```
 
-**2️⃣ DURING Work:**
+**After file edits:**
 ```bash
-npx claude-flow@alpha hooks post-edit --file "[file]" --memory-key "swarm/[agent]/[step]"
-npx claude-flow@alpha hooks notify --message "[what was done]"
+npx claude-flow@alpha hooks post-edit --file "[file]" --memory-key "agent/[step]"
 ```
 
-**3️⃣ AFTER Work:**
+**After completion:**
 ```bash
 npx claude-flow@alpha hooks post-task --task-id "[task]"
-npx claude-flow@alpha hooks session-end --export-metrics true
 ```
 
-## 🎯 Concurrent Execution Examples
+### Batch Execution Rule
+All related operations MUST be batched in a single message. Never send sequential messages for parallel-safe work.
 
-### ✅ CORRECT WORKFLOW: MCP Coordinates, Claude Code Executes
+## Available Agents (107 files, 28 categories)
 
-```javascript
-// Step 1: MCP tools set up coordination (optional, for complex tasks)
-[Single Message - Coordination Setup]:
-  mcp__claude-flow__swarm_init { topology: "mesh", maxAgents: 6 }
-  mcp__claude-flow__agent_spawn { type: "researcher" }
-  mcp__claude-flow__agent_spawn { type: "coder" }
-  mcp__claude-flow__agent_spawn { type: "tester" }
+Agents are defined in `.claude/agents/` and organized by category. Sourced from [claude-flow](https://github.com/ruvnet/claude-flow/tree/main/.claude/agents) (excluding flow-nexus), plus CrecheBooks domain agents.
 
-// Step 2: Claude Code Task tool spawns ACTUAL agents that do the work
-[Single Message - Parallel Agent Execution]:
-  // Claude Code's Task tool spawns real agents concurrently
-  Task("Research agent", "Analyze API requirements and best practices. Check memory for prior decisions.", "researcher")
-  Task("Coder agent", "Implement REST endpoints with authentication. Coordinate via hooks.", "coder")
-  Task("Database agent", "Design and implement database schema. Store decisions in memory.", "code-analyzer")
-  Task("Tester agent", "Create comprehensive test suite with 90% coverage.", "tester")
-  Task("Reviewer agent", "Review code quality and security. Document findings.", "reviewer")
-  
-  // Batch ALL todos in ONE call
-  TodoWrite { todos: [
-    {id: "1", content: "Research API patterns", status: "in_progress", priority: "high"},
-    {id: "2", content: "Design database schema", status: "in_progress", priority: "high"},
-    {id: "3", content: "Implement authentication", status: "pending", priority: "high"},
-    {id: "4", content: "Build REST endpoints", status: "pending", priority: "high"},
-    {id: "5", content: "Write unit tests", status: "pending", priority: "medium"},
-    {id: "6", content: "Integration tests", status: "pending", priority: "medium"},
-    {id: "7", content: "API documentation", status: "pending", priority: "low"},
-    {id: "8", content: "Performance optimization", status: "pending", priority: "low"}
-  ]}
-  
-  // Parallel file operations
-  Bash "mkdir -p app/{src,tests,docs,config}"
-  Write "app/package.json"
-  Write "app/src/server.js"
-  Write "app/tests/server.test.js"
-  Write "app/docs/API.md"
+### Domain (CrecheBooks-specific)
+- `domain/orchestrator` -- Multi-agent task orchestration for bookkeeping workflows
+- `domain/transaction-categorizer` -- Categorize financial transactions
+- `domain/payment-matcher` -- Match payments to invoices
+- `domain/sars-agent` -- SARS PAYE tax calculations
+
+### Core Development
+- `core/coder`, `core/planner`, `core/researcher`, `core/reviewer`, `core/tester`
+
+### Analysis
+- `analysis/code-analyzer`, `analysis/analyze-code-quality`, `analysis/code-review/analyze-code-quality`
+
+### Architecture
+- `architecture/system-design/arch-system-design`
+
+### Backend & Development
+- `backend/dev-backend-api`, `development/backend/dev-backend-api`
+
+### Consensus & Distributed
+- `consensus/byzantine-coordinator`, `consensus/crdt-synchronizer`, `consensus/gossip-coordinator`, `consensus/performance-benchmarker`, `consensus/quorum-manager`, `consensus/raft-manager`, `consensus/security-manager`
+
+### Data & ML
+- `data/ml/data-ml-model`
+
+### DevOps
+- `devops/ci-cd/ops-cicd-github`
+
+### Documentation
+- `documentation/api-docs/docs-api-openapi`
+
+### GitHub
+- `github/code-review-swarm`, `github/github-modes`, `github/issue-tracker`, `github/multi-repo-swarm`, `github/pr-manager`, `github/project-board-sync`, `github/release-manager`, `github/release-swarm`, `github/repo-architect`, `github/swarm-issue`, `github/swarm-pr`, `github/sync-coordinator`, `github/workflow-automation`
+
+### Goal & Reasoning
+- `goal/agent`, `goal/code-goal-planner`, `goal/goal-planner`
+- `reasoning/agent`, `reasoning/goal-planner`
+
+### Hive-Mind
+- `hive-mind/collective-intelligence-coordinator`, `hive-mind/queen-coordinator`, `hive-mind/scout-explorer`, `hive-mind/swarm-memory-manager`, `hive-mind/worker-specialist`
+
+### Neural & SONA
+- `neural/safla-neural`
+- `sona/sona-learning-optimizer`
+
+### Optimization
+- `optimization/benchmark-suite`, `optimization/load-balancer`, `optimization/performance-monitor`, `optimization/resource-allocator`, `optimization/topology-optimizer`
+
+### Payments
+- `payments/agentic-payments`
+
+### SPARC Methodology
+- `sparc/specification`, `sparc/pseudocode`, `sparc/architecture`, `sparc/refinement`
+
+### Specialized
+- `specialized/mobile/spec-mobile-react-native`
+
+### Sublinear
+- `sublinear/consensus-coordinator`, `sublinear/matrix-optimizer`, `sublinear/pagerank-analyzer`, `sublinear/performance-optimizer`, `sublinear/trading-predictor`
+
+### Swarm Coordination
+- `swarm/adaptive-coordinator`, `swarm/hierarchical-coordinator`, `swarm/mesh-coordinator`
+
+### Templates
+- `templates/automation-smart-agent`, `templates/coordinator-swarm-init`, `templates/github-pr-manager`, `templates/implementer-sparc-coder`, `templates/memory-coordinator`, `templates/migration-plan`, `templates/orchestrator-task`, `templates/performance-analyzer`, `templates/sparc-coordinator`
+
+### Testing & Validation
+- `testing/tdd-london-swarm`, `testing/production-validator`, `testing/unit/tdd-london-swarm`, `testing/validation/production-validator`
+
+### v3 Specialists
+- `v3/v3-integration-architect`, `v3/v3-memory-specialist`, `v3/v3-performance-engineer`, `v3/v3-queen-coordinator`, `v3/v3-security-architect`
+
+### YAML Specialists (root + v3/)
+- `database-specialist.yaml`, `project-coordinator.yaml`, `python-specialist.yaml`, `security-auditor.yaml`, `typescript-specialist.yaml`
+- `v3/database-specialist.yaml`, `v3/project-coordinator.yaml`, `v3/python-specialist.yaml`, `v3/test-architect.yaml`, `v3/typescript-specialist.yaml`
+
+## File Organization
+
+```
+crechebooks/
+  apps/
+    api/                      # NestJS 11 API
+      src/
+        modules/              # Feature modules (auth, tenants, invoices, etc.)
+        common/               # Shared utilities, guards, decorators
+      prisma/                 # Schema and migrations
+      test/                   # E2E tests
+    web/                      # Next.js 15 frontend
+      src/
+        app/                  # App router pages
+        components/           # React components
+        lib/                  # Client utilities
+  scripts/                    # Dev and deployment scripts
+  .claude/
+    agents/                   # 107 agent definitions across 28 categories
+    config.json               # v3 master config
+    settings.json             # Permissions, hooks, env
+  .claude-flow/
+    config.yaml               # v3 runtime config
+    daemon-state.json          # Worker state
+    memory/                   # Persistent memory store
+    neural/                   # Neural model data
+    metrics/                  # Performance metrics
 ```
 
-### ❌ WRONG (Multiple Messages):
-```javascript
-Message 1: mcp__claude-flow__swarm_init
-Message 2: Task("agent 1")
-Message 3: TodoWrite { todos: [single todo] }
-Message 4: Write "file.js"
-// This breaks parallel coordination!
+**Rules:**
+- Source code lives in `apps/` subdirectories
+- Tests are colocated with source (`.spec.ts` next to `.ts`) or in `test/` for E2E
+- Scripts go in `scripts/`
+- Never save working files, text, markdown, or tests to the project root
+
+## Tech Stack Reference
+
+### API (`apps/api`)
+NestJS 11, Prisma 7, PostgreSQL 16, Redis 7 (via BullMQ), Passport (JWT + API key), class-validator, class-transformer, Decimal.js, pdfkit, exceljs, mailgun.js
+
+### Web (`apps/web`)
+Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Zustand, next-auth
+
+## CLI Tool (@crechebooks/cli)
+
+The CLI provides terminal-based access to CrecheBooks operations.
+
+### Installation
+```bash
+pnpm cli:build                # Build the CLI package
+pnpm cli:link                 # Link globally for 'cb' command
 ```
 
-## Performance Benefits
+### Authentication
+```bash
+cb auth login                 # Authenticate with API key or OAuth
+cb auth status                # Show current authentication state
+cb auth logout                # Clear stored credentials
+```
 
-- **84.8% SWE-Bench solve rate**
-- **32.3% token reduction**
-- **2.8-4.4x speed improvement**
-- **27+ neural models**
+### Invoice Commands
+```bash
+# List invoices
+cb invoices list                           # All invoices
+cb invoices list --status DRAFT            # Filter by status
+cb invoices list --from 2025-01-01 --to 2025-01-31
+cb invoices list --format json             # JSON output
 
-## Hooks Integration
+# Generate invoices
+cb invoices generate --month 2025-01       # Generate for all enrolled children
+cb invoices generate --month 2025-01 --dry-run  # Preview without creating
 
-### Pre-Operation
-- Auto-assign agents by file type
-- Validate commands for safety
-- Prepare resources automatically
-- Optimize topology by complexity
-- Cache searches
+# Send invoices
+cb invoices send                           # Send all unsent DRAFT invoices
+cb invoices send --ids INV-001,INV-002     # Send specific invoices
+cb invoices send --channel whatsapp        # Send via WhatsApp
+cb invoices send --channel both            # Send via email and WhatsApp
 
-### Post-Operation
-- Auto-format code
-- Train neural patterns
-- Update memory
-- Analyze performance
-- Track token usage
+# Download invoices
+cb invoices download INV-001               # Download single PDF
+cb invoices download --month 2025-01       # Download all for month as ZIP
+```
 
-### Session Management
-- Generate summaries
-- Persist state
-- Track metrics
-- Restore context
-- Export workflows
+### Payment Commands
+```bash
+# List payments
+cb payments list                           # All payments
+cb payments list --unallocated             # Unallocated only
+cb payments list --from 2025-01-01         # Filter by date
+cb payments list --format csv > payments.csv
 
-## Advanced Features (v2.0.0)
+# AI payment matching
+cb payments match                          # Run AI matcher
+cb payments match --dry-run                # Preview matches
+cb payments match --min-confidence 0.9     # Set confidence threshold
 
-- 🚀 Automatic Topology Selection
-- ⚡ Parallel Execution (2.8-4.4x speed)
-- 🧠 Neural Training
-- 📊 Bottleneck Analysis
-- 🤖 Smart Auto-Spawning
-- 🛡️ Self-Healing Workflows
-- 💾 Cross-Session Memory
-- 🔗 GitHub Integration
+# Manual allocation
+cb payments allocate --payment TX-001 --invoice INV-001
+cb payments allocate --payment TX-001 --invoice INV-001 --amount 150000
+```
 
-## Integration Tips
+### Output Formats
+```bash
+--format table                # Default tabular output
+--format json                 # JSON output for scripting
+--format csv                  # CSV output for spreadsheets
+```
 
-1. Start with basic swarm init
-2. Scale agents gradually
-3. Use memory for context
-4. Monitor progress regularly
-5. Train patterns from success
-6. Enable hooks automation
-7. Use GitHub tools first
+All amounts are displayed in ZAR and stored internally as cents.
 
-## Support
-
-- Documentation: https://github.com/ruvnet/claude-flow
-- Issues: https://github.com/ruvnet/claude-flow/issues
-- Flow-Nexus Platform: https://flow-nexus.ruv.io (registration required for cloud features)
-
----
-
-Remember: **Claude Flow coordinates, Claude Code creates!**
-
-# important-instruction-reminders
+## important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.

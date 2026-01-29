@@ -705,10 +705,11 @@ describe('RuvectorService (with real providers)', () => {
       expect(service.isAvailable()).toBe(true);
 
       // VectorDb constructor should have been called with storagePath
+      // Note: distanceMetric is omitted due to WASM enum compatibility issues
       const VectorDbCtor = mock.VectorDb as jest.Mock;
       expect(VectorDbCtor).toHaveBeenCalledWith(
         expect.objectContaining({
-          distanceMetric: 'cosine',
+          dimensions: 384,
           storagePath: ':memory:',
         }),
       );

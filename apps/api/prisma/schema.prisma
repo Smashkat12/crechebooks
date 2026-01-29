@@ -447,6 +447,35 @@ enum OpeningBalanceImportStatus {
   FAILED
 }
 
+// TASK-CLI-001: API Key Authentication for CLI/MCP Access
+enum ApiKeyScope {
+  // Read scopes
+  READ_TENANTS
+  READ_PARENTS
+  READ_CHILDREN
+  READ_STAFF
+  READ_INVOICES
+  READ_PAYMENTS
+  READ_TRANSACTIONS
+  READ_REPORTS
+
+  // Write scopes
+  WRITE_PARENTS
+  WRITE_CHILDREN
+  WRITE_STAFF
+  WRITE_INVOICES
+  WRITE_PAYMENTS
+  WRITE_TRANSACTIONS
+
+  // Admin scopes
+  MANAGE_USERS
+  MANAGE_API_KEYS
+  MANAGE_INTEGRATIONS
+
+  // Full access
+  FULL_ACCESS
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -650,6 +679,9 @@ model Tenant {
   // TASK-SDK-012: Feature Flags for SDK Rollout
   featureFlags       FeatureFlag[]
 
+  // TASK-CLI-001: API Keys for CLI/MCP Access
+  apiKeys            ApiKey[]
+
   @@map("tenants")
 }
 
@@ -729,11 +761,44 @@ model User {
   openingBalancesVerified        OpeningBalance[]
   openingBalanceImportsProcessed OpeningBalanceImport[]
 
+  // TASK-CLI-001: API Keys created by this user
+  apiKeys ApiKey[] @relation("ApiKeyCreatedBy")
+
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([auth0Id])
   @@index([currentTenantId])
   @@map("users")
+}
+
+// TASK-CLI-001: API Key Authentication for CLI/MCP Production Access
+// Enables secure remote access to CrecheBooks via terminal and Claude Code
+model ApiKey {
+  id          String        @id @default(uuid())
+  name        String        @db.VarChar(100) // Human-readable name: "Production CLI", "CI/CD Pipeline"
+  keyPrefix   String        @map("key_prefix") @db.VarChar(12) // First 8 chars for display: "cb_prod_abc..."
+  keyHash     String        @unique @map("key_hash") @db.VarChar(128) // bcrypt hash of full key
+  tenantId    String        @map("tenant_id")
+  userId      String        @map("user_id") // User who created this key
+  scopes      ApiKeyScope[] // Permissions granted to this key
+  description String?       @db.VarChar(500) // Optional notes about key usage
+  environment String        @default("production") @db.VarChar(20) // local, staging, production
+  expiresAt   DateTime?     @map("expires_at") // Optional expiry (null = never expires)
+  lastUsedAt  DateTime?     @map("last_used_at") // Track usage for security audits
+  lastUsedIp  String?       @map("last_used_ip") @db.VarChar(45) // IPv4 or IPv6
+  revokedAt   DateTime?     @map("revoked_at") // Soft delete - key is invalid when set
+  revokedBy   String?       @map("revoked_by") // User who revoked the key
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("ApiKeyCreatedBy", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([keyHash])
+  @@index([tenantId, revokedAt]) // Fast lookup for active keys per tenant
+  @@map("api_keys")
 }
 
 model AuditLog {

@@ -59,10 +59,26 @@ output.txt
 # Claude Code local development artifacts
 .claude/agents/
 .claude-flow/metrics/
+.claude-flow/agents/store.json
+.claude-flow/daemon-state.json
+.claude-flow/config.yaml
+.claude-flow/learning/
+.claude-flow/memory/
+.claude-flow/pids/
+.claude-flow/security/
+.claude-flow/swarm/
 
 # Memory and session data (local state)
 memory/backups/
 memory/data/
+
+# Ruvector local database
+**/ruvector.db
+**/data/ruvector/
+**/data/vectors.db
+
+# TypeScript build info
+**/*.tsbuildinfo
 
 # Prompt scratch files
 prompt*.txt

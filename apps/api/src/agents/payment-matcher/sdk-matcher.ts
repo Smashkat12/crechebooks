@@ -18,6 +18,7 @@ import { Transaction } from '@prisma/client';
 import { BaseSdkAgent } from '../sdk/base-sdk-agent';
 import { SdkAgentFactory } from '../sdk/sdk-agent.factory';
 import { SdkConfigService } from '../sdk/sdk-config';
+import { ClaudeClientService } from '../sdk/claude-client.service';
 import { AgentDefinition } from '../sdk/interfaces/sdk-agent.interface';
 import { RuvectorService } from '../sdk/ruvector.service';
 import { InvoiceCandidate } from './interfaces/matcher.interface';
@@ -52,6 +53,9 @@ export class SdkPaymentMatcher extends BaseSdkAgent {
     @Optional()
     @Inject(RuvectorService)
     private readonly ruvector?: RuvectorService,
+    @Optional()
+    @Inject(ClaudeClientService)
+    private readonly claudeClient?: ClaudeClientService,
   ) {
     super(factory, config, SdkPaymentMatcher.name);
   }
@@ -88,15 +92,25 @@ export class SdkPaymentMatcher extends BaseSdkAgent {
     );
 
     const result = await this.executeWithFallback<SdkMatchResult>(
-      // eslint-disable-next-line @typescript-eslint/require-await
       async () => {
-        const message = this.buildMatchMessage(transaction, candidates);
+        if (!this.claudeClient?.isAvailable()) {
+          throw new Error(
+            'Claude client not available. Check ANTHROPIC_API_KEY configuration.',
+          );
+        }
 
-        // Stub: In the real implementation this would call the Claude Agent SDK.
-        // For now, throw to indicate SDK is not yet wired up.
-        throw new Error(
-          `SDK call not yet implemented for model=${routedModel}, tenant=${tenantId}, message length=${String(message.length)}`,
-        );
+        const message = this.buildMatchMessage(transaction, candidates);
+        const agentDef = this.getAgentDefinition(tenantId);
+
+        const response = await this.claudeClient.sendMessage({
+          systemPrompt: agentDef.prompt,
+          messages: [{ role: 'user', content: message }],
+          model: routedModel,
+          temperature: 0, // Deterministic for financial matching
+          maxTokens: 1024,
+        });
+
+        return this.parseMatchResponse(response.content);
       },
       // eslint-disable-next-line @typescript-eslint/require-await
       async () => {

@@ -32,7 +32,7 @@ function createMockRuvector(available: boolean): RuvectorService {
 
 describe('CrecheBooksMcpService', () => {
   describe('initialization', () => {
-    it('should register 5 core tools when ruvector is unavailable', () => {
+    it('should register 7 core tools when ruvector is unavailable', () => {
       const prisma = createMockPrisma();
       const ruvector = createMockRuvector(false);
       const service = new CrecheBooksMcpService(prisma, ruvector);
@@ -40,16 +40,18 @@ describe('CrecheBooksMcpService', () => {
       service.onModuleInit();
 
       const tools = service.listTools();
-      expect(tools).toHaveLength(5);
+      expect(tools).toHaveLength(7);
       expect(tools).toContain('get_patterns');
       expect(tools).toContain('get_history');
       expect(tools).toContain('get_invoices');
       expect(tools).toContain('query_transactions');
       expect(tools).toContain('get_reports');
+      expect(tools).toContain('generate_invoices');
+      expect(tools).toContain('send_invoices');
       expect(tools).not.toContain('search_similar_transactions');
     });
 
-    it('should register 6 tools when ruvector is available', () => {
+    it('should register 8 tools when ruvector is available', () => {
       const prisma = createMockPrisma();
       const ruvector = createMockRuvector(true);
       const service = new CrecheBooksMcpService(prisma, ruvector);
@@ -57,17 +59,17 @@ describe('CrecheBooksMcpService', () => {
       service.onModuleInit();
 
       const tools = service.listTools();
-      expect(tools).toHaveLength(6);
+      expect(tools).toHaveLength(8);
       expect(tools).toContain('search_similar_transactions');
     });
 
-    it('should register 5 tools when ruvector is not injected', () => {
+    it('should register 7 tools when ruvector is not injected', () => {
       const prisma = createMockPrisma();
       const service = new CrecheBooksMcpService(prisma, undefined);
 
       service.onModuleInit();
 
-      expect(service.listTools()).toHaveLength(5);
+      expect(service.listTools()).toHaveLength(7);
     });
   });
 
@@ -129,7 +131,7 @@ describe('CrecheBooksMcpService', () => {
       service.onModuleInit();
 
       const definitions = service.getToolDefinitions();
-      expect(definitions).toHaveLength(5);
+      expect(definitions).toHaveLength(7);
 
       for (const def of definitions) {
         expect(def.name).toBeDefined();
@@ -170,8 +172,8 @@ describe('CrecheBooksMcpService', () => {
 
       const info = service.getServerInfo();
       expect(info.name).toBe('crechebooks-mcp');
-      expect(info.version).toBe('1.0.0');
-      expect(info.toolCount).toBe(5);
+      expect(info.version).toBe('1.1.0');
+      expect(info.toolCount).toBe(7);
       expect(info.ruvectorAvailable).toBe(false);
     });
 
@@ -182,7 +184,7 @@ describe('CrecheBooksMcpService', () => {
       service.onModuleInit();
 
       const info = service.getServerInfo();
-      expect(info.toolCount).toBe(6);
+      expect(info.toolCount).toBe(8);
       expect(info.ruvectorAvailable).toBe(true);
     });
 

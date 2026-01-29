@@ -314,3 +314,14 @@ export interface McpToolResult<T = unknown> {
     resultCount?: number;
   };
 }
+
+// Re-export mutation types
+export * from './mutations';
+
+// Re-export entity operation types
+export * from './tenant-operations';
+export * from './parent-operations';
+export * from './child-operations';
+
+// Re-export SARS compliance types
+export * from './sars';

@@ -1,0 +1,55 @@
+# ============================================
+# CrecheBooks Docker Compose - Dev Infrastructure
+# ============================================
+# Dev-only: PostgreSQL + Redis (API and Web run locally via pnpm dev)
+# Usage: docker compose -f docker-compose.dev.yml up -d
+
+services:
+  # ==========================================
+  # PostgreSQL Database
+  # ==========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: crechebooks-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: crechebooks
+      POSTGRES_PASSWORD: crechebooks_dev_password
+      POSTGRES_DB: crechebooks
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crechebooks -d crechebooks"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Redis Cache & Queue
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: crechebooks-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: crechebooks-dev-network

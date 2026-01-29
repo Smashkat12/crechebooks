@@ -17,7 +17,9 @@ import { DatabaseModule } from '../database/database.module';
 import { RedisModule } from '../common/redis/redis.module';
 import { ShutdownModule } from '../common/shutdown';
 import { MonitoringModule } from '../database/monitoring/monitoring.module';
+import { SdkAgentModule } from '../agents/sdk/sdk-agent.module';
 import { HealthController } from './health.controller';
+import { AiHealthController } from './ai-health.controller';
 import { DatabaseHealthIndicator } from './indicators/database.health';
 import { RedisHealthIndicator } from './indicators/redis.health';
 import { PoolHealthIndicator } from '../database/monitoring/pool-health.indicator';
@@ -29,8 +31,9 @@ import { PoolHealthIndicator } from '../database/monitoring/pool-health.indicato
     RedisModule,
     ShutdownModule, // TASK-INFRA-007: Graceful shutdown integration
     MonitoringModule, // TASK-PERF-104: Database pool monitoring
+    SdkAgentModule, // TASK-SDK-005: Claude API integration
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, AiHealthController],
   providers: [
     DatabaseHealthIndicator,
     RedisHealthIndicator,

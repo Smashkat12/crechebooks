@@ -5,7 +5,7 @@
 # Uses pnpm workspace for building, npm for production node_modules
 
 # Stage 1: Dependencies
-FROM node:20-slim AS deps
+FROM node:25-slim AS deps
 
 # Install required system dependencies (python3/make/g++ needed for native modules like hnswlib-node)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,7 +30,7 @@ COPY packages/types/package.json ./packages/types/
 RUN pnpm install --frozen-lockfile --prod=false
 
 # Stage 2: Builder
-FROM node:20-slim AS builder
+FROM node:25-slim AS builder
 
 # Install required system dependencies (python3/make/g++ needed for native modules like hnswlib-node)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -81,7 +81,7 @@ RUN sed 's|"@crechebooks/types": "workspace:\*"|"@crechebooks/types": "file:../p
     npm install --legacy-peer-deps
 
 # Stage 3: Production Runner
-FROM node:20-slim AS runner
+FROM node:25-slim AS runner
 
 # Install required system dependencies and dumb-init
 RUN apt-get update && apt-get install -y --no-install-recommends \

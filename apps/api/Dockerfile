@@ -97,27 +97,24 @@ WORKDIR /app
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nestjs nestjs
 
-# Copy built application from builder
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/prod/node_modules ./node_modules
-COPY --from=builder /app/prod/package.json ./
-COPY --from=builder /app/apps/api/prisma ./prisma
-COPY --from=builder /app/apps/api/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/apps/api/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/apps/api/scripts ./scripts
+# Copy built application from builder (using --chown to avoid slow recursive chown)
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/prod/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/prod/package.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/tsconfig.json ./tsconfig.json
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma.config.ts ./prisma.config.ts
+COPY --from=builder --chown=nestjs:nodejs /app/apps/api/scripts ./scripts
 
 # Copy startup script
-COPY apps/api/start.sh ./start.sh
+COPY --chown=nestjs:nodejs apps/api/start.sh ./start.sh
 RUN chmod +x ./start.sh
 
 # Copy types package (needed at runtime for some type exports)
-COPY --from=builder /app/packages/types /app/packages/types
+COPY --from=builder --chown=nestjs:nodejs /app/packages/types /app/packages/types
 
 # Copy agent context files (required for transaction categorizer)
-COPY .claude/context/ ./.claude/context/
-
-# Set ownership
-RUN chown -R nestjs:nodejs /app
+COPY --chown=nestjs:nodejs .claude/context/ ./.claude/context/
 
 USER nestjs
 

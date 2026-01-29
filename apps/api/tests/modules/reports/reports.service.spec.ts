@@ -411,6 +411,8 @@ describe('ReportsService', () => {
       financialReportService.exportIncomeStatementExcel.mockResolvedValue(
         testExcelBuffer,
       );
+      // Mock synthesis agent for includeInsights=true tests
+      reportSynthesisAgent.synthesizeReport.mockResolvedValue(testSdkResult);
     });
 
     it('should export income statement as PDF', async () => {
@@ -419,7 +421,7 @@ describe('ReportsService', () => {
         testStart,
         testEnd,
         ExportFormat.PDF,
-        true,
+        false, // Don't include insights for basic PDF export test
         testTenantId,
       );
 

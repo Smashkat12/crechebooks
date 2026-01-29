@@ -1,0 +1,28 @@
+api:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/api/**'
+
+web:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/web/**'
+
+database:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/api/prisma/**'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/package.json'
+          - 'pnpm-lock.yaml'
+
+infrastructure:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docker-compose*.yml'
+          - '**/Dockerfile'
+          - 'scripts/**'

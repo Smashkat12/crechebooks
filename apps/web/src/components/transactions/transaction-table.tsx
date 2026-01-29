@@ -17,9 +17,8 @@ import { CategorizationDialog } from './categorization-dialog';
 import { SplitTransactionModal, SplitRow } from './SplitTransactionModal';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { useTransactionsList } from '@/hooks/use-transactions';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Upload, FileSpreadsheet } from 'lucide-react';
+import { AlertCircle, Loader2, FileSpreadsheet } from 'lucide-react';
 
 interface TransactionTableProps {
   tenantId: string;
@@ -60,7 +59,7 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
     year: !filters.dateRange?.from && !filters.dateRange?.to && year && year > 0 ? year : undefined,
   }), [tenantId, page, filters, year]);
 
-  const { data, isLoading, isError, error, refetch } = useTransactionsList(queryParams);
+  const { data, isLoading, isError, error: _error, refetch } = useTransactionsList(queryParams);
 
   const handleEdit = (transaction: ITransaction) => {
     setSelectedTransaction(transaction);

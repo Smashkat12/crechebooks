@@ -17,8 +17,6 @@ import {
   Post,
   Body,
   Logger,
-  HttpException,
-  HttpStatus,
   Optional,
   Inject,
 } from '@nestjs/common';
@@ -115,9 +113,7 @@ export class AiHealthController {
    * POST /health/ai/test
    */
   @Post('test')
-  async testMessage(
-    @Body() dto: TestMessageDto,
-  ): Promise<TestMessageResponse> {
+  async testMessage(@Body() dto: TestMessageDto): Promise<TestMessageResponse> {
     const startTime = Date.now();
 
     if (!this.claudeClient?.isAvailable()) {
@@ -209,7 +205,9 @@ Type: ${dto.isCredit ? 'CREDIT (income)' : 'DEBIT (expense)'}`;
       });
 
       // Parse JSON from response
-      const jsonMatch = response.content.match(/\{[\s\S]*?"accountCode"[\s\S]*?\}/);
+      const jsonMatch = response.content.match(
+        /\{[\s\S]*?"accountCode"[\s\S]*?\}/,
+      );
       if (!jsonMatch) {
         return {
           success: false,

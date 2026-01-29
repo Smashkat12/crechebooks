@@ -18,7 +18,7 @@ import {
   TaxStatus,
   LineType,
 } from '@prisma/client';
-import { Tenant, Transaction, Invoice } from '@prisma/client';
+import type { Tenant } from '@prisma/client';
 import { cleanDatabase } from '../../helpers/clean-database';
 
 // Configure Decimal.js for banker's rounding

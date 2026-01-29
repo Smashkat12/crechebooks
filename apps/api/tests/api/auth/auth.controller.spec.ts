@@ -8,7 +8,7 @@ import { Reflector } from '@nestjs/core';
 import type { Response } from 'express';
 import { AuthController } from '../../../src/api/auth/auth.controller';
 import { AuthService } from '../../../src/api/auth/auth.service';
-import { RateLimitGuard } from '../../../src/common/guards/rate-limit.guard';
+import type { RateLimitGuard as _RateLimitGuard } from '../../../src/common/guards/rate-limit.guard';
 import { RateLimitService } from '../../../src/common/rate-limit/rate-limit.service';
 import { LoginRequestDto } from '../../../src/api/auth/dto/login.dto';
 import { CallbackRequestDto } from '../../../src/api/auth/dto/callback.dto';

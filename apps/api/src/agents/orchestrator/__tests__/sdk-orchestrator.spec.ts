@@ -24,7 +24,7 @@ import {
 import { SubagentResult } from '../interfaces/sdk-orchestrator.interface';
 import {
   WorkflowRequest,
-  WorkflowResult,
+  type WorkflowResult as _WorkflowResult,
   WorkflowType,
 } from '../interfaces/orchestrator.interface';
 import { SdkAgentFactory } from '../../sdk/sdk-agent.factory';

@@ -2,7 +2,7 @@
 
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Edit, Mail, Phone, UserPlus, MessageSquare, CheckCircle2, XCircle, Send, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, Mail, Phone, UserPlus, CheckCircle2, XCircle, Send, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

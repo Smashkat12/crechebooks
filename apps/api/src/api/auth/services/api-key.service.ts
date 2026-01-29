@@ -13,12 +13,18 @@
  * - Soft revocation preserves audit trail
  */
 
-import { Injectable, Logger, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
-import { ApiKey, ApiKeyScope, Prisma } from '@prisma/client';
+import { ApiKey, ApiKeyScope } from '@prisma/client';
 import { IUser } from '../../../database/entities/user.entity';
 
 // Key format: cb_<environment>_<32 random chars>
@@ -64,12 +70,18 @@ export class ApiKeyService {
     tenantId: string,
     dto: CreateApiKeyDto,
   ): Promise<ApiKeyWithSecret> {
-    this.logger.log(`Creating API key "${dto.name}" for user ${userId} in tenant ${tenantId}`);
+    this.logger.log(
+      `Creating API key "${dto.name}" for user ${userId} in tenant ${tenantId}`,
+    );
 
     // Generate secure random key
-    const randomPart = crypto.randomBytes(KEY_LENGTH).toString('base64url').slice(0, KEY_LENGTH);
+    const randomPart = crypto
+      .randomBytes(KEY_LENGTH)
+      .toString('base64url')
+      .slice(0, KEY_LENGTH);
     const environment = dto.environment || 'production';
-    const envPrefix = environment === 'production' ? 'prod' : environment.slice(0, 4);
+    const envPrefix =
+      environment === 'production' ? 'prod' : environment.slice(0, 4);
     const fullKey = `${KEY_PREFIX}${envPrefix}_${randomPart}`;
 
     // Extract prefix for display (first 12 chars)
@@ -79,7 +91,8 @@ export class ApiKeyService {
     const keyHash = await bcrypt.hash(fullKey, BCRYPT_ROUNDS);
 
     // Ensure scopes are valid - default to FULL_ACCESS if empty
-    const scopes = dto.scopes.length > 0 ? dto.scopes : [ApiKeyScope.FULL_ACCESS];
+    const scopes =
+      dto.scopes.length > 0 ? dto.scopes : [ApiKeyScope.FULL_ACCESS];
 
     // Create the key record
     const apiKey = await this.prisma.apiKey.create({
@@ -108,7 +121,10 @@ export class ApiKeyService {
    * Validate an API key and return user context
    * Called by ApiKeyAuthGuard on each request
    */
-  async validateApiKey(key: string, clientIp?: string): Promise<ValidatedApiKey | null> {
+  async validateApiKey(
+    key: string,
+    clientIp?: string,
+  ): Promise<ValidatedApiKey | null> {
     // Key must start with cb_ prefix
     if (!key.startsWith(KEY_PREFIX)) {
       this.logger.debug('Invalid key format - missing prefix');
@@ -168,7 +184,9 @@ export class ApiKeyService {
           updatedAt: user.updatedAt,
         };
 
-        this.logger.debug(`API key validated: ${apiKey.id} for user ${user.email}`);
+        this.logger.debug(
+          `API key validated: ${apiKey.id} for user ${user.email}`,
+        );
 
         return {
           apiKey,
@@ -196,7 +214,10 @@ export class ApiKeyService {
   /**
    * List API keys for a tenant (without hashes)
    */
-  async listApiKeys(tenantId: string, includeRevoked = false): Promise<ApiKey[]> {
+  async listApiKeys(
+    tenantId: string,
+    includeRevoked = false,
+  ): Promise<ApiKey[]> {
     return this.prisma.apiKey.findMany({
       where: {
         tenantId,
@@ -224,7 +245,11 @@ export class ApiKeyService {
   /**
    * Revoke an API key (soft delete)
    */
-  async revokeApiKey(id: string, tenantId: string, revokedByUserId: string): Promise<ApiKey> {
+  async revokeApiKey(
+    id: string,
+    tenantId: string,
+    revokedByUserId: string,
+  ): Promise<ApiKey> {
     const apiKey = await this.getApiKey(id, tenantId);
 
     if (apiKey.revokedAt) {

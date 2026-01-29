@@ -70,7 +70,7 @@ function createStatement(
   };
 }
 
-function createManyTransactions(count: number): Array<{
+function _createManyTransactions(count: number): Array<{
   amountCents: number;
   isCredit: boolean;
   description: string;

@@ -7,7 +7,7 @@
  */
 
 import { AgentMemoryService, computeInputHash } from '../agent-memory.service';
-import { PatternLearner } from '../pattern-learner';
+import type { PatternLearner as _PatternLearner } from '../pattern-learner';
 import type {
   StoreDecisionParams,
   RecordCorrectionParams,

@@ -107,6 +107,9 @@ import { OnboardingService } from './services/onboarding.service';
 import { ParentFeeAgreementPdfService } from './services/parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from './services/parent-consent-forms-pdf.service';
 import { ParentOnboardingService } from './services/parent-onboarding.service';
+// TASK-REPORTS-005: Missing Report Types
+import { CashFlowReportService } from './services/cash-flow-report.service';
+import { AgedPayablesService } from './services/aged-payables.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
@@ -250,6 +253,9 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     ParentFeeAgreementPdfService,
     ParentConsentFormsPdfService,
     ParentOnboardingService,
+    // TASK-REPORTS-005: Missing Report Types
+    CashFlowReportService,
+    AgedPayablesService,
   ],
   exports: [
     PrismaService,
@@ -362,6 +368,9 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     ParentFeeAgreementPdfService,
     ParentConsentFormsPdfService,
     ParentOnboardingService,
+    // TASK-REPORTS-005: Missing Report Types
+    CashFlowReportService,
+    AgedPayablesService,
   ],
 })
 export class DatabaseModule {}

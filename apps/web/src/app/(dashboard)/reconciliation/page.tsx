@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { useReconciliationSummary, useReconciliationHistory, useReconciliationDiscrepancies, useRefreshMatchResults, type BankStatementReconciliationResult, type BankStatementMatch } from '@/hooks/use-reconciliation';
+import { useReconciliationSummary, useReconciliationHistory, useReconciliationDiscrepancies, useRefreshMatchResults, useIncomeStatement, type BankStatementReconciliationResult, type BankStatementMatch } from '@/hooks/use-reconciliation';
 import { apiClient } from '@/lib/api';
 import type { IReconciliation } from '@crechebooks/types';
 import {
@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ReconciliationPage() {
   const { data: summary, isLoading, error, refetch } = useReconciliationSummary();
+  const { data: incomeStatement, isLoading: incomeLoading, error: incomeError } = useIncomeStatement();
   const { data: history, isLoading: historyLoading, error: historyError } = useReconciliationHistory();
   const { data: discrepancies, isLoading: discrepanciesLoading, error: discrepanciesError } = useReconciliationDiscrepancies();
   const [isFormOpen, setIsFormOpen] = React.useState(false);
@@ -44,8 +45,8 @@ export default function ReconciliationPage() {
     }
   }, [refreshMatches]);
 
-  if (error || historyError || discrepanciesError) {
-    throw new Error(`Failed to load reconciliation: ${(error || historyError || discrepanciesError)?.message}`);
+  if (error || historyError || discrepanciesError || incomeError) {
+    throw new Error(`Failed to load reconciliation: ${(error || historyError || discrepanciesError || incomeError)?.message}`);
   }
 
   const handleReconciliationSuccess = () => {
@@ -243,7 +244,7 @@ export default function ReconciliationPage() {
         </DialogContent>
       </Dialog>
 
-      {isLoading ? (
+      {isLoading || incomeLoading ? (
         <div className="grid gap-4 md:grid-cols-3">
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
@@ -292,21 +293,21 @@ export default function ReconciliationPage() {
           <Card>
             <CardHeader>
               <CardTitle>Summary</CardTitle>
-              <CardDescription>Period: {summary.period}</CardDescription>
+              <CardDescription>Period: {incomeStatement?.period || summary.period}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Income</p>
-                  <p className="text-lg font-semibold text-green-600">{formatCurrency(summary.totalIncome)}</p>
+                  <p className="text-lg font-semibold text-green-600">{formatCurrency(incomeStatement?.totalIncome ?? 0)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Expenses</p>
-                  <p className="text-lg font-semibold text-red-600">{formatCurrency(summary.totalExpenses)}</p>
+                  <p className="text-lg font-semibold text-red-600">{formatCurrency(incomeStatement?.totalExpenses ?? 0)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Net Profit</p>
-                  <p className="text-lg font-semibold">{formatCurrency(summary.netProfit)}</p>
+                  <p className={`text-lg font-semibold ${(incomeStatement?.netProfit ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(incomeStatement?.netProfit ?? 0)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Accounting Balance</p>

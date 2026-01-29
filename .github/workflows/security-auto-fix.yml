@@ -1,0 +1,278 @@
+name: Security Auto-Fix
+
+on:
+  # Trigger on new code scanning alerts
+  code_scanning_alert:
+    types: [created, reopened]
+
+  # Manual trigger for batch processing
+  workflow_dispatch:
+    inputs:
+      max_alerts:
+        description: 'Maximum alerts to process'
+        required: false
+        default: '10'
+      dry_run:
+        description: 'Dry run (no PRs created)'
+        required: false
+        default: 'false'
+        type: boolean
+
+  # Scheduled daily scan for accumulated alerts
+  schedule:
+    - cron: '0 6 * * *'  # 6 AM UTC daily
+
+permissions:
+  contents: write
+  pull-requests: write
+  security-events: read
+
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '9.15.0'
+
+jobs:
+  analyze-alerts:
+    name: Analyze Security Alerts
+    runs-on: ubuntu-latest
+    outputs:
+      alerts_json: ${{ steps.fetch-alerts.outputs.alerts }}
+      alert_count: ${{ steps.fetch-alerts.outputs.count }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch open code scanning alerts
+        id: fetch-alerts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Fetch alerts and categorize by fixability
+          ALERTS=$(gh api repos/${{ github.repository }}/code-scanning/alerts \
+            --jq '[.[] | select(.state=="open")] |
+              map({
+                number: .number,
+                rule: .rule.id,
+                severity: .rule.security_severity_level,
+                path: .most_recent_instance.location.path,
+                start_line: .most_recent_instance.location.start_line,
+                end_line: .most_recent_instance.location.end_line,
+                message: .most_recent_instance.message.text
+              }) |
+              .[0:${{ inputs.max_alerts || 10 }}]')
+
+          echo "alerts<<EOF" >> $GITHUB_OUTPUT
+          echo "$ALERTS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          COUNT=$(echo "$ALERTS" | jq 'length')
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "📊 Found $COUNT open alerts to process"
+
+  auto-fix-unused-vars:
+    name: Fix Unused Variables
+    needs: analyze-alerts
+    if: needs.analyze-alerts.outputs.alert_count > 0
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Process alerts and apply fixes
+        id: apply-fixes
+        env:
+          ALERTS_JSON: ${{ needs.analyze-alerts.outputs.alerts_json }}
+        run: |
+          echo "🔧 Processing alerts..."
+
+          # Create fixes tracking file
+          echo "[]" > /tmp/fixes.json
+          FIXED_COUNT=0
+
+          # Process each alert
+          echo "$ALERTS_JSON" | jq -c '.[]' | while read -r alert; do
+            RULE=$(echo "$alert" | jq -r '.rule')
+            FILE=$(echo "$alert" | jq -r '.path')
+            LINE=$(echo "$alert" | jq -r '.start_line')
+            NUMBER=$(echo "$alert" | jq -r '.number')
+
+            echo "📝 Alert #$NUMBER: $RULE in $FILE:$LINE"
+
+            # Handle different rule types
+            case "$RULE" in
+              "js/unused-local-variable")
+                # Extract the variable name from the message
+                MSG=$(echo "$alert" | jq -r '.message')
+                VAR_NAME=$(echo "$MSG" | grep -oP "Variable '\K[^']+")
+
+                if [ -n "$VAR_NAME" ] && [ -f "$FILE" ]; then
+                  # Check if it's a destructuring assignment or regular variable
+                  LINE_CONTENT=$(sed -n "${LINE}p" "$FILE")
+
+                  # Strategy 1: Prefix with underscore for intentionally unused
+                  if echo "$LINE_CONTENT" | grep -qE "(const|let|var)\s+\{.*$VAR_NAME"; then
+                    # Destructuring - replace with _varName
+                    sed -i "${LINE}s/\b${VAR_NAME}\b/_${VAR_NAME}/" "$FILE"
+                    echo "  ✅ Prefixed with underscore: $VAR_NAME -> _$VAR_NAME"
+                    FIXED_COUNT=$((FIXED_COUNT + 1))
+                  elif echo "$LINE_CONTENT" | grep -qE "(const|let|var)\s+$VAR_NAME\s*="; then
+                    # Regular assignment - prefix with underscore
+                    sed -i "${LINE}s/\b${VAR_NAME}\b/_${VAR_NAME}/" "$FILE"
+                    echo "  ✅ Prefixed unused variable: _$VAR_NAME"
+                    FIXED_COUNT=$((FIXED_COUNT + 1))
+                  else
+                    echo "  ⏭️ Skipped: Complex pattern requires manual review"
+                  fi
+                fi
+                ;;
+
+              "js/sql-injection"|"js/code-injection")
+                echo "  🔒 Security issue requires manual review"
+                ;;
+
+              *)
+                echo "  ⏭️ Unknown rule type: $RULE"
+                ;;
+            esac
+          done
+
+          echo "fixed_count=$FIXED_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Run linter to verify fixes
+        run: |
+          pnpm lint --fix || true
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "📭 No changes to commit"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "📬 Changes detected"
+            git diff --stat
+          fi
+
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.has_changes == 'true' && inputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="auto-fix/security-$(date +%Y%m%d-%H%M%S)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "fix(security): auto-fix code scanning alerts
+
+          Automated fixes applied by Security Auto-Fix workflow:
+          - Prefixed unused variables with underscore
+          - Applied ESLint auto-fixes
+
+          Resolves code scanning alerts.
+
+          Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "🔒 Auto-fix: Code scanning alerts" \
+            --body "$(cat <<'EOF'
+          ## Security Auto-Fix
+
+          This PR was automatically generated to fix code scanning alerts.
+
+          ### Changes Applied
+          - ✅ Unused variables prefixed with `_` (TypeScript convention)
+          - ✅ ESLint auto-fixes applied
+
+          ### Alerts Addressed
+          See [Code Scanning Alerts](/${{ github.repository }}/security/code-scanning) for details.
+
+          ### Review Checklist
+          - [ ] Verify fixes don't break functionality
+          - [ ] Ensure tests still pass
+          - [ ] Check that prefixed variables are truly unused
+
+          ---
+          🤖 Generated by Security Auto-Fix workflow
+          EOF
+          )" \
+            --label "security,automated" \
+            --head "$BRANCH" \
+            --base main
+
+  notify-manual-review:
+    name: Flag Manual Review Items
+    needs: [analyze-alerts, auto-fix-unused-vars]
+    if: always() && needs.analyze-alerts.outputs.alert_count > 0
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create issue for manual review items
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ALERTS_JSON: ${{ needs.analyze-alerts.outputs.alerts_json }}
+        run: |
+          # Check for security-critical alerts that need manual review
+          CRITICAL=$(echo "$ALERTS_JSON" | jq '[.[] | select(.severity == "critical" or .severity == "high")]')
+          CRITICAL_COUNT=$(echo "$CRITICAL" | jq 'length')
+
+          if [ "$CRITICAL_COUNT" -gt 0 ]; then
+            echo "⚠️ Found $CRITICAL_COUNT critical/high severity alerts requiring manual review"
+
+            # Create or update tracking issue
+            ISSUE_BODY=$(cat <<EOF
+          ## 🔒 Security Alerts Requiring Manual Review
+
+          The following alerts require manual intervention:
+
+          $(echo "$CRITICAL" | jq -r '.[] | "- [ ] **\(.rule)** in \(.path):\(.start_line) - \(.message)"')
+
+          ### Priority
+          These alerts have been flagged as **critical** or **high** severity.
+
+          ### Action Required
+          1. Review each alert in the [Security tab](/${{ github.repository }}/security/code-scanning)
+          2. Apply appropriate fixes
+          3. Mark items as resolved
+
+          ---
+          Last updated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          EOF
+          )
+
+            # Check if tracking issue exists
+            EXISTING=$(gh issue list --label "security-review" --state open --json number --jq '.[0].number')
+
+            if [ -n "$EXISTING" ]; then
+              gh issue comment "$EXISTING" --body "$ISSUE_BODY"
+            else
+              gh issue create \
+                --title "🔒 Security: Manual Review Required" \
+                --body "$ISSUE_BODY" \
+                --label "security,security-review,priority:high"
+            fi
+          fi

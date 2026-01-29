@@ -14,6 +14,9 @@ import { ReportsService } from '../../../src/modules/reports/reports.service';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { RedisService } from '../../../src/common/redis/redis.service';
 import { FinancialReportService } from '../../../src/database/services/financial-report.service';
+import { CashFlowReportService } from '../../../src/database/services/cash-flow-report.service';
+import { AgedPayablesService } from '../../../src/database/services/aged-payables.service';
+import { PdfGeneratorService } from '../../../src/modules/reports/pdf-generator.service';
 import { ReportSynthesisAgent } from '../../../src/agents/report-synthesis';
 import { ReportType } from '../../../src/modules/reports/dto/report-data.dto';
 import { ExportFormat } from '../../../src/modules/reports/dto/export-report.dto';
@@ -135,6 +138,21 @@ describe('ReportsService', () => {
       synthesizeReport: jest.fn(),
     };
 
+    const mockCashFlowReportService = {
+      generateCashFlowStatement: jest.fn(),
+      getCashFlowSummary: jest.fn(),
+    };
+
+    const mockAgedPayablesService = {
+      generateAgedPayablesReport: jest.fn(),
+      isFeatureAvailable: jest.fn().mockReturnValue(false),
+      getFeatureMessage: jest.fn().mockReturnValue('Supplier bills feature coming soon'),
+    };
+
+    const mockPdfGeneratorService = {
+      generateReportPdf: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReportsService,
@@ -144,7 +162,16 @@ describe('ReportsService', () => {
           provide: FinancialReportService,
           useValue: mockFinancialReportService,
         },
+        {
+          provide: CashFlowReportService,
+          useValue: mockCashFlowReportService,
+        },
+        {
+          provide: AgedPayablesService,
+          useValue: mockAgedPayablesService,
+        },
         { provide: ReportSynthesisAgent, useValue: mockReportSynthesisAgent },
+        { provide: PdfGeneratorService, useValue: mockPdfGeneratorService },
       ],
     }).compile();
 

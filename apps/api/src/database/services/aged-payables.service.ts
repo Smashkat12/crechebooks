@@ -87,11 +87,7 @@ export class AgedPayablesService {
     tenantId: string,
     asOfDate: Date,
   ): Promise<AgedPayablesReport> {
-    this.logger.log(
-      `Generating Aged Payables Report for tenant ${tenantId} as of ${asOfDate.toISOString()}`,
-    );
-
-    // Validate tenantId
+    // Validate inputs BEFORE logging (to avoid RangeError on invalid date)
     if (!tenantId) {
       throw new BusinessException(
         'Tenant ID is required for aged payables report',
@@ -100,7 +96,6 @@ export class AgedPayablesService {
       );
     }
 
-    // Validate asOfDate
     if (!asOfDate || isNaN(asOfDate.getTime())) {
       throw new BusinessException(
         'Valid as-of date is required for aged payables report',
@@ -108,6 +103,10 @@ export class AgedPayablesService {
         { asOfDate: String(asOfDate) },
       );
     }
+
+    this.logger.log(
+      `Generating Aged Payables Report for tenant ${tenantId} as of ${asOfDate.toISOString()}`,
+    );
 
     // Return empty structure - bills/suppliers module not in scope
     // NEVER return null - always return structure with zeros

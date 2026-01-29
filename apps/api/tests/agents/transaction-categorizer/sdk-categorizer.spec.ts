@@ -467,7 +467,7 @@ describe('SdkCategorizer', () => {
           'tenant-1',
           'haiku',
         ),
-      ).rejects.toThrow('SDK inference not available');
+      ).rejects.toThrow('Claude client not available');
     });
   });
 

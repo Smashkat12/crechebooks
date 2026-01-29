@@ -89,6 +89,35 @@ interface IncomeStatement {
   netProfit: number;
 }
 
+// API response format for income statement (snake_case from backend)
+interface ApiIncomeStatementResponse {
+  success: boolean;
+  data: {
+    period: {
+      start: string;
+      end: string;
+    };
+    income: {
+      total: number;
+      breakdown: Array<{
+        account_code: string;
+        account_name: string;
+        amount: number;
+      }>;
+    };
+    expenses: {
+      total: number;
+      breakdown: Array<{
+        account_code: string;
+        account_name: string;
+        amount: number;
+      }>;
+    };
+    net_profit: number;
+    generated_at: string;
+  };
+}
+
 interface ReconciliationParams extends Record<string, unknown> {
   startDate?: string;
   endDate?: string;
@@ -239,13 +268,40 @@ export function useIncomeStatement(params?: ReconciliationParams) {
   return useQuery<IncomeStatement, AxiosError>({
     queryKey: queryKeys.reports.incomeStatement(params),
     queryFn: async () => {
-      const { data } = await apiClient.get<IncomeStatement>(
+      // Build query params for API
+      const queryParams: Record<string, string> = {};
+      if (params?.startDate) queryParams.period_start = params.startDate;
+      if (params?.endDate) queryParams.period_end = params.endDate;
+
+      // If no dates provided, use current month
+      if (!queryParams.period_start || !queryParams.period_end) {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        queryParams.period_start = startOfMonth.toISOString().split('T')[0];
+        queryParams.period_end = endOfMonth.toISOString().split('T')[0];
+      }
+
+      const { data } = await apiClient.get<ApiIncomeStatementResponse>(
         endpoints.reconciliation.incomeStatement,
-        {
-          params,
-        }
+        { params: queryParams }
       );
-      return data;
+
+      // Transform API snake_case response to frontend camelCase
+      return {
+        period: `${data.data.period.start} to ${data.data.period.end}`,
+        income: data.data.income.breakdown.map((item) => ({
+          category: item.account_name,
+          amount: item.amount,
+        })),
+        expenses: data.data.expenses.breakdown.map((item) => ({
+          category: item.account_name,
+          amount: item.amount,
+        })),
+        totalIncome: data.data.income.total,
+        totalExpenses: data.data.expenses.total,
+        netProfit: data.data.net_profit,
+      };
     },
   });
 }

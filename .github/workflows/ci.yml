@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   pull_request:
-    branches: [main, dev]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -265,3 +265,56 @@ jobs:
           tags: crechebooks-web:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # CI Summary - single required status check for branch protection
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, test-api, test-web, build]
+    steps:
+      - name: Check job results
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint & Type Check | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test API | ${{ needs.test-api.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Web | ${{ needs.test-web.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Write CI results artifact
+        run: |
+          cat > ci-results.json << 'JSONEOF'
+          {
+            "workflow": "CI/CD Pipeline",
+            "ref": "${{ github.ref }}",
+            "sha": "${{ github.sha }}",
+            "event": "${{ github.event_name }}",
+            "jobs": {
+              "lint": "${{ needs.lint.result }}",
+              "test-api": "${{ needs.test-api.result }}",
+              "test-web": "${{ needs.test-web.result }}",
+              "build": "${{ needs.build.result }}"
+            },
+            "timestamp": "${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}"
+          }
+          JSONEOF
+
+      - name: Upload CI results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-results
+          path: ci-results.json
+          retention-days: 30
+
+      - name: Fail if any required job failed
+        if: >-
+          needs.lint.result == 'failure' ||
+          needs.test-api.result == 'failure' ||
+          needs.test-web.result == 'failure' ||
+          needs.build.result == 'failure'
+        run: |
+          echo "One or more required jobs failed."
+          exit 1

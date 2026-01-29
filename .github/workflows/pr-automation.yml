@@ -1,0 +1,51 @@
+name: PR Automation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  # Auto-label PRs based on files changed
+  label:
+    name: Auto Label
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Label PR
+        uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          sync-labels: true
+
+  # Validate PR title follows conventional commits
+  title:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+          subjectPattern: ^.+$
+          subjectPatternError: |
+            The PR title "{title}" doesn't match the required format.
+            Use conventional commits: type(scope): description
+            Examples: feat(api): add invoice endpoint, fix(web): correct date format

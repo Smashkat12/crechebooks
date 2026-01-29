@@ -109,6 +109,7 @@ describe('ReportsService', () => {
     data: testAIInsights,
     source: 'SDK',
     model: 'claude-3-sonnet',
+    durationMs: 150,
   };
 
   beforeEach(async () => {
@@ -351,6 +352,7 @@ describe('ReportsService', () => {
       const fallbackResult: SdkExecutionResult<AIInsights> = {
         data: { ...testAIInsights, source: 'FALLBACK' },
         source: 'FALLBACK',
+        durationMs: 50,
       };
       reportSynthesisAgent.synthesizeReport.mockResolvedValue(fallbackResult);
 
@@ -369,7 +371,7 @@ describe('ReportsService', () => {
     const testExcelBuffer = Buffer.from('Excel content');
 
     beforeEach(() => {
-      prismaService.tenant.findUnique.mockResolvedValue({
+      (prismaService.tenant.findUnique as jest.Mock).mockResolvedValue({
         id: testTenantId,
         name: 'Test Creche',
       } as any);
@@ -462,7 +464,7 @@ describe('ReportsService', () => {
     });
 
     it('should use default name when tenant not found', async () => {
-      prismaService.tenant.findUnique.mockResolvedValue(null);
+      (prismaService.tenant.findUnique as jest.Mock).mockResolvedValue(null);
 
       await service.exportReport(
         ReportType.INCOME_STATEMENT,

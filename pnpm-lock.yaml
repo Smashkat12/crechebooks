@@ -228,6 +228,9 @@ importers:
       xero-node:
         specifier: ^6.0.0
         version: 6.0.0
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3.2.0

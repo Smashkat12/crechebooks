@@ -1,11 +1,21 @@
-# Github Commands
+# GitHub Commands
 
-Commands for github operations in Claude Flow.
+Commands for managing CrecheBooks GitHub workflows using `gh` CLI.
 
 ## Available Commands
 
-- [github-swarm](./github-swarm.md)
-- [repo-analyze](./repo-analyze.md)
-- [pr-enhance](./pr-enhance.md)
-- [issue-triage](./issue-triage.md)
-- [code-review](./code-review.md)
+| Command | Description |
+|---------|-------------|
+| `pr-manager` | Create, review, and merge PRs |
+| `issue-tracker` | Create and manage issues |
+| `release-manager` | Create and manage releases |
+| `code-review` | Review code changes |
+| `issue-triage` | Triage incoming issues |
+| `pr-enhance` | Enhance PR descriptions |
+| `repo-analyze` | Analyze repository |
+
+## Prerequisites
+
+```bash
+gh auth status  # Ensure GitHub CLI is authenticated
+```

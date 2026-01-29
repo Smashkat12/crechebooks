@@ -8,7 +8,6 @@ import {
   ValidateNested,
   Min,
   IsNumber,
-  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';

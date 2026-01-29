@@ -120,8 +120,8 @@ export default function ParentDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
+  const [_error, setError] = useState<string | null>(null);
+  const [_onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
 
   useEffect(() => {
     const fetchDashboard = async () => {

@@ -11,7 +11,7 @@ import Decimal from 'decimal.js';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { VatAdjustmentService } from '../../../src/database/services/vat-adjustment.service';
 import { VatAdjustmentType, TaxStatus } from '@prisma/client';
-import { Tenant, VatAdjustment, User } from '@prisma/client';
+import { Tenant, User } from '@prisma/client';
 import { cleanDatabase } from '../../helpers/clean-database';
 
 // Configure Decimal.js for banker's rounding

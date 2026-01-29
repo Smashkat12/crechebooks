@@ -14,7 +14,6 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { ParentFeeAgreementPdfService } from './parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from './parent-consent-forms-pdf.service';

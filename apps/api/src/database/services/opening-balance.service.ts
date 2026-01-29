@@ -29,7 +29,7 @@ import {
   CreateOpeningBalanceImportDto,
   SetAccountBalanceDto,
   OpeningBalanceResponse,
-  OpeningBalanceImportResponse,
+  type OpeningBalanceImportResponse as _OpeningBalanceImportResponse,
   ImportSummaryResponse,
   WizardStepResponse,
 } from '../dto/opening-balance.dto';
@@ -468,7 +468,7 @@ export class OpeningBalanceService {
     });
 
     const currentCredit = existingBalance?.creditCents || 0;
-    const currentDebit = existingBalance?.debitCents || 0;
+    const _currentDebit = existingBalance?.debitCents || 0;
 
     // discrepancy = totalDebits - totalCredits
     // If discrepancy > 0, debits are higher, need more credits
@@ -641,7 +641,8 @@ export class OpeningBalanceService {
     importId: string,
     stepNumber: number,
   ): Promise<WizardStepResponse> {
-    const importRecord = await this.getImportById(tenantId, importId);
+    // Validate import exists (throws if not found)
+    await this.getImportById(tenantId, importId);
     const stepConfig = WIZARD_STEPS.find((s) => s.step === stepNumber);
 
     if (!stepConfig) {

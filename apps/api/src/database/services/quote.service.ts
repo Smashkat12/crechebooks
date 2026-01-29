@@ -29,7 +29,7 @@ import {
 import {
   CreateQuoteDto,
   UpdateQuoteDto,
-  QuoteResponse,
+  type QuoteResponse as _QuoteResponse,
   QuoteSummaryResponse,
 } from '../dto/quote.dto';
 
@@ -532,7 +532,7 @@ export class QuoteService {
 
     const totalQuotes = quotes.length;
     const sentCount = statusCounts.SENT + statusCounts.VIEWED;
-    const respondedCount =
+    const _respondedCount =
       statusCounts.ACCEPTED + statusCounts.DECLINED + statusCounts.CONVERTED;
     const conversionRate =
       sentCount > 0

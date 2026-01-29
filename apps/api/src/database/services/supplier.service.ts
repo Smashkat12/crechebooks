@@ -240,7 +240,8 @@ export class SupplierService {
     userId: string,
     supplierId: string,
   ): Promise<Supplier> {
-    const supplier = await this.getSupplierById(tenantId, supplierId);
+    // Validate supplier exists (throws if not found)
+    await this.getSupplierById(tenantId, supplierId);
 
     // Check for unpaid bills
     const unpaidBills = await this.prisma.supplierBill.count({

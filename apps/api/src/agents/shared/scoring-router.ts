@@ -13,7 +13,7 @@
  * - MultiModelRouter stub returns null to trigger accuracy-based fallback
  */
 
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
   ScoringPath,
   ScoringWeights,

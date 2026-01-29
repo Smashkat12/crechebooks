@@ -10,7 +10,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   SonaBootstrapService,
-  BootstrapStats,
+  type BootstrapStats as _BootstrapStats,
 } from '../../../src/agents/sdk/sona-bootstrap.service';
 import { IntelligenceEngineService } from '../../../src/agents/sdk/intelligence-engine.service';
 import { PersistenceConfig } from '../../../src/agents/sdk/persistence-config';

@@ -17,9 +17,9 @@ import { CategorizationDialog } from './categorization-dialog';
 import { SplitTransactionModal, SplitRow } from './SplitTransactionModal';
 import { TransactionDetailModal } from './TransactionDetailModal';
 import { useTransactionsList } from '@/hooks/use-transactions';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import type { Alert as _Alert, AlertDescription as _AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, Loader2, Upload, FileSpreadsheet } from 'lucide-react';
+import { AlertCircle, Loader2, FileSpreadsheet } from 'lucide-react';
 
 interface TransactionTableProps {
   tenantId: string;
@@ -97,7 +97,7 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
       onSplit: handleSplit,
       onDelete: handleDelete,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [handleView, handleEdit, handleSplit, handleDelete]
   );
 

@@ -6,7 +6,7 @@
  */
 
 import Link from 'next/link';
-import { AlertCircle, ArrowRight, CheckCircle2, ClipboardList } from 'lucide-react';
+import { ArrowRight, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';

@@ -4,7 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Menu, ChevronDown } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+// import { cn } from '@/lib/utils'; // Currently unused
 import { Button } from '@/components/ui/button';
 import {
   Sheet,

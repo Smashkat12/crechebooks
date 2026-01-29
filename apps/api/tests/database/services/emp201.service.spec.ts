@@ -17,7 +17,7 @@ import {
   PayFrequency,
 } from '@prisma/client';
 import { Tenant, Staff } from '@prisma/client';
-import { EMP201_CONSTANTS } from '../../../src/database/constants/emp201.constants';
+import type { EMP201_CONSTANTS as _EMP201_CONSTANTS } from '../../../src/database/constants/emp201.constants';
 import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('Emp201Service', () => {

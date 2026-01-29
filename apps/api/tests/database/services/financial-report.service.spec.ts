@@ -32,7 +32,7 @@ import {
   CategorizationSource,
   VatType,
 } from '../../../src/database/entities/categorization.entity';
-import { FeeType } from '../../../src/database/entities/fee-structure.entity';
+import type { FeeType as _FeeType } from '../../../src/database/entities/fee-structure.entity';
 import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('FinancialReportService (Integration)', () => {

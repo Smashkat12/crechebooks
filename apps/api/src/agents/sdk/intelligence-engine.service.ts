@@ -50,12 +50,14 @@ export class IntelligenceEngineService
     try {
       const config = this.buildConfig();
       this.engine = new IntelligenceEngine(config);
-      await this.engine.initialize();
+      // IntelligenceEngine is ready after construction - no initialize() method
+      // Run a quick stats check to verify it's working
+      const stats = this.engine.getStats();
       this.initialized = true;
       this.logger.log(
         'IntelligenceEngine initialized successfully ' +
-          `(embeddingDim=${config.embeddingDim}, sona=${config.enableSona}, ` +
-          `storagePath=${config.storagePath})`,
+          `(embeddingDim=${String(config.embeddingDim)}, sona=${String(config.enableSona)}, ` +
+          `memories=${String(stats.totalMemories)}, episodes=${String(stats.totalEpisodes)})`,
       );
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

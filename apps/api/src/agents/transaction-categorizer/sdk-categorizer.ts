@@ -23,6 +23,7 @@ import {
   SdkConfigService,
   RuvectorService,
 } from '../sdk';
+import { ClaudeClientService } from '../sdk/claude-client.service';
 import type { AgentDefinition } from '../sdk';
 import { CATEGORIZER_SYSTEM_PROMPT } from './categorizer-prompt';
 import type {
@@ -83,6 +84,9 @@ export class SdkCategorizer extends BaseSdkAgent {
     @Optional()
     @Inject(RuvectorService)
     private readonly ruvector?: RuvectorService,
+    @Optional()
+    @Inject(ClaudeClientService)
+    private readonly claudeClient?: ClaudeClientService,
   ) {
     super(factory, config, SdkCategorizer.name);
     this.reasoningBank = new ReasoningBank({ namespace: 'categorizer' });
@@ -292,35 +296,36 @@ export class SdkCategorizer extends BaseSdkAgent {
   }
 
   /**
-   * Execute inference via the SDK execution engine.
-   * NOTE: agentic-flow's AgenticFlow class may not be available at runtime.
-   * This method throws "SDK inference not available" when called without
-   * the real agentic-flow package. The executeWithFallback() method in
-   * BaseSdkAgent catches this and falls through to the fallback path.
+   * Execute inference via Claude API through Requesty proxy.
    *
-   * @param _agentDef - Agent definition with prompt and tools
-   * @param _userMessage - User message to send to the LLM
-   * @param _tenantId - Tenant ID for isolation
-   * @param _model - Model to use (haiku or sonnet)
+   * @param agentDef - Agent definition with prompt and tools
+   * @param userMessage - User message to send to the LLM
+   * @param _tenantId - Tenant ID for isolation (used in prompt)
+   * @param model - Model to use (haiku or sonnet)
    * @returns LLM response string
-   * @throws Error when SDK inference engine is not available
+   * @throws Error when Claude client is not available or API call fails
    */
-  executeSdkInference(
-    _agentDef: AgentDefinition,
-    _userMessage: string,
+  async executeSdkInference(
+    agentDef: AgentDefinition,
+    userMessage: string,
     _tenantId: string,
-    _model: string = 'haiku',
+    model: string = 'haiku',
   ): Promise<string> {
-    // The actual agentic-flow AgenticFlow class is not available at runtime.
-    // This stub rejects so that executeWithFallback() catches it and uses
-    // the fallback path. When the real agentic-flow ships, this method
-    // will be replaced with actual LLM inference.
-    return Promise.reject(
-      new Error(
-        'SDK inference not available: agentic-flow execution engine not installed. ' +
-          'Install agentic-flow to enable LLM-based categorization.',
-      ),
-    );
+    if (!this.claudeClient?.isAvailable()) {
+      throw new Error(
+        'Claude client not available. Check ANTHROPIC_API_KEY configuration.',
+      );
+    }
+
+    const response = await this.claudeClient.sendMessage({
+      systemPrompt: agentDef.prompt,
+      messages: [{ role: 'user', content: userMessage }],
+      model,
+      temperature: 0, // Deterministic for financial categorization
+      maxTokens: 1024,
+    });
+
+    return response.content;
   }
 
   /**

@@ -37,9 +37,8 @@ export class ReportQueryDto {
     default: true,
   })
   @IsOptional()
-  @Transform(
-    ({ value }: { value: string | boolean | undefined }) =>
-      value === undefined ? true : value === 'true' || value === true,
+  @Transform(({ value }: { value: string | boolean | undefined }) =>
+    value === undefined ? true : value === 'true' || value === true,
   )
   includeHistorical?: boolean = true;
 }

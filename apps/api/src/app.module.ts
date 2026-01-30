@@ -22,6 +22,7 @@ import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
 import { BankingModule } from './integrations/banking';
 import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
+import { ReportsModule } from './modules/reports';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { RedisThrottlerStorageService } from './common/redis/redis-throttler-sto
     CspModule, // TASK-SEC-103: CSP configuration and violation reporting
     WebSocketModule, // TASK-FEAT-101: Real-time Dashboard WebSocket
     BankingModule, // TASK-INT-101: Bank API Integration (Stitch Open Banking)
+    ReportsModule, // TASK-REPORTS-002: Reports API Module
   ],
   controllers: [],
   providers: [

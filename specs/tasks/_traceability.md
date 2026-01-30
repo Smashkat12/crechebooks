@@ -1540,3 +1540,115 @@ TASK-SDK-001 (Setup)
 **Last Updated**: 2026-01-26
 **Author**: Claude Code
 **Review Status**: Phase 26 (SDK Migration) Added
+
+---
+
+## Reports Feature Traceability Matrix
+
+### Overview
+
+Maps the Reports Enhancement requirements to implementation tasks, ensuring comprehensive coverage of dashboard, AI insights, and export functionality.
+
+### 1. Report Data Endpoints
+
+| Endpoint | HTTP Method | Implemented | Task ID | Notes |
+|----------|-------------|-------------|---------|-------|
+| `/reports/:type/data` | GET | ✅ | TASK-REPORTS-002 | Dashboard JSON |
+| `/reports/:type/insights` | POST | ✅ | TASK-REPORTS-002 | AI analysis |
+| `/reports/:type/export` | GET | ✅ | TASK-REPORTS-002 | PDF/Excel/CSV |
+
+### 2. Report Types Coverage
+
+| Report Type | Service | Task ID | Status |
+|-------------|---------|---------|--------|
+| Income Statement | FinancialReportService | TASK-RECON-013 | ✅ Exists |
+| Balance Sheet | BalanceSheetService | TASK-RECON-013 | ✅ Exists |
+| Cash Flow | CashFlowReportService | TASK-REPORTS-005 | ✅ Complete |
+| VAT Report | VatCalculationService | TASK-SARS-011 | ✅ Exists |
+| Aged Receivables | AgedReceivablesService | TASK-PAY-013 | ✅ Exists |
+| Aged Payables | AgedPayablesService | TASK-REPORTS-005 | ✅ Complete |
+
+### 3. AI Synthesis Agent
+
+| Feature | Method | Task ID | Status |
+|---------|--------|---------|--------|
+| Executive Summary | synthesizeReport() | TASK-REPORTS-001 | ✅ Complete |
+| Key Findings | extractKeyFindings() | TASK-REPORTS-001 | ✅ Complete |
+| Trend Detection | analyzeTrends() | TASK-REPORTS-001 | ✅ Complete |
+| Anomaly Detection | detectAnomalies() | TASK-REPORTS-001 | ✅ Complete |
+| Recommendations | generateRecommendations() | TASK-REPORTS-001 | ✅ Complete |
+| Fallback (Rules) | generateFallbackInsights() | TASK-REPORTS-001 | ✅ Complete |
+
+### 4. Frontend Components
+
+| Component | File Path | Task ID | Status |
+|-----------|-----------|---------|--------|
+| ReportDashboard | `components/reports/report-dashboard.tsx` | TASK-REPORTS-004 | ✅ Complete |
+| AIInsightsBanner | `components/reports/ai-insights-banner.tsx` | TASK-REPORTS-004 | ✅ Complete |
+| AnomaliesCard | `components/reports/anomalies-card.tsx` | TASK-REPORTS-004 | ✅ Complete |
+| RecommendationsCard | `components/reports/recommendations-card.tsx` | TASK-REPORTS-004 | ✅ Complete |
+| ReportMetricCard | `components/reports/report-metric-card.tsx` | TASK-REPORTS-004 | ✅ Complete |
+| CashFlowReport | `components/reports/cash-flow.tsx` | TASK-REPORTS-005 | ✅ Complete |
+| BalanceSheetReport | `components/reports/balance-sheet.tsx` | TASK-REPORTS-005 | ✅ Complete |
+| AgedPayablesReport | `components/reports/aged-payables.tsx` | TASK-REPORTS-005 | ✅ Complete |
+
+### 5. Data Fetching Hooks
+
+| Hook | File Path | Task ID | Status |
+|------|-----------|---------|--------|
+| useReportData | `hooks/use-report-data.ts` | TASK-REPORTS-004 | ✅ Complete |
+| useAIInsights | `hooks/use-ai-insights.ts` | TASK-REPORTS-004 | ✅ Complete |
+| useExportReport (update) | `hooks/useExportReport.ts` | TASK-REPORTS-004 | ✅ Complete |
+
+### 6. PDF Generation Features
+
+| Feature | Method | Task ID | Status |
+|---------|--------|---------|--------|
+| AI Insights Section | renderAIInsights() | TASK-REPORTS-003 | ✅ Complete |
+| Executive Summary | renderExecutiveSummary() | TASK-REPORTS-003 | ✅ Complete |
+| Key Findings | renderKeyFindings() | TASK-REPORTS-003 | ✅ Complete |
+| Trends | renderTrends() | TASK-REPORTS-003 | ✅ Complete |
+| Anomalies | renderAnomalies() | TASK-REPORTS-003 | ✅ Complete |
+| Recommendations | renderRecommendations() | TASK-REPORTS-003 | ✅ Complete |
+| Confidence Badge | renderConfidenceBadge() | TASK-REPORTS-003 | ✅ Complete |
+
+### 7. Export Formats
+
+| Format | Content | AI Insights | Task ID | Status |
+|--------|---------|-------------|---------|--------|
+| PDF | Full report + narrative | ✅ Yes | TASK-REPORTS-003 | ✅ Complete |
+| Excel | Raw data (tabs per section) | ❌ No | TASK-REPORTS-002 | ✅ Complete |
+| CSV | Raw data (flat) | ❌ No | TASK-REPORTS-002 | ✅ Complete |
+
+### 8. Caching Strategy
+
+| Data Type | Cache TTL | Storage | Task ID |
+|-----------|-----------|---------|---------|
+| Report Data | 5 minutes | NestJS Cache | TASK-REPORTS-002 |
+| AI Insights | 10 minutes | NestJS Cache | TASK-REPORTS-002 |
+| Frontend Data | staleTime: 5 min | TanStack Query | TASK-REPORTS-004 |
+| Frontend Insights | staleTime: 10 min | TanStack Query | TASK-REPORTS-004 |
+
+### 9. Requirement to Task Mapping
+
+| Requirement | Task IDs | Coverage |
+|-------------|----------|----------|
+| REQ-REPORTS-AI-AGENT | TASK-REPORTS-001 | AI synthesis with fallback |
+| REQ-REPORTS-API | TASK-REPORTS-002 | REST endpoints for data/insights/export |
+| REQ-REPORTS-AI-PDF | TASK-REPORTS-003 | PDF with AI insights section |
+| REQ-REPORTS-DASHBOARD-UI | TASK-REPORTS-004 | Dashboard with charts and metrics |
+| REQ-REPORTS-FULL-COVERAGE | TASK-REPORTS-005 | All 6 report types complete |
+
+### Coverage Summary
+
+| Area | Total Items | Implemented | Pending | Percentage |
+|------|-------------|-------------|---------|------------|
+| API Endpoints | 3 | 3 | 0 | 100% |
+| Report Services | 6 | 6 | 0 | 100% |
+| AI Agent Methods | 6 | 6 | 0 | 100% |
+| UI Components | 8 | 8 | 0 | 100% |
+| Data Hooks | 3 | 3 | 0 | 100% |
+| PDF Features | 7 | 7 | 0 | 100% |
+| Export Formats | 3 | 3 | 0 | 100% |
+| **Total** | **36** | **36** | **0** | **100%** |
+

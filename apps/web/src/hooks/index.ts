@@ -16,6 +16,37 @@ export * from './use-simplepay';
 export * from './use-leave';
 export * from './use-xero-split';
 
+// TASK-REPORTS-004: Report data and AI insights hooks
+export { useReportData, reportDataQueryKeys } from './use-report-data';
+export type {
+  ReportDataResponse,
+  ReportSummary,
+  ReportSection,
+  AccountBreakdown,
+  ChartData,
+  MonthlyTrendPoint,
+  CategoryBreakdown,
+  ComparisonPoint,
+  ProfitMarginPoint,
+  HistoricalDataPoint,
+  Period,
+} from './use-report-data';
+export { useAIInsights, aiInsightsQueryKeys } from './use-ai-insights';
+export type {
+  AIInsights,
+  KeyFinding,
+  TrendAnalysis,
+  AnomalyDetection,
+  Recommendation,
+  Severity,
+  Impact,
+  TrendDirection,
+  AnomalyType,
+  RecommendationPriority,
+  FindingCategory,
+  RecommendationCategory,
+} from './use-ai-insights';
+
 // TASK-UI-008: Mobile responsiveness hooks
 export {
   useMobile,

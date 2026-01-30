@@ -14,6 +14,7 @@ export const AgentType = {
   SARS: 'sars',
   VALIDATOR: 'validator',
   ORCHESTRATOR: 'orchestrator',
+  REPORT_SYNTHESIS: 'report-synthesis',
 } as const;
 
 export type AgentType = (typeof AgentType)[keyof typeof AgentType];
@@ -39,6 +40,8 @@ export const DecisionSource = {
   HISTORICAL: 'HISTORICAL',
   HYBRID: 'HYBRID',
   RULE_BASED: 'RULE_BASED',
+  SDK: 'SDK',
+  FALLBACK: 'FALLBACK',
 } as const;
 
 export type DecisionSource =

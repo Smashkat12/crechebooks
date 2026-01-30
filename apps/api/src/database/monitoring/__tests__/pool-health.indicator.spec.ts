@@ -215,9 +215,7 @@ describe('PoolHealthIndicator', () => {
         createMockMetrics({ utilizationPercent: 95 }),
       );
 
-      expect(() => indicator.isHealthy('pool')).toThrow(
-        HealthCheckError,
-      );
+      expect(() => indicator.isHealthy('pool')).toThrow(HealthCheckError);
     });
 
     it('should handle 0% utilization', async () => {
@@ -243,9 +241,7 @@ describe('PoolHealthIndicator', () => {
         createMockMetrics({ utilizationPercent: 100 }),
       );
 
-      expect(() => indicator.isHealthy('pool')).toThrow(
-        HealthCheckError,
-      );
+      expect(() => indicator.isHealthy('pool')).toThrow(HealthCheckError);
     });
   });
 });

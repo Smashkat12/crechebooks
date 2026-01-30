@@ -169,7 +169,9 @@ export function listStaff(
       },
       required: ['tenantId'],
     },
-    handler: async (args: ListStaffInput): Promise<McpToolResult<StaffRecord[]>> => {
+    handler: async (
+      args: ListStaffInput,
+    ): Promise<McpToolResult<StaffRecord[]>> => {
       const startTime = Date.now();
       const limit = Math.min(args.limit || 50, 100);
       const page = args.page || 1;
@@ -229,7 +231,8 @@ export function listStaff(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to list staff: ${errorMessage}`,
@@ -308,9 +311,20 @@ export function createStaff(
           description: 'User ID performing the action (for audit)',
         },
       },
-      required: ['tenantId', 'firstName', 'lastName', 'email', 'idNumber', 'dateOfBirth', 'employmentType', 'basicSalaryCents'],
+      required: [
+        'tenantId',
+        'firstName',
+        'lastName',
+        'email',
+        'idNumber',
+        'dateOfBirth',
+        'employmentType',
+        'basicSalaryCents',
+      ],
     },
-    handler: async (args: CreateStaffInput): Promise<McpToolResult<StaffRecord>> => {
+    handler: async (
+      args: CreateStaffInput,
+    ): Promise<McpToolResult<StaffRecord>> => {
       const startTime = Date.now();
 
       try {
@@ -332,7 +346,7 @@ export function createStaff(
             dateOfBirth: new Date(args.dateOfBirth),
             startDate: args.startDate ? new Date(args.startDate) : new Date(),
             employmentType: args.employmentType,
-            payFrequency: (args.payFrequency || 'MONTHLY') as 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY',
+            payFrequency: args.payFrequency || 'MONTHLY',
             basicSalaryCents: args.basicSalaryCents,
             isActive: true,
           },
@@ -360,7 +374,8 @@ export function createStaff(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to create staff: ${errorMessage}`,
@@ -410,7 +425,10 @@ export function updateStaff(
           enum: ['WEEKLY', 'FORTNIGHTLY', 'MONTHLY'],
           description: 'Pay frequency',
         },
-        basicSalaryCents: { type: 'number', description: 'Basic salary in cents' },
+        basicSalaryCents: {
+          type: 'number',
+          description: 'Basic salary in cents',
+        },
         bankName: { type: 'string', description: 'Bank name' },
         bankAccount: { type: 'string', description: 'Bank account number' },
         bankBranchCode: { type: 'string', description: 'Bank branch code' },
@@ -418,7 +436,9 @@ export function updateStaff(
       },
       required: ['tenantId', 'staffId'],
     },
-    handler: async (args: UpdateStaffInput): Promise<McpToolResult<StaffRecord>> => {
+    handler: async (
+      args: UpdateStaffInput,
+    ): Promise<McpToolResult<StaffRecord>> => {
       const startTime = Date.now();
 
       try {
@@ -427,12 +447,15 @@ export function updateStaff(
         if (args.lastName) updateData.lastName = args.lastName;
         if (args.email) updateData.email = args.email;
         if (args.phone) updateData.phone = args.phone;
-        if (args.employmentType) updateData.employmentType = args.employmentType;
+        if (args.employmentType)
+          updateData.employmentType = args.employmentType;
         if (args.payFrequency) updateData.payFrequency = args.payFrequency;
-        if (args.basicSalaryCents !== undefined) updateData.basicSalaryCents = args.basicSalaryCents;
+        if (args.basicSalaryCents !== undefined)
+          updateData.basicSalaryCents = args.basicSalaryCents;
         if (args.bankName) updateData.bankName = args.bankName;
         if (args.bankAccount) updateData.bankAccount = args.bankAccount;
-        if (args.bankBranchCode) updateData.bankBranchCode = args.bankBranchCode;
+        if (args.bankBranchCode)
+          updateData.bankBranchCode = args.bankBranchCode;
 
         const staff = await prisma.staff.update({
           where: { id: args.staffId },
@@ -461,7 +484,8 @@ export function updateStaff(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to update staff: ${errorMessage}`,
@@ -481,11 +505,13 @@ export function updateStaff(
  */
 export function initiateOnboarding(
   prisma: PrismaService,
-): McpToolDefinition<InitiateOnboardingInput, McpToolResult<{ staffId: string; status: string }>> {
+): McpToolDefinition<
+  InitiateOnboardingInput,
+  McpToolResult<{ staffId: string; status: string }>
+> {
   return {
     name: 'initiate_onboarding',
-    description:
-      'Start the onboarding workflow for a staff member.',
+    description: 'Start the onboarding workflow for a staff member.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -564,7 +590,8 @@ export function initiateOnboarding(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to initiate onboarding: ${errorMessage}`,
@@ -584,11 +611,13 @@ export function initiateOnboarding(
  */
 export function completeOnboarding(
   prisma: PrismaService,
-): McpToolDefinition<CompleteOnboardingInput, McpToolResult<{ staffId: string; status: string }>> {
+): McpToolDefinition<
+  CompleteOnboardingInput,
+  McpToolResult<{ staffId: string; status: string }>
+> {
   return {
     name: 'complete_onboarding',
-    description:
-      'Mark onboarding as complete for a staff member.',
+    description: 'Mark onboarding as complete for a staff member.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -640,7 +669,8 @@ export function completeOnboarding(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to complete onboarding: ${errorMessage}`,
@@ -701,16 +731,27 @@ export function requestLeave(
           description: 'User ID performing the action (for audit)',
         },
       },
-      required: ['tenantId', 'staffId', 'leaveTypeId', 'leaveTypeName', 'startDate', 'endDate'],
+      required: [
+        'tenantId',
+        'staffId',
+        'leaveTypeId',
+        'leaveTypeName',
+        'startDate',
+        'endDate',
+      ],
     },
-    handler: async (args: RequestLeaveInput): Promise<McpToolResult<LeaveRequestRecord>> => {
+    handler: async (
+      args: RequestLeaveInput,
+    ): Promise<McpToolResult<LeaveRequestRecord>> => {
       const startTime = Date.now();
 
       try {
         // Calculate days
         const start = new Date(args.startDate);
         const end = new Date(args.endDate);
-        const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const totalDays =
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+          1;
         const totalHours = totalDays * 8; // Assume 8-hour workday
 
         // Create leave request
@@ -749,7 +790,8 @@ export function requestLeave(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to create leave request: ${errorMessage}`,
@@ -769,7 +811,10 @@ export function requestLeave(
  */
 export function getLeaveBalance(
   prisma: PrismaService,
-): McpToolDefinition<GetLeaveBalanceInput, McpToolResult<LeaveBalanceRecord[]>> {
+): McpToolDefinition<
+  GetLeaveBalanceInput,
+  McpToolResult<LeaveBalanceRecord[]>
+> {
   return {
     name: 'get_leave_balance',
     description:
@@ -792,7 +837,9 @@ export function getLeaveBalance(
       },
       required: ['tenantId', 'staffId'],
     },
-    handler: async (args: GetLeaveBalanceInput): Promise<McpToolResult<LeaveBalanceRecord[]>> => {
+    handler: async (
+      args: GetLeaveBalanceInput,
+    ): Promise<McpToolResult<LeaveBalanceRecord[]>> => {
       const startTime = Date.now();
       const year = args.year || new Date().getFullYear().toString();
 
@@ -841,7 +888,10 @@ export function getLeaveBalance(
 
           const usedDays = usedResult._sum?.totalDays?.toNumber() || 0;
           const pendingDays = pendingResult._sum?.totalDays?.toNumber() || 0;
-          const availableDays = Math.max(0, leaveType.entitledDays - usedDays - pendingDays);
+          const availableDays = Math.max(
+            0,
+            leaveType.entitledDays - usedDays - pendingDays,
+          );
 
           balances.push({
             leaveTypeName: leaveType.name,
@@ -863,7 +913,8 @@ export function getLeaveBalance(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to get leave balance: ${errorMessage}`,

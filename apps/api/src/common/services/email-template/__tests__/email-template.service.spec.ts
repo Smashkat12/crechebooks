@@ -295,7 +295,6 @@ describe('EmailTemplateService', () => {
       expect(result.html).not.toContain('<script>');
       // Handlebars double-escapes: < becomes &lt; then & becomes &amp;lt;
       expect(result.html).toMatch(/&(?:amp;)?lt;script/);
-
     });
 
     it('should escape HTML in line item descriptions', () => {

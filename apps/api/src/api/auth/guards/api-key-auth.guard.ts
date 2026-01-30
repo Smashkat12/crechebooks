@@ -95,7 +95,9 @@ export class ApiKeyAuthGuard implements CanActivate {
   ): Promise<boolean> {
     const clientIp = this.getClientIp(request);
 
-    this.logger.debug(`Authenticating with API key (prefix: ${apiKey.slice(0, 12)}...)`);
+    this.logger.debug(
+      `Authenticating with API key (prefix: ${apiKey.slice(0, 12)}...)`,
+    );
 
     const validated = await this.apiKeyService.validateApiKey(apiKey, clientIp);
 

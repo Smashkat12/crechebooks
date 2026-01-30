@@ -18,17 +18,39 @@ export const listTransactionsTool = {
   description: 'List bank transactions with comprehensive filtering options',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
-    status: z.enum(['PENDING', 'CATEGORIZED', 'RECONCILED']).optional()
+    status: z
+      .enum(['PENDING', 'CATEGORIZED', 'RECONCILED'])
+      .optional()
       .describe('Filter by transaction status'),
     fromDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
     toDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
-    isReconciled: z.boolean().optional().describe('Filter by reconciliation status'),
+    isReconciled: z
+      .boolean()
+      .optional()
+      .describe('Filter by reconciliation status'),
     accountId: z.string().uuid().optional().describe('Filter by bank account'),
     categoryCode: z.string().optional().describe('Filter by category code'),
-    minAmountCents: z.number().int().optional().describe('Minimum amount in cents'),
-    maxAmountCents: z.number().int().optional().describe('Maximum amount in cents'),
-    isCredit: z.boolean().optional().describe('Filter credits (true) or debits (false)'),
-    limit: z.number().int().min(1).max(200).default(50).describe('Maximum results'),
+    minAmountCents: z
+      .number()
+      .int()
+      .optional()
+      .describe('Minimum amount in cents'),
+    maxAmountCents: z
+      .number()
+      .int()
+      .optional()
+      .describe('Maximum amount in cents'),
+    isCredit: z
+      .boolean()
+      .optional()
+      .describe('Filter credits (true) or debits (false)'),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(200)
+      .default(50)
+      .describe('Maximum results'),
     page: z.number().int().min(1).default(1).describe('Page number'),
   }),
   handler: async (input: {
@@ -62,17 +84,24 @@ export const listTransactionsTool = {
  */
 export const importTransactionsTool = {
   name: 'import_transactions',
-  description: 'Import transactions from a bank statement file (CSV, PDF, OFX, MT940)',
+  description:
+    'Import transactions from a bank statement file (CSV, PDF, OFX, MT940)',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
     accountId: z.string().uuid().optional().describe('Target bank account ID'),
     fileBase64: z.string().describe('Base64 encoded file content'),
     fileName: z.string().describe('Original file name'),
-    format: z.enum(['csv', 'pdf', 'ofx', 'mt940', 'auto']).default('auto')
+    format: z
+      .enum(['csv', 'pdf', 'ofx', 'mt940', 'auto'])
+      .default('auto')
       .describe('File format (auto-detect by default)'),
-    dryRun: z.boolean().default(false)
+    dryRun: z
+      .boolean()
+      .default(false)
       .describe('Preview import without saving'),
-    skipDuplicates: z.boolean().default(true)
+    skipDuplicates: z
+      .boolean()
+      .default(true)
       .describe('Skip transactions that already exist'),
   }),
   handler: async (input: {
@@ -107,7 +136,10 @@ export const categorizeTransactionTool = {
     tenantId: z.string().uuid().describe('The tenant ID'),
     transactionId: z.string().uuid().describe('The transaction ID'),
     categoryCode: z.string().describe('Category code to assign'),
-    notes: z.string().optional().describe('Optional notes for the categorization'),
+    notes: z
+      .string()
+      .optional()
+      .describe('Optional notes for the categorization'),
   }),
   handler: async (input: {
     tenantId: string;
@@ -132,14 +164,26 @@ export const categorizeTransactionTool = {
  */
 export const batchCategorizeTool = {
   name: 'batch_categorize',
-  description: 'Run AI-powered batch categorization on all pending transactions',
+  description:
+    'Run AI-powered batch categorization on all pending transactions',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
-    minConfidence: z.number().min(0).max(1).default(0.85)
+    minConfidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .default(0.85)
       .describe('Minimum confidence threshold for auto-apply (0-1)'),
-    maxTransactions: z.number().int().min(1).max(1000).default(100)
+    maxTransactions: z
+      .number()
+      .int()
+      .min(1)
+      .max(1000)
+      .default(100)
       .describe('Maximum transactions to process'),
-    dryRun: z.boolean().default(false)
+    dryRun: z
+      .boolean()
+      .default(false)
       .describe('Preview categorizations without applying'),
   }),
   handler: async (input: {
@@ -155,7 +199,9 @@ export const batchCategorizeTool = {
         auto_categorized: 0,
         needs_review: 0,
         categories_used: {},
-        message: input.dryRun ? 'Dry run completed' : 'Batch categorization completed',
+        message: input.dryRun
+          ? 'Dry run completed'
+          : 'Batch categorization completed',
       },
     };
   },
@@ -170,7 +216,12 @@ export const getCategorizationSuggestionsTool = {
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
     transactionId: z.string().uuid().describe('The transaction ID'),
-    maxSuggestions: z.number().int().min(1).max(10).default(5)
+    maxSuggestions: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .default(5)
       .describe('Maximum number of suggestions to return'),
   }),
   handler: async (input: {
@@ -194,15 +245,28 @@ export const getCategorizationSuggestionsTool = {
  */
 export const splitTransactionTool = {
   name: 'split_transaction',
-  description: 'Split a transaction into multiple parts with different categories',
+  description:
+    'Split a transaction into multiple parts with different categories',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
     transactionId: z.string().uuid().describe('The transaction ID to split'),
-    parts: z.array(z.object({
-      amountCents: z.number().int().positive().describe('Amount in cents for this part'),
-      categoryCode: z.string().describe('Category code for this part'),
-      description: z.string().optional().describe('Optional description for this part'),
-    })).min(2).describe('Split parts (must total to original transaction amount)'),
+    parts: z
+      .array(
+        z.object({
+          amountCents: z
+            .number()
+            .int()
+            .positive()
+            .describe('Amount in cents for this part'),
+          categoryCode: z.string().describe('Category code for this part'),
+          description: z
+            .string()
+            .optional()
+            .describe('Optional description for this part'),
+        }),
+      )
+      .min(2)
+      .describe('Split parts (must total to original transaction amount)'),
   }),
   handler: async (input: {
     tenantId: string;
@@ -240,10 +304,14 @@ export const exportTransactionsTool = {
     tenantId: z.string().uuid().describe('The tenant ID'),
     fromDate: z.string().optional().describe('Start date (YYYY-MM-DD)'),
     toDate: z.string().optional().describe('End date (YYYY-MM-DD)'),
-    status: z.enum(['PENDING', 'CATEGORIZED', 'RECONCILED']).optional()
+    status: z
+      .enum(['PENDING', 'CATEGORIZED', 'RECONCILED'])
+      .optional()
       .describe('Filter by status'),
     accountId: z.string().uuid().optional().describe('Filter by bank account'),
-    includeReconciled: z.boolean().default(true)
+    includeReconciled: z
+      .boolean()
+      .default(true)
       .describe('Include reconciled transactions'),
   }),
   handler: async (input: {
@@ -270,7 +338,8 @@ export const exportTransactionsTool = {
  */
 export const getTransactionTool = {
   name: 'get_transaction',
-  description: 'Get detailed information about a specific transaction including categorization history',
+  description:
+    'Get detailed information about a specific transaction including categorization history',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
     transactionId: z.string().uuid().describe('The transaction ID'),

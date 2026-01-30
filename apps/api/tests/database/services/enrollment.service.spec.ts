@@ -66,7 +66,13 @@ describe('EnrollmentService', () => {
         ProRataService,
         CreditNoteService,
         InvoiceNumberService,
-        { provide: WelcomePackDeliveryService, useValue: { deliverWelcomePack: jest.fn().mockResolvedValue(undefined), sendWelcomePack: jest.fn().mockResolvedValue({ success: true }) } },
+        {
+          provide: WelcomePackDeliveryService,
+          useValue: {
+            deliverWelcomePack: jest.fn().mockResolvedValue(undefined),
+            sendWelcomePack: jest.fn().mockResolvedValue({ success: true }),
+          },
+        },
       ],
     }).compile();
 

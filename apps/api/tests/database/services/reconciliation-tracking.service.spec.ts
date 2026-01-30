@@ -89,8 +89,20 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
         { provide: ReconciliationRepository, useValue: {} },
         { provide: LLMWhispererParser, useValue: {} },
         { provide: ToleranceConfigService, useValue: mockToleranceConfig },
-        { provide: AccruedBankChargeService, useValue: { getAccruedCharges: jest.fn().mockResolvedValue([]), createAccruedCharge: jest.fn().mockResolvedValue({}) } },
-        { provide: BankFeeService, useValue: { detectBankFees: jest.fn().mockResolvedValue([]), categorizeBankFee: jest.fn().mockResolvedValue({}) } },
+        {
+          provide: AccruedBankChargeService,
+          useValue: {
+            getAccruedCharges: jest.fn().mockResolvedValue([]),
+            createAccruedCharge: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: BankFeeService,
+          useValue: {
+            detectBankFees: jest.fn().mockResolvedValue([]),
+            categorizeBankFee: jest.fn().mockResolvedValue({}),
+          },
+        },
       ],
     }).compile();
 

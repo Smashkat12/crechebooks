@@ -79,7 +79,9 @@ describe('WelcomePackDeliveryService', () => {
   let enrollmentRepo: EnrollmentRepository;
   let mockEmailService: ReturnType<typeof createMockEmailService>;
   let mockPdfService: ReturnType<typeof createMockPdfService>;
-  let mockEmailTemplateService: ReturnType<typeof createMockEmailTemplateService>;
+  let mockEmailTemplateService: ReturnType<
+    typeof createMockEmailTemplateService
+  >;
 
   // Test data
   let testTenant: Tenant;

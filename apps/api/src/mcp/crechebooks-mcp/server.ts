@@ -99,7 +99,9 @@ export class CrecheBooksMcpService implements OnModuleInit {
 
     // Payment mutations
     if (this.paymentMatchingService) {
-      this.registerTool(matchPayments(this.prisma, this.paymentMatchingService));
+      this.registerTool(
+        matchPayments(this.prisma, this.paymentMatchingService),
+      );
       this.logger.log('Registered match_payments mutation tool');
     } else {
       this.logger.warn(

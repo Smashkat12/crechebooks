@@ -39,7 +39,8 @@ export function listChildren(
         },
         enrolled: {
           type: 'boolean',
-          description: 'Filter by enrollment status (true = has active enrollment)',
+          description:
+            'Filter by enrollment status (true = has active enrollment)',
         },
         isActive: {
           type: 'boolean',
@@ -235,7 +236,13 @@ export function createChild(
           description: 'User ID performing the action (for audit trail)',
         },
       },
-      required: ['tenantId', 'parentId', 'firstName', 'lastName', 'dateOfBirth'],
+      required: [
+        'tenantId',
+        'parentId',
+        'firstName',
+        'lastName',
+        'dateOfBirth',
+      ],
     },
     handler: async (
       args: CreateChildInput,
@@ -355,7 +362,10 @@ export function createChild(
  */
 export function createEnrollment(
   prisma: PrismaService,
-): McpToolDefinition<CreateEnrollmentInput, McpToolResult<CreateEnrollmentOutput>> {
+): McpToolDefinition<
+  CreateEnrollmentInput,
+  McpToolResult<CreateEnrollmentOutput>
+> {
   return {
     name: 'create_enrollment',
     description:

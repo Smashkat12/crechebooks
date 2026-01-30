@@ -53,7 +53,14 @@ describe('E2E: SARS Submission Flow', () => {
       .overrideProvider(JwtStrategy)
       .useClass(TestJwtStrategy)
       .overrideProvider(ThrottlerStorage)
-      .useValue({ increment: jest.fn().mockResolvedValue({ totalHits: 0, timeToExpire: 60, isBlocked: false, timeToBlockExpire: 0 }) })
+      .useValue({
+        increment: jest.fn().mockResolvedValue({
+          totalHits: 0,
+          timeToExpire: 60,
+          isBlocked: false,
+          timeToBlockExpire: 0,
+        }),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

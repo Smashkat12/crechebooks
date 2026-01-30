@@ -512,7 +512,7 @@ export function downloadSarsFile(
         const submission = await prisma.sarsSubmission.findFirst({
           where: {
             tenantId: args.tenantId,
-            submissionType: args.submissionType as 'VAT201' | 'EMP201',
+            submissionType: args.submissionType,
             periodStart,
           },
           orderBy: { createdAt: 'desc' },
@@ -713,11 +713,7 @@ function generateVat201Csv(submission: {
 
   const rows = [
     ['Field', 'Value', 'Amount'],
-    [
-      'Period Start',
-      submission.periodStart.toISOString().split('T')[0],
-      '',
-    ],
+    ['Period Start', submission.periodStart.toISOString().split('T')[0], ''],
     ['Period End', submission.periodEnd.toISOString().split('T')[0], ''],
     [
       'Output VAT (collected)',
@@ -800,9 +796,39 @@ async function generateEmp201Csv(
 
   const totalsRows = [
     [],
-    ['TOTALS', '', '', String(totalGross), formatCents(totalGross), String(totalPaye), formatCents(totalPaye), String(totalUif), formatCents(totalUif)],
-    ['SDL (1%)', '', '', '', '', '', '', String(totalSdl), formatCents(totalSdl)],
-    ['TOTAL DUE', '', '', '', '', '', '', String(totalPaye + totalUif + totalSdl), formatCents(totalPaye + totalUif + totalSdl)],
+    [
+      'TOTALS',
+      '',
+      '',
+      String(totalGross),
+      formatCents(totalGross),
+      String(totalPaye),
+      formatCents(totalPaye),
+      String(totalUif),
+      formatCents(totalUif),
+    ],
+    [
+      'SDL (1%)',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      String(totalSdl),
+      formatCents(totalSdl),
+    ],
+    [
+      'TOTAL DUE',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      String(totalPaye + totalUif + totalSdl),
+      formatCents(totalPaye + totalUif + totalSdl),
+    ],
   ];
 
   return [headerRow, ...dataRows, ...totalsRows]

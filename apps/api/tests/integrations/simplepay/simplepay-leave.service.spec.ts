@@ -852,7 +852,10 @@ describe('SimplePayLeaveService', () => {
           return Promise.resolve({ '1': 10 } as Record<string, number>);
         }
         if (endpoint.includes('/leave_types')) {
-          return Promise.resolve({ '1': 'Annual Leave' } as Record<string, string>);
+          return Promise.resolve({ '1': 'Annual Leave' } as Record<
+            string,
+            string
+          >);
         }
         return Promise.resolve({});
       });

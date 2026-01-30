@@ -322,9 +322,7 @@ function calculateVAT(subtotalCents: number, vatRate: number = 0.15): number {
 /**
  * Helper: Cleanup billing test data
  */
-async function cleanupBillingTestData(
-  prisma: PrismaService,
-): Promise<void> {
+async function cleanupBillingTestData(prisma: PrismaService): Promise<void> {
   await cleanDatabase(prisma);
 }
 
@@ -350,7 +348,14 @@ describe('E2E: Billing Cycle Flow', () => {
       .overrideProvider(JwtStrategy)
       .useClass(TestJwtStrategy)
       .overrideProvider(ThrottlerStorage)
-      .useValue({ increment: jest.fn().mockResolvedValue({ totalHits: 0, timeToExpire: 60, isBlocked: false, timeToBlockExpire: 0 }) })
+      .useValue({
+        increment: jest.fn().mockResolvedValue({
+          totalHits: 0,
+          timeToExpire: 60,
+          isBlocked: false,
+          timeToBlockExpire: 0,
+        }),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();

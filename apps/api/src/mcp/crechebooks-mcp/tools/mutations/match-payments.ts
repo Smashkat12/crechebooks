@@ -50,8 +50,7 @@ export function matchPayments(
         },
         maxMatches: {
           type: 'number',
-          description:
-            'Maximum number of matches to process. Defaults to 50.',
+          description: 'Maximum number of matches to process. Defaults to 50.',
           minimum: 1,
           maximum: 500,
         },
@@ -326,7 +325,7 @@ async function handleDryRun(
         invoiceNumber: bestMatch.invoice.invoiceNumber,
         amountCents: transactionAmount,
         confidence: bestMatch.confidence / 100,
-        action: action as 'AUTO_APPLY' | 'REVIEW_REQUIRED',
+        action: action,
         reasoning: bestMatch.reasons.join('; '),
         applied: false, // Dry run - never applied
       });

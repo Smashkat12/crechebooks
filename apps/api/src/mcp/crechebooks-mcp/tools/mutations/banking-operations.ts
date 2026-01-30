@@ -15,10 +15,14 @@ import { z } from 'zod';
  */
 export const listBankAccountsTool = {
   name: 'list_bank_accounts',
-  description: 'List all linked bank accounts for the tenant with current balances and sync status',
+  description:
+    'List all linked bank accounts for the tenant with current balances and sync status',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
-    activeOnly: z.boolean().optional().describe('Filter to only active accounts'),
+    activeOnly: z
+      .boolean()
+      .optional()
+      .describe('Filter to only active accounts'),
   }),
   handler: async (input: { tenantId: string; activeOnly?: boolean }) => {
     // This is a placeholder - actual implementation would call the banking service
@@ -38,11 +42,15 @@ export const listBankAccountsTool = {
  */
 export const syncBankAccountTool = {
   name: 'sync_bank_account',
-  description: 'Trigger a manual synchronization of transactions from a bank account via Open Banking API',
+  description:
+    'Trigger a manual synchronization of transactions from a bank account via Open Banking API',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
     accountId: z.string().uuid().describe('The bank account ID to sync'),
-    fromDate: z.string().optional().describe('Start date for sync (YYYY-MM-DD)'),
+    fromDate: z
+      .string()
+      .optional()
+      .describe('Start date for sync (YYYY-MM-DD)'),
     toDate: z.string().optional().describe('End date for sync (YYYY-MM-DD)'),
   }),
   handler: async (input: {
@@ -68,7 +76,8 @@ export const syncBankAccountTool = {
  */
 export const getAccountBalanceTool = {
   name: 'get_account_balance',
-  description: 'Get the current balance and available balance for a linked bank account',
+  description:
+    'Get the current balance and available balance for a linked bank account',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
     accountId: z.string().uuid().describe('The bank account ID'),
@@ -94,12 +103,18 @@ export const getAccountBalanceTool = {
  */
 export const initiateBankLinkTool = {
   name: 'initiate_bank_link',
-  description: 'Initiate the Open Banking OAuth flow to link a new bank account. Returns an authorization URL.',
+  description:
+    'Initiate the Open Banking OAuth flow to link a new bank account. Returns an authorization URL.',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
-    bankCode: z.enum(['FNB', 'ABSA', 'STANDARD', 'NEDBANK', 'CAPITEC']).optional()
+    bankCode: z
+      .enum(['FNB', 'ABSA', 'STANDARD', 'NEDBANK', 'CAPITEC'])
+      .optional()
       .describe('Optional: Pre-select a specific bank'),
-    redirectUrl: z.string().url().optional()
+    redirectUrl: z
+      .string()
+      .url()
+      .optional()
       .describe('Custom redirect URL after authorization'),
   }),
   handler: async (input: {
@@ -124,11 +139,14 @@ export const initiateBankLinkTool = {
  */
 export const unlinkBankAccountTool = {
   name: 'unlink_bank_account',
-  description: 'Unlink a bank account and optionally delete associated transactions',
+  description:
+    'Unlink a bank account and optionally delete associated transactions',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
     accountId: z.string().uuid().describe('The bank account ID to unlink'),
-    deleteTransactions: z.boolean().default(false)
+    deleteTransactions: z
+      .boolean()
+      .default(false)
       .describe('Whether to delete imported transactions (default: false)'),
   }),
   handler: async (input: {
@@ -152,10 +170,16 @@ export const unlinkBankAccountTool = {
  */
 export const checkConsentStatusTool = {
   name: 'check_consent_status',
-  description: 'Check which bank accounts have expiring or expired Open Banking consent',
+  description:
+    'Check which bank accounts have expiring or expired Open Banking consent',
   inputSchema: z.object({
     tenantId: z.string().uuid().describe('The tenant ID'),
-    expiringWithinDays: z.number().int().min(1).max(90).default(14)
+    expiringWithinDays: z
+      .number()
+      .int()
+      .min(1)
+      .max(90)
+      .default(14)
       .describe('Number of days to check for expiring consent'),
   }),
   handler: async (input: { tenantId: string; expiringWithinDays?: number }) => {

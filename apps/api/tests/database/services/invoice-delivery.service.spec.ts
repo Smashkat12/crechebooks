@@ -99,7 +99,9 @@ describe('InvoiceDeliveryService', () => {
   let invoiceRepo: InvoiceRepository;
   let mockEmailService: ReturnType<typeof createMockEmailService>;
   let mockWhatsAppService: ReturnType<typeof createMockWhatsAppService>;
-  let mockEmailTemplateService: ReturnType<typeof createMockEmailTemplateService>;
+  let mockEmailTemplateService: ReturnType<
+    typeof createMockEmailTemplateService
+  >;
 
   // Test data
   let testTenant: Tenant;
@@ -136,7 +138,15 @@ describe('InvoiceDeliveryService', () => {
         // Mock external services that require real API credentials
         { provide: EmailService, useValue: mockEmailService },
         { provide: WhatsAppService, useValue: mockWhatsAppService },
-        { provide: InvoicePdfService, useValue: { generatePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')), generateInvoicePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')) } },
+        {
+          provide: InvoicePdfService,
+          useValue: {
+            generatePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
+            generateInvoicePdf: jest
+              .fn()
+              .mockResolvedValue(Buffer.from('mock-pdf')),
+          },
+        },
       ],
     }).compile();
 

@@ -8,7 +8,7 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsOptional } from 'class-validator';
+import { IsDate, IsOptional } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ReportType } from '../../../agents/report-synthesis';
 
@@ -20,16 +20,16 @@ export class ReportQueryDto {
     description: 'Start date of the report period (ISO 8601)',
     example: '2025-01-01T00:00:00.000Z',
   })
-  @IsDateString()
   @Transform(({ value }: { value: string }) => new Date(value))
+  @IsDate()
   start!: Date;
 
   @ApiProperty({
     description: 'End date of the report period (ISO 8601)',
     example: '2025-12-31T23:59:59.999Z',
   })
-  @IsDateString()
   @Transform(({ value }: { value: string }) => new Date(value))
+  @IsDate()
   end!: Date;
 
   @ApiPropertyOptional({

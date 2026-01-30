@@ -8,7 +8,7 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsDateString, IsOptional, IsBoolean } from 'class-validator';
+import { IsDateString, IsOptional } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ReportType } from '../../../agents/report-synthesis';
 

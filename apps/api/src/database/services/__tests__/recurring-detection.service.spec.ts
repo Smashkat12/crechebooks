@@ -470,13 +470,17 @@ describe('RecurringDetectionService', () => {
       // Assert
       expect(result.payeePattern).toBe('EXISTING PAYEE');
       expect(result.isActive).toBe(true);
-      expect(payeePatternRepo.update).toHaveBeenCalledWith('existing-id', TENANT_ID, {
-        isRecurring: true,
-        expectedAmountCents: 5000,
-        amountVariancePercent: 5,
-        defaultAccountCode: '5500',
-        defaultAccountName: 'Updated Account',
-      });
+      expect(payeePatternRepo.update).toHaveBeenCalledWith(
+        'existing-id',
+        TENANT_ID,
+        {
+          isRecurring: true,
+          expectedAmountCents: 5000,
+          amountVariancePercent: 5,
+          defaultAccountCode: '5500',
+          defaultAccountName: 'Updated Account',
+        },
+      );
     });
   });
 

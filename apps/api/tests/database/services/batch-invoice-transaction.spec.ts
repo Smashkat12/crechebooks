@@ -92,7 +92,13 @@ describe('Batch Invoice Transaction Isolation (TASK-BILL-002)', () => {
         CreditBalanceService,
         CreditNoteService,
         { provide: XeroSyncService, useValue: mockXeroSyncService },
-        { provide: WelcomePackDeliveryService, useValue: { deliverWelcomePack: jest.fn().mockResolvedValue(undefined), sendWelcomePack: jest.fn().mockResolvedValue({ success: true }) } },
+        {
+          provide: WelcomePackDeliveryService,
+          useValue: {
+            deliverWelcomePack: jest.fn().mockResolvedValue(undefined),
+            sendWelcomePack: jest.fn().mockResolvedValue({ success: true }),
+          },
+        },
       ],
     }).compile();
 
@@ -377,7 +383,9 @@ describe('Batch Invoice Transaction Isolation (TASK-BILL-002)', () => {
       expect(createdUser).toBeNull();
 
       // Clean up
-      await prisma.tenant.delete({ where: { id: testTenant.id } }).catch(() => {});
+      await prisma.tenant
+        .delete({ where: { id: testTenant.id } })
+        .catch(() => {});
     });
 
     it('should use serializable isolation level', async () => {

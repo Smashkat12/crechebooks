@@ -383,9 +383,13 @@ describe('PayeeAlias Integration', () => {
         `${mockPattern.id}:${aliasPayee}`,
       );
 
-      expect(patternRepo.update).toHaveBeenCalledWith(mockPattern.id, mockTenantId, {
-        payeeAliases: ['WOOLIES'],
-      });
+      expect(patternRepo.update).toHaveBeenCalledWith(
+        mockPattern.id,
+        mockTenantId,
+        {
+          payeeAliases: ['WOOLIES'],
+        },
+      );
     });
 
     it('should list all aliases for a canonical name', async () => {

@@ -16,7 +16,10 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { ParentAuthGuard } from './guards/parent-auth.guard';
 import { StaffAuthGuard } from './guards/staff-auth.guard';
-import { ApiKeyAuthGuard, CombinedAuthGuard } from './guards/api-key-auth.guard';
+import {
+  ApiKeyAuthGuard,
+  CombinedAuthGuard,
+} from './guards/api-key-auth.guard';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { RedisModule } from '../../common/redis/redis.module';
 import { RateLimitModule } from '../../common/rate-limit/rate-limit.module';
@@ -85,7 +88,12 @@ export type AuthProvider = 'auth0' | 'jwt';
     RateLimitModule,
     MailgunModule,
   ],
-  controllers: [AuthController, ParentAuthController, StaffAuthController, ApiKeyController],
+  controllers: [
+    AuthController,
+    ParentAuthController,
+    StaffAuthController,
+    ApiKeyController,
+  ],
   providers: [
     AuthService,
     MagicLinkService,

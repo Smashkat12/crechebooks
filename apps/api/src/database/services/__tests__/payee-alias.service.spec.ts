@@ -149,9 +149,13 @@ describe('PayeeAliasService', () => {
 
       expect(result.alias).toBe('WOOLIES');
       expect(result.canonicalName).toBe('WOOLWORTHS');
-      expect(patternRepo.update).toHaveBeenCalledWith(mockPattern.id, mockTenantId, {
-        payeeAliases: ['WOOLWORTHS SANDTON', 'W/WORTHS', 'WOOLIES'],
-      });
+      expect(patternRepo.update).toHaveBeenCalledWith(
+        mockPattern.id,
+        mockTenantId,
+        {
+          payeeAliases: ['WOOLWORTHS SANDTON', 'W/WORTHS', 'WOOLIES'],
+        },
+      );
     });
 
     it('should create new pattern if canonical name does not exist', async () => {
@@ -252,9 +256,13 @@ describe('PayeeAliasService', () => {
 
       await service.deleteAlias(mockTenantId, 'pattern-1:W/WORTHS');
 
-      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', mockTenantId, {
-        payeeAliases: ['WOOLWORTHS SANDTON'],
-      });
+      expect(patternRepo.update).toHaveBeenCalledWith(
+        'pattern-1',
+        mockTenantId,
+        {
+          payeeAliases: ['WOOLWORTHS SANDTON'],
+        },
+      );
     });
 
     it('should be case-insensitive when deleting', async () => {
@@ -266,9 +274,13 @@ describe('PayeeAliasService', () => {
 
       await service.deleteAlias(mockTenantId, 'pattern-1:w/worths');
 
-      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', mockTenantId, {
-        payeeAliases: ['WOOLWORTHS SANDTON'],
-      });
+      expect(patternRepo.update).toHaveBeenCalledWith(
+        'pattern-1',
+        mockTenantId,
+        {
+          payeeAliases: ['WOOLWORTHS SANDTON'],
+        },
+      );
     });
 
     it('should handle aliases with colons', async () => {
@@ -284,9 +296,13 @@ describe('PayeeAliasService', () => {
 
       await service.deleteAlias(mockTenantId, 'pattern-1:STORE:BRANCH1');
 
-      expect(patternRepo.update).toHaveBeenCalledWith('pattern-1', mockTenantId, {
-        payeeAliases: [],
-      });
+      expect(patternRepo.update).toHaveBeenCalledWith(
+        'pattern-1',
+        mockTenantId,
+        {
+          payeeAliases: [],
+        },
+      );
     });
 
     it('should throw error for invalid alias ID format', async () => {

@@ -45,12 +45,14 @@ export function sendInvoices(
         },
         method: {
           type: 'string',
-          description: 'Delivery method: "email", "whatsapp", or "both". Default: "email"',
+          description:
+            'Delivery method: "email", "whatsapp", or "both". Default: "email"',
           enum: ['email', 'whatsapp', 'both'],
         },
         userId: {
           type: 'string',
-          description: 'User ID performing the send operation (for audit trail)',
+          description:
+            'User ID performing the send operation (for audit trail)',
         },
       },
       required: ['tenantId'],
@@ -80,7 +82,16 @@ export function sendInvoices(
               : sendAll
                 ? { status: 'DRAFT' }
                 : args.statusFilter
-                  ? { status: args.statusFilter as 'DRAFT' | 'SENT' | 'VIEWED' | 'PARTIALLY_PAID' | 'PAID' | 'OVERDUE' | 'VOID' }
+                  ? {
+                      status: args.statusFilter as
+                        | 'DRAFT'
+                        | 'SENT'
+                        | 'VIEWED'
+                        | 'PARTIALLY_PAID'
+                        | 'PAID'
+                        | 'OVERDUE'
+                        | 'VOID',
+                    }
                   : { status: 'DRAFT' }),
           },
           include: {
@@ -124,9 +135,12 @@ export function sendInvoices(
           }
 
           // Check if parent has required contact info
-          const canSendEmail = parent.email && deliveryMethods.includes('EMAIL');
+          const canSendEmail =
+            parent.email && deliveryMethods.includes('EMAIL');
           const canSendWhatsApp =
-            parent.whatsapp && parent.whatsappOptIn && deliveryMethods.includes('WHATSAPP');
+            parent.whatsapp &&
+            parent.whatsappOptIn &&
+            deliveryMethods.includes('WHATSAPP');
 
           if (!canSendEmail && !canSendWhatsApp) {
             results.push({
@@ -148,7 +162,12 @@ export function sendInvoices(
                 where: { id: invoice.id },
                 data: {
                   status: 'SENT',
-                  deliveryMethod: method === 'both' ? 'BOTH' : method === 'whatsapp' ? 'WHATSAPP' : 'EMAIL',
+                  deliveryMethod:
+                    method === 'both'
+                      ? 'BOTH'
+                      : method === 'whatsapp'
+                        ? 'WHATSAPP'
+                        : 'EMAIL',
                   deliveryStatus: 'SENT',
                   deliveredAt: new Date(),
                 },
@@ -209,7 +228,8 @@ export function sendInvoices(
             });
             sentCount++;
           } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : String(err);
+            const errorMessage =
+              err instanceof Error ? err.message : String(err);
             results.push({
               invoiceId: invoice.id,
               invoiceNumber: invoice.invoiceNumber,

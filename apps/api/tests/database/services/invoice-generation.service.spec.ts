@@ -120,7 +120,12 @@ describe('InvoiceGenerationService', () => {
         // Mock XeroSyncService because it requires external Xero API credentials
         // This is a SERVICE mock for external integration, not a DATA mock
         { provide: XeroSyncService, useValue: mockXeroSyncService },
-        { provide: WelcomePackDeliveryService, useValue: { deliverWelcomePack: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: WelcomePackDeliveryService,
+          useValue: {
+            deliverWelcomePack: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 

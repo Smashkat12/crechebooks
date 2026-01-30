@@ -24,9 +24,19 @@ import {
   Query,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { ApiKeyService, CreateApiKeyDto, ApiKeyWithSecret } from './services/api-key.service';
+import {
+  ApiKeyService,
+  CreateApiKeyDto,
+  ApiKeyWithSecret,
+} from './services/api-key.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { getTenantId } from './utils/tenant-assertions';
 import type { IUser } from '../../database/entities/user.entity';
@@ -97,7 +107,8 @@ export class ApiKeyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create a new API key',
-    description: 'Generate a new API key for CLI/MCP access. The secret key is only returned once!',
+    description:
+      'Generate a new API key for CLI/MCP access. The secret key is only returned once!',
   })
   @ApiResponse({ status: 201, description: 'API key created successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -106,7 +117,9 @@ export class ApiKeyController {
     @Body() request: CreateApiKeyRequest,
   ): Promise<CreateApiKeyResponse> {
     const tenantId = getTenantId(user);
-    this.logger.log(`Creating API key "${request.name}" for tenant ${tenantId}`);
+    this.logger.log(
+      `Creating API key "${request.name}" for tenant ${tenantId}`,
+    );
 
     // Calculate expiry date if specified
     let expiresAt: Date | undefined;
@@ -123,7 +136,11 @@ export class ApiKeyController {
       expiresAt,
     };
 
-    const apiKey = await this.apiKeyService.createApiKey(user.id, tenantId, dto);
+    const apiKey = await this.apiKeyService.createApiKey(
+      user.id,
+      tenantId,
+      dto,
+    );
 
     return CreateApiKeyResponse.fromWithSecret(apiKey);
   }
@@ -176,7 +193,8 @@ export class ApiKeyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Rotate an API key',
-    description: 'Revokes the old key and creates a new one with the same settings. The new secret is only returned once!',
+    description:
+      'Revokes the old key and creates a new one with the same settings. The new secret is only returned once!',
   })
   @ApiResponse({ status: 201, description: 'New API key created' })
   @ApiResponse({ status: 404, description: 'API key not found' })

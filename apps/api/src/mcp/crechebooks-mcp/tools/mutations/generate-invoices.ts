@@ -17,7 +17,10 @@ import type { McpToolDefinition, McpToolResult } from '../../types/index';
 
 export function generateInvoices(
   prisma: PrismaService,
-): McpToolDefinition<GenerateInvoicesInput, McpToolResult<GenerateInvoicesOutput>> {
+): McpToolDefinition<
+  GenerateInvoicesInput,
+  McpToolResult<GenerateInvoicesOutput>
+> {
   return {
     name: 'generate_invoices',
     description:
@@ -62,7 +65,8 @@ export function generateInvoices(
         if (!billingMonthMatch) {
           return {
             success: false,
-            error: 'Invalid billingMonth format. Expected YYYY-MM (e.g., 2024-03)',
+            error:
+              'Invalid billingMonth format. Expected YYYY-MM (e.g., 2024-03)',
             metadata: {
               toolName: 'generate_invoices',
               executionMs: Date.now() - startTime,
@@ -90,10 +94,7 @@ export function generateInvoices(
             tenantId: args.tenantId,
             status: 'ACTIVE',
             startDate: { lte: billingPeriodEnd },
-            OR: [
-              { endDate: null },
-              { endDate: { gte: billingPeriodStart } },
-            ],
+            OR: [{ endDate: null }, { endDate: { gte: billingPeriodStart } }],
             ...(childIdFilter ? { childId: { in: childIdFilter } } : {}),
           },
           include: {
@@ -136,7 +137,9 @@ export function generateInvoices(
             childId: true,
           },
         });
-        const existingChildIds = new Set(existingInvoices.map((inv) => inv.childId));
+        const existingChildIds = new Set(
+          existingInvoices.map((inv) => inv.childId),
+        );
 
         const invoicesToCreate: GeneratedInvoiceSummary[] = [];
         const errors: InvoiceGenerationError[] = [];
@@ -156,11 +159,16 @@ export function generateInvoices(
           }
 
           // Calculate fee amount (use override if set, otherwise fee structure amount)
-          let feeAmountCents = enrollment.customFeeOverrideCents ?? feeStructure.amountCents;
+          let feeAmountCents =
+            enrollment.customFeeOverrideCents ?? feeStructure.amountCents;
 
           // Apply sibling discount if applicable
-          if (enrollment.siblingDiscountApplied && feeStructure.siblingDiscountPercent) {
-            const discountMultiplier = 1 - Number(feeStructure.siblingDiscountPercent) / 100;
+          if (
+            enrollment.siblingDiscountApplied &&
+            feeStructure.siblingDiscountPercent
+          ) {
+            const discountMultiplier =
+              1 - Number(feeStructure.siblingDiscountPercent) / 100;
             feeAmountCents = Math.round(feeAmountCents * discountMultiplier);
           }
 
@@ -254,7 +262,8 @@ export function generateInvoices(
               });
               totalAmountCents += invoice.totalCents;
             } catch (err) {
-              const errorMessage = err instanceof Error ? err.message : String(err);
+              const errorMessage =
+                err instanceof Error ? err.message : String(err);
               errors.push({
                 childId: child.id,
                 reason: `Failed to create invoice: ${errorMessage}`,

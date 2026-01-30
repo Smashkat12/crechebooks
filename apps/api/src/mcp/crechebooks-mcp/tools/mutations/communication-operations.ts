@@ -15,7 +15,14 @@ import type { McpToolDefinition, McpToolResult } from '../../types/index';
 
 export interface ListBroadcastsInput {
   tenantId: string;
-  status?: 'draft' | 'scheduled' | 'sending' | 'sent' | 'partially_sent' | 'failed' | 'cancelled';
+  status?:
+    | 'draft'
+    | 'scheduled'
+    | 'sending'
+    | 'sent'
+    | 'partially_sent'
+    | 'failed'
+    | 'cancelled';
   recipientType?: 'parent' | 'staff' | 'custom';
   limit?: number;
   page?: number;
@@ -113,7 +120,15 @@ export function listBroadcasts(
         },
         status: {
           type: 'string',
-          enum: ['draft', 'scheduled', 'sending', 'sent', 'partially_sent', 'failed', 'cancelled'],
+          enum: [
+            'draft',
+            'scheduled',
+            'sending',
+            'sent',
+            'partially_sent',
+            'failed',
+            'cancelled',
+          ],
           description: 'Filter by broadcast status',
         },
         recipientType: {
@@ -134,7 +149,9 @@ export function listBroadcasts(
       },
       required: ['tenantId'],
     },
-    handler: async (args: ListBroadcastsInput): Promise<McpToolResult<BroadcastRecord[]>> => {
+    handler: async (
+      args: ListBroadcastsInput,
+    ): Promise<McpToolResult<BroadcastRecord[]>> => {
       const startTime = Date.now();
       const limit = args.limit || 20;
       const page = args.page || 1;
@@ -186,7 +203,8 @@ export function listBroadcasts(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to list broadcasts: ${errorMessage}`,
@@ -251,7 +269,9 @@ export function createBroadcast(
       },
       required: ['tenantId', 'body', 'recipientType', 'channel'],
     },
-    handler: async (args: CreateBroadcastInput): Promise<McpToolResult<BroadcastRecord>> => {
+    handler: async (
+      args: CreateBroadcastInput,
+    ): Promise<McpToolResult<BroadcastRecord>> => {
       const startTime = Date.now();
 
       try {
@@ -280,11 +300,13 @@ export function createBroadcast(
             subject: args.subject,
             body: args.body,
             recipientType: args.recipientType,
-            recipientFilter: args.recipientFilter as object || undefined,
+            recipientFilter: (args.recipientFilter as object) || undefined,
             channel: args.channel,
             status: 'draft',
             totalRecipients,
-            scheduledAt: args.scheduledAt ? new Date(args.scheduledAt) : undefined,
+            scheduledAt: args.scheduledAt
+              ? new Date(args.scheduledAt)
+              : undefined,
             createdBy: args.userId || 'system',
           },
         });
@@ -312,7 +334,8 @@ export function createBroadcast(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to create broadcast: ${errorMessage}`,
@@ -332,7 +355,10 @@ export function createBroadcast(
  */
 export function previewRecipients(
   prisma: PrismaService,
-): McpToolDefinition<PreviewRecipientsInput, McpToolResult<{ total: number; recipients: RecipientPreview[] }>> {
+): McpToolDefinition<
+  PreviewRecipientsInput,
+  McpToolResult<{ total: number; recipients: RecipientPreview[] }>
+> {
   return {
     name: 'preview_recipients',
     description:
@@ -363,7 +389,9 @@ export function previewRecipients(
     },
     handler: async (
       args: PreviewRecipientsInput,
-    ): Promise<McpToolResult<{ total: number; recipients: RecipientPreview[] }>> => {
+    ): Promise<
+      McpToolResult<{ total: number; recipients: RecipientPreview[] }>
+    > => {
       const startTime = Date.now();
 
       try {
@@ -444,7 +472,8 @@ export function previewRecipients(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to preview recipients: ${errorMessage}`,
@@ -464,7 +493,10 @@ export function previewRecipients(
  */
 export function sendBroadcast(
   prisma: PrismaService,
-): McpToolDefinition<SendBroadcastInput, McpToolResult<{ broadcastId: string; status: string }>> {
+): McpToolDefinition<
+  SendBroadcastInput,
+  McpToolResult<{ broadcastId: string; status: string }>
+> {
   return {
     name: 'send_broadcast',
     description:
@@ -546,7 +578,8 @@ export function sendBroadcast(
           },
         };
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         return {
           success: false,
           error: `Failed to send broadcast: ${errorMessage}`,

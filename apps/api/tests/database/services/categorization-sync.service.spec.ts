@@ -86,7 +86,10 @@ describe('CategorizationService - categorizeAndSync (TASK-XERO-005)', () => {
     mockXeroSyncService.hasValidConnection.mockResolvedValue(false);
     mockXeroSyncService.pushToXero.mockResolvedValue(false);
     mockXeroSyncService.isReconciledTransactionError.mockReturnValue(false);
-    mockXeroSyncService.createCategorizationJournal.mockResolvedValue({ posted: false, error: 'not attempted' });
+    mockXeroSyncService.createCategorizationJournal.mockResolvedValue({
+      posted: false,
+      error: 'not attempted',
+    });
 
     await cleanDatabase(prisma);
 

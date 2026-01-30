@@ -586,7 +586,8 @@ describe('InvoiceGenerationService - Ad-Hoc Charges', () => {
       // The $transaction mock uses prisma.invoiceLine.create (tx.invoiceLine.create)
       // Override it to track VAT application on AD_HOC lines
       let vatApplied = false;
-      const txInvoiceLineCreate = (prisma as any).invoiceLine.create as jest.Mock;
+      const txInvoiceLineCreate = (prisma as any).invoiceLine
+        .create as jest.Mock;
       txInvoiceLineCreate.mockImplementation(async (args: any) => {
         const data = args.data;
         if (data.lineType === LineType.AD_HOC && data.vatCents > 0) {

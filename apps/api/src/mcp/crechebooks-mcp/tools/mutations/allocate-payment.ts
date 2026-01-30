@@ -17,7 +17,10 @@ import type { McpToolDefinition, McpToolResult } from '../../types/index';
 export function allocatePayment(
   prisma: PrismaService,
   paymentAllocationService: PaymentAllocationService,
-): McpToolDefinition<AllocatePaymentInput, McpToolResult<AllocatePaymentOutput>> {
+): McpToolDefinition<
+  AllocatePaymentInput,
+  McpToolResult<AllocatePaymentOutput>
+> {
   return {
     name: 'allocate_payment',
     description:

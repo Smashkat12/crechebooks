@@ -54,9 +54,8 @@ export class ExportQueryDto {
     default: true,
   })
   @IsOptional()
-  @Transform(
-    ({ value }: { value: string | boolean | undefined }) =>
-      value === undefined ? true : value === 'true' || value === true,
+  @Transform(({ value }: { value: string | boolean | undefined }) =>
+    value === undefined ? true : value === 'true' || value === true,
   )
   includeInsights?: boolean = true;
 }

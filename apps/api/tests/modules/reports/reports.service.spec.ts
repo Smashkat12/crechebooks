@@ -146,7 +146,9 @@ describe('ReportsService', () => {
     const mockAgedPayablesService = {
       generateAgedPayablesReport: jest.fn(),
       isFeatureAvailable: jest.fn().mockReturnValue(false),
-      getFeatureMessage: jest.fn().mockReturnValue('Supplier bills feature coming soon'),
+      getFeatureMessage: jest
+        .fn()
+        .mockReturnValue('Supplier bills feature coming soon'),
     };
 
     const mockPdfGeneratorService = {

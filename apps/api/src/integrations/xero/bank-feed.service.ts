@@ -611,12 +611,24 @@ export class BankFeedService {
     // Xero sends negative amounts for fees/debits, positive for credits
     // Sign convention: amountCents carries sign, isCredit indicates direction
 
-    // Detect fee transactions with incorrect positive amounts (audit warning)
-    if (this.isFeeTransaction(description) && amountCents > 0) {
+    // TASK-RECON-039: Fee correction - bank fees MUST be debits regardless of Xero type
+    // Xero sometimes incorrectly sends fees as positive/RECEIVE transactions
+    // This mirrors the fix in CSV parser for consistency
+    let correctedAmountCents = amountCents;
+    let correctedIsCredit = isCredit;
+
+    if (this.isFeeTransaction(description) && (isCredit || amountCents > 0)) {
       this.logger.warn(
-        `Fee transaction "${description}" has positive amount - verify sign convention`,
-        { transactionId: xeroTx.bankTransactionID, amountCents },
+        `Xero sync: Fee transaction "${description}" has incorrect sign (amount=${amountCents}, isCredit=${isCredit}), correcting to debit`,
+        {
+          transactionId: xeroTx.bankTransactionID,
+          originalAmount: amountCents,
+        },
       );
+      // Force fee to be a debit (expense)
+      correctedIsCredit = false;
+      // Ensure amount is negative for debits
+      correctedAmountCents = amountCents > 0 ? -amountCents : amountCents;
     }
 
     // Create transaction
@@ -628,8 +640,8 @@ export class BankFeedService {
       description,
       payeeName: xeroTx.contact?.name ?? undefined,
       reference: xeroTx.reference ?? undefined,
-      amountCents, // FIXED: Preserve original sign (no Math.abs)
-      isCredit,
+      amountCents: correctedAmountCents, // FIXED: Fees corrected to negative
+      isCredit: correctedIsCredit, // FIXED: Fees corrected to debit
       source: ImportSource.BANK_FEED,
       status,
       xeroAccountCode,
@@ -639,11 +651,31 @@ export class BankFeedService {
   }
 
   /**
-   * Check if a transaction description indicates a fee/charge
-   * Used for audit logging when fee signs appear incorrect
+   * Check if a transaction description indicates a BANK fee/charge (expense)
+   * Bank fee transactions should ALWAYS be debits regardless of how Xero marks them.
+   *
+   * IMPORTANT: Distinguishes between:
+   * - Bank fees (expenses): "Cash Deposit Fee", "Bank Charges", "Monthly Account Fee"
+   * - Parent payments (income): "Monthly Fee Payment", "School Fee Paid", "Fee Received"
+   *
+   * Rule: If description contains "payment", "paid", "received", or "from" after "fee",
+   * it's likely a parent payment, NOT a bank fee.
    */
   private isFeeTransaction(description: string): boolean {
-    return /\b(fee|charge|bank charges|service fee|monthly fee|transaction fee)\b/i.test(
+    // First check if it's an incoming payment (not a bank fee)
+    // Patterns like "Fee Payment", "Fees Paid", "Fee Received" are income, not bank fees
+    if (/\b(fee|fees)\s*(payment|paid|received|from)\b/i.test(description)) {
+      return false;
+    }
+    if (
+      /\b(payment|paid|received)\s*(for\s*)?(fee|fees)\b/i.test(description)
+    ) {
+      return false;
+    }
+
+    // Bank fee patterns - these are expenses/charges from the bank
+    // Note: Just "monthly fee" alone is ambiguous but in bank context it's usually a bank charge
+    return /\b(bank\s*charges?|service\s*(fee|charge)|debit\s*order\s*fee|cash\s*deposit\s*fee|cash\s*handling\s*fee|withdrawal\s*fee|transaction\s*fee|atm\s*fee|card\s*fee|account\s*fee|maintenance\s*fee|penalty|interest\s*charge|#cash\s*deposit\s*fee)\b/i.test(
       description,
     );
   }

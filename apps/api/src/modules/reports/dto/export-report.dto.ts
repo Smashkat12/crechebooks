@@ -7,7 +7,7 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsDateString, IsOptional, IsBoolean } from 'class-validator';
+import { IsEnum, IsDateString, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 /**
@@ -54,10 +54,9 @@ export class ExportQueryDto {
     default: true,
   })
   @IsOptional()
-  @IsBoolean()
   @Transform(
-    ({ value }: { value: string | boolean }) =>
-      value === 'true' || value === true,
+    ({ value }: { value: string | boolean | undefined }) =>
+      value === undefined ? true : value === 'true' || value === true,
   )
   includeInsights?: boolean = true;
 }

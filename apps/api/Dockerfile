@@ -114,7 +114,8 @@ RUN chmod +x ./start.sh
 COPY --from=builder --chown=nestjs:nodejs /app/packages/types /app/packages/types
 
 # Copy agent context files (required for transaction categorizer)
-COPY --chown=nestjs:nodejs .claude/context/ ./.claude/context/
+# NOTE: Copy from builder stage since .dockerignore patterns can be unreliable
+COPY --from=builder --chown=nestjs:nodejs /app/.claude/context/ ./.claude/context/
 
 USER nestjs
 

@@ -82,6 +82,7 @@ memory/data/
 
 # Prompt scratch files
 prompt*.txt
+prompt*.md
 
 # Next.js build output
 .next/

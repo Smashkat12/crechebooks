@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { User, Building2, Link as LinkIcon, DollarSign, MessageSquare } from 'lucide-react';
+import { User, Building2, Link as LinkIcon, DollarSign, MessageSquare, Key } from 'lucide-react';
 
 const settingsNav = [
   { href: '/settings', label: 'Profile', icon: User, exact: true },
@@ -12,6 +12,7 @@ const settingsNav = [
   { href: '/settings/integrations', label: 'Integrations', icon: LinkIcon },
   { href: '/settings/fees', label: 'Fee Structures', icon: DollarSign },
   { href: '/settings/templates', label: 'Templates', icon: MessageSquare },
+  { href: '/settings/api-keys', label: 'API Keys', icon: Key },
 ];
 
 export default function SettingsLayout({

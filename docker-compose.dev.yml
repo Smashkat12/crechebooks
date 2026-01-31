@@ -14,10 +14,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: crechebooks
-      POSTGRES_PASSWORD: crechebooks_dev_password
+      POSTGRES_PASSWORD: crechebooks_dev_2024
       POSTGRES_DB: crechebooks
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Use 5433 externally to avoid conflict with system PostgreSQL
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

@@ -145,4 +145,11 @@ export const endpoints = {
     updateContactSubmissionStatus: (id: string) => `/admin/contact-submissions/${id}/status`,
     updateDemoRequestStatus: (id: string) => `/admin/demo-requests/${id}/status`,
   },
+  apiKeys: {
+    list: '/auth/api-keys',
+    create: '/auth/api-keys',
+    detail: (id: string) => `/auth/api-keys/${id}`,
+    revoke: (id: string) => `/auth/api-keys/${id}`,
+    rotate: (id: string) => `/auth/api-keys/${id}/rotate`,
+  },
 } as const;

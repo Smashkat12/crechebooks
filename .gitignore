@@ -69,8 +69,8 @@ output.txt
 .claude-flow/swarm/
 
 # Memory and session data (local state)
-memory/backups/
-memory/data/
+**/memory/backups/
+**/memory/data/
 
 # Ruvector local database
 **/ruvector.db

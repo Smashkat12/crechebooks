@@ -6,10 +6,10 @@
 
 services:
   # ==========================================
-  # PostgreSQL Database
+  # PostgreSQL Database (with pgvector extension)
   # ==========================================
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16  # Includes pgvector extension for AI embeddings
     container_name: crechebooks-postgres
     restart: unless-stopped
     environment:

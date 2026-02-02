@@ -682,6 +682,9 @@ model Tenant {
   // TASK-CLI-001: API Keys for CLI/MCP Access
   apiKeys            ApiKey[]
 
+  // PGVECTOR: AI Embedding Storage
+  vectorEmbeddings   VectorEmbedding[]
+
   @@map("tenants")
 }
 
@@ -3910,4 +3913,32 @@ model ShadowComparison {
   @@index([tenantId, agentType, createdAt])
   @@index([agentType, createdAt])
   @@index([resultsMatch, agentType])
+}
+
+// ============================================
+// PGVECTOR: AI Embedding Storage
+// ============================================
+// Persists vector embeddings for AI agents (categorization, payment matching, semantic search)
+// Uses pgvector extension for efficient similarity search via HNSW index
+
+model VectorEmbedding {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  collection  String   @db.VarChar(50)  // e.g., 'decisions', 'patterns', 'transactions'
+  contentId   String   @map("content_id") @db.VarChar(100)  // ID of the embedded content
+  contentType String   @map("content_type") @db.VarChar(30) // e.g., 'transaction', 'pattern', 'decision'
+  contentHash String   @map("content_hash") @db.VarChar(64) // SHA-256 of content for dedup
+  embedding   Unsupported("vector(384)")  // pgvector type - 384d MiniLM embeddings
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, collection, contentId])
+  @@index([tenantId])
+  @@index([tenantId, collection])
+  @@index([tenantId, contentType])
+  @@index([contentHash])
+  @@map("vector_embeddings")
 }

@@ -77,6 +77,7 @@ import { BulkOperationLogRepository } from './repositories/bulk-operation-log.re
 import { EmployeeSetupLogRepository } from './repositories/employee-setup-log.repository';
 import { XeroAccountRepository } from './repositories/xero-account.repository';
 import { CategorizationJournalRepository } from './repositories/categorization-journal.repository';
+import { PgVectorRepository } from './repositories/pgvector.repository';
 import { StaffOnboardingService } from './services/staff-onboarding.service';
 import { StaffDocumentService } from './services/staff-document.service';
 import { WelcomePackPdfService } from './services/welcome-pack-pdf.service';
@@ -230,6 +231,7 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     EmployeeSetupLogRepository,
     XeroAccountRepository,
     CategorizationJournalRepository,
+    PgVectorRepository, // TASK-PGVEC-001: pgvector for AI embedding persistence
     // TASK-STAFF-004 to TASK-STAFF-007: Staff Management Services
     StaffTerminationService,
     TimeTrackingService,
@@ -345,6 +347,7 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     EmployeeSetupLogRepository,
     XeroAccountRepository,
     CategorizationJournalRepository,
+    PgVectorRepository, // TASK-PGVEC-001: pgvector for AI embedding persistence
     // TASK-STAFF-004 to TASK-STAFF-007: Staff Management Services
     StaffTerminationService,
     TimeTrackingService,

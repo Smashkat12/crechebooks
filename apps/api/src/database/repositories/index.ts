@@ -25,3 +25,4 @@ export * from './bulk-operation-log.repository';
 export * from './xero-account.repository';
 export * from './bank-statement-match.repository';
 export * from './categorization-journal.repository';
+export * from './pgvector.repository';

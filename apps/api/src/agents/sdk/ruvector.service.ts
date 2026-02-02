@@ -2,11 +2,16 @@
  * Ruvector Service
  * TASK-SDK-001: Claude Agent SDK TypeScript Integration Setup
  * TASK-STUB-001: EmbeddingService Real Provider Setup
+ * TASK-PGVEC-001: pgvector for AI embedding persistence
  *
  * @module agents/sdk/ruvector.service
- * @description Service for vector database operations using ruvector.
+ * @description Service for vector database operations using ruvector or pgvector.
  * Provides embedding generation, similarity search, and tenant-scoped
  * collection management for agent context retrieval.
+ *
+ * STORAGE BACKENDS:
+ * - RUVECTOR_PG_EXTENSION=true: Uses PostgreSQL pgvector extension (persistent, production-ready)
+ * - RUVECTOR_PG_EXTENSION=false: Uses ruvector WASM VectorDb (file-based, ephemeral on Railway)
  *
  * CRITICAL RULES:
  * - Initialization failure is non-fatal (service degrades gracefully)
@@ -14,7 +19,7 @@
  * - No silent error swallowing
  */
 
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
   EmbeddingResult,
@@ -25,6 +30,7 @@ import {
   OnnxFallbackProvider,
 } from './embedding-provider';
 import type { EmbeddingProvider } from './embedding-provider';
+import { PgVectorRepository } from '../../database/repositories/pgvector.repository';
 
 /**
  * Search result from ruvector similarity search.
@@ -105,11 +111,22 @@ export class RuvectorService implements OnModuleInit {
   private activeDimensions = 384;
   private fallbackProviders: EmbeddingProvider[] = [];
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    @Optional() @Inject(PgVectorRepository)
+    private readonly pgVectorRepo?: PgVectorRepository,
+  ) {
     this.enabled =
       this.configService.get<string>('RUVECTOR_ENABLED') === 'true';
     this.pgExtension =
       this.configService.get<string>('RUVECTOR_PG_EXTENSION') === 'true';
+  }
+
+  /**
+   * Check if pgvector backend is available and should be used.
+   */
+  isPgVectorEnabled(): boolean {
+    return this.pgExtension && !!this.pgVectorRepo?.isAvailable();
   }
 
   /**
@@ -162,10 +179,24 @@ export class RuvectorService implements OnModuleInit {
       this.registerProviders();
 
       this.initialized = true;
+
+      // Log storage backend status
+      // Note: pgvector availability is checked at runtime, not init time
+      const pgvectorConfigured = this.pgExtension ? 'enabled' : 'disabled';
       this.logger.log(
-        `Ruvector initialized successfully (pgExtension=${String(this.pgExtension)}, ` +
+        `Ruvector initialized successfully (pgvector=${pgvectorConfigured}, ` +
           `provider=${this.activeProvider}, dimensions=${String(this.activeDimensions)})`,
       );
+
+      // Log pgvector status after a brief delay to ensure it's initialized
+      if (this.pgExtension) {
+        setTimeout(() => {
+          const pgvectorReady = this.pgVectorRepo?.isAvailable() ?? false;
+          this.logger.log(
+            `pgvector backend status: ${pgvectorReady ? 'READY' : 'UNAVAILABLE'}`,
+          );
+        }, 100);
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -325,12 +356,14 @@ export class RuvectorService implements OnModuleInit {
 
   /**
    * Insert a vector into a tenant-scoped collection.
+   * Uses pgvector (PostgreSQL) when RUVECTOR_PG_EXTENSION=true, otherwise ruvector WASM.
    *
    * @param collectionType - Collection type
    * @param tenantId - Tenant ID
    * @param id - Unique vector ID
    * @param vector - The vector to store
    * @param metadata - Optional metadata
+   * @param content - Optional content string (required for pgvector deduplication)
    * @throws Error if ruvector is not initialized
    */
   async insertVector(
@@ -339,9 +372,29 @@ export class RuvectorService implements OnModuleInit {
     id: string,
     vector: number[],
     metadata?: Record<string, unknown>,
+    content?: string,
   ): Promise<void> {
-    if (!this.initialized || !this.vectorDb) {
+    if (!this.initialized) {
       throw new Error('Ruvector not initialized');
+    }
+
+    // Use pgvector if enabled
+    if (this.isPgVectorEnabled() && this.pgVectorRepo) {
+      await this.pgVectorRepo.upsert({
+        tenantId,
+        collection: collectionType,
+        contentId: id,
+        contentType: (metadata?.contentType as string) ?? 'unknown',
+        content: content ?? id, // Use id as content fallback for hash
+        embedding: vector,
+        metadata,
+      });
+      return;
+    }
+
+    // Fallback to ruvector WASM
+    if (!this.vectorDb) {
+      throw new Error('Ruvector vectorDb not initialized');
     }
 
     const collection = this.getTenantCollection(collectionType, tenantId);
@@ -358,11 +411,13 @@ export class RuvectorService implements OnModuleInit {
 
   /**
    * Search within a tenant-scoped collection.
+   * Uses pgvector (PostgreSQL) when RUVECTOR_PG_EXTENSION=true, otherwise ruvector WASM.
    *
    * @param collectionType - Collection type
    * @param tenantId - Tenant ID
    * @param queryVector - The query embedding vector
    * @param limit - Maximum results to return
+   * @param contentType - Optional content type filter (pgvector only)
    * @returns Array of search results
    * @throws Error if ruvector is not initialized
    */
@@ -371,9 +426,32 @@ export class RuvectorService implements OnModuleInit {
     tenantId: string,
     queryVector: number[],
     limit: number,
+    contentType?: string,
   ): Promise<RuvectorSearchResult[]> {
-    if (!this.initialized || !this.vectorDb) {
+    if (!this.initialized) {
       throw new Error('Ruvector not initialized');
+    }
+
+    // Use pgvector if enabled
+    if (this.isPgVectorEnabled() && this.pgVectorRepo) {
+      const results = await this.pgVectorRepo.searchSimilar({
+        tenantId,
+        collection: collectionType,
+        embedding: queryVector,
+        limit,
+        contentType,
+      });
+
+      return results.map((r) => ({
+        id: r.contentId,
+        score: r.score,
+        metadata: r.metadata ?? undefined,
+      }));
+    }
+
+    // Fallback to ruvector WASM
+    if (!this.vectorDb) {
+      throw new Error('Ruvector vectorDb not initialized');
     }
 
     const collection = this.getTenantCollection(collectionType, tenantId);

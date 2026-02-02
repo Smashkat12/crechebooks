@@ -14,8 +14,14 @@ import { ExtractJwt, Strategy, StrategyOptionsWithRequest } from 'passport-jwt';
 import { passportJwtSecret } from 'jwks-rsa';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import * as jwt from 'jsonwebtoken';
 import { IUser, UserRole } from '../../../database/entities/user.entity';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+
+/**
+ * Type for passport-jwt secretOrKeyProvider callback
+ */
+type SecretCallback = (err: Error | null, secret?: string | Buffer) => void;
 
 /**
  * TASK-SEC-001: Token expiration warning threshold
@@ -79,6 +85,7 @@ function extractJwtFromCookieOrHeader(req: Request): string | null {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(JwtStrategy.name);
   private readonly isLocalDev: boolean;
+  private readonly jwtSecret: string | undefined;
 
   constructor(
     private readonly configService: ConfigService,
@@ -109,31 +116,84 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // TASK-UI-001: Use custom extractor for both cookie and header support
-    const strategyOptions = isJwtMode
-      ? {
-          jwtFromRequest: extractJwtFromCookieOrHeader,
-          secretOrKey: jwtSecret,
-          algorithms: ['HS256'],
+    // TASK-ADMIN-001: Support both Auth0 RS256 and local HS256 (impersonation) tokens
+    let strategyOptions: Record<string, unknown>;
+
+    if (isJwtMode) {
+      // Pure JWT mode - all tokens use HS256 with JWT_SECRET
+      strategyOptions = {
+        jwtFromRequest: extractJwtFromCookieOrHeader,
+        secretOrKey: jwtSecret,
+        algorithms: ['HS256'],
+      };
+    } else {
+      // Hybrid mode - Auth0 RS256 for normal tokens, HS256 for impersonation tokens
+      // Create the Auth0 JWKS provider
+      const auth0SecretProvider = passportJwtSecret({
+        cache: true,
+        rateLimit: true,
+        jwksRequestsPerMinute: 5,
+        jwksUri: `https://${domain}/.well-known/jwks.json`,
+      });
+
+      // Custom secret provider that handles both token types
+      // passport-jwt calls this with (request, rawJwtToken, done)
+      const hybridSecretProvider = (
+        req: Request,
+        rawJwtToken: string,
+        done: SecretCallback,
+      ) => {
+        try {
+          // Decode token without verification to check if it's an impersonation token
+          const decoded = jwt.decode(rawJwtToken) as JwtPayload | null;
+
+          if (decoded?.impersonation && jwtSecret) {
+            // This is an impersonation token - use JWT_SECRET with HS256
+            Logger.debug(
+              `Detected impersonation token for session ${decoded.impersonation.sessionId}`,
+              'JwtStrategy',
+            );
+            done(null, jwtSecret);
+          } else {
+            // Regular Auth0 token - use JWKS
+            // The passportJwtSecret returns a function compatible with passport-jwt
+            (auth0SecretProvider as (req: Request, token: string, cb: SecretCallback) => void)(
+              req,
+              rawJwtToken,
+              done,
+            );
+          }
+        } catch (err) {
+          // If decode fails, try Auth0 JWKS as fallback
+          (auth0SecretProvider as (req: Request, token: string, cb: SecretCallback) => void)(
+            req,
+            rawJwtToken,
+            done,
+          );
         }
-      : {
-          jwtFromRequest: extractJwtFromCookieOrHeader,
-          issuer: `https://${domain}/`,
-          algorithms: ['RS256'],
-          secretOrKeyProvider: passportJwtSecret({
-            cache: true,
-            rateLimit: true,
-            jwksRequestsPerMinute: 5,
-            jwksUri: `https://${domain}/.well-known/jwks.json`,
-          }),
-        };
+      };
+
+      strategyOptions = {
+        jwtFromRequest: extractJwtFromCookieOrHeader,
+        // Don't enforce issuer - impersonation tokens have different issuer
+        algorithms: ['RS256', 'HS256'], // Support both algorithms
+        secretOrKeyProvider: hybridSecretProvider,
+      };
+    }
 
     super(strategyOptions as StrategyOptionsWithRequest);
 
     this.isLocalDev = isJwtMode as boolean;
+    this.jwtSecret = jwtSecret;
+
     if (this.isLocalDev) {
       const modeDescription =
         authProvider === 'jwt' ? 'JWT provider mode' : 'local development mode';
       this.logger.log(`Running in ${modeDescription} with JWT_SECRET`);
+    } else {
+      this.logger.log(
+        'JWT Strategy initialized with hybrid Auth0/impersonation support (TASK-ADMIN-001)',
+      );
     }
     this.logger.log(
       'JWT Strategy initialized with HttpOnly cookie support (TASK-UI-001)',

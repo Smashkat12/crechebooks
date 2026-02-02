@@ -51,6 +51,8 @@ export class PersistenceConfig {
     );
 
     const isPersistent = this.checkPersistentVolume(dataDir);
+    const usePgVector =
+      this.configService.get<string>('RUVECTOR_PG_EXTENSION') === 'true';
 
     this.config = {
       dataDir,
@@ -65,15 +67,26 @@ export class PersistenceConfig {
     };
 
     if (!isPersistent) {
-      this.logger.warn(
-        `RUVECTOR_DATA_DIR "${dataDir}" is not persistent. ` +
-          'Data will be lost on server restart. ' +
-          'Configure a Railway persistent volume at /data/ruvector for production.',
-      );
+      if (usePgVector) {
+        this.logger.log(
+          'Using pgvector for vector storage (RUVECTOR_PG_EXTENSION=true). ' +
+            'Local file storage not required for production.',
+        );
+      } else {
+        this.logger.warn(
+          `RUVECTOR_DATA_DIR "${dataDir}" is not persistent. ` +
+            'Data will be lost on server restart. ' +
+            'Configure RUVECTOR_PG_EXTENSION=true or mount a Railway volume at /data/ruvector.',
+        );
+      }
     }
 
-    // Ensure directories exist
-    this.ensureDirectories(this.config);
+    // Only attempt directory creation if we might actually use file storage
+    // Skip on Railway without persistent volume when pgvector is enabled
+    const isRailway = !!this.configService.get<string>('RAILWAY_ENVIRONMENT');
+    if (!isRailway || isPersistent || !usePgVector) {
+      this.ensureDirectories(this.config);
+    }
 
     return this.config;
   }

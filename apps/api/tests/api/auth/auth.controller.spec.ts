@@ -8,12 +8,15 @@ import { Reflector } from '@nestjs/core';
 import type { Response } from 'express';
 import { AuthController } from '../../../src/api/auth/auth.controller';
 import { AuthService } from '../../../src/api/auth/auth.service';
+import { ImpersonationService } from '../../../src/api/admin/impersonation.service';
 import type { RateLimitGuard as _RateLimitGuard } from '../../../src/common/guards/rate-limit.guard';
 import { RateLimitService } from '../../../src/common/rate-limit/rate-limit.service';
 import { LoginRequestDto } from '../../../src/api/auth/dto/login.dto';
 import { CallbackRequestDto } from '../../../src/api/auth/dto/callback.dto';
 import { RefreshRequestDto } from '../../../src/api/auth/dto/refresh.dto';
 import { ACCESS_TOKEN_COOKIE } from '../../../src/api/auth/strategies/jwt.strategy';
+import { UserRole } from '../../../src/database/entities/user.entity';
+import type { IUser } from '../../../src/database/entities/user.entity';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -25,6 +28,32 @@ describe('AuthController', () => {
     handleCallback: jest.fn(),
     refreshAccessToken: jest.fn(),
     devLogin: jest.fn(),
+  };
+
+  const mockImpersonationService = {
+    endImpersonation: jest.fn(),
+  };
+
+  // Mock user for logout tests
+  const mockUser: IUser = {
+    id: 'user-123',
+    email: 'test@example.com',
+    name: 'Test User',
+    role: UserRole.ADMIN,
+    tenantId: 'tenant-123',
+    isActive: true,
+    auth0Id: 'auth0|123',
+    lastLoginAt: null,
+    currentTenantId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const mockSuperAdminUser: IUser = {
+    ...mockUser,
+    id: 'super-admin-123',
+    role: UserRole.SUPER_ADMIN,
+    tenantId: null,
   };
 
   // Create fresh mock Response for each test
@@ -44,6 +73,10 @@ describe('AuthController', () => {
         {
           provide: AuthService,
           useValue: mockAuthService,
+        },
+        {
+          provide: ImpersonationService,
+          useValue: mockImpersonationService,
         },
         {
           provide: RateLimitService,
@@ -433,8 +466,8 @@ describe('AuthController', () => {
     });
 
     describe('POST /auth/logout - Cookie Clearing', () => {
-      it('should clear HttpOnly cookie on logout', () => {
-        const result = controller.logout(mockResponse);
+      it('should clear HttpOnly cookie on logout', async () => {
+        const result = await controller.logout(mockUser, mockResponse);
 
         expect(result).toEqual({
           success: true,
@@ -450,11 +483,11 @@ describe('AuthController', () => {
         );
       });
 
-      it('should clear cookie with secure flag in production', () => {
+      it('should clear cookie with secure flag in production', async () => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = 'production';
 
-        controller.logout(mockResponse);
+        await controller.logout(mockUser, mockResponse);
 
         expect(mockResponse.clearCookie).toHaveBeenCalledWith(
           ACCESS_TOKEN_COOKIE,
@@ -466,6 +499,39 @@ describe('AuthController', () => {
         );
 
         process.env.NODE_ENV = originalEnv;
+      });
+
+      it('should end impersonation session for SUPER_ADMIN users', async () => {
+        mockImpersonationService.endImpersonation.mockResolvedValue({
+          success: true,
+          message: 'Impersonation ended',
+        });
+
+        await controller.logout(mockSuperAdminUser, mockResponse);
+
+        expect(mockImpersonationService.endImpersonation).toHaveBeenCalledWith(
+          mockSuperAdminUser.id,
+        );
+      });
+
+      it('should not call endImpersonation for non-SUPER_ADMIN users', async () => {
+        await controller.logout(mockUser, mockResponse);
+
+        expect(mockImpersonationService.endImpersonation).not.toHaveBeenCalled();
+      });
+
+      it('should still logout even if endImpersonation fails', async () => {
+        mockImpersonationService.endImpersonation.mockRejectedValue(
+          new Error('Session not found'),
+        );
+
+        const result = await controller.logout(mockSuperAdminUser, mockResponse);
+
+        expect(result).toEqual({
+          success: true,
+          message: 'Logged out successfully',
+        });
+        expect(mockResponse.clearCookie).toHaveBeenCalled();
       });
     });
 

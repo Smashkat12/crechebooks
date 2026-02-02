@@ -211,7 +211,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // TASK-SEC-001: Explicit expiration validation with logging
     this.validateJwtExpiration(payload);
 
-    // In local dev mode, try to find by ID first, then by auth0Id
+    // User lookup with support for impersonation tokens and different auth modes
     let user: {
       id: string;
       tenantId: string | null;
@@ -226,8 +226,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       updatedAt: Date;
     } | null = null;
 
-    if (this.isLocalDev) {
-      // Try UUID lookup first (for dev tokens that use userId as sub)
+    // TASK-ADMIN-001: Impersonation tokens use internal user ID as sub, not auth0Id
+    // Check for impersonation context first and use appropriate lookup strategy
+    if (payload.impersonation) {
+      // Impersonation token - sub is the internal user ID (UUID)
+      this.logger.debug(
+        `Impersonation token detected for session ${payload.impersonation.sessionId}, looking up by user ID`,
+      );
+      user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+    } else if (this.isLocalDev) {
+      // Local dev mode: Try UUID lookup first (for dev tokens that use userId as sub)
       user = await this.prisma.user.findFirst({
         where: {
           OR: [

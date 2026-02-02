@@ -382,13 +382,14 @@ describe('AuthController', () => {
 
         await controller.callback(callbackDto, mockResponse);
 
+        // Cookie uses sameSite: 'lax' consistently for cross-origin compatibility
         expect(mockResponse.cookie).toHaveBeenCalledWith(
           ACCESS_TOKEN_COOKIE,
           authResult.accessToken,
           expect.objectContaining({
             httpOnly: true,
             secure: true,
-            sameSite: 'strict',
+            sameSite: 'lax',
           }),
         );
 
@@ -489,12 +490,14 @@ describe('AuthController', () => {
 
         await controller.logout(mockUser, mockResponse);
 
+        // Cookie uses sameSite: 'lax' consistently for cross-origin compatibility
+        // and to ensure cookies set during impersonation (which use 'lax') are properly cleared
         expect(mockResponse.clearCookie).toHaveBeenCalledWith(
           ACCESS_TOKEN_COOKIE,
           expect.objectContaining({
             httpOnly: true,
             secure: true,
-            sameSite: 'strict',
+            sameSite: 'lax',
           }),
         );
 

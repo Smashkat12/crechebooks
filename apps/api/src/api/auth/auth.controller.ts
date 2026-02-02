@@ -32,6 +32,7 @@ import {
 import { RefreshRequestDto, RefreshResponseDto } from './dto/refresh.dto';
 import { DevLoginRequestDto, DevLoginResponseDto } from './dto/dev-login.dto';
 import { Public } from './decorators/public.decorator';
+import { Roles } from './decorators/roles.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import {
   RateLimit,
@@ -231,8 +232,11 @@ export class AuthController {
    * TASK-UI-001: Set HttpOnly cookie with access token
    * - HttpOnly: Prevents JavaScript access (XSS protection)
    * - Secure: Only sent over HTTPS in production
-   * - SameSite: Strict for CSRF protection
-   * - Path: /api to limit cookie scope
+   * - SameSite: Lax for cross-origin compatibility (required for impersonation flow)
+   * - Path: / to allow all routes
+   *
+   * Note: Using 'lax' consistently across all cookie operations (login, impersonation, logout)
+   * ensures cookies can be properly cleared. 'strict' would break cross-origin flows.
    */
   private setAccessTokenCookie(
     res: Response,
@@ -244,7 +248,7 @@ export class AuthController {
     res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      sameSite: 'lax',
       maxAge: expiresInSeconds * 1000, // Convert to milliseconds
       path: '/', // Allow all API routes and frontend
     });
@@ -254,6 +258,15 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  // Allow all authenticated users including SUPER_ADMIN to logout
+  // Including SUPER_ADMIN in @Roles tells TenantGuard to skip tenant check
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.OWNER,
+    UserRole.ADMIN,
+    UserRole.ACCOUNTANT,
+    UserRole.VIEWER,
+  )
   @ApiOperation({
     summary: 'Logout user',
     description:
@@ -300,15 +313,20 @@ export class AuthController {
   /**
    * TASK-UI-001: Clear HttpOnly cookies on logout
    * Also clears admin_token cookie used during impersonation
+   *
+   * IMPORTANT: Cookie clearing must use the same sameSite attribute as when set.
+   * Impersonation sets cookies with sameSite: 'lax', so we must clear with 'lax' too.
+   * Using 'strict' here when cookies were set with 'lax' would fail to clear them.
    */
   private clearAccessTokenCookie(res: Response): void {
     const isProduction = process.env.NODE_ENV === 'production';
 
     // Clear the main access token cookie
+    // Use 'lax' consistently since impersonation tokens are set with 'lax'
     res.clearCookie(ACCESS_TOKEN_COOKIE, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      sameSite: 'lax',
       path: '/',
     });
 

@@ -24,8 +24,12 @@ import { IntelligenceEngineService } from './intelligence-engine.service';
 import { PersistenceConfig } from './persistence-config';
 import type { IntelligenceTrajectory } from './interfaces/intelligence-engine.interface';
 
-/** Default system tenant ID for bootstrap-level feature flags */
-const SYSTEM_TENANT_ID = '__system__';
+/**
+ * System tenant ID used for system-wide feature flags and SONA learning.
+ * This tenant is created via migration (see 20250202_add_system_tenant.sql).
+ * Using a well-known UUID ensures consistency across environments.
+ */
+const SYSTEM_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
 export interface BootstrapStats {
   /** Number of PayeePattern trajectories seeded */
@@ -389,7 +393,7 @@ export class SonaBootstrapService implements OnModuleInit {
   /**
    * Check if SONA has already been bootstrapped by looking for the
    * SONA_BOOTSTRAPPED flag in the feature_flags table.
-   * Uses compound unique key: tenantId_flag with SYSTEM_TENANT_ID.
+   * Uses the __system__ tenant (UUID: 00000000-0000-0000-0000-000000000000).
    */
   private async checkBootstrapFlag(): Promise<boolean> {
     if (!this.prisma) return false;
@@ -416,7 +420,7 @@ export class SonaBootstrapService implements OnModuleInit {
   /**
    * Set the SONA_BOOTSTRAPPED flag in feature_flags table.
    * Records the number of trajectories seeded for audit purposes.
-   * Uses compound unique key: tenantId_flag with SYSTEM_TENANT_ID.
+   * Uses the __system__ tenant (UUID: 00000000-0000-0000-0000-000000000000).
    */
   private async setBootstrapFlag(totalSeeded: number): Promise<void> {
     if (!this.prisma) return;

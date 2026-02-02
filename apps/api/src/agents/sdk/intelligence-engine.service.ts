@@ -72,8 +72,19 @@ export class IntelligenceEngineService
   async onModuleDestroy(): Promise<void> {
     if (this.engine) {
       try {
-        await this.engine.shutdown();
-        this.logger.log('IntelligenceEngine shut down gracefully');
+        // Check if shutdown method exists (ruvector API may vary by version)
+        if (typeof this.engine.shutdown === 'function') {
+          await this.engine.shutdown();
+          this.logger.log('IntelligenceEngine shut down gracefully');
+        } else if (typeof this.engine.close === 'function') {
+          // Alternative method name
+          await this.engine.close();
+          this.logger.log('IntelligenceEngine closed gracefully');
+        } else {
+          this.logger.debug(
+            'IntelligenceEngine has no shutdown/close method - cleanup not required',
+          );
+        }
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(`IntelligenceEngine shutdown error: ${message}`);

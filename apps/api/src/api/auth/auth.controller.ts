@@ -32,6 +32,7 @@ import {
 import { RefreshRequestDto, RefreshResponseDto } from './dto/refresh.dto';
 import { DevLoginRequestDto, DevLoginResponseDto } from './dto/dev-login.dto';
 import { Public } from './decorators/public.decorator';
+import { CurrentUser } from './decorators/current-user.decorator';
 import {
   RateLimit,
   RateLimitPresets,
@@ -39,6 +40,9 @@ import {
 import { StrictRateLimit } from '../../common/decorators/throttle.decorator';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { ACCESS_TOKEN_COOKIE } from './strategies/jwt.strategy';
+import { ImpersonationService } from '../admin/impersonation.service';
+import type { IUser } from '../../database/entities/user.entity';
+import { UserRole } from '../../database/entities/user.entity';
 
 @Controller('auth')
 @ApiTags('Authentication')
@@ -46,7 +50,10 @@ import { ACCESS_TOKEN_COOKIE } from './strategies/jwt.strategy';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly impersonationService: ImpersonationService,
+  ) {}
 
   @Post('login')
   @Public()
@@ -250,17 +257,36 @@ export class AuthController {
   @ApiOperation({
     summary: 'Logout user',
     description:
-      'Clears the HttpOnly authentication cookie. TASK-UI-001: Cookie-based logout.',
+      'Clears the HttpOnly authentication cookie and ends any active impersonation session. ' +
+      'TASK-UI-001: Cookie-based logout. TASK-ADMIN-001: Impersonation cleanup.',
   })
   @ApiResponse({
     status: 200,
     description: 'Logout successful',
   })
-  logout(@Res({ passthrough: true }) res: Response): {
+  async logout(
+    @CurrentUser() user: IUser,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{
     success: boolean;
     message: string;
-  } {
-    this.logger.debug('Processing logout request');
+  }> {
+    this.logger.debug(`Processing logout request for user ${user?.id}`);
+
+    // TASK-ADMIN-001: End any active impersonation session for SUPER_ADMIN users
+    if (user?.role === UserRole.SUPER_ADMIN) {
+      try {
+        await this.impersonationService.endImpersonation(user.id);
+        this.logger.debug(
+          `Ended impersonation session for SUPER_ADMIN ${user.id} on logout`,
+        );
+      } catch (error) {
+        // Log but don't fail logout if impersonation cleanup fails
+        this.logger.warn(
+          `Failed to end impersonation session on logout: ${error}`,
+        );
+      }
+    }
 
     // TASK-UI-001: Clear HttpOnly cookie
     this.clearAccessTokenCookie(res);

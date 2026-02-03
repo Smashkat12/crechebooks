@@ -50,11 +50,18 @@ export interface SimplePayPayslip {
   id: string | number;
   employee_id: string | number;
   employee_name: string;
+  basic?: number;
+  overtime?: number;
+  bonus?: number;
+  other_earnings?: number;
   gross: number;
   nett: number;
   paye: number;
   uif_employee: number;
   uif_employer: number;
+  other_deductions?: number;
+  medical_aid_contribution?: number;
+  pension_contribution?: number;
   items: SimplePayPayslipItem[];
 }
 

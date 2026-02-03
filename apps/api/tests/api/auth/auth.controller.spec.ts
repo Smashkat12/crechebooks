@@ -520,7 +520,9 @@ describe('AuthController', () => {
       it('should not call endImpersonation for non-SUPER_ADMIN users', async () => {
         await controller.logout(mockUser, mockResponse);
 
-        expect(mockImpersonationService.endImpersonation).not.toHaveBeenCalled();
+        expect(
+          mockImpersonationService.endImpersonation,
+        ).not.toHaveBeenCalled();
       });
 
       it('should still logout even if endImpersonation fails', async () => {
@@ -528,7 +530,10 @@ describe('AuthController', () => {
           new Error('Session not found'),
         );
 
-        const result = await controller.logout(mockSuperAdminUser, mockResponse);
+        const result = await controller.logout(
+          mockSuperAdminUser,
+          mockResponse,
+        );
 
         expect(result).toEqual({
           success: true,

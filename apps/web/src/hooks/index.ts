@@ -58,3 +58,12 @@ export {
 
 // TASK-ADMIN-001: Impersonation hooks
 export * from './use-impersonation';
+
+// TASK-ACCT-UI-001: Chart of Accounts hooks
+export * from './use-accounts';
+
+// TASK-PAY-021: Payroll Processing hooks
+export * from './use-payroll-processing';
+
+// TASK-FIX-005: Bank Fee Configuration hooks
+export * from './use-bank-fees';

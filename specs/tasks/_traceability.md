@@ -1652,3 +1652,90 @@ Maps the Reports Enhancement requirements to implementation tasks, ensuring comp
 | Export Formats | 3 | 3 | 0 | 100% |
 | **Total** | **36** | **36** | **0** | **100%** |
 
+
+---
+
+## Documentation Swarm Gap Analysis Traceability Matrix
+
+Analysis Date: 2026-02-03
+Source: 10-agent documentation swarm analyzing 40+ controllers and 85 frontend pages.
+
+### Gap-to-Task Mapping
+
+| Gap ID | Gap Description | Severity | Task ID | Status |
+|--------|-----------------|----------|---------|--------|
+| GAP-ACCT-001 | Chart of Accounts - No frontend UI | CRITICAL | TASK-ACCT-UI-001 | ⭕ Ready |
+| GAP-ACCT-002 | General Ledger - No frontend UI | CRITICAL | TASK-ACCT-UI-002 | ⭕ Ready |
+| GAP-ACCT-003 | Cash Flow - No frontend UI | HIGH | TASK-ACCT-UI-003 | ⭕ Ready |
+| GAP-ACCT-004 | Supplier Management - No frontend UI | CRITICAL | TASK-ACCT-UI-004 | ⭕ Ready |
+| GAP-ACCT-005 | Quote System - No frontend UI | HIGH | TASK-ACCT-UI-005 | ⭕ Ready |
+| GAP-ACCT-006 | Onboarding Wizard - No frontend UI | HIGH | TASK-ACCT-UI-006 | ⭕ Ready |
+| GAP-QUOTE-001 | Quote PDF & Email - TODO present | HIGH | TASK-QUOTE-001 | ✅ Complete |
+| GAP-QUOTE-002 | Quote Public Acceptance - Missing | MEDIUM | TASK-QUOTE-002 | ⭕ Ready |
+| GAP-PAY-001 | Payroll Processing - TODO stub | CRITICAL | TASK-PAY-021 | ⭕ Ready |
+| GAP-SARS-001 | SARS Submission Notifications - TODO | HIGH | TASK-FIX-001 | ⭕ Ready |
+| GAP-USER-001 | Profile Update - TODO stub | MEDIUM | TASK-FIX-002 | ⭕ Ready |
+| GAP-INV-001 | Invoice Deletion - TODO present | MEDIUM | TASK-FIX-003 | ⭕ Ready |
+| GAP-FX-001 | Currency Conversion - Placeholder API | LOW | TASK-FIX-004 | ⭕ Ready |
+| GAP-BANK-001 | Bank Fee Config - Hardcoded FNB | MEDIUM | TASK-FIX-005 | ⭕ Ready |
+
+### Backend-to-Frontend Coverage
+
+| Backend Controller | API Complete | Frontend Pages | Coverage | Task |
+|-------------------|--------------|----------------|----------|------|
+| ChartOfAccountController | 100% | 0 pages | 0% | TASK-ACCT-UI-001 |
+| GeneralLedgerController | 100% | 0 pages | 0% | TASK-ACCT-UI-002 |
+| CashFlowController | 100% | 0 pages | 0% | TASK-ACCT-UI-003 |
+| SupplierController | 100% | 0 pages | 0% | TASK-ACCT-UI-004 |
+| QuoteController | 100% | 0 pages | 0% | TASK-ACCT-UI-005 |
+| OnboardingController | 100% | 0 pages | 0% | TASK-ACCT-UI-006 |
+| PayrollController | 100% | 1 page (stub) | 10% | TASK-PAY-021 |
+
+### TODO-to-Task Mapping
+
+| File | Line | TODO Description | Task ID |
+|------|------|------------------|---------|
+| `quote.service.ts` | 259 | ~~Generate PDF and send email~~ RESOLVED | TASK-QUOTE-001 |
+| `staff/payroll/page.tsx` | handleComplete | Implement actual payroll processing | TASK-PAY-021 |
+| `sars-submission-retry.service.ts` | multiple | Send email notification to administrators | TASK-FIX-001 |
+| `settings/page.tsx` | onSubmit | Implement profile update API call | TASK-FIX-002 |
+| `invoices/page.tsx` | delete | Confirm and delete | TASK-FIX-003 |
+| `currency-conversion.service.ts` | getRate | Implement actual SARB/OANDA API | TASK-FIX-004 |
+| `bank-fee.service.ts` | config | Add bank_fee_config to tenant | TASK-FIX-005 |
+
+### Effort Breakdown by Category
+
+| Category | Tasks | Total Effort | Priority |
+|----------|-------|--------------|----------|
+| Accounting Module UI | 6 | 58 hours | P0/P1 |
+| Quote System | 2 | 14 hours | P1/P2 |
+| Payroll Integration | 1 | 12 hours | P0 |
+| Quick Wins | 5 | 23 hours | P1-P3 |
+| **Total** | **14** | **97 hours** | — |
+
+### Implementation Coverage After Phase 21
+
+| Domain | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Accounting Module | 0% | 100% | +100% |
+| Quote System | 50% | 100% | +50% |
+| Payroll Processing | 10% | 100% | +90% |
+| Settings/Profile | 80% | 100% | +20% |
+| Invoice Management | 95% | 100% | +5% |
+
+### Risk Assessment
+
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| Accounting UI blocks finance ops | HIGH | CERTAIN | Prioritize TASK-ACCT-UI-001/004 |
+| Payroll stub causes data loss | HIGH | MEDIUM | TASK-PAY-021 in Sprint 1 |
+| Quote emails never sent | MEDIUM | CERTAIN | TASK-QUOTE-001 |
+| SARS failures unnotified | MEDIUM | LIKELY | TASK-FIX-001 |
+
+### Documentation Source
+
+- Full gap analysis: `docs/architecture/gaps-and-opportunities.md`
+- Task specifications: `specs/tasks/TASK-*.md`
+- Agent output: claude-flow memory store
+
+---

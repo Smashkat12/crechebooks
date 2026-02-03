@@ -104,6 +104,7 @@ import { OpeningBalanceService } from './services/opening-balance.service';
 import { CashFlowService } from './services/cash-flow.service';
 import { SupplierService } from './services/supplier.service';
 import { QuoteService } from './services/quote.service';
+import { QuotePdfService } from './services/quote-pdf.service'; // TASK-QUOTE-001
 import { OnboardingService } from './services/onboarding.service';
 import { ParentFeeAgreementPdfService } from './services/parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from './services/parent-consent-forms-pdf.service';
@@ -111,6 +112,7 @@ import { ParentOnboardingService } from './services/parent-onboarding.service';
 // TASK-REPORTS-005: Missing Report Types
 import { CashFlowReportService } from './services/cash-flow-report.service';
 import { AgedPayablesService } from './services/aged-payables.service';
+import { CurrencyConversionService } from './services/currency-conversion.service'; // TASK-FIX-004
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
@@ -125,6 +127,8 @@ import { ExtractionValidatorModule } from '../agents/extraction-validator/valida
 import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
 import { ConversationalModule } from '../agents/conversational/conversational.module';
 import { RolloutModule } from '../agents/rollout/rollout.module';
+// TASK-FIX-004: Exchange Rate Integration
+import { ExchangeRateModule } from '../integrations/exchange-rates';
 
 @Module({
   imports: [
@@ -142,8 +146,11 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     forwardRef(() => NotificationModule),
     forwardRef(() => SimplePayModule), // TASK-STAFF-006: For SimplePay offboarding integration
     forwardRef(() => RolloutModule), // TASK-SDK-012: Parallel Rollout Framework
+    ExchangeRateModule, // TASK-FIX-004: Real FX Rate Integration
   ],
   providers: [
+    // TASK-QUOTE-001: QuotePdfService for quote PDF generation
+    QuotePdfService,
     PrismaService,
     TenantRepository,
     UserRepository,
@@ -258,6 +265,8 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
     AgedPayablesService,
+    // TASK-FIX-004: Currency Conversion with Real FX Rates
+    CurrencyConversionService,
   ],
   exports: [
     PrismaService,
@@ -366,6 +375,7 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     CashFlowService,
     SupplierService,
     QuoteService,
+    QuotePdfService, // TASK-QUOTE-001: Quote PDF generation (export)
     OnboardingService,
     // TASK-ONBOARD: Parent Onboarding Services
     ParentFeeAgreementPdfService,
@@ -374,6 +384,8 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
     AgedPayablesService,
+    // TASK-FIX-004: Currency Conversion with Real FX Rates
+    CurrencyConversionService,
   ],
 })
 export class DatabaseModule {}

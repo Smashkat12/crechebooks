@@ -617,4 +617,137 @@ export class SimplePayPayRunService {
       waveCacheTtlMs: this.WAVE_CACHE_TTL_MS,
     };
   }
+
+  /**
+   * Create a new pay run in SimplePay for a wave
+   * SimplePay API: POST /clients/{clientId}/waves/{waveId}/payment_runs
+   */
+  async createPayRun(
+    tenantId: string,
+    waveId: number,
+    payDate: Date,
+  ): Promise<SimplePayPayRun> {
+    await this.apiClient.initializeForTenant(tenantId);
+    const clientId = this.apiClient.getClientId();
+
+    try {
+      interface PaymentRunWrapper {
+        payment_run: SimplePayPayRun;
+      }
+      const response = await this.apiClient.post<PaymentRunWrapper>(
+        `/clients/${clientId}/waves/${waveId}/payment_runs`,
+        {
+          pay_date: payDate.toISOString().split('T')[0], // YYYY-MM-DD format
+        },
+      );
+
+      this.logger.log(
+        `Created pay run ${response.payment_run.id} for wave ${waveId}`,
+      );
+      return response.payment_run;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create pay run for wave ${waveId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Finalize a pay run in SimplePay
+   * SimplePay API: POST /payment_runs/{id}/finalise
+   */
+  async finalizePayRun(
+    tenantId: string,
+    payRunId: string | number,
+  ): Promise<SimplePayPayRun> {
+    await this.apiClient.initializeForTenant(tenantId);
+
+    try {
+      interface PaymentRunWrapper {
+        payment_run: SimplePayPayRun;
+      }
+      const response = await this.apiClient.post<PaymentRunWrapper>(
+        `/payment_runs/${payRunId}/finalise`,
+        {},
+      );
+
+      this.logger.log(`Finalized pay run ${payRunId}`);
+      return response.payment_run;
+    } catch (error) {
+      this.logger.error(
+        `Failed to finalize pay run ${payRunId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get the current/latest pay run for a wave
+   */
+  async getCurrentPayRun(
+    tenantId: string,
+    waveId: number,
+  ): Promise<SimplePayPayRun | null> {
+    const payRuns = await this.getPayRuns(tenantId, waveId);
+
+    // Return the most recent pay run that's not yet finalized
+    const draftPayRun = payRuns.find((pr) => pr.status === 'draft');
+    if (draftPayRun) {
+      return draftPayRun;
+    }
+
+    // Or return the latest one
+    return payRuns.length > 0 ? payRuns[0] : null;
+  }
+
+  /**
+   * Process payroll for a month - creates and finalizes pay run
+   * This is the main method called from the Payroll Controller
+   */
+  async processMonthlyPayroll(
+    tenantId: string,
+    month: number, // 1-12
+    year: number,
+  ): Promise<{
+    payRun: SimplePayPayRun;
+    payslips: SimplePayPayslip[];
+    accounting: SimplePayAccounting;
+  }> {
+    // Get the first active wave
+    const waves = await this.getWaves(tenantId);
+    const activeWave = waves.find((w) => w.is_active);
+
+    if (!activeWave) {
+      throw new Error(
+        'No active payment wave found in SimplePay. Please configure a wave in SimplePay first.',
+      );
+    }
+
+    // Calculate pay date (last day of the month)
+    const payDate = new Date(year, month, 0); // month is 1-indexed, so this gives last day
+
+    // Check for existing draft pay run or create new one
+    let payRun = await this.getCurrentPayRun(tenantId, activeWave.id);
+
+    if (!payRun || payRun.status === 'finalized') {
+      // Create new pay run
+      payRun = await this.createPayRun(tenantId, activeWave.id, payDate);
+    }
+
+    // Finalize the pay run if it's still draft
+    if (payRun.status === 'draft') {
+      payRun = await this.finalizePayRun(tenantId, payRun.id);
+    }
+
+    // Fetch payslips and accounting data
+    const payslips = await this.getPayRunPayslips(tenantId, payRun.id);
+    const accounting = await this.getPayRunAccounting(tenantId, payRun.id);
+
+    this.logger.log(
+      `Processed payroll for ${month}/${year}: ${payslips.length} employees, pay run ${payRun.id}`,
+    );
+
+    return { payRun, payslips, accounting };
+  }
 }

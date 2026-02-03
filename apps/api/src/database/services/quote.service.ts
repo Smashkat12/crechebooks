@@ -1,6 +1,7 @@
 /**
  * Quotes System Service
  * TASK-ACCT-012: Quotes System Foundation
+ * TASK-QUOTE-001: Quote PDF Generation and Email Delivery
  *
  * @module database/services/quote
  * @description Manages quotes for prospective parents.
@@ -13,12 +14,18 @@
 
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from './audit-log.service';
+import { QuotePdfService } from './quote-pdf.service';
+import { EmailTemplateService } from '../../common/services/email-template/email-template.service';
+import { EmailService } from '../../integrations/email/email.service';
 import {
   Quote,
   QuoteLine,
@@ -32,15 +39,22 @@ import {
   QuoteResponse,
   QuoteSummaryResponse,
 } from '../dto/quote.dto';
+import { PublicQuoteResponse } from '../../api/public/quotes/dto/quote-action.dto';
 
 // SA VAT rate (15%)
 const SA_VAT_RATE = 0.15;
 
 @Injectable()
 export class QuoteService {
+  private readonly logger = new Logger(QuoteService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditLogService,
+    private readonly quotePdfService: QuotePdfService,
+    private readonly emailTemplateService: EmailTemplateService,
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -239,6 +253,7 @@ export class QuoteService {
 
   /**
    * Send a quote to recipient
+   * TASK-QUOTE-001: Generates PDF and sends email with attachment
    */
   async sendQuote(
     tenantId: string,
@@ -256,15 +271,91 @@ export class QuoteService {
       throw new BadRequestException('Cannot send quote without line items');
     }
 
-    // TODO: Generate PDF and send email
-    // This would integrate with an email service
-    // For now, just update the status
+    this.logger.log(
+      `Sending quote ${quote.quoteNumber} to ${quote.recipientEmail}`,
+    );
 
+    // Generate unique view token for public access
+    const viewToken = crypto.randomUUID();
+
+    // Generate PDF
+    const pdfBuffer = await this.quotePdfService.generatePdf(tenantId, quoteId);
+
+    // Build public URLs
+    const baseUrl =
+      this.configService.get<string>('APP_URL') || 'http://localhost:3001';
+    const viewQuoteUrl = `${baseUrl}/quote/${viewToken}`;
+    const acceptQuoteUrl = `${baseUrl}/quote/${viewToken}/accept`;
+    const declineQuoteUrl = `${baseUrl}/quote/${viewToken}/decline`;
+
+    // Get tenant details for email template
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    // Render email template
+    const emailContent = this.emailTemplateService.renderQuoteEmail({
+      recipientName: quote.recipientName,
+      tenantName: tenant.tradingName || tenant.name,
+      quoteNumber: quote.quoteNumber,
+      quoteDate: quote.quoteDate,
+      expiryDate: quote.expiryDate,
+      validityDays: quote.validityDays,
+      childName: quote.childName || undefined,
+      expectedStartDate: quote.expectedStartDate || undefined,
+      subtotalCents: quote.subtotalCents,
+      vatCents: quote.vatAmountCents,
+      totalCents: quote.totalCents,
+      lineItems: quote.lines.map((line) => ({
+        description: line.description,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+        totalCents: line.lineTotalCents,
+      })),
+      viewQuoteUrl,
+      acceptQuoteUrl,
+      declineQuoteUrl,
+      bankName: tenant.bankName || undefined,
+      bankAccountHolder: tenant.bankAccountHolder || undefined,
+      bankAccountNumber: tenant.bankAccountNumber || undefined,
+      bankBranchCode: tenant.bankBranchCode || undefined,
+      bankAccountType: tenant.bankAccountType || undefined,
+      supportEmail: tenant.email,
+    });
+
+    // Send email with PDF attachment
+    await this.emailService.sendEmailWithOptions({
+      to: quote.recipientEmail,
+      subject: emailContent.subject,
+      body: emailContent.text,
+      html: emailContent.html,
+      attachments: [
+        {
+          filename: `Quote-${quote.quoteNumber}.pdf`,
+          content: pdfBuffer,
+          contentType: 'application/pdf',
+        },
+      ],
+      tags: ['quote', 'quote-sent'],
+      customVariables: {
+        quoteId: quoteId,
+        tenantId: tenantId,
+      },
+    });
+
+    this.logger.log(`Quote ${quote.quoteNumber} email sent successfully`);
+
+    // Update quote with status and view token
     const updated = await this.prisma.quote.update({
       where: { id: quoteId },
       data: {
         status: 'SENT',
         sentAt: new Date(),
+        viewToken,
       },
     });
 
@@ -278,6 +369,239 @@ export class QuoteService {
     });
 
     return updated;
+  }
+
+  /**
+   * Get a quote by its public view token
+   * TASK-QUOTE-001: For public quote access without authentication
+   */
+  async getQuoteByViewToken(viewToken: string): Promise<
+    Quote & {
+      lines: QuoteLine[];
+      tenant: { name: string; tradingName: string | null };
+    }
+  > {
+    const quote = await this.prisma.quote.findUnique({
+      where: { viewToken },
+      include: {
+        lines: { orderBy: { lineNumber: 'asc' } },
+        tenant: {
+          select: {
+            name: true,
+            tradingName: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException('Quote not found or invalid token');
+    }
+
+    return quote as Quote & {
+      lines: QuoteLine[];
+      tenant: { name: string; tradingName: string | null };
+    };
+  }
+
+  /**
+   * TASK-QUOTE-002: Get quote by view token for public access
+   * Also marks as VIEWED if currently SENT
+   */
+  async getQuoteByViewTokenPublic(
+    viewToken: string,
+  ): Promise<PublicQuoteResponse> {
+    const quote = await this.prisma.quote.findUnique({
+      where: { viewToken },
+      include: {
+        lines: { orderBy: { lineNumber: 'asc' } },
+        tenant: {
+          select: {
+            name: true,
+            tradingName: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException('Quote not found or link expired');
+    }
+
+    // Check if expired
+    const isExpired = quote.expiryDate < new Date();
+
+    // Auto-expire if needed
+    if (isExpired && ['SENT', 'VIEWED'].includes(quote.status)) {
+      await this.prisma.quote.update({
+        where: { id: quote.id },
+        data: { status: 'EXPIRED' },
+      });
+      quote.status = 'EXPIRED' as any;
+    }
+
+    // Mark as viewed if first view
+    if (quote.status === 'SENT' && !quote.viewedAt) {
+      await this.prisma.quote.update({
+        where: { id: quote.id },
+        data: {
+          status: 'VIEWED',
+          viewedAt: new Date(),
+        },
+      });
+      quote.status = 'VIEWED' as any;
+      quote.viewedAt = new Date();
+    }
+
+    const canAccept = ['SENT', 'VIEWED'].includes(quote.status) && !isExpired;
+    const canDecline = ['SENT', 'VIEWED'].includes(quote.status);
+
+    return {
+      quoteNumber: quote.quoteNumber,
+      recipientName: quote.recipientName,
+      childName: quote.childName,
+      expectedStartDate: quote.expectedStartDate,
+      quoteDate: quote.quoteDate,
+      expiryDate: quote.expiryDate,
+      validityDays: quote.validityDays,
+      subtotalCents: quote.subtotalCents,
+      vatAmountCents: quote.vatAmountCents,
+      totalCents: quote.totalCents,
+      status: quote.status,
+      isExpired,
+      canAccept,
+      canDecline,
+      lines: quote.lines.map((line) => ({
+        description: line.description,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+        lineTotalCents: line.lineTotalCents,
+      })),
+      tenant: {
+        name: quote.tenant.tradingName || quote.tenant.name,
+        phone: quote.tenant.phone,
+        email: quote.tenant.email,
+      },
+    };
+  }
+
+  /**
+   * TASK-QUOTE-002: Accept quote by view token (public access)
+   */
+  async acceptQuoteByToken(
+    viewToken: string,
+    confirmedBy: string,
+  ): Promise<{ success: boolean; message: string; nextStep: string }> {
+    const quote = await this.prisma.quote.findUnique({
+      where: { viewToken },
+    });
+
+    if (!quote) {
+      throw new NotFoundException('Quote not found or link expired');
+    }
+
+    if (!['SENT', 'VIEWED'].includes(quote.status)) {
+      throw new BadRequestException(
+        `Cannot accept quote with status ${quote.status}`,
+      );
+    }
+
+    // Check expiry
+    if (quote.expiryDate < new Date()) {
+      await this.prisma.quote.update({
+        where: { id: quote.id },
+        data: { status: 'EXPIRED' },
+      });
+      throw new BadRequestException(
+        'Quote has expired and can no longer be accepted',
+      );
+    }
+
+    // Accept the quote
+    await this.prisma.quote.update({
+      where: { id: quote.id },
+      data: {
+        status: 'ACCEPTED',
+        acceptedAt: new Date(),
+        notes: quote.notes
+          ? `${quote.notes}\n\nAccepted by: ${confirmedBy} on ${new Date().toISOString()}`
+          : `Accepted by: ${confirmedBy} on ${new Date().toISOString()}`,
+      },
+    });
+
+    // Log the acceptance (without userId - public action)
+    await this.auditService.logUpdate({
+      tenantId: quote.tenantId,
+      userId: 'PUBLIC', // Special marker for public actions
+      entityType: 'Quote',
+      entityId: quote.id,
+      beforeValue: { status: quote.status },
+      afterValue: { status: 'ACCEPTED', acceptedBy: confirmedBy },
+    });
+
+    this.logger.log(
+      `Quote ${quote.quoteNumber} accepted by ${confirmedBy} via public link`,
+    );
+
+    return {
+      success: true,
+      message: `Thank you! Quote ${quote.quoteNumber} has been accepted.`,
+      nextStep:
+        'The creche will contact you to complete the enrollment process.',
+    };
+  }
+
+  /**
+   * TASK-QUOTE-002: Decline quote by view token (public access)
+   */
+  async declineQuoteByToken(
+    viewToken: string,
+    reason?: string,
+  ): Promise<{ success: boolean; message: string }> {
+    const quote = await this.prisma.quote.findUnique({
+      where: { viewToken },
+    });
+
+    if (!quote) {
+      throw new NotFoundException('Quote not found or link expired');
+    }
+
+    if (!['SENT', 'VIEWED'].includes(quote.status)) {
+      throw new BadRequestException(
+        `Cannot decline quote with status ${quote.status}`,
+      );
+    }
+
+    await this.prisma.quote.update({
+      where: { id: quote.id },
+      data: {
+        status: 'DECLINED',
+        declinedAt: new Date(),
+        declineReason: reason,
+      },
+    });
+
+    await this.auditService.logUpdate({
+      tenantId: quote.tenantId,
+      userId: 'PUBLIC',
+      entityType: 'Quote',
+      entityId: quote.id,
+      beforeValue: { status: quote.status },
+      afterValue: { status: 'DECLINED', reason },
+    });
+
+    this.logger.log(
+      `Quote ${quote.quoteNumber} declined via public link${reason ? `: ${reason}` : ''}`,
+    );
+
+    return {
+      success: true,
+      message: 'Quote has been declined. Thank you for letting us know.',
+    };
   }
 
   /**

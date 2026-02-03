@@ -206,8 +206,7 @@ export class ImpersonationController {
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Get current impersonation session',
-    description:
-      'Returns the current active impersonation session if any.',
+    description: 'Returns the current active impersonation session if any.',
   })
   @ApiResponse({
     status: 200,

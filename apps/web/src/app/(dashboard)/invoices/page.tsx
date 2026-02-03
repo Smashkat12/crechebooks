@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { InvoiceTable } from '@/components/invoices';
 import { SendInvoiceDialog } from '@/components/invoices/send-invoice-dialog';
-import { useDownloadInvoicePdf } from '@/hooks/use-invoices';
+import { DeleteInvoiceDialog } from '@/components/invoices/delete-invoice-dialog';
+import { useDownloadInvoicePdf, useDeleteInvoice } from '@/hooks/use-invoices';
 import { useSendInvoice } from '@/hooks/useSendInvoice';
 import { useToast } from '@/hooks/use-toast';
 import type { Invoice } from '@/types/invoice';
@@ -17,8 +18,10 @@ export default function InvoicesPage() {
   const router = useRouter();
   const { downloadPdf } = useDownloadInvoicePdf();
   const sendInvoice = useSendInvoice();
+  const deleteInvoice = useDeleteInvoice();
   const { toast } = useToast();
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   const handleView = (invoice: Invoice) => {
@@ -82,7 +85,31 @@ export default function InvoicesPage() {
   };
 
   const handleDelete = (invoice: Invoice) => {
-    // TODO: Confirm and delete
+    setSelectedInvoice(invoice);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!selectedInvoice) return;
+
+    deleteInvoice.mutate(selectedInvoice.id, {
+      onSuccess: () => {
+        toast({
+          title: 'Invoice deleted',
+          description: `Invoice ${selectedInvoice.invoiceNumber} has been deleted.`,
+        });
+        setDeleteDialogOpen(false);
+        setSelectedInvoice(null);
+      },
+      onError: (error) => {
+        toast({
+          title: 'Failed to delete',
+          description:
+            error.message || 'An error occurred while deleting the invoice',
+          variant: 'destructive',
+        });
+      },
+    });
   };
 
   return (
@@ -119,6 +146,14 @@ export default function InvoicesPage() {
         onClose={() => setSendDialogOpen(false)}
         onSend={handleConfirmSend}
         isLoading={sendInvoice.isPending}
+      />
+
+      <DeleteInvoiceDialog
+        invoice={selectedInvoice}
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        isLoading={deleteInvoice.isPending}
       />
     </div>
   );

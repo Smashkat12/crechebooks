@@ -6,6 +6,8 @@
 import {
   Controller,
   Post,
+  Get,
+  Patch,
   Body,
   HttpCode,
   HttpStatus,
@@ -31,7 +33,9 @@ import {
 } from './dto/callback.dto';
 import { RefreshRequestDto, RefreshResponseDto } from './dto/refresh.dto';
 import { DevLoginRequestDto, DevLoginResponseDto } from './dto/dev-login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from './decorators/public.decorator';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Roles } from './decorators/roles.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import {
@@ -204,6 +208,80 @@ export class AuthController {
         name: result.user.name,
         role: result.user.role,
         tenant_id: result.user.tenantId,
+      },
+    };
+  }
+
+  /**
+   * TASK-FIX-002: Get current user profile
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get current user profile',
+    description: 'Returns the authenticated user profile',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile retrieved successfully',
+  })
+  async getProfile(@CurrentUser() user: IUser): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      name: string;
+      email: string;
+      role: string;
+      tenantId: string | null;
+    };
+  }> {
+    this.logger.debug(`Getting profile for user ${user.id}`);
+    return {
+      success: true,
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        tenantId: user.tenantId,
+      },
+    };
+  }
+
+  /**
+   * TASK-FIX-002: Update current user profile
+   */
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({
+    summary: 'Update current user profile',
+    description: 'Update the authenticated user name and email',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully',
+  })
+  async updateProfile(
+    @CurrentUser() user: IUser,
+    @Body() dto: UpdateProfileDto,
+  ): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      name: string;
+      email: string;
+    };
+  }> {
+    this.logger.debug(`Updating profile for user ${user.id}`);
+
+    const updatedUser = await this.authService.updateProfile(user.id, dto);
+
+    return {
+      success: true,
+      data: {
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
       },
     };
   }

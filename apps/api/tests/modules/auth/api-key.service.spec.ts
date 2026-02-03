@@ -13,7 +13,15 @@ import {
   ApiKeyService,
   CreateApiKeyDto,
 } from '../../../src/api/auth/services/api-key.service';
-import { ApiKeyScope, Tenant, User, UserRole, TaxStatus, SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
+import {
+  ApiKeyScope,
+  Tenant,
+  User,
+  UserRole,
+  TaxStatus,
+  SubscriptionPlan,
+  SubscriptionStatus,
+} from '@prisma/client';
 import {
   NotFoundException,
   ConflictException,
@@ -96,7 +104,11 @@ describe('ApiKeyService', () => {
         environment: 'production',
       };
 
-      const result = await service.createApiKey(testUser.id, testTenant.id, dto);
+      const result = await service.createApiKey(
+        testUser.id,
+        testTenant.id,
+        dto,
+      );
 
       expect(result).toBeDefined();
       expect(result.id).toBeDefined();
@@ -116,7 +128,11 @@ describe('ApiKeyService', () => {
         environment: 'staging',
       };
 
-      const result = await service.createApiKey(testUser.id, testTenant.id, dto);
+      const result = await service.createApiKey(
+        testUser.id,
+        testTenant.id,
+        dto,
+      );
 
       expect(result.secretKey).toMatch(/^cb_stag_/);
       expect(result.environment).toBe('staging');
@@ -132,10 +148,17 @@ describe('ApiKeyService', () => {
         expiresAt: futureDate,
       };
 
-      const result = await service.createApiKey(testUser.id, testTenant.id, dto);
+      const result = await service.createApiKey(
+        testUser.id,
+        testTenant.id,
+        dto,
+      );
 
       expect(result.expiresAt).toBeDefined();
-      expect(new Date(result.expiresAt!).getTime()).toBeCloseTo(futureDate.getTime(), -3);
+      expect(new Date(result.expiresAt!).getTime()).toBeCloseTo(
+        futureDate.getTime(),
+        -3,
+      );
     });
 
     it('should default to FULL_ACCESS if no scopes provided', async () => {
@@ -144,7 +167,11 @@ describe('ApiKeyService', () => {
         scopes: [],
       };
 
-      const result = await service.createApiKey(testUser.id, testTenant.id, dto);
+      const result = await service.createApiKey(
+        testUser.id,
+        testTenant.id,
+        dto,
+      );
 
       expect(result.scopes).toContain(ApiKeyScope.FULL_ACCESS);
     });
@@ -192,15 +219,21 @@ describe('ApiKeyService', () => {
     });
 
     it('should reject wrong key', async () => {
-      const result = await service.validateApiKey('cb_prod_wrongkeywrongkeywrongkey12');
+      const result = await service.validateApiKey(
+        'cb_prod_wrongkeywrongkeywrongkey12',
+      );
       expect(result).toBeNull();
     });
 
     it('should reject revoked key', async () => {
-      const revokedKey = await service.createApiKey(testUser.id, testTenant.id, {
-        name: 'To Be Revoked',
-        scopes: [ApiKeyScope.READ_TENANTS],
-      });
+      const revokedKey = await service.createApiKey(
+        testUser.id,
+        testTenant.id,
+        {
+          name: 'To Be Revoked',
+          scopes: [ApiKeyScope.READ_TENANTS],
+        },
+      );
 
       await service.revokeApiKey(revokedKey.id, testTenant.id, testUser.id);
 
@@ -212,11 +245,15 @@ describe('ApiKeyService', () => {
       const pastDate = new Date();
       pastDate.setDate(pastDate.getDate() - 1);
 
-      const expiredKey = await service.createApiKey(testUser.id, testTenant.id, {
-        name: 'Expired Key',
-        scopes: [ApiKeyScope.READ_TENANTS],
-        expiresAt: pastDate,
-      });
+      const expiredKey = await service.createApiKey(
+        testUser.id,
+        testTenant.id,
+        {
+          name: 'Expired Key',
+          scopes: [ApiKeyScope.READ_TENANTS],
+          expiresAt: pastDate,
+        },
+      );
 
       const result = await service.validateApiKey(expiredKey.secretKey);
       expect(result).toBeNull();
@@ -265,18 +302,27 @@ describe('ApiKeyService', () => {
 
     it('should include revoked keys when requested', async () => {
       // Create and revoke a key
-      const keyToRevoke = await service.createApiKey(testUser.id, testTenant.id, {
-        name: 'Key to List Revoked',
-        scopes: [ApiKeyScope.READ_TENANTS],
-      });
+      const keyToRevoke = await service.createApiKey(
+        testUser.id,
+        testTenant.id,
+        {
+          name: 'Key to List Revoked',
+          scopes: [ApiKeyScope.READ_TENANTS],
+        },
+      );
       await service.revokeApiKey(keyToRevoke.id, testTenant.id, testUser.id);
 
       const keysWithRevoked = await service.listApiKeys(testTenant.id, true);
-      const keysWithoutRevoked = await service.listApiKeys(testTenant.id, false);
+      const keysWithoutRevoked = await service.listApiKeys(
+        testTenant.id,
+        false,
+      );
 
       expect(keysWithRevoked.length).toBeGreaterThan(keysWithoutRevoked.length);
       expect(keysWithRevoked.some((k) => k.id === keyToRevoke.id)).toBe(true);
-      expect(keysWithoutRevoked.some((k) => k.id === keyToRevoke.id)).toBe(false);
+      expect(keysWithoutRevoked.some((k) => k.id === keyToRevoke.id)).toBe(
+        false,
+      );
     });
   });
 
@@ -300,13 +346,13 @@ describe('ApiKeyService', () => {
       });
 
       await expect(
-        service.getApiKey(created.id, 'wrong-tenant-id')
+        service.getApiKey(created.id, 'wrong-tenant-id'),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException for non-existent id', async () => {
       await expect(
-        service.getApiKey('non-existent-id', testTenant.id)
+        service.getApiKey('non-existent-id', testTenant.id),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -318,7 +364,11 @@ describe('ApiKeyService', () => {
         scopes: [ApiKeyScope.READ_CHILDREN],
       });
 
-      const revoked = await service.revokeApiKey(key.id, testTenant.id, testUser.id);
+      const revoked = await service.revokeApiKey(
+        key.id,
+        testTenant.id,
+        testUser.id,
+      );
 
       expect(revoked.revokedAt).toBeDefined();
       expect(revoked.revokedBy).toBe(testUser.id);
@@ -333,7 +383,7 @@ describe('ApiKeyService', () => {
       await service.revokeApiKey(key.id, testTenant.id, testUser.id);
 
       await expect(
-        service.revokeApiKey(key.id, testTenant.id, testUser.id)
+        service.revokeApiKey(key.id, testTenant.id, testUser.id),
       ).rejects.toThrow(ConflictException);
     });
   });
@@ -350,7 +400,7 @@ describe('ApiKeyService', () => {
       const rotated = await service.rotateApiKey(
         original.id,
         testTenant.id,
-        testUser.id
+        testUser.id,
       );
 
       // New key should have same settings
@@ -378,7 +428,7 @@ describe('ApiKeyService', () => {
       await service.revokeApiKey(key.id, testTenant.id, testUser.id);
 
       await expect(
-        service.rotateApiKey(key.id, testTenant.id, testUser.id)
+        service.rotateApiKey(key.id, testTenant.id, testUser.id),
       ).rejects.toThrow(ForbiddenException);
     });
   });

@@ -3,6 +3,8 @@ import {
   UnauthorizedException,
   Logger,
   InternalServerErrorException,
+  NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -378,6 +380,56 @@ export class AuthService {
       currentTenantId: user.currentTenantId,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+    };
+  }
+
+  /**
+   * Update user profile
+   * TASK-FIX-002: Profile Update Implementation
+   */
+  async updateProfile(
+    userId: string,
+    dto: { name?: string; email?: string },
+  ): Promise<{ id: string; name: string; email: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      this.logger.error(`User not found for profile update: ${userId}`);
+      throw new NotFoundException('User not found');
+    }
+
+    // If email is changing, check if it's already in use by another user
+    if (dto.email && dto.email !== user.email) {
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          email: dto.email,
+          id: { not: userId },
+        },
+      });
+      if (existingUser) {
+        this.logger.warn(
+          `Email already in use during profile update: ${dto.email}`,
+        );
+        throw new ConflictException('Email already in use');
+      }
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.name && { name: dto.name }),
+        ...(dto.email && { email: dto.email }),
+      },
+    });
+
+    this.logger.log(`Profile updated for user ${userId}`);
+
+    return {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
     };
   }
 

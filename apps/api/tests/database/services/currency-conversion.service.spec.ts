@@ -1,6 +1,7 @@
 /**
  * Currency Conversion Service Tests
  * TXN-004: Fix Currency Conversion
+ * TASK-FIX-004: Real FX Rate Integration
  */
 import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -10,6 +11,7 @@ import {
   Currency,
   ExchangeRateSource,
 } from '../../../src/database/services/currency-conversion.service';
+import { ExchangeRateClient } from '../../../src/integrations/exchange-rates/exchange-rate.client';
 import { ValidationException } from '../../../src/shared/exceptions';
 
 describe('CurrencyConversionService', () => {
@@ -328,5 +330,200 @@ describe('CurrencyConversionService', () => {
 
       expect(Number.isInteger(result.convertedCents)).toBe(true);
     });
+  });
+
+  // ============================================================================
+  // TASK-FIX-004: Async Methods Tests
+  // ============================================================================
+
+  describe('getExchangeRateAsync', () => {
+    it('should return rate between two currencies', async () => {
+      const rate = await service.getExchangeRateAsync(
+        Currency.USD,
+        Currency.ZAR,
+      );
+
+      expect(rate.fromCurrency).toBe(Currency.USD);
+      expect(rate.toCurrency).toBe(Currency.ZAR);
+      expect(rate.rate).toBeGreaterThan(0);
+      expect(rate.timestamp).toBeDefined();
+    });
+
+    it('should cache rates on subsequent calls', async () => {
+      const rate1 = await service.getExchangeRateAsync(
+        Currency.EUR,
+        Currency.ZAR,
+      );
+      const rate2 = await service.getExchangeRateAsync(
+        Currency.EUR,
+        Currency.ZAR,
+      );
+
+      expect(rate1.timestamp.getTime()).toBe(rate2.timestamp.getTime());
+    });
+
+    it('should use CMA 1:1 rate for CMA currency pairs', async () => {
+      const rate = await service.getExchangeRateAsync(
+        Currency.ZAR,
+        Currency.NAD,
+      );
+
+      expect(rate.rate).toBe(1.0);
+      expect(rate.source).toBe(ExchangeRateSource.SARB);
+    });
+  });
+
+  describe('convertCurrencyAsync', () => {
+    it('should return same amount when currencies match', async () => {
+      const result = await service.convertCurrencyAsync(
+        10000,
+        Currency.ZAR,
+        Currency.ZAR,
+      );
+
+      expect(result.originalCents).toBe(10000);
+      expect(result.convertedCents).toBe(10000);
+      expect(result.exchangeRate).toBe(1.0);
+    });
+
+    it('should convert USD to ZAR', async () => {
+      const result = await service.convertCurrencyAsync(
+        10000,
+        Currency.USD,
+        Currency.ZAR,
+      );
+
+      expect(result.originalCents).toBe(10000);
+      expect(result.originalCurrency).toBe(Currency.USD);
+      expect(result.convertedCurrency).toBe(Currency.ZAR);
+      expect(result.convertedCents).toBeGreaterThan(0);
+      expect(result.exchangeRate).toBeGreaterThan(1);
+    });
+
+    it('should handle CMA currencies at 1:1', async () => {
+      const result = await service.convertCurrencyAsync(
+        50000,
+        Currency.ZAR,
+        Currency.LSL,
+      );
+
+      expect(result.convertedCents).toBe(50000);
+      expect(result.exchangeRate).toBe(1.0);
+    });
+  });
+
+  describe('convertToZARAsync', () => {
+    it('should convert foreign currency to ZAR', async () => {
+      const result = await service.convertToZARAsync(10000, Currency.GBP);
+
+      expect(result.originalCurrency).toBe(Currency.GBP);
+      expect(result.convertedCurrency).toBe(Currency.ZAR);
+      expect(result.convertedCents).toBeGreaterThan(10000);
+    });
+
+    it('should handle ZAR input', async () => {
+      const result = await service.convertToZARAsync(10000, Currency.ZAR);
+
+      expect(result.convertedCents).toBe(10000);
+    });
+  });
+
+  describe('convertFromZARAsync', () => {
+    it('should convert ZAR to foreign currency', async () => {
+      const result = await service.convertFromZARAsync(100000, Currency.USD);
+
+      expect(result.originalCurrency).toBe(Currency.ZAR);
+      expect(result.convertedCurrency).toBe(Currency.USD);
+      expect(result.convertedCents).toBeLessThan(100000);
+    });
+  });
+
+  describe('isExternalApiConfigured', () => {
+    it('should return false when no ExchangeRateClient is injected', () => {
+      // The service is created without ExchangeRateClient in these tests
+      expect(service.isExternalApiConfigured()).toBe(false);
+    });
+  });
+
+  describe('refreshRates', () => {
+    it('should complete without error when API is not configured', async () => {
+      // Should not throw, just warn and return
+      await expect(service.refreshRates()).resolves.not.toThrow();
+    });
+  });
+});
+
+// ============================================================================
+// TASK-FIX-004: Integration tests with mocked ExchangeRateClient
+// ============================================================================
+
+describe('CurrencyConversionService with ExchangeRateClient', () => {
+  let service: CurrencyConversionService;
+  let mockExchangeRateClient: Partial<ExchangeRateClient>;
+
+  beforeEach(async () => {
+    mockExchangeRateClient = {
+      isConfigured: jest.fn().mockReturnValue(true),
+      getRate: jest.fn().mockResolvedValue({
+        fromCurrency: Currency.USD,
+        toCurrency: Currency.ZAR,
+        rate: 18.25,
+        inverseRate: 1 / 18.25,
+        source: ExchangeRateSource.OPENEXCHANGE,
+        effectiveDate: new Date(),
+        timestamp: new Date(),
+      }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        {
+          provide: PrismaService,
+          useValue: {
+            onModuleInit: jest.fn(),
+            onModuleDestroy: jest.fn(),
+          },
+        },
+        {
+          provide: ExchangeRateClient,
+          useValue: mockExchangeRateClient,
+        },
+        CurrencyConversionService,
+      ],
+    }).compile();
+
+    service = module.get<CurrencyConversionService>(CurrencyConversionService);
+  });
+
+  it('should use ExchangeRateClient when configured', async () => {
+    const rate = await service.getExchangeRateAsync(Currency.USD, Currency.ZAR);
+
+    expect(mockExchangeRateClient.getRate).toHaveBeenCalled();
+    expect(rate.rate).toBe(18.25);
+    expect(rate.source).toBe(ExchangeRateSource.OPENEXCHANGE);
+  });
+
+  it('should report API as configured', () => {
+    expect(service.isExternalApiConfigured()).toBe(true);
+  });
+
+  it('should fall back to defaults when API fails', async () => {
+    (mockExchangeRateClient.getRate as jest.Mock).mockRejectedValue(
+      new Error('API Error'),
+    );
+
+    const rate = await service.getExchangeRateAsync(Currency.USD, Currency.ZAR);
+
+    // Should fall back to default rates
+    expect(rate.rate).toBeGreaterThan(0);
+    expect(rate.source).toBe(ExchangeRateSource.MANUAL);
+  });
+
+  it('should not call API for CMA currency pairs', async () => {
+    const rate = await service.getExchangeRateAsync(Currency.ZAR, Currency.NAD);
+
+    expect(mockExchangeRateClient.getRate).not.toHaveBeenCalled();
+    expect(rate.rate).toBe(1.0);
+    expect(rate.source).toBe(ExchangeRateSource.SARB);
   });
 });

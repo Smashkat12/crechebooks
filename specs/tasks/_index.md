@@ -2911,3 +2911,162 @@ graph TD
 4. **TASK-REPORTS-003** (PDF Generation) — After API endpoints exist
 5. **TASK-REPORTS-005** (Missing Reports) — After API endpoints exist
 
+
+---
+
+## Phase 21: Documentation Swarm Gap Remediation (2026-02-03)
+
+Analysis Date: 2026-02-03
+Source: Comprehensive 10-agent documentation swarm analysis of CrecheBooks codebase.
+
+These tasks address critical UI gaps where backend APIs are 100% complete but frontend pages are missing or incomplete.
+
+### Analysis Summary
+
+| Metric | Value |
+|--------|-------|
+| Backend Controllers Analyzed | 40+ |
+| Frontend Pages Analyzed | 85 |
+| Critical UI Gaps Found | 6 |
+| TODOs Requiring Fixes | 5 |
+| Tasks Created | 14 |
+| Total Estimated Effort | 97 hours |
+
+### 21.1 Accounting Module UI (CRITICAL GAP)
+
+**Problem**: 6 backend controllers with 0% frontend UI coverage.
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status | Effort |
+|-------|---------|-------|-------|--------------|----------|--------|--------|
+| 501 | TASK-ACCT-UI-001 | Chart of Accounts UI Pages | surface | TASK-WEB-006, TASK-WEB-007 | P0-CRITICAL | ⭕ Ready | 8h |
+| 502 | TASK-ACCT-UI-002 | General Ledger UI Pages | surface | TASK-ACCT-UI-001 | P0-CRITICAL | ⭕ Ready | 10h |
+| 503 | TASK-ACCT-UI-003 | Cash Flow UI Pages | surface | TASK-ACCT-UI-001, TASK-ACCT-UI-002 | P1-HIGH | ⭕ Ready | 10h |
+| 504 | TASK-ACCT-UI-004 | Supplier Management UI Pages | surface | TASK-WEB-006 | P0-CRITICAL | ⭕ Ready | 12h |
+| 505 | TASK-ACCT-UI-005 | Quote System UI Pages | surface | TASK-WEB-006 | P1-HIGH | ⭕ Ready | 10h |
+| 506 | TASK-ACCT-UI-006 | Accounting Onboarding Wizard | surface | TASK-WEB-004 | P1-HIGH | ⭕ Ready | 8h |
+
+**Backend APIs Available**:
+- `ChartOfAccountController` at `/accounts`
+- `GeneralLedgerController` at `/general-ledger`
+- `CashFlowController` at `/cash-flow`
+- `SupplierController` at `/suppliers`
+- `QuoteController` at `/quotes`
+- `OnboardingController` at `/onboarding`
+
+### 21.2 Quote System Completion
+
+**Problem**: Quote generation exists but PDF/email delivery is a TODO.
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status | Effort |
+|-------|---------|-------|-------|--------------|----------|--------|--------|
+| 421 | TASK-QUOTE-001 | Quote PDF Generation & Email Delivery | logic | TASK-BILL-013 | P1-HIGH | ✅ Complete | 6h |
+| 422 | TASK-QUOTE-002 | Quote Public Acceptance Portal | surface | TASK-QUOTE-001 | P2-MEDIUM | ⭕ Ready | 8h |
+
+**Implementation Complete** (2026-02-03):
+- QuotePdfService created following invoice-pdf.service.ts pattern
+- Quote email template added to EmailTemplateService
+- QuoteService.sendQuote() now generates PDF, sends email with attachment
+- viewToken field added for public quote access
+- Migration: 20260203100000_add_quote_view_token
+
+### 21.3 Payroll Processing Integration
+
+**Problem**: Frontend stub does nothing - needs to wire to backend APIs.
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status | Effort |
+|-------|---------|-------|-------|--------------|----------|--------|--------|
+| 271 | TASK-PAY-021 | Complete Payroll Processing Integration | surface | TASK-PAY-011, TASK-SARS-012 | P0-CRITICAL | ⭕ Ready | 12h |
+
+**Frontend TODO** (staff/payroll/page.tsx):
+```typescript
+const handleComplete = async (...) => {
+  // TODO: Implement actual payroll processing
+  router.push('/staff');
+};
+```
+
+### 21.4 Quick Wins (TODO Fixes)
+
+**Problem**: Multiple small TODOs blocking full functionality.
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status | Effort |
+|-------|---------|-------|-------|--------------|----------|--------|--------|
+| 601 | TASK-FIX-001 | SARS Submission Failure Notifications | logic | TASK-SARS-018 | P1-HIGH | ⭕ Ready | 4h |
+| 602 | TASK-FIX-002 | Profile Update Implementation | surface | TASK-WEB-040 | P2-MEDIUM | ⭕ Ready | 2h |
+| 603 | TASK-FIX-003 | Invoice Deletion Handler | surface | TASK-WEB-033 | P2-MEDIUM | ⭕ Ready | 3h |
+| 604 | TASK-FIX-004 | Currency Conversion Service | logic | TASK-TRANS-014 | P3-LOW | ⭕ Ready | 6h |
+| 605 | TASK-FIX-005 | Bank Fee Configuration | logic + surface | TASK-TRANS-001 | P2-MEDIUM | ⭕ Ready | 8h |
+
+---
+
+## Phase 21 Progress Summary
+
+| Priority | Tasks | Complete | Pending | Percentage |
+|----------|-------|----------|---------|------------|
+| P0-CRITICAL | 4 | 0 | 4 | 0% |
+| P1-HIGH | 5 | 0 | 5 | 0% |
+| P2-MEDIUM | 4 | 0 | 4 | 0% |
+| P3-LOW | 1 | 0 | 1 | 0% |
+| **Total Phase 21** | **14** | **0** | **14** | **0%** |
+
+### Phase 21 Dependency Graph
+
+```mermaid
+graph TD
+    subgraph "Accounting Module (Critical)"
+        ACCT001[TASK-ACCT-UI-001<br/>Chart of Accounts]
+        ACCT002[TASK-ACCT-UI-002<br/>General Ledger]
+        ACCT003[TASK-ACCT-UI-003<br/>Cash Flow]
+        ACCT004[TASK-ACCT-UI-004<br/>Suppliers]
+        ACCT005[TASK-ACCT-UI-005<br/>Quotes UI]
+        ACCT006[TASK-ACCT-UI-006<br/>Onboarding]
+    end
+
+    subgraph "Quote Completion"
+        QUOTE001[TASK-QUOTE-001<br/>PDF & Email]
+        QUOTE002[TASK-QUOTE-002<br/>Public Portal]
+    end
+
+    subgraph "Payroll"
+        PAY021[TASK-PAY-021<br/>Processing Integration]
+    end
+
+    subgraph "Quick Wins"
+        FIX001[TASK-FIX-001<br/>SARS Notifications]
+        FIX002[TASK-FIX-002<br/>Profile Update]
+        FIX003[TASK-FIX-003<br/>Invoice Delete]
+        FIX004[TASK-FIX-004<br/>Currency FX]
+        FIX005[TASK-FIX-005<br/>Bank Fees]
+    end
+
+    ACCT001 --> ACCT002
+    ACCT001 --> ACCT003
+    ACCT002 --> ACCT003
+    QUOTE001 --> QUOTE002
+```
+
+### Recommended Execution Order
+
+**Sprint 1 (Week 1-2): Critical Accounting**
+1. TASK-ACCT-UI-001 (Chart of Accounts) - Foundation for GL
+2. TASK-ACCT-UI-004 (Suppliers) - Independent, high value
+3. TASK-PAY-021 (Payroll) - Unblock staff management
+
+**Sprint 2 (Week 3-4): Accounting Completion**
+4. TASK-ACCT-UI-002 (General Ledger)
+5. TASK-ACCT-UI-005 (Quote UI)
+6. TASK-QUOTE-001 (Quote PDF/Email)
+
+**Sprint 3 (Week 5-6): Polish**
+7. TASK-ACCT-UI-003 (Cash Flow)
+8. TASK-ACCT-UI-006 (Onboarding Wizard)
+9. TASK-QUOTE-002 (Public Acceptance)
+10. TASK-FIX-001 through TASK-FIX-005
+
+### Documentation Source
+
+Findings documented in:
+- `docs/architecture/gaps-and-opportunities.md` - Full gap analysis
+- Task specification files in `specs/tasks/TASK-*.md`
+
+---

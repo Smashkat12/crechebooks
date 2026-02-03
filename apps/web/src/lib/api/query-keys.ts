@@ -119,6 +119,15 @@ export const queryKeys = {
     status: () => [...queryKeys.xero.all, 'status'] as const,
     syncJobs: () => [...queryKeys.xero.all, 'sync-jobs'] as const,
   },
+  // Xero Payroll Journals
+  xeroJournals: {
+    all: ['xeroJournals'] as const,
+    lists: () => [...queryKeys.xeroJournals.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.xeroJournals.lists(), params] as const,
+    pending: () => [...queryKeys.xeroJournals.all, 'pending'] as const,
+    stats: () => [...queryKeys.xeroJournals.all, 'stats'] as const,
+    detail: (id: string) => [...queryKeys.xeroJournals.all, 'detail', id] as const,
+  },
   // Statements
   statements: {
     all: ['statements'] as const,
@@ -142,5 +151,59 @@ export const queryKeys = {
     all: ['admin'] as const,
     contactSubmissions: () => [...queryKeys.admin.all, 'contact-submissions'] as const,
     demoRequests: () => [...queryKeys.admin.all, 'demo-requests'] as const,
+  },
+  // Chart of Accounts
+  accounts: {
+    all: ['accounts'] as const,
+    lists: () => [...queryKeys.accounts.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.accounts.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.accounts.all, 'detail', id] as const,
+    byCode: (code: string) => [...queryKeys.accounts.all, 'byCode', code] as const,
+    summary: () => [...queryKeys.accounts.all, 'summary'] as const,
+    educationExempt: () => [...queryKeys.accounts.all, 'education-exempt'] as const,
+    trialBalance: (asOfDate: string) => [...queryKeys.accounts.all, 'trial-balance', asOfDate] as const,
+  },
+  // Suppliers
+  suppliers: {
+    all: ['suppliers'] as const,
+    lists: () => [...queryKeys.suppliers.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.suppliers.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.suppliers.all, 'detail', id] as const,
+    statement: (id: string, params?: Record<string, unknown>) =>
+      [...queryKeys.suppliers.all, 'statement', id, params] as const,
+    payablesSummary: () => [...queryKeys.suppliers.all, 'payables-summary'] as const,
+    bills: (supplierId: string) => [...queryKeys.suppliers.all, 'bills', supplierId] as const,
+  },
+  // General Ledger
+  generalLedger: {
+    all: ['general-ledger'] as const,
+    lists: () => [...queryKeys.generalLedger.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.generalLedger.lists(), params] as const,
+    accountLedger: (accountCode: string, params?: Record<string, unknown>) =>
+      [...queryKeys.generalLedger.all, 'account', accountCode, params] as const,
+    trialBalance: (asOfDate: string) => [...queryKeys.generalLedger.all, 'trial-balance', asOfDate] as const,
+    summary: (params?: Record<string, unknown>) => [...queryKeys.generalLedger.all, 'summary', params] as const,
+  },
+  // Quotes
+  quotes: {
+    all: ['quotes'] as const,
+    lists: () => [...queryKeys.quotes.all, 'list'] as const,
+    list: (params?: Record<string, unknown>) => [...queryKeys.quotes.lists(), params] as const,
+    detail: (id: string) => [...queryKeys.quotes.all, 'detail', id] as const,
+    summary: (params?: Record<string, unknown>) => [...queryKeys.quotes.all, 'summary', params] as const,
+  },
+  // Cash Flow
+  cashFlow: {
+    all: ['cash-flow'] as const,
+    statement: (params?: Record<string, unknown>) => [...queryKeys.cashFlow.all, 'statement', params] as const,
+    trend: (params?: Record<string, unknown>) => [...queryKeys.cashFlow.all, 'trend', params] as const,
+    summary: (params?: Record<string, unknown>) => [...queryKeys.cashFlow.all, 'summary', params] as const,
+  },
+  // TASK-FIX-005: Bank Fee Configuration
+  bankFees: {
+    all: ['bank-fees'] as const,
+    config: () => [...queryKeys.bankFees.all, 'config'] as const,
+    banks: () => [...queryKeys.bankFees.all, 'banks'] as const,
+    bankDefaults: (bankCode: string) => [...queryKeys.bankFees.all, 'defaults', bankCode] as const,
   },
 } as const;

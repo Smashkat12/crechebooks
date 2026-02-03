@@ -157,19 +157,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           } else {
             // Regular Auth0 token - use JWKS
             // The passportJwtSecret returns a function compatible with passport-jwt
-            (auth0SecretProvider as (req: Request, token: string, cb: SecretCallback) => void)(
-              req,
-              rawJwtToken,
-              done,
-            );
+            (
+              auth0SecretProvider as (
+                req: Request,
+                token: string,
+                cb: SecretCallback,
+              ) => void
+            )(req, rawJwtToken, done);
           }
         } catch (err) {
           // If decode fails, try Auth0 JWKS as fallback
-          (auth0SecretProvider as (req: Request, token: string, cb: SecretCallback) => void)(
-            req,
-            rawJwtToken,
-            done,
-          );
+          (
+            auth0SecretProvider as (
+              req: Request,
+              token: string,
+              cb: SecretCallback,
+            ) => void
+          )(req, rawJwtToken, done);
         }
       };
 

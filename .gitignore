@@ -107,3 +107,7 @@ test-results/
 .eslintcache
 .cache/
 .env.dev-secrets
+
+# Local docs
+docs/company-docs/
+docs/data

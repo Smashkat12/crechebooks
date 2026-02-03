@@ -102,7 +102,17 @@ interface PayrollListParams extends Record<string, unknown> {
 interface ProcessPayrollParams {
   month: number;
   year: number;
-  staffIds?: string[];
+  staffIds: string[];
+}
+
+interface ProcessPayrollResult {
+  success: boolean;
+  count: number;
+  payrollIds: string[];
+  errors?: Array<{
+    staffId: string;
+    error: string;
+  }>;
 }
 
 interface CreateStaffParams {
@@ -223,12 +233,13 @@ export function useCreateStaff() {
 }
 
 // Process payroll for a period
+// TASK-PAY-021: Enhanced with partial failure support
 export function useProcessPayroll() {
   const queryClient = useQueryClient();
 
-  return useMutation<{ success: boolean; count: number }, AxiosError, ProcessPayrollParams>({
+  return useMutation<ProcessPayrollResult, AxiosError, ProcessPayrollParams>({
     mutationFn: async ({ month, year, staffIds }) => {
-      const { data } = await apiClient.post<{ success: boolean; count: number }>(
+      const { data } = await apiClient.post<ProcessPayrollResult>(
         endpoints.payroll.process,
         {
           month,
@@ -240,6 +251,7 @@ export function useProcessPayroll() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.payroll.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.staff.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
     },
   });

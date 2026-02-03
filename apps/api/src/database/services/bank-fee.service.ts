@@ -9,6 +9,7 @@
  * - Apply fees to transactions during import
  */
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ValidationException,
@@ -47,6 +48,17 @@ export enum TransactionType {
   DEBIT_ORDER = 'DEBIT_ORDER',
   TRANSFER = 'TRANSFER',
   UNKNOWN = 'UNKNOWN',
+}
+
+/**
+ * TASK-FIX-005: Supported South African banks
+ */
+export enum SouthAfricanBank {
+  FNB = 'FNB',
+  STANDARD_BANK = 'STANDARD_BANK',
+  NEDBANK = 'NEDBANK',
+  ABSA = 'ABSA',
+  CAPITEC = 'CAPITEC',
 }
 
 /**
@@ -143,6 +155,210 @@ const DEFAULT_FNB_FEES: FeeRule[] = [
   },
 ];
 
+/**
+ * TASK-FIX-005: Standard Bank fees (as of 2024)
+ */
+const DEFAULT_STANDARD_BANK_FEES: FeeRule[] = [
+  {
+    feeType: BankFeeType.CASH_DEPOSIT_FEE,
+    transactionTypes: [
+      TransactionType.CASH_DEPOSIT,
+      TransactionType.ADT_DEPOSIT,
+    ],
+    fixedAmountCents: 1350,
+    isActive: true,
+    description: 'Standard Bank Cash Deposit fee',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_DEPOSIT],
+    fixedAmountCents: 450,
+    isActive: true,
+    description: 'Standard Bank ATM Deposit fee',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_WITHDRAWAL],
+    fixedAmountCents: 1100,
+    isActive: true,
+    description: 'Standard Bank ATM Withdrawal fee',
+  },
+  {
+    feeType: BankFeeType.EFT_DEBIT_FEE,
+    transactionTypes: [TransactionType.EFT_DEBIT, TransactionType.DEBIT_ORDER],
+    fixedAmountCents: 450,
+    isActive: true,
+    description: 'Standard Bank EFT Debit fee',
+  },
+  {
+    feeType: BankFeeType.EFT_CREDIT_FEE,
+    transactionTypes: [TransactionType.EFT_CREDIT, TransactionType.TRANSFER],
+    fixedAmountCents: 850,
+    isActive: true,
+    description: 'Standard Bank EFT Credit fee',
+  },
+  {
+    feeType: BankFeeType.CARD_TRANSACTION_FEE,
+    transactionTypes: [TransactionType.CARD_PURCHASE],
+    fixedAmountCents: 500,
+    isActive: true,
+    description: 'Standard Bank Card Transaction fee',
+  },
+];
+
+/**
+ * TASK-FIX-005: Nedbank fees (as of 2024)
+ */
+const DEFAULT_NEDBANK_FEES: FeeRule[] = [
+  {
+    feeType: BankFeeType.CASH_DEPOSIT_FEE,
+    transactionTypes: [
+      TransactionType.CASH_DEPOSIT,
+      TransactionType.ADT_DEPOSIT,
+    ],
+    fixedAmountCents: 1400,
+    isActive: true,
+    description: 'Nedbank Cash Deposit fee',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_DEPOSIT],
+    fixedAmountCents: 500,
+    isActive: true,
+    description: 'Nedbank ATM Deposit fee',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_WITHDRAWAL],
+    fixedAmountCents: 1150,
+    isActive: true,
+    description: 'Nedbank ATM Withdrawal fee',
+  },
+  {
+    feeType: BankFeeType.EFT_DEBIT_FEE,
+    transactionTypes: [TransactionType.EFT_DEBIT, TransactionType.DEBIT_ORDER],
+    fixedAmountCents: 500,
+    isActive: true,
+    description: 'Nedbank EFT Debit fee',
+  },
+  {
+    feeType: BankFeeType.EFT_CREDIT_FEE,
+    transactionTypes: [TransactionType.EFT_CREDIT, TransactionType.TRANSFER],
+    fixedAmountCents: 900,
+    isActive: true,
+    description: 'Nedbank EFT Credit fee',
+  },
+  {
+    feeType: BankFeeType.CARD_TRANSACTION_FEE,
+    transactionTypes: [TransactionType.CARD_PURCHASE],
+    fixedAmountCents: 525,
+    isActive: true,
+    description: 'Nedbank Card Transaction fee',
+  },
+];
+
+/**
+ * TASK-FIX-005: ABSA fees (as of 2024)
+ */
+const DEFAULT_ABSA_FEES: FeeRule[] = [
+  {
+    feeType: BankFeeType.CASH_DEPOSIT_FEE,
+    transactionTypes: [
+      TransactionType.CASH_DEPOSIT,
+      TransactionType.ADT_DEPOSIT,
+    ],
+    fixedAmountCents: 1450,
+    isActive: true,
+    description: 'ABSA Cash Deposit fee',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_DEPOSIT],
+    fixedAmountCents: 550,
+    isActive: true,
+    description: 'ABSA ATM Deposit fee',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_WITHDRAWAL],
+    fixedAmountCents: 1200,
+    isActive: true,
+    description: 'ABSA ATM Withdrawal fee',
+  },
+  {
+    feeType: BankFeeType.EFT_DEBIT_FEE,
+    transactionTypes: [TransactionType.EFT_DEBIT, TransactionType.DEBIT_ORDER],
+    fixedAmountCents: 475,
+    isActive: true,
+    description: 'ABSA EFT Debit fee',
+  },
+  {
+    feeType: BankFeeType.EFT_CREDIT_FEE,
+    transactionTypes: [TransactionType.EFT_CREDIT, TransactionType.TRANSFER],
+    fixedAmountCents: 925,
+    isActive: true,
+    description: 'ABSA EFT Credit fee',
+  },
+  {
+    feeType: BankFeeType.CARD_TRANSACTION_FEE,
+    transactionTypes: [TransactionType.CARD_PURCHASE],
+    fixedAmountCents: 550,
+    isActive: true,
+    description: 'ABSA Card Transaction fee',
+  },
+];
+
+/**
+ * TASK-FIX-005: Capitec fees (as of 2024) - typically lower fees
+ */
+const DEFAULT_CAPITEC_FEES: FeeRule[] = [
+  {
+    feeType: BankFeeType.CASH_DEPOSIT_FEE,
+    transactionTypes: [
+      TransactionType.CASH_DEPOSIT,
+      TransactionType.ADT_DEPOSIT,
+    ],
+    fixedAmountCents: 0,
+    isActive: true,
+    description: 'Capitec Cash Deposit fee (free at Capitec ATMs)',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_DEPOSIT],
+    fixedAmountCents: 0,
+    isActive: true,
+    description: 'Capitec ATM Deposit fee (free)',
+  },
+  {
+    feeType: BankFeeType.ATM_FEE,
+    transactionTypes: [TransactionType.ATM_WITHDRAWAL],
+    fixedAmountCents: 0,
+    isActive: true,
+    description: 'Capitec ATM Withdrawal fee (free at Capitec ATMs)',
+  },
+  {
+    feeType: BankFeeType.EFT_DEBIT_FEE,
+    transactionTypes: [TransactionType.EFT_DEBIT, TransactionType.DEBIT_ORDER],
+    fixedAmountCents: 0,
+    isActive: true,
+    description: 'Capitec EFT Debit fee (free)',
+  },
+  {
+    feeType: BankFeeType.EFT_CREDIT_FEE,
+    transactionTypes: [TransactionType.EFT_CREDIT, TransactionType.TRANSFER],
+    fixedAmountCents: 0,
+    isActive: true,
+    description: 'Capitec EFT Credit fee (free)',
+  },
+  {
+    feeType: BankFeeType.CARD_TRANSACTION_FEE,
+    transactionTypes: [TransactionType.CARD_PURCHASE],
+    fixedAmountCents: 0,
+    isActive: true,
+    description: 'Capitec Card Transaction fee (free)',
+  },
+];
+
 @Injectable()
 export class BankFeeService {
   private readonly logger = new Logger(BankFeeService.name);
@@ -154,7 +370,8 @@ export class BankFeeService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Get or create bank fee configuration for a tenant
+   * TASK-FIX-005: Get or create bank fee configuration for a tenant
+   * Now loads from database bankFeeConfig JSON field
    */
   async getConfiguration(tenantId: string): Promise<BankFeeConfiguration> {
     // Check cache first
@@ -163,12 +380,13 @@ export class BankFeeService {
       return cached;
     }
 
-    // Load from tenant settings (stored as JSON in tenant record)
+    // Load from tenant settings
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
-        closureDates: true, // We'll repurpose a JSON field or add a new one
+        bankName: true,
+        bankFeeConfig: true,
       },
     });
 
@@ -176,16 +394,23 @@ export class BankFeeService {
       throw new NotFoundException('Tenant', tenantId);
     }
 
-    // Check if there's a BankFeeConfig in a JSON field
-    // For now, we'll store in a dedicated table or use defaults
-    // TODO: Add bank_fee_config column to tenant table or create separate table
+    // Check if there's stored configuration
+    if (tenant.bankFeeConfig) {
+      const storedConfig =
+        tenant.bankFeeConfig as unknown as BankFeeConfiguration;
+      storedConfig.tenantId = tenantId;
+      storedConfig.updatedAt = new Date();
+      this.configCache.set(tenantId, storedConfig);
+      return storedConfig;
+    }
 
-    // Return default configuration with FNB fees
+    // Return default configuration based on tenant's bank
+    const bankName = tenant.bankName || 'FNB';
     const config: BankFeeConfiguration = {
       tenantId,
-      bankName: 'FNB',
-      feeRules: [...DEFAULT_FNB_FEES],
-      defaultTransactionFeeCents: 500, // R5.00 default
+      bankName,
+      feeRules: this.getDefaultFeeRules(bankName),
+      defaultTransactionFeeCents: 500,
       isEnabled: true,
       updatedAt: new Date(),
     };
@@ -483,24 +708,105 @@ export class BankFeeService {
   }
 
   /**
-   * Get default fee rules for a bank
+   * TASK-FIX-005: Get default fee rules for a bank
+   * Now supports all major South African banks
    */
   getDefaultFeeRules(bankName: string = 'FNB'): FeeRule[] {
-    // Currently only FNB defaults are implemented
-    // TODO: Add support for other SA banks (Standard Bank, Nedbank, ABSA, Capitec)
-    if (bankName.toUpperCase() === 'FNB') {
-      return [...DEFAULT_FNB_FEES];
+    const normalizedBank = bankName.toUpperCase().replace(/\s+/g, '_');
+
+    switch (normalizedBank) {
+      case 'FNB':
+      case 'FIRST_NATIONAL_BANK':
+        return [...DEFAULT_FNB_FEES];
+      case 'STANDARD_BANK':
+        return [...DEFAULT_STANDARD_BANK_FEES];
+      case 'NEDBANK':
+        return [...DEFAULT_NEDBANK_FEES];
+      case 'ABSA':
+        return [...DEFAULT_ABSA_FEES];
+      case 'CAPITEC':
+        return [...DEFAULT_CAPITEC_FEES];
+      default:
+        return [
+          {
+            feeType: BankFeeType.TRANSACTION_FEE,
+            transactionTypes: Object.values(TransactionType),
+            fixedAmountCents: 500,
+            isActive: true,
+            description: 'Generic transaction fee',
+          },
+        ];
+    }
+  }
+
+  /**
+   * TASK-FIX-005: Get list of supported banks
+   */
+  getSupportedBanks(): { code: SouthAfricanBank; name: string }[] {
+    return [
+      { code: SouthAfricanBank.FNB, name: 'First National Bank (FNB)' },
+      { code: SouthAfricanBank.STANDARD_BANK, name: 'Standard Bank' },
+      { code: SouthAfricanBank.NEDBANK, name: 'Nedbank' },
+      { code: SouthAfricanBank.ABSA, name: 'ABSA' },
+      { code: SouthAfricanBank.CAPITEC, name: 'Capitec' },
+    ];
+  }
+
+  /**
+   * TASK-FIX-005: Save bank fee configuration for a tenant
+   */
+  async saveConfiguration(
+    tenantId: string,
+    config: Partial<BankFeeConfiguration>,
+  ): Promise<BankFeeConfiguration> {
+    const currentConfig = await this.getConfiguration(tenantId);
+    const newConfig: BankFeeConfiguration = {
+      ...currentConfig,
+      ...config,
+      tenantId,
+      updatedAt: new Date(),
+    };
+
+    // Validate fee rules
+    if (newConfig.feeRules) {
+      this.validateFeeRules(newConfig.feeRules);
     }
 
-    // Return generic defaults
-    return [
-      {
-        feeType: BankFeeType.TRANSACTION_FEE,
-        transactionTypes: Object.values(TransactionType),
-        fixedAmountCents: 500, // R5.00
-        isActive: true,
-        description: 'Generic transaction fee',
+    // Save to database
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        bankFeeConfig: newConfig as unknown as Prisma.JsonObject,
+        ...(config.bankName && { bankName: config.bankName }),
       },
-    ];
+    });
+
+    // Update cache
+    this.configCache.set(tenantId, newConfig);
+
+    this.logger.log(
+      `Saved bank fee configuration for tenant ${tenantId}: ${newConfig.bankName}`,
+    );
+
+    return newConfig;
+  }
+
+  /**
+   * TASK-FIX-005: Apply bank preset to tenant
+   */
+  async applyBankPreset(
+    tenantId: string,
+    bankCode: SouthAfricanBank,
+  ): Promise<BankFeeConfiguration> {
+    const bankName =
+      this.getSupportedBanks().find((b) => b.code === bankCode)?.name ||
+      bankCode;
+    const feeRules = this.getDefaultFeeRules(bankCode);
+
+    return this.saveConfiguration(tenantId, {
+      bankName,
+      feeRules,
+      isEnabled: true,
+    });
   }
 }

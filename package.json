@@ -48,7 +48,9 @@
     "cli:build": "pnpm --filter @crechebooks/cli build"
   },
   "devDependencies": {
+    "@claude-flow/embeddings": "3.0.0-alpha.7",
     "better-sqlite3": "^12.6.2",
+    "claude-flow": "3.1.0-alpha.2",
     "prettier": "^3.4.2",
     "turbo": "^2.3.3"
   },

@@ -5,4 +5,5 @@ export { GenerateInvoicesWizard } from "./generate-invoices-wizard";
 export { InvoicePreview } from "./invoice-preview";
 export { InvoiceLineItems } from "./invoice-line-items";
 export { SendInvoiceDialog } from "./send-invoice-dialog";
+export { DeleteInvoiceDialog } from "./delete-invoice-dialog";
 export { InvoiceStatusBadge } from "./invoice-status-badge";

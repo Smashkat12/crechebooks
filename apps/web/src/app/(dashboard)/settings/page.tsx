@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/use-auth';
+import { useUpdateProfile } from '@/hooks/use-profile';
+import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,6 +22,8 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfileSettingsPage() {
   const { user } = useAuth();
+  const updateProfile = useUpdateProfile();
+  const { toast } = useToast();
 
   const {
     register,
@@ -34,7 +38,24 @@ export default function ProfileSettingsPage() {
   });
 
   const onSubmit = async (data: ProfileFormData) => {
-    // TODO: Implement profile update API call
+    try {
+      await updateProfile.mutateAsync(data);
+      toast({
+        title: 'Profile updated',
+        description: 'Your profile has been updated successfully.',
+      });
+    } catch (error) {
+      // Extract error message from API response or use fallback
+      const axiosError = error as { response?: { data?: { message?: string } } };
+      const message =
+        axiosError.response?.data?.message ||
+        (error instanceof Error ? error.message : 'Failed to update profile. Please try again.');
+      toast({
+        title: 'Update failed',
+        description: message,
+        variant: 'destructive',
+      });
+    }
   };
 
   // Check if user is OWNER or ADMIN
@@ -65,8 +86,11 @@ export default function ProfileSettingsPage() {
                 <p className="text-sm text-destructive">{errors.email.message}</p>
               )}
             </div>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            <Button
+              type="submit"
+              disabled={isSubmitting || updateProfile.isPending}
+            >
+              {updateProfile.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </form>
         </CardContent>

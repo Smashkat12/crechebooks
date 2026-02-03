@@ -26,6 +26,7 @@ export enum EmailTemplateName {
   REMINDER_EMAIL = 'reminder_email',
   PAYMENT_RECEIPT = 'payment_receipt',
   WELCOME_PACK_EMAIL = 'welcome_pack_email',
+  QUOTE_EMAIL = 'quote_email', // TASK-QUOTE-001
 }
 
 /**
@@ -178,6 +179,33 @@ export interface WelcomePackEmailData extends BaseEmailTemplateData {
 }
 
 /**
+ * Quote email template data (TASK-QUOTE-001)
+ */
+export interface QuoteEmailData extends BaseEmailTemplateData {
+  quoteNumber: string;
+  quoteDate: Date | string;
+  expiryDate: Date | string;
+  validityDays: number;
+  childName?: string;
+  expectedStartDate?: Date | string;
+  subtotalCents: number;
+  vatCents: number;
+  totalCents: number;
+  lineItems: Array<{
+    description: string;
+    quantity: number;
+    unitPriceCents: number;
+    totalCents: number;
+  }>;
+  /** Link to view quote online (public token-based) */
+  viewQuoteUrl?: string;
+  /** Link to accept quote */
+  acceptQuoteUrl?: string;
+  /** Link to decline quote */
+  declineQuoteUrl?: string;
+}
+
+/**
  * Union type for all template data types
  */
 export type EmailTemplateData =
@@ -185,7 +213,8 @@ export type EmailTemplateData =
   | StatementEmailData
   | ReminderEmailData
   | PaymentReceiptData
-  | WelcomePackEmailData;
+  | WelcomePackEmailData
+  | QuoteEmailData;
 
 /**
  * Rendered email result
@@ -398,6 +427,16 @@ export class EmailTemplateService implements OnModuleInit {
       Handlebars.compile(this.getEmbeddedWelcomePackTextTemplate()),
     );
 
+    // Quote email template (TASK-QUOTE-001)
+    this.templates.set(
+      EmailTemplateName.QUOTE_EMAIL,
+      Handlebars.compile(this.getEmbeddedQuoteHtmlTemplate()),
+    );
+    this.textTemplates.set(
+      EmailTemplateName.QUOTE_EMAIL,
+      Handlebars.compile(this.getEmbeddedQuoteTextTemplate()),
+    );
+
     this.logger.log('Loaded embedded templates');
   }
 
@@ -547,6 +586,13 @@ export class EmailTemplateService implements OnModuleInit {
   }
 
   /**
+   * Render quote email (TASK-QUOTE-001)
+   */
+  renderQuoteEmail(data: QuoteEmailData): RenderedEmail {
+    return this.render(EmailTemplateName.QUOTE_EMAIL, data);
+  }
+
+  /**
    * Generate email subject based on template type
    */
   private generateSubject(
@@ -573,6 +619,11 @@ export class EmailTemplateService implements OnModuleInit {
         return `Payment Receipt ${receiptNumber} from ${tenantName}`;
       case EmailTemplateName.WELCOME_PACK_EMAIL:
         return `Welcome to ${tenantName} - ${(data as unknown as WelcomePackEmailData).childName || 'Your Child'}'s Enrollment`;
+      case EmailTemplateName.QUOTE_EMAIL: {
+        const quoteNumber =
+          typeof data.quoteNumber === 'string' ? data.quoteNumber : '';
+        return `Quote ${quoteNumber} from ${tenantName}`;
+      }
       default:
         return `Message from ${tenantName}`;
     }
@@ -1454,6 +1505,265 @@ We can't wait to see {{childName}} on {{formatDate startDate}}! If you have any 
 
 With warm regards,
 The {{tenantName}} Team
+
+{{#if footerText}}
+{{footerText}}
+{{/if}}
+{{#if supportEmail}}
+Questions? Contact us at {{supportEmail}}{{#if supportPhone}} | {{supportPhone}}{{/if}}
+{{/if}}
+
+(c) {{currentYear}} {{tenantName}}`;
+  }
+
+  /**
+   * Quote HTML email template (TASK-QUOTE-001)
+   */
+  private getEmbeddedQuoteHtmlTemplate(): string {
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quote {{quoteNumber}}</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 0; background-color: #f5f5f5;">
+  <!-- Header with branding -->
+  <div style="background: linear-gradient(135deg, {{defaultColor primaryColor '#007bff'}} 0%, {{defaultColor secondaryColor '#0056b3'}} 100%); color: white; padding: 30px 25px; text-align: center; border-radius: 0 0 20px 20px;">
+    {{#if tenantLogo}}
+    <img src="{{tenantLogo}}" alt="{{tenantName}}" style="max-height: 70px; margin-bottom: 15px;">
+    {{/if}}
+    <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;">{{tenantName}}</h1>
+    <p style="margin: 8px 0 0 0; font-size: 16px; opacity: 0.9;">Quote for Your Consideration</p>
+  </div>
+
+  <!-- Main content -->
+  <div style="padding: 30px 25px; background-color: #ffffff; margin: 0;">
+    <p style="font-size: 16px; margin-bottom: 5px;">Dear <strong>{{recipientName}}</strong>,</p>
+    <p style="color: #666; margin-top: 0;">Thank you for your interest in our services. Please find your quote details below.</p>
+
+    <!-- Quote Details Card -->
+    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 12px; margin: 25px 0; border-left: 4px solid {{defaultColor primaryColor '#007bff'}};">
+      <h3 style="margin: 0 0 15px 0; color: {{defaultColor primaryColor '#007bff'}}; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">Quote Details</h3>
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Quote Number:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 600; color: #333;">{{quoteNumber}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Quote Date:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500;">{{formatDate quoteDate}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Valid Until:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500; color: #dc3545;">{{formatDate expiryDate}}</td>
+        </tr>
+        {{#if childName}}
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Child's Name:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500;">{{childName}}</td>
+        </tr>
+        {{/if}}
+        {{#if expectedStartDate}}
+        <tr>
+          <td style="padding: 10px 0; color: #555;">Expected Start:</td>
+          <td style="padding: 10px 0; text-align: right; font-weight: 500;">{{formatDate expectedStartDate}}</td>
+        </tr>
+        {{/if}}
+      </table>
+    </div>
+
+    <!-- Line Items -->
+    <h3 style="border-bottom: 2px solid {{defaultColor primaryColor '#007bff'}}; padding-bottom: 10px; color: #333; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">Quoted Services</h3>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 13px;">
+        <thead>
+          <tr style="background-color: {{defaultColor primaryColor '#007bff'}}; color: white;">
+            <th style="padding: 12px 8px; text-align: left; border-radius: 6px 0 0 0;">Description</th>
+            <th style="padding: 12px 8px; text-align: right;">Qty</th>
+            <th style="padding: 12px 8px; text-align: right;">Unit Price</th>
+            <th style="padding: 12px 8px; text-align: right; border-radius: 0 6px 0 0;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each lineItems}}
+          <tr style="{{#if @odd}}background-color: #f8f9fa;{{/if}}">
+            <td style="padding: 10px 8px; border-bottom: 1px solid #eee;">{{description}}</td>
+            <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee;">{{quantity}}</td>
+            <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee;">{{formatCurrency unitPriceCents}}</td>
+            <td style="padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee; font-weight: 600;">{{formatCurrency totalCents}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Totals -->
+    <div style="background-color: white; padding: 15px 20px; border: 2px solid {{defaultColor primaryColor '#007bff'}}; border-radius: 8px; margin-bottom: 25px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 8px 0; color: #555;"><strong>Subtotal:</strong></td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 500;">{{formatCurrency subtotalCents}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555;"><strong>VAT (15%):</strong></td>
+          <td style="padding: 8px 0; text-align: right; font-weight: 500;">{{formatCurrency vatCents}}</td>
+        </tr>
+        <tr style="border-top: 2px solid {{defaultColor primaryColor '#007bff'}};">
+          <td style="padding: 15px 0 10px 0; font-size: 18px; font-weight: 700; color: #333;">Total:</td>
+          <td style="padding: 15px 0 10px 0; text-align: right; font-size: 22px; font-weight: 700; color: {{defaultColor primaryColor '#007bff'}};">{{formatCurrency totalCents}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Validity Notice -->
+    <div style="background-color: #fff3cd; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; font-size: 14px; color: #856404;">
+        <strong>Valid for {{validityDays}} days:</strong> This quote is valid until {{formatDate expiryDate}}. Prices may be subject to change after this date.
+      </p>
+    </div>
+
+    <!-- Bank Details / Payment Instructions -->
+    {{#if bankAccountNumber}}
+    <div style="background-color: #e8f4fd; padding: 20px; border-radius: 12px; margin: 25px 0; border: 1px solid #b8daff;">
+      <h3 style="margin: 0 0 15px 0; color: {{defaultColor primaryColor '#007bff'}}; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+        <span style="margin-right: 8px;">&#128179;</span>Banking Details for Deposit
+      </h3>
+      <p style="margin: 0 0 15px 0; color: #555; font-size: 14px;">If you wish to secure your place with a deposit, please use the following banking details:</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <tr>
+          <td style="padding: 8px 0; color: #555; width: 45%;">Bank:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankName}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Holder:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountHolder}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Number:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountNumber}}</td>
+        </tr>
+        {{#if bankBranchCode}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Branch Code:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankBranchCode}}</td>
+        </tr>
+        {{/if}}
+        {{#if bankAccountType}}
+        <tr>
+          <td style="padding: 8px 0; color: #555;">Account Type:</td>
+          <td style="padding: 8px 0; font-weight: 600; color: #333;">{{bankAccountType}}</td>
+        </tr>
+        {{/if}}
+      </table>
+      <div style="background-color: #fff3cd; padding: 12px; border-radius: 6px; margin-top: 15px; border-left: 4px solid #ffc107;">
+        <p style="margin: 0; font-size: 13px; color: #856404;">
+          <strong>Reference:</strong> Please use "{{#if childName}}{{childName}}{{else}}{{quoteNumber}}{{/if}}" as the payment reference.
+        </p>
+      </div>
+    </div>
+    {{/if}}
+
+    <!-- Action Buttons -->
+    <div style="text-align: center; margin: 30px 0;">
+      {{#if viewQuoteUrl}}
+      <a href="{{viewQuoteUrl}}" style="background: linear-gradient(135deg, {{defaultColor primaryColor '#007bff'}} 0%, {{defaultColor secondaryColor '#0056b3'}} 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: 600; box-shadow: 0 4px 15px rgba(0,123,255,0.3); margin: 5px;">
+        View Quote Online
+      </a>
+      {{/if}}
+      {{#if acceptQuoteUrl}}
+      <a href="{{acceptQuoteUrl}}" style="background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: 600; box-shadow: 0 4px 15px rgba(40,167,69,0.3); margin: 5px;">
+        Accept Quote
+      </a>
+      {{/if}}
+      {{#if declineQuoteUrl}}
+      <a href="{{declineQuoteUrl}}" style="background: transparent; color: #6c757d; padding: 14px 35px; text-decoration: none; border-radius: 25px; display: inline-block; font-weight: 600; border: 2px solid #6c757d; margin: 5px;">
+        Decline
+      </a>
+      {{/if}}
+    </div>
+
+    <p style="color: #666; font-size: 14px; margin-top: 25px;">A PDF copy of this quote is attached for your records.</p>
+    <p style="color: #666; font-size: 14px;">If you have any questions, please don't hesitate to contact us.</p>
+    <p style="color: #666; font-size: 14px;">We look forward to welcoming you!</p>
+  </div>
+
+  <!-- Footer -->
+  <div style="background-color: #2c3e50; color: #bdc3c7; padding: 25px; text-align: center; font-size: 12px;">
+    {{#if footerText}}
+    <p style="margin: 0 0 10px 0;">{{footerText}}</p>
+    {{/if}}
+    {{#if supportEmail}}
+    <p style="margin: 0 0 10px 0;">Questions? Contact us at <a href="mailto:{{supportEmail}}" style="color: {{defaultColor primaryColor '#007bff'}}; text-decoration: none;">{{supportEmail}}</a>{{#if supportPhone}} | {{supportPhone}}{{/if}}</p>
+    {{/if}}
+    <p style="margin: 0; opacity: 0.7;">&copy; {{currentYear}} {{tenantName}}. All rights reserved.</p>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Quote text email template (TASK-QUOTE-001)
+   */
+  private getEmbeddedQuoteTextTemplate(): string {
+    return `{{tenantName}}
+QUOTE
+=====
+
+Dear {{recipientName}},
+
+Thank you for your interest in our services. Please find your quote details below.
+
+QUOTE DETAILS
+-------------
+Quote Number: {{quoteNumber}}
+Quote Date: {{formatDate quoteDate}}
+Valid Until: {{formatDate expiryDate}}
+{{#if childName}}Child's Name: {{childName}}{{/if}}
+{{#if expectedStartDate}}Expected Start: {{formatDate expectedStartDate}}{{/if}}
+
+QUOTED SERVICES
+---------------
+{{#each lineItems}}
+- {{description}}: {{quantity}} x {{formatCurrency unitPriceCents}} = {{formatCurrency totalCents}}
+{{/each}}
+
+----------------------------------------
+Subtotal: {{formatCurrency subtotalCents}}
+VAT (15%): {{formatCurrency vatCents}}
+TOTAL: {{formatCurrency totalCents}}
+----------------------------------------
+
+VALIDITY NOTICE
+---------------
+This quote is valid for {{validityDays}} days until {{formatDate expiryDate}}.
+Prices may be subject to change after this date.
+
+{{#if bankAccountNumber}}
+BANKING DETAILS FOR DEPOSIT
+---------------------------
+If you wish to secure your place with a deposit:
+
+Bank: {{bankName}}
+Account Holder: {{bankAccountHolder}}
+Account Number: {{bankAccountNumber}}
+{{#if bankBranchCode}}Branch Code: {{bankBranchCode}}{{/if}}
+{{#if bankAccountType}}Account Type: {{bankAccountType}}{{/if}}
+
+Reference: Please use "{{#if childName}}{{childName}}{{else}}{{quoteNumber}}{{/if}}" as the payment reference.
+{{/if}}
+
+{{#if viewQuoteUrl}}
+View quote online: {{viewQuoteUrl}}
+{{/if}}
+{{#if acceptQuoteUrl}}
+Accept this quote: {{acceptQuoteUrl}}
+{{/if}}
+
+A PDF copy of this quote is attached for your records.
+
+If you have any questions, please don't hesitate to contact us.
+We look forward to welcoming you!
 
 {{#if footerText}}
 {{footerText}}

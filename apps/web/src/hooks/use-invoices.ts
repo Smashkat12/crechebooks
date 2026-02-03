@@ -354,3 +354,26 @@ export function useDownloadInvoicePdf() {
 
   return { downloadPdf };
 }
+
+/**
+ * Delete invoice mutation hook
+ * TASK-FIX-003: Invoice Deletion Handler
+ */
+export function useDeleteInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation<{ success: boolean }, AxiosError, string>({
+    mutationFn: async (invoiceId: string) => {
+      const { data } = await apiClient.delete<{ success: boolean }>(
+        endpoints.invoices.detail(invoiceId),
+      );
+      return data;
+    },
+    onSuccess: () => {
+      // Invalidate invoice lists to refresh the table
+      queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() });
+      // Also invalidate dashboard as it may show invoice counts
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    },
+  });
+}

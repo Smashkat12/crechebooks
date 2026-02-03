@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, Check, Users, Calculator, FileCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, Users, Calculator, FileCheck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -205,6 +205,7 @@ export function PayrollWizard({
                 <Checkbox
                   id="select-all"
                   checked={selectedStaffIds.length === activeStaff.length}
+                  disabled={isLoading}
                   onCheckedChange={(checked) => {
                     setSelectedStaffIds(checked ? activeStaff.map(s => s.id) : []);
                   }}
@@ -223,6 +224,7 @@ export function PayrollWizard({
                       <Checkbox
                         id={`staff-${staffMember.id}`}
                         checked={selectedStaffIds.includes(staffMember.id)}
+                        disabled={isLoading}
                         onCheckedChange={() => toggleStaff(staffMember.id)}
                       />
                       <Label htmlFor={`staff-${staffMember.id}`}>
@@ -304,12 +306,19 @@ export function PayrollWizard({
         <div>
           {currentStep === 'confirm' ? (
             <Button onClick={handleConfirm} disabled={isLoading}>
-              {isLoading ? 'Processing...' : 'Process Payroll'}
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                'Process Payroll'
+              )}
             </Button>
           ) : (
             <Button
               onClick={goNext}
-              disabled={selectedStaffIds.length === 0}
+              disabled={selectedStaffIds.length === 0 || isLoading}
             >
               {currentStep === 'select' ? 'Calculate' : 'Continue'}
               <ChevronRight className="ml-2 h-4 w-4" />

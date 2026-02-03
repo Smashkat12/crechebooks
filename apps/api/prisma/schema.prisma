@@ -514,6 +514,9 @@ model Tenant {
   bankAccountType   String? @map("bank_account_type") @db.VarChar(30)
   bankSwiftCode     String? @map("bank_swift_code") @db.VarChar(20)
 
+  // TASK-FIX-005: Bank fee configuration for multi-bank support
+  bankFeeConfig     Json?   @map("bank_fee_config")
+
   // TASK-ENROL-006: Parent welcome pack customization
   parentWelcomeMessage String? @map("parent_welcome_message") @db.Text
   operatingHours       String? @map("operating_hours") @db.VarChar(200)
@@ -537,6 +540,7 @@ model Tenant {
   staff                 Staff[]
   payrolls              Payroll[]
   sarsSubmissions       SarsSubmission[]
+  sarsNotifications     SarsNotification[]
   reconciliations       Reconciliation[]
   xeroToken             XeroToken?
   bankConnections       BankConnection[]
@@ -1420,13 +1424,32 @@ model SarsSubmission {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  tenant    Tenant @relation(fields: [tenantId], references: [id])
-  submitter User?  @relation(fields: [submittedBy], references: [id])
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  submitter     User?              @relation(fields: [submittedBy], references: [id])
+  notifications SarsNotification[]
 
   @@unique([tenantId, submissionType, periodStart])
   @@index([tenantId, status])
   @@index([deadline])
   @@map("sars_submissions")
+}
+
+// TASK-FIX-001: SARS Submission Failure Notifications
+model SarsNotification {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  submissionId     String   @map("submission_id")
+  notificationType String   @map("notification_type") @db.VarChar(50)
+  payload          Json
+  sentAt           DateTime @map("sent_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  submission SarsSubmission @relation(fields: [submissionId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([submissionId])
+  @@map("sars_notifications")
 }
 
 model Payroll {
@@ -3508,6 +3531,9 @@ model Quote {
 
   // Content
   notes String? @db.Text
+
+  // Public access token for recipient (TASK-QUOTE-001)
+  viewToken String? @unique @map("view_token") @db.VarChar(36)
 
   // Audit
   createdById String   @map("created_by_id")

@@ -7,7 +7,13 @@
  * - CorrelationIdMiddleware for request correlation
  */
 
-import { Global, MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
+import {
+  Global,
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { StructuredLoggerService } from './structured-logger.service';
 import { CorrelationIdMiddleware } from './correlation-id.middleware';
 
@@ -22,6 +28,8 @@ export class LoggerModule implements NestModule {
    * Note: Using { path: '*path', method: RequestMethod.ALL } for path-to-regexp v8 compatibility
    */
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CorrelationIdMiddleware).forRoutes({ path: '*path', method: RequestMethod.ALL });
+    consumer
+      .apply(CorrelationIdMiddleware)
+      .forRoutes({ path: '*path', method: RequestMethod.ALL });
   }
 }

@@ -14,6 +14,11 @@ import {
   ClipboardList,
   Shield,
   Megaphone,
+  Calculator,
+  Truck,
+  BookOpen,
+  FilePlus2,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -30,6 +35,7 @@ export const mainNavLinks: NavLink[] = [
   { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { title: 'Transactions', href: '/transactions', icon: Receipt },
   { title: 'Invoices', href: '/invoices', icon: FileText },
+  { title: 'Quotes', href: '/accounting/quotes', icon: FilePlus2 },
   { title: 'Statements', href: '/statements', icon: ClipboardList },
   { title: 'Payments', href: '/payments', icon: Wallet },
   { title: 'Arrears', href: '/arrears', icon: AlertTriangle },
@@ -44,6 +50,10 @@ export const managementNavLinks: NavLink[] = [
 ];
 
 export const complianceNavLinks: NavLink[] = [
+  { title: 'Accounting', href: '/accounting/accounts', icon: Calculator },
+  { title: 'General Ledger', href: '/accounting/general-ledger', icon: BookOpen },
+  { title: 'Cash Flow', href: '/accounting/cash-flow', icon: TrendingUp },
+  { title: 'Suppliers', href: '/accounting/suppliers', icon: Truck },
   { title: 'SARS', href: '/sars', icon: Building2 },
   { title: 'Reconciliation', href: '/reconciliation', icon: BarChart3 },
   { title: 'Reports', href: '/reports', icon: FileSpreadsheet },

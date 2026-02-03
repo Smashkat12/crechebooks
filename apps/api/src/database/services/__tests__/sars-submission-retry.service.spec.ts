@@ -50,6 +50,12 @@ describe('SarsSubmissionRetryService', () => {
         findUnique: jest.fn(),
         update: jest.fn(),
       },
+      sarsNotification: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+      userTenantRole: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
 
     service = new SarsSubmissionRetryService(mockPrisma);
@@ -392,7 +398,7 @@ describe('SarsSubmissionRetryService', () => {
   });
 
   describe('notifyAdmin', () => {
-    it('should log admin notification for failed submission', () => {
+    it('should log admin notification for failed submission', async () => {
       const loggerSpy = jest.spyOn(service['logger'], 'error');
 
       const error: SarsApiError = {
@@ -400,7 +406,7 @@ describe('SarsSubmissionRetryService', () => {
         message: 'Service unavailable',
       };
 
-      service.notifyAdmin(mockSubmission, error);
+      await service.notifyAdmin(mockSubmission, error);
 
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining('[ADMIN ALERT]'),
@@ -408,7 +414,7 @@ describe('SarsSubmissionRetryService', () => {
       );
     });
 
-    it('should include all notification details', () => {
+    it('should include all notification details', async () => {
       const loggerSpy = jest.spyOn(service['logger'], 'error');
 
       const submissionWithMetadata = {
@@ -427,13 +433,80 @@ describe('SarsSubmissionRetryService', () => {
         message: 'Validation failed',
       };
 
-      service.notifyAdmin(submissionWithMetadata, error);
+      await service.notifyAdmin(submissionWithMetadata, error);
 
       const callArgs = loggerSpy.mock.calls[0][0];
       expect(callArgs).toContain(submissionId);
       expect(callArgs).toContain(tenantId);
       expect(callArgs).toContain('VAT201');
       expect(callArgs).toContain('Validation failed');
+    });
+
+    it('should create notification record in database', async () => {
+      const error: SarsApiError = {
+        statusCode: 503,
+        message: 'Service unavailable',
+      };
+
+      await service.notifyAdmin(mockSubmission, error);
+
+      expect(mockPrisma.sarsNotification.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          tenantId,
+          submissionId,
+          notificationType: 'SUBMISSION_FAILED',
+          payload: expect.objectContaining({
+            submissionId,
+            tenantId,
+            errorMessage: 'Service unavailable',
+          }),
+          sentAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('should query admin users for email notification', async () => {
+      mockPrisma.userTenantRole.findMany.mockResolvedValue([
+        {
+          user: { id: 'user-1', email: 'admin@test.com', name: 'Admin User' },
+        },
+      ]);
+
+      const error: SarsApiError = {
+        statusCode: 503,
+        message: 'Service unavailable',
+      };
+
+      await service.notifyAdmin(mockSubmission, error);
+
+      expect(mockPrisma.userTenantRole.findMany).toHaveBeenCalledWith({
+        where: {
+          tenantId,
+          isActive: true,
+          role: { in: ['OWNER', 'ADMIN'] },
+        },
+        include: { user: { select: { id: true, email: true, name: true } } },
+      });
+    });
+
+    it('should handle notification record creation failure gracefully', async () => {
+      mockPrisma.sarsNotification.create.mockRejectedValue(
+        new Error('DB connection failed'),
+      );
+      const loggerErrorSpy = jest.spyOn(service['logger'], 'error');
+
+      const error: SarsApiError = {
+        statusCode: 503,
+        message: 'Service unavailable',
+      };
+
+      // Should not throw
+      await service.notifyAdmin(mockSubmission, error);
+
+      // Should log the error
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to create notification record'),
+      );
     });
   });
 

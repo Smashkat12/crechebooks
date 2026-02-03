@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { User, Building2, Link as LinkIcon, DollarSign, MessageSquare, Key } from 'lucide-react';
+import { User, Building2, Link as LinkIcon, DollarSign, MessageSquare, Key, Landmark } from 'lucide-react';
 
 const settingsNav = [
   { href: '/settings', label: 'Profile', icon: User, exact: true },
   { href: '/settings/organization', label: 'Organization', icon: Building2 },
   { href: '/settings/integrations', label: 'Integrations', icon: LinkIcon },
   { href: '/settings/fees', label: 'Fee Structures', icon: DollarSign },
+  { href: '/settings/bank-fees', label: 'Bank Fees', icon: Landmark },
   { href: '/settings/templates', label: 'Templates', icon: MessageSquare },
   { href: '/settings/api-keys', label: 'API Keys', icon: Key },
 ];

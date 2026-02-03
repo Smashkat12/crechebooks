@@ -19,7 +19,13 @@
  * - No silent error swallowing
  */
 
-import { Injectable, Logger, OnModuleInit, Optional, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  Optional,
+  Inject,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
   EmbeddingResult,
@@ -113,7 +119,8 @@ export class RuvectorService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    @Optional() @Inject(PgVectorRepository)
+    @Optional()
+    @Inject(PgVectorRepository)
     private readonly pgVectorRepo?: PgVectorRepository,
   ) {
     this.enabled =

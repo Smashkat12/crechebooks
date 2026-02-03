@@ -3,6 +3,7 @@
 /**
  * Tenant Onboarding Wizard
  * TASK-ACCT-014: Interactive onboarding checklist for new tenants
+ * TASK-ACCT-UI-006: Extended with all step inline forms
  *
  * Styled similar to stub.africa onboarding with expandable sections
  * and inline forms for a seamless onboarding experience.
@@ -39,7 +40,16 @@ import {
   OnboardingStepId,
   type OnboardingProgressResponse,
 } from '@/hooks/use-tenant-onboarding';
-import { BankDetailsForm, AddressForm, VatConfigForm } from './forms';
+import {
+  BankDetailsForm,
+  AddressForm,
+  VatConfigForm,
+  LogoForm,
+  FeeStructureForm,
+  ChildEnrollForm,
+  InvoiceForm,
+  BankConnectForm,
+} from './forms';
 
 // Step icons mapping
 const STEP_ICONS: Record<OnboardingStepId, React.ComponentType<{ className?: string }>> = {
@@ -53,11 +63,16 @@ const STEP_ICONS: Record<OnboardingStepId, React.ComponentType<{ className?: str
   [OnboardingStepId.BANK_CONNECT]: Link2,
 };
 
-// Steps that have inline forms vs ones that need navigation
+// TASK-ACCT-UI-006: All steps now have inline forms
 const INLINE_FORM_STEPS: OnboardingStepId[] = [
+  OnboardingStepId.LOGO,
   OnboardingStepId.ADDRESS,
   OnboardingStepId.BANK_DETAILS,
   OnboardingStepId.VAT_CONFIG,
+  OnboardingStepId.FEE_STRUCTURE,
+  OnboardingStepId.ENROL_CHILD,
+  OnboardingStepId.FIRST_INVOICE,
+  OnboardingStepId.BANK_CONNECT,
 ];
 
 // Step navigation links for steps without inline forms
@@ -107,15 +122,25 @@ function StepItem({
   const isComplete = step.isComplete || step.isSkipped;
   const hasInlineForm = INLINE_FORM_STEPS.includes(step.id);
 
-  // Render the appropriate inline form based on step ID
+  // TASK-ACCT-UI-006: Render the appropriate inline form based on step ID
   const renderInlineForm = () => {
     switch (step.id) {
-      case OnboardingStepId.BANK_DETAILS:
-        return <BankDetailsForm onComplete={onFormComplete} />;
+      case OnboardingStepId.LOGO:
+        return <LogoForm onComplete={onFormComplete} />;
       case OnboardingStepId.ADDRESS:
         return <AddressForm onComplete={onFormComplete} />;
+      case OnboardingStepId.BANK_DETAILS:
+        return <BankDetailsForm onComplete={onFormComplete} />;
       case OnboardingStepId.VAT_CONFIG:
         return <VatConfigForm onComplete={onFormComplete} />;
+      case OnboardingStepId.FEE_STRUCTURE:
+        return <FeeStructureForm onComplete={onFormComplete} />;
+      case OnboardingStepId.ENROL_CHILD:
+        return <ChildEnrollForm onComplete={onFormComplete} />;
+      case OnboardingStepId.FIRST_INVOICE:
+        return <InvoiceForm onComplete={onFormComplete} />;
+      case OnboardingStepId.BANK_CONNECT:
+        return <BankConnectForm onComplete={onFormComplete} />;
       default:
         return null;
     }

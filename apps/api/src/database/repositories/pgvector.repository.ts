@@ -224,7 +224,9 @@ export class PgVectorRepository implements OnModuleInit {
    *
    * @throws Error if pgvector is not available
    */
-  async searchSimilar(options: VectorSearchOptions): Promise<VectorSearchResult[]> {
+  async searchSimilar(
+    options: VectorSearchOptions,
+  ): Promise<VectorSearchResult[]> {
     if (!this.extensionAvailable) {
       throw new Error(
         'pgvector extension not available. Run migration to enable.',
@@ -291,7 +293,10 @@ export class PgVectorRepository implements OnModuleInit {
    * Delete all vectors in a collection for a tenant.
    * Useful for re-indexing.
    */
-  async deleteCollection(tenantId: string, collection: string): Promise<number> {
+  async deleteCollection(
+    tenantId: string,
+    collection: string,
+  ): Promise<number> {
     const result = await this.prisma.$executeRaw`
       DELETE FROM vector_embeddings
       WHERE tenant_id = ${tenantId}

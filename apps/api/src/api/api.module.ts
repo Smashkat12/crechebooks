@@ -15,6 +15,7 @@ import { XeroPayrollModule } from './xero/xero-payroll.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { CommunicationsApiModule } from './communications/communications-api.module';
 import { AccountingModule } from './accounting/accounting.module';
+import { PayrollModule } from './payroll/payroll.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AccountingModule } from './accounting/accounting.module';
     IntegrationsModule,
     CommunicationsApiModule,
     AccountingModule, // TASK-ACCT: Accounting Parity Features
+    PayrollModule, // SimplePay payroll processing integration
   ],
   exports: [
     AuthModule,
@@ -52,6 +54,7 @@ import { AccountingModule } from './accounting/accounting.module';
     IntegrationsModule,
     CommunicationsApiModule,
     AccountingModule,
+    PayrollModule,
   ],
 })
 export class ApiModule {}

@@ -21,7 +21,10 @@ import {
 
 describe('WhatsAppChannelAdapter', () => {
   let adapter: WhatsAppChannelAdapter;
-  let whatsAppService: jest.Mocked<Partial<WhatsAppService>>;
+  let whatsAppService: {
+    sendMessage: jest.Mock;
+    isValidPhoneNumber: jest.Mock;
+  };
   let prisma: {
     parent: {
       findUnique: jest.Mock;
@@ -90,7 +93,7 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber!.mockReturnValue(true);
+      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -112,7 +115,7 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: mockPhone,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber!.mockReturnValue(true);
+      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -152,7 +155,7 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber!.mockReturnValue(false);
+      whatsAppService.isValidPhoneNumber.mockReturnValue(false);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -176,7 +179,7 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber!.mockReturnValue(true);
+      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -214,7 +217,7 @@ describe('WhatsAppChannelAdapter', () => {
         lastName: 'Doe',
       });
 
-      whatsAppService.sendMessage!.mockResolvedValue({
+      whatsAppService.sendMessage.mockResolvedValue({
         messageId: mockMessageId,
         sentAt: mockSentAt,
       });
@@ -242,7 +245,7 @@ describe('WhatsAppChannelAdapter', () => {
         lastName: 'Doe',
       });
 
-      whatsAppService.sendMessage!.mockResolvedValue({
+      whatsAppService.sendMessage.mockResolvedValue({
         messageId: 'wamid_test456',
         sentAt: new Date(),
       });
@@ -309,7 +312,7 @@ describe('WhatsAppChannelAdapter', () => {
         lastName: 'Doe',
       });
 
-      whatsAppService.sendMessage!.mockRejectedValue(
+      whatsAppService.sendMessage.mockRejectedValue(
         new Error('Rate limit exceeded'),
       );
 
@@ -352,7 +355,7 @@ describe('WhatsAppChannelAdapter', () => {
         lastName: 'Doe',
       });
 
-      whatsAppService.sendMessage!.mockResolvedValue({
+      whatsAppService.sendMessage.mockResolvedValue({
         messageId: 'wamid_test789',
         sentAt: new Date(),
       });
@@ -383,7 +386,7 @@ describe('WhatsAppChannelAdapter', () => {
         lastName: 'Doe',
       });
 
-      whatsAppService.sendMessage!.mockResolvedValue({
+      whatsAppService.sendMessage.mockResolvedValue({
         messageId: 'wamid_empty',
         sentAt: new Date(),
       });
@@ -412,7 +415,7 @@ describe('WhatsAppChannelAdapter', () => {
         lastName: 'Doe',
       });
 
-      whatsAppService.sendMessage!.mockResolvedValue({
+      whatsAppService.sendMessage.mockResolvedValue({
         messageId: 'wamid_special',
         sentAt: new Date(),
       });
@@ -443,7 +446,7 @@ describe('WhatsAppChannelAdapter', () => {
         lastName: 'Doe',
       });
 
-      whatsAppService.sendMessage!.mockResolvedValue({
+      whatsAppService.sendMessage.mockResolvedValue({
         messageId: 'wamid_long',
         sentAt: new Date(),
       });
@@ -482,7 +485,7 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber!.mockReturnValue(true);
+      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -496,7 +499,7 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber!.mockReturnValue(false);
+      whatsAppService.isValidPhoneNumber.mockReturnValue(false);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -510,7 +513,7 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber!.mockReturnValue(true);
+      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 

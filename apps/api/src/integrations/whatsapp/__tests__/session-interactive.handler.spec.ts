@@ -572,7 +572,7 @@ describe('SessionInteractiveHandler', () => {
       const result = await handler.sendPaymentMethods(
         '+27821234567',
         'tenant-123',
-        mockTenant,
+        mockTenant as any,
       );
 
       expect(result.success).toBe(true);
@@ -599,7 +599,7 @@ describe('SessionInteractiveHandler', () => {
       const result = await handler.sendPaymentMethods(
         '+27821234567',
         'tenant-123',
-        tenantWithoutBank,
+        tenantWithoutBank as any,
       );
 
       expect(result.success).toBe(true);

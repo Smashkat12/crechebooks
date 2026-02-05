@@ -174,10 +174,9 @@ export const PAYMENT_CONFIRMATION: ContentTemplateDefinition = {
  * - {{4}} oldestInvoice (e.g., "INV-2026-000123")
  * - {{5}} unpaidCount (e.g., "2")
  * - {{6}} tenantName (e.g., "Little Stars Creche")
- * - {{7}} parentId (e.g., "parent-123")
  */
 export const ARREARS_NOTICE: ContentTemplateDefinition = {
-  friendlyName: 'cb_arrears_notice_v2',
+  friendlyName: 'cb_arrears_notice_v3',
   language: 'en',
   category: 'UTILITY',
   variables: {
@@ -187,7 +186,6 @@ export const ARREARS_NOTICE: ContentTemplateDefinition = {
     '4': 'INV-2026-000123',
     '5': '2',
     '6': 'Little Stars Creche',
-    '7': 'parent-123',
   },
   types: {
     'twilio/call-to-action': {
@@ -196,12 +194,12 @@ export const ARREARS_NOTICE: ContentTemplateDefinition = {
         {
           type: 'URL',
           title: 'View Account',
-          url: 'https://app.elleelephant.co.za/account/{{7}}',
+          url: 'https://app.elleelephant.co.za/parent/invoices',
         },
         {
           type: 'URL',
           title: 'Contact Us',
-          url: 'https://app.elleelephant.co.za/contact/{{7}}',
+          url: 'https://app.elleelephant.co.za/parent/help',
         },
       ],
     },
@@ -219,10 +217,9 @@ export const ARREARS_NOTICE: ContentTemplateDefinition = {
  * - {{4}} startDate (e.g., "1 March 2026")
  * - {{5}} monthlyFee (e.g., "2,450.00")
  * - {{6}} feeStructure (e.g., "Full Day")
- * - {{7}} onboardToken (e.g., "onboard-token-123")
  */
 export const WELCOME_ENROLLMENT: ContentTemplateDefinition = {
-  friendlyName: 'cb_welcome_enrollment_v2',
+  friendlyName: 'cb_welcome_enrollment_v3',
   language: 'en',
   category: 'UTILITY',
   variables: {
@@ -232,7 +229,6 @@ export const WELCOME_ENROLLMENT: ContentTemplateDefinition = {
     '4': '1 March 2026',
     '5': '2,450.00',
     '6': 'Full Day',
-    '7': 'onboard-token-123',
   },
   types: {
     'twilio/call-to-action': {
@@ -241,12 +237,12 @@ export const WELCOME_ENROLLMENT: ContentTemplateDefinition = {
         {
           type: 'URL',
           title: 'Set Up Portal',
-          url: 'https://app.elleelephant.co.za/onboard/{{7}}',
+          url: 'https://app.elleelephant.co.za/parent/login',
         },
         {
           type: 'URL',
           title: 'Get Help',
-          url: 'https://app.elleelephant.co.za/help/{{7}}',
+          url: 'https://app.elleelephant.co.za/parent/help',
         },
       ],
     },
@@ -388,7 +384,7 @@ export const REMINDER_FIRM: ContentTemplateDefinition = {
  * - {{5}} tenantName (e.g., "Little Stars Creche")
  */
 export const REMINDER_FINAL: ContentTemplateDefinition = {
-  friendlyName: 'cb_reminder_final',
+  friendlyName: 'cb_reminder_final_v2',
   language: 'en',
   category: 'UTILITY',
   variables: {
@@ -405,12 +401,12 @@ export const REMINDER_FINAL: ContentTemplateDefinition = {
         {
           type: 'URL',
           title: 'Pay Immediately',
-          url: 'https://app.elleelephant.co.za/pay/{{4}}',
+          url: 'https://app.elleelephant.co.za/parent/invoices',
         },
         {
           type: 'URL',
           title: 'Request Callback',
-          url: 'https://app.elleelephant.co.za/callback/{{4}}',
+          url: 'https://app.elleelephant.co.za/parent/help',
         },
       ],
     },
@@ -471,12 +467,12 @@ export const TEMPLATE_NAMES = {
   INVOICE_WITH_DOCUMENT: 'cb_invoice_with_document_v3',
   PAYMENT_REMINDER_INTERACTIVE: 'cb_payment_reminder_interactive',
   PAYMENT_CONFIRMATION: 'cb_payment_confirmation_v4',
-  ARREARS_NOTICE: 'cb_arrears_notice_v2',
-  WELCOME_ENROLLMENT: 'cb_welcome_enrollment_v2',
+  ARREARS_NOTICE: 'cb_arrears_notice_v3',
+  WELCOME_ENROLLMENT: 'cb_welcome_enrollment_v3',
   STATEMENT_NOTIFICATION: 'cb_statement_notification_v2',
   REMINDER_FRIENDLY: 'cb_reminder_friendly',
   REMINDER_FIRM: 'cb_reminder_firm',
-  REMINDER_FINAL: 'cb_reminder_final',
+  REMINDER_FINAL: 'cb_reminder_final_v2',
   ONBOARDING_RESUME: 'cb_onboarding_resume',
 } as const;
 

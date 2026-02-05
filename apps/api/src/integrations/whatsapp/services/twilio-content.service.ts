@@ -33,6 +33,7 @@ import {
   CONTENT_LIMITS,
 } from '../types/content.types';
 import { WhatsAppContextType } from '../types/message-history.types';
+import { ALL_TEMPLATES } from '../templates/content-templates';
 
 /**
  * Twilio Content API response for content list
@@ -214,11 +215,47 @@ export class TwilioContentService implements OnModuleInit {
       }
 
       this.logger.log(`Loaded ${this.templateCache.size} content templates`);
+
+      // Auto-register missing templates from definitions
+      await this.ensureTemplatesRegistered();
     } catch (error) {
       this.logger.error(
         `Failed to load content templates: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Auto-register any templates from ALL_TEMPLATES that are missing from Twilio.
+   * After registration, each template is submitted for WhatsApp/Meta approval.
+   */
+  private async ensureTemplatesRegistered(): Promise<void> {
+    for (const definition of ALL_TEMPLATES) {
+      if (!this.templateCache.has(definition.friendlyName)) {
+        this.logger.log(
+          `Registering missing template: ${definition.friendlyName}`,
+        );
+        try {
+          const result = await this.registerTemplate(definition);
+          if (result.success && result.contentSid) {
+            // Submit for Meta/WhatsApp approval
+            const category =
+              (definition.category as
+                | 'UTILITY'
+                | 'MARKETING'
+                | 'AUTHENTICATION') || 'UTILITY';
+            await this.submitForApproval(result.contentSid, category);
+            this.logger.log(
+              `Submitted ${definition.friendlyName} for WhatsApp approval`,
+            );
+          }
+        } catch (error) {
+          this.logger.warn(
+            `Failed to auto-register template ${definition.friendlyName}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
     }
   }
 

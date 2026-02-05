@@ -418,6 +418,37 @@ export const REMINDER_FINAL: ContentTemplateDefinition = {
 };
 
 /**
+ * Onboarding re-engagement template
+ * TASK-WA-011: Sent when a parent's onboarding session goes stale (>24h)
+ * Category: UTILITY
+ *
+ * Variables:
+ * - {{1}} parentName (e.g., "Sarah")
+ * - {{2}} tenantName (e.g., "Little Stars Creche")
+ * - {{3}} stepDescription (e.g., "child details")
+ */
+export const ONBOARDING_RESUME: ContentTemplateDefinition = {
+  friendlyName: 'cb_onboarding_resume',
+  language: 'en',
+  category: 'UTILITY',
+  variables: {
+    '1': 'Sarah',
+    '2': 'Little Stars Creche',
+    '3': 'child details',
+  },
+  types: {
+    'twilio/quick-reply': {
+      body: "Hi {{1}},\n\nWe noticed you started enrolling at {{2}} but didn't finish. You were on the {{3}} step.\n\nWould you like to continue where you left off?\n\nKind regards,\n{{2}} Team",
+      actions: [
+        { type: 'QUICK_REPLY', title: 'Continue', id: 'onboard_resume' },
+        { type: 'QUICK_REPLY', title: 'Start Over', id: 'onboard_restart' },
+        { type: 'QUICK_REPLY', title: 'Not Now', id: 'onboard_cancel' },
+      ],
+    },
+  },
+};
+
+/**
  * All template definitions for batch registration
  */
 export const ALL_TEMPLATES: ContentTemplateDefinition[] = [
@@ -430,6 +461,7 @@ export const ALL_TEMPLATES: ContentTemplateDefinition[] = [
   REMINDER_FRIENDLY,
   REMINDER_FIRM,
   REMINDER_FINAL,
+  ONBOARDING_RESUME,
 ];
 
 /**
@@ -445,6 +477,7 @@ export const TEMPLATE_NAMES = {
   REMINDER_FRIENDLY: 'cb_reminder_friendly',
   REMINDER_FIRM: 'cb_reminder_firm',
   REMINDER_FINAL: 'cb_reminder_final',
+  ONBOARDING_RESUME: 'cb_onboarding_resume',
 } as const;
 
 export type TemplateName = (typeof TEMPLATE_NAMES)[keyof typeof TEMPLATE_NAMES];

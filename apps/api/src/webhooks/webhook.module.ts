@@ -23,9 +23,10 @@ import { PrismaService } from '../database/prisma/prisma.service';
 import { AuditLogService } from '../database/services/audit-log.service';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { IdempotencyGuard } from '../common/guards/idempotency.guard';
+import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [ConfigModule, WhatsAppModule],
   controllers: [WebhookController],
   providers: [
     WebhookService,

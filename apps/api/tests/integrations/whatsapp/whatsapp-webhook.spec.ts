@@ -95,8 +95,8 @@ describe('WebhookController - WhatsApp', () => {
 
   describe('handleWhatsAppWebhook', () => {
     it('should process valid webhook with correct signature', async () => {
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -123,7 +123,7 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should reject webhook with invalid signature', async () => {
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(false);
+      webhookService.verifyWhatsAppSignature.mockReturnValue(false);
 
       const mockReq = {
         rawBody: Buffer.from(JSON.stringify(mockWhatsAppPayload)),
@@ -183,8 +183,8 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should handle payload without raw body', async () => {
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -211,8 +211,8 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should store result for idempotency after processing', async () => {
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -242,7 +242,7 @@ describe('WebhookController - WhatsApp', () => {
 
   describe('handleWhatsAppVerification', () => {
     it('should return challenge for valid verify request', () => {
-      webhookService.verifyWhatsAppSubscription!.mockReturnValue(
+      webhookService.verifyWhatsAppSubscription.mockReturnValue(
         'challenge_123',
       );
 
@@ -261,7 +261,7 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should throw error for invalid verify token', () => {
-      webhookService.verifyWhatsAppSubscription!.mockImplementation(() => {
+      webhookService.verifyWhatsAppSubscription.mockImplementation(() => {
         throw new BusinessException(
           'Invalid verify token',
           'INVALID_VERIFY_TOKEN',
@@ -278,7 +278,7 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should throw error for invalid mode', () => {
-      webhookService.verifyWhatsAppSubscription!.mockImplementation(() => {
+      webhookService.verifyWhatsAppSubscription.mockImplementation(() => {
         throw new BusinessException(
           'Invalid webhook mode',
           'INVALID_WEBHOOK_MODE',
@@ -313,8 +313,8 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should process valid Twilio status callback', async () => {
-      webhookService.verifyTwilioSignature!.mockReturnValue(true);
-      webhookService.processTwilioStatusCallback!.mockResolvedValue({
+      webhookService.verifyTwilioSignature.mockReturnValue(true);
+      webhookService.processTwilioStatusCallback.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -342,7 +342,7 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should reject callback with invalid signature in production', async () => {
-      webhookService.verifyTwilioSignature!.mockReturnValue(false);
+      webhookService.verifyTwilioSignature.mockReturnValue(false);
 
       const mockReq = {
         headers: {
@@ -364,8 +364,8 @@ describe('WebhookController - WhatsApp', () => {
 
     it('should skip signature verification in development', async () => {
       process.env.NODE_ENV = 'development';
-      webhookService.verifyTwilioSignature!.mockReturnValue(false);
-      webhookService.processTwilioStatusCallback!.mockResolvedValue({
+      webhookService.verifyTwilioSignature.mockReturnValue(false);
+      webhookService.processTwilioStatusCallback.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -420,8 +420,8 @@ describe('WebhookController - WhatsApp', () => {
         ],
       };
 
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -475,8 +475,8 @@ describe('WebhookController - WhatsApp', () => {
         ],
       };
 
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -539,8 +539,8 @@ describe('WebhookController - WhatsApp', () => {
         ],
       };
 
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 1,
         skipped: 0,
         errors: [],
@@ -572,8 +572,8 @@ describe('WebhookController - WhatsApp', () => {
         entry: [],
       };
 
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 0,
         skipped: 0,
         errors: [],
@@ -647,8 +647,8 @@ describe('WebhookController - WhatsApp', () => {
         ],
       };
 
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 2,
         skipped: 0,
         errors: [],
@@ -671,8 +671,8 @@ describe('WebhookController - WhatsApp', () => {
     });
 
     it('should handle processing errors gracefully', async () => {
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 0,
         skipped: 0,
         errors: [{ eventId: 'wamid_123', error: 'Invoice not found' }],
@@ -732,8 +732,8 @@ describe('WebhookController - WhatsApp', () => {
         ],
       };
 
-      webhookService.verifyWhatsAppSignature!.mockReturnValue(true);
-      webhookService.processWhatsAppEvent!.mockResolvedValue({
+      webhookService.verifyWhatsAppSignature.mockReturnValue(true);
+      webhookService.processWhatsAppEvent.mockResolvedValue({
         processed: 0,
         skipped: 1, // Incoming messages might be skipped by delivery tracking
         errors: [],

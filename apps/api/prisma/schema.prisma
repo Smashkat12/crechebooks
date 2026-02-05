@@ -692,6 +692,9 @@ model Tenant {
   // PGVECTOR: AI Embedding Storage
   vectorEmbeddings   VectorEmbedding[]
 
+  // TASK-WA-011: WhatsApp Onboarding Sessions
+  whatsAppOnboardingSessions WhatsAppOnboardingSession[]
+
   @@map("tenants")
 }
 
@@ -1052,6 +1055,9 @@ model Parent {
 
   // TASK-ONBOARD: Parent onboarding documents
   generatedDocuments ParentGeneratedDocument[]
+
+  // TASK-WA-011: WhatsApp Onboarding Sessions
+  whatsAppOnboardingSessions WhatsAppOnboardingSession[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -3969,6 +3975,63 @@ model ShadowComparison {
   @@index([tenantId, agentType, createdAt])
   @@index([agentType, createdAt])
   @@index([resultsMatch, agentType])
+}
+
+// ============================================
+// TASK-WA-011: WhatsApp Onboarding State Machine
+// Tracks multi-step conversational onboarding via WhatsApp
+// ============================================
+
+enum OnboardingStep {
+  WELCOME
+  CONSENT
+  PARENT_NAME
+  PARENT_SURNAME
+  PARENT_EMAIL
+  PARENT_ID_NUMBER
+  CHILD_NAME
+  CHILD_DOB
+  CHILD_ALLERGIES
+  CHILD_ANOTHER
+  EMERGENCY_CONTACT_NAME
+  EMERGENCY_CONTACT_PHONE
+  EMERGENCY_CONTACT_RELATION
+  ID_DOCUMENT
+  FEE_AGREEMENT
+  COMMUNICATION_PREFS
+  CONFIRMATION
+  COMPLETE
+}
+
+enum WaOnboardingStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  EXPIRED
+}
+
+model WhatsAppOnboardingSession {
+  id            String             @id @default(cuid())
+  tenantId      String             @map("tenant_id")
+  waId          String             @map("wa_id") @db.VarChar(20) // WhatsApp phone number (E.164)
+  parentId      String?            @map("parent_id") // Linked after parent record is created
+  currentStep   OnboardingStep     @default(WELCOME) @map("current_step")
+  collectedData Json               @default("{}") @map("collected_data")
+  status        WaOnboardingStatus @default(IN_PROGRESS)
+  lastMessageAt DateTime           @default(now()) @map("last_message_at")
+  startedAt     DateTime           @default(now()) @map("started_at")
+  completedAt   DateTime?          @map("completed_at")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  parent Parent? @relation(fields: [parentId], references: [id])
+
+  @@unique([tenantId, waId])
+  @@index([tenantId, status])
+  @@index([waId])
+  @@index([status, lastMessageAt])
+  @@map("whatsapp_onboarding_sessions")
 }
 
 // ============================================

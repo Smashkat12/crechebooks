@@ -2,7 +2,7 @@
 
 <metadata>
   <title>WhatsApp Message History Entity</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>foundation</layer>
   <sequence>260</sequence>
   <implements>

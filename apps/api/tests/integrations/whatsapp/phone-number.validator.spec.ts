@@ -392,6 +392,65 @@ describe('Phone Number Validator', () => {
     });
   });
 
+  describe('South African Number Formats (WhatsApp)', () => {
+    it('should accept mobile numbers starting with +27', () => {
+      expect(isValidPhoneNumber('+27821234567')).toBe(true);
+      expect(isValidPhoneNumber('+27831234567')).toBe(true);
+      expect(isValidPhoneNumber('+27841234567')).toBe(true);
+      expect(isValidPhoneNumber('+27721234567')).toBe(true);
+      expect(isValidPhoneNumber('+27601234567')).toBe(true); // Cell C
+    });
+
+    it('should accept mobile numbers in WhatsApp format (without +)', () => {
+      expect(isValidPhoneNumber('27821234567')).toBe(true);
+      expect(isValidPhoneNumber('27831234567')).toBe(true);
+      expect(isValidPhoneNumber('27841234567')).toBe(true);
+    });
+
+    it('should reject landline numbers (not suitable for WhatsApp)', () => {
+      // Landlines start with 0 in local format, which fails validation
+      expect(isValidPhoneNumber('0218881234')).toBe(false);
+      expect(isValidPhoneNumber('0118881234')).toBe(false);
+    });
+
+    it('should reject numbers with local 0 prefix (need country code)', () => {
+      expect(isValidPhoneNumber('0821234567')).toBe(false);
+      expect(isValidPhoneNumber('0831234567')).toBe(false);
+    });
+
+    it('should normalize SA numbers with local format', () => {
+      // These should be rejected since they start with 0
+      expect(() => normalizePhoneNumber('0821234567')).toThrow();
+    });
+  });
+
+  describe('WhatsApp API Compatibility', () => {
+    it('should validate numbers suitable for Twilio/Meta WhatsApp API', () => {
+      // Twilio expects E.164 format
+      expect(isValidPhoneNumber('+27821234567')).toBe(true);
+      expect(isValidPhoneNumber('+14155551234')).toBe(true);
+      expect(isValidPhoneNumber('+442071234567')).toBe(true);
+    });
+
+    it('should normalize for WhatsApp API submission', () => {
+      expect(normalizePhoneNumber('27821234567')).toBe('+27821234567');
+      expect(normalizePhoneNumber('+27 82 123 4567')).toBe('+27821234567');
+      expect(normalizePhoneNumber('+27-82-123-4567')).toBe('+27821234567');
+    });
+
+    it('should reject numbers that WhatsApp API would reject', () => {
+      expect(isValidPhoneNumber('')).toBe(false);
+      expect(isValidPhoneNumber('+')).toBe(false);
+      expect(isValidPhoneNumber('+0')).toBe(false);
+      expect(isValidPhoneNumber('whatsapp:+27821234567')).toBe(false); // Protocol prefix
+    });
+
+    it('should handle whitespace around numbers', () => {
+      expect(normalizePhoneNumber('  +27821234567  ')).toBe('+27821234567');
+      expect(normalizePhoneNumber('\t27821234567\n')).toBe('+27821234567');
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should handle boundary length phone numbers', () => {
       // Minimum valid: 8 digits after country code (+ country code = 8+)

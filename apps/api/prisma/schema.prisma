@@ -643,6 +643,9 @@ model Tenant {
   // TASK-WA-001: WhatsApp Message History
   whatsAppMessages WhatsAppMessage[]
 
+  // TASK-WA-007: WhatsApp Content Templates
+  whatsAppContentTemplates WhatsAppContentTemplate[]
+
   // TASK-COMM-001: Ad-hoc Communication
   broadcastMessages BroadcastMessage[]
   recipientGroups   RecipientGroup[]
@@ -3226,6 +3229,33 @@ model WhatsAppMessage {
   @@index([tenantId, contextType, contextId])
   @@index([wamid])
   @@map("whatsapp_messages")
+}
+
+// ============================================
+// TASK-WA-007: WhatsApp Content Templates (Twilio Content API)
+// Tracks rich message templates with approval status
+// ============================================
+
+model WhatsAppContentTemplate {
+  id             String    @id @default(uuid())
+  tenantId       String?   @map("tenant_id")
+  friendlyName   String    @unique @map("friendly_name") @db.VarChar(200)
+  contentSid     String    @map("content_sid") @db.VarChar(50)
+  language       String    @default("en") @db.VarChar(10)
+  category       String    @default("UTILITY") @db.VarChar(20) // UTILITY, MARKETING, AUTHENTICATION
+  contentType    String    @map("content_type") @db.VarChar(50) // twilio/quick-reply, twilio/card, etc.
+  approvalStatus String?   @map("approval_status") @db.VarChar(30) // pending, approved, rejected
+  variables      Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  approvedAt     DateTime? @map("approved_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([approvalStatus])
+  @@index([contentSid])
+  @@map("whatsapp_content_templates")
 }
 
 // ============================================

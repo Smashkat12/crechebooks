@@ -16,6 +16,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { CommunicationsApiModule } from './communications/communications-api.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { PayrollModule } from './payroll/payroll.module';
+import { WhatsAppApiModule } from './whatsapp/whatsapp-api.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { PayrollModule } from './payroll/payroll.module';
     CommunicationsApiModule,
     AccountingModule, // TASK-ACCT: Accounting Parity Features
     PayrollModule, // SimplePay payroll processing integration
+    WhatsAppApiModule, // TASK-WA-004: WhatsApp opt-in management
   ],
   exports: [
     AuthModule,
@@ -55,6 +57,7 @@ import { PayrollModule } from './payroll/payroll.module';
     CommunicationsApiModule,
     AccountingModule,
     PayrollModule,
+    WhatsAppApiModule,
   ],
 })
 export class ApiModule {}

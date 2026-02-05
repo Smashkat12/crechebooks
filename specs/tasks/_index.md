@@ -1557,10 +1557,10 @@ These tasks complete the WhatsApp Business API integration by adding message his
 
 | Order | Task ID | Title | Layer | Dependencies | Priority | Status |
 |-------|---------|-------|-------|--------------|----------|--------|
-| 713 | TASK-WA-011 | WhatsApp Onboarding State Machine and Session Model | foundation | TASK-WA-001, TASK-WA-007 | P1-HIGH | ⭕ Pending |
-| 714 | TASK-WA-012 | WhatsApp Conversational Onboarding Handler | logic | TASK-WA-011, TASK-WA-007, TASK-WA-009 | P1-HIGH | ⭕ Pending |
-| 715 | TASK-WA-013 | WhatsApp Onboarding Advanced Features | logic | TASK-WA-012 | P2-MEDIUM | ⭕ Pending |
-| 716 | TASK-WA-014 | WhatsApp Onboarding Admin Visibility and Tests | surface | TASK-WA-012, TASK-WA-013 | P2-MEDIUM | ⭕ Pending |
+| 713 | TASK-WA-011 | WhatsApp Onboarding State Machine and Session Model | foundation | TASK-WA-001, TASK-WA-007 | P1-HIGH | ✅ Complete |
+| 714 | TASK-WA-012 | WhatsApp Conversational Onboarding Handler | logic | TASK-WA-011, TASK-WA-007, TASK-WA-009 | P1-HIGH | ✅ Complete |
+| 715 | TASK-WA-013 | WhatsApp Onboarding Advanced Features | logic | TASK-WA-012 | P2-MEDIUM | ✅ Complete |
+| 716 | TASK-WA-014 | WhatsApp Onboarding Admin Visibility and Tests | surface | TASK-WA-012, TASK-WA-013 | P2-MEDIUM | ✅ Complete |
 
 **WhatsApp Parent Onboarding (TASK-WA-011 to TASK-WA-014)**:
 - Conversational onboarding flow via WhatsApp (Phase 1 — text-based)
@@ -1802,11 +1802,11 @@ graph TD
         WA006[TASK-WA-006<br/>Retry Service]
     end
 
-    subgraph "Phase 20.8 - WhatsApp Onboarding (New)"
-        WA011[TASK-WA-011<br/>Onboarding State Machine ⭕]
-        WA012[TASK-WA-012<br/>Conversation Handler ⭕]
-        WA013[TASK-WA-013<br/>Advanced Features ⭕]
-        WA014[TASK-WA-014<br/>Admin Visibility ⭕]
+    subgraph "Phase 20.8 - WhatsApp Onboarding (Complete)"
+        WA011[TASK-WA-011<br/>Onboarding State Machine ✅]
+        WA012[TASK-WA-012<br/>Conversation Handler ✅]
+        WA013[TASK-WA-013<br/>Advanced Features ✅]
+        WA014[TASK-WA-014<br/>Admin Visibility ✅]
     end
 
     INT005 --> WA001

@@ -141,10 +141,10 @@ This document maps Twilio WhatsApp API capabilities to CrecheBooks implementatio
 | Templates (rich) | 9 | 9 | 0 | 100% |
 | Button Handlers | 7 | 7 | 0 | 100% |
 | Session Features | 4 | 4 | 0 | 100% |
-| Parent Onboarding (Phase 1) | 4 | 0 | 4 | 0% |
+| Parent Onboarding (Phase 1) | 4 | 4 | 0 | 100% |
 | WhatsApp Flows (Phase 2) | 4 | 0 | 4 | 0% |
 | Operational Enhancements | 3 | 0 | 3 | 0% |
-| **Total** | **44** | **31** | **13** | **70%** |
+| **Total** | **44** | **35** | **9** | **80%** |
 
 ### Completed Foundation Tasks
 - ✅ **TASK-WA-001**: Message history entity - `entities/whatsapp-message.entity.ts`
@@ -186,10 +186,10 @@ This document maps Twilio WhatsApp API capabilities to CrecheBooks implementatio
 
 | Task ID | Title | Layer | Dependencies | Priority | Status |
 |---------|-------|-------|--------------|----------|--------|
-| TASK-WA-011 | Onboarding State Machine and Session Model | foundation | TASK-WA-001, TASK-WA-007 | P1-HIGH | ⭕ Pending |
-| TASK-WA-012 | Conversational Onboarding Handler | logic | TASK-WA-011, TASK-WA-007, TASK-WA-009 | P1-HIGH | ⭕ Pending |
-| TASK-WA-013 | Onboarding Advanced Features | logic | TASK-WA-012 | P2-MEDIUM | ⭕ Pending |
-| TASK-WA-014 | Onboarding Admin Visibility and Tests | surface | TASK-WA-012, TASK-WA-013 | P2-MEDIUM | ⭕ Pending |
+| TASK-WA-011 | Onboarding State Machine and Session Model | foundation | TASK-WA-001, TASK-WA-007 | P1-HIGH | ✅ Complete |
+| TASK-WA-012 | Conversational Onboarding Handler | logic | TASK-WA-011, TASK-WA-007, TASK-WA-009 | P1-HIGH | ✅ Complete |
+| TASK-WA-013 | Onboarding Advanced Features | logic | TASK-WA-012 | P2-MEDIUM | ✅ Complete |
+| TASK-WA-014 | Onboarding Admin Visibility and Tests | surface | TASK-WA-012, TASK-WA-013 | P2-MEDIUM | ✅ Complete |
 
 ### Onboarding Template Mapping
 
@@ -231,11 +231,11 @@ graph TD
         J[TASK-WA-010<br/>Session Features ✅]
     end
 
-    subgraph "Phase 20.8 - WhatsApp Onboarding (Pending)"
-        K[TASK-WA-011<br/>Onboarding State Machine ⭕]
-        L[TASK-WA-012<br/>Conversation Handler ⭕]
-        M[TASK-WA-013<br/>Advanced Features ⭕]
-        N[TASK-WA-014<br/>Admin Visibility ⭕]
+    subgraph "Phase 20.8 - WhatsApp Onboarding (Complete)"
+        K[TASK-WA-011<br/>Onboarding State Machine ✅]
+        L[TASK-WA-012<br/>Conversation Handler ✅]
+        M[TASK-WA-013<br/>Advanced Features ✅]
+        N[TASK-WA-014<br/>Admin Visibility ✅]
     end
 
     subgraph "Phase 29 - WhatsApp Flows (Pending)"
@@ -295,12 +295,12 @@ graph TD
 | cb_invoice_with_document_v3 | Yes | 24-48 hours | UTILITY, pending approval |
 | cb_payment_reminder_interactive | Yes | 24-48 hours | UTILITY, pending approval |
 | cb_payment_confirmation_v4 | Yes | 24-48 hours | UTILITY, pending approval |
-| cb_arrears_notice_v2 | Yes | 24-48 hours | UTILITY, pending approval |
-| cb_welcome_enrollment_v2 | Yes | 24-48 hours | UTILITY, pending approval |
+| cb_arrears_notice_v3 | Yes | 24-48 hours | UTILITY, pending approval |
+| cb_welcome_enrollment_v3 | Yes | 24-48 hours | UTILITY, pending approval |
 | cb_statement_notification_v2 | Yes | 24-48 hours | UTILITY, pending approval |
 | cb_reminder_friendly | Yes | 24-48 hours | UTILITY, pending approval |
 | cb_reminder_firm | Yes | 24-48 hours | UTILITY, pending approval |
-| cb_reminder_final | Yes | 24-48 hours | UTILITY, pending approval |
+| cb_reminder_final_v2 | Yes | 24-48 hours | UTILITY, pending approval |
 | cb_onboarding_resume | Yes | 24-48 hours | UTILITY, TASK-WA-011 |
 | List Picker (session) | No | N/A | Cannot be approved |
 | Quick Reply (3 btn session) | No | N/A | Session only |
@@ -399,23 +399,23 @@ graph TD
 
 | Feature | Task | Status |
 |---------|------|--------|
-| Onboarding State Machine (Prisma model) | TASK-WA-011 | ⭕ Pending |
-| Onboarding types/interfaces | TASK-WA-011 | ⭕ Pending |
-| Re-engagement template | TASK-WA-011 | ⭕ Pending |
-| Conversational handler (16 steps) | TASK-WA-012 | ⭕ Pending |
-| Input validation (SA ID, email, phone, DOB) | TASK-WA-012 | ⭕ Pending |
-| POPIA consent collection | TASK-WA-012 | ⭕ Pending |
-| Parent/Child/EmergencyContact creation | TASK-WA-012 | ⭕ Pending |
-| Webhook routing | TASK-WA-012 | ⭕ Pending |
-| Multi-child registration loop | TASK-WA-013 | ⭕ Pending |
-| ID document photo upload | TASK-WA-013 | ⭕ Pending |
-| Session expiry CRON job | TASK-WA-013 | ⭕ Pending |
-| Progress indicators | TASK-WA-013 | ⭕ Pending |
-| Edit flow from confirmation | TASK-WA-013 | ⭕ Pending |
-| Admin API endpoints | TASK-WA-014 | ⭕ Pending |
-| Convert-to-enrollment action | TASK-WA-014 | ⭕ Pending |
-| Admin notification on completion | TASK-WA-014 | ⭕ Pending |
-| E2E onboarding tests | TASK-WA-014 | ⭕ Pending |
+| Onboarding State Machine (Prisma model) | TASK-WA-011 | ✅ Complete |
+| Onboarding types/interfaces | TASK-WA-011 | ✅ Complete |
+| Re-engagement template | TASK-WA-011 | ✅ Complete |
+| Conversational handler (16 steps) | TASK-WA-012 | ✅ Complete |
+| Input validation (SA ID, email, phone, DOB) | TASK-WA-012 | ✅ Complete |
+| POPIA consent collection | TASK-WA-012 | ✅ Complete |
+| Parent/Child/EmergencyContact creation | TASK-WA-012 | ✅ Complete |
+| Webhook routing | TASK-WA-012 | ✅ Complete |
+| Multi-child registration loop | TASK-WA-013 | ✅ Complete |
+| ID document photo upload | TASK-WA-013 | ✅ Complete |
+| Session expiry CRON job | TASK-WA-013 | ✅ Complete |
+| Progress indicators | TASK-WA-013 | ✅ Complete |
+| Edit flow from confirmation | TASK-WA-013 | ✅ Complete |
+| Admin API endpoints | TASK-WA-014 | ✅ Complete |
+| Convert-to-enrollment action | TASK-WA-014 | ✅ Complete |
+| Admin notification on completion | TASK-WA-014 | ✅ Complete |
+| E2E onboarding tests | TASK-WA-014 | ✅ Complete |
 
 ### WhatsApp Flows Coverage (Phase 29)
 
@@ -456,4 +456,47 @@ graph TD
 ---
 
 *Traceability matrix created: 2026-02-05*
-*Last updated: 2026-02-05*
+*Last updated: 2026-02-06*
+
+---
+
+## Completed Work Summary (Phase 28)
+
+**TASK-WA-011 to TASK-WA-014** — Completed 2026-02-05
+
+### Files Created/Modified
+
+| File | Description |
+|------|-------------|
+| `apps/api/prisma/schema.prisma` | Added `OnboardingStep` enum, `WaOnboardingStatus` enum, `WhatsAppOnboardingSession` model |
+| `apps/api/src/integrations/whatsapp/types/onboarding.types.ts` | Interfaces, validators (SA ID Luhn, email, phone, DOB) |
+| `apps/api/src/integrations/whatsapp/handlers/onboarding-conversation.handler.ts` | 16-step conversation handler (~1050 lines) |
+| `apps/api/src/integrations/whatsapp/jobs/onboarding-expiry.job.ts` | Hourly CRON for session expiry + re-engagement |
+| `apps/api/src/integrations/whatsapp/controllers/onboarding.controller.ts` | Admin API (stats, list, detail, enroll) |
+| `apps/api/src/integrations/whatsapp/dto/onboarding.dto.ts` | Request/response DTOs |
+| `apps/api/src/webhooks/webhook.controller.ts` | Added `POST /webhooks/twilio/incoming` |
+| `apps/api/src/integrations/whatsapp/templates/content-templates.ts` | Added `ONBOARDING_RESUME`, fixed URL templates (v3) |
+| `apps/web/src/components/parent-portal/auth-guard.tsx` | Parent portal auth redirect |
+| `apps/web/src/app/parent/login/page.tsx` | Redirect param support |
+| `apps/web/src/app/parent/verify/page.tsx` | Redirect after magic link auth |
+
+### Tests
+
+- 101 tests across 3 suites (handler unit, controller unit, E2E)
+- `pnpm test --filter @crechebooks/api -- --testPathPatterns="onboarding"`
+
+### Templates on Twilio
+
+| Template | SID | Status |
+|----------|-----|--------|
+| `cb_onboarding_resume` | HXd9d72c0d5e34e38601819d594c176cd5 | Submitted for approval |
+| `cb_arrears_notice_v3` | HX6910ca9be8e5634c4f4281b60fe85feb | Submitted for approval |
+| `cb_welcome_enrollment_v3` | HX4af6f93bf57360b232fead10707aeda1 | Submitted for approval |
+| `cb_reminder_final_v2` | HXfd0303c96c1e777d9250d4efaee4aecf | Submitted for approval |
+
+### Commits
+
+- `ddf43b1` feat(whatsapp): implement parent onboarding via conversational flow
+- `6ac97bf` fix(db): add missing migration for whatsapp_onboarding_sessions table
+- `ab8b9b5` fix(whatsapp): use approved template for onboarding re-engagement
+- `b9f59a8` fix(whatsapp): fix template URLs and add parent portal auth redirect

@@ -19,6 +19,9 @@ import {
   SESSION_WINDOW_MS,
   ABANDON_THRESHOLD_MS,
 } from '../types/onboarding.types';
+import { ContentVariable } from '../types/content.types';
+import { WhatsAppContextType } from '../types/message-history.types';
+import { TEMPLATE_NAMES } from '../templates/content-templates';
 
 @Injectable()
 export class OnboardingExpiryJob {
@@ -47,6 +50,20 @@ export class OnboardingExpiryJob {
       this.logger.log(`Marked ${abandoned.count} sessions as ABANDONED`);
     }
 
+    // Look up the approved onboarding resume template ONCE before the loop
+    const resumeTemplate = await this.contentService.getTemplateAsync(
+      TEMPLATE_NAMES.ONBOARDING_RESUME,
+    );
+
+    if (!resumeTemplate?.sid) {
+      this.logger.warn(
+        'ONBOARDING_RESUME template not registered on Twilio. ' +
+          'Re-engagement messages disabled. ' +
+          'Register via POST /api/v1/whatsapp/templates/register',
+      );
+      return;
+    }
+
     // Send re-engagement for stale (>24h, <7d) sessions
     const staleSessions = await this.prisma.whatsAppOnboardingSession.findMany({
       where: {
@@ -65,17 +82,29 @@ export class OnboardingExpiryJob {
       const tenantName = session.tenant.tradingName || session.tenant.name;
       const stepLabel = this.stepToFriendlyLabel(session.currentStep);
 
+      const variables: ContentVariable[] = [
+        { key: '1', value: firstName },
+        { key: '2', value: tenantName },
+        { key: '3', value: stepLabel },
+      ];
+
       try {
-        await this.contentService.sendSessionQuickReply(
+        const result = await this.contentService.sendContentMessage(
           session.waId,
-          `Hi ${firstName},\n\nWe noticed you started enrolling at ${tenantName} but didn't finish. You were on the ${stepLabel} step.\n\nWould you like to continue where you left off?\n\nKind regards,\n${tenantName} Team`,
-          [
-            { title: 'Continue', id: 'onboard_resume' },
-            { title: 'Start Over', id: 'onboard_restart' },
-            { title: 'Not Now', id: 'onboard_cancel' },
-          ],
+          resumeTemplate.sid,
+          variables,
+          session.tenantId,
+          WhatsAppContextType.WELCOME,
+          session.id,
         );
-        this.logger.log(`Re-engagement sent to ${session.waId}`);
+
+        if (result.success) {
+          this.logger.log(`Re-engagement sent to ${session.waId}`);
+        } else {
+          this.logger.warn(
+            `Failed to send re-engagement to ${session.waId}: ${result.error}`,
+          );
+        }
       } catch (error) {
         this.logger.warn(
           `Failed to send re-engagement to ${session.waId}: ${error instanceof Error ? error.message : String(error)}`,

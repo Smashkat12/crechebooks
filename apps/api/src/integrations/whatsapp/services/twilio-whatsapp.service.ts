@@ -657,9 +657,7 @@ To stop receiving messages, reply STOP at any time.
       { key: '4', value: this.getBillingPeriod(data.dueDate) },
       { key: '5', value: this.formatAmount(data.amount) },
       { key: '6', value: data.childName },
-      { key: '7', value: data.pdfUrl },
-      { key: '8', value: data.invoiceNumber },
-      { key: '9', value: tenant.tradingName || tenant.name },
+      { key: '7', value: tenant.tradingName || tenant.name },
     ];
 
     const result = await this.contentService.sendContentMessage(
@@ -754,15 +752,14 @@ To stop receiving messages, reply STOP at any time.
         { key: '5', value: tenant.tradingName || tenant.name },
       ];
     } else {
-      // REMINDER_FINAL: parentFullName, daysOverdue, amount, invoiceNumber, tenantPhone, tenantName
+      // REMINDER_FINAL: parentFullName, daysOverdue, amount, invoiceNumber, tenantName
       const parentFullName = data.parentName; // Assume full name provided
       variables = [
         { key: '1', value: parentFullName },
         { key: '2', value: data.daysOverdue.toString() },
         { key: '3', value: this.formatAmount(data.amount) },
         { key: '4', value: data.invoiceNumber },
-        { key: '5', value: tenant.phone || '' },
-        { key: '6', value: tenant.tradingName || tenant.name },
+        { key: '5', value: tenant.tradingName || tenant.name },
       ];
     }
 
@@ -831,15 +828,11 @@ To stop receiving messages, reply STOP at any time.
     }
 
     const variables: ContentVariable[] = [
-      { key: '1', value: data.receiptNumber },
-      { key: '2', value: data.parentName },
-      { key: '3', value: this.formatAmount(data.amount) },
-      { key: '4', value: data.paymentReference },
-      { key: '5', value: this.formatDate(data.paymentDate) },
-      { key: '6', value: data.invoiceNumber },
-      { key: '7', value: this.formatAmount(data.remainingBalance) },
-      { key: '8', value: data.receiptPdfUrl || '' },
-      { key: '9', value: tenant.tradingName || tenant.name },
+      { key: '1', value: data.parentName },
+      { key: '2', value: this.formatAmount(data.amount) },
+      { key: '3', value: this.formatDate(data.paymentDate) },
+      { key: '4', value: data.invoiceNumber },
+      { key: '5', value: tenant.tradingName || tenant.name },
     ];
 
     const result = await this.contentService.sendContentMessage(
@@ -912,7 +905,6 @@ To stop receiving messages, reply STOP at any time.
       { key: '5', value: data.unpaidInvoiceCount.toString() },
       { key: '6', value: tenant.tradingName || tenant.name },
       { key: '7', value: data.parentId },
-      { key: '8', value: tenant.phone || '' },
     ];
 
     const result = await this.contentService.sendContentMessage(
@@ -983,9 +975,7 @@ To stop receiving messages, reply STOP at any time.
       { key: '4', value: this.formatDate(data.startDate) },
       { key: '5', value: this.formatAmount(data.monthlyFee) },
       { key: '6', value: data.feeStructure },
-      { key: '7', value: data.bannerImageUrl || '' },
-      { key: '8', value: data.onboardToken || '' },
-      { key: '9', value: tenant.phone || '' },
+      { key: '7', value: data.onboardToken || '' },
     ];
 
     const result = await this.contentService.sendContentMessage(
@@ -1064,9 +1054,8 @@ To stop receiving messages, reply STOP at any time.
       { key: '6', value: this.formatAmount(data.charges) },
       { key: '7', value: this.formatAmount(data.payments) },
       { key: '8', value: this.formatAmount(data.closingBalance) },
-      { key: '9', value: data.statementPdfUrl },
-      { key: '10', value: data.statementId },
-      { key: '11', value: tenant.tradingName || tenant.name },
+      { key: '9', value: data.statementId },
+      { key: '10', value: tenant.tradingName || tenant.name },
     ];
 
     const result = await this.contentService.sendContentMessage(

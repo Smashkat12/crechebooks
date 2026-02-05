@@ -19,8 +19,18 @@ import type { WhatsAppWebhookPayload } from '../../../src/webhooks/types/webhook
 
 describe('WebhookController - WhatsApp', () => {
   let controller: WebhookController;
-  let webhookService: jest.Mocked<Partial<WebhookService>>;
-  let idempotencyService: jest.Mocked<Partial<IdempotencyService>>;
+  let webhookService: {
+    verifyWhatsAppSignature: jest.Mock;
+    verifyWhatsAppSubscription: jest.Mock;
+    processWhatsAppEvent: jest.Mock;
+    verifyTwilioSignature: jest.Mock;
+    processTwilioStatusCallback: jest.Mock;
+  };
+  let idempotencyService: {
+    check: jest.Mock;
+    checkAndSet: jest.Mock;
+    markProcessed: jest.Mock;
+  };
 
   const mockWhatsAppPayload: WhatsAppWebhookPayload = {
     object: 'whatsapp_business_account',
@@ -61,7 +71,8 @@ describe('WebhookController - WhatsApp', () => {
     };
 
     idempotencyService = {
-      checkDuplicate: jest.fn(),
+      check: jest.fn(),
+      checkAndSet: jest.fn(),
       markProcessed: jest.fn(),
     };
 

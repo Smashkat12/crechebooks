@@ -14,6 +14,7 @@
 
 export { PortalHeader } from './portal-header';
 export { PortalNav } from './portal-nav';
+export { ParentAuthGuard } from './auth-guard';
 
 // Dashboard Components (TASK-PORTAL-012)
 export { BalanceCard } from './balance-card';

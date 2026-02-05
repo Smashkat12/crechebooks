@@ -71,9 +71,15 @@ function VerifyContent() {
         setUser(data.parent);
         setState('success');
 
-        // Redirect to dashboard after a brief success message
+        // Redirect to saved destination or dashboard after a brief success message
         setTimeout(() => {
-          router.push('/parent/dashboard');
+          const redirect = sessionStorage.getItem('parent_login_redirect');
+          if (redirect) {
+            sessionStorage.removeItem('parent_login_redirect');
+            router.push(redirect);
+          } else {
+            router.push('/parent/dashboard');
+          }
         }, 2000);
       } catch (err) {
         setState('error');

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { PortalHeader } from '@/components/parent-portal/portal-header';
 import { PortalNav } from '@/components/parent-portal/portal-nav';
+import { ParentAuthGuard } from '@/components/parent-portal/auth-guard';
 
 export const metadata: Metadata = {
   title: {
@@ -19,7 +20,7 @@ export default function ParentPortalLayout({
     <div className="min-h-screen flex flex-col bg-background">
       <PortalHeader />
       <main className="flex-1 container mx-auto px-4 py-6 pb-20 md:pb-6">
-        {children}
+        <ParentAuthGuard>{children}</ParentAuthGuard>
       </main>
       <PortalNav />
       <footer className="hidden md:block border-t bg-muted/50 py-4 mt-auto">

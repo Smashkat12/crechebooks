@@ -46,6 +46,13 @@ export default function ParentLoginPage() {
       }
 
       setFormState('success');
+
+      // Preserve redirect destination for after magic link verification
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect) {
+        sessionStorage.setItem('parent_login_redirect', redirect);
+      }
     } catch (err) {
       setError(
         err instanceof Error

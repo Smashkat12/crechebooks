@@ -3,27 +3,39 @@
  * TASK-WA-008: Rich WhatsApp Template Definitions
  *
  * Defines all 9 rich templates for WhatsApp messaging via Twilio Content API.
- * Each template uses tenant.tradingName for branding (variable {{9}} or similar).
+ * Each template uses tenant.tradingName for branding.
  *
  * Templates:
- * 1. INVOICE_WITH_DOCUMENT - Card with PDF and Pay Now button
+ * 1. INVOICE_WITH_DOCUMENT - Quick reply with View Invoice + Pay Now buttons
  * 2. PAYMENT_REMINDER_INTERACTIVE - Quick reply with 3 action buttons
- * 3. PAYMENT_CONFIRMATION - Card with receipt PDF
- * 4. ARREARS_NOTICE - CTA with URL + Phone buttons
- * 5. WELCOME_ENROLLMENT - Card with portal setup
- * 6. STATEMENT_NOTIFICATION - Card with statement PDF
+ * 3. PAYMENT_CONFIRMATION - Quick reply with View Receipt button
+ * 4. ARREARS_NOTICE - CTA with URL buttons
+ * 5. WELCOME_ENROLLMENT - CTA with portal setup URL buttons
+ * 6. STATEMENT_NOTIFICATION - Quick reply with View Statement button
  * 7. REMINDER_FRIENDLY - Quick reply (1-7 days overdue)
  * 8. REMINDER_FIRM - Quick reply (8-14 days overdue)
  * 9. REMINDER_FINAL - CTA with urgent tone
  *
  * IMPORTANT: All templates use tenant branding, NOT "CrecheBooks"
+ *
+ * WhatsApp Template Rules:
+ * - Media URLs in templates must be static (no variables)
+ * - Variables cannot be at the start or end of the body
+ * - PDFs are delivered via Option A hybrid flow (session messages after button tap)
+ * - twilio/card supports URL buttons only (not QUICK_REPLY)
+ * - twilio/quick-reply supports QUICK_REPLY buttons only
+ * - twilio/call-to-action supports URL + PHONE_NUMBER buttons
  */
 
 import { ContentTemplateDefinition } from '../types/content.types';
 
 /**
- * Invoice notification with PDF card and action buttons
+ * Invoice notification with quick reply buttons
  * Category: UTILITY
+ *
+ * PDF delivered via Option A hybrid flow:
+ *   1. This template sent → parent taps "View Invoice" → opens 24h session
+ *   2. Button handler sends PDF as session message (no approval needed)
  *
  * Variables:
  * - {{1}} invoiceNumber (e.g., "INV-2026-001234")
@@ -32,12 +44,10 @@ import { ContentTemplateDefinition } from '../types/content.types';
  * - {{4}} period (e.g., "February 2026")
  * - {{5}} amount (e.g., "2,450.00")
  * - {{6}} childName (e.g., "Emma Smith")
- * - {{7}} pdfUrl (e.g., "https://api.example.com/invoices/sample/pdf")
- * - {{8}} invoiceId (e.g., "INV-2026-001234")
- * - {{9}} tenantName (e.g., "Little Stars Creche")
+ * - {{7}} tenantName (e.g., "Little Stars Creche")
  */
 export const INVOICE_WITH_DOCUMENT: ContentTemplateDefinition = {
-  friendlyName: 'cb_invoice_with_document_v2',
+  friendlyName: 'cb_invoice_with_document_v3',
   language: 'en',
   category: 'UTILITY',
   variables: {
@@ -47,26 +57,26 @@ export const INVOICE_WITH_DOCUMENT: ContentTemplateDefinition = {
     '4': 'February 2026',
     '5': '2,450.00',
     '6': 'Emma Smith',
-    '7': 'https://api.example.com/invoices/sample/pdf',
-    '8': 'INV-2026-001234',
-    '9': 'Little Stars Creche',
+    '7': 'Little Stars Creche',
   },
   types: {
-    'twilio/card': {
-      title: 'Invoice Ready: {{1}}',
-      subtitle: 'New invoice available',
-      body: 'Hi {{3}},\n\nYour invoice for {{4}} is ready.\n\nAmount Due: R{{5}}\nChild: {{6}}\nDue Date: {{2}}\n\nKind regards,\n{{9}} Team',
-      media: ['{{7}}'],
+    'twilio/quick-reply': {
+      body: 'Hi {{3}},\n\nYour invoice for {{4}} is ready.\n\nInvoice: {{1}}\nAmount Due: R{{5}}\nChild: {{6}}\nDue Date: {{2}}\n\nTap below to view your invoice or pay.\n\nKind regards,\n{{7}} Team',
       actions: [
         {
-          type: 'URL',
+          type: 'QUICK_REPLY',
           title: 'View Invoice',
-          url: 'https://app.elleelephant.co.za/invoices/{{8}}',
+          id: 'view_{{1}}',
         },
         {
-          type: 'URL',
+          type: 'QUICK_REPLY',
           title: 'Pay Now',
-          url: 'https://app.elleelephant.co.za/pay/{{8}}',
+          id: 'pay_{{1}}',
+        },
+        {
+          type: 'QUICK_REPLY',
+          title: 'Need Help',
+          id: 'help_{{1}}',
         },
       ],
     },
@@ -116,46 +126,37 @@ export const PAYMENT_REMINDER_INTERACTIVE: ContentTemplateDefinition = {
 };
 
 /**
- * Payment confirmation with receipt card
+ * Payment confirmation with quick reply button
  * Category: UTILITY
  *
+ * Receipt PDF delivered via Option A hybrid flow when parent taps "View Receipt".
+ *
  * Variables:
- * - {{1}} receiptNumber (e.g., "REC-2026-00456")
- * - {{2}} parentName (e.g., "Sarah")
- * - {{3}} amount (e.g., "2,450.00")
- * - {{4}} reference (e.g., "SMITH-FEB-2026")
- * - {{5}} paymentDate (e.g., "15 February 2026")
- * - {{6}} invoiceNumber (e.g., "INV-2026-001234")
- * - {{7}} remainingBalance (e.g., "0.00")
- * - {{8}} receiptPdfUrl (e.g., "https://api.example.com/receipts/sample/pdf")
- * - {{9}} tenantName (e.g., "Little Stars Creche")
+ * - {{1}} parentName (e.g., "Sarah")
+ * - {{2}} amount (e.g., "2,450.00")
+ * - {{3}} paymentDate (e.g., "15 February 2026")
+ * - {{4}} invoiceNumber (e.g., "INV-2026-001234")
+ * - {{5}} tenantName (e.g., "Little Stars Creche")
  */
 export const PAYMENT_CONFIRMATION: ContentTemplateDefinition = {
-  friendlyName: 'cb_payment_confirmation_v2',
+  friendlyName: 'cb_payment_confirmation_v4',
   language: 'en',
   category: 'UTILITY',
   variables: {
-    '1': 'REC-2026-00456',
-    '2': 'Sarah',
-    '3': '2,450.00',
-    '4': 'SMITH-FEB-2026',
-    '5': '15 February 2026',
-    '6': 'INV-2026-001234',
-    '7': '0.00',
-    '8': 'https://api.example.com/receipts/sample/pdf',
-    '9': 'Little Stars Creche',
+    '1': 'Sarah',
+    '2': '2,450.00',
+    '3': '15 February 2026',
+    '4': 'INV-2026-001234',
+    '5': 'Little Stars Creche',
   },
   types: {
-    'twilio/card': {
-      title: 'Payment Received',
-      subtitle: 'Thank you for your payment',
-      body: "Thank you, {{2}}!\n\nWe've received your payment of R{{3}}.\n\nReceipt: {{1}}\nReference: {{4}}\nDate: {{5}}\nApplied to: {{6}}\n\nRemaining Balance: R{{7}}\n\nKind regards,\n{{9}} Team",
-      media: ['{{8}}'],
+    'twilio/quick-reply': {
+      body: "Thank you for your payment, {{1}}!\n\nWe have received and processed your payment of R{{2}} on {{3}} from {{5}}. This payment has been applied to invoice {{4}}.\n\nYou can view your full receipt and account details by tapping the button below. If you have any questions about your account, please don't hesitate to contact us.\n\nKind regards,\n{{5}} Team",
       actions: [
         {
-          type: 'URL',
+          type: 'QUICK_REPLY',
           title: 'View Receipt',
-          url: 'https://app.elleelephant.co.za/receipts/{{1}}',
+          id: 'view_{{4}}',
         },
       ],
     },
@@ -218,11 +219,10 @@ export const ARREARS_NOTICE: ContentTemplateDefinition = {
  * - {{4}} startDate (e.g., "1 March 2026")
  * - {{5}} monthlyFee (e.g., "2,450.00")
  * - {{6}} feeStructure (e.g., "Full Day")
- * - {{7}} bannerImageUrl (e.g., "https://cdn.example.com/welcome-banner.jpg")
- * - {{8}} onboardToken (e.g., "onboard-token-123")
+ * - {{7}} onboardToken (e.g., "onboard-token-123")
  */
 export const WELCOME_ENROLLMENT: ContentTemplateDefinition = {
-  friendlyName: 'cb_welcome_enrollment',
+  friendlyName: 'cb_welcome_enrollment_v2',
   language: 'en',
   category: 'UTILITY',
   variables: {
@@ -232,25 +232,21 @@ export const WELCOME_ENROLLMENT: ContentTemplateDefinition = {
     '4': '1 March 2026',
     '5': '2,450.00',
     '6': 'Full Day',
-    '7': 'https://cdn.example.com/welcome-banner.jpg',
-    '8': 'onboard-token-123',
+    '7': 'onboard-token-123',
   },
   types: {
-    'twilio/card': {
-      title: 'Welcome to {{1}}!',
-      subtitle: 'Enrollment Confirmed',
-      body: "Dear {{2}},\n\nWe're delighted that {{3}} is joining our family!\n\nEnrollment Details:\n- Start Date: {{4}}\n- Monthly Fee: R{{5}}\n- Fee Structure: {{6}}\n\nYour parent portal is ready. Set up your account to view and pay invoices.",
-      media: ['{{7}}'],
+    'twilio/call-to-action': {
+      body: "Welcome to {{1}}!\n\nDear {{2}},\n\nWe're delighted that {{3}} is joining our family!\n\nEnrollment Details:\n- Start Date: {{4}}\n- Monthly Fee: R{{5}}\n- Fee Structure: {{6}}\n\nYour parent portal is ready. Set up your account to view and pay invoices.\n\nKind regards,\n{{1}} Team",
       actions: [
         {
           type: 'URL',
           title: 'Set Up Portal',
-          url: 'https://app.elleelephant.co.za/onboard/{{8}}',
+          url: 'https://app.elleelephant.co.za/onboard/{{7}}',
         },
         {
           type: 'URL',
           title: 'Get Help',
-          url: 'https://app.elleelephant.co.za/help/{{8}}',
+          url: 'https://app.elleelephant.co.za/help/{{7}}',
         },
       ],
     },
@@ -258,8 +254,10 @@ export const WELCOME_ENROLLMENT: ContentTemplateDefinition = {
 };
 
 /**
- * Monthly statement notification
+ * Monthly statement notification with quick reply button
  * Category: UTILITY
+ *
+ * Statement PDF delivered via Option A hybrid flow when parent taps "View Statement".
  *
  * Variables:
  * - {{1}} period (e.g., "February 2026")
@@ -270,12 +268,11 @@ export const WELCOME_ENROLLMENT: ContentTemplateDefinition = {
  * - {{6}} charges (e.g., "2,450.00")
  * - {{7}} payments (e.g., "2,450.00")
  * - {{8}} closingBalance (e.g., "0.00")
- * - {{9}} statementPdfUrl (e.g., "https://api.example.com/statements/sample/pdf")
- * - {{10}} statementId (e.g., "STM-2026-02-123")
- * - {{11}} tenantName (e.g., "Little Stars Creche")
+ * - {{9}} statementId (e.g., "STM-2026-02-123")
+ * - {{10}} tenantName (e.g., "Little Stars Creche")
  */
 export const STATEMENT_NOTIFICATION: ContentTemplateDefinition = {
-  friendlyName: 'cb_statement_notification',
+  friendlyName: 'cb_statement_notification_v2',
   language: 'en',
   category: 'UTILITY',
   variables: {
@@ -287,21 +284,22 @@ export const STATEMENT_NOTIFICATION: ContentTemplateDefinition = {
     '6': '2,450.00',
     '7': '2,450.00',
     '8': '0.00',
-    '9': 'https://api.example.com/statements/sample/pdf',
-    '10': 'STM-2026-02-123',
-    '11': 'Little Stars Creche',
+    '9': 'STM-2026-02-123',
+    '10': 'Little Stars Creche',
   },
   types: {
-    'twilio/card': {
-      title: '{{1}} Statement Ready',
-      subtitle: 'Monthly account statement',
-      body: 'Hi {{4}},\n\nYour monthly statement from {{11}} is ready.\n\nPeriod: {{2}} to {{3}}\nOpening Balance: R{{5}}\nCharges: R{{6}}\nPayments: R{{7}}\nClosing Balance: R{{8}}\n\nDownload the attached PDF for full details.',
-      media: ['{{9}}'],
+    'twilio/quick-reply': {
+      body: 'Hi {{4}},\n\nYour monthly statement from {{10}} is ready.\n\nPeriod: {{2}} to {{3}}\nOpening Balance: R{{5}}\nCharges: R{{6}}\nPayments: R{{7}}\nClosing Balance: R{{8}}\n\nTap below for the full statement.\n\nKind regards,\n{{10}} Team',
       actions: [
         {
-          type: 'URL',
+          type: 'QUICK_REPLY',
           title: 'View Statement',
-          url: 'https://app.elleelephant.co.za/statements/{{10}}',
+          id: 'view_{{9}}',
+        },
+        {
+          type: 'QUICK_REPLY',
+          title: 'Need Help',
+          id: 'help_{{9}}',
         },
       ],
     },
@@ -438,12 +436,12 @@ export const ALL_TEMPLATES: ContentTemplateDefinition[] = [
  * Template names for reference
  */
 export const TEMPLATE_NAMES = {
-  INVOICE_WITH_DOCUMENT: 'cb_invoice_with_document_v2',
+  INVOICE_WITH_DOCUMENT: 'cb_invoice_with_document_v3',
   PAYMENT_REMINDER_INTERACTIVE: 'cb_payment_reminder_interactive',
-  PAYMENT_CONFIRMATION: 'cb_payment_confirmation_v2',
+  PAYMENT_CONFIRMATION: 'cb_payment_confirmation_v4',
   ARREARS_NOTICE: 'cb_arrears_notice_v2',
-  WELCOME_ENROLLMENT: 'cb_welcome_enrollment',
-  STATEMENT_NOTIFICATION: 'cb_statement_notification',
+  WELCOME_ENROLLMENT: 'cb_welcome_enrollment_v2',
+  STATEMENT_NOTIFICATION: 'cb_statement_notification_v2',
   REMINDER_FRIENDLY: 'cb_reminder_friendly',
   REMINDER_FIRM: 'cb_reminder_firm',
   REMINDER_FINAL: 'cb_reminder_final',

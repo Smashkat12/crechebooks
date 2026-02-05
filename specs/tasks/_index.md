@@ -1553,6 +1553,179 @@ These tasks complete the WhatsApp Business API integration by adding message his
 - Button response handlers for workflow automation
 - Statement period selector, invoice list, balance inquiry
 
+### 20.8 WhatsApp Parent Onboarding (Sequence 713-716)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 713 | TASK-WA-011 | WhatsApp Onboarding State Machine and Session Model | foundation | TASK-WA-001, TASK-WA-007 | P1-HIGH | ⭕ Pending |
+| 714 | TASK-WA-012 | WhatsApp Conversational Onboarding Handler | logic | TASK-WA-011, TASK-WA-007, TASK-WA-009 | P1-HIGH | ⭕ Pending |
+| 715 | TASK-WA-013 | WhatsApp Onboarding Advanced Features | logic | TASK-WA-012 | P2-MEDIUM | ⭕ Pending |
+| 716 | TASK-WA-014 | WhatsApp Onboarding Admin Visibility and Tests | surface | TASK-WA-012, TASK-WA-013 | P2-MEDIUM | ⭕ Pending |
+
+**WhatsApp Parent Onboarding (TASK-WA-011 to TASK-WA-014)**:
+- Conversational onboarding flow via WhatsApp (Phase 1 — text-based)
+- State machine tracking 17 onboarding steps per session
+- Parent/child/emergency contact data collection via conversation
+- SA ID validation (Luhn), email, phone, DOB validation
+- POPIA consent collection and audit trail
+- Multi-child registration loop
+- ID document photo upload (optional)
+- Session expiry CRON job with re-engagement templates
+- Admin API endpoints for onboarding visibility and statistics
+- Convert-to-enrollment action for completed onboarding
+- Admin email notifications on completion
+- E2E tests for full onboarding flow
+- **CRITICAL**: All messages use tenant.tradingName (not "CrecheBooks")
+
+---
+
+## Phase 29: WhatsApp Flows Onboarding (Phase 2) (2026-02-05)
+
+Analysis Date: 2026-02-05
+Source: WhatsApp parent onboarding ideation — Phase 2 replaces conversational flow with native WhatsApp Flows (multi-screen forms).
+
+WhatsApp Flows provide a native form experience inside WhatsApp — structured inputs, date pickers, dropdowns, and multi-screen navigation. This phase upgrades the Phase 1 conversational onboarding (TASK-WA-011 to 014) to a 5-screen native form while keeping conversational as a fallback.
+
+### 29.1 Flows API Foundation (Sequence 717)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 717 | TASK-WA-015 | WhatsApp Flows API Integration Service | foundation | TASK-WA-007, TASK-WA-012 | P2-MEDIUM | ⭕ Pending |
+
+### 29.2 Flows Onboarding Definition (Sequence 718)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 718 | TASK-WA-016 | WhatsApp Flows Onboarding Form Definition | logic | TASK-WA-015, TASK-WA-011 | P2-MEDIUM | ⭕ Pending |
+
+### 29.3 Flows Processing and Fallback (Sequence 719)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 719 | TASK-WA-017 | WhatsApp Flows Onboarding Processing and Fallback | logic | TASK-WA-016, TASK-WA-012 | P2-MEDIUM | ⭕ Pending |
+
+### 29.4 Flows Deployment and Testing (Sequence 720)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 720 | TASK-WA-018 | WhatsApp Flows Deployment, Testing and Migration | integration | TASK-WA-016, TASK-WA-017 | P2-MEDIUM | ⭕ Pending |
+
+**WhatsApp Flows Features (TASK-WA-015 to TASK-WA-018)**:
+- Meta Graph API integration for WhatsApp Flows CRUD
+- 5-screen onboarding form: Consent → Parent Details → Child Details → Emergency Contact → Confirmation
+- Native input types: TextInput, DatePicker, Dropdown, OptIn, RadioButtons
+- AES-128-GCM encryption for data exchange endpoint
+- Unified routing: Flows (preferred) vs conversational (fallback)
+- Per-tenant whatsappFlowsEnabled flag for gradual rollout
+- Flow deployment script (create, upload, validate, publish)
+- E2E tests for Flow completion and fallback routing
+- **Prerequisite**: Phase 1 conversational (TASK-WA-011 to 014) must be complete first
+
+### Phase 29 Dependency Graph
+
+```mermaid
+graph TD
+    subgraph "Phase 28 Prerequisites (Complete First)"
+        WA011[TASK-WA-011<br/>Onboarding State Machine]
+        WA012[TASK-WA-012<br/>Conversation Handler]
+    end
+
+    subgraph "Phase 29 - WhatsApp Flows"
+        WA015[TASK-WA-015<br/>Flows API Service ⭕]
+        WA016[TASK-WA-016<br/>Flow Definition ⭕]
+        WA017[TASK-WA-017<br/>Processing & Fallback ⭕]
+        WA018[TASK-WA-018<br/>Deployment & Testing ⭕]
+    end
+
+    WA007[TASK-WA-007<br/>Content API ✅] --> WA015
+    WA012 --> WA015
+    WA015 --> WA016
+    WA011 --> WA016
+    WA016 --> WA017
+    WA012 --> WA017
+    WA016 --> WA018
+    WA017 --> WA018
+```
+
+### Execution Order
+
+1. **TASK-WA-015** (Flows API Service) — Foundation, requires WA-007 and WA-012
+2. **TASK-WA-016** (Flow Definition) — 5-screen form JSON, requires WA-015 and WA-011
+3. **TASK-WA-017** (Processing & Fallback) — Data processing and routing, requires WA-016
+4. **TASK-WA-018** (Deployment & Testing) — Deploy to Meta, E2E tests, requires WA-016 and WA-017
+
+---
+
+## Phase 30: WhatsApp Operational Enhancements (2026-02-05)
+
+Analysis Date: 2026-02-05
+Source: WhatsApp integration gap analysis — operational features needed for production readiness.
+
+These tasks address production operational needs: automated template approval monitoring, payment deep-linking via Yoco, and rich broadcast messaging integration.
+
+### 30.1 Template Monitoring (Sequence 721)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 721 | TASK-WA-019 | WhatsApp Template Approval Monitoring Service | logic | TASK-WA-007, TASK-WA-008 | P2-HIGH | ⭕ Pending |
+
+### 30.2 Payment Deep-Linking (Sequence 722)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 722 | TASK-WA-020 | WhatsApp Payment Deep-Linking with Yoco | logic | TASK-WA-009, TASK-PAY-011 | P2-HIGH | ⭕ Pending |
+
+### 30.3 Broadcast Integration (Sequence 723)
+
+| Order | Task ID | Title | Layer | Dependencies | Priority | Status |
+|-------|---------|-------|-------|--------------|----------|--------|
+| 723 | TASK-WA-021 | WhatsApp Broadcast Integration with Ad-hoc Communications | logic | TASK-WA-007, TASK-COMM-001 | P3-MEDIUM | ⭕ Pending |
+
+**Operational Enhancements (TASK-WA-019 to TASK-WA-021)**:
+- Template approval CRON monitor (every 6 hours, sync Twilio → local DB)
+- Admin email notifications on template approval/rejection
+- Rejection reason tracking for resubmission
+- Dynamic Yoco checkout links from WhatsApp "Pay Now" buttons
+- WhatsApp-initiated payment tracking (channel: 'whatsapp')
+- Auto-send payment confirmation template after Yoco webhook
+- Rate-limited broadcast sending (50/batch, 1s delay)
+- Broadcast announcement template (cb_broadcast_announcement)
+- Opt-out handling (STOP → whatsappOptIn = false)
+
+### Phase 30 Dependency Graph
+
+```mermaid
+graph TD
+    subgraph "Foundation (Complete)"
+        WA007[TASK-WA-007<br/>Content API ✅]
+        WA008[TASK-WA-008<br/>Templates ✅]
+        WA009[TASK-WA-009<br/>Button Handlers ✅]
+        PAY011[TASK-PAY-011<br/>Payment Matching ✅]
+        COMM001[TASK-COMM-001<br/>Broadcast Entity ✅]
+    end
+
+    subgraph "Phase 30 - Operational"
+        WA019[TASK-WA-019<br/>Template Monitor ⭕]
+        WA020[TASK-WA-020<br/>Payment Links ⭕]
+        WA021[TASK-WA-021<br/>Broadcast ⭕]
+    end
+
+    WA007 --> WA019
+    WA008 --> WA019
+    WA009 --> WA020
+    PAY011 --> WA020
+    WA007 --> WA021
+    COMM001 --> WA021
+```
+
+### Execution Order
+
+Tasks in Phase 30 are independent — can be implemented in any order or in parallel:
+
+1. **TASK-WA-019** (Template Monitor) — No blockers, high value
+2. **TASK-WA-020** (Payment Links) — Resolves existing TODO, high value
+3. **TASK-WA-021** (Broadcast) — Enhances existing feature, lower priority
+
 ---
 
 ## Phase 20 Progress Summary
@@ -1560,10 +1733,10 @@ These tasks complete the WhatsApp Business API integration by adding message his
 | Priority | Tasks | Complete | Pending | Percentage |
 |----------|-------|----------|---------|------------|
 | P1-CRITICAL | 2 | 2 | 0 | 100% |
-| P1-HIGH | 2 | 2 | 0 | 100% |
+| P1-HIGH | 4 | 2 | 2 | 50% |
 | P2-HIGH | 4 | 4 | 0 | 100% |
-| P2-MEDIUM | 2 | 2 | 0 | 100% |
-| **Total Phase 20** | **10** | **10** | **0** | **100%** |
+| P2-MEDIUM | 4 | 2 | 2 | 50% |
+| **Total Phase 20** | **14** | **10** | **4** | **71%** |
 
 ### Phase 20 Key Features
 
@@ -1629,6 +1802,13 @@ graph TD
         WA006[TASK-WA-006<br/>Retry Service]
     end
 
+    subgraph "Phase 20.8 - WhatsApp Onboarding (New)"
+        WA011[TASK-WA-011<br/>Onboarding State Machine ⭕]
+        WA012[TASK-WA-012<br/>Conversation Handler ⭕]
+        WA013[TASK-WA-013<br/>Advanced Features ⭕]
+        WA014[TASK-WA-014<br/>Admin Visibility ⭕]
+    end
+
     INT005 --> WA001
     INT005 --> WA002
     WA001 --> WA003
@@ -1641,6 +1821,15 @@ graph TD
     WA001 --> WA005
     WA001 --> WA006
     WA002 --> WA006
+
+    WA001 --> WA011
+    WA007 --> WA011
+    WA011 --> WA012
+    WA007 --> WA012
+    WA009 --> WA012
+    WA012 --> WA013
+    WA012 --> WA014
+    WA013 --> WA014
 ```
 
 ### Execution Order (Recommended)
@@ -1653,6 +1842,10 @@ Tasks should be implemented in this order to respect dependencies:
 4. **TASK-WA-003** (Statement Delivery) - Requires WA-001 and WA-002
 5. **TASK-WA-004** (Opt-In UI) - Requires WA-001
 6. **TASK-WA-006** (Retry Service) - Requires WA-001 and WA-002
+7. **TASK-WA-011** (Onboarding State Machine) - Requires WA-001 and WA-007
+8. **TASK-WA-012** (Conversation Handler) - Requires WA-011, WA-007, WA-009
+9. **TASK-WA-013** (Advanced Features) - Requires WA-012
+10. **TASK-WA-014** (Admin Visibility & Tests) - Requires WA-012 and WA-013
 
 ### WhatsApp Implementation Coverage
 
@@ -2836,7 +3029,7 @@ Analysis triggered by ruvnet/ruvector deep code analysis:
 
 ---
 
-**Total Tasks**: 268 (192 complete + 6 WhatsApp + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal + 8 Accounting Parity + 12 SDK Migration + 12 Stub Replacement)
+**Total Tasks**: 279 (192 complete + 6 WhatsApp + 4 WhatsApp Onboarding + 4 WhatsApp Flows + 3 WhatsApp Ops + 3 Parent Welcome Pack + 6 Ad-hoc Communications + 16 Portals + 8 Admin Portal + 8 Accounting Parity + 12 SDK Migration + 12 Stub Replacement)
 **Overall Completion**: 197/268 (73.5%)
 
 

@@ -43,6 +43,8 @@ import {
 } from '../common/decorators/idempotent.decorator';
 import { IdempotencyGuard } from '../common/guards/idempotency.guard';
 import { IdempotencyService } from '../common/services/idempotency.service';
+import { OnboardingConversationHandler } from '../integrations/whatsapp/handlers/onboarding-conversation.handler';
+import { PrismaService } from '../database/prisma/prisma.service';
 
 /**
  * Public webhook endpoints (no auth required, signature verified)
@@ -56,6 +58,8 @@ export class WebhookController {
   constructor(
     private readonly webhookService: WebhookService,
     private readonly idempotencyService: IdempotencyService,
+    private readonly onboardingHandler: OnboardingConversationHandler,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -409,5 +413,146 @@ export class WebhookController {
     );
 
     return result;
+  }
+
+  /**
+   * Handle Twilio incoming WhatsApp messages
+   * TASK-WA-012: Conversational onboarding via WhatsApp
+   *
+   * Twilio sends incoming messages as form data with fields:
+   * - From: whatsapp:+27XXXXXXXXX
+   * - Body: message text
+   * - NumMedia: number of media attachments
+   * - MediaUrl0, MediaContentType0: first media attachment
+   * - MessageSid: unique message ID
+   *
+   * Returns empty TwiML response as Twilio expects.
+   *
+   * @param req - Express request for signature verification
+   * @param body - Twilio incoming message parameters
+   * @param signature - X-Twilio-Signature header
+   */
+  @Post('twilio/incoming')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Handle Twilio incoming WhatsApp messages' })
+  @ApiHeader({ name: 'x-twilio-signature', required: false })
+  @ApiResponse({
+    status: 200,
+    description: 'Message processed, TwiML response',
+  })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
+  async handleTwilioIncoming(
+    @Req() req: Request,
+    @Body() body: Record<string, string>,
+    @Headers('x-twilio-signature') signature: string,
+  ): Promise<string> {
+    const from = body.From || '';
+    const messageBody = body.Body || '';
+    const numMedia = parseInt(body.NumMedia || '0', 10);
+    const mediaUrl = numMedia > 0 ? body.MediaUrl0 : undefined;
+    const mediaContentType = numMedia > 0 ? body.MediaContentType0 : undefined;
+    const messageSid = body.MessageSid || '';
+
+    // Extract waId: strip "whatsapp:" prefix
+    const waId = from.replace('whatsapp:', '').replace('+', '');
+
+    this.logger.debug(
+      `Twilio incoming: ${messageSid} from ${waId}, body="${messageBody.substring(0, 50)}"`,
+    );
+
+    // Build the full URL for signature verification
+    const protocol =
+      req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    const url = `${protocol}://${host}${req.originalUrl}`;
+
+    // Verify signature (skip in development if not configured)
+    if (
+      process.env.NODE_ENV === 'production' &&
+      !this.webhookService.verifyTwilioSignature(url, body, signature)
+    ) {
+      this.logger.warn('Invalid Twilio incoming webhook signature');
+      throw new BusinessException(
+        'Invalid webhook signature',
+        'INVALID_SIGNATURE',
+      );
+    }
+
+    // Determine tenantId: look up from existing onboarding session or find first active tenant
+    let tenantId: string | null = null;
+
+    // First, try to find an existing session for this waId
+    const existingSession =
+      await this.prisma.whatsAppOnboardingSession.findFirst({
+        where: { waId },
+        orderBy: { updatedAt: 'desc' },
+        select: { tenantId: true },
+      });
+
+    if (existingSession) {
+      tenantId = existingSession.tenantId;
+    } else {
+      // Look up parent by whatsapp or phone number
+      const parent = await this.prisma.parent.findFirst({
+        where: {
+          OR: [
+            { whatsapp: waId },
+            { phone: waId },
+            { whatsapp: `+${waId}` },
+            { phone: `+${waId}` },
+          ],
+        },
+        select: { tenantId: true },
+      });
+
+      if (parent) {
+        tenantId = parent.tenantId;
+      } else {
+        // Fallback: use first tenant (for new registrations)
+        const firstTenant = await this.prisma.tenant.findFirst({
+          select: { id: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        tenantId = firstTenant?.id || null;
+      }
+    }
+
+    if (!tenantId) {
+      this.logger.warn(`No tenant found for incoming message from ${waId}`);
+      return '<Response></Response>';
+    }
+
+    try {
+      // Check if onboarding handler should handle this message
+      const shouldHandle = await this.onboardingHandler.shouldHandle(
+        waId,
+        tenantId,
+        messageBody,
+      );
+
+      if (shouldHandle) {
+        await this.onboardingHandler.handleMessage(
+          waId,
+          tenantId,
+          messageBody,
+          mediaUrl,
+          mediaContentType,
+        );
+      } else {
+        this.logger.debug(
+          `Message from ${waId} not handled by onboarding handler`,
+        );
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Error handling incoming message: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+
+    // Always return empty TwiML response
+    return '<Response></Response>';
   }
 }

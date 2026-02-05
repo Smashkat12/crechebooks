@@ -1,6 +1,7 @@
 /**
  * Twilio WhatsApp Service
  * TASK-WA-007: Twilio WhatsApp Integration (Alternative to Meta Cloud API)
+ * TASK-WA-008: Rich WhatsApp Template Definitions
  *
  * Provides WhatsApp messaging via Twilio API.
  * Benefits over Meta:
@@ -9,6 +10,11 @@
  * - Easier to test and develop
  *
  * For production, requires upgraded Twilio account and WhatsApp Business number.
+ *
+ * Rich messaging features (TASK-WA-008):
+ * - Card templates with PDF attachments and action buttons
+ * - Quick reply templates with interactive buttons
+ * - Call-to-action templates with URL/phone buttons
  */
 
 import { Injectable, Logger, Optional } from '@nestjs/common';
@@ -23,6 +29,9 @@ import {
   WhatsAppContextType,
 } from '../types/message-history.types';
 import { WhatsAppTemplateName } from '../types/whatsapp.types';
+import { TwilioContentService } from './twilio-content.service';
+import { TEMPLATE_NAMES } from '../templates/content-templates';
+import { ContentVariable } from '../types/content.types';
 
 /**
  * Twilio configuration
@@ -69,6 +78,7 @@ export class TwilioWhatsAppService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
     @Optional() private readonly messageEntity?: WhatsAppMessageEntity,
+    @Optional() private readonly contentService?: TwilioContentService,
   ) {
     this.config = this.loadConfig();
 
@@ -547,5 +557,532 @@ To stop receiving messages, reply STOP at any time.
       .digest('base64');
 
     return signature === expectedSignature;
+  }
+
+  // ============================================================================
+  // RICH TEMPLATE METHODS (TASK-WA-008)
+  // ============================================================================
+
+  /**
+   * Format amount in cents to display format
+   * @example formatAmount(245000) => "2,450.00"
+   */
+  private formatAmount(cents: number): string {
+    return (cents / 100).toLocaleString('en-ZA', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  /**
+   * Format date for display
+   * @example formatDate(new Date('2026-02-28')) => "28 February 2026"
+   */
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('en-ZA', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  /**
+   * Get billing period from date (month and year)
+   * @example getBillingPeriod(new Date('2026-02-28')) => "February 2026"
+   */
+  private getBillingPeriod(date: Date): string {
+    return date.toLocaleDateString('en-ZA', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  /**
+   * Send rich invoice notification with PDF card and action buttons
+   * Uses INVOICE_WITH_DOCUMENT template with tenant branding
+   *
+   * Falls back to legacy text if content service unavailable
+   */
+  async sendRichInvoiceNotification(
+    tenantId: string,
+    recipientPhone: string,
+    data: {
+      parentName: string;
+      invoiceNumber: string;
+      childName: string;
+      amount: number; // In cents
+      dueDate: Date;
+      pdfUrl: string;
+    },
+  ): Promise<TwilioMessageResult> {
+    // Get tenant for branding
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        error: 'Tenant not found',
+        errorCode: 'TENANT_NOT_FOUND',
+      };
+    }
+
+    // Check if content service and template are available
+    const template = this.contentService?.getTemplate(
+      TEMPLATE_NAMES.INVOICE_WITH_DOCUMENT,
+    );
+
+    if (!this.contentService || !template) {
+      // Fallback to legacy text message
+      this.logger.debug(
+        'Rich template not available, using legacy text message',
+      );
+      return this.sendInvoiceNotification(
+        tenantId,
+        recipientPhone,
+        data.parentName,
+        data.invoiceNumber,
+        data.amount / 100,
+        data.dueDate,
+        tenant.tradingName || tenant.name,
+        data.pdfUrl,
+      );
+    }
+
+    const variables: ContentVariable[] = [
+      { key: '1', value: data.invoiceNumber },
+      { key: '2', value: this.formatDate(data.dueDate) },
+      { key: '3', value: data.parentName },
+      { key: '4', value: this.getBillingPeriod(data.dueDate) },
+      { key: '5', value: this.formatAmount(data.amount) },
+      { key: '6', value: data.childName },
+      { key: '7', value: data.pdfUrl },
+      { key: '8', value: data.invoiceNumber },
+      { key: '9', value: tenant.tradingName || tenant.name },
+    ];
+
+    const result = await this.contentService.sendContentMessage(
+      recipientPhone,
+      template.sid,
+      variables,
+      tenantId,
+      WhatsAppContextType.INVOICE,
+      data.invoiceNumber,
+    );
+
+    return {
+      success: result.success,
+      messageId: result.messageSid,
+      error: result.error,
+      errorCode: result.errorCode,
+    };
+  }
+
+  /**
+   * Send rich payment reminder with quick reply buttons
+   * Uses PAYMENT_REMINDER_INTERACTIVE or escalated templates based on days overdue
+   */
+  async sendRichPaymentReminder(
+    tenantId: string,
+    recipientPhone: string,
+    data: {
+      parentName: string;
+      childName: string;
+      invoiceNumber: string;
+      amount: number; // In cents
+      daysOverdue: number;
+      originalDueDate: Date;
+    },
+  ): Promise<TwilioMessageResult> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        error: 'Tenant not found',
+        errorCode: 'TENANT_NOT_FOUND',
+      };
+    }
+
+    // Select template based on days overdue
+    let templateName: string;
+    if (data.daysOverdue <= 7) {
+      templateName = TEMPLATE_NAMES.REMINDER_FRIENDLY;
+    } else if (data.daysOverdue <= 14) {
+      templateName = TEMPLATE_NAMES.REMINDER_FIRM;
+    } else {
+      templateName = TEMPLATE_NAMES.REMINDER_FINAL;
+    }
+
+    const template = this.contentService?.getTemplate(templateName);
+
+    if (!this.contentService || !template) {
+      // Fallback to legacy text message
+      return this.sendPaymentReminder(
+        tenantId,
+        recipientPhone,
+        data.parentName,
+        data.invoiceNumber,
+        data.amount / 100,
+        data.daysOverdue,
+        tenant.tradingName || tenant.name,
+      );
+    }
+
+    let variables: ContentVariable[];
+
+    if (templateName === TEMPLATE_NAMES.REMINDER_FRIENDLY) {
+      // REMINDER_FRIENDLY: parentName, amount, childName, dueDate, invoiceNumber, tenantName
+      variables = [
+        { key: '1', value: data.parentName },
+        { key: '2', value: this.formatAmount(data.amount) },
+        { key: '3', value: data.childName },
+        { key: '4', value: this.formatDate(data.originalDueDate) },
+        { key: '5', value: data.invoiceNumber },
+        { key: '6', value: tenant.tradingName || tenant.name },
+      ];
+    } else if (templateName === TEMPLATE_NAMES.REMINDER_FIRM) {
+      // REMINDER_FIRM: parentName, daysOverdue, amount, invoiceNumber, tenantName
+      variables = [
+        { key: '1', value: data.parentName },
+        { key: '2', value: data.daysOverdue.toString() },
+        { key: '3', value: this.formatAmount(data.amount) },
+        { key: '4', value: data.invoiceNumber },
+        { key: '5', value: tenant.tradingName || tenant.name },
+      ];
+    } else {
+      // REMINDER_FINAL: parentFullName, daysOverdue, amount, invoiceNumber, tenantPhone, tenantName
+      const parentFullName = data.parentName; // Assume full name provided
+      variables = [
+        { key: '1', value: parentFullName },
+        { key: '2', value: data.daysOverdue.toString() },
+        { key: '3', value: this.formatAmount(data.amount) },
+        { key: '4', value: data.invoiceNumber },
+        { key: '5', value: tenant.phone || '' },
+        { key: '6', value: tenant.tradingName || tenant.name },
+      ];
+    }
+
+    const result = await this.contentService.sendContentMessage(
+      recipientPhone,
+      template.sid,
+      variables,
+      tenantId,
+      WhatsAppContextType.REMINDER,
+      data.invoiceNumber,
+    );
+
+    return {
+      success: result.success,
+      messageId: result.messageSid,
+      error: result.error,
+      errorCode: result.errorCode,
+    };
+  }
+
+  /**
+   * Send rich payment confirmation with receipt card
+   * Uses PAYMENT_CONFIRMATION template with tenant branding
+   */
+  async sendRichPaymentConfirmation(
+    tenantId: string,
+    recipientPhone: string,
+    data: {
+      parentName: string;
+      receiptNumber: string;
+      amount: number; // In cents
+      paymentReference: string;
+      paymentDate: Date;
+      invoiceNumber: string;
+      remainingBalance: number; // In cents
+      receiptPdfUrl?: string;
+    },
+  ): Promise<TwilioMessageResult> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        error: 'Tenant not found',
+        errorCode: 'TENANT_NOT_FOUND',
+      };
+    }
+
+    const template = this.contentService?.getTemplate(
+      TEMPLATE_NAMES.PAYMENT_CONFIRMATION,
+    );
+
+    if (!this.contentService || !template) {
+      // Fallback to legacy text message
+      return this.sendPaymentConfirmation(
+        tenantId,
+        recipientPhone,
+        data.parentName,
+        data.invoiceNumber,
+        data.amount / 100,
+        data.paymentReference,
+        tenant.tradingName || tenant.name,
+      );
+    }
+
+    const variables: ContentVariable[] = [
+      { key: '1', value: data.receiptNumber },
+      { key: '2', value: data.parentName },
+      { key: '3', value: this.formatAmount(data.amount) },
+      { key: '4', value: data.paymentReference },
+      { key: '5', value: this.formatDate(data.paymentDate) },
+      { key: '6', value: data.invoiceNumber },
+      { key: '7', value: this.formatAmount(data.remainingBalance) },
+      { key: '8', value: data.receiptPdfUrl || '' },
+      { key: '9', value: tenant.tradingName || tenant.name },
+    ];
+
+    const result = await this.contentService.sendContentMessage(
+      recipientPhone,
+      template.sid,
+      variables,
+      tenantId,
+      WhatsAppContextType.INVOICE,
+      data.receiptNumber,
+    );
+
+    return {
+      success: result.success,
+      messageId: result.messageSid,
+      error: result.error,
+      errorCode: result.errorCode,
+    };
+  }
+
+  /**
+   * Send rich arrears notice with call-to-action buttons
+   * Uses ARREARS_NOTICE template with tenant branding
+   */
+  async sendRichArrearsNotice(
+    tenantId: string,
+    recipientPhone: string,
+    data: {
+      parentFullName: string;
+      parentId: string;
+      daysOverdue: number;
+      totalAmount: number; // In cents
+      oldestInvoiceNumber: string;
+      unpaidInvoiceCount: number;
+    },
+  ): Promise<TwilioMessageResult> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        error: 'Tenant not found',
+        errorCode: 'TENANT_NOT_FOUND',
+      };
+    }
+
+    const template = this.contentService?.getTemplate(
+      TEMPLATE_NAMES.ARREARS_NOTICE,
+    );
+
+    if (!this.contentService || !template) {
+      // Fallback to legacy text message using sendPaymentReminder with URGENT
+      return this.sendPaymentReminder(
+        tenantId,
+        recipientPhone,
+        data.parentFullName,
+        data.oldestInvoiceNumber,
+        data.totalAmount / 100,
+        data.daysOverdue,
+        tenant.tradingName || tenant.name,
+      );
+    }
+
+    const variables: ContentVariable[] = [
+      { key: '1', value: data.parentFullName },
+      { key: '2', value: data.daysOverdue.toString() },
+      { key: '3', value: this.formatAmount(data.totalAmount) },
+      { key: '4', value: data.oldestInvoiceNumber },
+      { key: '5', value: data.unpaidInvoiceCount.toString() },
+      { key: '6', value: tenant.tradingName || tenant.name },
+      { key: '7', value: data.parentId },
+      { key: '8', value: tenant.phone || '' },
+    ];
+
+    const result = await this.contentService.sendContentMessage(
+      recipientPhone,
+      template.sid,
+      variables,
+      tenantId,
+      WhatsAppContextType.ARREARS,
+      data.oldestInvoiceNumber,
+    );
+
+    return {
+      success: result.success,
+      messageId: result.messageSid,
+      error: result.error,
+      errorCode: result.errorCode,
+    };
+  }
+
+  /**
+   * Send rich welcome message for new enrollments
+   * Uses WELCOME_ENROLLMENT template with tenant branding
+   */
+  async sendRichWelcomeMessage(
+    tenantId: string,
+    recipientPhone: string,
+    data: {
+      parentName: string;
+      childName: string;
+      startDate: Date;
+      monthlyFee: number; // In cents
+      feeStructure: string;
+      onboardToken?: string;
+      bannerImageUrl?: string;
+    },
+  ): Promise<TwilioMessageResult> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        error: 'Tenant not found',
+        errorCode: 'TENANT_NOT_FOUND',
+      };
+    }
+
+    const template = this.contentService?.getTemplate(
+      TEMPLATE_NAMES.WELCOME_ENROLLMENT,
+    );
+
+    if (!this.contentService || !template) {
+      // Fallback to legacy text message
+      return this.sendWelcomeMessage(
+        tenantId,
+        recipientPhone,
+        data.parentName,
+        data.childName,
+        tenant.tradingName || tenant.name,
+      );
+    }
+
+    const variables: ContentVariable[] = [
+      { key: '1', value: tenant.tradingName || tenant.name },
+      { key: '2', value: data.parentName },
+      { key: '3', value: data.childName },
+      { key: '4', value: this.formatDate(data.startDate) },
+      { key: '5', value: this.formatAmount(data.monthlyFee) },
+      { key: '6', value: data.feeStructure },
+      { key: '7', value: data.bannerImageUrl || '' },
+      { key: '8', value: data.onboardToken || '' },
+      { key: '9', value: tenant.phone || '' },
+    ];
+
+    const result = await this.contentService.sendContentMessage(
+      recipientPhone,
+      template.sid,
+      variables,
+      tenantId,
+      WhatsAppContextType.WELCOME,
+      data.childName,
+    );
+
+    return {
+      success: result.success,
+      messageId: result.messageSid,
+      error: result.error,
+      errorCode: result.errorCode,
+    };
+  }
+
+  /**
+   * Send rich statement notification with PDF card
+   * Uses STATEMENT_NOTIFICATION template with tenant branding
+   */
+  async sendRichStatementNotification(
+    tenantId: string,
+    recipientPhone: string,
+    data: {
+      parentName: string;
+      period: string; // e.g., "February 2026"
+      periodStart: Date;
+      periodEnd: Date;
+      openingBalance: number; // In cents
+      charges: number; // In cents
+      payments: number; // In cents
+      closingBalance: number; // In cents
+      statementPdfUrl: string;
+      statementId: string;
+    },
+  ): Promise<TwilioMessageResult> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      return {
+        success: false,
+        error: 'Tenant not found',
+        errorCode: 'TENANT_NOT_FOUND',
+      };
+    }
+
+    const template = this.contentService?.getTemplate(
+      TEMPLATE_NAMES.STATEMENT_NOTIFICATION,
+    );
+
+    if (!this.contentService || !template) {
+      // Fallback to legacy text message
+      return this.sendStatementNotification(
+        tenantId,
+        recipientPhone,
+        data.parentName,
+        data.period,
+        data.openingBalance / 100,
+        data.closingBalance / 100,
+        tenant.tradingName || tenant.name,
+        data.statementPdfUrl,
+      );
+    }
+
+    const variables: ContentVariable[] = [
+      { key: '1', value: data.period },
+      { key: '2', value: this.formatDate(data.periodStart) },
+      { key: '3', value: this.formatDate(data.periodEnd) },
+      { key: '4', value: data.parentName },
+      { key: '5', value: this.formatAmount(data.openingBalance) },
+      { key: '6', value: this.formatAmount(data.charges) },
+      { key: '7', value: this.formatAmount(data.payments) },
+      { key: '8', value: this.formatAmount(data.closingBalance) },
+      { key: '9', value: data.statementPdfUrl },
+      { key: '10', value: data.statementId },
+      { key: '11', value: tenant.tradingName || tenant.name },
+    ];
+
+    const result = await this.contentService.sendContentMessage(
+      recipientPhone,
+      template.sid,
+      variables,
+      tenantId,
+      WhatsAppContextType.STATEMENT,
+      data.statementId,
+    );
+
+    return {
+      success: result.success,
+      messageId: result.messageSid,
+      error: result.error,
+      errorCode: result.errorCode,
+    };
   }
 }

@@ -2,7 +2,7 @@
 
 <metadata>
   <title>Statement Delivery via WhatsApp</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>262</sequence>
   <implements>

@@ -19,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { EnrollmentSuccessModal, type EnrollmentData } from '@/components/enrollments';
+import { WhatsAppOptIn } from '@/components/parents/whatsapp-opt-in';
+import { WhatsAppMessageHistory } from '@/components/parents/whatsapp-message-history';
 
 interface ParentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -421,6 +423,17 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* TASK-WA-004: WhatsApp Notifications Section */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <WhatsAppOptIn
+          parentId={id}
+          phone={parent.phone}
+          whatsappNumber={parent.whatsapp}
+          initialOptedIn={(parent as unknown as { whatsappOptIn?: boolean }).whatsappOptIn ?? false}
+        />
+        <WhatsAppMessageHistory parentId={id} />
       </div>
 
       {/* TASK-BILL-023: Enrollment Success Modal with Invoice */}

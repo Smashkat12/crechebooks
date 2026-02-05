@@ -2,7 +2,7 @@
 
 <metadata>
   <title>WhatsApp Channel Adapter Tests</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>testing</layer>
   <sequence>264</sequence>
   <implements>

@@ -67,3 +67,6 @@ export * from './use-payroll-processing';
 
 // TASK-FIX-005: Bank Fee Configuration hooks
 export * from './use-bank-fees';
+
+// TASK-WA-004: WhatsApp Opt-In Management hooks
+export * from './use-whatsapp';

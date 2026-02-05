@@ -2,7 +2,7 @@
 
 <metadata>
   <title>WhatsApp Opt-In UI Components</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>surface</layer>
   <sequence>263</sequence>
   <implements>

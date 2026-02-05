@@ -2,7 +2,7 @@
 
 <metadata>
   <title>WhatsApp Template Management Service</title>
-  <status>ready</status>
+  <status>complete</status>
   <layer>logic</layer>
   <sequence>261</sequence>
   <implements>

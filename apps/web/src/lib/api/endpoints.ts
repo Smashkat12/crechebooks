@@ -208,4 +208,11 @@ export const endpoints = {
     bankDefaults: (bankCode: string) => `/settings/bank-fees/banks/${bankCode}/defaults`,
     applyPreset: '/settings/bank-fees/apply-preset',
   },
+  // TASK-WA-004: WhatsApp Opt-In Management
+  whatsapp: {
+    optIn: '/whatsapp/opt-in',
+    optOut: '/whatsapp/opt-out',
+    history: (parentId: string) => `/whatsapp/history/${parentId}`,
+    status: (parentId: string) => `/whatsapp/status/${parentId}`,
+  },
 } as const;

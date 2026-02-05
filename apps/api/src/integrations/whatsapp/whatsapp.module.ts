@@ -5,6 +5,9 @@
  * TASK-WA-002: WhatsApp Template Management Service
  * TASK-WA-006: WhatsApp Message Retry Service
  * TASK-WA-007: Twilio WhatsApp Integration (Alternative Provider)
+ * TASK-WA-007: Twilio Content API Integration Service
+ * TASK-WA-009: Interactive Button Response Handlers
+ * TASK-WA-010: Session-Based Interactive Features & Document Delivery
  *
  * Provides WhatsApp Business API integration for invoice delivery
  * and reminders via Meta Cloud API or Twilio.
@@ -17,13 +20,18 @@
 import { Module, forwardRef, Logger } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { WhatsAppService } from './whatsapp.service';
 import { WhatsAppMessageEntity } from './entities/whatsapp-message.entity';
 import { WhatsAppTemplateService } from './services/template.service';
 import { WhatsAppRetryService } from './services/retry.service';
 import { WhatsAppRetryProcessor } from './processors/whatsapp-retry.processor';
 import { TwilioWhatsAppService } from './services/twilio-whatsapp.service';
+import { TwilioContentService } from './services/twilio-content.service';
 import { WhatsAppProviderService } from './services/whatsapp-provider.service';
+import { DocumentUrlService } from './services/document-url.service';
+import { ButtonResponseHandler } from './handlers/button-response.handler';
+import { SessionInteractiveHandler } from './handlers/session-interactive.handler';
 import { DatabaseModule } from '../../database/database.module';
 import { QUEUE_NAMES } from '../../scheduler/types/scheduler.types';
 
@@ -100,13 +108,29 @@ const retryProviders = isRedisConfigured()
   : [WhatsAppRetryService]; // Service can still be injected but won't process jobs
 
 @Module({
-  imports: [forwardRef(() => DatabaseModule), ConfigModule, ...bullImports],
+  imports: [
+    forwardRef(() => DatabaseModule),
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '15m' }, // Default for document URLs
+      }),
+      inject: [ConfigService],
+    }),
+    ...bullImports,
+  ],
   providers: [
     WhatsAppService,
     WhatsAppMessageEntity,
     WhatsAppTemplateService,
     TwilioWhatsAppService,
+    TwilioContentService,
     WhatsAppProviderService,
+    DocumentUrlService,
+    ButtonResponseHandler,
+    SessionInteractiveHandler,
     ...retryProviders,
   ],
   exports: [
@@ -115,7 +139,11 @@ const retryProviders = isRedisConfigured()
     WhatsAppTemplateService,
     WhatsAppRetryService,
     TwilioWhatsAppService,
+    TwilioContentService,
     WhatsAppProviderService,
+    DocumentUrlService,
+    ButtonResponseHandler,
+    SessionInteractiveHandler,
   ],
 })
 export class WhatsAppModule {}

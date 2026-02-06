@@ -53,10 +53,15 @@ export class WhatsAppService {
     this.config = this.loadConfig();
 
     if (!this.config) {
-      this.logger.warn(
-        'WhatsApp API not configured. Set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, ' +
-          'WHATSAPP_BUSINESS_ACCOUNT_ID, WHATSAPP_WEBHOOK_VERIFY_TOKEN, and WHATSAPP_APP_SECRET environment variables.',
-      );
+      // Only warn if Meta is the selected provider; when Twilio is active
+      // these env vars are intentionally absent.
+      const provider = process.env.WHATSAPP_PROVIDER?.toLowerCase();
+      if (provider !== 'twilio') {
+        this.logger.warn(
+          'WhatsApp Meta API not configured. Set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, ' +
+            'WHATSAPP_BUSINESS_ACCOUNT_ID, WHATSAPP_WEBHOOK_VERIFY_TOKEN, and WHATSAPP_APP_SECRET environment variables.',
+        );
+      }
     } else {
       this.logger.log('WhatsApp Business API service initialized');
     }

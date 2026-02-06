@@ -228,33 +228,66 @@ export class TwilioContentService implements OnModuleInit {
 
   /**
    * Auto-register any templates from ALL_TEMPLATES that are missing from Twilio.
+   * Checks the database first to avoid re-registering templates that were
+   * already created in a previous deploy but aren't in the Twilio API list.
    * After registration, each template is submitted for WhatsApp/Meta approval.
    */
   private async ensureTemplatesRegistered(): Promise<void> {
     for (const definition of ALL_TEMPLATES) {
-      if (!this.templateCache.has(definition.friendlyName)) {
-        this.logger.log(
-          `Registering missing template: ${definition.friendlyName}`,
-        );
-        try {
-          const result = await this.registerTemplate(definition);
-          if (result.success && result.contentSid) {
-            // Submit for Meta/WhatsApp approval
-            const category =
-              (definition.category as
-                | 'UTILITY'
-                | 'MARKETING'
-                | 'AUTHENTICATION') || 'UTILITY';
-            await this.submitForApproval(result.contentSid, category);
-            this.logger.log(
-              `Submitted ${definition.friendlyName} for WhatsApp approval`,
-            );
-          }
-        } catch (error) {
-          this.logger.warn(
-            `Failed to auto-register template ${definition.friendlyName}: ${error instanceof Error ? error.message : String(error)}`,
+      if (this.templateCache.has(definition.friendlyName)) {
+        continue;
+      }
+
+      // Check database before hitting Twilio API — the template may already
+      // exist from a previous deploy even if the Twilio list didn't return it.
+      try {
+        const dbTemplate =
+          await this.prisma.whatsAppContentTemplate.findUnique({
+            where: { friendlyName: definition.friendlyName },
+          });
+
+        if (dbTemplate?.contentSid) {
+          this.templateCache.set(definition.friendlyName, {
+            sid: dbTemplate.contentSid,
+            friendlyName: dbTemplate.friendlyName,
+            language: dbTemplate.language,
+            variables:
+              (dbTemplate.variables as Record<string, string>) || {},
+            types: {},
+            approvalStatus: dbTemplate.approvalStatus as
+              | ContentApprovalStatus
+              | undefined,
+          });
+          this.logger.log(
+            `Restored template from database: ${definition.friendlyName} (${dbTemplate.contentSid})`,
+          );
+          continue;
+        }
+      } catch {
+        // Database check failed — fall through to registration
+      }
+
+      this.logger.log(
+        `Registering missing template: ${definition.friendlyName}`,
+      );
+      try {
+        const result = await this.registerTemplate(definition);
+        if (result.success && result.contentSid) {
+          // Submit for Meta/WhatsApp approval
+          const category =
+            (definition.category as
+              | 'UTILITY'
+              | 'MARKETING'
+              | 'AUTHENTICATION') || 'UTILITY';
+          await this.submitForApproval(result.contentSid, category);
+          this.logger.log(
+            `Submitted ${definition.friendlyName} for WhatsApp approval`,
           );
         }
+      } catch (error) {
+        this.logger.warn(
+          `Failed to auto-register template ${definition.friendlyName}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
   }

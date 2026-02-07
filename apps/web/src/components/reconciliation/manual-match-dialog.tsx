@@ -92,10 +92,11 @@ export function ManualMatchDialog({
 
   // Check if this looks like a fee situation (Xero gross > Bank net)
   const isFeeScenario = useMemo(() => {
-    if (amountDifference === null) return false;
-    // Fee scenario: Xero (gross) > Bank (net), difference is positive and reasonable (1-50 rand typically)
-    return amountDifference > 0 && amountDifference <= 100; // Up to R100 fee
-  }, [amountDifference]);
+    if (amountDifference === null || !selectedTransaction) return false;
+    const xeroAmount = selectedTransaction.amount;
+    // Fee scenario: Xero (gross) > Bank (net), difference is positive and <= 10% of gross (matches backend MAX_FEE_PERCENTAGE)
+    return amountDifference > 0 && amountDifference <= Math.abs(xeroAmount) * 0.1;
+  }, [amountDifference, selectedTransaction]);
 
   // Check if amounts match exactly
   const isExactMatch = amountDifference !== null && Math.abs(amountDifference) < 0.01;

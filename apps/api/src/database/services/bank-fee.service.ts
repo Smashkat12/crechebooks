@@ -34,6 +34,7 @@ export enum BankFeeType {
   TRANSFER_FEE = 'TRANSFER_FEE',
   RTC_PAYMENT_FEE = 'RTC_PAYMENT_FEE',
   FUEL_CARD_FEE = 'FUEL_CARD_FEE',
+  SEND_MONEY_FEE = 'SEND_MONEY_FEE',
 }
 
 /**
@@ -52,6 +53,7 @@ export enum TransactionType {
   TRANSFER = 'TRANSFER',
   RTC_PAYMENT = 'RTC_PAYMENT',
   FUEL_PURCHASE = 'FUEL_PURCHASE',
+  SEND_MONEY = 'SEND_MONEY',
   UNKNOWN = 'UNKNOWN',
 }
 
@@ -178,6 +180,14 @@ const DEFAULT_FNB_FEES: FeeRule[] = [
     fixedAmountCents: 625, // R6.25
     isActive: true,
     description: 'FNB Fuel card transaction fee',
+  },
+  {
+    feeType: BankFeeType.SEND_MONEY_FEE,
+    transactionTypes: [TransactionType.SEND_MONEY],
+    fixedAmountCents: 700, // R7.00 base fee
+    percentageRate: 0.02, // ~2% of transaction amount
+    isActive: true,
+    description: 'FNB Send Money (eWallet/App) fee',
   },
 ];
 
@@ -647,6 +657,11 @@ export class BankFeeService {
     // Card transactions
     if (/CARD|POS|MASTERCARD|VISA/i.test(text)) {
       return TransactionType.CARD_PURCHASE;
+    }
+
+    // FNB Send Money (eWallet/App) — must match before generic PAYMENT
+    if (/SEND\s*MONEY/i.test(text) || /E[\s-]*WALLET/i.test(text)) {
+      return TransactionType.SEND_MONEY;
     }
 
     // Transfer

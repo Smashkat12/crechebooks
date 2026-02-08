@@ -31,6 +31,9 @@ export enum BankFeeType {
   ADT_DEPOSIT_FEE = 'ADT_DEPOSIT_FEE',
   EFT_DEBIT_FEE = 'EFT_DEBIT_FEE',
   EFT_CREDIT_FEE = 'EFT_CREDIT_FEE',
+  TRANSFER_FEE = 'TRANSFER_FEE',
+  RTC_PAYMENT_FEE = 'RTC_PAYMENT_FEE',
+  FUEL_CARD_FEE = 'FUEL_CARD_FEE',
 }
 
 /**
@@ -47,6 +50,8 @@ export enum TransactionType {
   ATM_WITHDRAWAL = 'ATM_WITHDRAWAL',
   DEBIT_ORDER = 'DEBIT_ORDER',
   TRANSFER = 'TRANSFER',
+  RTC_PAYMENT = 'RTC_PAYMENT',
+  FUEL_PURCHASE = 'FUEL_PURCHASE',
   UNKNOWN = 'UNKNOWN',
 }
 
@@ -141,10 +146,17 @@ const DEFAULT_FNB_FEES: FeeRule[] = [
   },
   {
     feeType: BankFeeType.EFT_CREDIT_FEE,
-    transactionTypes: [TransactionType.EFT_CREDIT, TransactionType.TRANSFER],
-    fixedAmountCents: 940, // R9.40
+    transactionTypes: [TransactionType.EFT_CREDIT],
+    fixedAmountCents: 575, // R5.75 (incoming EFT received)
     isActive: true,
-    description: 'FNB EFT Credit/Transfer fee',
+    description: 'FNB EFT Credit (incoming payment) fee',
+  },
+  {
+    feeType: BankFeeType.TRANSFER_FEE,
+    transactionTypes: [TransactionType.TRANSFER],
+    fixedAmountCents: 940, // R9.40 (outgoing transfer)
+    isActive: true,
+    description: 'FNB Transfer/Outgoing EFT fee',
   },
   {
     feeType: BankFeeType.CARD_TRANSACTION_FEE,
@@ -152,6 +164,20 @@ const DEFAULT_FNB_FEES: FeeRule[] = [
     fixedAmountCents: 545, // R5.45
     isActive: true,
     description: 'FNB Card Transaction fee',
+  },
+  {
+    feeType: BankFeeType.RTC_PAYMENT_FEE,
+    transactionTypes: [TransactionType.RTC_PAYMENT],
+    fixedAmountCents: 800, // R8.00
+    isActive: true,
+    description: 'FNB Real-Time Clearing (RTC) payment fee',
+  },
+  {
+    feeType: BankFeeType.FUEL_CARD_FEE,
+    transactionTypes: [TransactionType.FUEL_PURCHASE],
+    fixedAmountCents: 625, // R6.25
+    isActive: true,
+    description: 'FNB Fuel card transaction fee',
   },
 ];
 
@@ -595,6 +621,11 @@ export class BankFeeService {
       return TransactionType.CASH_WITHDRAWAL;
     }
 
+    // RTC (Real-Time Clearing) payments — must match before generic PAYMENT
+    if (/RTC\s*(CR|CREDIT|PMT|PAYMENT)?/i.test(text) || /REAL[\s-]*TIME\s*CLEAR/i.test(text)) {
+      return TransactionType.RTC_PAYMENT;
+    }
+
     // EFT patterns
     if (/(EFT|ACB|NAEDO)\s*(CR|CREDIT)/i.test(text)) {
       return TransactionType.EFT_CREDIT;
@@ -606,6 +637,11 @@ export class BankFeeService {
     // Debit order
     if (/DEBIT\s*ORDER|D\/O|MAGTAPE/i.test(text)) {
       return TransactionType.DEBIT_ORDER;
+    }
+
+    // Fuel card transactions — must match before generic CARD/POS
+    if (/FUEL|PETROL|DIESEL|ENGEN|SHELL|CALTEX|SASOL|BP\s/i.test(text)) {
+      return TransactionType.FUEL_PURCHASE;
     }
 
     // Card transactions

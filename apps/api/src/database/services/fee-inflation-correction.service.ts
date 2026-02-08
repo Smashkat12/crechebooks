@@ -61,6 +61,11 @@ export interface FeeCorrectionPreview {
     matchId: string;
     reason: string;
     confidence: number;
+    bankDescription: string;
+    bankAmountCents: number;
+    xeroAmountCents: number;
+    feeAmountCents: number;
+    detectedType: string;
   }>;
 }
 
@@ -164,34 +169,57 @@ export class FeeInflationCorrectionService {
         ? calculatedFees[0].feeType
         : 'UNKNOWN_FEE';
 
-    // Calculate confidence based on how closely the difference matches expected fee
+    // Calculate confidence using multi-factor scoring:
+    // 1. Does the fee match the expected amount for this type?
+    // 2. Is the fee within a reasonable % of the transaction amount?
+    // 3. Do we even recognize the transaction type?
     let confidence = 0;
     let explanation = '';
+
+    const feeRatio = bankAmountCents > 0 ? feeDifference / bankAmountCents : 1;
+    const isKnownType = transactionType !== TransactionType.UNKNOWN;
 
     if (expectedFeeCents > 0) {
       const feeDelta = Math.abs(feeDifference - expectedFeeCents);
       if (feeDelta <= 50) {
-        // Within R0.50 tolerance
+        // Exact match (within R0.50)
         confidence = 0.95;
-        explanation = `Fee difference (R${(feeDifference / 100).toFixed(2)}) matches expected ${transactionType} fee (R${(expectedFeeCents / 100).toFixed(2)})`;
+        explanation = `Fee R${(feeDifference / 100).toFixed(2)} matches expected ${transactionType} fee R${(expectedFeeCents / 100).toFixed(2)}`;
       } else if (feeDelta <= 200) {
-        // Within R2.00
+        // Close match (within R2.00)
+        confidence = 0.90;
+        explanation = `Fee R${(feeDifference / 100).toFixed(2)} close to expected ${transactionType} fee R${(expectedFeeCents / 100).toFixed(2)}`;
+      } else if (isKnownType && feeRatio <= 0.05) {
+        // Known type, fee within 5% of transaction — likely a tiered/variable fee
+        confidence = 0.88;
+        explanation = `${transactionType} fee R${(feeDifference / 100).toFixed(2)} differs from schedule (R${(expectedFeeCents / 100).toFixed(2)}) but is ${(feeRatio * 100).toFixed(1)}% of amount — likely variable fee`;
+      } else if (isKnownType && feeRatio <= 0.10) {
+        // Known type, fee within 10% of transaction
         confidence = 0.85;
-        explanation = `Fee difference (R${(feeDifference / 100).toFixed(2)}) is close to expected ${transactionType} fee (R${(expectedFeeCents / 100).toFixed(2)})`;
+        explanation = `${transactionType} fee R${(feeDifference / 100).toFixed(2)} differs from schedule but is ${(feeRatio * 100).toFixed(1)}% of amount`;
+      } else if (isKnownType) {
+        // Known type but fee is unusually high relative to amount
+        confidence = 0.7;
+        explanation = `${transactionType} fee R${(feeDifference / 100).toFixed(2)} is ${(feeRatio * 100).toFixed(1)}% of amount — unusually high`;
       } else {
         confidence = 0.6;
-        explanation = `Fee difference (R${(feeDifference / 100).toFixed(2)}) does not closely match expected fee (R${(expectedFeeCents / 100).toFixed(2)})`;
+        explanation = `Fee R${(feeDifference / 100).toFixed(2)} does not match expected fee R${(expectedFeeCents / 100).toFixed(2)}`;
       }
-    } else if (
-      feeDifference > 0 &&
-      feeDifference <= xeroAmountCents * 0.1
-    ) {
-      // No configured fee but difference is within 10% - could still be a fee
+    } else if (isKnownType && feeRatio <= 0.05) {
+      // Known type, no configured fee, but fee is small relative to amount
+      confidence = 0.85;
+      explanation = `No configured fee for ${transactionType}, but R${(feeDifference / 100).toFixed(2)} is only ${(feeRatio * 100).toFixed(1)}% of amount`;
+    } else if (feeRatio <= 0.03) {
+      // Unknown type but very small fee relative to amount
+      confidence = 0.80;
+      explanation = `Unknown type, but fee R${(feeDifference / 100).toFixed(2)} is only ${(feeRatio * 100).toFixed(1)}% of amount — likely a bank fee`;
+    } else if (feeRatio <= 0.10) {
+      // Unknown type, fee within 10%
       confidence = 0.5;
-      explanation = `No configured fee for ${transactionType}, but difference (R${(feeDifference / 100).toFixed(2)}) is within 10% of amount`;
+      explanation = `No configured fee for ${transactionType}, difference R${(feeDifference / 100).toFixed(2)} is ${(feeRatio * 100).toFixed(1)}% of amount`;
     } else {
       confidence = 0.1;
-      explanation = `Fee difference (R${(feeDifference / 100).toFixed(2)}) exceeds typical fee range`;
+      explanation = `Fee R${(feeDifference / 100).toFixed(2)} is ${(feeRatio * 100).toFixed(1)}% of amount — exceeds typical fee range`;
     }
 
     return {
@@ -389,6 +417,11 @@ export class FeeInflationCorrectionService {
           matchId: match.id,
           reason: 'Missing transaction or Xero amount',
           confidence: 0,
+          bankDescription: match.bankDescription,
+          bankAmountCents: match.bankAmountCents,
+          xeroAmountCents: match.xeroAmountCents ?? 0,
+          feeAmountCents: 0,
+          detectedType: 'N/A',
         });
         continue;
       }
@@ -416,6 +449,11 @@ export class FeeInflationCorrectionService {
           matchId: match.id,
           reason: detection.explanation,
           confidence: detection.confidence,
+          bankDescription: match.bankDescription,
+          bankAmountCents: match.bankAmountCents,
+          xeroAmountCents: match.xeroAmountCents,
+          feeAmountCents: detection.actualFeeCents,
+          detectedType: detection.transactionType,
         });
       }
     }

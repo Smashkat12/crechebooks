@@ -22,6 +22,7 @@ import {
 } from '../../../src/database/entities/bank-statement-match.entity';
 import { AccruedBankChargeService } from '../../../src/database/services/accrued-bank-charge.service';
 import { BankFeeService } from '../../../src/database/services/bank-fee.service';
+import { FeeInflationCorrectionService } from '../../../src/database/services/fee-inflation-correction.service';
 import { BusinessException } from '../../../src/shared/exceptions';
 
 describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
@@ -101,6 +102,20 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
           useValue: {
             detectBankFees: jest.fn().mockResolvedValue([]),
             categorizeBankFee: jest.fn().mockResolvedValue({}),
+          },
+        },
+        {
+          provide: FeeInflationCorrectionService,
+          useValue: {
+            detectAndValidateFeeMatch: jest.fn().mockResolvedValue({
+              isMatch: false,
+              confidence: 0,
+              transactionType: 'UNKNOWN',
+              feeType: 'NONE',
+              expectedFeeCents: 0,
+              actualFeeCents: 0,
+              explanation: 'mock',
+            }),
           },
         },
       ],

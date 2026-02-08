@@ -129,7 +129,7 @@ describe('FeeInflationCorrectionService', () => {
       expect(result.actualFeeCents).toBe(368);
     });
 
-    it('should return low confidence for unknown transaction types', async () => {
+    it('should return moderate confidence for unknown types with small fee ratio', async () => {
       mockBankFeeService.detectTransactionType.mockReturnValue(
         TransactionType.UNKNOWN,
       );
@@ -138,12 +138,13 @@ describe('FeeInflationCorrectionService', () => {
       const result = await service.detectAndValidateFeeMatch(
         tenantId,
         100000, // R1,000 bank
-        100500, // R1,005 xero
+        100500, // R1,005 xero — fee is 0.5% of amount
         'Unknown Transfer',
       );
 
+      // Fee ratio 0.5% < 3% → 0.80 confidence (below MIN_CORRECTION_CONFIDENCE)
       expect(result.isMatch).toBe(false);
-      expect(result.confidence).toBe(0.5);
+      expect(result.confidence).toBe(0.80);
       expect(result.actualFeeCents).toBe(500);
     });
 
@@ -172,7 +173,7 @@ describe('FeeInflationCorrectionService', () => {
       expect(result.confidence).toBe(0);
     });
 
-    it('should give 0.85 confidence when fee is close but not exact', async () => {
+    it('should give 0.90 confidence when fee is close but not exact (within R2)', async () => {
       mockBankFeeService.detectTransactionType.mockReturnValue(
         TransactionType.ADT_DEPOSIT,
       );
@@ -193,7 +194,136 @@ describe('FeeInflationCorrectionService', () => {
       );
 
       expect(result.isMatch).toBe(true);
-      expect(result.confidence).toBe(0.85);
+      expect(result.confidence).toBe(0.90);
+    });
+
+    it('should detect RTC payment fee with high confidence (R8.00)', async () => {
+      mockBankFeeService.detectTransactionType.mockReturnValue(
+        TransactionType.RTC_PAYMENT,
+      );
+      mockBankFeeService.calculateFees.mockResolvedValue([
+        {
+          feeType: 'RTC_PAYMENT_FEE',
+          feeAmountCents: 800,
+          appliedRule: {},
+          description: 'RTC fee',
+        },
+      ]);
+
+      const result = await service.detectAndValidateFeeMatch(
+        tenantId,
+        200000, // R2,000 bank
+        200800, // R2,008 xero
+        'RTC Credit Payment',
+      );
+
+      expect(result.isMatch).toBe(true);
+      expect(result.confidence).toBe(0.95);
+      expect(result.feeType).toBe('RTC_PAYMENT_FEE');
+      expect(result.actualFeeCents).toBe(800);
+    });
+
+    it('should detect fuel card fee with high confidence (R6.25)', async () => {
+      mockBankFeeService.detectTransactionType.mockReturnValue(
+        TransactionType.FUEL_PURCHASE,
+      );
+      mockBankFeeService.calculateFees.mockResolvedValue([
+        {
+          feeType: 'FUEL_CARD_FEE',
+          feeAmountCents: 625,
+          appliedRule: {},
+          description: 'Fuel card fee',
+        },
+      ]);
+
+      const result = await service.detectAndValidateFeeMatch(
+        tenantId,
+        80000, // R800 bank
+        80625, // R806.25 xero
+        'ENGEN FUEL Centurion',
+      );
+
+      expect(result.isMatch).toBe(true);
+      expect(result.confidence).toBe(0.95);
+      expect(result.feeType).toBe('FUEL_CARD_FEE');
+    });
+
+    it('should give high confidence for ADT with variable fee (ratio-based)', async () => {
+      // ADT with R10.95 fee instead of expected R14.70
+      mockBankFeeService.detectTransactionType.mockReturnValue(
+        TransactionType.ADT_DEPOSIT,
+      );
+      mockBankFeeService.calculateFees.mockResolvedValue([
+        {
+          feeType: 'ADT_DEPOSIT_FEE',
+          feeAmountCents: 1470,
+          appliedRule: {},
+          description: 'ADT fee',
+        },
+      ]);
+
+      const result = await service.detectAndValidateFeeMatch(
+        tenantId,
+        300000, // R3,000 bank
+        301095, // R3,010.95 xero — fee of R10.95 (0.37% of amount)
+        'ADT Deposit',
+      );
+
+      // Known type, fee within 5% of amount → 0.88
+      expect(result.isMatch).toBe(true);
+      expect(result.confidence).toBe(0.88);
+      expect(result.actualFeeCents).toBe(1095);
+    });
+
+    it('should give high confidence for large ADT with proportional fee (R129.70 on R10k)', async () => {
+      mockBankFeeService.detectTransactionType.mockReturnValue(
+        TransactionType.ADT_DEPOSIT,
+      );
+      mockBankFeeService.calculateFees.mockResolvedValue([
+        {
+          feeType: 'ADT_DEPOSIT_FEE',
+          feeAmountCents: 1470,
+          appliedRule: {},
+          description: 'ADT fee',
+        },
+      ]);
+
+      const result = await service.detectAndValidateFeeMatch(
+        tenantId,
+        1000000,  // R10,000 bank
+        1012970,  // R10,129.70 xero — fee of R129.70 (1.3% of amount)
+        'ADT Fridge Deposit',
+      );
+
+      // Known type, fee within 5% of amount → 0.88
+      expect(result.isMatch).toBe(true);
+      expect(result.confidence).toBe(0.88);
+      expect(result.actualFeeCents).toBe(12970);
+    });
+
+    it('should detect EFT credit with corrected fee (R5.75)', async () => {
+      mockBankFeeService.detectTransactionType.mockReturnValue(
+        TransactionType.EFT_CREDIT,
+      );
+      mockBankFeeService.calculateFees.mockResolvedValue([
+        {
+          feeType: 'EFT_CREDIT_FEE',
+          feeAmountCents: 575,
+          appliedRule: {},
+          description: 'EFT credit fee',
+        },
+      ]);
+
+      const result = await service.detectAndValidateFeeMatch(
+        tenantId,
+        500000, // R5,000 bank
+        500575, // R5,005.75 xero
+        'EFT CR Payment Received',
+      );
+
+      expect(result.isMatch).toBe(true);
+      expect(result.confidence).toBe(0.95);
+      expect(result.feeType).toBe('EFT_CREDIT_FEE');
     });
   });
 
@@ -422,7 +552,7 @@ describe('FeeInflationCorrectionService', () => {
       expect(mockPrisma.transaction.update).not.toHaveBeenCalled();
     });
 
-    it('should skip matches with low confidence', async () => {
+    it('should skip matches with low confidence and include detail', async () => {
       mockPrisma.bankStatementMatch.findMany.mockResolvedValue([
         {
           id: 'match-1',
@@ -449,6 +579,12 @@ describe('FeeInflationCorrectionService', () => {
 
       expect(result.correctableMatches).toBe(0);
       expect(result.skipped).toHaveLength(1);
+      // Verify enhanced skipped fields
+      expect(result.skipped[0].bankDescription).toBe('Random Transfer');
+      expect(result.skipped[0].bankAmountCents).toBe(100000);
+      expect(result.skipped[0].xeroAmountCents).toBe(200000);
+      expect(result.skipped[0].feeAmountCents).toBe(100000);
+      expect(result.skipped[0].detectedType).toBe('UNKNOWN');
     });
 
     it('should skip already-corrected matches', async () => {

@@ -18,6 +18,7 @@ import { ComparativeBalanceSheetService } from '../../../src/database/services/c
 import { SplitTransactionMatcherService } from '../../../src/database/services/split-transaction-matcher.service';
 import { AccruedBankChargeService } from '../../../src/database/services/accrued-bank-charge.service';
 import { XeroTransactionSplitService } from '../../../src/database/services/xero-transaction-split.service';
+import { FeeInflationCorrectionService } from '../../../src/database/services/fee-inflation-correction.service';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
@@ -119,6 +120,33 @@ describe('ReconciliationController - reconcile', () => {
         {
           provide: XeroTransactionSplitService,
           useValue: { splitTransaction: jest.fn() },
+        },
+        {
+          provide: FeeInflationCorrectionService,
+          useValue: {
+            detectAndValidateFeeMatch: jest.fn().mockResolvedValue({
+              isMatch: false,
+              confidence: 0,
+              transactionType: 'UNKNOWN',
+              feeType: 'NONE',
+              expectedFeeCents: 0,
+              actualFeeCents: 0,
+              explanation: 'mock',
+            }),
+            correctExistingMatches: jest.fn().mockResolvedValue({
+              totalMatches: 0,
+              correctableMatches: 0,
+              totalFeesCents: 0,
+              corrections: [],
+              skipped: [],
+            }),
+            matchMonthlyFeeTransactions: jest.fn().mockResolvedValue({
+              matchedCount: 0,
+              totalMatchedCents: 0,
+              matches: [],
+              unmatched: [],
+            }),
+          },
         },
         {
           provide: PrismaService,

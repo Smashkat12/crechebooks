@@ -1,0 +1,260 @@
+{
+  "version": "2025.1",
+  "description": "Payee pattern matching rules for SA creche transactions",
+  "autoApplyConfidenceThreshold": 0.80,
+  "patterns": [
+    {
+      "id": "bank-fnb-cheque",
+      "regex": "^FNB CHEQUE",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "bank-fnb-fee",
+      "regex": "FNB.*SERVICE FEE|FNB.*ADMIN",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "bank-nedbank",
+      "regex": "NEDBANK.*FEE|NEDBANK.*CHARGE",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "bank-standard",
+      "regex": "STANDARD BANK.*FEE|SBSA.*CHARGE",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "bank-absa",
+      "regex": "ABSA.*FEE|ABSA.*CHARGE",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "bank-capitec",
+      "regex": "CAPITEC.*FEE|CAPITEC.*CHARGE",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "sars-payment",
+      "regex": "^SARS|SOUTH AFRICAN REVENUE",
+      "accountCode": "2200",
+      "accountName": "VAT Payable",
+      "confidence": 1.0,
+      "vatType": "NO_VAT",
+      "flagForReview": true,
+      "reviewReason": "Tax payment - verify correct tax type"
+    },
+    {
+      "id": "utility-eskom",
+      "regex": "ESKOM|CITY POWER|MUNICIPALITY.*ELEC",
+      "accountCode": "5200",
+      "accountName": "Utilities - Electricity",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "utility-water",
+      "regex": "WATER.*BOARD|MUNICIPALITY.*WATER|RAND WATER",
+      "accountCode": "5210",
+      "accountName": "Utilities - Water",
+      "confidence": 0.90,
+      "vatType": "ZERO_RATED"
+    },
+    {
+      "id": "telecom-vodacom",
+      "regex": "VODACOM",
+      "accountCode": "8300",
+      "accountName": "Telephone and Internet",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "telecom-mtn",
+      "regex": "MTN",
+      "accountCode": "8300",
+      "accountName": "Telephone and Internet",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "telecom-telkom",
+      "regex": "TELKOM",
+      "accountCode": "8300",
+      "accountName": "Telephone and Internet",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "telecom-cellc",
+      "regex": "CELL C",
+      "accountCode": "8300",
+      "accountName": "Telephone and Internet",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "telecom-afrihost",
+      "regex": "AFRIHOST|RAIN",
+      "accountCode": "8300",
+      "accountName": "Telephone and Internet",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "groceries-shoprite",
+      "regex": "SHOPRITE|CHECKERS",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.75,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "groceries-pnp",
+      "regex": "PICK N PAY|PNP",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.75,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "groceries-woolworths",
+      "regex": "WOOLWORTHS|WOOLIES",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.75,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "groceries-spar",
+      "regex": "SPAR",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.75,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "groceries-makro",
+      "regex": "MAKRO",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.75,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "school-fee-deposit",
+      "regex": "DEPOSIT|SCHOOL.*FEE|TUITION",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.70,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "salary-payment",
+      "regex": "SALARY|WAGE|PAY.*EMP",
+      "accountCode": "5000",
+      "accountName": "Salaries and Wages",
+      "confidence": 0.85,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "insurance-outsurance",
+      "regex": "OUTSURANCE",
+      "accountCode": "5500",
+      "accountName": "Insurance",
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "insurance-sanlam",
+      "regex": "SANLAM",
+      "accountCode": "5500",
+      "accountName": "Insurance",
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "insurance-oldmutual",
+      "regex": "OLD MUTUAL",
+      "accountCode": "5500",
+      "accountName": "Insurance",
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "insurance-discovery",
+      "regex": "DISCOVERY",
+      "accountCode": "5500",
+      "accountName": "Insurance",
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "insurance-momentum",
+      "regex": "MOMENTUM",
+      "accountCode": "5500",
+      "accountName": "Insurance",
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "insurance-santam",
+      "regex": "SANTAM",
+      "accountCode": "5500",
+      "accountName": "Insurance",
+      "confidence": 0.90,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "rent-payment",
+      "regex": "RENT|LEASE",
+      "accountCode": "5100",
+      "accountName": "Rent",
+      "confidence": 0.80,
+      "vatType": "EXEMPT"
+    },
+    {
+      "id": "cleaning-supplies",
+      "regex": "CLICKS|DIS-CHEM|GAME",
+      "accountCode": "5600",
+      "accountName": "Cleaning and Hygiene",
+      "confidence": 0.70,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "educational-supplies",
+      "regex": "WALTONS|CNA|TAKEALOT",
+      "accountCode": "5300",
+      "accountName": "Educational Supplies",
+      "confidence": 0.75,
+      "vatType": "STANDARD"
+    }
+  ]
+}

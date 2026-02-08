@@ -1,0 +1,137 @@
+{
+  "version": "2025",
+  "effectiveFrom": "2025-03-01",
+  "effectiveTo": "2026-02-28",
+  "source": "SARS Tax Tables 2025",
+  "paye": {
+    "taxYear": "2025",
+    "description": "Individual tax brackets - values in CENTS",
+    "taxBrackets": [
+      {
+        "bracketNumber": 1,
+        "fromCents": 0,
+        "toCents": 23740000,
+        "rate": 0.18,
+        "baseTaxCents": 0
+      },
+      {
+        "bracketNumber": 2,
+        "fromCents": 23740001,
+        "toCents": 37080000,
+        "rate": 0.26,
+        "baseTaxCents": 427320
+      },
+      {
+        "bracketNumber": 3,
+        "fromCents": 37080001,
+        "toCents": 51210000,
+        "rate": 0.31,
+        "baseTaxCents": 773760
+      },
+      {
+        "bracketNumber": 4,
+        "fromCents": 51210001,
+        "toCents": 67340000,
+        "rate": 0.36,
+        "baseTaxCents": 1211100
+      },
+      {
+        "bracketNumber": 5,
+        "fromCents": 67340001,
+        "toCents": 85710000,
+        "rate": 0.39,
+        "baseTaxCents": 1791780
+      },
+      {
+        "bracketNumber": 6,
+        "fromCents": 85710001,
+        "toCents": 181270000,
+        "rate": 0.41,
+        "baseTaxCents": 2509050
+      },
+      {
+        "bracketNumber": 7,
+        "fromCents": 181270001,
+        "toCents": 999999999999,
+        "rate": 0.45,
+        "baseTaxCents": 6425670
+      }
+    ],
+    "rebates": {
+      "description": "Tax rebates in CENTS - deducted from calculated tax",
+      "primary": {
+        "amountCents": 1760000,
+        "ageRequirement": null
+      },
+      "secondary": {
+        "amountCents": 975000,
+        "ageRequirement": 65
+      },
+      "tertiary": {
+        "amountCents": 325500,
+        "ageRequirement": 75
+      }
+    },
+    "taxThresholds": {
+      "description": "Annual income below which no tax is payable (in CENTS)",
+      "under65": 9540000,
+      "age65to74": 14795800,
+      "age75plus": 16531400
+    },
+    "medicalTaxCredits": {
+      "description": "Monthly medical aid tax credits in CENTS",
+      "mainMember": 36400,
+      "firstDependant": 36400,
+      "additionalDependant": 24500
+    }
+  },
+  "uif": {
+    "description": "Unemployment Insurance Fund - values in CENTS",
+    "employeeRate": 0.01,
+    "employerRate": 0.01,
+    "totalRate": 0.02,
+    "maxMonthlyEarningsCents": 1771200,
+    "maxMonthlyContributionCents": 17712,
+    "maxEmployeeContributionCents": 17712,
+    "maxEmployerContributionCents": 17712
+  },
+  "vat": {
+    "description": "Value Added Tax",
+    "standardRate": 0.15,
+    "registrationThresholdCents": 100000000,
+    "registrationThresholdDescription": "R1,000,000 annual turnover",
+    "zeroRatedItems": [
+      "exports",
+      "illuminating paraffin",
+      "brown bread",
+      "maize meal",
+      "samp",
+      "mealie rice",
+      "dried mealies",
+      "dried beans",
+      "lentils",
+      "pilchards",
+      "milk powder",
+      "dairy powder blend",
+      "rice",
+      "vegetables",
+      "fruit",
+      "vegetable oil",
+      "milk",
+      "eggs"
+    ],
+    "exemptItems": [
+      "educational services",
+      "childcare services",
+      "public transport",
+      "residential rentals",
+      "financial services"
+    ]
+  },
+  "sdl": {
+    "description": "Skills Development Levy",
+    "rate": 0.01,
+    "thresholdCents": 50000000,
+    "thresholdDescription": "R500,000 annual payroll"
+  }
+}

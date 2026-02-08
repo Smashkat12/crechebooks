@@ -1,0 +1,86 @@
+{
+  "version": "2025.1",
+  "description": "Default tenant configuration for new creches",
+  "defaults": {
+    "taxStatus": "NOT_REGISTERED",
+    "vatRate": 0.15,
+    "currency": "ZAR",
+    "timezone": "Africa/Johannesburg",
+    "locale": "en-ZA",
+    "fiscalYearEnd": "February",
+    "billingDayOfMonth": 1,
+    "paymentTermsDays": 7,
+    "reminderDaysBefore": [7, 3, 1],
+    "reminderDaysAfter": [1, 7, 14, 30],
+    "preferredContact": "WHATSAPP",
+    "enableAutoCategorization": true,
+    "autoCategorizeConfidenceThreshold": 0.80,
+    "enableAutoPaymentMatching": true,
+    "autoPaymentMatchConfidenceThreshold": 0.80,
+    "sarsSubmissionRequired": true,
+    "sarsAlwaysRequireReview": true
+  },
+  "autonomyLevels": {
+    "L3_FULL_AUTO": {
+      "description": "Full autonomy - auto-apply decisions",
+      "requiresReview": false,
+      "confidenceThreshold": 0.80,
+      "applicableTo": [
+        "high-confidence categorization",
+        "exact payment matches",
+        "routine bank imports"
+      ]
+    },
+    "L2_DRAFT": {
+      "description": "Draft for review - SARS submissions",
+      "requiresReview": true,
+      "alwaysEscalate": true,
+      "applicableTo": [
+        "PAYE calculations",
+        "UIF calculations",
+        "VAT submissions",
+        "EMP201 returns",
+        "VAT201 returns",
+        "IRP5 certificates"
+      ]
+    },
+    "L1_SUGGEST": {
+      "description": "Suggest only - user must confirm",
+      "requiresReview": true,
+      "applicableTo": [
+        "low-confidence categorization",
+        "ambiguous payment matches",
+        "new payee patterns",
+        "amounts exceeding thresholds"
+      ]
+    }
+  },
+  "agentBehavior": {
+    "alwaysEscalate": [
+      "SARS submissions",
+      "amounts > R50000",
+      "unknown payees",
+      "split transactions",
+      "refunds",
+      "reversals"
+    ],
+    "logAllDecisions": true,
+    "logFormat": "jsonl",
+    "maxRetries": 3,
+    "timeoutSeconds": 30,
+    "failFast": true,
+    "noBackwardsCompatibility": true
+  },
+  "monetaryRules": {
+    "allValuesInCents": true,
+    "roundingMode": "ROUND_HALF_EVEN",
+    "decimalLibrary": "decimal.js",
+    "maxCentsValue": 999999999999,
+    "neverUseFloats": true
+  },
+  "tenantIsolation": {
+    "required": true,
+    "enforceOnAllQueries": true,
+    "failOnMissingTenantId": true
+  }
+}

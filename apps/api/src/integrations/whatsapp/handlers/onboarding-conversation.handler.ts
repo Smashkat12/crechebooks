@@ -945,11 +945,13 @@ export class OnboardingConversationHandler {
       return;
     }
     if (mediaUrl) {
-      // Validate image content type if provided
-      if (mediaContentType && !mediaContentType.startsWith('image/')) {
+      // Validate content type - accept images and PDFs
+      const isImage = mediaContentType?.startsWith('image/');
+      const isPdf = mediaContentType === 'application/pdf';
+      if (mediaContentType && !isImage && !isPdf) {
         await this.contentService.sendSessionMessage(
           waId,
-          'Please send a photo (image) of your ID document, or type "Skip" to continue without it.',
+          'Please send a photo or PDF of your ID document, or type "Skip" to continue without it.',
           tenantId,
         );
         return;
@@ -973,7 +975,7 @@ export class OnboardingConversationHandler {
     // No media and not "skip" - re-prompt
     await this.contentService.sendSessionMessage(
       waId,
-      'Please send a photo of your SA ID document, or type "Skip" to continue without it.',
+      'Please send a photo or PDF of your SA ID document, or type "Skip" to continue without it.',
       tenantId,
     );
   }
@@ -1308,7 +1310,7 @@ export class OnboardingConversationHandler {
       case OnboardingStep.ID_DOCUMENT:
         await this.contentService.sendSessionMessage(
           waId,
-          'Please send a photo of your SA ID document (or type Skip).',
+          'Please send a photo or PDF of your SA ID document (or type Skip).',
           tenantId,
         );
         break;
@@ -1493,7 +1495,8 @@ export class OnboardingConversationHandler {
         waId,
         `Registration complete! Welcome to ${tenantName}!\n\n` +
           `${data.parent?.firstName}, we've registered ${childNames || 'your child'} successfully.\n\n` +
-          `${tenantName} will be in touch with next steps. Thank you!`,
+          `You'll receive an email shortly with a link to access your Parent Portal, where you can view invoices, statements, and manage your account.\n\n` +
+          `${tenantName} will also be in touch with next steps. Thank you!`,
         tenantId,
       );
 

@@ -121,6 +121,11 @@ export interface IBankStatementMatch {
   matchConfidence: number | null;
   discrepancyReason: string | null;
 
+  // Fee-adjusted match fields (Prisma schema lines 1547-1549)
+  isFeeAdjustedMatch: boolean;
+  accruedFeeAmountCents: number | null;
+  feeType: string | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -165,6 +170,7 @@ export interface BankStatementReconciliationResult {
     inXeroOnly: number;
     amountMismatch: number;
     dateMismatch: number;
+    feeAdjusted: number;
     total: number;
   };
   status: 'RECONCILED' | 'DISCREPANCY';
@@ -186,4 +192,8 @@ export interface CreateBankStatementMatchDto {
   status: BankStatementMatchStatus;
   matchConfidence: number | null;
   discrepancyReason: string | null;
+  // Fee-adjusted match fields (optional, default false/null)
+  isFeeAdjustedMatch?: boolean;
+  accruedFeeAmountCents?: number | null;
+  feeType?: string | null;
 }

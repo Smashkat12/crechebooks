@@ -600,6 +600,167 @@ export function useUnmatch() {
   });
 }
 
+// ============================================
+// Fee Inflation Corrections
+// ============================================
+
+// Preview response from API
+interface ApiFeeCorrectionPreview {
+  success: boolean;
+  data: {
+    totalMatches: number;
+    correctableMatches: number;
+    totalFeesCents: number;
+    corrections: Array<{
+      matchId: string;
+      transactionId: string;
+      bankAmountCents: number;
+      xeroAmountCents: number;
+      feeAmountCents: number;
+      feeType: string;
+      confidence: number;
+      description: string;
+    }>;
+    skipped: Array<{
+      matchId: string;
+      reason: string;
+      confidence: number;
+    }>;
+  };
+}
+
+export interface FeeCorrectionPreview {
+  totalMatches: number;
+  correctableMatches: number;
+  totalFeesCents: number;
+  corrections: Array<{
+    matchId: string;
+    transactionId: string;
+    bankAmountCents: number;
+    xeroAmountCents: number;
+    feeAmountCents: number;
+    feeType: string;
+    confidence: number;
+    description: string;
+  }>;
+  skipped: Array<{
+    matchId: string;
+    reason: string;
+    confidence: number;
+  }>;
+}
+
+// Apply response from API
+interface ApiFeeCorrectionApplyResult {
+  success: boolean;
+  data: {
+    corrected: number;
+    skipped: number;
+    totalFeesCents: number;
+    corrections: Array<{
+      matchId: string;
+      transactionId: string;
+      previousAmountCents: number;
+      correctedAmountCents: number;
+      feeAmountCents: number;
+      feeType: string;
+      accruedChargeId: string;
+    }>;
+    errors: Array<{ matchId: string; error: string }>;
+  };
+}
+
+export interface FeeCorrectionApplyResult {
+  corrected: number;
+  skipped: number;
+  totalFeesCents: number;
+  corrections: Array<{
+    matchId: string;
+    transactionId: string;
+    previousAmountCents: number;
+    correctedAmountCents: number;
+    feeAmountCents: number;
+    feeType: string;
+    accruedChargeId: string;
+  }>;
+  errors: Array<{ matchId: string; error: string }>;
+}
+
+// Preview fee corrections (dry-run)
+export function usePreviewFeeCorrections() {
+  return useMutation<FeeCorrectionPreview, AxiosError, void>({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<ApiFeeCorrectionPreview>(
+        '/reconciliation/fee-corrections/preview'
+      );
+      return data.data;
+    },
+  });
+}
+
+// Apply fee corrections
+export function useApplyFeeCorrections() {
+  const queryClient = useQueryClient();
+
+  return useMutation<FeeCorrectionApplyResult, AxiosError, void>({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<ApiFeeCorrectionApplyResult>(
+        '/reconciliation/fee-corrections/apply'
+      );
+      return data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+    },
+  });
+}
+
+// Match monthly fee aggregates
+interface MonthlyFeeMatchParams {
+  startDate: string;
+  endDate: string;
+}
+
+interface ApiMonthlyFeeMatchResult {
+  success: boolean;
+  data: {
+    matched_count: number;
+    total_matched_cents: number;
+    matches: Array<{
+      feeType: string;
+      accruedTotalCents: number;
+      chargeTransactionId: string;
+      chargeAmountCents: number;
+    }>;
+    unmatched: Array<{
+      feeType: string;
+      accruedTotalCents: number;
+      reason: string;
+    }>;
+  };
+}
+
+export function useMatchMonthlyFees() {
+  const queryClient = useQueryClient();
+
+  return useMutation<ApiMonthlyFeeMatchResult['data'], AxiosError, MonthlyFeeMatchParams>({
+    mutationFn: async ({ startDate, endDate }) => {
+      const { data } = await apiClient.post<ApiMonthlyFeeMatchResult>(
+        '/reconciliation/fee-corrections/match-monthly',
+        {
+          start_date: startDate,
+          end_date: endDate,
+        }
+      );
+      return data.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
+    },
+  });
+}
+
 // Hook to fetch reconciliation details with match summary by ID
 interface ReconciliationDetailsResponse {
   success: boolean;

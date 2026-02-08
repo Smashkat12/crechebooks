@@ -41,6 +41,9 @@ export class BankStatementMatchRepository {
           status: dto.status,
           matchConfidence: dto.matchConfidence,
           discrepancyReason: dto.discrepancyReason,
+          isFeeAdjustedMatch: dto.isFeeAdjustedMatch ?? false,
+          accruedFeeAmountCents: dto.accruedFeeAmountCents ?? null,
+          feeType: dto.feeType ?? null,
         },
       });
     } catch (error) {
@@ -312,6 +315,9 @@ export class BankStatementMatchRepository {
       status?: BankStatementMatchStatus;
       matchConfidence?: number | null;
       discrepancyReason?: string | null;
+      isFeeAdjustedMatch?: boolean;
+      accruedFeeAmountCents?: number | null;
+      feeType?: string | null;
     },
   ): Promise<BankStatementMatch> {
     try {

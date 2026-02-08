@@ -154,6 +154,7 @@ export class ParentAuthController {
    * In future, could implement token blacklisting via Redis.
    */
   @Post('logout')
+  @Public() // Skip global JwtAuthGuard - parent sessions use their own token type
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
@@ -178,6 +179,7 @@ export class ParentAuthController {
    * Get current authenticated parent info.
    */
   @Get('me')
+  @Public() // Skip global JwtAuthGuard - parent sessions use their own token type
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current parent info',

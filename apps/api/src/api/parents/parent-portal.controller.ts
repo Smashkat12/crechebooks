@@ -24,6 +24,7 @@ import {
 } from '@nestjs/swagger';
 import type { Response, Request } from 'express';
 import { ParentAuthGuard } from '../auth/guards/parent-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import type { ParentSession } from '../auth/decorators/current-parent.decorator';
 import { CurrentParent } from '../auth/decorators/current-parent.decorator';
 import {
@@ -52,6 +53,7 @@ import { InvoiceStatus } from '@prisma/client';
 @ApiTags('Parent Portal')
 @ApiBearerAuth()
 @Controller('parent-portal')
+@Public() // Skip global JwtAuthGuard - ParentAuthGuard handles auth for parent session tokens
 @UseGuards(ParentAuthGuard)
 export class ParentPortalController {
   private readonly logger = new Logger(ParentPortalController.name);

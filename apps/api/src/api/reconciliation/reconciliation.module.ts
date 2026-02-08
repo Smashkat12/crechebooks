@@ -31,6 +31,7 @@ import { SplitTransactionMatcherService } from '../../database/services/split-tr
 import { AccruedBankChargeService } from '../../database/services/accrued-bank-charge.service';
 import { BankFeeService } from '../../database/services/bank-fee.service';
 import { XeroTransactionSplitService } from '../../database/services/xero-transaction-split.service';
+import { FeeInflationCorrectionService } from '../../database/services/fee-inflation-correction.service';
 import { PrismaModule } from '../../database/prisma';
 
 @Module({
@@ -58,7 +59,8 @@ import { PrismaModule } from '../../database/prisma';
     AccruedBankChargeService,
     BankFeeService,
     XeroTransactionSplitService,
+    FeeInflationCorrectionService,
   ],
-  exports: [AccruedBankChargeService, XeroTransactionSplitService],
+  exports: [AccruedBankChargeService, XeroTransactionSplitService, FeeInflationCorrectionService],
 })
 export class ReconciliationModule {}

@@ -28,6 +28,7 @@ import { BusinessException, NotFoundException } from '../../shared/exceptions';
 import { ToleranceConfigService } from './tolerance-config.service';
 import { AccruedBankChargeService } from './accrued-bank-charge.service';
 import { BankFeeService } from './bank-fee.service';
+import { FeeInflationCorrectionService } from './fee-inflation-correction.service';
 
 /**
  * TASK-RECON-005: Result of a manual match operation
@@ -83,6 +84,7 @@ export class BankStatementReconciliationService {
     private readonly toleranceConfig: ToleranceConfigService,
     private readonly accruedChargeService: AccruedBankChargeService,
     private readonly bankFeeService: BankFeeService,
+    private readonly feeInflationService: FeeInflationCorrectionService,
   ) {}
 
   /**
@@ -432,6 +434,60 @@ export class BankStatementReconciliationService {
       });
     }
 
+    // Fee-refinement pass: validate FEE_ADJUSTED_MATCH entries
+    // For each match flagged as fee-adjusted, run detection to confirm or downgrade
+    const allMatches = await this.matchRepo.findByReconciliationId(
+      tenantId,
+      reconciliationId,
+    );
+
+    for (const m of allMatches) {
+      if (
+        m.status !== BankStatementMatchStatus.FEE_ADJUSTED_MATCH ||
+        !m.transactionId ||
+        !m.xeroAmountCents
+      ) {
+        continue;
+      }
+
+      try {
+        const detection =
+          await this.feeInflationService.detectAndValidateFeeMatch(
+            tenantId,
+            m.bankAmountCents,
+            m.xeroAmountCents,
+            m.bankDescription,
+          );
+
+        if (detection.confidence >= 0.85) {
+          // Confirmed fee-adjusted match — update with fee metadata
+          await this.matchRepo.update(m.id, {
+            isFeeAdjustedMatch: true,
+            accruedFeeAmountCents: detection.actualFeeCents,
+            feeType: detection.feeType,
+          });
+        } else {
+          // Low confidence — downgrade to AMOUNT_MISMATCH
+          await this.matchRepo.update(m.id, {
+            status: BankStatementMatchStatus.AMOUNT_MISMATCH,
+            discrepancyReason: `Fee detection below threshold (${(detection.confidence * 100).toFixed(0)}%): ${detection.explanation}`,
+          });
+
+          // Update in-memory matches array to reflect the status change
+          const idx = matches.findIndex(
+            (mm) => mm.transactionId === m.transactionId,
+          );
+          if (idx >= 0) {
+            matches[idx].status = BankStatementMatchStatus.AMOUNT_MISMATCH;
+          }
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Fee refinement failed for match ${m.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
     return matches;
   }
 
@@ -519,11 +575,10 @@ export class BankStatementReconciliationService {
       // Fee-adjusted match: Bank shows NET, Xero shows GROSS (Bank + Fee = Xero)
       const feeDifference = xeroTx.amountCents - bankTx.amountCents;
 
-      // If Xero amount is higher and the difference is in typical fee range (R1 - R50)
+      // If Xero amount is higher and the difference is within 10% (matches MAX_FEE_PERCENTAGE)
       if (
         feeDifference > 0 &&
-        feeDifference >= 100 &&
-        feeDifference <= 5000 &&
+        feeDifference <= xeroTx.amountCents * 0.1 &&
         bankTx.isCredit === xeroTx.isCredit
       ) {
         // This could be a fee-adjusted match - flag it as such
@@ -627,6 +682,7 @@ export class BankStatementReconciliationService {
     inXeroOnly: number;
     amountMismatch: number;
     dateMismatch: number;
+    feeAdjusted: number;
     total: number;
   } {
     const summary = {
@@ -635,6 +691,7 @@ export class BankStatementReconciliationService {
       inXeroOnly: 0,
       amountMismatch: 0,
       dateMismatch: 0,
+      feeAdjusted: 0,
       total: matches.length,
     };
 
@@ -654,6 +711,9 @@ export class BankStatementReconciliationService {
           break;
         case BankStatementMatchStatus.DATE_MISMATCH:
           summary.dateMismatch++;
+          break;
+        case BankStatementMatchStatus.FEE_ADJUSTED_MATCH:
+          summary.feeAdjusted++;
           break;
       }
     }

@@ -50,6 +50,7 @@ import { BankStatementReconciliationService } from '../../database/services/bank
 import { ComparativeBalanceSheetService } from '../../database/services/comparative-balance-sheet.service';
 import { AccruedBankChargeService } from '../../database/services/accrued-bank-charge.service';
 import { XeroTransactionSplitService } from '../../database/services/xero-transaction-split.service';
+import { FeeInflationCorrectionService } from '../../database/services/fee-inflation-correction.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -132,6 +133,7 @@ export class ReconciliationController {
     private readonly splitTransactionMatcherService: SplitTransactionMatcherService,
     private readonly accruedBankChargeService: AccruedBankChargeService,
     private readonly xeroTransactionSplitService: XeroTransactionSplitService,
+    private readonly feeInflationCorrectionService: FeeInflationCorrectionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -1288,6 +1290,7 @@ export class ReconciliationController {
           in_xero_only: result.matchSummary.inXeroOnly,
           amount_mismatch: result.matchSummary.amountMismatch,
           date_mismatch: result.matchSummary.dateMismatch,
+          fee_adjusted_match: result.matchSummary.feeAdjusted,
           total: result.matchSummary.total,
         },
         status: result.status,
@@ -2370,6 +2373,141 @@ export class ReconciliationController {
   }
 
   // ============================================
+  // Fee Inflation Correction
+  // Corrects FNB bank feed GROSS amounts to NET
+  // ============================================
+
+  @Post('fee-corrections/preview')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Preview fee inflation corrections (dry-run)',
+    description:
+      'Scans existing matches where Xero GROSS > Bank NET and shows proposed corrections without applying them',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview of proposed fee corrections',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async previewFeeCorrections(@CurrentUser() user: IUser) {
+    this.logger.log(
+      `Preview fee corrections: tenant=${getTenantId(user)}`,
+    );
+
+    const result =
+      await this.feeInflationCorrectionService.correctExistingMatches(
+        getTenantId(user),
+        user.id,
+        { dryRun: true },
+      );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Post('fee-corrections/apply')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Apply fee inflation corrections',
+    description:
+      'Corrects transaction amounts from Xero GROSS to Bank NET, creates accrued bank charges for the fee portion',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Fee corrections applied successfully',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER or ADMIN role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async applyFeeCorrections(@CurrentUser() user: IUser) {
+    this.logger.log(
+      `Apply fee corrections: tenant=${getTenantId(user)}`,
+    );
+
+    const result =
+      await this.feeInflationCorrectionService.correctExistingMatches(
+        getTenantId(user),
+        user.id,
+        { dryRun: false },
+      );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  @Post('fee-corrections/match-monthly')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Match monthly fee aggregates to charge transactions',
+    description:
+      'Groups accrued charges by fee type for the given period and matches to monthly fee transactions like #Cash Deposit Fee',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Monthly fee matching results',
+  })
+  @ApiBadRequestResponse({
+    description: 'Missing or invalid date parameters',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async matchMonthlyFees(
+    @Body() body: { start_date: string; end_date: string },
+    @CurrentUser() user: IUser,
+  ) {
+    this.logger.log(
+      `Match monthly fees: tenant=${getTenantId(user)}, period=${body.start_date} to ${body.end_date}`,
+    );
+
+    if (!body.start_date || !body.end_date) {
+      throw new BadRequestException(
+        'Both start_date and end_date are required (YYYY-MM-DD)',
+      );
+    }
+
+    const startDate = new Date(body.start_date);
+    const endDate = new Date(body.end_date);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new BadRequestException('Invalid date format. Use YYYY-MM-DD');
+    }
+
+    const result =
+      await this.feeInflationCorrectionService.matchMonthlyFeeTransactions(
+        getTenantId(user),
+        user.id,
+        startDate,
+        endDate,
+      );
+
+    return {
+      success: true,
+      data: {
+        matched_count: result.matchedCount,
+        total_matched_cents: result.totalMatchedCents,
+        matches: result.matches,
+        unmatched: result.unmatched,
+      },
+    };
+  }
+
+  // ============================================
   // TASK-RECON-UI: Get Reconciliation by ID
   // NOTE: This must be LAST to avoid matching specific routes like 'summary', 'discrepancies', 'xero-splits'
   // ============================================
@@ -2430,6 +2568,8 @@ export class ReconciliationController {
       amountMismatch: matches.filter((m) => m.status === 'AMOUNT_MISMATCH')
         .length,
       dateMismatch: matches.filter((m) => m.status === 'DATE_MISMATCH').length,
+      feeAdjusted: matches.filter((m) => m.status === 'FEE_ADJUSTED_MATCH')
+        .length,
       total: matches.length,
     };
 
@@ -2458,6 +2598,7 @@ export class ReconciliationController {
           in_xero_only: matchSummary.inXeroOnly,
           amount_mismatch: matchSummary.amountMismatch,
           date_mismatch: matchSummary.dateMismatch,
+          fee_adjusted_match: matchSummary.feeAdjusted,
           total: matchSummary.total,
         },
       },

@@ -98,6 +98,7 @@ export class BankStatementReconciliationResponseDto {
       in_xero_only: number;
       amount_mismatch: number;
       date_mismatch: number;
+      fee_adjusted_match: number;
       total: number;
     };
     status: 'RECONCILED' | 'DISCREPANCY';

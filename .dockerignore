@@ -71,10 +71,12 @@ turbo.json
 # Local development
 .claude-flow
 
-# Claude Code - exclude dev files but include context for agents
-# First exclude all .claude subdirs, then re-include context
-.claude/*
-!.claude/context/
+# Claude Code - exclude dev files but keep context for agents
+.claude/agents/
+.claude/commands/
+.claude/config.json
+.claude/settings.json
+.claude/settings.local.json
 specs
 docs/company-docs
 

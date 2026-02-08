@@ -285,9 +285,10 @@ export class FeeInflationCorrectionService {
         },
       });
 
-      // 2. Create AccruedBankCharge record
-      const accruedCharge = await tx.accruedBankCharge.create({
-        data: {
+      // 2. Upsert AccruedBankCharge record (idempotent — may exist from prior reconciliation)
+      const accruedCharge = await tx.accruedBankCharge.upsert({
+        where: { bankStatementMatchId: matchId },
+        create: {
           tenantId,
           sourceTransactionId: transactionId,
           sourceDescription: currentMatch.bankDescription,
@@ -298,6 +299,15 @@ export class FeeInflationCorrectionService {
           feeDescription: `Fee extracted from Xero gross amount (R${(xeroAmountCents / 100).toFixed(2)} → R${(bankAmountCents / 100).toFixed(2)})`,
           status: 'ACCRUED',
           bankStatementMatchId: matchId,
+          xeroTransactionId: currentTransaction.xeroTransactionId ?? null,
+          xeroAmountCents,
+        },
+        update: {
+          sourceAmountCents: bankAmountCents,
+          accruedAmountCents: feeAmountCents,
+          feeType,
+          feeDescription: `Fee extracted from Xero gross amount (R${(xeroAmountCents / 100).toFixed(2)} → R${(bankAmountCents / 100).toFixed(2)})`,
+          status: 'ACCRUED',
           xeroTransactionId: currentTransaction.xeroTransactionId ?? null,
           xeroAmountCents,
         },

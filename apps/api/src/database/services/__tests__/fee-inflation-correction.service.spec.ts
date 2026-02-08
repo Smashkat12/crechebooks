@@ -44,6 +44,7 @@ describe('FeeInflationCorrectionService', () => {
       },
       accruedBankCharge: {
         create: jest.fn(),
+        upsert: jest.fn(),
         findMany: jest.fn(),
         update: jest.fn(),
       },
@@ -349,7 +350,7 @@ describe('FeeInflationCorrectionService', () => {
       });
 
       mockPrisma.transaction.update.mockResolvedValue({});
-      mockPrisma.accruedBankCharge.create.mockResolvedValue({
+      mockPrisma.accruedBankCharge.upsert.mockResolvedValue({
         id: 'accrued-1',
       });
       mockPrisma.bankStatementMatch.update.mockResolvedValue({});
@@ -375,7 +376,7 @@ describe('FeeInflationCorrectionService', () => {
       });
     });
 
-    it('should create AccruedBankCharge with fee amount', async () => {
+    it('should upsert AccruedBankCharge with fee amount', async () => {
       await service.applyFeeCorrection(
         tenantId,
         matchId,
@@ -387,8 +388,9 @@ describe('FeeInflationCorrectionService', () => {
         userId,
       );
 
-      expect(mockPrisma.accruedBankCharge.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      expect(mockPrisma.accruedBankCharge.upsert).toHaveBeenCalledWith({
+        where: { bankStatementMatchId: matchId },
+        create: expect.objectContaining({
           tenantId,
           sourceTransactionId: transactionId,
           accruedAmountCents: 1470,
@@ -396,6 +398,12 @@ describe('FeeInflationCorrectionService', () => {
           status: 'ACCRUED',
           xeroAmountCents: 1001470,
           bankStatementMatchId: matchId,
+        }),
+        update: expect.objectContaining({
+          accruedAmountCents: 1470,
+          feeType: 'ADT_DEPOSIT_FEE',
+          status: 'ACCRUED',
+          xeroAmountCents: 1001470,
         }),
       });
     });
@@ -643,7 +651,7 @@ describe('FeeInflationCorrectionService', () => {
         bankAmountCents: 1000000,
         xeroAmountCents: 1001470,
       });
-      mockPrisma.accruedBankCharge.create.mockResolvedValue({
+      mockPrisma.accruedBankCharge.upsert.mockResolvedValue({
         id: 'accrued-1',
       });
 

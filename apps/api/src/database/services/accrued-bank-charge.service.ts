@@ -544,6 +544,7 @@ export class AccruedBankChargeService {
       [TransactionType.TRANSFER]: 'TRANSFER_FEE',
       [TransactionType.RTC_PAYMENT]: 'RTC_PAYMENT_FEE',
       [TransactionType.FUEL_PURCHASE]: 'FUEL_CARD_FEE',
+      [TransactionType.SEND_MONEY]: 'SEND_MONEY_FEE',
       [TransactionType.UNKNOWN]: 'UNKNOWN_FEE',
     };
 

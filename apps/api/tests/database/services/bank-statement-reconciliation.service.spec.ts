@@ -27,6 +27,7 @@ import {
 } from '../../../src/database/services/tolerance-config.service';
 import { AccruedBankChargeService } from '../../../src/database/services/accrued-bank-charge.service';
 import { BankFeeService } from '../../../src/database/services/bank-fee.service';
+import { FeeInflationCorrectionService } from '../../../src/database/services/fee-inflation-correction.service';
 import { ConfigService } from '@nestjs/config';
 import {
   Tenant,
@@ -144,6 +145,33 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
           useValue: mockAccruedChargeService,
         },
         { provide: BankFeeService, useValue: mockBankFeeService },
+        {
+          provide: FeeInflationCorrectionService,
+          useValue: {
+            detectAndValidateFeeMatch: jest.fn().mockResolvedValue({
+              isMatch: false,
+              confidence: 0,
+              transactionType: 'UNKNOWN',
+              feeType: 'NONE',
+              expectedFeeCents: 0,
+              actualFeeCents: 0,
+              explanation: 'mock',
+            }),
+            correctExistingMatches: jest.fn().mockResolvedValue({
+              totalMatches: 0,
+              correctableMatches: 0,
+              totalFeesCents: 0,
+              corrections: [],
+              skipped: [],
+            }),
+            matchMonthlyFeeTransactions: jest.fn().mockResolvedValue({
+              matchedCount: 0,
+              totalMatchedCents: 0,
+              matches: [],
+              unmatched: [],
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -1094,6 +1122,7 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
 
       mockMatchRepo.deleteByReconciliationId.mockResolvedValue(undefined);
       mockMatchRepo.create.mockResolvedValue({} as any);
+      mockMatchRepo.findByReconciliationId.mockResolvedValue([]);
       mockPrisma.reconciliation.update.mockResolvedValue({});
     });
 
@@ -1394,6 +1423,33 @@ describe('BankStatementReconciliationService (Integration Tests)', () => {
         {
           provide: BankFeeService,
           useValue: mockBankFeeServiceIntegration,
+        },
+        {
+          provide: FeeInflationCorrectionService,
+          useValue: {
+            detectAndValidateFeeMatch: jest.fn().mockResolvedValue({
+              isMatch: false,
+              confidence: 0,
+              transactionType: 'UNKNOWN',
+              feeType: 'NONE',
+              expectedFeeCents: 0,
+              actualFeeCents: 0,
+              explanation: 'mock',
+            }),
+            correctExistingMatches: jest.fn().mockResolvedValue({
+              totalMatches: 0,
+              correctableMatches: 0,
+              totalFeesCents: 0,
+              corrections: [],
+              skipped: [],
+            }),
+            matchMonthlyFeeTransactions: jest.fn().mockResolvedValue({
+              matchedCount: 0,
+              totalMatchedCents: 0,
+              matches: [],
+              unmatched: [],
+            }),
+          },
         },
       ],
     }).compile();

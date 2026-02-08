@@ -607,6 +607,8 @@ export class XeroTransactionSplitService {
       [TransactionType.CARD_PURCHASE]: 'CARD_TRANSACTION_FEE',
       [TransactionType.CASH_WITHDRAWAL]: 'CASH_WITHDRAWAL_FEE',
       [TransactionType.TRANSFER]: 'TRANSFER_FEE',
+      [TransactionType.RTC_PAYMENT]: 'RTC_PAYMENT_FEE',
+      [TransactionType.FUEL_PURCHASE]: 'FUEL_CARD_FEE',
       [TransactionType.UNKNOWN]: 'UNKNOWN_FEE',
     };
 

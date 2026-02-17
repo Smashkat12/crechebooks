@@ -65,8 +65,10 @@ export class ParentConsentFormsPdfService {
 
     const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
     const fileName = `Consent_Forms_${timestamp}.pdf`;
+    const baseDir =
+      process.env.NODE_ENV === 'production' ? '/tmp' : process.cwd();
     const uploadDir = path.join(
-      process.cwd(),
+      baseDir,
       'uploads',
       'parent-documents',
       data.tenantId,

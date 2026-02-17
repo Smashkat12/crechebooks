@@ -502,7 +502,7 @@ export class ParentOnboardingService {
       });
 
       if (enrollment && !enrollment.welcomePackSentAt) {
-        await this.welcomePackDelivery.sendWelcomePack(enrollment.id, tenantId);
+        await this.welcomePackDelivery.sendWelcomePack(tenantId, enrollment.id);
         this.logger.log(`Welcome pack sent for parent ${parentId}`);
       }
 
@@ -669,8 +669,8 @@ export class ParentOnboardingService {
       if (enrollment) {
         try {
           await this.welcomePackDelivery.sendWelcomePack(
-            enrollment.id,
             tenantId,
+            enrollment.id,
           );
           this.logger.log(`Auto-triggered welcome pack for parent ${parentId}`);
         } catch (error) {

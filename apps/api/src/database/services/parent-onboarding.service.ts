@@ -539,14 +539,43 @@ export class ParentOnboardingService {
       throw new NotFoundException('Document', documentId);
     }
 
-    if (!fs.existsSync(document.filePath)) {
-      throw new BusinessException(
-        'Document file not found',
-        'DOCUMENT_FILE_NOT_FOUND',
-      );
-    }
+    let buffer: Buffer;
 
-    const buffer = fs.readFileSync(document.filePath);
+    if (fs.existsSync(document.filePath)) {
+      buffer = fs.readFileSync(document.filePath);
+    } else {
+      // File missing (e.g. after redeploy on ephemeral filesystem) — regenerate
+      this.logger.warn(
+        `File not found at ${document.filePath}, regenerating ${document.documentType}`,
+      );
+
+      if (document.documentType === 'FEE_AGREEMENT') {
+        const result = await this.feeAgreementService.generateFeeAgreement({
+          parentId,
+          tenantId,
+        });
+        buffer = result.buffer;
+        await this.prisma.parentGeneratedDocument.update({
+          where: { id: document.id },
+          data: { filePath: result.filePath, fileName: result.fileName },
+        });
+      } else if (document.documentType === 'CONSENT_FORMS') {
+        const result = await this.consentFormsService.generateConsentForms({
+          parentId,
+          tenantId,
+        });
+        buffer = result.buffer;
+        await this.prisma.parentGeneratedDocument.update({
+          where: { id: document.id },
+          data: { filePath: result.filePath, fileName: result.fileName },
+        });
+      } else {
+        throw new BusinessException(
+          'Document file not found and cannot be regenerated',
+          'DOCUMENT_FILE_NOT_FOUND',
+        );
+      }
+    }
 
     return {
       buffer,

@@ -6,6 +6,7 @@ import {
   FileText,
   Download,
   Shield,
+  ShieldAlert,
   Heart,
   Camera,
 } from 'lucide-react';
@@ -157,6 +158,21 @@ export function ConsentsStep({
               />
             </div>
           ))}
+        </div>
+
+        {/* Indemnity and Liability Waiver */}
+        <div className="border rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-amber-600" />
+            <h4 className="font-medium">Indemnity and Liability Waiver</h4>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            By continuing, you indemnify and hold harmless the school, its staff, and
+            representatives from claims arising from accidents during normal activities
+            (unless due to negligence), loss of personal property, or illness contracted
+            at the school. You acknowledge that children participate in age-appropriate
+            activities including outdoor play, arts and crafts, and excursions.
+          </p>
         </div>
 
         {/* Download Full Consent Document */}

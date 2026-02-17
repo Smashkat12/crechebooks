@@ -231,6 +231,7 @@ export class ParentOnboardingService {
       where: { id: tenantId },
       select: {
         name: true,
+        tradingName: true,
         invoiceDayOfMonth: true,
         invoiceDueDays: true,
       },
@@ -276,7 +277,7 @@ export class ParentOnboardingService {
     }
 
     return {
-      schoolName: tenant?.name ?? '',
+      schoolName: tenant?.tradingName || tenant?.name || '',
       invoiceDayOfMonth: tenant?.invoiceDayOfMonth ?? 1,
       invoiceDueDays: tenant?.invoiceDueDays ?? 7,
       children,

@@ -42,6 +42,7 @@ interface FeeAgreementStepProps {
   feeSummary: FeeSummary | null;
   isLoadingFeeSummary: boolean;
   onConsentChange: (data: ConsentFormData) => void;
+  onGenerate: () => void;
   onDownload: (documentId: string) => void;
   onSign: (documentType: 'FEE_AGREEMENT' | 'CONSENT_FORMS') => void;
   onBack: () => void;
@@ -55,6 +56,7 @@ export function FeeAgreementStep({
   feeSummary,
   isLoadingFeeSummary,
   onConsentChange,
+  onGenerate,
   onDownload,
   onSign,
   onBack,
@@ -162,13 +164,18 @@ export function FeeAgreementStep({
               </div>
             )}
 
-            {/* PDF download (supplementary) */}
-            {feeDoc && (
-              <div className="flex items-center justify-between border rounded-lg p-3">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-amber-600" />
-                  <p className="text-sm">Full fee agreement document</p>
+            {/* Full agreement PDF */}
+            <div className="flex items-center justify-between border rounded-lg p-3">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-amber-600" />
+                <div>
+                  <p className="text-sm font-medium">Full Fee Agreement</p>
+                  {!feeDoc && isGeneratingDocs && (
+                    <p className="text-xs text-muted-foreground">Preparing document...</p>
+                  )}
                 </div>
+              </div>
+              {feeDoc ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -177,8 +184,27 @@ export function FeeAgreementStep({
                   <Download className="mr-2 h-4 w-4" />
                   Download PDF
                 </Button>
-              </div>
-            )}
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isGeneratingDocs}
+                  onClick={onGenerate}
+                >
+                  {isGeneratingDocs ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="mr-2 h-4 w-4" />
+                      Generate PDF
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
 
             {/* Acceptance checkbox */}
             <div className="flex items-start gap-3 p-4 border rounded-lg bg-muted/50">

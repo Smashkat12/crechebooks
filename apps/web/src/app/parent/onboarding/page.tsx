@@ -38,6 +38,7 @@ export default function ParentOnboardingPage() {
     setProfileData,
     setConsentData,
     handleSaveContact,
+    handleGenerateDocuments,
     handleDownloadDocument,
     handleSignDocument,
     handleCompleteOnboarding,
@@ -120,6 +121,7 @@ export default function ParentOnboardingPage() {
           feeSummary={feeSummary}
           isLoadingFeeSummary={isLoadingFeeSummary}
           onConsentChange={setConsentData}
+          onGenerate={handleGenerateDocuments}
           onDownload={handleDownloadDocument}
           onSign={handleSignDocument}
           onBack={() => setCurrentStep('contact')}

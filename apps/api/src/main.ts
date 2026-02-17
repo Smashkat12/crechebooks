@@ -96,13 +96,14 @@ async function bootstrap(): Promise<void> {
   );
 
   // TASK-SEC-104: Global exception filter for standardized error responses
-  // Order matters: GlobalExceptionFilter first, then PayloadTooLargeFilter
-  // PayloadTooLargeFilter handles specific payload errors before they reach GlobalExceptionFilter
+  // Order: PayloadTooLargeFilter first, GlobalExceptionFilter last.
+  // NestJS tries last-registered first, so GlobalExceptionFilter runs first as catch-all.
+  // PayloadTooLargeFilter is kept for specific payload-too-large detection only.
   app.useGlobalFilters(
+    new PayloadTooLargeFilter(logger),
     new GlobalExceptionFilter(
       configService as unknown as ConfigService<Record<string, unknown>>,
     ),
-    new PayloadTooLargeFilter(logger),
   );
 
   // TASK-SEC-103: Get CSP configuration service for environment-based CSP

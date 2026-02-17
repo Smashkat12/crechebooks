@@ -1,4 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsString,
+  IsOptional,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * Invoice item in dashboard response
@@ -564,12 +570,18 @@ export class CrecheBankDetailsDto {
  */
 export class ParentAddressDto {
   @ApiPropertyOptional({ description: 'Street address' })
+  @IsOptional()
+  @IsString()
   street?: string;
 
   @ApiPropertyOptional({ description: 'City' })
+  @IsOptional()
+  @IsString()
   city?: string;
 
   @ApiPropertyOptional({ description: 'Postal code (4 digits)' })
+  @IsOptional()
+  @IsString()
   postalCode?: string;
 }
 
@@ -643,18 +655,29 @@ export class ParentProfileDto {
  */
 export class UpdateParentProfileDto {
   @ApiPropertyOptional({ description: 'First name' })
+  @IsOptional()
+  @IsString()
   firstName?: string;
 
   @ApiPropertyOptional({ description: 'Last name' })
+  @IsOptional()
+  @IsString()
   lastName?: string;
 
   @ApiPropertyOptional({ description: 'Phone number (SA format)' })
+  @IsOptional()
+  @IsString()
   phone?: string;
 
   @ApiPropertyOptional({ description: 'Alternative phone number' })
+  @IsOptional()
+  @IsString()
   alternativePhone?: string;
 
   @ApiPropertyOptional({ description: 'Address', type: ParentAddressDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ParentAddressDto)
   address?: ParentAddressDto;
 }
 

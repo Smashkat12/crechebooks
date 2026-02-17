@@ -228,8 +228,12 @@ export function useOnboarding() {
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to update profile');
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          throw new Error(data.error?.message || data.message || 'Failed to update profile');
+        }
+        throw new Error(`Failed to update profile (${response.status})`);
       }
 
       setSuccess('Contact information saved!');

@@ -61,6 +61,24 @@ export interface SignDocumentDto {
   }>;
 }
 
+export interface FeeChildSummary {
+  childName: string;
+  feeType: string;
+  feeStructureName: string;
+  monthlyAmountCents: number;
+  registrationFeeCents: number;
+  siblingDiscountApplied: boolean;
+  siblingDiscountPercent: number | null;
+  vatInclusive: boolean;
+}
+
+export interface FeeSummary {
+  schoolName: string;
+  invoiceDayOfMonth: number;
+  invoiceDueDays: number;
+  children: FeeChildSummary[];
+}
+
 @Injectable()
 export class ParentOnboardingService {
   private readonly logger = new Logger(ParentOnboardingService.name);
@@ -178,6 +196,90 @@ export class ParentOnboardingService {
       totalRequired: requiredItems.length,
       requiredActions,
       documents,
+    };
+  }
+
+  /**
+   * Get fee summary for the parent's enrolled children
+   */
+  async getFeeSummary(
+    parentId: string,
+    tenantId: string,
+  ): Promise<FeeSummary> {
+    const parent = await this.prisma.parent.findFirst({
+      where: { id: parentId, tenantId },
+      include: {
+        children: {
+          where: { deletedAt: null },
+          include: {
+            enrollments: {
+              where: { status: { in: ['ACTIVE', 'PENDING'] } },
+              include: { feeStructure: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Parent', parentId);
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        name: true,
+        invoiceDayOfMonth: true,
+        invoiceDueDays: true,
+      },
+    });
+
+    const children: FeeChildSummary[] = [];
+
+    for (const child of parent.children) {
+      const enrollment = (
+        child as typeof child & {
+          enrollments: Array<{
+            customFeeOverrideCents: number | null;
+            siblingDiscountApplied: boolean;
+            feeStructure: {
+              name: string;
+              feeType: string;
+              amountCents: number;
+              registrationFeeCents: number;
+              siblingDiscountPercent: unknown;
+              vatInclusive: boolean;
+            };
+          }>;
+        }
+      ).enrollments?.[0];
+      if (!enrollment) continue;
+
+      const fs = enrollment.feeStructure;
+      const monthlyAmountCents =
+        enrollment.customFeeOverrideCents ?? fs.amountCents;
+
+      children.push({
+        childName: `${child.firstName} ${child.lastName}`,
+        feeType: fs.feeType,
+        feeStructureName: fs.name,
+        monthlyAmountCents,
+        registrationFeeCents: fs.registrationFeeCents,
+        siblingDiscountApplied: enrollment.siblingDiscountApplied,
+        siblingDiscountPercent: fs.siblingDiscountPercent
+          ? Number(fs.siblingDiscountPercent)
+          : null,
+        vatInclusive: fs.vatInclusive,
+      });
+    }
+
+    return {
+      schoolName: tenant?.name ?? '',
+      invoiceDayOfMonth: tenant?.invoiceDayOfMonth ?? 1,
+      invoiceDueDays: tenant?.invoiceDueDays ?? 7,
+      children,
     };
   }
 

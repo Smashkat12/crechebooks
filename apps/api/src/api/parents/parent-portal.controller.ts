@@ -80,6 +80,21 @@ export class ParentPortalController {
     );
   }
 
+  @Get('onboarding/fee-summary')
+  @ApiOperation({
+    summary: 'Get fee summary for enrolled children',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Fee summary with per-child fees and payment terms',
+  })
+  async getFeeSummary(@CurrentParent() session: ParentSession) {
+    return this.parentOnboarding.getFeeSummary(
+      session.parentId,
+      session.tenantId,
+    );
+  }
+
   @Post('onboarding/documents/generate')
   @ApiOperation({
     summary: 'Generate onboarding documents (fee agreement, consent forms)',

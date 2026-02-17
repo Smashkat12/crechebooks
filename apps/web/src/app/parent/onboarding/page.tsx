@@ -32,11 +32,12 @@ export default function ParentOnboardingPage() {
     currentStep,
     profileData,
     consentData,
+    feeSummary,
+    isLoadingFeeSummary,
     setCurrentStep,
     setProfileData,
     setConsentData,
     handleSaveContact,
-    handleGenerateDocuments,
     handleDownloadDocument,
     handleSignDocument,
     handleCompleteOnboarding,
@@ -116,8 +117,9 @@ export default function ParentOnboardingPage() {
         <FeeAgreementStep
           onboardingStatus={onboardingStatus}
           consentData={consentData}
+          feeSummary={feeSummary}
+          isLoadingFeeSummary={isLoadingFeeSummary}
           onConsentChange={setConsentData}
-          onGenerate={handleGenerateDocuments}
           onDownload={handleDownloadDocument}
           onSign={handleSignDocument}
           onBack={() => setCurrentStep('contact')}

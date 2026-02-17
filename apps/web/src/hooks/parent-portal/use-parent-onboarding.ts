@@ -69,6 +69,24 @@ export interface ConsentFormData {
   acknowledgedConsents: boolean;
 }
 
+export interface FeeChildSummary {
+  childName: string;
+  feeType: string;
+  feeStructureName: string;
+  monthlyAmountCents: number;
+  registrationFeeCents: number;
+  siblingDiscountApplied: boolean;
+  siblingDiscountPercent: number | null;
+  vatInclusive: boolean;
+}
+
+export interface FeeSummary {
+  schoolName: string;
+  invoiceDayOfMonth: number;
+  invoiceDueDays: number;
+  children: FeeChildSummary[];
+}
+
 export type Step = 'contact' | 'fee_agreement' | 'consents' | 'complete';
 
 export interface StepConfig {
@@ -124,6 +142,9 @@ export function useOnboarding() {
     acknowledgedFeeAgreement: false,
     acknowledgedConsents: false,
   });
+
+  const [feeSummary, setFeeSummary] = useState<FeeSummary | null>(null);
+  const [isLoadingFeeSummary, setIsLoadingFeeSummary] = useState(false);
 
   // ---------- Data fetching ----------
 
@@ -190,6 +211,23 @@ export function useOnboarding() {
     }
   }, []);
 
+  const fetchFeeSummary = useCallback(async (token: string) => {
+    setIsLoadingFeeSummary(true);
+    try {
+      const response = await fetch(`${API_URL}/api/v1/parent-portal/onboarding/fee-summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setFeeSummary(data);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch fee summary:', err);
+    } finally {
+      setIsLoadingFeeSummary(false);
+    }
+  }, []);
+
   useEffect(() => {
     const token = getParentToken();
     if (!token) {
@@ -199,6 +237,23 @@ export function useOnboarding() {
     fetchOnboardingStatus(token);
     fetchProfile(token);
   }, [router, fetchOnboardingStatus, fetchProfile]);
+
+  // Auto-fetch fee summary and auto-generate docs when entering fee_agreement step
+  useEffect(() => {
+    if (currentStep !== 'fee_agreement') return;
+    const token = getParentToken();
+    if (!token) return;
+
+    fetchFeeSummary(token);
+
+    // Auto-generate documents if none exist yet
+    const feeDoc = onboardingStatus?.documents.find(
+      (d) => d.documentType === 'FEE_AGREEMENT',
+    );
+    if (!feeDoc && !isGeneratingDocs) {
+      handleGenerateDocuments();
+    }
+  }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------- Handlers ----------
 
@@ -386,6 +441,8 @@ export function useOnboarding() {
     parentName,
     profileData,
     consentData,
+    feeSummary,
+    isLoadingFeeSummary,
     // Setters
     setCurrentStep,
     setProfileData,

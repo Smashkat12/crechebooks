@@ -220,6 +220,10 @@ export class ChildRepository {
         where.isActive = filter.isActive;
       }
 
+      if (filter.status) {
+        where.status = filter.status;
+      }
+
       if (filter.search) {
         where.OR = [
           { firstName: { contains: filter.search, mode: 'insensitive' } },
@@ -289,6 +293,9 @@ export class ChildRepository {
       }
       if (dto.parentId !== undefined) {
         updateData.parent = { connect: { id: dto.parentId } };
+      }
+      if (dto.status !== undefined) {
+        updateData.status = dto.status;
       }
 
       return await this.prisma.child.update({

@@ -106,6 +106,7 @@ describe('ChildController', () => {
     medicalNotes: 'Allergic to peanuts',
     emergencyContact: 'Jane Smith',
     emergencyPhone: '+27821234567',
+    status: 'REGISTERED' as import('@prisma/client').ChildStatus,
     isActive: true,
     deletedAt: null,
     createdAt: new Date(),

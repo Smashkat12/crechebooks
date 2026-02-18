@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { EnrollmentSuccessModal, type EnrollmentData } from '@/components/enrollments';
+import { EnrollmentSuccessModal, EnrollChildDialog, type EnrollmentData } from '@/components/enrollments';
 import { WhatsAppOptIn } from '@/components/parents/whatsapp-opt-in';
 import { WhatsAppMessageHistory } from '@/components/parents/whatsapp-message-history';
 
@@ -40,6 +40,7 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
   const [isAddChildOpen, setIsAddChildOpen] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [enrollmentResult, setEnrollmentResult] = useState<EnrollmentData | null>(null);
+  const [enrollChildTarget, setEnrollChildTarget] = useState<{ id: string; name: string } | null>(null);
   const [childForm, setChildForm] = useState({
     firstName: '',
     lastName: '',
@@ -412,18 +413,33 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
                         DOB: {new Date(child.dateOfBirth).toLocaleDateString('en-ZA')}
                       </p>
                     </div>
-                    <Badge variant={
-                      (child.status as string) === 'ENROLLED' ? 'default' :
-                      (child.status as string) === 'WITHDRAWN' ? 'destructive' :
-                      (child.status as string) === 'GRADUATED' ? 'outline' :
-                      'secondary'
-                    }>
-                      {(child.status as string) === 'ENROLLED' ? 'Enrolled' :
-                       (child.status as string) === 'REGISTERED' ? 'Registered' :
-                       (child.status as string) === 'WITHDRAWN' ? 'Withdrawn' :
-                       (child.status as string) === 'GRADUATED' ? 'Graduated' :
-                       child.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {(child.status as string) === 'REGISTERED' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setEnrollChildTarget({
+                            id: child.id,
+                            name: `${child.firstName} ${child.lastName}`,
+                          })}
+                        >
+                          <UserPlus className="h-3 w-3 mr-1" />
+                          Enroll
+                        </Button>
+                      )}
+                      <Badge variant={
+                        (child.status as string) === 'ENROLLED' ? 'default' :
+                        (child.status as string) === 'WITHDRAWN' ? 'destructive' :
+                        (child.status as string) === 'GRADUATED' ? 'outline' :
+                        'secondary'
+                      }>
+                        {(child.status as string) === 'ENROLLED' ? 'Enrolled' :
+                         (child.status as string) === 'REGISTERED' ? 'Registered' :
+                         (child.status as string) === 'WITHDRAWN' ? 'Withdrawn' :
+                         (child.status as string) === 'GRADUATED' ? 'Graduated' :
+                         child.status}
+                      </Badge>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -444,6 +460,20 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
         />
         <WhatsAppMessageHistory parentId={id} />
       </div>
+
+      {/* Enroll existing child dialog */}
+      <EnrollChildDialog
+        open={!!enrollChildTarget}
+        onOpenChange={(open) => { if (!open) setEnrollChildTarget(null); }}
+        childId={enrollChildTarget?.id}
+        childName={enrollChildTarget?.name}
+        parentId={id}
+        onSuccess={(data) => {
+          refetchChildren();
+          setEnrollmentResult(data);
+          setShowSuccessModal(true);
+        }}
+      />
 
       {/* TASK-BILL-023: Enrollment Success Modal with Invoice */}
       <EnrollmentSuccessModal

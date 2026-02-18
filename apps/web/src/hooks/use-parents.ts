@@ -23,11 +23,11 @@ interface ParentListParams extends Record<string, unknown> {
 }
 
 interface EnrollChildParams {
-  parentId: string;
   childId: string;
   feeStructureId: string;
   startDate: string;
-  endDate?: string;
+  /** Optional parent ID for cache invalidation */
+  parentId?: string;
 }
 
 // List parents with pagination and filters
@@ -118,28 +118,30 @@ export function useCreateParent() {
   });
 }
 
-// Enroll a child
+// Enroll an existing child (POST /children/enroll)
 export function useEnrollChild() {
   const queryClient = useQueryClient();
 
-  return useMutation<{ success: boolean; enrollmentId: string }, AxiosError, EnrollChildParams>({
-    mutationFn: async ({ parentId, childId, feeStructureId, startDate, endDate }) => {
-      const { data } = await apiClient.post<{ success: boolean; enrollmentId: string }>(
+  return useMutation<CreateChildResponse, AxiosError, EnrollChildParams>({
+    mutationFn: async ({ childId, feeStructureId, startDate }) => {
+      const { data } = await apiClient.post<CreateChildResponse>(
         endpoints.children.enroll,
         {
-          parentId,
-          childId,
-          feeStructureId,
-          startDate,
-          endDate,
+          child_id: childId,
+          fee_structure_id: feeStructureId,
+          start_date: startDate,
         }
       );
       return data;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.parents.detail(variables.parentId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.parents.children(variables.parentId) });
+      if (variables.parentId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.parents.detail(variables.parentId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.parents.children(variables.parentId) });
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.children.detail(variables.childId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.children.lists() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.enrollments.lists() });
     },
   });
 }
@@ -252,6 +254,48 @@ interface UpdateParentParams {
   preferredCommunication?: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'BOTH';
   /** TASK-WA-004: WhatsApp opt-in consent (POPIA compliant) */
   whatsappOptIn?: boolean;
+}
+
+// List children with optional filters (GET /children)
+interface ChildrenListParams extends Record<string, unknown> {
+  page?: number;
+  limit?: number;
+  status?: 'REGISTERED' | 'ENROLLED' | 'WITHDRAWN' | 'GRADUATED';
+  parent_id?: string;
+  search?: string;
+}
+
+interface ChildListItem {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  parent: { id: string; name: string; email: string };
+  enrollment_status: string | null;
+  current_enrollment: {
+    id: string;
+    fee_structure: { id: string; name: string; amount: number };
+    status: string;
+  } | null;
+}
+
+interface ChildrenListResponse {
+  success: boolean;
+  data: ChildListItem[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export function useChildren(params?: ChildrenListParams) {
+  return useQuery<ChildrenListResponse, AxiosError>({
+    queryKey: queryKeys.children.list(params),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ChildrenListResponse>(
+        endpoints.children.list,
+        { params },
+      );
+      return data;
+    },
+  });
 }
 
 // Update a parent

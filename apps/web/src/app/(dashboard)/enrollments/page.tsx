@@ -18,7 +18,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Download, Loader2, Calendar } from 'lucide-react';
+import { Download, Loader2, Calendar, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +27,7 @@ import {
   EnrollmentFilters,
   BulkActionsBar,
   OffboardingDialog,
+  EnrollChildDialog,
 } from '@/components/enrollments';
 import type { EnrollmentFiltersState } from '@/components/enrollments/EnrollmentFilters';
 import type { Enrollment } from '@/lib/api/enrollments';
@@ -49,6 +50,7 @@ export default function EnrollmentsPage() {
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [isExporting, setIsExporting] = React.useState(false);
   const [offboardingEnrollment, setOffboardingEnrollment] = React.useState<Enrollment | null>(null);
+  const [isEnrollDialogOpen, setIsEnrollDialogOpen] = React.useState(false);
 
   // Reset page when filters change
   React.useEffect(() => {
@@ -187,6 +189,10 @@ export default function EnrollmentsPage() {
             )}
             Export CSV
           </Button>
+          <Button onClick={() => setIsEnrollDialogOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Enroll Child
+          </Button>
         </div>
       </div>
 
@@ -265,6 +271,15 @@ export default function EnrollmentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Enroll Child Dialog */}
+      <EnrollChildDialog
+        open={isEnrollDialogOpen}
+        onOpenChange={setIsEnrollDialogOpen}
+        onSuccess={() => {
+          refetch();
+        }}
+      />
 
       {/* Off-boarding Dialog */}
       <OffboardingDialog

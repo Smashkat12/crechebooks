@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useFeeStructures } from '@/hooks/use-fee-structures';
 
 export interface EnrollmentFiltersState {
   status?: 'all' | 'active' | 'inactive' | 'pending';
@@ -37,6 +38,9 @@ export function EnrollmentFilters({
   onFiltersChange,
   className,
 }: EnrollmentFiltersProps) {
+  const { data: feeStructuresData } = useFeeStructures();
+  const feeStructures = feeStructuresData?.fee_structures ?? [];
+
   const hasActiveFilters = !!(
     filters.status !== 'active' ||
     filters.feeTierId ||
@@ -72,11 +76,11 @@ export function EnrollmentFilters({
         </SelectContent>
       </Select>
 
-      {/* Fee Tier Filter - Placeholder for now */}
+      {/* Fee Tier Filter */}
       <Select
         value={filters.feeTierId}
         onValueChange={(value) =>
-          onFiltersChange({ ...filters, feeTierId: value })
+          onFiltersChange({ ...filters, feeTierId: value === 'all' ? undefined : value })
         }
       >
         <SelectTrigger className="w-full sm:w-[180px]">
@@ -84,9 +88,11 @@ export function EnrollmentFilters({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Fee Tiers</SelectItem>
-          <SelectItem value="tier-1">Standard Tier</SelectItem>
-          <SelectItem value="tier-2">Premium Tier</SelectItem>
-          <SelectItem value="tier-3">VIP Tier</SelectItem>
+          {feeStructures.map((fs) => (
+            <SelectItem key={fs.id} value={fs.id}>
+              {fs.name}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 

@@ -21,6 +21,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { EnrollmentStatus } from '../../../database/entities/enrollment.entity';
+import { ChildStatus } from '@prisma/client';
 
 /**
  * Query parameters for GET /children endpoint
@@ -70,4 +71,13 @@ export class ListChildrenQueryDto {
   @IsString()
   @ApiProperty({ required: false, description: 'Search by child name' })
   search?: string;
+
+  @IsOptional()
+  @IsEnum(ChildStatus)
+  @ApiProperty({
+    required: false,
+    enum: ChildStatus,
+    description: 'Filter by child status (REGISTERED, ENROLLED, WITHDRAWN, GRADUATED)',
+  })
+  status?: ChildStatus;
 }

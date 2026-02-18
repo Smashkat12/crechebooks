@@ -11,9 +11,11 @@ export { EnrollmentStatusBadge } from './EnrollmentStatusBadge';
 export { BulkActionsBar } from './BulkActionsBar';
 export { EnrollmentSuccessModal } from './EnrollmentSuccessModal';
 export { OffboardingDialog } from './OffboardingDialog';
+export { EnrollChildDialog } from './EnrollChildDialog';
 export type { EnrollmentFiltersState } from './EnrollmentFilters';
 export type {
   EnrollmentData,
   EnrollmentInvoice,
   EnrollmentSuccessModalProps,
 } from './EnrollmentSuccessModal';
+export type { EnrollChildDialogProps } from './EnrollChildDialog';

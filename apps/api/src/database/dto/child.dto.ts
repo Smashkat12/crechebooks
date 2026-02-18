@@ -21,6 +21,7 @@ import {
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
+import { ChildStatus } from '@prisma/client';
 import { Gender } from '../entities/child.entity';
 import {
   SanitizeName,
@@ -73,7 +74,11 @@ export class CreateChildDto {
   emergencyPhone?: string;
 }
 
-export class UpdateChildDto extends PartialType(CreateChildDto) {}
+export class UpdateChildDto extends PartialType(CreateChildDto) {
+  @IsOptional()
+  @IsEnum(ChildStatus)
+  status?: ChildStatus;
+}
 
 export class ChildFilterDto {
   @IsOptional()
@@ -87,4 +92,8 @@ export class ChildFilterDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsEnum(ChildStatus)
+  status?: ChildStatus;
 }

@@ -73,6 +73,7 @@ describe('InvoiceController', () => {
     medicalNotes: null,
     emergencyContact: null,
     emergencyPhone: null,
+    status: 'REGISTERED' as import('@prisma/client').ChildStatus,
     isActive: true,
     deletedAt: null,
     createdAt: new Date(),

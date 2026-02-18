@@ -220,3 +220,24 @@ export class EnrollChildResponseDto {
   })
   data!: EnrollChildDataDto;
 }
+
+/**
+ * API-layer DTO for enrolling an existing child (snake_case)
+ * Used by POST /children/enroll to enroll a REGISTERED child.
+ */
+export class EnrollExistingChildDto {
+  @IsUUID()
+  @ApiProperty({ description: 'Existing child UUID' })
+  child_id!: string;
+
+  @IsUUID()
+  @ApiProperty({ description: 'Fee structure UUID' })
+  fee_structure_id!: string;
+
+  @IsISO8601({ strict: true })
+  @ApiProperty({
+    example: '2026-02-01',
+    description: 'Enrollment start date (YYYY-MM-DD)',
+  })
+  start_date!: string;
+}

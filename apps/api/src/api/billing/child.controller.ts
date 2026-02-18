@@ -36,7 +36,7 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { UserRole, ChildStatus } from '@prisma/client';
 import { ChildRepository } from '../../database/repositories/child.repository';
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { FeeStructureRepository } from '../../database/repositories/fee-structure.repository';
@@ -52,6 +52,7 @@ import { NotFoundException } from '../../shared/exceptions';
 import { EnrollmentStatus } from '../../database/entities/enrollment.entity';
 import {
   EnrollChildDto,
+  EnrollExistingChildDto,
   EnrollChildResponseDto,
   ChildDetailResponseDto,
   ChildListResponseDto,
@@ -213,6 +214,116 @@ export class ChildController {
     };
   }
 
+  @Post('enroll')
+  @HttpCode(201)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Enroll an existing child in a fee structure',
+    description:
+      'Enrolls an already-registered child (e.g. from WhatsApp onboarding) into a fee structure. Creates enrollment, generates invoice, sends welcome pack.',
+  })
+  @ApiResponse({ status: 201, type: EnrollChildResponseDto })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiNotFoundResponse({ description: 'Child or fee structure not found' })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions (requires OWNER or ADMIN)',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async enrollExistingChild(
+    @Body() dto: EnrollExistingChildDto,
+    @CurrentUser() user: IUser,
+  ): Promise<EnrollChildResponseDto> {
+    const tenantId = getTenantId(user);
+    this.logger.log(
+      `Enroll existing child: tenant=${tenantId}, child=${dto.child_id}`,
+    );
+
+    // 1. Validate child exists and belongs to tenant
+    const child = await this.childRepo.findById(dto.child_id, tenantId);
+    if (!child) {
+      this.logger.error(
+        `Child not found: ${dto.child_id} for tenant ${tenantId}`,
+      );
+      throw new NotFoundException('Child', dto.child_id);
+    }
+
+    // 2. Validate fee structure exists and belongs to tenant
+    const feeStructure = await this.feeStructureRepo.findById(
+      dto.fee_structure_id,
+      tenantId,
+    );
+    if (!feeStructure) {
+      this.logger.error(
+        `Fee structure not found: ${dto.fee_structure_id} for tenant ${tenantId}`,
+      );
+      throw new NotFoundException('FeeStructure', dto.fee_structure_id);
+    }
+
+    // 3. Create enrollment (service validates no duplicate, date, etc.)
+    const {
+      enrollment,
+      invoice,
+      invoiceError,
+      welcomePackSent,
+      welcomePackError,
+    } = await this.enrollmentService.enrollChild(
+      tenantId,
+      child.id,
+      dto.fee_structure_id,
+      new Date(dto.start_date),
+      user.id,
+      true, // Allow historic dates for flexibility
+    );
+
+    // 4. Update child status to ENROLLED
+    await this.childRepo.update(child.id, tenantId, {
+      status: ChildStatus.ENROLLED,
+    });
+
+    this.logger.log(`Created enrollment: ${enrollment.id}`);
+    if (invoice) {
+      this.logger.log(`Created enrollment invoice: ${invoice.invoiceNumber}`);
+    }
+
+    // 5. Transform to response
+    return {
+      success: true,
+      data: {
+        child: {
+          id: child.id,
+          first_name: child.firstName,
+          last_name: child.lastName,
+        },
+        enrollment: {
+          id: enrollment.id,
+          fee_structure: {
+            id: feeStructure.id,
+            name: feeStructure.name,
+            amount: feeStructure.amountCents / 100,
+          },
+          start_date: enrollment.startDate.toISOString().split('T')[0],
+          end_date: enrollment.endDate
+            ? enrollment.endDate.toISOString().split('T')[0]
+            : undefined,
+          status: enrollment.status,
+        },
+        invoice: invoice
+          ? {
+              id: invoice.id,
+              invoice_number: invoice.invoiceNumber,
+              total: invoice.totalCents / 100,
+              due_date: invoice.dueDate.toISOString().split('T')[0],
+              status: invoice.status,
+            }
+          : null,
+        invoice_error: invoiceError || null,
+        welcome_pack_sent: welcomePackSent || false,
+        welcome_pack_error: welcomePackError || null,
+      },
+    };
+  }
+
   @Post(':childId/enrollments/:enrollmentId/resend-welcome-pack')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
@@ -320,6 +431,7 @@ export class ChildController {
     let allChildren = await this.childRepo.findByTenant(tenantId, {
       parentId: query.parent_id,
       search: query.search,
+      status: query.status,
     });
 
     // 2. Get enrollments for all children if filtering by enrollment status

@@ -11,7 +11,7 @@ import { useParent, useParentChildren, useCreateChild, useSendOnboardingInvite }
 import { useFeeStructures } from '@/hooks/use-fee-structures';
 import { useSendInvoices } from '@/hooks/use-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EnrollmentStatus } from '@crechebooks/types';
+// ChildStatus values: REGISTERED, ENROLLED, WITHDRAWN, GRADUATED
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -412,8 +412,17 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
                         DOB: {new Date(child.dateOfBirth).toLocaleDateString('en-ZA')}
                       </p>
                     </div>
-                    <Badge variant={child.status === EnrollmentStatus.ACTIVE ? 'default' : 'secondary'}>
-                      {child.status === EnrollmentStatus.ACTIVE ? 'Enrolled' : child.status}
+                    <Badge variant={
+                      (child.status as string) === 'ENROLLED' ? 'default' :
+                      (child.status as string) === 'WITHDRAWN' ? 'destructive' :
+                      (child.status as string) === 'GRADUATED' ? 'outline' :
+                      'secondary'
+                    }>
+                      {(child.status as string) === 'ENROLLED' ? 'Enrolled' :
+                       (child.status as string) === 'REGISTERED' ? 'Registered' :
+                       (child.status as string) === 'WITHDRAWN' ? 'Withdrawn' :
+                       (child.status as string) === 'GRADUATED' ? 'Graduated' :
+                       child.status}
                     </Badge>
                   </div>
                 ))}

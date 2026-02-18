@@ -19,9 +19,15 @@ export interface OnboardingCollectedData {
     email?: string;
     idNumber?: string;
     phone?: string; // From waId
+    address?: {
+      street: string;
+      city: string;
+      postalCode?: string;
+    };
   };
   children?: Array<{
     firstName?: string;
+    surname?: string; // TASK-WA-015: Per-child surname (no longer inherits parent's)
     dateOfBirth?: string; // YYYY-MM-DD
     allergies?: string;
   }>;
@@ -31,7 +37,15 @@ export interface OnboardingCollectedData {
     relationship?: string;
   };
   idDocumentMediaUrl?: string;
+  selectedFeeStructureId?: string; // TASK-WA-015: Selected fee structure
   feeAcknowledged?: boolean;
+  mediaConsent?: 'internal_only' | 'website' | 'social_media' | 'all' | 'none'; // TASK-WA-015
+  authorizedCollectors?: Array<{
+    name: string;
+    idNumber: string;
+    relationship: string;
+  }>; // TASK-WA-015
+  consentsAcknowledged?: boolean; // TASK-WA-015: Legal consents
   communicationPrefs?: {
     whatsapp?: boolean;
     email?: boolean;

@@ -2,16 +2,19 @@
  * Onboarding Conversation Handler
  * TASK-WA-012: WhatsApp Conversational Onboarding
  * TASK-WA-013: Advanced Features (multi-child, media validation, progress, edit flow)
+ * TASK-WA-015: Complete onboarding → auto-enrollment → parent portal
  *
  * Manages a multi-step conversational flow for parents to register
  * their children at a creche via WhatsApp.
  *
  * Step flow:
  * WELCOME -> CONSENT -> PARENT_NAME -> PARENT_SURNAME -> PARENT_EMAIL ->
- * PARENT_ID_NUMBER -> CHILD_NAME -> CHILD_DOB -> CHILD_ALLERGIES ->
- * CHILD_ANOTHER (loop or continue) -> EMERGENCY_CONTACT_NAME ->
- * EMERGENCY_CONTACT_PHONE -> EMERGENCY_CONTACT_RELATION -> ID_DOCUMENT ->
- * FEE_AGREEMENT -> COMMUNICATION_PREFS -> CONFIRMATION -> COMPLETE
+ * PARENT_ID_NUMBER -> PARENT_ADDRESS -> CHILD_NAME -> CHILD_SURNAME ->
+ * CHILD_DOB -> CHILD_ALLERGIES -> CHILD_ANOTHER (loop or continue) ->
+ * EMERGENCY_CONTACT_NAME -> EMERGENCY_CONTACT_PHONE -> EMERGENCY_CONTACT_RELATION ->
+ * ID_DOCUMENT -> FEE_SELECTION -> FEE_AGREEMENT -> MEDIA_CONSENT ->
+ * AUTHORIZED_COLLECTORS -> CONSENT_AGREEMENT -> COMMUNICATION_PREFS ->
+ * CONFIRMATION -> COMPLETE
  *
  * IMPORTANT: All messages use tenant.tradingName for branding, NOT "CrecheBooks"
  */
@@ -20,6 +23,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnboardingStep, WaOnboardingStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { TwilioContentService } from '../services/twilio-content.service';
+import { EnrollmentService } from '../../../database/services/enrollment.service';
+import { FeeStructureRepository } from '../../../database/repositories/fee-structure.repository';
+import { ParentFeeAgreementPdfService } from '../../../database/services/parent-fee-agreement-pdf.service';
+import { ParentConsentFormsPdfService } from '../../../database/services/parent-consent-forms-pdf.service';
+import { MagicLinkService } from '../../../api/auth/services/magic-link.service';
 import {
   OnboardingCollectedData,
   ONBOARDING_TRIGGERS,
@@ -40,7 +48,9 @@ const STEP_ORDER: OnboardingStep[] = [
   OnboardingStep.PARENT_SURNAME,
   OnboardingStep.PARENT_EMAIL,
   OnboardingStep.PARENT_ID_NUMBER,
+  OnboardingStep.PARENT_ADDRESS,
   OnboardingStep.CHILD_NAME,
+  OnboardingStep.CHILD_SURNAME,
   OnboardingStep.CHILD_DOB,
   OnboardingStep.CHILD_ALLERGIES,
   OnboardingStep.CHILD_ANOTHER,
@@ -48,7 +58,11 @@ const STEP_ORDER: OnboardingStep[] = [
   OnboardingStep.EMERGENCY_CONTACT_PHONE,
   OnboardingStep.EMERGENCY_CONTACT_RELATION,
   OnboardingStep.ID_DOCUMENT,
+  OnboardingStep.FEE_SELECTION,
   OnboardingStep.FEE_AGREEMENT,
+  OnboardingStep.MEDIA_CONSENT,
+  OnboardingStep.AUTHORIZED_COLLECTORS,
+  OnboardingStep.CONSENT_AGREEMENT,
   OnboardingStep.COMMUNICATION_PREFS,
   OnboardingStep.CONFIRMATION,
   OnboardingStep.COMPLETE,
@@ -77,6 +91,11 @@ export class OnboardingConversationHandler {
   constructor(
     private readonly prisma: PrismaService,
     private readonly contentService: TwilioContentService,
+    private readonly enrollmentService: EnrollmentService,
+    private readonly feeStructureRepo: FeeStructureRepository,
+    private readonly feeAgreementPdfService: ParentFeeAgreementPdfService,
+    private readonly consentFormsPdfService: ParentConsentFormsPdfService,
+    private readonly magicLinkService: MagicLinkService,
   ) {}
 
   /**
@@ -308,8 +327,28 @@ export class OnboardingConversationHandler {
           data,
         );
         break;
+      case OnboardingStep.PARENT_ADDRESS:
+        await this.handleParentAddress(
+          body,
+          waId,
+          tenantId,
+          tenantName,
+          sessionId,
+          data,
+        );
+        break;
       case OnboardingStep.CHILD_NAME:
         await this.handleChildName(
+          body,
+          waId,
+          tenantId,
+          tenantName,
+          sessionId,
+          data,
+        );
+        break;
+      case OnboardingStep.CHILD_SURNAME:
+        await this.handleChildSurname(
           body,
           waId,
           tenantId,
@@ -418,8 +457,48 @@ export class OnboardingConversationHandler {
           mediaContentType,
         );
         break;
+      case OnboardingStep.FEE_SELECTION:
+        await this.handleFeeSelection(
+          body,
+          waId,
+          tenantId,
+          tenantName,
+          sessionId,
+          data,
+        );
+        break;
       case OnboardingStep.FEE_AGREEMENT:
         await this.handleFeeAgreement(
+          body,
+          waId,
+          tenantId,
+          tenantName,
+          sessionId,
+          data,
+        );
+        break;
+      case OnboardingStep.MEDIA_CONSENT:
+        await this.handleMediaConsent(
+          body,
+          waId,
+          tenantId,
+          tenantName,
+          sessionId,
+          data,
+        );
+        break;
+      case OnboardingStep.AUTHORIZED_COLLECTORS:
+        await this.handleAuthorizedCollectors(
+          body,
+          waId,
+          tenantId,
+          tenantName,
+          sessionId,
+          data,
+        );
+        break;
+      case OnboardingStep.CONSENT_AGREEMENT:
+        await this.handleConsentAgreement(
           body,
           waId,
           tenantId,
@@ -696,6 +775,58 @@ export class OnboardingConversationHandler {
       data.parent.idNumber = result.normalized;
     }
     await this.advanceToStep(
+      OnboardingStep.PARENT_ADDRESS,
+      data,
+      waId,
+      tenantId,
+      tenantName,
+      sessionId,
+    );
+  }
+
+  /**
+   * PARENT_ADDRESS - Collect physical address (street, city, postal code)
+   * TASK-WA-015: Required for enrollment records
+   */
+  private async handleParentAddress(
+    body: string,
+    waId: string,
+    tenantId: string,
+    tenantName: string,
+    sessionId: string,
+    data: OnboardingCollectedData,
+  ): Promise<void> {
+    const trimmed = body.trim();
+    if (trimmed.length < 5) {
+      await this.contentService.sendSessionMessage(
+        waId,
+        'Please provide your full address including street, city, and postal code.',
+        tenantId,
+      );
+      return;
+    }
+    if (!data.parent) data.parent = {};
+    // Parse address: split by comma into street, city, postalCode
+    const parts = trimmed.split(',').map((p) => p.trim());
+    if (parts.length >= 3) {
+      data.parent.address = {
+        street: parts[0],
+        city: parts[1],
+        postalCode: parts[2],
+      };
+    } else if (parts.length === 2) {
+      data.parent.address = {
+        street: parts[0],
+        city: parts[1],
+      };
+    } else {
+      // Single line - store as street only
+      data.parent.address = {
+        street: trimmed,
+        city: '',
+      };
+    }
+    await this.advanceToStep(
       OnboardingStep.CHILD_NAME,
       data,
       waId,
@@ -733,6 +864,42 @@ export class OnboardingConversationHandler {
       data.children.push({ firstName: result.normalized });
     } else {
       lastChild.firstName = result.normalized;
+    }
+    await this.advanceToStep(
+      OnboardingStep.CHILD_SURNAME,
+      data,
+      waId,
+      tenantId,
+      tenantName,
+      sessionId,
+    );
+  }
+
+  /**
+   * CHILD_SURNAME - Collect child's surname (per-child, no longer inherits parent's)
+   * TASK-WA-015: Each child gets their own surname
+   */
+  private async handleChildSurname(
+    body: string,
+    waId: string,
+    tenantId: string,
+    tenantName: string,
+    sessionId: string,
+    data: OnboardingCollectedData,
+  ): Promise<void> {
+    const result = validateName(body);
+    if (!result.valid) {
+      await this.contentService.sendSessionMessage(
+        waId,
+        result.error!,
+        tenantId,
+      );
+      return;
+    }
+    if (!data.children || data.children.length === 0) {
+      data.children = [{ surname: result.normalized }];
+    } else {
+      data.children[data.children.length - 1].surname = result.normalized;
     }
     await this.advanceToStep(
       OnboardingStep.CHILD_DOB,
@@ -935,7 +1102,7 @@ export class OnboardingConversationHandler {
     if (lower === 'skip') {
       // Skip ID document upload
       await this.advanceToStep(
-        OnboardingStep.FEE_AGREEMENT,
+        OnboardingStep.FEE_SELECTION,
         data,
         waId,
         tenantId,
@@ -963,7 +1130,7 @@ export class OnboardingConversationHandler {
         tenantId,
       );
       await this.advanceToStep(
-        OnboardingStep.FEE_AGREEMENT,
+        OnboardingStep.FEE_SELECTION,
         data,
         waId,
         tenantId,
@@ -995,7 +1162,7 @@ export class OnboardingConversationHandler {
     if (lower === 'agree' || lower === 'fee_agree') {
       data.feeAcknowledged = true;
       await this.advanceToStep(
-        OnboardingStep.COMMUNICATION_PREFS,
+        OnboardingStep.MEDIA_CONSENT,
         data,
         waId,
         tenantId,
@@ -1020,6 +1187,333 @@ export class OnboardingConversationHandler {
     } else {
       await this.sendStepPrompt(
         OnboardingStep.FEE_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+      );
+    }
+  }
+
+  /**
+   * FEE_SELECTION - Select a fee structure from the tenant's active list
+   * TASK-WA-015: Let parent choose their fee plan before acknowledging
+   */
+  private async handleFeeSelection(
+    body: string,
+    waId: string,
+    tenantId: string,
+    tenantName: string,
+    sessionId: string,
+    data: OnboardingCollectedData,
+  ): Promise<void> {
+    // Check if fee structure was already auto-selected (single structure)
+    if (data.selectedFeeStructureId) {
+      await this.advanceToStep(
+        OnboardingStep.FEE_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+      return;
+    }
+
+    // Try to match user selection to a fee structure
+    const feeStructures =
+      await this.feeStructureRepo.findActiveByTenant(tenantId);
+
+    if (feeStructures.length === 0) {
+      // No fee structures configured - skip selection
+      this.logger.warn(`No active fee structures for tenant ${tenantId}`);
+      await this.advanceToStep(
+        OnboardingStep.FEE_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+      return;
+    }
+
+    if (feeStructures.length === 1) {
+      // Auto-select single fee structure
+      const fs = feeStructures[0];
+      data.selectedFeeStructureId = fs.id;
+      const amount = (fs.amountCents / 100).toLocaleString('en-ZA', {
+        minimumFractionDigits: 2,
+      });
+      await this.contentService.sendSessionMessage(
+        waId,
+        `Monthly fee: R ${amount} (${fs.name})`,
+        tenantId,
+      );
+      await this.advanceToStep(
+        OnboardingStep.FEE_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+      return;
+    }
+
+    // Multiple fee structures - try to match user's selection
+    const lower = body.toLowerCase().trim();
+    const selectedIndex = parseInt(lower, 10) - 1;
+    const selectedByNumber =
+      !isNaN(selectedIndex) &&
+      selectedIndex >= 0 &&
+      selectedIndex < feeStructures.length;
+
+    // Also try matching by list picker ID (fee_0, fee_1, etc.)
+    const idMatch = lower.match(/^fee_(\d+)$/);
+    const selectedByListId =
+      idMatch && parseInt(idMatch[1], 10) < feeStructures.length;
+
+    if (selectedByNumber) {
+      const fs = feeStructures[selectedIndex];
+      data.selectedFeeStructureId = fs.id;
+      const amount = (fs.amountCents / 100).toLocaleString('en-ZA', {
+        minimumFractionDigits: 2,
+      });
+      await this.contentService.sendSessionMessage(
+        waId,
+        `Selected: ${fs.name} - R ${amount}/month`,
+        tenantId,
+      );
+      await this.advanceToStep(
+        OnboardingStep.FEE_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+    } else if (selectedByListId) {
+      const idx = parseInt(idMatch![1], 10);
+      const fs = feeStructures[idx];
+      data.selectedFeeStructureId = fs.id;
+      const amount = (fs.amountCents / 100).toLocaleString('en-ZA', {
+        minimumFractionDigits: 2,
+      });
+      await this.contentService.sendSessionMessage(
+        waId,
+        `Selected: ${fs.name} - R ${amount}/month`,
+        tenantId,
+      );
+      await this.advanceToStep(
+        OnboardingStep.FEE_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+    } else {
+      // Show list picker
+      const items = feeStructures.map((fs, idx) => {
+        const amount = (fs.amountCents / 100).toLocaleString('en-ZA', {
+          minimumFractionDigits: 2,
+        });
+        return {
+          item: fs.name,
+          id: `fee_${idx}`,
+          description: `R ${amount}/month`,
+        };
+      });
+      await this.contentService.sendListPicker(
+        waId,
+        'Please select a fee structure:',
+        'Fee Options',
+        items,
+        tenantId,
+      );
+    }
+  }
+
+  /**
+   * MEDIA_CONSENT - Select photo/video consent level
+   * TASK-WA-015: 5 options for media usage consent
+   */
+  private async handleMediaConsent(
+    body: string,
+    waId: string,
+    tenantId: string,
+    tenantName: string,
+    sessionId: string,
+    data: OnboardingCollectedData,
+  ): Promise<void> {
+    const lower = body.toLowerCase().trim();
+
+    const consentMap: Record<string, OnboardingCollectedData['mediaConsent']> = {
+      media_internal: 'internal_only',
+      media_website: 'website',
+      media_social: 'social_media',
+      media_all: 'all',
+      media_none: 'none',
+      // Also accept plain text
+      'internal use only': 'internal_only',
+      'website & promotional': 'website',
+      'social media': 'social_media',
+      'all of the above': 'all',
+      'no photos/videos': 'none',
+    };
+
+    const consent = consentMap[lower];
+    if (consent) {
+      data.mediaConsent = consent;
+      await this.advanceToStep(
+        OnboardingStep.AUTHORIZED_COLLECTORS,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+    } else {
+      // Show list picker
+      await this.contentService.sendListPicker(
+        waId,
+        'How may we use photos/videos of your child?',
+        'Media Consent',
+        [
+          { item: 'Internal use only (records)', id: 'media_internal', description: 'School records only' },
+          { item: 'Website & promotional', id: 'media_website', description: 'Website and brochures' },
+          { item: 'Social media platforms', id: 'media_social', description: 'Facebook, Instagram, etc.' },
+          { item: 'All of the above', id: 'media_all', description: 'All usage permitted' },
+          { item: 'No photos/videos', id: 'media_none', description: 'No media consent' },
+        ],
+        tenantId,
+      );
+    }
+  }
+
+  /**
+   * AUTHORIZED_COLLECTORS - Collect authorized persons for child pickup
+   * TASK-WA-015: Collect name, ID, relationship or skip
+   */
+  private async handleAuthorizedCollectors(
+    body: string,
+    waId: string,
+    tenantId: string,
+    tenantName: string,
+    sessionId: string,
+    data: OnboardingCollectedData,
+  ): Promise<void> {
+    const lower = body.toLowerCase().trim();
+
+    // Handle "skip" or "none"
+    if (lower === 'skip' || lower === 'none') {
+      await this.advanceToStep(
+        OnboardingStep.CONSENT_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+      return;
+    }
+
+    // Handle "done" / "no" when asked to add another
+    if (lower === 'done' || lower === 'no' || lower === 'collector_done') {
+      await this.advanceToStep(
+        OnboardingStep.CONSENT_AGREEMENT,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+      return;
+    }
+
+    // Handle "yes" when asked to add another
+    if (lower === 'yes' || lower === 'collector_another') {
+      await this.contentService.sendSessionMessage(
+        waId,
+        'Please provide the next person\'s details: Name, ID Number, Relationship (e.g., "Jane Doe, 8501235678012, Grandmother")',
+        tenantId,
+      );
+      return;
+    }
+
+    // Parse: "Name, ID, Relationship"
+    const parts = body.split(',').map((p) => p.trim());
+    if (parts.length >= 3) {
+      if (!data.authorizedCollectors) data.authorizedCollectors = [];
+      data.authorizedCollectors.push({
+        name: parts[0],
+        idNumber: parts[1],
+        relationship: parts[2],
+      });
+      // Ask if they want to add another
+      await this.contentService.sendSessionQuickReply(
+        waId,
+        `Added ${parts[0]} as authorized collector. Add another person?`,
+        [
+          { title: 'Yes', id: 'collector_another' },
+          { title: 'Done', id: 'collector_done' },
+        ],
+        tenantId,
+      );
+    } else {
+      // Invalid format - re-prompt
+      await this.contentService.sendSessionMessage(
+        waId,
+        'Please provide details as: Name, ID Number, Relationship (e.g., "Jane Doe, 8501235678012, Grandmother") or type "Skip" if none.',
+        tenantId,
+      );
+    }
+  }
+
+  /**
+   * CONSENT_AGREEMENT - Acknowledge all legal consents
+   * TASK-WA-015: POPIA, medical, indemnity, T&Cs
+   */
+  private async handleConsentAgreement(
+    body: string,
+    waId: string,
+    tenantId: string,
+    tenantName: string,
+    sessionId: string,
+    data: OnboardingCollectedData,
+  ): Promise<void> {
+    const lower = body.toLowerCase().trim();
+
+    if (lower === 'i agree' || lower === 'consent_agree') {
+      data.consentsAcknowledged = true;
+      await this.advanceToStep(
+        OnboardingStep.COMMUNICATION_PREFS,
+        data,
+        waId,
+        tenantId,
+        tenantName,
+        sessionId,
+      );
+    } else if (lower === 'decline' || lower === 'consent_decline_all') {
+      await this.prisma.whatsAppOnboardingSession.update({
+        where: { id: sessionId },
+        data: {
+          status: WaOnboardingStatus.ABANDONED,
+          collectedData: data as unknown as Prisma.InputJsonValue,
+        },
+      });
+      await this.contentService.sendSessionMessage(
+        waId,
+        `We understand. Without consent, we're unable to complete enrollment. ` +
+          `Please contact ${tenantName} directly for more information. ` +
+          `You can restart anytime by typing "register".`,
+        tenantId,
+      );
+    } else {
+      // Re-prompt
+      await this.sendStepPrompt(
+        OnboardingStep.CONSENT_AGREEMENT,
         data,
         waId,
         tenantId,
@@ -1175,6 +1669,58 @@ export class OnboardingConversationHandler {
       return;
     }
 
+    // TASK-WA-015: For FEE_SELECTION, auto-select if only one fee structure
+    if (nextStep === OnboardingStep.FEE_SELECTION) {
+      try {
+        const feeStructures =
+          await this.feeStructureRepo.findActiveByTenant(tenantId);
+
+        if (feeStructures.length === 0) {
+          // No fee structures - skip straight to FEE_AGREEMENT
+          this.logger.warn(
+            `No active fee structures for tenant ${tenantId}, skipping FEE_SELECTION`,
+          );
+          await this.advanceToStep(
+            OnboardingStep.FEE_AGREEMENT,
+            data,
+            waId,
+            tenantId,
+            tenantName,
+            sessionId,
+          );
+          return;
+        }
+
+        if (feeStructures.length === 1) {
+          // Auto-select single fee structure
+          const fs = feeStructures[0];
+          data.selectedFeeStructureId = fs.id;
+          const amount = (fs.amountCents / 100).toLocaleString('en-ZA', {
+            minimumFractionDigits: 2,
+          });
+          await this.contentService.sendSessionMessage(
+            waId,
+            `Monthly fee: R ${amount} (${fs.name})`,
+            tenantId,
+          );
+          // Save selected fee and advance to FEE_AGREEMENT
+          await this.advanceToStep(
+            OnboardingStep.FEE_AGREEMENT,
+            data,
+            waId,
+            tenantId,
+            tenantName,
+            sessionId,
+          );
+          return;
+        }
+      } catch (err) {
+        this.logger.error(
+          `Error querying fee structures: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
     await this.sendStepPrompt(nextStep, data, waId, tenantId, tenantName);
   }
 
@@ -1188,12 +1734,14 @@ export class OnboardingConversationHandler {
     tenantId: string,
     tenantName: string,
   ): Promise<void> {
-    // TASK-WA-013: Progress indicators at key milestones
+    // TASK-WA-015: Progress indicators at key milestones
     const progress: Partial<Record<OnboardingStep, string>> = {
-      [OnboardingStep.CHILD_NAME]: 'Step 2 of 5: Child Details',
-      [OnboardingStep.EMERGENCY_CONTACT_NAME]: 'Step 3 of 5: Emergency Contact',
-      [OnboardingStep.ID_DOCUMENT]: 'Step 4 of 5: Verification',
-      [OnboardingStep.FEE_AGREEMENT]: 'Step 5 of 5: Fee Agreement',
+      [OnboardingStep.CHILD_NAME]: 'Step 2 of 7: Child Details',
+      [OnboardingStep.EMERGENCY_CONTACT_NAME]: 'Step 3 of 7: Emergency Contact',
+      [OnboardingStep.ID_DOCUMENT]: 'Step 4 of 7: Verification',
+      [OnboardingStep.FEE_SELECTION]: 'Step 5 of 7: Fee Selection',
+      [OnboardingStep.MEDIA_CONSENT]: 'Step 6 of 7: Consents',
+      [OnboardingStep.COMMUNICATION_PREFS]: 'Step 7 of 7: Preferences',
     };
     if (progress[step]) {
       await this.contentService.sendSessionMessage(
@@ -1248,6 +1796,14 @@ export class OnboardingConversationHandler {
         );
         break;
 
+      case OnboardingStep.PARENT_ADDRESS:
+        await this.contentService.sendSessionMessage(
+          waId,
+          'What is your home address? Please include street, city, and postal code (e.g., "123 Main Road, Sandton, 2196")',
+          tenantId,
+        );
+        break;
+
       case OnboardingStep.CHILD_NAME:
         await this.contentService.sendSessionMessage(
           waId,
@@ -1255,6 +1811,17 @@ export class OnboardingConversationHandler {
           tenantId,
         );
         break;
+
+      case OnboardingStep.CHILD_SURNAME: {
+        const childNameSurname =
+          data.children?.[data.children.length - 1]?.firstName || 'your child';
+        await this.contentService.sendSessionMessage(
+          waId,
+          `What is ${childNameSurname}'s surname?`,
+          tenantId,
+        );
+        break;
+      }
 
       case OnboardingStep.CHILD_DOB: {
         const childName =
@@ -1315,6 +1882,37 @@ export class OnboardingConversationHandler {
         );
         break;
 
+      case OnboardingStep.FEE_SELECTION:
+        // Multiple fee structures (0-1 are auto-handled in advanceToStep)
+        try {
+          const feeStructuresForPrompt =
+            await this.feeStructureRepo.findActiveByTenant(tenantId);
+          const items = feeStructuresForPrompt.map((fs, idx) => {
+            const amount = (fs.amountCents / 100).toLocaleString('en-ZA', {
+              minimumFractionDigits: 2,
+            });
+            return {
+              item: fs.name,
+              id: `fee_${idx}`,
+              description: `R ${amount}/month`,
+            };
+          });
+          await this.contentService.sendListPicker(
+            waId,
+            'Please select a fee structure:',
+            'Fee Options',
+            items,
+            tenantId,
+          );
+        } catch {
+          await this.contentService.sendSessionMessage(
+            waId,
+            'Please select a fee option.',
+            tenantId,
+          );
+        }
+        break;
+
       case OnboardingStep.FEE_AGREEMENT:
         await this.contentService.sendSessionQuickReply(
           waId,
@@ -1324,6 +1922,50 @@ export class OnboardingConversationHandler {
           [
             { title: 'Agree', id: 'fee_agree' },
             { title: 'Decline', id: 'fee_decline' },
+          ],
+          tenantId,
+        );
+        break;
+
+      case OnboardingStep.MEDIA_CONSENT:
+        await this.contentService.sendListPicker(
+          waId,
+          'How may we use photos/videos of your child?',
+          'Media Consent',
+          [
+            { item: 'Internal use only (records)', id: 'media_internal', description: 'School records only' },
+            { item: 'Website & promotional', id: 'media_website', description: 'Website and brochures' },
+            { item: 'Social media platforms', id: 'media_social', description: 'Facebook, Instagram, etc.' },
+            { item: 'All of the above', id: 'media_all', description: 'All usage permitted' },
+            { item: 'No photos/videos', id: 'media_none', description: 'No media consent' },
+          ],
+          tenantId,
+        );
+        break;
+
+      case OnboardingStep.AUTHORIZED_COLLECTORS:
+        await this.contentService.sendSessionMessage(
+          waId,
+          'Besides yourself, who else may collect your child from school?\n\n' +
+            'Reply with their Name, ID Number, and Relationship ' +
+            '(e.g., "Jane Doe, 8501235678012, Grandmother")\n\n' +
+            'Or type "Skip" if none.',
+          tenantId,
+        );
+        break;
+
+      case OnboardingStep.CONSENT_AGREEMENT:
+        await this.contentService.sendSessionQuickReply(
+          waId,
+          'By continuing you agree to:\n\n' +
+            'POPIA consent (data processing)\n' +
+            'Medical consent (emergency treatment)\n' +
+            'Indemnity waiver (liability)\n' +
+            'Terms and conditions\n\n' +
+            'Reply "I Agree" to accept all consent forms.',
+          [
+            { title: 'I Agree', id: 'consent_agree' },
+            { title: 'Decline', id: 'consent_decline_all' },
           ],
           tenantId,
         );
@@ -1382,6 +2024,11 @@ export class OnboardingConversationHandler {
       if (data.parent.email) lines.push(`Email: ${data.parent.email}`);
       if (data.parent.idNumber) lines.push(`ID: ${data.parent.idNumber}`);
       if (data.parent.phone) lines.push(`Phone: ${data.parent.phone}`);
+      if (data.parent.address) {
+        const addr = data.parent.address;
+        const addrParts = [addr.street, addr.city, addr.postalCode].filter(Boolean);
+        lines.push(`Address: ${addrParts.join(', ')}`);
+      }
       lines.push('');
     }
 
@@ -1389,7 +2036,10 @@ export class OnboardingConversationHandler {
       for (let i = 0; i < data.children.length; i++) {
         const child = data.children[i];
         lines.push(`*Child ${i + 1}*`);
-        if (child.firstName) lines.push(`Name: ${child.firstName}`);
+        if (child.firstName) {
+          const surname = child.surname || data.parent?.surname || '';
+          lines.push(`Name: ${child.firstName} ${surname}`);
+        }
         if (child.dateOfBirth) lines.push(`DOB: ${child.dateOfBirth}`);
         if (child.allergies) lines.push(`Allergies: ${child.allergies}`);
         lines.push('');
@@ -1405,6 +2055,33 @@ export class OnboardingConversationHandler {
       if (data.emergencyContact.relationship)
         lines.push(`Relationship: ${data.emergencyContact.relationship}`);
       lines.push('');
+    }
+
+    if (data.selectedFeeStructureId) {
+      lines.push('*Fee Structure:* Selected');
+    }
+
+    if (data.mediaConsent) {
+      const consentLabels: Record<string, string> = {
+        internal_only: 'Internal use only',
+        website: 'Website & promotional',
+        social_media: 'Social media',
+        all: 'All usage permitted',
+        none: 'No photos/videos',
+      };
+      lines.push(`*Media Consent:* ${consentLabels[data.mediaConsent] || data.mediaConsent}`);
+    }
+
+    if (data.authorizedCollectors && data.authorizedCollectors.length > 0) {
+      lines.push('*Authorized Collectors:*');
+      for (const c of data.authorizedCollectors) {
+        lines.push(`  - ${c.name} (${c.relationship})`);
+      }
+      lines.push('');
+    }
+
+    if (data.consentsAcknowledged) {
+      lines.push('*Consents:* All acknowledged');
     }
 
     if (data.communicationPrefs) {
@@ -1453,15 +2130,32 @@ export class OnboardingConversationHandler {
 
       this.logger.log(`Parent created: ${parent.id} for tenant ${tenantId}`);
 
-      // Create Child record(s)
+      // Store address as JSON on parent if provided
+      if (data.parent?.address) {
+        await this.prisma.parent.update({
+          where: { id: parent.id },
+          data: {
+            address: JSON.stringify(data.parent.address),
+          },
+        });
+      }
+
+      // Create Child record(s) and enroll them
       const children = data.children || [];
+      const createdChildren: Array<{ id: string; firstName: string; lastName: string }> = [];
+      let firstInvoiceTotal = 0;
+      let feeStructureName = '';
+
       for (const childData of children) {
+        // Use per-child surname, falling back to parent's surname
+        const childLastName = childData.surname || data.parent?.surname || '';
+
         const child = await this.prisma.child.create({
           data: {
             tenantId,
             parentId: parent.id,
             firstName: childData.firstName || '',
-            lastName: data.parent?.surname || '',
+            lastName: childLastName,
             dateOfBirth: childData.dateOfBirth
               ? new Date(childData.dateOfBirth)
               : new Date(),
@@ -1470,7 +2164,94 @@ export class OnboardingConversationHandler {
             emergencyPhone: data.emergencyContact?.phone,
           },
         });
+        createdChildren.push({
+          id: child.id,
+          firstName: child.firstName,
+          lastName: child.lastName,
+        });
         this.logger.log(`Child created: ${child.id} for parent ${parent.id}`);
+
+        // TASK-WA-015: Auto-enroll child if fee structure was selected
+        if (data.selectedFeeStructureId) {
+          try {
+            const enrollResult = await this.enrollmentService.enrollChild(
+              tenantId,
+              child.id,
+              data.selectedFeeStructureId,
+              new Date(),
+              parent.id, // userId = parent (self-enrolled via WhatsApp)
+              false, // allowHistoricDates
+              true,  // skipWelcomePack — handler sends its own completion message
+            );
+
+            // Update child status to ENROLLED
+            await this.prisma.child.update({
+              where: { id: child.id },
+              data: { status: 'ENROLLED' },
+            });
+
+            if (enrollResult.invoice) {
+              firstInvoiceTotal = enrollResult.invoice.totalCents;
+            }
+
+            // Get fee structure name for the confirmation message
+            if (!feeStructureName) {
+              const fs = await this.feeStructureRepo.findById(
+                data.selectedFeeStructureId,
+                tenantId,
+              );
+              feeStructureName = fs?.name || 'Selected plan';
+            }
+
+            this.logger.log(
+              `Child ${child.id} enrolled in ${data.selectedFeeStructureId}`,
+            );
+          } catch (enrollError) {
+            this.logger.error(
+              `Failed to enroll child ${child.id}: ${enrollError instanceof Error ? enrollError.message : String(enrollError)}`,
+            );
+          }
+        }
+      }
+
+      // TASK-WA-015: Generate fee agreement and consent form PDFs
+      try {
+        await this.feeAgreementPdfService.generateFeeAgreement({
+          parentId: parent.id,
+          tenantId,
+        });
+        this.logger.log(`Fee agreement PDF generated for parent ${parent.id}`);
+      } catch (pdfError) {
+        this.logger.warn(
+          `Failed to generate fee agreement PDF: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`,
+        );
+      }
+
+      try {
+        await this.consentFormsPdfService.generateConsentForms({
+          parentId: parent.id,
+          tenantId,
+        });
+        this.logger.log(`Consent forms PDF generated for parent ${parent.id}`);
+      } catch (pdfError) {
+        this.logger.warn(
+          `Failed to generate consent forms PDF: ${pdfError instanceof Error ? pdfError.message : String(pdfError)}`,
+        );
+      }
+
+      // TASK-WA-015: Generate magic link for parent portal
+      let magicLinkUrl = '';
+      if (parent.email) {
+        try {
+          magicLinkUrl = await this.magicLinkService.generateMagicLinkUrl(
+            parent.email,
+            tenantId,
+          );
+        } catch (linkError) {
+          this.logger.warn(
+            `Failed to generate magic link: ${linkError instanceof Error ? linkError.message : String(linkError)}`,
+          );
+        }
       }
 
       // Mark session as COMPLETED
@@ -1485,18 +2266,38 @@ export class OnboardingConversationHandler {
         },
       });
 
-      // Send confirmation message
-      const childNames = children
+      // Build confirmation message
+      const childNames = createdChildren
         .map((c) => c.firstName)
         .filter(Boolean)
         .join(', ');
 
+      const invoiceAmount = firstInvoiceTotal
+        ? (firstInvoiceTotal / 100).toLocaleString('en-ZA', {
+            minimumFractionDigits: 2,
+          })
+        : null;
+
+      let completionMsg =
+        `Enrollment complete for ${childNames || 'your child'}!\n\n`;
+
+      if (feeStructureName) {
+        completionMsg += `Enrolled in ${feeStructureName}\n`;
+      }
+      if (invoiceAmount) {
+        completionMsg += `First invoice generated (R ${invoiceAmount})\n`;
+      }
+      completionMsg += `Welcome pack on its way\n\n`;
+
+      if (magicLinkUrl) {
+        completionMsg += `Access your parent portal:\n${magicLinkUrl}\n\n`;
+      }
+
+      completionMsg += `Thank you for choosing ${tenantName}!`;
+
       await this.contentService.sendSessionMessage(
         waId,
-        `Registration complete! Welcome to ${tenantName}!\n\n` +
-          `${data.parent?.firstName}, we've registered ${childNames || 'your child'} successfully.\n\n` +
-          `You'll receive an email shortly with a link to access your Parent Portal, where you can view invoices, statements, and manage your account.\n\n` +
-          `${tenantName} will also be in touch with next steps. Thank you!`,
+        completionMsg,
         tenantId,
       );
 
@@ -1515,7 +2316,6 @@ export class OnboardingConversationHandler {
           `New WhatsApp onboarding complete: ${data.parent?.firstName} ${data.parent?.surname}, ` +
             `${children.length} child(ren). Notifying ${admins.length} admin(s).`,
         );
-        // Note: Email notification would be added here when NotificationService is available
       } catch (adminError) {
         this.logger.warn(
           `Failed to notify admins: ${adminError instanceof Error ? adminError.message : String(adminError)}`,

@@ -32,8 +32,16 @@ export interface IChild {
 export enum EnrollmentStatus {
   ACTIVE = 'ACTIVE',
   PENDING = 'PENDING',
-  SUSPENDED = 'SUSPENDED',
-  EXITED = 'EXITED',
+  WITHDRAWN = 'WITHDRAWN',
+  GRADUATED = 'GRADUATED',
+}
+
+// TASK-WA-015: Child lifecycle status (independent of enrollment)
+export enum ChildStatus {
+  REGISTERED = 'REGISTERED',
+  ENROLLED = 'ENROLLED',
+  WITHDRAWN = 'WITHDRAWN',
+  GRADUATED = 'GRADUATED',
 }
 
 export enum CommunicationMethod {

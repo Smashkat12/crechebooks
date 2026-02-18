@@ -107,6 +107,14 @@ enum EnrollmentStatus {
   GRADUATED
 }
 
+// TASK-WA-015: Child lifecycle status (independent of enrollment)
+enum ChildStatus {
+  REGISTERED // Created but not yet enrolled
+  ENROLLED // Active enrollment exists
+  WITHDRAWN // All enrollments withdrawn
+  GRADUATED // Graduated from creche
+}
+
 enum InvoiceStatus {
   DRAFT
   SENT
@@ -1134,12 +1142,13 @@ model Child {
   gender           Gender?
   medicalNotes     String?   @map("medical_notes")
   emergencyContact String?   @map("emergency_contact") @db.VarChar(200)
-  emergencyPhone   String?   @map("emergency_phone") @db.VarChar(20)
-  isActive         Boolean   @default(true) @map("is_active")
+  emergencyPhone   String?      @map("emergency_phone") @db.VarChar(20)
+  status           ChildStatus  @default(REGISTERED)
+  isActive         Boolean      @default(true) @map("is_active")
   // TASK-DATA-003: Soft delete support
-  deletedAt        DateTime? @map("deleted_at")
-  createdAt        DateTime  @default(now()) @map("created_at")
-  updatedAt        DateTime  @updatedAt @map("updated_at")
+  deletedAt        DateTime?    @map("deleted_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   parent      Parent       @relation(fields: [parentId], references: [id], onDelete: Cascade)
@@ -1150,6 +1159,7 @@ model Child {
   @@index([tenantId, parentId])
   @@index([tenantId, isActive])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, status])
   @@map("children")
 }
 
@@ -3989,7 +3999,9 @@ enum OnboardingStep {
   PARENT_SURNAME
   PARENT_EMAIL
   PARENT_ID_NUMBER
+  PARENT_ADDRESS          // TASK-WA-015: Collect physical address
   CHILD_NAME
+  CHILD_SURNAME           // TASK-WA-015: Per-child surname
   CHILD_DOB
   CHILD_ALLERGIES
   CHILD_ANOTHER
@@ -3997,7 +4009,11 @@ enum OnboardingStep {
   EMERGENCY_CONTACT_PHONE
   EMERGENCY_CONTACT_RELATION
   ID_DOCUMENT
+  FEE_SELECTION           // TASK-WA-015: Select fee structure
   FEE_AGREEMENT
+  MEDIA_CONSENT           // TASK-WA-015: Photo/video consent
+  AUTHORIZED_COLLECTORS   // TASK-WA-015: Authorized pickup persons
+  CONSENT_AGREEMENT       // TASK-WA-015: Legal consents acknowledgment
   COMMUNICATION_PREFS
   CONFIRMATION
   COMPLETE

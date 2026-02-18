@@ -172,7 +172,7 @@ export class ParentController {
       gender: child.gender,
       allergies: child.allergies,
       medicalNotes: child.medicalNotes,
-      status: child.status || 'ACTIVE',
+      status: child.status || 'REGISTERED',
       createdAt: child.createdAt,
       updatedAt: child.updatedAt,
     }));

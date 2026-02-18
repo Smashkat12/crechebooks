@@ -236,6 +236,47 @@ The CrecheBooks Team
   }
 
   /**
+   * Generate a magic link URL for a parent without sending an email.
+   * Used by WhatsApp onboarding to include in the completion message.
+   *
+   * TASK-WA-015: WhatsApp onboarding → parent portal magic link
+   *
+   * @param email - Parent's email address
+   * @param tenantId - Tenant UUID (for verification, not used in token directly)
+   * @returns Magic link URL, or empty string if parent not found
+   */
+  async generateMagicLinkUrl(email: string, tenantId: string): Promise<string> {
+    const parent = await this.prisma.parent.findFirst({
+      where: {
+        email: { equals: email, mode: 'insensitive' },
+        tenantId,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+
+    if (!parent || !parent.email) {
+      this.logger.warn(
+        `generateMagicLinkUrl: parent not found for email ${email} in tenant ${tenantId}`,
+      );
+      return '';
+    }
+
+    const payload: MagicLinkPayload = {
+      sub: parent.id,
+      email: parent.email,
+      tenantId: parent.tenantId,
+      type: 'magic_link',
+    };
+
+    const token = this.jwtService.sign(payload, {
+      expiresIn: `${this.config.expiresInMinutes}m`,
+    });
+
+    return `${this.config.portalBaseUrl}/parent/verify?token=${encodeURIComponent(token)}`;
+  }
+
+  /**
    * Verify a magic link token and return parent information.
    *
    * @param token - JWT token from magic link

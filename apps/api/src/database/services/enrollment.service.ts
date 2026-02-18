@@ -83,6 +83,7 @@ export class EnrollmentService {
    * @param startDate - Enrollment start date
    * @param userId - User performing the enrollment
    * @param allowHistoricDates - If true, allows historical start dates (for data imports)
+   * @param skipWelcomePack - If true, skips welcome pack delivery (e.g. WhatsApp onboarding sends its own completion message)
    * @returns Created enrollment with generated invoice (if any)
    * @throws NotFoundException if child or fee structure doesn't exist
    * @throws ConflictException if child already has active enrollment
@@ -95,6 +96,7 @@ export class EnrollmentService {
     startDate: Date,
     userId: string,
     allowHistoricDates = false,
+    skipWelcomePack = false,
   ): Promise<EnrollChildResult> {
     // 1. Validate child exists and belongs to tenant
     const child = await this.childRepo.findById(childId, tenantId);
@@ -201,28 +203,36 @@ export class EnrollmentService {
 
     // 8. Send welcome pack (non-blocking, don't fail enrollment if email fails)
     // TASK-ENROL-008: Welcome Pack Delivery Integration
+    // TASK-WA-015: Skip when called from WhatsApp onboarding (handler sends its own completion message)
     let welcomePackResult: { sent: boolean; error?: string } = { sent: false };
-    try {
-      const deliveryResult =
-        await this.welcomePackDeliveryService.sendWelcomePack(
-          tenantId,
-          enrollment.id,
-        );
-      welcomePackResult = {
-        sent: deliveryResult.success,
-        error: deliveryResult.error,
-      };
-      if (deliveryResult.success) {
-        this.logger.log(`Welcome pack sent for enrollment ${enrollment.id}`);
-      }
-    } catch (error) {
-      welcomePackResult = {
-        sent: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-      this.logger.warn(
-        `Failed to send welcome pack for enrollment ${enrollment.id}: ${welcomePackResult.error}`,
+    if (skipWelcomePack) {
+      this.logger.log(
+        `Skipping welcome pack for enrollment ${enrollment.id} (skipWelcomePack=true)`,
       );
+      welcomePackResult = { sent: false, error: 'Skipped by caller' };
+    } else {
+      try {
+        const deliveryResult =
+          await this.welcomePackDeliveryService.sendWelcomePack(
+            tenantId,
+            enrollment.id,
+          );
+        welcomePackResult = {
+          sent: deliveryResult.success,
+          error: deliveryResult.error,
+        };
+        if (deliveryResult.success) {
+          this.logger.log(`Welcome pack sent for enrollment ${enrollment.id}`);
+        }
+      } catch (error) {
+        welcomePackResult = {
+          sent: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+        this.logger.warn(
+          `Failed to send welcome pack for enrollment ${enrollment.id}: ${welcomePackResult.error}`,
+        );
+      }
     }
 
     this.logger.log(

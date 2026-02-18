@@ -4011,6 +4011,7 @@ enum OnboardingStep {
   ID_DOCUMENT
   FEE_SELECTION           // TASK-WA-015: Select fee structure
   FEE_AGREEMENT
+  START_DATE              // When the child will start attending
   MEDIA_CONSENT           // TASK-WA-015: Photo/video consent
   AUTHORIZED_COLLECTORS   // TASK-WA-015: Authorized pickup persons
   CONSENT_AGREEMENT       // TASK-WA-015: Legal consents acknowledgment

@@ -27,15 +27,15 @@ const statusConfig: Record<EnrollmentStatusType, {
     icon: Clock,
     className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
   },
-  SUSPENDED: {
-    label: 'Suspended',
+  WITHDRAWN: {
+    label: 'Withdrawn',
     variant: 'outline',
     icon: AlertCircle,
     className: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
   },
-  EXITED: {
-    label: 'Exited',
-    variant: 'destructive',
+  GRADUATED: {
+    label: 'Graduated',
+    variant: 'secondary',
     icon: XCircle,
     className: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
   },

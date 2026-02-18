@@ -22,7 +22,7 @@ const childSchema = z.object({
   enrollmentDate: z.date({ required_error: 'Enrollment date is required' }),
   exitDate: z.date().optional(),
   feeStructureId: z.string().min(1, 'Fee structure is required'),
-  status: z.enum(['ACTIVE', 'PENDING', 'SUSPENDED', 'EXITED']),
+  status: z.enum(['ACTIVE', 'PENDING', 'WITHDRAWN', 'GRADUATED']),
   notes: z.string().max(500).optional(),
 });
 
@@ -40,8 +40,8 @@ interface ChildFormProps {
 const statusOptions = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'PENDING', label: 'Pending' },
-  { value: 'SUSPENDED', label: 'Suspended' },
-  { value: 'EXITED', label: 'Exited' },
+  { value: 'WITHDRAWN', label: 'Withdrawn' },
+  { value: 'GRADUATED', label: 'Graduated' },
 ];
 
 export function ChildForm({

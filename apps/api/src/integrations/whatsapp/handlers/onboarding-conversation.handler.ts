@@ -12,7 +12,7 @@
  * PARENT_ID_NUMBER -> PARENT_ADDRESS -> CHILD_NAME -> CHILD_SURNAME ->
  * CHILD_DOB -> CHILD_ALLERGIES -> CHILD_ANOTHER (loop or continue) ->
  * EMERGENCY_CONTACT_NAME -> EMERGENCY_CONTACT_PHONE -> EMERGENCY_CONTACT_RELATION ->
- * ID_DOCUMENT -> FEE_SELECTION -> FEE_AGREEMENT -> MEDIA_CONSENT ->
+ * ID_DOCUMENT -> FEE_SELECTION -> FEE_AGREEMENT -> START_DATE -> MEDIA_CONSENT ->
  * AUTHORIZED_COLLECTORS -> CONSENT_AGREEMENT -> COMMUNICATION_PREFS ->
  * CONFIRMATION -> COMPLETE
  *
@@ -36,6 +36,7 @@ import {
   validatePhone,
   validateDOB,
   validateName,
+  validateStartDate,
 } from '../types/onboarding.types';
 
 /**
@@ -60,6 +61,7 @@ const STEP_ORDER: OnboardingStep[] = [
   OnboardingStep.ID_DOCUMENT,
   OnboardingStep.FEE_SELECTION,
   OnboardingStep.FEE_AGREEMENT,
+  OnboardingStep.START_DATE,
   OnboardingStep.MEDIA_CONSENT,
   OnboardingStep.AUTHORIZED_COLLECTORS,
   OnboardingStep.CONSENT_AGREEMENT,
@@ -477,6 +479,16 @@ export class OnboardingConversationHandler {
           data,
         );
         break;
+      case OnboardingStep.START_DATE:
+        await this.handleStartDate(
+          body,
+          waId,
+          tenantId,
+          tenantName,
+          sessionId,
+          data,
+        );
+        break;
       case OnboardingStep.MEDIA_CONSENT:
         await this.handleMediaConsent(
           body,
@@ -545,6 +557,17 @@ export class OnboardingConversationHandler {
         if (editLower === 'edit_emergency') {
           await this.advanceToStep(
             OnboardingStep.EMERGENCY_CONTACT_NAME,
+            data,
+            waId,
+            tenantId,
+            tenantName,
+            sessionId,
+          );
+          break;
+        }
+        if (editLower === 'edit_startdate') {
+          await this.advanceToStep(
+            OnboardingStep.START_DATE,
             data,
             waId,
             tenantId,
@@ -1162,7 +1185,7 @@ export class OnboardingConversationHandler {
     if (lower === 'agree' || lower === 'fee_agree') {
       data.feeAcknowledged = true;
       await this.advanceToStep(
-        OnboardingStep.MEDIA_CONSENT,
+        OnboardingStep.START_DATE,
         data,
         waId,
         tenantId,
@@ -1193,6 +1216,37 @@ export class OnboardingConversationHandler {
         tenantName,
       );
     }
+  }
+
+  /**
+   * START_DATE - Collect when the child will start (or started) at the creche
+   */
+  private async handleStartDate(
+    body: string,
+    waId: string,
+    tenantId: string,
+    tenantName: string,
+    sessionId: string,
+    data: OnboardingCollectedData,
+  ): Promise<void> {
+    const result = validateStartDate(body);
+    if (!result.valid) {
+      await this.contentService.sendSessionMessage(
+        waId,
+        result.error || 'Invalid date. Please enter as DD/MM/YYYY.',
+        tenantId,
+      );
+      return;
+    }
+    data.startDate = result.normalized;
+    await this.advanceToStep(
+      OnboardingStep.MEDIA_CONSENT,
+      data,
+      waId,
+      tenantId,
+      tenantName,
+      sessionId,
+    );
   }
 
   /**
@@ -1605,6 +1659,11 @@ export class OnboardingConversationHandler {
             id: 'edit_emergency',
             description: 'Contact info',
           },
+          {
+            item: 'Start Date',
+            id: 'edit_startdate',
+            description: 'Expected first day',
+          },
         ],
         tenantId,
       );
@@ -1927,6 +1986,18 @@ export class OnboardingConversationHandler {
         );
         break;
 
+      case OnboardingStep.START_DATE: {
+        const childName = data.children?.[0]?.firstName || 'your child';
+        await this.contentService.sendSessionMessage(
+          waId,
+          `When did (or will) ${childName} start at ${tenantName}?\n\n` +
+            'Please enter the date as DD/MM/YYYY (e.g., 01/03/2026).\n\n' +
+            'This can be a past date if already attending, or up to 6 months from now.',
+          tenantId,
+        );
+        break;
+      }
+
       case OnboardingStep.MEDIA_CONSENT:
         await this.contentService.sendListPicker(
           waId,
@@ -2061,6 +2132,10 @@ export class OnboardingConversationHandler {
       lines.push('*Fee Structure:* Selected');
     }
 
+    if (data.startDate) {
+      lines.push(`*Start Date:* ${data.startDate}`);
+    }
+
     if (data.mediaConsent) {
       const consentLabels: Record<string, string> = {
         internal_only: 'Internal use only',
@@ -2174,13 +2249,16 @@ export class OnboardingConversationHandler {
         // TASK-WA-015: Auto-enroll child if fee structure was selected
         if (data.selectedFeeStructureId) {
           try {
+            const startDate = data.startDate
+              ? new Date(data.startDate)
+              : new Date();
             const enrollResult = await this.enrollmentService.enrollChild(
               tenantId,
               child.id,
               data.selectedFeeStructureId,
-              new Date(),
+              startDate,
               parent.id, // userId = parent (self-enrolled via WhatsApp)
-              false, // allowHistoricDates
+              !!data.startDate, // allowHistoricDates — true when parent chose a past date
               true,  // skipWelcomePack — handler sends its own completion message
             );
 

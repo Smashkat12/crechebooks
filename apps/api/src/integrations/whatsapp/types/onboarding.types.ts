@@ -39,6 +39,7 @@ export interface OnboardingCollectedData {
   idDocumentMediaUrl?: string;
   selectedFeeStructureId?: string; // TASK-WA-015: Selected fee structure
   feeAcknowledged?: boolean;
+  startDate?: string; // YYYY-MM-DD: when child starts attending
   mediaConsent?: 'internal_only' | 'website' | 'social_media' | 'all' | 'none'; // TASK-WA-015
   authorizedCollectors?: Array<{
     name: string;
@@ -177,6 +178,48 @@ export function validateDOB(input: string): ValidationResult {
     };
   }
   // Store as YYYY-MM-DD
+  const normalized = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return { valid: true, normalized };
+}
+
+/**
+ * Start date validation (DD/MM/YYYY)
+ * Allows past dates up to 1 year ago (child already attending) and future dates up to 6 months out.
+ */
+export function validateStartDate(input: string): ValidationResult {
+  const match = input.trim().match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (!match) {
+    return { valid: false, error: 'Please enter a date as DD/MM/YYYY.' };
+  }
+  const [, dayStr, monthStr, yearStr] = match;
+  const day = Number(dayStr);
+  const month = Number(monthStr);
+  const year = Number(yearStr);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return { valid: false, error: 'Invalid date. Please enter as DD/MM/YYYY.' };
+  }
+  const now = new Date();
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  if (date < oneYearAgo) {
+    return {
+      valid: false,
+      error: 'Start date cannot be more than 1 year in the past.',
+    };
+  }
+  const sixMonthsFromNow = new Date(now);
+  sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+  if (date > sixMonthsFromNow) {
+    return {
+      valid: false,
+      error: 'Start date cannot be more than 6 months in the future.',
+    };
+  }
   const normalized = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   return { valid: true, normalized };
 }

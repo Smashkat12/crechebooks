@@ -9,12 +9,18 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OnboardingConversationHandler } from './onboarding-conversation.handler';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { TwilioContentService } from '../services/twilio-content.service';
+import { EnrollmentService } from '../../../database/services/enrollment.service';
+import { FeeStructureRepository } from '../../../database/repositories/fee-structure.repository';
+import { ParentFeeAgreementPdfService } from '../../../database/services/parent-fee-agreement-pdf.service';
+import { ParentConsentFormsPdfService } from '../../../database/services/parent-consent-forms-pdf.service';
+import { MagicLinkService } from '../../../api/auth/services/magic-link.service';
 import {
   validateSAID,
   validateEmail,
   validatePhone,
   validateDOB,
   validateName,
+  validateStartDate,
 } from '../types/onboarding.types';
 
 // ============================================
@@ -34,6 +40,7 @@ const createMockPrisma = () => ({
   },
   child: {
     create: jest.fn(),
+    update: jest.fn(),
   },
   tenant: {
     findUnique: jest.fn(),
@@ -47,6 +54,27 @@ const createMockContentService = () => ({
   sendMediaMessage: jest.fn().mockResolvedValue({ success: true }),
   sendContentMessage: jest.fn().mockResolvedValue({ success: true }),
   sendListPicker: jest.fn().mockResolvedValue({ success: true }),
+});
+
+const createMockEnrollmentService = () => ({
+  enrollChild: jest.fn().mockResolvedValue({ enrollment: { id: 'enr-1' }, invoice: null }),
+});
+
+const createMockFeeStructureRepo = () => ({
+  findActiveByTenant: jest.fn().mockResolvedValue([]),
+  findById: jest.fn().mockResolvedValue(null),
+});
+
+const createMockFeeAgreementPdfService = () => ({
+  generateFeeAgreement: jest.fn().mockResolvedValue(undefined),
+});
+
+const createMockConsentFormsPdfService = () => ({
+  generateConsentForms: jest.fn().mockResolvedValue(undefined),
+});
+
+const createMockMagicLinkService = () => ({
+  generateMagicLinkUrl: jest.fn().mockResolvedValue('https://app.example.com/magic?token=abc'),
 });
 
 const TENANT_ID = 'tenant-123';
@@ -221,6 +249,66 @@ describe('Validation Functions', () => {
     });
   });
 
+  describe('validateStartDate', () => {
+    it('should accept a valid date in DD/MM/YYYY format', () => {
+      const year = new Date().getFullYear();
+      const result = validateStartDate(`01/03/${year}`);
+      expect(result.valid).toBe(true);
+      expect(result.normalized).toBe(`${year}-03-01`);
+    });
+
+    it('should accept a past date within 1 year', () => {
+      const past = new Date();
+      past.setMonth(past.getMonth() - 6);
+      const day = String(past.getDate()).padStart(2, '0');
+      const month = String(past.getMonth() + 1).padStart(2, '0');
+      const result = validateStartDate(`${day}/${month}/${past.getFullYear()}`);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should accept a future date within 6 months', () => {
+      const future = new Date();
+      future.setMonth(future.getMonth() + 3);
+      const day = String(future.getDate()).padStart(2, '0');
+      const month = String(future.getMonth() + 1).padStart(2, '0');
+      const result = validateStartDate(`${day}/${month}/${future.getFullYear()}`);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject a date more than 1 year in the past', () => {
+      const year = new Date().getFullYear() - 2;
+      const result = validateStartDate(`01/01/${year}`);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('1 year');
+    });
+
+    it('should reject a date more than 6 months in the future', () => {
+      const future = new Date();
+      future.setMonth(future.getMonth() + 8);
+      const result = validateStartDate(`01/${String(future.getMonth() + 1).padStart(2, '0')}/${future.getFullYear()}`);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('6 months');
+    });
+
+    it('should reject invalid date format', () => {
+      const result = validateStartDate('not-a-date');
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('DD/MM/YYYY');
+    });
+
+    it('should reject invalid calendar date (Feb 30)', () => {
+      const year = new Date().getFullYear();
+      const result = validateStartDate(`30/02/${year}`);
+      expect(result.valid).toBe(false);
+    });
+
+    it('should accept different date separators', () => {
+      const year = new Date().getFullYear();
+      const result = validateStartDate(`01-03-${year}`);
+      expect(result.valid).toBe(true);
+    });
+  });
+
   describe('validateName', () => {
     it('should accept a valid name', () => {
       const result = validateName('John');
@@ -256,16 +344,31 @@ describe('OnboardingConversationHandler', () => {
   let handler: OnboardingConversationHandler;
   let mockPrisma: ReturnType<typeof createMockPrisma>;
   let mockContentService: ReturnType<typeof createMockContentService>;
+  let mockEnrollmentService: ReturnType<typeof createMockEnrollmentService>;
+  let mockFeeStructureRepo: ReturnType<typeof createMockFeeStructureRepo>;
+  let mockFeeAgreementPdfService: ReturnType<typeof createMockFeeAgreementPdfService>;
+  let mockConsentFormsPdfService: ReturnType<typeof createMockConsentFormsPdfService>;
+  let mockMagicLinkService: ReturnType<typeof createMockMagicLinkService>;
 
   beforeEach(async () => {
     mockPrisma = createMockPrisma();
     mockContentService = createMockContentService();
+    mockEnrollmentService = createMockEnrollmentService();
+    mockFeeStructureRepo = createMockFeeStructureRepo();
+    mockFeeAgreementPdfService = createMockFeeAgreementPdfService();
+    mockConsentFormsPdfService = createMockConsentFormsPdfService();
+    mockMagicLinkService = createMockMagicLinkService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OnboardingConversationHandler,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: TwilioContentService, useValue: mockContentService },
+        { provide: EnrollmentService, useValue: mockEnrollmentService },
+        { provide: FeeStructureRepository, useValue: mockFeeStructureRepo },
+        { provide: ParentFeeAgreementPdfService, useValue: mockFeeAgreementPdfService },
+        { provide: ParentConsentFormsPdfService, useValue: mockConsentFormsPdfService },
+        { provide: MagicLinkService, useValue: mockMagicLinkService },
       ],
     }).compile();
 
@@ -672,7 +775,7 @@ describe('OnboardingConversationHandler', () => {
       );
     });
 
-    it('should skip ID number and advance to CHILD_NAME', async () => {
+    it('should skip ID number and advance to PARENT_ADDRESS', async () => {
       const session = createSession({
         currentStep: 'PARENT_ID_NUMBER',
         collectedData: {
@@ -688,7 +791,7 @@ describe('OnboardingConversationHandler', () => {
         session,
       );
       mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
-        createSession({ currentStep: 'CHILD_NAME' }),
+        createSession({ currentStep: 'PARENT_ADDRESS' }),
       );
 
       await handler.handleMessage(WA_ID, TENANT_ID, 'skip');
@@ -696,13 +799,13 @@ describe('OnboardingConversationHandler', () => {
       expect(mockPrisma.whatsAppOnboardingSession.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            currentStep: 'CHILD_NAME',
+            currentStep: 'PARENT_ADDRESS',
           }),
         }),
       );
     });
 
-    it('should advance from CHILD_NAME to CHILD_DOB', async () => {
+    it('should advance from CHILD_NAME to CHILD_SURNAME', async () => {
       const session = createSession({
         currentStep: 'CHILD_NAME',
         collectedData: {
@@ -718,7 +821,7 @@ describe('OnboardingConversationHandler', () => {
         session,
       );
       mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
-        createSession({ currentStep: 'CHILD_DOB' }),
+        createSession({ currentStep: 'CHILD_SURNAME' }),
       );
 
       await handler.handleMessage(WA_ID, TENANT_ID, 'Lily');
@@ -726,7 +829,7 @@ describe('OnboardingConversationHandler', () => {
       expect(mockPrisma.whatsAppOnboardingSession.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            currentStep: 'CHILD_DOB',
+            currentStep: 'CHILD_SURNAME',
           }),
         }),
       );
@@ -980,13 +1083,13 @@ describe('OnboardingConversationHandler', () => {
       );
     });
 
-    it('should advance from FEE_AGREEMENT (agree) to COMMUNICATION_PREFS', async () => {
+    it('should advance from FEE_AGREEMENT (agree) to START_DATE', async () => {
       const session = createSession({ currentStep: 'FEE_AGREEMENT' });
       mockPrisma.whatsAppOnboardingSession.findUnique.mockResolvedValue(
         session,
       );
       mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
-        createSession({ currentStep: 'COMMUNICATION_PREFS' }),
+        createSession({ currentStep: 'START_DATE' }),
       );
 
       await handler.handleMessage(WA_ID, TENANT_ID, 'agree');
@@ -994,7 +1097,7 @@ describe('OnboardingConversationHandler', () => {
       expect(mockPrisma.whatsAppOnboardingSession.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            currentStep: 'COMMUNICATION_PREFS',
+            currentStep: 'START_DATE',
           }),
         }),
       );
@@ -1017,6 +1120,52 @@ describe('OnboardingConversationHandler', () => {
             status: 'ABANDONED',
           }),
         }),
+      );
+    });
+
+    it('should advance from START_DATE to MEDIA_CONSENT with valid date', async () => {
+      const year = new Date().getFullYear();
+      const session = createSession({
+        currentStep: 'START_DATE',
+        collectedData: { children: [{ firstName: 'Lily' }] },
+      });
+      mockPrisma.whatsAppOnboardingSession.findUnique.mockResolvedValue(
+        session,
+      );
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ currentStep: 'MEDIA_CONSENT' }),
+      );
+
+      await handler.handleMessage(WA_ID, TENANT_ID, `01/03/${year}`);
+
+      expect(mockPrisma.whatsAppOnboardingSession.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            currentStep: 'MEDIA_CONSENT',
+            collectedData: expect.objectContaining({
+              startDate: `${year}-03-01`,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('should reject invalid start date and not advance', async () => {
+      const session = createSession({
+        currentStep: 'START_DATE',
+        collectedData: { children: [{ firstName: 'Lily' }] },
+      });
+      mockPrisma.whatsAppOnboardingSession.findUnique.mockResolvedValue(
+        session,
+      );
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(session);
+
+      await handler.handleMessage(WA_ID, TENANT_ID, 'invalid');
+
+      expect(mockContentService.sendSessionMessage).toHaveBeenCalledWith(
+        WA_ID,
+        expect.stringContaining('DD/MM/YYYY'),
+        TENANT_ID,
       );
     });
 

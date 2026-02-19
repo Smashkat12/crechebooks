@@ -59,9 +59,11 @@ export interface DashboardMetrics {
   arrears: {
     total: number;
     count: number;
+    overdueBy7: number;
+    overdueBy14: number;
     overdueBy30: number;
     overdueBy60: number;
-    overdueBy90: number;
+    overdueOver60: number;
   };
   enrollment: {
     total: number;

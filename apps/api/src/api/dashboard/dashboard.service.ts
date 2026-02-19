@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { DashboardMetricsResponseDto } from './dto/dashboard-metrics.dto';
 import { DashboardTrendsResponseDto } from './dto/dashboard-trends.dto';
 import { withTimeout, TimeoutError } from '../../common/utils/promise-utils';
-import { todayUTC } from '../../shared/utils/date.util';
+import { todayUTC, diffCalendarDays } from '../../shared/utils/date.util';
 
 /**
  * Default timeout for dashboard metrics queries (ms)
@@ -207,31 +207,37 @@ export class DashboardService {
     );
     const outstanding = totalInvoiced - totalCollected;
 
-    // Calculate arrears by aging bucket
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-
+    // Calculate arrears by aging bucket aligned with reminder stages:
+    // 1-7 days (before first reminder), 8-14 (first sent), 15-30 (second sent),
+    // 31-60 (final sent), 60+ (escalated)
+    let overdueBy7 = 0;
+    let overdueBy14 = 0;
     let overdueBy30 = 0;
     let overdueBy60 = 0;
-    let overdueBy90 = 0;
+    let overdueOver60 = 0;
     const uniqueParentsInArrears = new Set<string>();
 
     for (const inv of overdueInvoices) {
       const arrears = inv.totalCents - inv.amountPaidCents;
       if (arrears > 0) {
         uniqueParentsInArrears.add(inv.parentId);
-        if (inv.dueDate <= ninetyDaysAgo) {
-          overdueBy90 += arrears;
-        } else if (inv.dueDate <= sixtyDaysAgo) {
+        const daysOverdue = diffCalendarDays(inv.dueDate, now);
+        if (daysOverdue > 60) {
+          overdueOver60 += arrears;
+        } else if (daysOverdue > 30) {
           overdueBy60 += arrears;
-        } else if (inv.dueDate <= thirtyDaysAgo) {
+        } else if (daysOverdue > 14) {
           overdueBy30 += arrears;
+        } else if (daysOverdue > 7) {
+          overdueBy14 += arrears;
+        } else {
+          overdueBy7 += arrears;
         }
       }
     }
 
-    const totalArrears = overdueBy30 + overdueBy60 + overdueBy90;
+    const totalArrears =
+      overdueBy7 + overdueBy14 + overdueBy30 + overdueBy60 + overdueOver60;
 
     // Calculate expense totals
     const totalExpenses = expenses.reduce(
@@ -263,9 +269,11 @@ export class DashboardService {
       arrears: {
         total: totalArrears / 100,
         count: uniqueParentsInArrears.size,
+        overdueBy7: overdueBy7 / 100,
+        overdueBy14: overdueBy14 / 100,
         overdueBy30: overdueBy30 / 100,
         overdueBy60: overdueBy60 / 100,
-        overdueBy90: overdueBy90 / 100,
+        overdueOver60: overdueOver60 / 100,
       },
       enrollment: {
         total: enrollments + inactiveEnrollments,

@@ -1367,19 +1367,181 @@ export class InvoiceGenerationService {
   }
 
   /**
-   * TASK-BILL-037: Check if child is eligible for January re-registration fee
-   *
-   * Re-registration fee applies ONLY to continuing students:
-   * - Billing month must be January (YYYY-01)
-   * - Child must have been ACTIVE on December 31st of previous year
-   *
-   * This is NOT for students returning after WITHDRAWN/GRADUATED status.
-   * Those are new enrollments and pay the full registration fee (R500).
+   * Generate catch-up invoices for months between enrollment start and current month.
+   * Skips the enrollment month (handled by createEnrollmentInvoice).
+   * Safe to call multiple times - duplicate prevention via findByBillingPeriod.
    *
    * @param tenantId - Tenant ID for multi-tenant isolation
-   * @param childId - Child ID to check
-   * @param billingMonth - Format: YYYY-MM
-   * @returns true if child is eligible for re-registration fee
+   * @param childId - Child to generate catch-up invoices for
+   * @param enrollmentStartDate - Enrollment start date
+   * @param userId - User performing the generation
+   * @returns Summary of generated, skipped, and errored months
+   */
+  async generateCatchUpInvoices(
+    tenantId: string,
+    childId: string,
+    enrollmentStartDate: Date,
+    userId: string,
+  ): Promise<{ generated: number; skipped: number; errors: string[] }> {
+    const startDate = new Date(enrollmentStartDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    const now = toSATimezone(new Date());
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-indexed
+
+    // Start from the month AFTER the enrollment month
+    let year = startDate.getFullYear();
+    let month = startDate.getMonth() + 1; // advance one month
+    if (month > 11) {
+      month = 0;
+      year++;
+    }
+
+    let generated = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+
+    while (
+      year < currentYear ||
+      (year === currentYear && month <= currentMonth)
+    ) {
+      const billingMonth = `${year}-${String(month + 1).padStart(2, '0')}`;
+      try {
+        const result = await this.generateMonthlyInvoices(
+          tenantId,
+          billingMonth,
+          userId,
+          [childId],
+        );
+        generated += result.invoicesCreated;
+        if (result.invoicesCreated === 0 && result.errors.length === 0) {
+          skipped++;
+        }
+        if (result.errors.length > 0) {
+          errors.push(
+            ...result.errors.map((e) => `${billingMonth}: ${e.error}`),
+          );
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        errors.push(`${billingMonth}: ${msg}`);
+      }
+
+      month++;
+      if (month > 11) {
+        month = 0;
+        year++;
+      }
+    }
+
+    this.logger.log(
+      `Catch-up invoices for child ${childId}: generated=${generated}, skipped=${skipped}, errors=${errors.length}`,
+    );
+
+    return { generated, skipped, errors };
+  }
+
+  /**
+   * Generate catch-up invoices for all active enrollments in a tenant.
+   * For each enrollment with a historic start date, generates missing months.
+   *
+   * @param tenantId - Tenant ID for multi-tenant isolation
+   * @param userId - User performing the generation
+   * @param childId - Optional: specific child only
+   * @param fromMonth - Optional: start from this month (YYYY-MM) instead of enrollment start
+   * @returns Aggregated summary across all enrollments
+   */
+  async catchUpAllEnrollments(
+    tenantId: string,
+    userId: string,
+    childId?: string,
+    fromMonth?: string,
+  ): Promise<{
+    total_generated: number;
+    total_skipped: number;
+    total_errors: number;
+    children: Array<{
+      child_id: string;
+      child_name: string;
+      generated: number;
+      skipped: number;
+      errors: string[];
+    }>;
+  }> {
+    const enrollments = await this.getActiveEnrollmentsWithRelations(tenantId);
+
+    const filtered = childId
+      ? enrollments.filter((e) => e.childId === childId)
+      : enrollments;
+
+    if (filtered.length === 0) {
+      return {
+        total_generated: 0,
+        total_skipped: 0,
+        total_errors: 0,
+        children: [],
+      };
+    }
+
+    let totalGenerated = 0;
+    let totalSkipped = 0;
+    let totalErrors = 0;
+    const children: Array<{
+      child_id: string;
+      child_name: string;
+      generated: number;
+      skipped: number;
+      errors: string[];
+    }> = [];
+
+    for (const enrollment of filtered) {
+      // Determine effective start date
+      let effectiveStart = enrollment.startDate;
+      if (fromMonth) {
+        const parsed = parseBillingMonth(fromMonth);
+        if (parsed) {
+          const fromDate = new Date(parsed.year, parsed.month - 1, 1);
+          if (fromDate > effectiveStart) {
+            effectiveStart = fromDate;
+          }
+        }
+      }
+
+      const result = await this.generateCatchUpInvoices(
+        tenantId,
+        enrollment.childId,
+        effectiveStart,
+        userId,
+      );
+
+      totalGenerated += result.generated;
+      totalSkipped += result.skipped;
+      totalErrors += result.errors.length;
+
+      children.push({
+        child_id: enrollment.childId,
+        child_name: `${enrollment.child.firstName} ${enrollment.child.lastName}`,
+        generated: result.generated,
+        skipped: result.skipped,
+        errors: result.errors,
+      });
+    }
+
+    this.logger.log(
+      `Catch-up all enrollments: ${filtered.length} children, generated=${totalGenerated}, skipped=${totalSkipped}, errors=${totalErrors}`,
+    );
+
+    return {
+      total_generated: totalGenerated,
+      total_skipped: totalSkipped,
+      total_errors: totalErrors,
+      children,
+    };
+  }
+
+  /**
+   * TASK-BILL-037: Check if child is eligible for January re-registration fee
    */
   private async isEligibleForReRegistration(
     tenantId: string,

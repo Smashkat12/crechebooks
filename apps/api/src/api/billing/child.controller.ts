@@ -42,6 +42,7 @@ import { ParentRepository } from '../../database/repositories/parent.repository'
 import { FeeStructureRepository } from '../../database/repositories/fee-structure.repository';
 import { EnrollmentRepository } from '../../database/repositories/enrollment.repository';
 import { EnrollmentService } from '../../database/services/enrollment.service';
+import { InvoiceGenerationService } from '../../database/services/invoice-generation.service';
 import { WelcomePackDeliveryService } from '../../database/services/welcome-pack-delivery.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -72,6 +73,7 @@ export class ChildController {
     private readonly feeStructureRepo: FeeStructureRepository,
     private readonly enrollmentRepo: EnrollmentRepository,
     private readonly enrollmentService: EnrollmentService,
+    private readonly invoiceGenerationService: InvoiceGenerationService,
     private readonly welcomePackDeliveryService: WelcomePackDeliveryService,
   ) {}
 
@@ -173,7 +175,31 @@ export class ChildController {
       );
     }
 
-    // 5. Transform to response (camelCase -> snake_case)
+    // 5. Generate catch-up invoices for past months (if start date is historic)
+    let catchUpInvoices: { generated: number; skipped: number; errors: string[] } | null = null;
+    const startNorm = new Date(dto.start_date);
+    startNorm.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (startNorm < today) {
+      try {
+        catchUpInvoices = await this.invoiceGenerationService.generateCatchUpInvoices(
+          getTenantId(user),
+          child.id,
+          new Date(dto.start_date),
+          user.id,
+        );
+        this.logger.log(
+          `Catch-up invoices for child ${child.id}: generated=${catchUpInvoices.generated}, skipped=${catchUpInvoices.skipped}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to generate catch-up invoices for child ${child.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    // 6. Transform to response (camelCase -> snake_case)
     return {
       success: true,
       data: {
@@ -210,6 +236,7 @@ export class ChildController {
         // TASK-ENROL-008: Include welcome pack status
         welcome_pack_sent: welcomePackSent || false,
         welcome_pack_error: welcomePackError || null,
+        catch_up_invoices: catchUpInvoices,
       },
     };
   }
@@ -286,7 +313,31 @@ export class ChildController {
       this.logger.log(`Created enrollment invoice: ${invoice.invoiceNumber}`);
     }
 
-    // 5. Transform to response
+    // 5. Generate catch-up invoices for past months (if start date is historic)
+    let catchUpInvoices: { generated: number; skipped: number; errors: string[] } | null = null;
+    const existingStartNorm = new Date(dto.start_date);
+    existingStartNorm.setHours(0, 0, 0, 0);
+    const existingToday = new Date();
+    existingToday.setHours(0, 0, 0, 0);
+    if (existingStartNorm < existingToday) {
+      try {
+        catchUpInvoices = await this.invoiceGenerationService.generateCatchUpInvoices(
+          tenantId,
+          child.id,
+          new Date(dto.start_date),
+          user.id,
+        );
+        this.logger.log(
+          `Catch-up invoices for child ${child.id}: generated=${catchUpInvoices.generated}, skipped=${catchUpInvoices.skipped}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to generate catch-up invoices for child ${child.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    // 6. Transform to response
     return {
       success: true,
       data: {
@@ -320,6 +371,7 @@ export class ChildController {
         invoice_error: invoiceError || null,
         welcome_pack_sent: welcomePackSent || false,
         welcome_pack_error: welcomePackError || null,
+        catch_up_invoices: catchUpInvoices,
       },
     };
   }

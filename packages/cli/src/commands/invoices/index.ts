@@ -237,6 +237,71 @@ export function registerInvoiceCommands(program: Command): void {
       });
     });
 
+  // Catch-up command
+  invoices
+    .command('catch-up')
+    .description('Generate missing invoices for historic enrollments')
+    .option('--child-id <id>', 'Specific child ID (catches up all if omitted)')
+    .option('--from <YYYY-MM>', 'Start from this month (defaults to enrollment start)')
+    .option('--dry-run', 'Preview without creating invoices')
+    .action(async (options) => {
+      await executeAction(async () => {
+        const credentials = requireAuth();
+        const client = createApiClient(credentials);
+
+        const childLabel = options.childId ? `child ${options.childId}` : 'all children';
+        const mode = options.dryRun ? 'Previewing' : 'Generating';
+        const spinner = ora(`${mode} catch-up invoices for ${childLabel}...`).start();
+
+        if (options.dryRun) {
+          spinner.info('Dry run mode — showing what would be generated');
+          printInfo('Dry run is not yet supported for catch-up. Remove --dry-run to generate.');
+          return;
+        }
+
+        const response = await client.catchUpInvoices({
+          childId: options.childId,
+          fromMonth: options.from,
+        });
+        spinner.stop();
+
+        if (!response.success || !response.data) {
+          printError('Failed to generate catch-up invoices');
+          return;
+        }
+
+        const { total_generated, total_skipped, total_errors, children } = response.data;
+
+        printSummary('Catch-Up Summary', {
+          'Invoices Generated': total_generated,
+          'Months Skipped (already invoiced)': total_skipped,
+          'Errors': total_errors,
+          'Children Processed': children.length,
+        });
+
+        if (children.length > 0) {
+          console.log('\nPer-child breakdown:');
+          for (const child of children) {
+            const status = child.errors.length > 0 ? '⚠' : '✓';
+            console.log(`  ${status} ${child.child_name} (${child.child_id})`);
+            console.log(`    Generated: ${child.generated}, Skipped: ${child.skipped}`);
+            if (child.errors.length > 0) {
+              for (const err of child.errors) {
+                console.log(`    Error: ${err}`);
+              }
+            }
+          }
+          console.log();
+        }
+
+        if (total_generated > 0) {
+          printSuccess(`Generated ${total_generated} catch-up invoices`);
+        } else if (total_errors === 0) {
+          printInfo('All months already invoiced — nothing to catch up');
+        }
+      });
+    });
+
   // Download command
   invoices
     .command('download <id>')

@@ -205,6 +205,18 @@ export class EnrollChildDataDto {
       'Error message if welcome pack delivery failed (enrollment still succeeded)',
   })
   welcome_pack_error?: string | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Catch-up invoices generated for historic enrollments (months between start date and now)',
+  })
+  catch_up_invoices?: {
+    generated: number;
+    skipped: number;
+    errors: string[];
+  } | null;
 }
 
 /**

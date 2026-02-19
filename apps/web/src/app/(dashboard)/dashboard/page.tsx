@@ -92,13 +92,8 @@ export default function DashboardPage() {
     expenses: d.expenses,
   })) ?? [];
 
-  // Transform arrears data for widget
-  const arrearsData = metrics.data?.arrears ? [{
-    id: '1',
-    parentName: 'Accounts in arrears',
-    amount: metrics.data.arrears.total,
-    daysOverdue: 30,
-  }] : [];
+  // Arrears bucket data for widget
+  const arrearsData = metrics.data?.arrears ?? null;
 
   // Show skeleton during initial load or while checking onboarding
   if (isInitialLoading || onboardingLoading) {

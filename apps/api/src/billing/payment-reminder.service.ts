@@ -22,6 +22,7 @@ import {
 } from '../scheduler/types/scheduler.types';
 import { BusinessException } from '../shared/exceptions';
 import { InvoiceStatus } from '../database/entities/invoice.entity';
+import { todayUTC, diffCalendarDays } from '../shared/utils/date.util';
 import {
   ReminderStage,
   OverdueInvoice,
@@ -158,8 +159,7 @@ export class PaymentReminderService {
    * @returns List of overdue invoices with reminder status
    */
   async getOverdueInvoices(tenantId: string): Promise<OverdueInvoice[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = todayUTC();
 
     const invoices = await this.prisma.invoice.findMany({
       where: {
@@ -362,17 +362,10 @@ export class PaymentReminderService {
   }
 
   /**
-   * Calculate days overdue
+   * Calculate days overdue (timezone-safe for @db.Date)
    */
   private calculateDaysOverdue(dueDate: Date): number {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-
-    const diffMs = today.getTime() - due.getTime();
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffCalendarDays(dueDate, new Date()));
   }
 
   /**

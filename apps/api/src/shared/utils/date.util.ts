@@ -117,4 +117,30 @@ export function isSameDay(a: Date, b: Date): boolean {
   return formatDate(a) === formatDate(b);
 }
 
+/**
+ * Get today's local date as a UTC noon Date, safe for Prisma @db.Date comparisons.
+ *
+ * PostgreSQL `date` columns compared with timestamps use the UTC date part.
+ * `new Date().setHours(0,0,0,0)` creates local midnight, which in UTC+
+ * timezones falls on the previous UTC calendar day. UTC noon ensures the
+ * correct calendar date regardless of timezone (max offset is ±14h).
+ */
+export function todayUTC(): Date {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12),
+  );
+}
+
+/**
+ * Calculate the difference in calendar days between two dates.
+ * Uses local date components to handle @db.Date values correctly
+ * (Prisma returns UTC midnight which is the correct local date in UTC+ zones).
+ */
+export function diffCalendarDays(from: Date, to: Date): number {
+  const fromMs = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  const toMs = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.floor((toMs - fromMs) / (1000 * 60 * 60 * 24));
+}
+
 export const SOUTH_AFRICAN_TIMEZONE = TIMEZONE;

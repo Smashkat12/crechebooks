@@ -29,6 +29,7 @@ import {
   PaymentReminderResult,
   getStageForDaysOverdue,
 } from '../../billing/types/reminder.types';
+import { todayUTC, diffCalendarDays } from '../../shared/utils/date.util';
 import { ReminderTemplateService } from '../../billing/reminder-template.service';
 import {
   ReminderStage as TemplateReminderStage,
@@ -236,8 +237,7 @@ export class PaymentReminderProcessor extends BaseProcessor<PaymentReminderJobDa
     tenantId: string,
     specificInvoiceIds?: string[],
   ): Promise<InvoiceWithParent[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = todayUTC();
 
     const whereClause: any = {
       tenantId,
@@ -427,17 +427,10 @@ export class PaymentReminderProcessor extends BaseProcessor<PaymentReminderJobDa
   }
 
   /**
-   * Calculate days overdue for an invoice
+   * Calculate days overdue for an invoice (timezone-safe for @db.Date)
    */
   private calculateDaysOverdue(dueDate: Date): number {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-
-    const diffMs = today.getTime() - due.getTime();
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffCalendarDays(dueDate, new Date()));
   }
 
   /**

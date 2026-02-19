@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { DashboardMetricsResponseDto } from './dto/dashboard-metrics.dto';
 import { DashboardTrendsResponseDto } from './dto/dashboard-trends.dto';
 import { withTimeout, TimeoutError } from '../../common/utils/promise-utils';
+import { todayUTC } from '../../shared/utils/date.util';
 
 /**
  * Default timeout for dashboard metrics queries (ms)
@@ -65,7 +66,8 @@ export class DashboardService {
     );
 
     // Current date for arrears calculations (what's overdue NOW)
-    const now = new Date();
+    // Use UTC noon to avoid @db.Date timezone drift (local midnight SAST = previous UTC day)
+    const now = todayUTC();
 
     // TASK-PERF-102: Execute all independent queries in parallel using Promise.all()
     // This provides ~3x performance improvement over sequential execution

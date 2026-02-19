@@ -20,6 +20,7 @@ import { InvoiceRepository } from '../repositories/invoice.repository';
 import { PaymentRepository } from '../repositories/payment.repository';
 import { ParentRepository } from '../repositories/parent.repository';
 import { NotFoundException, DatabaseException } from '../../shared/exceptions';
+import { diffCalendarDays } from '../../shared/utils/date.util';
 import {
   ArrearsFiltersDto,
   AgingBuckets,
@@ -516,40 +517,24 @@ export class ArrearsService {
   }
 
   /**
-   * Calculate number of days overdue for an invoice
+   * Calculate number of days overdue for an invoice (timezone-safe for @db.Date)
    *
    * @param dueDate - Invoice due date
    * @returns Days overdue (0 if not yet overdue, positive if overdue)
    */
   private calculateDaysOverdue(dueDate: Date): number {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-
-    const diffTime = today.getTime() - due.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    return Math.max(0, diffDays);
+    return Math.max(0, diffCalendarDays(dueDate, new Date()));
   }
 
   /**
-   * Calculate days between two dates
+   * Calculate days between two dates (timezone-safe for @db.Date)
    *
    * @param fromDate - Start date (e.g., due date)
    * @param toDate - End date (e.g., payment date)
    * @returns Days between dates (negative if toDate is before fromDate)
    */
   private calculateDaysBetween(fromDate: Date, toDate: Date): number {
-    const from = new Date(fromDate);
-    from.setHours(0, 0, 0, 0);
-
-    const to = new Date(toDate);
-    to.setHours(0, 0, 0, 0);
-
-    const diffTime = to.getTime() - from.getTime();
-    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffCalendarDays(fromDate, toDate);
   }
 
   /**

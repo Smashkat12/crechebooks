@@ -26,6 +26,7 @@ import { AuditLogService } from '../database/services/audit-log.service';
 import { AuditAction } from '../database/entities/audit-log.entity';
 import { InvoiceStatus } from '../database/entities/invoice.entity';
 import { ConfigService } from '@nestjs/config';
+import { todayUTC, diffCalendarDays } from '../shared/utils/date.util';
 import {
   ReminderStage,
   TemplateVariables,
@@ -408,8 +409,7 @@ export class ArrearsReminderJob implements OnModuleDestroy {
    * Get overdue invoices for a tenant
    */
   async getOverdueInvoices(tenantId: string): Promise<OverdueInvoice[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = todayUTC();
 
     const invoices = await this.prisma.invoice.findMany({
       where: {
@@ -941,17 +941,10 @@ This is an automated message.
   }
 
   /**
-   * Calculate days overdue
+   * Calculate days overdue using calendar-day diff (timezone-safe for @db.Date)
    */
   private calculateDaysOverdue(dueDate: Date): number {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const due = new Date(dueDate);
-    due.setHours(0, 0, 0, 0);
-
-    const diffMs = today.getTime() - due.getTime();
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffCalendarDays(dueDate, new Date()));
   }
 
   /**

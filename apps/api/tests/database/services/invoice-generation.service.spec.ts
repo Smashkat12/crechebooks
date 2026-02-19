@@ -951,7 +951,7 @@ describe('InvoiceGenerationService', () => {
       const xeroLines = await service.buildXeroLineItems(result.invoices[0].id);
 
       expect(xeroLines).toHaveLength(1);
-      expect(xeroLines[0].description).toBe('Full Day Care');
+      expect(xeroLines[0].description).toBe(`Monthly Creche Fee \u2013 First Child \u2013 June ${currentYear}`);
       expect(xeroLines[0].quantity).toBe(1);
       expect(xeroLines[0].unitAmount).toBe(5000); // R5000 (cents to rand)
       expect(xeroLines[0].accountCode).toBe('4000');

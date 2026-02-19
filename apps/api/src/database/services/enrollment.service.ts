@@ -887,9 +887,15 @@ export class EnrollmentService {
     }
 
     // Monthly fee line (pro-rated if needed)
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    const billingMonthLabel = `${monthNames[startDate.getMonth()]} ${startDate.getFullYear()}`;
+    const childFullName = `${child.firstName} ${child.lastName}`;
     const description = isProRated
-      ? `${feeStructure.name} (Pro-rated from ${startDate.getDate()}/${startDate.getMonth() + 1}/${startDate.getFullYear()})`
-      : feeStructure.name;
+      ? `Monthly Creche Fee – ${childFullName} – ${startDate.getDate()} to ${monthEnd.getDate()} ${monthNames[startDate.getMonth()]} ${startDate.getFullYear()} (pro-rated)`
+      : `Monthly Creche Fee – ${childFullName} – ${billingMonthLabel}`;
 
     lineItems.push({
       invoiceId: invoice.id,

@@ -21,6 +21,7 @@ import { CircuitBreakerModule } from './integrations/circuit-breaker';
 import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
 import { BankingModule } from './integrations/banking';
+import { YocoModule } from './integrations/yoco/yoco.module';
 import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
 import { ReportsModule } from './modules/reports';
 
@@ -69,6 +70,7 @@ import { ReportsModule } from './modules/reports';
     CspModule, // TASK-SEC-103: CSP configuration and violation reporting
     WebSocketModule, // TASK-FEAT-101: Real-time Dashboard WebSocket
     BankingModule, // TASK-INT-101: Bank API Integration (Stitch Open Banking)
+    YocoModule, // TASK-ACCT-011: Yoco Payment Gateway Integration
     ReportsModule, // TASK-REPORTS-002: Reports API Module
   ],
   controllers: [],

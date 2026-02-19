@@ -1304,11 +1304,29 @@ export class InvoiceGenerationService {
     const isMidMonthEnd =
       normalizedEnrollmentEnd && normalizedEnrollmentEnd < normalizedBillingEnd;
 
+    // Build human-friendly month label
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    const billingMonthLabel = `${monthNames[normalizedBillingStart.getMonth()]} ${normalizedBillingStart.getFullYear()}`;
+    const childName = `${enrollment.child.firstName} ${enrollment.child.lastName}`;
+
     if (!isMidMonthStart && !isMidMonthEnd) {
       // Full month - no pro-rata needed
       return {
         amountCents: monthlyFeeCents,
-        description: enrollment.feeStructure.name,
+        description: `Monthly Creche Fee – ${childName} – ${billingMonthLabel}`,
         isProRata: false,
       };
     }
@@ -1324,7 +1342,7 @@ export class InvoiceGenerationService {
     // Build description with date range
     const startDay = effectiveStart.getDate();
     const endDay = effectiveEnd.getDate();
-    const monthNames = [
+    const shortMonthNames = [
       'Jan',
       'Feb',
       'Mar',
@@ -1338,9 +1356,9 @@ export class InvoiceGenerationService {
       'Nov',
       'Dec',
     ];
-    const monthName = monthNames[effectiveStart.getMonth()];
+    const monthName = shortMonthNames[effectiveStart.getMonth()];
 
-    const description = `${enrollment.feeStructure.name} (Pro-rata: ${startDay} ${monthName} - ${endDay} ${monthName})`;
+    const description = `Monthly Creche Fee – ${childName} – ${startDay} to ${endDay} ${monthName} ${effectiveStart.getFullYear()} (pro-rated)`;
 
     this.logger.log(
       `Pro-rata applied for child ${enrollment.childId}: ` +

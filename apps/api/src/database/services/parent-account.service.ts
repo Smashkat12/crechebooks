@@ -235,19 +235,42 @@ export class ParentAccountService {
           lte: periodEnd,
         },
       },
+      include: {
+        child: {
+          select: { firstName: true, lastName: true },
+        },
+      },
       orderBy: { issueDate: 'asc' },
     });
 
     for (const invoice of invoices) {
       const isCreditNote = invoice.totalCents < 0;
+
+      // Build human-friendly description with child name and billing period
+      let invoiceDescription: string;
+      if (isCreditNote) {
+        invoiceDescription = `Credit Note: ${invoice.notes ?? 'Credit issued'}`;
+      } else {
+        const childName = invoice.child
+          ? `${invoice.child.firstName} ${invoice.child.lastName}`
+          : '';
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December',
+        ];
+        const periodMonth = monthNames[invoice.billingPeriodStart.getMonth()];
+        const periodYear = invoice.billingPeriodStart.getFullYear();
+        invoiceDescription = childName
+          ? `${childName} – ${periodMonth} ${periodYear}`
+          : `Creche Fees – ${periodMonth} ${periodYear}`;
+      }
+
       transactions.push({
         id: invoice.id,
         date: invoice.issueDate,
         type: isCreditNote ? 'CREDIT_NOTE' : 'INVOICE',
         referenceNumber: invoice.invoiceNumber,
-        description: isCreditNote
-          ? `Credit Note: ${invoice.notes ?? 'Credit issued'}`
-          : `Invoice for billing period`,
+        description: invoiceDescription,
         debitCents: isCreditNote ? 0 : invoice.totalCents,
         creditCents: isCreditNote ? Math.abs(invoice.totalCents) : 0,
         runningBalanceCents: 0, // Will be calculated after sorting

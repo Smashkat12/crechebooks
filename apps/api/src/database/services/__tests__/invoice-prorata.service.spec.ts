@@ -321,9 +321,9 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
-      expect(lineItemCall.description).toContain('Pro-rata');
-      expect(lineItemCall.description).toContain('15 Jan');
-      expect(lineItemCall.description).toContain('31 Jan');
+      expect(lineItemCall.description).toContain('pro-rated');
+      expect(lineItemCall.description).toContain('15 to 31 Jan');
+      expect(lineItemCall.description).toContain('John Doe');
       expect(lineItemCall.lineType).toBe(LineType.MONTHLY_FEE);
     });
 
@@ -358,7 +358,7 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
-      expect(lineItemCall.description).toContain('27 Jan');
+      expect(lineItemCall.description).toContain('27 to 31 Jan');
     });
   });
 
@@ -413,9 +413,8 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
-      expect(lineItemCall.description).toContain('Pro-rata');
-      expect(lineItemCall.description).toContain('1 Jan');
-      expect(lineItemCall.description).toContain('15 Jan');
+      expect(lineItemCall.description).toContain('pro-rated');
+      expect(lineItemCall.description).toContain('1 to 15 Jan');
     });
 
     it('should apply pro-rata for enrollment ending on first week of month', async () => {
@@ -453,7 +452,7 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(proRataAmount);
-      expect(lineItemCall.description).toContain('3 Jan');
+      expect(lineItemCall.description).toContain('1 to 3 Jan');
     });
   });
 
@@ -495,8 +494,10 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(MONTHLY_FEE_CENTS);
-      expect(lineItemCall.description).toBe('Monthly Fee - Standard');
-      expect(lineItemCall.description).not.toContain('Pro-rata');
+      expect(lineItemCall.description).toContain('Monthly Creche Fee');
+      expect(lineItemCall.description).toContain('John Doe');
+      expect(lineItemCall.description).toContain('January 2025');
+      expect(lineItemCall.description).not.toContain('pro-rated');
     });
 
     it('should NOT apply pro-rata when enrollment starts on first day of billing month', async () => {
@@ -528,7 +529,7 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
       expect(lineItemCall.unitPriceCents).toBe(MONTHLY_FEE_CENTS);
-      expect(lineItemCall.description).not.toContain('Pro-rata');
+      expect(lineItemCall.description).not.toContain('pro-rated');
     });
 
     it('should NOT apply pro-rata when enrollment ends on last day of billing month', async () => {
@@ -608,8 +609,7 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
 
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
-      expect(lineItemCall.description).toContain('10 Jan');
-      expect(lineItemCall.description).toContain('20 Jan');
+      expect(lineItemCall.description).toContain('10 to 20 Jan');
     });
   });
 
@@ -782,9 +782,7 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
 
       const txLineCreate = (prisma as any).invoiceLine.create;
       const lineItemCall = txLineCreate.mock.calls[0][0].data;
-      expect(lineItemCall.description).toContain('Feb');
-      expect(lineItemCall.description).toContain('15 Feb');
-      expect(lineItemCall.description).toContain('28 Feb');
+      expect(lineItemCall.description).toContain('15 to 28 Feb');
     });
 
     it('should handle multiple children with different pro-rata scenarios', async () => {
@@ -849,12 +847,12 @@ describe('InvoiceGenerationService - Pro-Rata Integration (TASK-BILL-036)', () =
       const txLineCreate = (prisma as any).invoiceLine.create;
       const firstInvoiceLineCall = txLineCreate.mock.calls[0][0].data;
       expect(firstInvoiceLineCall.unitPriceCents).toBe(MONTHLY_FEE_CENTS);
-      expect(firstInvoiceLineCall.description).not.toContain('Pro-rata');
+      expect(firstInvoiceLineCall.description).not.toContain('pro-rated');
 
       // Second invoice (mid-month) - with pro-rata
       const secondInvoiceLineCall = txLineCreate.mock.calls[1][0].data;
       expect(secondInvoiceLineCall.unitPriceCents).toBe(295455);
-      expect(secondInvoiceLineCall.description).toContain('Pro-rata');
+      expect(secondInvoiceLineCall.description).toContain('pro-rated');
     });
   });
 });

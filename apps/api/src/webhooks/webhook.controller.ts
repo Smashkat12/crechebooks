@@ -46,6 +46,8 @@ import { IdempotencyService } from '../common/services/idempotency.service';
 import { OnboardingConversationHandler } from '../integrations/whatsapp/handlers/onboarding-conversation.handler';
 import { ParentMenuHandler } from '../integrations/whatsapp/handlers/parent-menu.handler';
 import { PrismaService } from '../database/prisma/prisma.service';
+import { YocoService } from '../integrations/yoco/yoco.service';
+import type { YocoWebhookPayload } from '../integrations/yoco/yoco.types';
 
 /**
  * Public webhook endpoints (no auth required, signature verified)
@@ -62,6 +64,7 @@ export class WebhookController {
     private readonly onboardingHandler: OnboardingConversationHandler,
     private readonly parentMenuHandler: ParentMenuHandler,
     private readonly prisma: PrismaService,
+    private readonly yocoService: YocoService,
   ) {}
 
   /**
@@ -567,5 +570,33 @@ export class WebhookController {
 
     // Always return empty TwiML response
     return '<Response></Response>';
+  }
+
+  /**
+   * Handle Yoco payment webhooks
+   * TASK-ACCT-011: Online Payment Gateway Integration
+   *
+   * Events: payment.succeeded, payment.failed, payment.pending
+   *
+   * @param body - Yoco webhook payload
+   * @param signature - x-yoco-signature header for HMAC verification
+   */
+  @Post('yoco')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Handle Yoco payment webhooks' })
+  @ApiHeader({ name: 'x-yoco-signature', required: true })
+  @ApiResponse({ status: 200, description: 'Webhook processed' })
+  @ApiResponse({ status: 401, description: 'Invalid signature' })
+  async handleYocoWebhook(
+    @Body() body: YocoWebhookPayload,
+    @Headers('x-yoco-signature') signature: string,
+  ): Promise<{ received: true }> {
+    this.logger.debug(`Received Yoco webhook: ${body.type} for ${body.id}`);
+
+    await this.yocoService.handleWebhook(body, signature);
+
+    this.logger.log(`Yoco webhook processed: ${body.type}`);
+
+    return { received: true };
   }
 }

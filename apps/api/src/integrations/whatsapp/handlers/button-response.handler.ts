@@ -17,7 +17,8 @@
  * IMPORTANT: All responses use tenant.tradingName for branding, NOT "CrecheBooks"
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Tenant } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
@@ -29,6 +30,7 @@ import {
   ButtonAction,
   ParsedButtonPayload,
 } from '../types/button.types';
+import { YocoService } from '../../yoco/yoco.service';
 
 /**
  * Result of button response handling
@@ -55,6 +57,8 @@ export class ButtonResponseHandler {
     private readonly contentService: TwilioContentService,
     private readonly documentUrlService: DocumentUrlService,
     private readonly auditLogService: AuditLogService,
+    private readonly configService: ConfigService,
+    @Optional() @Inject(YocoService) private readonly yocoService?: YocoService,
   ) {}
 
   /**
@@ -171,26 +175,104 @@ export class ButtonResponseHandler {
   }
 
   /**
-   * PAY NOW - Send payment link
+   * PAY NOW - Create Yoco payment link or send EFT details
    *
-   * Sends a direct payment link for the specified invoice.
+   * If Yoco is configured: creates a payment link and sends the URL.
+   * If Yoco is not configured: sends tenant EFT bank details as fallback.
    */
   private async handlePayNow(
     to: string,
-    invoiceId: string,
+    invoiceNumber: string,
     tenant: Tenant,
   ): Promise<void> {
     const tenantName = tenant.tradingName || tenant.name;
-    // TODO: Make this URL configurable via environment variable
-    const paymentUrl = `https://app.elleelephant.co.za/pay/${invoiceId}`;
+
+    // Find invoice by number
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        invoiceNumber,
+        tenantId: tenant.id,
+        isDeleted: false,
+      },
+      include: { parent: true },
+    });
+
+    if (!invoice) {
+      await this.contentService.sendSessionMessage(
+        to,
+        `We couldn't find invoice ${invoiceNumber}. Please contact ${tenantName} for assistance.`,
+        tenant.id,
+      );
+      return;
+    }
+
+    const balanceDue = invoice.totalCents - invoice.amountPaidCents;
+    if (balanceDue <= 0) {
+      await this.contentService.sendSessionMessage(
+        to,
+        `Invoice ${invoiceNumber} is already paid in full. Thank you!`,
+        tenant.id,
+      );
+      return;
+    }
+
+    // Try Yoco payment link if service is available and configured
+    const yocoSecretKey = this.configService.get<string>('YOCO_SECRET_KEY');
+    if (this.yocoService && yocoSecretKey) {
+      try {
+        const paymentLink = await this.yocoService.createPaymentLink(
+          tenant.id,
+          'system',
+          {
+            parentId: invoice.parentId,
+            amountCents: balanceDue,
+            type: 'INVOICE',
+            invoiceId: invoice.id,
+          },
+        );
+
+        await this.contentService.sendSessionMessage(
+          to,
+          `Here's your secure payment link for ${tenantName}:\n\n${paymentLink.paymentUrl}\n\nAmount: R ${(balanceDue / 100).toFixed(2)}\nInvoice: ${invoiceNumber}\n\nThis link will remain active for 7 days.`,
+          tenant.id,
+        );
+
+        this.logger.log(
+          `Yoco payment link ${paymentLink.shortCode} sent for invoice ${invoiceNumber} to ${to}`,
+        );
+        return;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Failed to create Yoco payment link, falling back to EFT: ${errorMessage}`,
+        );
+      }
+    }
+
+    // EFT fallback: send bank details
+    const bankDetails = [
+      `Bank: ${(tenant as any).bankName || 'Contact us for details'}`,
+      (tenant as any).bankAccountNumber
+        ? `Account: ${(tenant as any).bankAccountNumber}`
+        : null,
+      (tenant as any).bankBranchCode
+        ? `Branch: ${(tenant as any).bankBranchCode}`
+        : null,
+      `Reference: ${invoiceNumber}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     await this.contentService.sendSessionMessage(
       to,
-      `Here's your secure payment link for ${tenantName}:\n\n${paymentUrl}\n\nThis link will remain active for 7 days.`,
+      `Please make an EFT payment to ${tenantName}:\n\n${bankDetails}\n\nAmount: R ${(balanceDue / 100).toFixed(2)}\n\nPlease use your invoice number as the payment reference. Send proof of payment to this chat.`,
       tenant.id,
     );
 
-    this.logger.log(`Payment link sent for invoice ${invoiceId} to ${to}`);
+    this.logger.log(
+      `EFT bank details sent for invoice ${invoiceNumber} to ${to}`,
+    );
   }
 
   /**

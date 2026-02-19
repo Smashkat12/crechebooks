@@ -218,9 +218,9 @@ export class YocoService {
     const checkoutRequest: YocoCheckoutRequest = {
       amount: paymentLink.amountCents,
       currency: 'ZAR',
-      successUrl: `${this.appUrl}/payment/success?linkId=${paymentLink.shortCode}`,
-      cancelUrl: `${this.appUrl}/payment/cancelled?linkId=${paymentLink.shortCode}`,
-      failureUrl: `${this.appUrl}/payment/failed?linkId=${paymentLink.shortCode}`,
+      successUrl: `${this.appUrl}/pay/success?linkId=${paymentLink.shortCode}`,
+      cancelUrl: `${this.appUrl}/pay/cancelled?linkId=${paymentLink.shortCode}`,
+      failureUrl: `${this.appUrl}/pay/failed?linkId=${paymentLink.shortCode}`,
       metadata: {
         paymentLinkId: paymentLink.id,
         tenantId: paymentLink.tenantId,

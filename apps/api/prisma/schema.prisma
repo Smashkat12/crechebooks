@@ -3233,6 +3233,7 @@ model WhatsAppMessage {
   sentAt      DateTime? @map("sent_at")
   deliveredAt DateTime? @map("delivered_at")
   readAt      DateTime? @map("read_at")
+  failedAt    DateTime? @map("failed_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 

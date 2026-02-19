@@ -671,13 +671,14 @@ describe('InvoiceGenerationService', () => {
       );
       expect(invoice).toBeDefined();
 
-      // Due date should be issue date + 7 days (testTenant.invoiceDueDays)
+      // Issue date = 1st of billing month, due date = last day of billing month
+      // Use getUTC* to match UTC noon dates stored in @db.Date columns
       const issueDate = new Date(invoice!.issueDate);
       const dueDate = new Date(invoice!.dueDate);
-      const diffDays = Math.round(
-        (dueDate.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-      expect(diffDays).toBe(7);
+      expect(issueDate.getUTCDate()).toBe(1); // 1st of month
+      expect(issueDate.getUTCMonth()).toBe(5); // June (0-indexed)
+      expect(dueDate.getUTCDate()).toBe(30); // June has 30 days
+      expect(dueDate.getUTCMonth()).toBe(5);
     });
 
     it('should create audit log entries for generated invoices', async () => {

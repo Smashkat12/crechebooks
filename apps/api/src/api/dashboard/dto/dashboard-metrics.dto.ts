@@ -26,20 +26,26 @@ class ExpenseMetricsDto {
 }
 
 class ArrearsMetricsDto {
-  @ApiProperty({ description: 'Total arrears amount in cents' })
+  @ApiProperty({ description: 'Total arrears amount in rands' })
   total: number;
 
   @ApiProperty({ description: 'Number of accounts in arrears' })
   count: number;
 
-  @ApiProperty({ description: 'Amount overdue by 30+ days in cents' })
+  @ApiProperty({ description: 'Amount overdue 1-7 days (before first reminder) in rands' })
+  overdueBy7: number;
+
+  @ApiProperty({ description: 'Amount overdue 8-14 days (first reminder sent) in rands' })
+  overdueBy14: number;
+
+  @ApiProperty({ description: 'Amount overdue 15-30 days (second reminder sent) in rands' })
   overdueBy30: number;
 
-  @ApiProperty({ description: 'Amount overdue by 60+ days in cents' })
+  @ApiProperty({ description: 'Amount overdue 31-60 days (final reminder sent) in rands' })
   overdueBy60: number;
 
-  @ApiProperty({ description: 'Amount overdue by 90+ days in cents' })
-  overdueBy90: number;
+  @ApiProperty({ description: 'Amount overdue 60+ days (escalated) in rands' })
+  overdueOver60: number;
 }
 
 class EnrollmentMetricsDto {

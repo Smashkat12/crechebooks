@@ -49,6 +49,8 @@ import {
   ChildSummaryDto,
   GenerateInvoicesDto,
   GenerateInvoicesResponseDto,
+  CatchUpInvoicesDto,
+  CatchUpInvoicesResponseDto,
   ApiSendInvoicesDto,
   SendInvoicesResponseDto,
   AddAdhocChargeRequestDto,
@@ -400,6 +402,52 @@ export class InvoiceController {
           code: err.code,
         })),
       },
+    };
+  }
+
+  @Post('catch-up')
+  @HttpCode(201)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Generate catch-up invoices for historic enrollments',
+    description:
+      'Generates missing monthly invoices from enrollment start date through current month. ' +
+      'Safe to run multiple times — duplicate prevention skips already-invoiced months.',
+  })
+  @ApiResponse({ status: 201, type: CatchUpInvoicesResponseDto })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid from_month format',
+  })
+  @ApiForbiddenResponse({
+    description: 'Insufficient permissions (requires OWNER or ADMIN)',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async catchUpInvoices(
+    @Body() dto: CatchUpInvoicesDto,
+    @CurrentUser() user: IUser,
+  ): Promise<CatchUpInvoicesResponseDto> {
+    const tenantId = getTenantId(user);
+
+    this.logger.log(
+      `Catch-up invoices: tenant=${tenantId}, child=${dto.child_id || 'all'}, from=${dto.from_month || 'enrollment start'}`,
+    );
+
+    const result = await this.invoiceGenerationService.catchUpAllEnrollments(
+      tenantId,
+      user.id,
+      dto.child_id,
+      dto.from_month,
+    );
+
+    this.logger.log(
+      `Catch-up complete: generated=${result.total_generated}, skipped=${result.total_skipped}, errors=${result.total_errors}`,
+    );
+
+    return {
+      success: true,
+      data: result,
     };
   }
 

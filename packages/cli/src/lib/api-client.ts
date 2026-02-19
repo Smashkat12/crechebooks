@@ -193,6 +193,42 @@ export class ApiClient {
     return response.data;
   }
 
+  async catchUpInvoices(
+    options: { childId?: string; fromMonth?: string },
+  ): Promise<
+    ApiResponse<{
+      total_generated: number;
+      total_skipped: number;
+      total_errors: number;
+      children: Array<{
+        child_id: string;
+        child_name: string;
+        generated: number;
+        skipped: number;
+        errors: string[];
+      }>;
+    }>
+  > {
+    const response = await this.client.post<
+      ApiResponse<{
+        total_generated: number;
+        total_skipped: number;
+        total_errors: number;
+        children: Array<{
+          child_id: string;
+          child_name: string;
+          generated: number;
+          skipped: number;
+          errors: string[];
+        }>;
+      }>
+    >('/api/v1/invoices/catch-up', {
+      child_id: options.childId,
+      from_month: options.fromMonth,
+    });
+    return response.data;
+  }
+
   async sendInvoices(
     options: SendInvoicesOptions,
   ): Promise<ApiResponse<{ sent_count: number; failed_count: number }>> {

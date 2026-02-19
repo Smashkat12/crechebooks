@@ -87,6 +87,76 @@ export class GenerationErrorDto {
 }
 
 /**
+ * Request DTO for catch-up invoice generation
+ * Generates missing monthly invoices from enrollment start to current month
+ */
+export class CatchUpInvoicesDto {
+  @IsOptional()
+  @IsUUID('4')
+  @ApiProperty({
+    required: false,
+    description:
+      'Specific child UUID. If omitted, catches up all active enrollments.',
+  })
+  child_id?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}$/, {
+    message: 'from_month must be in YYYY-MM format (e.g., 2025-11)',
+  })
+  @ApiProperty({
+    required: false,
+    example: '2025-11',
+    description:
+      'Start from this month (YYYY-MM). Defaults to enrollment start month.',
+  })
+  from_month?: string;
+}
+
+/**
+ * Response DTO for catch-up invoice generation
+ */
+export class CatchUpInvoicesResponseDto {
+  @ApiProperty()
+  success!: boolean;
+
+  @ApiProperty({
+    type: 'object',
+    properties: {
+      total_generated: { type: 'number' },
+      total_skipped: { type: 'number' },
+      total_errors: { type: 'number' },
+      children: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            child_id: { type: 'string' },
+            child_name: { type: 'string' },
+            generated: { type: 'number' },
+            skipped: { type: 'number' },
+            errors: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    },
+  })
+  data!: {
+    total_generated: number;
+    total_skipped: number;
+    total_errors: number;
+    children: Array<{
+      child_id: string;
+      child_name: string;
+      generated: number;
+      skipped: number;
+      errors: string[];
+    }>;
+  };
+}
+
+/**
  * Response DTO for invoice generation
  */
 export class GenerateInvoicesResponseDto {

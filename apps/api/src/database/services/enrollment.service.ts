@@ -55,6 +55,12 @@ export interface EnrollChildResult {
   welcomePackSent?: boolean;
   /** Error message if welcome pack delivery failed */
   welcomePackError?: string;
+  /** Catch-up invoice results for historic enrollments */
+  catchUpInvoices?: {
+    generated: number;
+    skipped: number;
+    errors: string[];
+  };
 }
 
 @Injectable()

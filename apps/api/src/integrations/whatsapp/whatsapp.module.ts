@@ -35,6 +35,7 @@ import { DocumentUrlService } from './services/document-url.service';
 import { ButtonResponseHandler } from './handlers/button-response.handler';
 import { SessionInteractiveHandler } from './handlers/session-interactive.handler';
 import { OnboardingConversationHandler } from './handlers/onboarding-conversation.handler';
+import { ParentMenuHandler } from './handlers/parent-menu.handler';
 import { OnboardingExpiryJob } from './jobs/onboarding-expiry.job';
 import { OnboardingController } from './controllers/onboarding.controller';
 import { DatabaseModule } from '../../database/database.module';
@@ -141,6 +142,7 @@ const retryProviders = isRedisConfigured()
     ButtonResponseHandler,
     SessionInteractiveHandler,
     OnboardingConversationHandler,
+    ParentMenuHandler,
     OnboardingExpiryJob,
     ...retryProviders,
   ],
@@ -156,6 +158,7 @@ const retryProviders = isRedisConfigured()
     ButtonResponseHandler,
     SessionInteractiveHandler,
     OnboardingConversationHandler,
+    ParentMenuHandler,
   ],
 })
 export class WhatsAppModule {}

@@ -13,15 +13,19 @@ export const DATE_FORMAT = 'dd/MM/yyyy';
 export const DATETIME_FORMAT = 'dd/MM/yyyy HH:mm';
 
 /**
- * Aging bands for arrears reporting
- * Used to categorize overdue amounts by age
+ * Aging bands for arrears reporting — aligned with reminder stages
+ * 1-7 days: before first reminder
+ * 8-14 days: first reminder sent
+ * 15-30 days: second reminder sent
+ * 31-60 days: final reminder sent
+ * 60+ days: escalated for manual review
  */
 export const AGING_BANDS = [
-  { label: 'Current', min: 0, max: 0, color: '#22c55e' },
-  { label: '1-30 Days', min: 1, max: 30, color: '#eab308' },
-  { label: '31-60 Days', min: 31, max: 60, color: '#f97316' },
-  { label: '61-90 Days', min: 61, max: 90, color: '#ef4444' },
-  { label: '90+ Days', min: 91, max: Infinity, color: '#dc2626' },
+  { label: '1-7 Days', min: 1, max: 7, color: '#eab308', key: 'overdueBy7' as const },
+  { label: '8-14 Days', min: 8, max: 14, color: '#f59e0b', key: 'overdueBy14' as const },
+  { label: '15-30 Days', min: 15, max: 30, color: '#f97316', key: 'overdueBy30' as const },
+  { label: '31-60 Days', min: 31, max: 60, color: '#ef4444', key: 'overdueBy60' as const },
+  { label: '60+ Days', min: 61, max: Infinity, color: '#dc2626', key: 'overdueOver60' as const },
 ] as const;
 
 // Tax configuration (South Africa)

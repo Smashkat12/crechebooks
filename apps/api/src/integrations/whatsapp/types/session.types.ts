@@ -40,9 +40,22 @@ export type HelpMenuOption =
   | 'human';
 
 /**
- * Quick reply menu actions from balance inquiry
+ * Quick reply menu actions from balance inquiry (original 3)
  */
 export type BalanceMenuAction = 'pay' | 'invoices' | 'statement';
+
+/**
+ * All menu actions supported by parent self-service menu
+ * Superset of BalanceMenuAction — covers all menu_* button IDs
+ */
+export type MenuAction =
+  | 'pay'
+  | 'invoices'
+  | 'statement'
+  | 'balance'
+  | 'payment'
+  | 'human'
+  | 'update';
 
 /**
  * Parsed list picker response
@@ -156,18 +169,32 @@ export function createListId(type: ListPickerType, value: string): string {
 }
 
 /**
+ * All valid menu actions as a readonly array
+ */
+export const VALID_MENU_ACTIONS: readonly MenuAction[] = [
+  'pay',
+  'invoices',
+  'statement',
+  'balance',
+  'payment',
+  'human',
+  'update',
+] as const;
+
+/**
  * Parse a quick reply menu action ID
  * Menu action IDs follow the format: menu_action
  * Examples:
  * - menu_pay -> 'pay'
  * - menu_invoices -> 'invoices'
  * - menu_statement -> 'statement'
+ * - menu_balance -> 'balance'
+ * - menu_human -> 'human'
  */
-export function parseMenuAction(buttonId: string): BalanceMenuAction | null {
+export function parseMenuAction(buttonId: string): MenuAction | null {
   if (!buttonId || !buttonId.startsWith('menu_')) {
     return null;
   }
-  const action = buttonId.substring(5) as BalanceMenuAction;
-  const validActions: BalanceMenuAction[] = ['pay', 'invoices', 'statement'];
-  return validActions.includes(action) ? action : null;
+  const action = buttonId.substring(5) as MenuAction;
+  return VALID_MENU_ACTIONS.includes(action) ? action : null;
 }

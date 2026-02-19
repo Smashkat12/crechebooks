@@ -44,6 +44,7 @@ import {
 import { IdempotencyGuard } from '../common/guards/idempotency.guard';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { OnboardingConversationHandler } from '../integrations/whatsapp/handlers/onboarding-conversation.handler';
+import { ParentMenuHandler } from '../integrations/whatsapp/handlers/parent-menu.handler';
 import { PrismaService } from '../database/prisma/prisma.service';
 
 /**
@@ -59,6 +60,7 @@ export class WebhookController {
     private readonly webhookService: WebhookService,
     private readonly idempotencyService: IdempotencyService,
     private readonly onboardingHandler: OnboardingConversationHandler,
+    private readonly parentMenuHandler: ParentMenuHandler,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -448,6 +450,8 @@ export class WebhookController {
   ): Promise<string> {
     const from = body.From || '';
     const messageBody = body.Body || '';
+    const buttonPayload = body.ButtonPayload || '';
+    const listId = body.ListId || '';
     const numMedia = parseInt(body.NumMedia || '0', 10);
     const mediaUrl = numMedia > 0 ? body.MediaUrl0 : undefined;
     const mediaContentType = numMedia > 0 ? body.MediaContentType0 : undefined;
@@ -523,24 +527,33 @@ export class WebhookController {
     }
 
     try {
+      // For interactive responses, prefer ButtonPayload/ListId over Body
+      // Twilio sends button ID in ButtonPayload, not in Body
+      const effectiveBody = buttonPayload || listId || messageBody;
+
       // Check if onboarding handler should handle this message
       const shouldHandle = await this.onboardingHandler.shouldHandle(
         waId,
         tenantId,
-        messageBody,
+        effectiveBody,
       );
 
       if (shouldHandle) {
         await this.onboardingHandler.handleMessage(
           waId,
           tenantId,
-          messageBody,
+          effectiveBody,
           mediaUrl,
           mediaContentType,
         );
       } else {
-        this.logger.debug(
-          `Message from ${waId} not handled by onboarding handler`,
+        // Route to parent self-service menu
+        await this.parentMenuHandler.handleIncomingMessage(
+          waId,
+          tenantId,
+          messageBody,
+          buttonPayload || undefined,
+          listId || undefined,
         );
       }
     } catch (error) {

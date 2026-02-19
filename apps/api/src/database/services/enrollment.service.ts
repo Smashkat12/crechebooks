@@ -812,12 +812,14 @@ export class EnrollmentService {
     );
 
     // 5. Create invoice with DRAFT status
-    const today = new Date();
-    const issueDate = new Date(today);
-    issueDate.setHours(0, 0, 0, 0);
-    const dueDate = new Date(today);
-    dueDate.setDate(dueDate.getDate() + 7); // Due in 7 days
-    dueDate.setHours(23, 59, 59, 999);
+    // Issue date = 1st of billing month, due date = last day of billing month
+    // Use UTC noon to avoid timezone drift with @db.Date columns
+    const issueDate = new Date(
+      Date.UTC(startDate.getFullYear(), startDate.getMonth(), 1, 12),
+    );
+    const dueDate = new Date(
+      Date.UTC(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 12),
+    );
 
     const invoice = await this.invoiceRepo.create({
       tenantId,

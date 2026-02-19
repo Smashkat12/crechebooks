@@ -636,12 +636,14 @@ export class InvoiceGenerationService {
     const tenant = await this.tenantRepo.findById(tenantId);
     const dueDays = tenant?.invoiceDueDays ?? this.DEFAULT_DUE_DAYS;
 
-    // Set dates (no time component)
-    const issueDate = new Date();
-    issueDate.setHours(0, 0, 0, 0);
-
-    const dueDate = new Date(issueDate);
-    dueDate.setDate(dueDate.getDate() + dueDays);
+    // Issue date = 1st of billing month, due date = last day of billing month
+    // Use UTC noon to avoid timezone drift with @db.Date columns
+    const issueDate = new Date(
+      Date.UTC(billingPeriodStart.getFullYear(), billingPeriodStart.getMonth(), 1, 12),
+    );
+    const dueDate = new Date(
+      Date.UTC(billingPeriodEnd.getFullYear(), billingPeriodEnd.getMonth(), billingPeriodEnd.getDate(), 12),
+    );
 
     // Create invoice
     const invoice = await this.invoiceRepo.create({
@@ -819,11 +821,14 @@ export class InvoiceGenerationService {
       `TASK-BILL-040: Creating invoice ${invoiceNumber} with transaction isolation`,
     );
 
-    // Set dates (no time component)
-    const issueDate = new Date();
-    issueDate.setHours(0, 0, 0, 0);
-    const dueDate = new Date(issueDate);
-    dueDate.setDate(dueDate.getDate() + dueDays);
+    // Issue date = 1st of billing month, due date = last day of billing month
+    // Use UTC noon to avoid timezone drift with @db.Date columns
+    const issueDate = new Date(
+      Date.UTC(billingPeriodStart.getFullYear(), billingPeriodStart.getMonth(), 1, 12),
+    );
+    const dueDate = new Date(
+      Date.UTC(billingPeriodEnd.getFullYear(), billingPeriodEnd.getMonth(), billingPeriodEnd.getDate(), 12),
+    );
 
     // Execute all database operations atomically
     const invoice = await this.prisma.$transaction(

@@ -14,8 +14,8 @@
  * Defaults to 'xero' for backwards compatibility when no env var is set.
  */
 
-import { DynamicModule, Logger, Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { DynamicModule, Logger, Module, type Provider } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { ACCOUNTING_PROVIDER } from './accounting-provider.token';
 import { AccountingController } from './accounting.controller';
 
@@ -35,16 +35,10 @@ export class AccountingModule {
   /**
    * Register with an explicit provider selection.
    *
-   * Use this when you want to hard-code the provider in your module
-   * imports rather than relying on environment variables.
-   *
    * @example
    * ```typescript
    * AccountingModule.register({ provider: 'xero' })
    * ```
-   *
-   * @param options - Module options including provider selection
-   * @returns Configured dynamic module
    */
   static register(options: AccountingModuleOptions): DynamicModule {
     return AccountingModule.buildModule(options.provider);
@@ -52,98 +46,91 @@ export class AccountingModule {
 
   /**
    * Register using the `ACCOUNTING_PROVIDER` environment variable.
-   *
-   * Falls back to 'xero' when the env var is not set, ensuring
-   * backwards compatibility with existing deployments.
-   *
-   * @example
-   * ```typescript
-   * AccountingModule.forRoot()
-   * ```
-   *
-   * @returns Configured dynamic module
+   * Falls back to 'xero' when the env var is not set.
    */
   static forRoot(): DynamicModule {
-    return {
-      module: AccountingModule,
-      imports: [ConfigModule],
-      controllers: [AccountingController],
-      providers: [
-        {
-          provide: ACCOUNTING_PROVIDER,
-          useFactory: (configService: ConfigService) => {
-            const providerName =
-              configService.get<string>('ACCOUNTING_PROVIDER') || 'xero';
+    const providerName =
+      (process.env.ACCOUNTING_PROVIDER as AccountingProviderType) || 'xero';
 
-            AccountingModule.logger.log(
-              `Accounting provider resolved from env: ${providerName}`,
-            );
+    AccountingModule.logger.log(
+      `Accounting provider resolved from env: ${providerName}`,
+    );
 
-            return AccountingModule.resolveProvider(
-              providerName as AccountingProviderType,
-            );
-          },
-          inject: [ConfigService],
-        },
-      ],
-      exports: [ACCOUNTING_PROVIDER],
-    };
+    return AccountingModule.buildModule(providerName);
   }
 
   /**
    * Build a dynamic module for a specific provider.
-   *
-   * @param provider - Provider type to register
-   * @returns Configured dynamic module
+   * Imports the provider-specific module and binds the adapter to ACCOUNTING_PROVIDER.
    */
   private static buildModule(provider: AccountingProviderType): DynamicModule {
     AccountingModule.logger.log(
       `Registering accounting provider: ${provider}`,
     );
 
+    const { imports, providers } =
+      AccountingModule.resolveProviderDependencies(provider);
+
     return {
       module: AccountingModule,
-      imports: [ConfigModule],
+      imports: [ConfigModule, ...(imports ?? [])],
       controllers: [AccountingController],
-      providers: [
-        {
-          provide: ACCOUNTING_PROVIDER,
-          useFactory: () =>
-            AccountingModule.resolveProvider(provider),
-        },
-      ],
+      providers: [...providers],
       exports: [ACCOUNTING_PROVIDER],
     };
   }
 
   /**
-   * Resolve a provider type to an instance placeholder.
-   *
-   * In a full implementation each provider would be a concrete class
-   * injected via NestJS DI. For now this serves as a registry stub
-   * that will be connected to real implementations when the Xero
-   * adapter and Stub.africa adapter are built.
-   *
-   * @param provider - Provider type identifier
-   * @returns A placeholder or real provider instance
+   * Resolve the imports and providers needed for a specific provider.
+   * Uses lazy require() to avoid circular dependencies at module declaration time.
    */
-  private static resolveProvider(provider: AccountingProviderType): unknown {
+  private static resolveProviderDependencies(
+    provider: AccountingProviderType,
+  ): { imports: DynamicModule['imports']; providers: Provider[] } {
     switch (provider) {
-      case 'xero':
-        // The Xero adapter will implement AccountingProvider and be
-        // returned here once it wraps the existing Xero services.
-        // For now, return a marker that signals Xero is selected.
-        AccountingModule.logger.log(
-          'Xero provider selected -- adapter registration pending',
-        );
-        return { providerName: 'xero', __pending: true };
+      case 'xero': {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { XeroModule } = require('../xero/xero.module');
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { XeroAccountingAdapter } = require('../xero/xero-accounting.adapter');
 
-      case 'stub':
-        // Stub.africa adapter will be added in a future task.
         AccountingModule.logger.log(
-          'Stub.africa provider selected -- adapter registration pending',
+          'Xero provider selected -- registering XeroAccountingAdapter',
         );
-        return { providerName: 'stub', __pending: true };
+
+        return {
+          imports: [XeroModule],
+          providers: [
+            XeroAccountingAdapter,
+            {
+              provide: ACCOUNTING_PROVIDER,
+              useExisting: XeroAccountingAdapter,
+            },
+          ],
+        };
+      }
+
+      case 'stub': {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { StubModule } = require('../stub/stub.module');
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { StubAccountingAdapter } = require('../stub/stub-accounting.adapter');
+
+        AccountingModule.logger.log(
+          'Stub.africa provider selected -- registering StubAccountingAdapter',
+        );
+
+        return {
+          imports: [StubModule],
+          providers: [
+            StubAccountingAdapter,
+            {
+              provide: ACCOUNTING_PROVIDER,
+              useExisting: StubAccountingAdapter,
+            },
+          ],
+        };
+      }
 
       default:
         throw new Error(

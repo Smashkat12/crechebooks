@@ -22,6 +22,7 @@ import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
 import { BankingModule } from './integrations/banking';
 import { YocoModule } from './integrations/yoco/yoco.module';
+import { AccountingModule } from './integrations/accounting/accounting.module';
 import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
 import { ReportsModule } from './modules/reports';
 
@@ -71,6 +72,7 @@ import { ReportsModule } from './modules/reports';
     WebSocketModule, // TASK-FEAT-101: Real-time Dashboard WebSocket
     BankingModule, // TASK-INT-101: Bank API Integration (Stitch Open Banking)
     YocoModule, // TASK-ACCT-011: Yoco Payment Gateway Integration
+    AccountingModule.forRoot(), // Provider-agnostic accounting abstraction (Xero, Stub.africa)
     ReportsModule, // TASK-REPORTS-002: Reports API Module
   ],
   controllers: [],

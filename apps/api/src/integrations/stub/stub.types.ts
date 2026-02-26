@@ -6,6 +6,10 @@
  *
  * CRITICAL: Stub amounts are in Rands (decimals), NOT cents.
  * CrecheBooks stores cents -- conversion happens in the adapter/client layer.
+ *
+ * API Auth: All endpoints require `apikey` + `appid` in the request body.
+ * Push/pull endpoints also require `uid` (business identifier).
+ * Data payloads are nested under the `data` key.
  */
 
 // ---------------------------------------------------------------------------
@@ -25,10 +29,47 @@ export interface StubConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Request Envelopes (body-based auth, per Stub API spec)
+// ---------------------------------------------------------------------------
+
+/** Base envelope -- apikey + appid in every request body. */
+export interface StubBaseEnvelope {
+  apikey: string;
+  appid: string;
+  signature?: string;
+}
+
+/** Envelope for push/business (no uid -- creating a new business). */
+export interface StubBusinessEnvelope extends StubBaseEnvelope {
+  data: StubBusinessPayload;
+  webhook?: string;
+}
+
+/** Envelope for push endpoints (income, expense). */
+export interface StubPushEnvelope extends StubBaseEnvelope {
+  uid: string;
+  data: StubTransactionPayload;
+  webhook?: string;
+}
+
+/** Envelope for push/settlement (batch income + expenses). */
+export interface StubSettlementEnvelope extends StubBaseEnvelope {
+  uid: string;
+  data: StubSettlementPayload;
+  webhook?: string;
+}
+
+/** Envelope for pull endpoints (bank-feed, income, expenses). */
+export interface StubPullEnvelope extends StubBaseEnvelope {
+  uid: string;
+  webhook: string;
+}
+
+// ---------------------------------------------------------------------------
 // Business
 // ---------------------------------------------------------------------------
 
-/** Payload for creating a business in Stub. */
+/** Payload for creating a business in Stub (nested under `data`). */
 export interface StubBusinessPayload {
   businessname: string;
   firstname: string;
@@ -43,7 +84,7 @@ export interface StubBusinessPayload {
 export interface StubBusinessResponse {
   /** Unique business identifier in Stub */
   uid: string;
-  /** Authentication token for subsequent API calls (1hr expiry) */
+  /** Authentication token (1hr expiry, not used in body-based auth) */
   token: string;
 }
 
@@ -51,7 +92,7 @@ export interface StubBusinessResponse {
 // Transactions
 // ---------------------------------------------------------------------------
 
-/** Payload for a single income or expense push to Stub. */
+/** Payload for a single income or expense push (nested under `data`). */
 export interface StubTransactionPayload {
   /** Unique transaction identifier */
   id: string;
@@ -59,8 +100,8 @@ export interface StubTransactionPayload {
   date: string;
   /** Description / line item name */
   name: string;
-  /** Category or account identifier */
-  accountid?: string;
+  /** Category for income/expense classification */
+  category?: string;
   /** Additional notes */
   notes?: string;
   /** Currency code (always 'ZAR' for CrecheBooks) */
@@ -69,12 +110,12 @@ export interface StubTransactionPayload {
   amount: number;
   /** VAT amount in Rands (decimal) */
   vat?: number;
-  /** Product or service identifier */
-  productid?: string;
 }
 
-/** Payload for batch push of income and expenses via /api/push/many. */
+/** Payload for settlement push (nested under `data` in /api/push/settlement). */
 export interface StubSettlementPayload {
+  /** Account identifier for the settlement */
+  accountid: string;
   income: StubTransactionPayload[];
   expenses: StubTransactionPayload[];
   summary?: {

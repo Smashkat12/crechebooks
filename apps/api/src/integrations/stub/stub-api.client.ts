@@ -4,9 +4,11 @@
  * Low-level HTTP client for the Stub Connect API.
  * Handles authentication, request formatting, error mapping, and logging.
  *
- * CRITICAL: This client converts CrecheBooks cents to Stub Rands where needed,
- * but most conversion logic lives in the adapter layer. The client accepts
- * Stub-native payloads (amounts already in Rands).
+ * CRITICAL: Stub uses body-based authentication. Every request body includes
+ * `apikey` and `appid`. Push/pull endpoints also require `uid` (business ID)
+ * and nest data payloads under the `data` key.
+ *
+ * This client accepts Stub-native payloads (amounts already in Rands).
  */
 
 import { Injectable, Logger } from '@nestjs/common';
@@ -41,7 +43,7 @@ export class StubApiClient {
       appId: this.configService.get<string>('STUB_APP_ID', ''),
       baseUrl: this.configService.get<string>(
         'STUB_BASE_URL',
-        'https://test.connect.stub.africa',
+        'https://connect.stub.africa',
       ),
       webhookUrl: this.configService.get<string>('STUB_WEBHOOK_URL', ''),
     };
@@ -53,14 +55,16 @@ export class StubApiClient {
 
   /**
    * Verify that the configured API key is valid.
-   *
-   * @returns true if the key is valid, false otherwise
+   * Body: { apikey, appid }
    */
   async verifyApiKey(): Promise<boolean> {
     this.logger.log('Verifying Stub API key');
 
     try {
-      await this.post<unknown>('/api/verify/apikey', {});
+      await this.post<unknown>('/api/verify/apikey', {
+        apikey: this.config.apiKey,
+        appid: this.config.appId,
+      });
       return true;
     } catch {
       this.logger.warn('Stub API key verification failed');
@@ -74,28 +78,23 @@ export class StubApiClient {
 
   /**
    * Create a new business in Stub and receive a uid + token.
-   *
-   * @param tenantId - CrecheBooks tenant (for logging context)
-   * @param payload - Business details
-   * @returns Stub business uid and authentication token
+   * Body: { apikey, appid, data: { businessname, firstname, ... } }
    */
   async createBusiness(
-    tenantId: string,
     payload: StubBusinessPayload,
   ): Promise<StubBusinessResponse> {
-    this.logger.log(
-      `Creating Stub business for tenant ${tenantId}: ${payload.businessname}`,
-    );
+    this.logger.log(`Creating Stub business: ${payload.businessname}`);
 
     const response = await this.post<StubBusinessResponse>(
       '/api/push/business',
-      payload,
+      {
+        apikey: this.config.apiKey,
+        appid: this.config.appId,
+        data: payload,
+      },
     );
 
-    this.logger.log(
-      `Stub business created for tenant ${tenantId}: uid=${response.uid}`,
-    );
-
+    this.logger.log(`Stub business created: uid=${response.uid}`);
     return response;
   }
 
@@ -105,53 +104,65 @@ export class StubApiClient {
 
   /**
    * Push a single income transaction to Stub.
-   *
-   * @param token - Stub business token
-   * @param transaction - Income transaction payload (amounts in Rands)
+   * Body: { apikey, appid, uid, data: { id, date, name, category, ... } }
    */
   async pushIncome(
-    token: string,
+    uid: string,
     transaction: StubTransactionPayload,
   ): Promise<void> {
     this.logger.log(
       `Pushing income to Stub: id=${transaction.id}, amount=R${transaction.amount}`,
     );
 
-    await this.postWithToken('/api/push/income', token, transaction);
+    await this.post('/api/push/income', {
+      apikey: this.config.apiKey,
+      appid: this.config.appId,
+      uid,
+      data: transaction,
+      webhook: this.config.webhookUrl || undefined,
+    });
   }
 
   /**
    * Push a single expense transaction to Stub.
-   *
-   * @param token - Stub business token
-   * @param transaction - Expense transaction payload (amounts in Rands)
+   * Body: { apikey, appid, uid, data: { id, date, name, category, ... } }
    */
   async pushExpense(
-    token: string,
+    uid: string,
     transaction: StubTransactionPayload,
   ): Promise<void> {
     this.logger.log(
       `Pushing expense to Stub: id=${transaction.id}, amount=R${transaction.amount}`,
     );
 
-    await this.postWithToken('/api/push/expense', token, transaction);
+    await this.post('/api/push/expense', {
+      apikey: this.config.apiKey,
+      appid: this.config.appId,
+      uid,
+      data: transaction,
+      webhook: this.config.webhookUrl || undefined,
+    });
   }
 
   /**
-   * Push multiple income and expense transactions in a single batch.
-   *
-   * @param token - Stub business token
-   * @param payload - Batch payload with income and expense arrays
+   * Push a settlement (batch of income + expenses).
+   * Body: { apikey, appid, uid, data: { accountid, income: [...], expenses: [...] } }
    */
-  async pushMany(
-    token: string,
+  async pushSettlement(
+    uid: string,
     payload: StubSettlementPayload,
   ): Promise<void> {
     this.logger.log(
-      `Pushing batch to Stub: ${payload.income.length} income, ${payload.expenses.length} expenses`,
+      `Pushing settlement to Stub: ${payload.income.length} income, ${payload.expenses.length} expenses`,
     );
 
-    await this.postWithToken('/api/push/many', token, payload);
+    await this.post('/api/push/settlement', {
+      apikey: this.config.apiKey,
+      appid: this.config.appId,
+      uid,
+      data: payload,
+      webhook: this.config.webhookUrl || undefined,
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -160,98 +171,64 @@ export class StubApiClient {
 
   /**
    * Initiate a bank feed pull. Results are delivered to the configured webhook.
-   *
-   * @param token - Stub business token
-   * @param webhookUrl - Override webhook URL (falls back to configured default)
+   * Body: { apikey, appid, uid, webhook }
    */
-  async pullBankFeed(token: string, webhookUrl?: string): Promise<void> {
-    const url = webhookUrl || this.config.webhookUrl;
+  async pullBankFeed(uid: string): Promise<void> {
+    this.logger.log('Initiating Stub bank feed pull');
 
-    this.logger.log(`Initiating Stub bank feed pull, webhook=${url}`);
-
-    await this.postWithToken('/api/pull/bank-feed', token, {
-      webhookUrl: url,
+    await this.post('/api/pull/bank-feed', {
+      apikey: this.config.apiKey,
+      appid: this.config.appId,
+      uid,
+      webhook: this.config.webhookUrl,
     });
   }
 
   /**
    * Initiate an income data pull. Results are delivered to the configured webhook.
-   *
-   * @param token - Stub business token
-   * @param webhookUrl - Override webhook URL (falls back to configured default)
+   * Body: { apikey, appid, uid, webhook }
    */
-  async pullIncome(token: string, webhookUrl?: string): Promise<void> {
-    const url = webhookUrl || this.config.webhookUrl;
+  async pullIncome(uid: string): Promise<void> {
+    this.logger.log('Initiating Stub income pull');
 
-    this.logger.log(`Initiating Stub income pull, webhook=${url}`);
-
-    await this.postWithToken('/api/pull/income', token, {
-      webhookUrl: url,
+    await this.post('/api/pull/income', {
+      apikey: this.config.apiKey,
+      appid: this.config.appId,
+      uid,
+      webhook: this.config.webhookUrl,
     });
   }
 
   /**
    * Initiate an expense data pull. Results are delivered to the configured webhook.
-   *
-   * @param token - Stub business token
-   * @param webhookUrl - Override webhook URL (falls back to configured default)
+   * Body: { apikey, appid, uid, webhook }
    */
-  async pullExpenses(token: string, webhookUrl?: string): Promise<void> {
-    const url = webhookUrl || this.config.webhookUrl;
+  async pullExpenses(uid: string): Promise<void> {
+    this.logger.log('Initiating Stub expenses pull');
 
-    this.logger.log(`Initiating Stub expenses pull, webhook=${url}`);
-
-    await this.postWithToken('/api/pull/expenses', token, {
-      webhookUrl: url,
+    await this.post('/api/pull/expenses', {
+      apikey: this.config.apiKey,
+      appid: this.config.appId,
+      uid,
+      webhook: this.config.webhookUrl,
     });
   }
 
   // ---------------------------------------------------------------------------
-  // Internal HTTP Helpers
+  // Internal HTTP Helper
   // ---------------------------------------------------------------------------
 
   /**
-   * POST request with standard API key + App ID headers.
+   * POST to Stub API. Auth credentials are included in the body by the caller,
+   * not added as headers. Only Content-Type header is needed.
    */
-  private async post<T>(endpoint: string, data: unknown): Promise<T> {
+  private async post<T>(endpoint: string, body: unknown): Promise<T> {
     const url = `${this.config.baseUrl}${endpoint}`;
 
     try {
       const response = await firstValueFrom(
-        this.httpService.post<T>(url, data, {
-          headers: {
-            'X-API-Key': this.config.apiKey,
-            'X-AppId': this.config.appId,
-            'Content-Type': 'application/json',
-          },
-        }),
-      );
-
-      return response.data;
-    } catch (error) {
-      throw this.mapError(endpoint, error);
-    }
-  }
-
-  /**
-   * POST request with a Stub business token (X-Token header).
-   */
-  private async postWithToken<T>(
-    endpoint: string,
-    token: string,
-    data: unknown,
-  ): Promise<T> {
-    const url = `${this.config.baseUrl}${endpoint}`;
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post<T>(url, data, {
-          headers: {
-            'X-API-Key': this.config.apiKey,
-            'X-AppId': this.config.appId,
-            'X-Token': token,
-            'Content-Type': 'application/json',
-          },
+        this.httpService.post<T>(url, body, {
+          headers: { 'Content-Type': 'application/json' },
         }),
       );
 

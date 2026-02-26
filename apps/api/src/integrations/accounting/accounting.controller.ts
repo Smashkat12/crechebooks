@@ -78,7 +78,7 @@ export class AccountingController {
 
   /** Get the active provider's name and capabilities. */
   @Get('capabilities')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Get provider capabilities',
     description:
@@ -143,7 +143,7 @@ export class AccountingController {
 
   /** Get the current connection status. */
   @Get('status')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Get connection status',
     description:
@@ -342,7 +342,7 @@ export class AccountingController {
 
   /** Get the chart of accounts from the accounting provider. */
   @Get('accounts')
-  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.STAFF)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Get chart of accounts',
     description: 'Retrieve the chart of accounts from the external accounting system.',
@@ -426,10 +426,10 @@ export class AccountingController {
   private assertProviderReady(): void {
     if (
       !this.provider ||
-      (this.provider as Record<string, unknown>).__pending === true
+      (this.provider as unknown as Record<string, unknown>).__pending === true
     ) {
       const name =
-        (this.provider as Record<string, unknown>)?.providerName ?? 'unknown';
+        (this.provider as unknown as Record<string, unknown>)?.providerName ?? 'unknown';
       throw new BusinessException(
         `Accounting provider '${name}' is not yet configured. ` +
           'An adapter must be registered for this provider.',

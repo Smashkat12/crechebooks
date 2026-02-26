@@ -1,13 +1,15 @@
 /**
  * Stub.africa Accounting Adapter -- AccountingProvider for Stub Connect API.
- * Push-only invoices, async webhook pulls, API key auth, amounts in Rands externally.
- * Per-tenant credentials stored in `stub_connections` (raw SQL, no migration).
+ *
+ * Push-only invoices, async webhook pulls, body-based API key auth.
+ * Per-tenant business UID stored in `stub_connections`.
+ * Global API key + App ID from env vars (STUB_API_KEY, STUB_APP_ID).
+ * Amounts converted from CrecheBooks cents to Stub Rands.
  */
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { EncryptionService } from '../../shared/services/encryption.service';
 import { BusinessException } from '../../shared/exceptions';
 import type { AccountingProvider } from '../accounting/interfaces';
 import type {
@@ -23,8 +25,6 @@ import type { StubTransactionPayload } from './stub.types';
 
 interface StubConnectionRow {
   tenant_id: string;
-  encrypted_api_key: string;
-  encrypted_app_id: string | null;
   stub_business_uid: string | null;
   is_active: boolean;
   connected_at: Date;
@@ -53,7 +53,6 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
   constructor(
     private readonly stubClient: StubApiClient,
     private readonly prisma: PrismaService,
-    private readonly encryption: EncryptionService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -73,32 +72,48 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
   }
 
   /**
-   * Verify and store a Stub API key.
-   * `code` carries the API key; `state` carries the Stub App ID.
+   * Connect a tenant to Stub.africa.
+   *
+   * `code` carries the Stub business UID (visible in the Stub dashboard URL).
+   * If `code` is 'create', a new business is created in Stub using tenant info.
    */
-  async handleCallback(tenantId: string, code: string, state: string): Promise<void> {
-    this.logger.log(`Verifying Stub API key for tenant ${tenantId}`);
+  async handleCallback(tenantId: string, code: string, _state: string): Promise<void> {
+    this.logger.log(`Connecting Stub for tenant ${tenantId}`);
+
     const isValid = await this.stubClient.verifyApiKey();
     if (!isValid) {
       throw new BusinessException(
-        'The provided Stub API key is invalid.',
+        'The configured Stub API credentials are invalid. Check STUB_API_KEY and STUB_APP_ID env vars.',
         'STUB_INVALID_API_KEY', { tenantId },
       );
     }
 
-    const encryptedKey = this.encryption.encrypt(code);
-    const encryptedAppId = state ? this.encryption.encrypt(state) : null;
-    await this.ensureConnectionTable();
+    let businessUid = code;
 
+    if (!code || code === 'create') {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { name: true },
+      });
+      const resp = await this.stubClient.createBusiness({
+        businessname: tenant?.name || 'CrecheBooks Business',
+        firstname: 'Admin',
+        lastname: 'User',
+        email: '',
+      });
+      businessUid = resp.uid;
+      this.logger.log(`Created Stub business for tenant ${tenantId}: uid=${businessUid}`);
+    }
+
+    await this.ensureConnectionTable();
     await this.prisma.$executeRaw`
-      INSERT INTO stub_connections (tenant_id, encrypted_api_key, encrypted_app_id, is_active, connected_at)
-      VALUES (${tenantId}, ${encryptedKey}, ${encryptedAppId}, true, NOW())
+      INSERT INTO stub_connections (tenant_id, stub_business_uid, is_active, connected_at)
+      VALUES (${tenantId}, ${businessUid}, true, NOW())
       ON CONFLICT (tenant_id) DO UPDATE SET
-        encrypted_api_key = ${encryptedKey},
-        encrypted_app_id = ${encryptedAppId},
+        stub_business_uid = ${businessUid},
         is_active = true, connected_at = NOW(), error_message = NULL
     `;
-    this.logger.log(`Stub API key stored for tenant ${tenantId}`);
+    this.logger.log(`Stub connected for tenant ${tenantId}, uid=${businessUid}`);
   }
 
   /** Check whether the tenant has a valid Stub connection. */
@@ -125,13 +140,13 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     };
   }
 
-  /** Disconnect by deactivating stored credentials. */
+  /** Disconnect by deactivating stored connection. */
   async disconnect(tenantId: string): Promise<void> {
     this.logger.log(`Disconnecting Stub for tenant ${tenantId}`);
     await this.ensureConnectionTable();
     await this.prisma.$executeRaw`
       UPDATE stub_connections
-      SET is_active = false, encrypted_api_key = '', encrypted_app_id = NULL
+      SET is_active = false, stub_business_uid = NULL
       WHERE tenant_id = ${tenantId}
     `;
   }
@@ -143,7 +158,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     tenantId: string, invoiceId: string, _options?: PushInvoiceOptions,
   ): Promise<InvoiceSyncResult> {
     this.logger.log(`Pushing invoice ${invoiceId} to Stub for tenant ${tenantId}`);
-    const token = await this.getStubToken(tenantId);
+    const uid = await this.getStubUid(tenantId);
 
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId },
@@ -159,7 +174,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     }
 
     const tx = this.invoiceToStubTransaction(invoice);
-    await this.stubClient.pushIncome(token, tx);
+    await this.stubClient.pushIncome(uid, tx);
     await this.updateSyncStatus(tenantId, 'success');
 
     return {
@@ -171,12 +186,12 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     };
   }
 
-  /** Push multiple invoices via /api/push/many. */
+  /** Push multiple invoices individually to Stub. */
   async pushInvoicesBulk(
     tenantId: string, invoiceIds: string[], _options?: PushInvoiceOptions,
   ): Promise<BulkInvoiceSyncResult> {
     this.logger.log(`Bulk pushing ${invoiceIds.length} invoices for tenant ${tenantId}`);
-    const token = await this.getStubToken(tenantId);
+    const uid = await this.getStubUid(tenantId);
 
     const invoices = await this.prisma.invoice.findMany({
       where: { id: { in: invoiceIds }, tenantId },
@@ -196,45 +211,30 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       }
     }
 
-    const transactions: StubTransactionPayload[] = [];
     for (const inv of invoices) {
       try {
-        transactions.push(this.invoiceToStubTransaction(inv));
+        const tx = this.invoiceToStubTransaction(inv);
+        await this.stubClient.pushIncome(uid, tx);
+        results.push({
+          invoiceId: inv.id,
+          externalInvoiceId: tx.id,
+          externalInvoiceNumber: inv.invoiceNumber,
+          externalStatus: 'PUSHED',
+          syncedAt: new Date(),
+        });
       } catch (err) {
         errors.push({
           entityId: inv.id,
-          error: err instanceof Error ? err.message : 'Conversion failed',
-          code: 'CONVERSION_ERROR',
+          error: err instanceof Error ? err.message : 'Push failed',
+          code: 'STUB_PUSH_FAILED',
         });
       }
     }
 
-    if (transactions.length > 0) {
-      try {
-        await this.stubClient.pushMany(token, { income: transactions, expenses: [] });
-        const now = new Date();
-        for (const tx of transactions) {
-          const inv = invoices.find((i) => `cb-inv-${i.id}` === tx.id);
-          results.push({
-            invoiceId: inv?.id ?? tx.id,
-            externalInvoiceId: tx.id,
-            externalInvoiceNumber: inv?.invoiceNumber,
-            externalStatus: 'PUSHED',
-            syncedAt: now,
-          });
-        }
-        await this.updateSyncStatus(tenantId, 'success');
-      } catch (err) {
-        for (const tx of transactions) {
-          errors.push({
-            entityId: tx.id,
-            error: err instanceof Error ? err.message : 'Batch push failed',
-            code: 'STUB_PUSH_FAILED',
-          });
-        }
-        await this.updateSyncStatus(tenantId, 'failed',
-          err instanceof Error ? err.message : 'Batch push failed');
-      }
+    if (results.length > 0) {
+      await this.updateSyncStatus(tenantId, 'success');
+    } else if (errors.length > 0) {
+      await this.updateSyncStatus(tenantId, 'failed', errors[0]?.error);
     }
 
     return { pushed: results.length, failed: errors.length, skipped: 0, results, errors };
@@ -293,7 +293,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
   /** Push payment as income to Stub (no payment allocation API). */
   async syncPayment(tenantId: string, paymentId: string, invoiceRef: string): Promise<PaymentSyncResult> {
     this.logger.log(`Syncing payment ${paymentId} to Stub for tenant ${tenantId}`);
-    const token = await this.getStubToken(tenantId);
+    const uid = await this.getStubUid(tenantId);
 
     const payment = await this.prisma.payment.findFirst({ where: { id: paymentId, tenantId } });
     if (!payment) {
@@ -306,11 +306,12 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       id: `cb-pmt-${paymentId}`,
       date: payment.paymentDate.toISOString().split('T')[0],
       name: `Payment received - Invoice ${invoiceRef}`,
+      category: 'Income',
       notes: payment.reference ?? undefined,
       currency: 'ZAR',
       amount: this.centsToRands(payment.amountCents),
     };
-    await this.stubClient.pushIncome(token, tx);
+    await this.stubClient.pushIncome(uid, tx);
 
     return {
       paymentId,
@@ -334,8 +335,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
   /** Initiate bank feed sync. Results arrive via webhook. */
   async syncBankTransactions(tenantId: string, _options?: BankSyncOptions): Promise<BankSyncResult> {
     this.logger.log(`Initiating Stub bank feed sync for tenant ${tenantId}`);
-    const token = await this.getStubToken(tenantId);
-    await this.stubClient.pullBankFeed(token);
+    const uid = await this.getStubUid(tenantId);
+    await this.stubClient.pullBankFeed(uid);
     return { transactionsImported: 0, transactionsUpdated: 0, errors: [] };
   }
 
@@ -406,8 +407,6 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     await this.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS stub_connections (
         tenant_id         VARCHAR(50) PRIMARY KEY REFERENCES tenants(id),
-        encrypted_api_key TEXT        NOT NULL DEFAULT '',
-        encrypted_app_id  TEXT,
         stub_business_uid VARCHAR(100),
         is_active         BOOLEAN     NOT NULL DEFAULT false,
         connected_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -423,20 +422,20 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Private: Credential Access ---------------------------------------------
 
-  /** Decrypt and return the Stub API key for a tenant. */
-  private async getStubToken(tenantId: string): Promise<string> {
+  /** Get the Stub business UID for a tenant. */
+  private async getStubUid(tenantId: string): Promise<string> {
     await this.ensureConnectionTable();
     const rows = await this.prisma.$queryRaw<StubConnectionRow[]>`
-      SELECT encrypted_api_key FROM stub_connections
+      SELECT stub_business_uid FROM stub_connections
       WHERE tenant_id = ${tenantId} AND is_active = true LIMIT 1
     `;
-    if (rows.length === 0 || !rows[0].encrypted_api_key) {
+    if (rows.length === 0 || !rows[0].stub_business_uid) {
       throw new BusinessException(
-        'Stub.africa is not connected for this tenant.',
+        'Stub.africa is not connected for this tenant. Please connect via Settings.',
         'STUB_NOT_CONNECTED', { tenantId },
       );
     }
-    return this.encryption.decrypt(rows[0].encrypted_api_key);
+    return rows[0].stub_business_uid;
   }
 
   /** Update sync status on the connection row. */
@@ -471,6 +470,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       id: `cb-inv-${invoice.id}`,
       date: invoice.issueDate.toISOString().split('T')[0],
       name: `${invoice.invoiceNumber} - ${invoice.parent.firstName} ${invoice.parent.lastName}`,
+      category: 'Income',
       notes: description,
       currency: 'ZAR',
       amount: this.centsToRands(invoice.totalCents),

@@ -25,6 +25,7 @@ import type {
   StubBusinessPayload,
   StubBusinessResponse,
   StubConfig,
+  StubSalePayload,
   StubSettlementPayload,
   StubTransactionPayload,
 } from './stub.types';
@@ -140,6 +141,25 @@ export class StubApiClient {
       appid: this.config.appId,
       uid,
       data: transaction,
+      webhook: this.config.webhookUrl || undefined,
+    });
+  }
+
+  /**
+   * Push a sale (invoice) to Stub.
+   * This creates an entry in the Sales section (accounts receivable), NOT income.
+   * Body: { apikey, appid, uid, data: { id, items: [...], customer: {...}, payment?: {...} } }
+   */
+  async pushSale(uid: string, sale: StubSalePayload): Promise<void> {
+    this.logger.log(
+      `Pushing sale to Stub: id=${sale.id}, items=${sale.items.length}, customer=${sale.customer.name}`,
+    );
+
+    await this.post('/api/push/sale', {
+      apikey: this.config.apiKey,
+      appid: this.config.appId,
+      uid,
+      data: sale,
       webhook: this.config.webhookUrl || undefined,
     });
   }

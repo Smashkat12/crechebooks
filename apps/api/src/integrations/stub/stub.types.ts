@@ -126,6 +126,76 @@ export interface StubSettlementPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Sales (Invoices / Accounts Receivable)
+// ---------------------------------------------------------------------------
+
+/** A line item in a Stub sale (nested under `data.items[]` in /api/push/sale). */
+export interface StubSaleItem {
+  /** Unique line item identifier */
+  id: string;
+  /** Product/service name */
+  name: string;
+  /** Line item description */
+  description?: string;
+  /** Unit price in Rands (decimal) */
+  price: number;
+  /** Quantity */
+  quantity: number;
+  /** Cost price in Rands (decimal) — optional */
+  cost?: number;
+  /** Currency for cost (defaults to ZAR) */
+  costcurrency?: string;
+}
+
+/** Customer details for a Stub sale (nested under `data.customer` in /api/push/sale). */
+export interface StubSaleCustomer {
+  /** Unique customer identifier */
+  id: string;
+  /** Customer name */
+  name: string;
+  /** Email address */
+  email?: string;
+  /** Address fields */
+  address?: string;
+  address2?: string;
+  suburb?: string;
+  city?: string;
+  postalcode?: string;
+  country?: string;
+  /** Tax registration numbers */
+  vatnumber?: string;
+  registrationnumber?: string;
+}
+
+/**
+ * Payload for /api/push/sale (nested under `data`).
+ * This creates a sale/invoice in Stub's Sales section (accounts receivable).
+ *
+ * - `id`: unique sale identifier
+ * - `payment`: optional — only set when the sale has been paid
+ * - `items`: line items on the invoice
+ * - `customer`: the customer/parent being invoiced
+ */
+export interface StubSalePayload {
+  /** Unique sale/invoice identifier */
+  id: string;
+  /** Payment details — omit if unpaid (creates an outstanding sale/invoice) */
+  payment?: {
+    id: string;
+    date: string;
+    name: string;
+    category?: string;
+    currency: string;
+    amount: number;
+    vat?: number;
+  };
+  /** Line items */
+  items: StubSaleItem[];
+  /** Customer / debtor */
+  customer: StubSaleCustomer;
+}
+
+// ---------------------------------------------------------------------------
 // API Responses
 // ---------------------------------------------------------------------------
 

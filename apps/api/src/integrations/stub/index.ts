@@ -12,6 +12,9 @@ export type {
   StubBusinessResponse,
   StubTransactionPayload,
   StubSettlementPayload,
+  StubSalePayload,
+  StubSaleItem,
+  StubSaleCustomer,
   StubApiResponse,
   StubApiError,
 } from './stub.types';

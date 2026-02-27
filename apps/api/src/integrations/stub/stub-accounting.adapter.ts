@@ -21,7 +21,7 @@ import type {
   PushInvoiceOptions, SyncOptions, SyncResult, SyncItemError,
 } from '../accounting/interfaces/accounting-types';
 import { StubApiClient } from './stub-api.client';
-import type { StubTransactionPayload } from './stub.types';
+import type { StubSalePayload, StubTransactionPayload } from './stub.types';
 
 interface StubConnectionRow {
   tenant_id: string;
@@ -153,7 +153,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Invoices ---------------------------------------------------------------
 
-  /** Push a single invoice to Stub as an income transaction. */
+  /** Push a single invoice to Stub as a sale (accounts receivable). */
   async pushInvoice(
     tenantId: string, invoiceId: string, _options?: PushInvoiceOptions,
   ): Promise<InvoiceSyncResult> {
@@ -163,7 +163,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId },
       include: {
-        parent: { select: { firstName: true, lastName: true, email: true } },
+        parent: { select: { id: true, firstName: true, lastName: true, email: true } },
         lines: { orderBy: { sortOrder: 'asc' } },
       },
     });
@@ -173,20 +173,20 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       );
     }
 
-    const tx = this.invoiceToStubTransaction(invoice);
-    await this.stubClient.pushIncome(uid, tx);
+    const sale = this.invoiceToStubSale(invoice);
+    await this.stubClient.pushSale(uid, sale);
     await this.updateSyncStatus(tenantId, 'success');
 
     return {
       invoiceId,
-      externalInvoiceId: tx.id,
+      externalInvoiceId: sale.id,
       externalInvoiceNumber: invoice.invoiceNumber,
       externalStatus: 'PUSHED',
       syncedAt: new Date(),
     };
   }
 
-  /** Push multiple invoices individually to Stub. */
+  /** Push multiple invoices as sales individually to Stub. */
   async pushInvoicesBulk(
     tenantId: string, invoiceIds: string[], _options?: PushInvoiceOptions,
   ): Promise<BulkInvoiceSyncResult> {
@@ -196,7 +196,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     const invoices = await this.prisma.invoice.findMany({
       where: { id: { in: invoiceIds }, tenantId },
       include: {
-        parent: { select: { firstName: true, lastName: true, email: true } },
+        parent: { select: { id: true, firstName: true, lastName: true, email: true } },
         lines: { orderBy: { sortOrder: 'asc' } },
       },
     });
@@ -213,11 +213,11 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
     for (const inv of invoices) {
       try {
-        const tx = this.invoiceToStubTransaction(inv);
-        await this.stubClient.pushIncome(uid, tx);
+        const sale = this.invoiceToStubSale(inv);
+        await this.stubClient.pushSale(uid, sale);
         results.push({
           invoiceId: inv.id,
-          externalInvoiceId: tx.id,
+          externalInvoiceId: sale.id,
           externalInvoiceNumber: inv.invoiceNumber,
           externalStatus: 'PUSHED',
           syncedAt: new Date(),
@@ -456,25 +456,43 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Private: Data Conversion -----------------------------------------------
 
-  /** Convert a CrecheBooks invoice to a Stub income transaction. */
-  private invoiceToStubTransaction(invoice: {
+  /**
+   * Convert a CrecheBooks invoice to a Stub sale payload.
+   * Sales appear in Stub's Sales section (accounts receivable) — NOT income.
+   * Income is only recorded when actual payment is received.
+   */
+  private invoiceToStubSale(invoice: {
     id: string; invoiceNumber: string; totalCents: number; vatCents: number;
     issueDate: Date;
-    parent: { firstName: string; lastName: string; email: string | null };
-    lines: Array<{ description: string }>;
-  }): StubTransactionPayload {
-    const description = invoice.lines.length > 0
-      ? invoice.lines.map((l) => l.description).join(', ')
-      : `Invoice ${invoice.invoiceNumber}`;
+    parent: { id: string; firstName: string; lastName: string; email: string | null };
+    lines: Array<{ description: string; totalCents: number; quantity: { toNumber(): number } | number }>;
+  }): StubSalePayload {
+    const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+
     return {
       id: `cb-inv-${invoice.id}`,
-      date: invoice.issueDate.toISOString().split('T')[0],
-      name: `${invoice.invoiceNumber} - ${invoice.parent.firstName} ${invoice.parent.lastName}`,
-      category: 'Income',
-      notes: description,
-      currency: 'ZAR',
-      amount: this.centsToRands(invoice.totalCents),
-      vat: invoice.vatCents > 0 ? this.centsToRands(invoice.vatCents) : undefined,
+      // No `payment` field — invoice is unpaid (accounts receivable)
+      items: invoice.lines.length > 0
+        ? invoice.lines.map((line, idx) => ({
+            id: `cb-inv-${invoice.id}-line-${idx}`,
+            name: line.description || `Line ${idx + 1}`,
+            description: line.description,
+            price: this.centsToRands(line.totalCents),
+            quantity: typeof line.quantity === 'number' ? line.quantity : line.quantity.toNumber(),
+          }))
+        : [{
+            id: `cb-inv-${invoice.id}-total`,
+            name: `Invoice ${invoice.invoiceNumber}`,
+            description: `Invoice ${invoice.invoiceNumber} for ${parentName}`,
+            price: this.centsToRands(invoice.totalCents),
+            quantity: 1,
+          }],
+      customer: {
+        id: `cb-parent-${invoice.parent.id}`,
+        name: parentName,
+        email: invoice.parent.email ?? undefined,
+        country: 'ZA',
+      },
     };
   }
 

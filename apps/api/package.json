@@ -72,7 +72,7 @@
     "joi": "^18.0.2",
     "jwks-rsa": "^3.2.0",
     "mailgun.js": "^10.2.3",
-    "nodemailer": "^7.0.11",
+    "nodemailer": "^8.0.1",
     "opossum": "^9.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

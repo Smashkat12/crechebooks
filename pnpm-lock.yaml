@@ -446,10 +446,10 @@ importers:
         version: 0.468.0(react@19.2.3)
       next:
         specifier: ^15.5.10
-        version: 15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        version: 15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       next-auth:
         specifier: ^5.0.0-beta.25
-        version: 5.0.0-beta.30(next@15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react@19.2.3)
+        version: 5.0.0-beta.30(next@15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react@19.2.3)
       next-themes:
         specifier: ^0.4.4
         version: 0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -485,17 +485,17 @@ importers:
         version: 5.0.9(@types/react@19.2.7)(react@19.2.3)(use-sync-external-store@1.6.0(react@19.2.3))
     devDependencies:
       '@eslint/eslintrc':
-        specifier: ^3.2.0
-        version: 3.3.3
+        specifier: ^3.3.4
+        version: 3.3.4
       '@playwright/test':
-        specifier: ^1.57.0
-        version: 1.57.0
+        specifier: ^1.58.2
+        version: 1.58.2
       '@testing-library/jest-dom':
         specifier: ^6.6.3
         version: 6.9.1
       '@testing-library/react':
-        specifier: ^16.1.0
-        version: 16.3.1(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@testing-library/user-event':
         specifier: ^14.5.2
         version: 14.6.1(@testing-library/dom@10.4.1)
@@ -512,8 +512,8 @@ importers:
         specifier: ^19.0.2
         version: 19.2.3(@types/react@19.2.7)
       autoprefixer:
-        specifier: ^10.4.20
-        version: 10.4.23(postcss@8.5.6)
+        specifier: ^10.4.27
+        version: 10.4.27(postcss@8.5.6)
       eslint:
         specifier: ^9.18.0
         version: 9.39.2(jiti@1.21.7)
@@ -1401,6 +1401,10 @@ packages:
 
   '@eslint/eslintrc@3.3.3':
     resolution: {integrity: sha512-Kr+LPIUVKz2qkx1HAMH8q1q6azbqBAsXJUxBl/ODDuVPX45Z9DfwB8tPjTi6nNZ8BuM3nbJxC5zCAg5elnBUTQ==}
+    engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@eslint/eslintrc@3.3.4':
+    resolution: {integrity: sha512-4h4MVF8pmBsncB60r0wSJiIeUKTSD4m7FmTFThG8RHlsg9ajqckLm9OraguFGZE4vVdpiI1Q4+hFnisopmG6gQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
   '@eslint/js@9.39.2':
@@ -2949,8 +2953,8 @@ packages:
     resolution: {integrity: sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
 
-  '@playwright/test@1.57.0':
-    resolution: {integrity: sha512-6TyEnHgd6SArQO8UO2OMTxshln3QMWBtPGrOCgs3wVEmQmwyuNtB10IZMfmYDE0riwNR1cu4q+pPcxMVtaG3TA==}
+  '@playwright/test@1.58.2':
+    resolution: {integrity: sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -3759,11 +3763,35 @@ packages:
   '@ruvector/edge-full@0.1.0':
     resolution: {integrity: sha512-GSvq2bB+aTNXpISTqccdZwOroRLSdQhi33L7569QUVi9P7a03hEtdZSX/Gk5aWtDufp230T57uLXQUA1Q0uBeQ==}
 
+  '@ruvector/gnn-darwin-arm64@0.1.22':
+    resolution: {integrity: sha512-5K4ZVMGyjyeB8O99Ol7hmD8CAd5J9WbtT2OD3AESEJ1FiLiSkYbqslODXVEBvFe8G/UwjOJnoJaFFUhyjBqbTA==}
+    os: ['!invalid']
+
+  '@ruvector/gnn-darwin-x64@0.1.22':
+    resolution: {integrity: sha512-qmS4epED7uS58VjYbbIOyBa1lyJQoZi0tYV5tbFMhGO8ljGDEfF3OWguKaUsTYLgOOhXNoYM16Ex7mPvC/KoMQ==}
+    os: ['!invalid']
+
+  '@ruvector/gnn-linux-arm64-gnu@0.1.22':
+    resolution: {integrity: sha512-YUUfNpt76o6wafVL1m087hm0xoXZDf8yA1qMmEH7dOt4PM/9/Xk4PqHa2gD7NKhVrqRuSxBxXuJ9RTgahs8A3g==}
+    os: ['!invalid']
+
+  '@ruvector/gnn-linux-arm64-musl@0.1.22':
+    resolution: {integrity: sha512-u9CeAWosrX+M1bjECIV3NKENUitspPTakAgoILoR3Rb/FeKGAFDkpjMhTEEkr3rRBw6ihmiSEvI1m6YeUYmQPw==}
+    os: ['!invalid']
+
   '@ruvector/gnn-linux-x64-gnu@0.1.22':
     resolution: {integrity: sha512-fv+WKHTVv5TU2Oiod+ue8SwcllE83V+Kc9/14OU1aF5lR6ZAIPIha/MvTYTlgz5+O2B2s0+ArhLJJ2vohaXZkA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
+
+  '@ruvector/gnn-linux-x64-musl@0.1.22':
+    resolution: {integrity: sha512-YkKw032ezjtlVKRiBWsYDHoAWgL5ZMALXcZRDl3EJmBBsIZXty1EpeYw0PogVsfAIDJ9+EFOARLX4+AwkqMqKg==}
+    os: ['!invalid']
+
+  '@ruvector/gnn-win32-x64-msvc@0.1.22':
+    resolution: {integrity: sha512-Pcde+8gafJTlHCR71JihNuMH82lL8zjJ2WbCFgcFXB5Bm9Chgjdch2L+aoj9FFRWw/x2IaY/7jd58GfIkOGE+A==}
+    os: ['!invalid']
 
   '@ruvector/gnn@0.1.22':
     resolution: {integrity: sha512-BOXLu6x/1GVj1zAqXJfF3zJWOzVl94i4bo6ATOlaDAlmGCvTwvvmomz8p9lPAMc99vmaox650MO9D4+CEqXK/A==}
@@ -3907,11 +3935,35 @@ packages:
     resolution: {integrity: sha512-XHQbphnWsRzWRWGK/HxK+RreY6OdlggMrOvrfkWlEq8EctHVy2ASwps7hk25Somx8Umj7+CkNuyQEbHcNcl/oQ==}
     engines: {node: '>= 16'}
 
+  '@ruvector/tiny-dancer-darwin-arm64@0.1.15':
+    resolution: {integrity: sha512-99vy9OLjppPj3kjusQnirgLvOnBt6Jrt2pij3Fvs5pzyp+zh04gb1np0tFR4JCxftKnuoKYqN7bCtQvgQbBBSg==}
+    engines: {node: '>=18.0.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@ruvector/tiny-dancer-darwin-x64@0.1.15':
+    resolution: {integrity: sha512-KxxhkiJwjRoUBeK0pwxuY8dKYpMrxpItss7CfNYhsbJc1YLmUzw1TG2Klga4vO1X7dsg/CYuHC+KKrgfSvEVwA==}
+    engines: {node: '>=18.0.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@ruvector/tiny-dancer-linux-arm64-gnu@0.1.15':
+    resolution: {integrity: sha512-HwduiK4dJj5x3hcKdHSgYksEssJFc7pNkg+ENyrlN1kIOyfCAQ76mx3uu+Hhg55hX6HbZEloXQcVG0jn4VM2uw==}
+    engines: {node: '>=18.0.0'}
+    cpu: [arm64]
+    os: [linux]
+
   '@ruvector/tiny-dancer-linux-x64-gnu@0.1.15':
     resolution: {integrity: sha512-lEknFh2p73KkHz6d51cP/Y5D10AATiXRsoQEDRkOjrO0Eb5blyxal4wzdqbylyXEH7UbRePCBrCCk5BkfZD1fA==}
     engines: {node: '>=18.0.0'}
     cpu: [x64]
     os: [linux]
+
+  '@ruvector/tiny-dancer-win32-x64-msvc@0.1.15':
+    resolution: {integrity: sha512-f465GiIh+CWv58d3eixWKJOi8kSqcRk5heH2SRwj2Q4wWjWru4esr96NXb1VCj0EKFfDWs9D+aPW2OU4xFeoPQ==}
+    engines: {node: '>=18.0.0'}
+    cpu: [x64]
+    os: [win32]
 
   '@ruvector/tiny-dancer@0.1.15':
     resolution: {integrity: sha512-Gl+eHhenRHVpyeqjJJBa2RL1HbXC+WNr8caEcEfNdODFKlKaicOPDaujUHAG3tEMZzeT3564eqPWu+ZiA+wxKQ==}
@@ -4254,8 +4306,8 @@ packages:
     resolution: {integrity: sha512-zIcONa+hVtVSSep9UT3jZ5rizo2BsxgyDYU7WFD5eICBE7no3881HGeb/QkGfsJs6JTkY1aQhT7rIPC7e+0nnA==}
     engines: {node: '>=14', npm: '>=6', yarn: '>=1'}
 
-  '@testing-library/react@16.3.1':
-    resolution: {integrity: sha512-gr4KtAWqIOQoucWYD/f6ki+j5chXfcPc74Col/6poTyqTmn7zRmodWahWRCp8tYd+GMqBonw6hstNzqjbs6gjw==}
+  '@testing-library/react@16.3.2':
+    resolution: {integrity: sha512-XU5/SytQM+ykqMnAnvB2umaJNIOsLF3PVv//1Ew4CTcpz0/BRyy/af40qqrt7SjKpDdT1saBMc42CUok5gaw+g==}
     engines: {node: '>=18'}
     peerDependencies:
       '@testing-library/dom': ^10.0.0
@@ -4992,6 +5044,9 @@ packages:
   ajv@6.12.6:
     resolution: {integrity: sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g==}
 
+  ajv@6.14.0:
+    resolution: {integrity: sha512-IWrosm/yrn43eiKqkfkHis7QioDleaXQHdDVPKg0FSwwd/DuvyX79TZnFOnYpB7dcsFAMmtFztZuXPDvSePkFw==}
+
   ajv@8.17.1:
     resolution: {integrity: sha512-B/gBuNg5SiMTrPkC+A2+cW0RszwxYmn6VYxB/inlBStS5nx6xHIt/ehKRhIMhqusl7a8LjQoZnjCs5vhwxOQ1g==}
 
@@ -5180,6 +5235,13 @@ packages:
 
   autoprefixer@10.4.23:
     resolution: {integrity: sha512-YYTXSFulfwytnjAPlw8QHncHJmlvFKtczb8InXaAx9Q0LbfDnfEYDE55omerIJKihhmU61Ft+cAOSzQVaBUmeA==}
+    engines: {node: ^10 || ^12 || >=14}
+    hasBin: true
+    peerDependencies:
+      postcss: ^8.1.0
+
+  autoprefixer@10.4.27:
+    resolution: {integrity: sha512-NP9APE+tO+LuJGn7/9+cohklunJsXWiaWEfV3si4Gi/XHDwVNgkwr1J3RQYFIvPy76GmJ9/bW8vyoU1LcxwKHA==}
     engines: {node: ^10 || ^12 || >=14}
     hasBin: true
     peerDependencies:
@@ -5473,6 +5535,9 @@ packages:
 
   caniuse-lite@1.0.30001761:
     resolution: {integrity: sha512-JF9ptu1vP2coz98+5051jZ4PwQgd2ni8A+gYSN7EA7dPKIMf0pDlSUxhdmVOaV3/fYK5uWBkgSXJaRLr4+3A6g==}
+
+  caniuse-lite@1.0.30001775:
+    resolution: {integrity: sha512-s3Qv7Lht9zbVKE9XoTyRG6wVDCKdtOFIjBGg3+Yhn6JaytuNKPIjBMTMIY1AnOH3seL5mvF+x33oGAyK3hVt3A==}
 
   cardinal@2.1.1:
     resolution: {integrity: sha512-JSr5eOgoEymtYHBjNWyjrMqet9Am2miJhlfKNdqLp6zoeAh0KN5dRAcxlecj5mAJrmQomgiOBj35xHLrFjqBpw==}
@@ -7949,6 +8014,9 @@ packages:
   minimatch@3.1.2:
     resolution: {integrity: sha512-J7p63hRiAjw1NDEww1W7i37+ByIrOWO5XQQAzZ3VOcL0PNybwpfmV/N05zFAzwQ9USyEcX6t3UO+K5aqBQOIHw==}
 
+  minimatch@3.1.5:
+    resolution: {integrity: sha512-VgjWUsnnT6n+NUk6eZq77zeFdpW2LWDzP6zFGrCbHXiYNul5Dzqk2HHQ5uFH2DNW5Xbp8+jVzaeNt94ssEEl4w==}
+
   minimatch@5.1.6:
     resolution: {integrity: sha512-lKwV/1brpG6mBUFHtb7NUmtABCb2WZZmm2wNiOA5hAb8VdCS4B3dtMWyvcoViccwAW/COERjXLt0zP1zXUN26g==}
     engines: {node: '>=10'}
@@ -8585,13 +8653,13 @@ packages:
   platform@1.3.6:
     resolution: {integrity: sha512-fnWVljUchTro6RiCFvCXBbNhJc2NijN7oIQxbwsyL0buWJPG85v81ehlHI9fXrJsMNgTofEoWIQeClKpgxFLrg==}
 
-  playwright-core@1.57.0:
-    resolution: {integrity: sha512-agTcKlMw/mjBWOnD6kFZttAAGHgi/Nw0CZ2o6JqWSbMlI219lAFLZZCyqByTsvVAJq5XA5H8cA6PrvBRpBWEuQ==}
+  playwright-core@1.58.2:
+    resolution: {integrity: sha512-yZkEtftgwS8CsfYo7nm0KE8jsvm6i/PTgVtB8DL726wNf6H2IMsDuxCpJj59KDaxCtSnrWan2AeDqM7JBaultg==}
     engines: {node: '>=18'}
     hasBin: true
 
-  playwright@1.57.0:
-    resolution: {integrity: sha512-ilYQj1s8sr2ppEJ2YVadYBN0Mb3mdo9J0wQ+UuDhzYqURwSoW4n1Xs5vs7ORwgDGmyEh33tRMeS8KhdkMoLXQw==}
+  playwright@1.58.2:
+    resolution: {integrity: sha512-vA30H8Nvkq/cPBnNw4Q8TWz1EJyqgpuinBcHET0YVJVFldr8JDNiU9LaWAE1KqSkRYazuaBhTpB5ZzShOezQ6A==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -11486,6 +11554,20 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@eslint/eslintrc@3.3.4':
+    dependencies:
+      ajv: 6.14.0
+      debug: 4.4.3
+      espree: 10.4.0
+      globals: 14.0.0
+      ignore: 5.3.2
+      import-fresh: 3.3.1
+      js-yaml: 4.1.1
+      minimatch: 3.1.5
+      strip-json-comments: 3.1.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@eslint/js@9.39.2': {}
 
   '@eslint/object-schema@2.1.7': {}
@@ -13233,9 +13315,9 @@ snapshots:
 
   '@pkgr/core@0.2.9': {}
 
-  '@playwright/test@1.57.0':
+  '@playwright/test@1.58.2':
     dependencies:
-      playwright: 1.57.0
+      playwright: 1.58.2
 
   '@prisma/adapter-pg@7.2.0':
     dependencies:
@@ -14027,12 +14109,36 @@ snapshots:
   '@ruvector/edge-full@0.1.0':
     optional: true
 
+  '@ruvector/gnn-darwin-arm64@0.1.22':
+    optional: true
+
+  '@ruvector/gnn-darwin-x64@0.1.22':
+    optional: true
+
+  '@ruvector/gnn-linux-arm64-gnu@0.1.22':
+    optional: true
+
+  '@ruvector/gnn-linux-arm64-musl@0.1.22':
+    optional: true
+
   '@ruvector/gnn-linux-x64-gnu@0.1.22':
+    optional: true
+
+  '@ruvector/gnn-linux-x64-musl@0.1.22':
+    optional: true
+
+  '@ruvector/gnn-win32-x64-msvc@0.1.22':
     optional: true
 
   '@ruvector/gnn@0.1.22':
     optionalDependencies:
+      '@ruvector/gnn-darwin-arm64': 0.1.22
+      '@ruvector/gnn-darwin-x64': 0.1.22
+      '@ruvector/gnn-linux-arm64-gnu': 0.1.22
+      '@ruvector/gnn-linux-arm64-musl': 0.1.22
       '@ruvector/gnn-linux-x64-gnu': 0.1.22
+      '@ruvector/gnn-linux-x64-musl': 0.1.22
+      '@ruvector/gnn-win32-x64-msvc': 0.1.22
 
   '@ruvector/graph-node-darwin-arm64@0.1.26':
     optional: true
@@ -14138,12 +14244,28 @@ snapshots:
       '@ruvector/sona-win32-arm64-msvc': 0.1.5
       '@ruvector/sona-win32-x64-msvc': 0.1.5
 
+  '@ruvector/tiny-dancer-darwin-arm64@0.1.15':
+    optional: true
+
+  '@ruvector/tiny-dancer-darwin-x64@0.1.15':
+    optional: true
+
+  '@ruvector/tiny-dancer-linux-arm64-gnu@0.1.15':
+    optional: true
+
   '@ruvector/tiny-dancer-linux-x64-gnu@0.1.15':
+    optional: true
+
+  '@ruvector/tiny-dancer-win32-x64-msvc@0.1.15':
     optional: true
 
   '@ruvector/tiny-dancer@0.1.15':
     optionalDependencies:
+      '@ruvector/tiny-dancer-darwin-arm64': 0.1.15
+      '@ruvector/tiny-dancer-darwin-x64': 0.1.15
+      '@ruvector/tiny-dancer-linux-arm64-gnu': 0.1.15
       '@ruvector/tiny-dancer-linux-x64-gnu': 0.1.15
+      '@ruvector/tiny-dancer-win32-x64-msvc': 0.1.15
     optional: true
 
   '@scarf/scarf@1.4.0': {}
@@ -14580,7 +14702,7 @@ snapshots:
       picocolors: 1.1.1
       redent: 3.0.0
 
-  '@testing-library/react@16.3.1(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+  '@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@babel/runtime': 7.28.4
       '@testing-library/dom': 10.4.1
@@ -15769,6 +15891,13 @@ snapshots:
       json-schema-traverse: 0.4.1
       uri-js: 4.4.1
 
+  ajv@6.14.0:
+    dependencies:
+      fast-deep-equal: 3.1.3
+      fast-json-stable-stringify: 2.1.0
+      json-schema-traverse: 0.4.1
+      uri-js: 4.4.1
+
   ajv@8.17.1:
     dependencies:
       fast-deep-equal: 3.1.3
@@ -16015,6 +16144,15 @@ snapshots:
       postcss: 8.5.6
       postcss-value-parser: 4.2.0
 
+  autoprefixer@10.4.27(postcss@8.5.6):
+    dependencies:
+      browserslist: 4.28.1
+      caniuse-lite: 1.0.30001775
+      fraction.js: 5.3.4
+      picocolors: 1.1.1
+      postcss: 8.5.6
+      postcss-value-parser: 4.2.0
+
   available-typed-arrays@1.0.7:
     dependencies:
       possible-typed-array-names: 1.1.0
@@ -16240,7 +16378,7 @@ snapshots:
   browserslist@4.28.1:
     dependencies:
       baseline-browser-mapping: 2.9.11
-      caniuse-lite: 1.0.30001761
+      caniuse-lite: 1.0.30001775
       electron-to-chromium: 1.5.267
       node-releases: 2.0.27
       update-browserslist-db: 1.2.3(browserslist@4.28.1)
@@ -16372,6 +16510,8 @@ snapshots:
   camelcase@6.3.0: {}
 
   caniuse-lite@1.0.30001761: {}
+
+  caniuse-lite@1.0.30001775: {}
 
   cardinal@2.1.1:
     dependencies:
@@ -19413,6 +19553,10 @@ snapshots:
     dependencies:
       brace-expansion: 1.1.12
 
+  minimatch@3.1.5:
+    dependencies:
+      brace-expansion: 1.1.12
+
   minimatch@5.1.6:
     dependencies:
       brace-expansion: 2.0.2
@@ -19554,10 +19698,10 @@ snapshots:
 
   neo-async@2.6.2: {}
 
-  next-auth@5.0.0-beta.30(next@15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react@19.2.3):
+  next-auth@5.0.0-beta.30(next@15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react@19.2.3):
     dependencies:
       '@auth/core': 0.41.0
-      next: 15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      next: 15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       react: 19.2.3
 
   next-themes@0.4.6(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
@@ -19565,7 +19709,7 @@ snapshots:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
-  next@15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+  next@15.5.11(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
     dependencies:
       '@next/env': 15.5.11
       '@swc/helpers': 0.5.15
@@ -19584,7 +19728,7 @@ snapshots:
       '@next/swc-win32-arm64-msvc': 15.5.7
       '@next/swc-win32-x64-msvc': 15.5.7
       '@opentelemetry/api': 1.9.0
-      '@playwright/test': 1.57.0
+      '@playwright/test': 1.58.2
       sharp: 0.34.5
     transitivePeerDependencies:
       - '@babel/core'
@@ -20117,11 +20261,11 @@ snapshots:
 
   platform@1.3.6: {}
 
-  playwright-core@1.57.0: {}
+  playwright-core@1.58.2: {}
 
-  playwright@1.57.0:
+  playwright@1.58.2:
     dependencies:
-      playwright-core: 1.57.0
+      playwright-core: 1.58.2
     optionalDependencies:
       fsevents: 2.3.2
 

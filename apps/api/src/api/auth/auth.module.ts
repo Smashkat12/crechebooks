@@ -149,10 +149,18 @@ export class AuthModule implements OnModuleInit {
    */
   private validateAuthConfiguration(): void {
     const nodeEnv = this.configService.get<string>('NODE_ENV');
-    const isProduction = nodeEnv === 'production';
+    const appEnv = this.configService.get<string>('APP_ENV'); // staging, production, or unset
+    const isProduction =
+      nodeEnv === 'production' && appEnv !== 'staging';
     const isDevelopment = nodeEnv === 'development';
     const authProvider =
       this.configService.get<string>('AUTH_PROVIDER') || 'auth0';
+
+    if (appEnv === 'staging') {
+      this.logger.warn(
+        `Staging mode active (APP_ENV=staging). Production auth guards relaxed.`,
+      );
+    }
 
     // Production validation
     if (isProduction) {
@@ -219,13 +227,14 @@ export class AuthModule implements OnModuleInit {
         }
 
         // Block DEV_AUTH_ENABLED in production - dev login bypass must never be active in prod
+        // Staging (APP_ENV=staging) is allowed to use DEV_AUTH_ENABLED=true
         const devAuthEnabled =
           this.configService.get<string>('DEV_AUTH_ENABLED');
         if (devAuthEnabled === 'true') {
           const errorMsg =
             'FATAL: DEV_AUTH_ENABLED=true is not allowed in production. ' +
             'The dev-login endpoint bypasses production authentication. ' +
-            'Set DEV_AUTH_ENABLED=false or remove it from your production environment.';
+            'Set DEV_AUTH_ENABLED=false, remove it, or set APP_ENV=staging for staging environments.';
           this.logger.error(errorMsg);
           throw new Error(errorMsg);
         }
@@ -245,8 +254,9 @@ export class AuthModule implements OnModuleInit {
       );
     }
 
-    // Development validation
-    if (isDevelopment) {
+    // Development / staging validation
+    const isStaging = appEnv === 'staging';
+    if (isDevelopment || isStaging) {
       const jwtSecret = this.configService.get<string>('JWT_SECRET');
       const devAuthEnabled = this.configService.get<string>('DEV_AUTH_ENABLED');
 

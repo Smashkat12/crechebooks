@@ -18,9 +18,9 @@ const DEFAULT_BASE_URL = 'http://localhost:3000';
 export const ENVIRONMENT_URLS: Record<string, string> = {
   local: 'http://localhost:3000',
   development: 'http://localhost:3000',
-  staging: process.env.CB_STAGING_URL || 'https://staging-crechebooks.up.railway.app',
-  production: process.env.CB_PRODUCTION_URL || 'https://crechebooks.up.railway.app',
-  railway: process.env.CB_PRODUCTION_URL || 'https://crechebooks.up.railway.app',
+  staging: process.env.CB_STAGING_URL || 'https://api-staging-5287.up.railway.app',
+  production: process.env.CB_PRODUCTION_URL || 'https://api.elleelephant.co.za',
+  railway: process.env.CB_PRODUCTION_URL || 'https://api.elleelephant.co.za',
 };
 
 /**

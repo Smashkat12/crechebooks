@@ -43,6 +43,41 @@ The primary MCP server key is `claude-flow@alpha` (matches `.mcp.json`). The `en
 | `predict` | Disabled | Not yet configured |
 | `document` | Disabled | Not yet configured |
 
+## Environments
+
+| | Production | Staging |
+|---|---|---|
+| **API** | `https://api.elleelephant.co.za` | `https://api-staging-5287.up.railway.app` |
+| **Web** | `https://app.elleelephant.co.za` | `https://web-staging-30e8.up.railway.app` |
+| **Auth** | Auth0 (RS256) | JWT (HS256) via `APP_ENV=staging` |
+| **Git branch** | `main` | `staging` |
+| **Deploy** | Auto on push to `main` | Auto on push to `staging` |
+
+**Tenant ID**: `bdff4374-64d5-420c-b454-8e85e9df552a` (env: `$CB_TENANT_ID`)
+**Route prefix**: All endpoints are at `/api/v1/*` (except `/health`)
+
+### Staging-First Workflow
+1. Work on `staging` branch
+2. Push to `origin staging` — Railway auto-deploys to staging
+3. Test at `https://api-staging-5287.up.railway.app`
+4. Merge `staging` into `main` for production deploy
+
+### API & DB Helpers
+
+Both helpers respect `CB_ENVIRONMENT` (default: `staging` in `.claude/settings.json`).
+
+```bash
+# Staging (default)
+.claude/helpers/cb-db.sh "SELECT ... FROM table WHERE tenant_id = '\$TENANT'"
+.claude/helpers/cb-api.sh GET /endpoint
+
+# Production (explicit)
+CB_ENVIRONMENT=production .claude/helpers/cb-db.sh "SELECT ... FROM table WHERE tenant_id = '\$TENANT'"
+CB_ENVIRONMENT=production .claude/helpers/cb-api.sh GET /endpoint
+```
+
+See `.claude/commands/crechebooks/_api-guide.md` for the full endpoint reference.
+
 ## CrecheBooks Domain Rules
 
 - **Currency**: South African Rand (ZAR)

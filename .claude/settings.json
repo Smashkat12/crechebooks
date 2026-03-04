@@ -2,8 +2,8 @@
   "customInstructions": "Follow the project's CLAUDE.md guidelines. CrecheBooks is a claude-flow v3 project. Use concurrent execution for all operations. Batch all related tool calls in a single message. Use pnpm (not npm). All amounts in ZAR cents. Tenant isolation is mandatory.",
   "env": {
     "CLAUDE_FLOW_VERSION": "3",
-    "CLAUDE_FLOW_AUTO_COMMIT": "false",
-    "CLAUDE_FLOW_AUTO_PUSH": "false",
+    "CLAUDE_FLOW_AUTO_COMMIT": "true",
+    "CLAUDE_FLOW_AUTO_PUSH": "true",
     "CLAUDE_FLOW_HOOKS_ENABLED": "true",
     "CLAUDE_FLOW_TELEMETRY_ENABLED": "true",
     "CLAUDE_FLOW_REMOTE_EXECUTION": "true",
@@ -32,7 +32,13 @@
     "AGENTIC_FLOW_AGENT_NAME": "claude-code",
     "AGENTIC_FLOW_PATTERN_BROADCAST_THRESHOLD": "0.7",
     "AGENTIC_FLOW_CONSENSUS_TIMEOUT": "30000",
-    "AGENTIC_FLOW_AUTO_BROADCAST_PATTERNS": "true"
+    "AGENTIC_FLOW_AUTO_BROADCAST_PATTERNS": "true",
+    "CB_API_URL": "https://api.elleelephant.co.za",
+    "CB_STAGING_API_URL": "https://api-staging-5287.up.railway.app",
+    "CB_TENANT_ID": "bdff4374-64d5-420c-b454-8e85e9df552a",
+    "CB_ENVIRONMENT": "staging",
+    "CRECHEBOOKS_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MjZiYWVkYy00NzRkLTRmZjAtOWY3Ni02Y2ZjNDg5ZGQ4M2IiLCJlbWFpbCI6InNtYXNoa2F0MTJAZ21haWwuY29tIiwidGVuYW50SWQiOiJiZGZmNDM3NC02NGQ1LTQyMGMtYjQ1NC04ZTg1ZTlkZjU1MmEiLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NzI1MzE0NDEsImV4cCI6MTgwNDA2NzQ0MX0.HQfVFednxoXXnrN3bXE4IpdIrHhlrEqZtVLY3rHug8s",
+    "CB_STAGING_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MjZiYWVkYy00NzRkLTRmZjAtOWY3Ni02Y2ZjNDg5ZGQ4M2IiLCJlbWFpbCI6InNtYXNoa2F0MTJAZ21haWwuY29tIiwibmFtZSI6IkthdGxlZ28gTW91bGFuZSIsInJvbGUiOiJBRE1JTiIsInRlbmFudElkIjoiYmRmZjQzNzQtNjRkNS00MjBjLWI0NTQtOGU4NWU5ZGY1NTJhIiwiaWF0IjoxNzcyNTM1OTY2LCJleHAiOjE4MDQwNzE5NjZ9.GZTsRnN8KC3rMuUN1oQMVwFgLTBrfda3254JjKN-aXY"
   },
   "permissions": {
     "allow": [

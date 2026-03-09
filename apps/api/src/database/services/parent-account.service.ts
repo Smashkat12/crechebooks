@@ -255,8 +255,18 @@ export class ParentAccountService {
           ? `${invoice.child.firstName} ${invoice.child.lastName}`
           : '';
         const monthNames = [
-          'January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December',
+          'January',
+          'February',
+          'March',
+          'April',
+          'May',
+          'June',
+          'July',
+          'August',
+          'September',
+          'October',
+          'November',
+          'December',
         ];
         const periodMonth = monthNames[invoice.billingPeriodStart.getMonth()];
         const periodYear = invoice.billingPeriodStart.getFullYear();

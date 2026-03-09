@@ -12,10 +12,7 @@ import {
   FeeCorrectionApplyResult,
 } from '../fee-inflation-correction.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  BankFeeService,
-  TransactionType,
-} from '../bank-fee.service';
+import { BankFeeService, TransactionType } from '../bank-fee.service';
 import { AccruedBankChargeService } from '../accrued-bank-charge.service';
 import { AuditLogService } from '../audit-log.service';
 import { BankStatementMatchStatus } from '@prisma/client';
@@ -67,7 +64,10 @@ describe('FeeInflationCorrectionService', () => {
         FeeInflationCorrectionService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: BankFeeService, useValue: mockBankFeeService },
-        { provide: AccruedBankChargeService, useValue: mockAccruedChargeService },
+        {
+          provide: AccruedBankChargeService,
+          useValue: mockAccruedChargeService,
+        },
         { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
@@ -145,7 +145,7 @@ describe('FeeInflationCorrectionService', () => {
 
       // Fee ratio 0.5% < 3% → 0.80 confidence (below MIN_CORRECTION_CONFIDENCE)
       expect(result.isMatch).toBe(false);
-      expect(result.confidence).toBe(0.80);
+      expect(result.confidence).toBe(0.8);
       expect(result.actualFeeCents).toBe(500);
     });
 
@@ -195,7 +195,7 @@ describe('FeeInflationCorrectionService', () => {
       );
 
       expect(result.isMatch).toBe(true);
-      expect(result.confidence).toBe(0.90);
+      expect(result.confidence).toBe(0.9);
     });
 
     it('should detect RTC payment fee with high confidence (R8.00)', async () => {
@@ -291,8 +291,8 @@ describe('FeeInflationCorrectionService', () => {
 
       const result = await service.detectAndValidateFeeMatch(
         tenantId,
-        1000000,  // R10,000 bank
-        1012970,  // R10,129.70 xero — fee of R129.70 (1.3% of amount)
+        1000000, // R10,000 bank
+        1012970, // R10,129.70 xero — fee of R129.70 (1.3% of amount)
         'ADT Fridge Deposit',
       );
 
@@ -543,11 +543,9 @@ describe('FeeInflationCorrectionService', () => {
         },
       ]);
 
-      const result = (await service.correctExistingMatches(
-        tenantId,
-        userId,
-        { dryRun: true },
-      )) as FeeCorrectionPreview;
+      const result = (await service.correctExistingMatches(tenantId, userId, {
+        dryRun: true,
+      })) as FeeCorrectionPreview;
 
       expect(result.totalMatches).toBe(1);
       expect(result.correctableMatches).toBe(1);
@@ -579,11 +577,9 @@ describe('FeeInflationCorrectionService', () => {
       );
       mockBankFeeService.calculateFees.mockResolvedValue([]);
 
-      const result = (await service.correctExistingMatches(
-        tenantId,
-        userId,
-        { dryRun: true },
-      )) as FeeCorrectionPreview;
+      const result = (await service.correctExistingMatches(tenantId, userId, {
+        dryRun: true,
+      })) as FeeCorrectionPreview;
 
       expect(result.correctableMatches).toBe(0);
       expect(result.skipped).toHaveLength(1);
@@ -599,11 +595,9 @@ describe('FeeInflationCorrectionService', () => {
       mockPrisma.bankStatementMatch.findMany.mockResolvedValue([]);
       // The where clause filters isFeeAdjustedMatch: false
 
-      const result = (await service.correctExistingMatches(
-        tenantId,
-        userId,
-        { dryRun: true },
-      )) as FeeCorrectionPreview;
+      const result = (await service.correctExistingMatches(tenantId, userId, {
+        dryRun: true,
+      })) as FeeCorrectionPreview;
 
       expect(result.totalMatches).toBe(0);
     });
@@ -655,11 +649,9 @@ describe('FeeInflationCorrectionService', () => {
         id: 'accrued-1',
       });
 
-      const result = (await service.correctExistingMatches(
-        tenantId,
-        userId,
-        { dryRun: false },
-      )) as FeeCorrectionApplyResult;
+      const result = (await service.correctExistingMatches(tenantId, userId, {
+        dryRun: false,
+      })) as FeeCorrectionApplyResult;
 
       expect(result.corrected).toBe(1);
       expect(result.totalFeesCents).toBe(1470);

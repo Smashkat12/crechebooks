@@ -114,7 +114,9 @@ export class AccountingController {
   ): Promise<ConnectResponseDto> {
     this.assertProviderReady();
     const tenantId = getTenantId(user);
-    this.logger.log(`Initiating ${this.provider.providerName} connection for tenant ${tenantId}`);
+    this.logger.log(
+      `Initiating ${this.provider.providerName} connection for tenant ${tenantId}`,
+    );
 
     const result = await this.provider.getAuthUrl(tenantId, dto.returnUrl);
     return { authUrl: result.authUrl };
@@ -128,14 +130,19 @@ export class AccountingController {
     description:
       'Processes the OAuth callback to complete the connection. Typically invoked via redirect.',
   })
-  @ApiResponse({ status: 200, description: 'Connection completed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Connection completed successfully',
+  })
   async callback(
     @CurrentUser() user: IUser,
     @Query() query: CallbackQueryDto,
   ): Promise<{ success: boolean }> {
     this.assertProviderReady();
     const tenantId = getTenantId(user);
-    this.logger.log(`Processing ${this.provider.providerName} OAuth callback for tenant ${tenantId}`);
+    this.logger.log(
+      `Processing ${this.provider.providerName} OAuth callback for tenant ${tenantId}`,
+    );
 
     await this.provider.handleCallback(tenantId, query.code, query.state);
     return { success: true };
@@ -178,12 +185,12 @@ export class AccountingController {
       'Revokes tokens and disconnects the tenant from the accounting provider.',
   })
   @ApiResponse({ status: 200, type: DisconnectResponseDto })
-  async disconnect(
-    @CurrentUser() user: IUser,
-  ): Promise<DisconnectResponseDto> {
+  async disconnect(@CurrentUser() user: IUser): Promise<DisconnectResponseDto> {
     this.assertProviderReady();
     const tenantId = getTenantId(user);
-    this.logger.log(`Disconnecting ${this.provider.providerName} for tenant ${tenantId}`);
+    this.logger.log(
+      `Disconnecting ${this.provider.providerName} for tenant ${tenantId}`,
+    );
 
     await this.provider.disconnect(tenantId);
     return { success: true, message: 'Accounting provider disconnected' };
@@ -194,7 +201,8 @@ export class AccountingController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Push invoice',
-    description: 'Push a single CrecheBooks invoice to the external accounting system.',
+    description:
+      'Push a single CrecheBooks invoice to the external accounting system.',
   })
   @ApiResponse({ status: 200, description: 'Invoice pushed successfully' })
   async pushInvoice(
@@ -215,7 +223,8 @@ export class AccountingController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Push invoices in bulk',
-    description: 'Push multiple CrecheBooks invoices to the external accounting system.',
+    description:
+      'Push multiple CrecheBooks invoices to the external accounting system.',
   })
   @ApiResponse({ status: 200, description: 'Bulk push completed' })
   async pushInvoicesBulk(
@@ -238,7 +247,8 @@ export class AccountingController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Pull invoices',
-    description: 'Pull invoices from the external accounting system into CrecheBooks.',
+    description:
+      'Pull invoices from the external accounting system into CrecheBooks.',
   })
   @ApiResponse({ status: 200, description: 'Invoices pulled successfully' })
   async pullInvoices(
@@ -272,7 +282,9 @@ export class AccountingController {
   ) {
     this.assertProviderReady();
     const tenantId = getTenantId(user);
-    this.logger.log(`Syncing contact for parent ${dto.parentId}, tenant ${tenantId}`);
+    this.logger.log(
+      `Syncing contact for parent ${dto.parentId}, tenant ${tenantId}`,
+    );
 
     return this.provider.syncContact(tenantId, dto.parentId);
   }
@@ -282,7 +294,8 @@ export class AccountingController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
     summary: 'Sync contacts in bulk',
-    description: 'Sync multiple CrecheBooks parent records to external contacts.',
+    description:
+      'Sync multiple CrecheBooks parent records to external contacts.',
   })
   @ApiResponse({ status: 200, description: 'Bulk contact sync completed' })
   async syncContactsBulk(
@@ -345,7 +358,8 @@ export class AccountingController {
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Get chart of accounts',
-    description: 'Retrieve the chart of accounts from the external accounting system.',
+    description:
+      'Retrieve the chart of accounts from the external accounting system.',
   })
   @ApiResponse({ status: 200, description: 'Accounts retrieved successfully' })
   async getAccounts(@CurrentUser() user: IUser) {
@@ -366,7 +380,10 @@ export class AccountingController {
       'Requires the provider to support journals (check capabilities first).',
   })
   @ApiResponse({ status: 201, description: 'Journal posted successfully' })
-  @ApiResponse({ status: 422, description: 'Provider does not support journals' })
+  @ApiResponse({
+    status: 422,
+    description: 'Provider does not support journals',
+  })
   @HttpCode(HttpStatus.CREATED)
   async postJournal(
     @CurrentUser() user: IUser,
@@ -404,15 +421,10 @@ export class AccountingController {
       'with the external accounting system.',
   })
   @ApiResponse({ status: 200, description: 'Sync completed' })
-  async sync(
-    @CurrentUser() user: IUser,
-    @Body() dto: SyncRequestDto,
-  ) {
+  async sync(@CurrentUser() user: IUser, @Body() dto: SyncRequestDto) {
     this.assertProviderReady();
     const tenantId = getTenantId(user);
-    this.logger.log(
-      `Starting ${dto.direction} sync for tenant ${tenantId}`,
-    );
+    this.logger.log(`Starting ${dto.direction} sync for tenant ${tenantId}`);
 
     return this.provider.sync(tenantId, {
       direction: dto.direction,
@@ -429,7 +441,8 @@ export class AccountingController {
       (this.provider as unknown as Record<string, unknown>).__pending === true
     ) {
       const name =
-        (this.provider as unknown as Record<string, unknown>)?.providerName ?? 'unknown';
+        (this.provider as unknown as Record<string, unknown>)?.providerName ??
+        'unknown';
       throw new BusinessException(
         `Accounting provider '${name}' is not yet configured. ` +
           'An adapter must be registered for this provider.',

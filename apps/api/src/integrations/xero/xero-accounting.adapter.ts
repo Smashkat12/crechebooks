@@ -104,8 +104,17 @@ export class XeroAccountingAdapter implements AccountingProvider {
 
     await this.prisma.xeroOAuthState.upsert({
       where: { tenantId },
-      create: { tenantId, codeVerifier: 'not-used', state, expiresAt: new Date(Date.now() + 600_000) },
-      update: { codeVerifier: 'not-used', state, expiresAt: new Date(Date.now() + 600_000) },
+      create: {
+        tenantId,
+        codeVerifier: 'not-used',
+        state,
+        expiresAt: new Date(Date.now() + 600_000),
+      },
+      update: {
+        codeVerifier: 'not-used',
+        state,
+        expiresAt: new Date(Date.now() + 600_000),
+      },
     });
 
     const baseUrl = await Promise.resolve(xeroClient.buildConsentUrl());
@@ -113,13 +122,19 @@ export class XeroAccountingAdapter implements AccountingProvider {
   }
 
   /** Handle the OAuth callback -- exchange code for tokens and persist. */
-  async handleCallback(tenantId: string, code: string, state: string): Promise<void> {
+  async handleCallback(
+    tenantId: string,
+    code: string,
+    state: string,
+  ): Promise<void> {
     const statePayload = this.authService.validateState(state);
     if (statePayload.tenantId !== tenantId) {
       throw new Error('OAuth state tenantId mismatch');
     }
 
-    const storedState = await this.prisma.xeroOAuthState.findUnique({ where: { tenantId } });
+    const storedState = await this.prisma.xeroOAuthState.findUnique({
+      where: { tenantId },
+    });
     if (!storedState || storedState.state !== state) {
       throw new Error('Invalid OAuth state. Possible CSRF attack.');
     }
@@ -127,7 +142,9 @@ export class XeroAccountingAdapter implements AccountingProvider {
     const redirectUri = this.requireEnv('XERO_REDIRECT_URI');
     const xeroClient = this.buildXeroClient();
 
-    const tokenSet = (await xeroClient.apiCallback(`${redirectUri}?code=${code}`)) as {
+    const tokenSet = (await xeroClient.apiCallback(
+      `${redirectUri}?code=${code}`,
+    )) as {
       access_token?: string;
       refresh_token?: string;
       expires_in?: number;
@@ -146,15 +163,21 @@ export class XeroAccountingAdapter implements AccountingProvider {
 
     await this.prisma.tenant.update({
       where: { id: tenantId },
-      data: { xeroConnectedAt: new Date(), xeroTenantName: xeroTenant.tenantName ?? undefined },
+      data: {
+        xeroConnectedAt: new Date(),
+        xeroTenantName: xeroTenant.tenantName ?? undefined,
+      },
     });
     await this.prisma.xeroOAuthState.delete({ where: { tenantId } });
   }
 
   /** Check whether the tenant has a valid Xero connection. */
   async getConnectionStatus(tenantId: string): Promise<ConnectionStatus> {
-    const xeroToken = await this.prisma.xeroToken.findUnique({ where: { tenantId } });
-    if (!xeroToken) return { isConnected: false, providerName: this.providerName };
+    const xeroToken = await this.prisma.xeroToken.findUnique({
+      where: { tenantId },
+    });
+    if (!xeroToken)
+      return { isConnected: false, providerName: this.providerName };
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -184,9 +207,19 @@ export class XeroAccountingAdapter implements AccountingProvider {
   // ---------------------------------------------------------------------------
 
   /** Push a single invoice to Xero. */
-  async pushInvoice(tenantId: string, invoiceId: string, options?: PushInvoiceOptions): Promise<InvoiceSyncResult> {
+  async pushInvoice(
+    tenantId: string,
+    invoiceId: string,
+    options?: PushInvoiceOptions,
+  ): Promise<InvoiceSyncResult> {
     const { accessToken, xeroTenantId } = await this.getCredentials(tenantId);
-    const r = await this.invoiceService.pushInvoice(tenantId, invoiceId, accessToken, xeroTenantId, options?.force ?? false);
+    const r = await this.invoiceService.pushInvoice(
+      tenantId,
+      invoiceId,
+      accessToken,
+      xeroTenantId,
+      options?.force ?? false,
+    );
     return {
       invoiceId: r.invoiceId,
       externalInvoiceId: r.xeroInvoiceId,
@@ -197,9 +230,19 @@ export class XeroAccountingAdapter implements AccountingProvider {
   }
 
   /** Push multiple invoices to Xero in bulk. */
-  async pushInvoicesBulk(tenantId: string, invoiceIds: string[], options?: PushInvoiceOptions): Promise<BulkInvoiceSyncResult> {
+  async pushInvoicesBulk(
+    tenantId: string,
+    invoiceIds: string[],
+    options?: PushInvoiceOptions,
+  ): Promise<BulkInvoiceSyncResult> {
     const { accessToken, xeroTenantId } = await this.getCredentials(tenantId);
-    const r = await this.invoiceService.pushInvoices(tenantId, invoiceIds, accessToken, xeroTenantId, options?.force ?? false);
+    const r = await this.invoiceService.pushInvoices(
+      tenantId,
+      invoiceIds,
+      accessToken,
+      xeroTenantId,
+      options?.force ?? false,
+    );
     return {
       pushed: r.pushed,
       failed: r.failed,
@@ -211,14 +254,26 @@ export class XeroAccountingAdapter implements AccountingProvider {
         externalStatus: i.xeroStatus,
         syncedAt: i.syncedAt,
       })),
-      errors: r.errors.map((e) => ({ entityId: e.invoiceId, error: e.error, code: e.code })),
+      errors: r.errors.map((e) => ({
+        entityId: e.invoiceId,
+        error: e.error,
+        code: e.code,
+      })),
     };
   }
 
   /** Pull invoices from Xero. */
-  async pullInvoices(tenantId: string, filters?: InvoicePullFilters): Promise<PulledInvoicesResult> {
+  async pullInvoices(
+    tenantId: string,
+    filters?: InvoicePullFilters,
+  ): Promise<PulledInvoicesResult> {
     const { accessToken, xeroTenantId } = await this.getCredentials(tenantId);
-    const r = await this.invoiceService.pullInvoices(tenantId, accessToken, xeroTenantId, filters?.since);
+    const r = await this.invoiceService.pullInvoices(
+      tenantId,
+      accessToken,
+      xeroTenantId,
+      filters?.since,
+    );
     return {
       totalFound: r.totalFound,
       imported: r.imported,
@@ -238,7 +293,11 @@ export class XeroAccountingAdapter implements AccountingProvider {
         imported: inv.imported,
         importReason: inv.importReason,
       })),
-      errors: r.errors.map((e) => ({ entityId: e.xeroInvoiceId, error: e.error, code: e.code })),
+      errors: r.errors.map((e) => ({
+        entityId: e.xeroInvoiceId,
+        error: e.error,
+        code: e.code,
+      })),
     };
   }
 
@@ -247,7 +306,10 @@ export class XeroAccountingAdapter implements AccountingProvider {
   // ---------------------------------------------------------------------------
 
   /** Sync a single parent to a Xero contact. */
-  async syncContact(tenantId: string, parentId: string): Promise<ContactSyncResult> {
+  async syncContact(
+    tenantId: string,
+    parentId: string,
+  ): Promise<ContactSyncResult> {
     const r = await this.contactService.getOrCreateContact(tenantId, parentId);
     return {
       parentId: r.parentId,
@@ -259,7 +321,10 @@ export class XeroAccountingAdapter implements AccountingProvider {
   }
 
   /** Sync multiple parents to Xero contacts in bulk. */
-  async syncContactsBulk(tenantId: string, parentIds: string[]): Promise<BulkContactSyncResult> {
+  async syncContactsBulk(
+    tenantId: string,
+    parentIds: string[],
+  ): Promise<BulkContactSyncResult> {
     const r = await this.contactService.bulkSyncContacts(tenantId, parentIds);
     return {
       synced: r.synced,
@@ -272,7 +337,11 @@ export class XeroAccountingAdapter implements AccountingProvider {
         wasCreated: c.wasCreated,
         syncedAt: c.syncedAt,
       })),
-      errors: r.errors.map((e) => ({ entityId: e.parentId, error: e.error, code: e.code })),
+      errors: r.errors.map((e) => ({
+        entityId: e.parentId,
+        error: e.error,
+        code: e.code,
+      })),
     };
   }
 
@@ -281,8 +350,16 @@ export class XeroAccountingAdapter implements AccountingProvider {
   // ---------------------------------------------------------------------------
 
   /** Sync a single payment to Xero. */
-  async syncPayment(tenantId: string, paymentId: string, invoiceRef: string): Promise<PaymentSyncResult> {
-    const r = await this.paymentService.syncPaymentToXero(tenantId, paymentId, invoiceRef);
+  async syncPayment(
+    tenantId: string,
+    paymentId: string,
+    invoiceRef: string,
+  ): Promise<PaymentSyncResult> {
+    const r = await this.paymentService.syncPaymentToXero(
+      tenantId,
+      paymentId,
+      invoiceRef,
+    );
     return {
       paymentId: r.paymentId,
       externalPaymentId: r.xeroPaymentId,
@@ -293,8 +370,14 @@ export class XeroAccountingAdapter implements AccountingProvider {
   }
 
   /** Pull payments from Xero for a given external invoice. */
-  async pullPayments(tenantId: string, invoiceRef: string): Promise<PulledPaymentsResult> {
-    const r = await this.paymentService.pullPaymentsFromXero(tenantId, invoiceRef);
+  async pullPayments(
+    tenantId: string,
+    invoiceRef: string,
+  ): Promise<PulledPaymentsResult> {
+    const r = await this.paymentService.pullPaymentsFromXero(
+      tenantId,
+      invoiceRef,
+    );
     return {
       payments: r.results.map((p) => ({
         paymentId: p.paymentId,
@@ -303,7 +386,11 @@ export class XeroAccountingAdapter implements AccountingProvider {
         amountCents: p.amountCents,
         syncedAt: p.syncedAt,
       })),
-      errors: r.errors.map((e) => ({ entityId: e.paymentId, error: e.error, code: e.code })),
+      errors: r.errors.map((e) => ({
+        entityId: e.paymentId,
+        error: e.error,
+        code: e.code,
+      })),
     };
   }
 
@@ -312,7 +399,10 @@ export class XeroAccountingAdapter implements AccountingProvider {
   // ---------------------------------------------------------------------------
 
   /** Import bank feed transactions from Xero. */
-  async syncBankTransactions(tenantId: string, options?: BankSyncOptions): Promise<BankSyncResult> {
+  async syncBankTransactions(
+    tenantId: string,
+    options?: BankSyncOptions,
+  ): Promise<BankSyncResult> {
     const r = await this.bankFeedService.syncTransactions(tenantId, {
       fromDate: options?.fromDate ? new Date(options.fromDate) : undefined,
       forceFullSync: false,
@@ -320,7 +410,11 @@ export class XeroAccountingAdapter implements AccountingProvider {
     return {
       transactionsImported: r.transactionsCreated,
       transactionsUpdated: 0,
-      errors: r.errors.map((e) => ({ entityId: e.transactionId, error: e.error, code: e.code })),
+      errors: r.errors.map((e) => ({
+        entityId: e.transactionId,
+        error: e.error,
+        code: e.code,
+      })),
     };
   }
 
@@ -329,19 +423,27 @@ export class XeroAccountingAdapter implements AccountingProvider {
   // ---------------------------------------------------------------------------
 
   /** Post a manual journal entry to Xero. */
-  async postJournal(tenantId: string, journal: JournalEntry): Promise<JournalPostResult> {
+  async postJournal(
+    tenantId: string,
+    journal: JournalEntry,
+  ): Promise<JournalPostResult> {
     const { accessToken, xeroTenantId } = await this.getCredentials(tenantId);
-    const r = await this.journalService.createJournal(tenantId, accessToken, xeroTenantId, {
-      narration: journal.narration,
-      date: journal.date,
-      lines: journal.lineItems.map((item) => ({
-        accountCode: item.accountCode,
-        description: item.description,
-        amountCents: item.debitCents ?? item.creditCents ?? 0,
-        isDebit: (item.debitCents ?? 0) > 0,
-        taxType: item.taxType ?? 'NONE',
-      })),
-    });
+    const r = await this.journalService.createJournal(
+      tenantId,
+      accessToken,
+      xeroTenantId,
+      {
+        narration: journal.narration,
+        date: journal.date,
+        lines: journal.lineItems.map((item) => ({
+          accountCode: item.accountCode,
+          description: item.description,
+          amountCents: item.debitCents ?? item.creditCents ?? 0,
+          isDebit: (item.debitCents ?? 0) > 0,
+          taxType: item.taxType ?? 'NONE',
+        })),
+      },
+    );
     return {
       externalJournalId: r.manualJournalId,
       status: r.status,
@@ -357,9 +459,20 @@ export class XeroAccountingAdapter implements AccountingProvider {
 
   /** Retrieve the chart of accounts, preferring cached DB records. */
   async getAccounts(tenantId: string): Promise<AccountingAccount[]> {
-    const cached = await this.prisma.xeroAccount.findMany({ where: { tenantId } });
+    const cached = await this.prisma.xeroAccount.findMany({
+      where: { tenantId },
+    });
     if (cached.length > 0) {
-      return cached.map((a) => this.mapAccount(a.xeroAccountId ?? a.id, a.accountCode, a.name, a.type, a.status, a.taxType));
+      return cached.map((a) =>
+        this.mapAccount(
+          a.xeroAccountId ?? a.id,
+          a.accountCode,
+          a.name,
+          a.type,
+          a.status,
+          a.taxType,
+        ),
+      );
     }
 
     if (!(await this.tokenManager.hasValidConnection(tenantId))) return [];
@@ -370,7 +483,16 @@ export class XeroAccountingAdapter implements AccountingProvider {
     xeroClient.setTokenSet({ access_token: accessToken, token_type: 'Bearer' });
 
     const accounts = await getAccounts(xeroClient, xeroTenantId);
-    return accounts.map((a) => this.mapAccount(a.accountId ?? '', a.code, a.name, a.type, a.status, a.taxType));
+    return accounts.map((a) =>
+      this.mapAccount(
+        a.accountId ?? '',
+        a.code,
+        a.name,
+        a.type,
+        a.status,
+        a.taxType,
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -385,46 +507,102 @@ export class XeroAccountingAdapter implements AccountingProvider {
     const entities = options.entities ?? ['invoices', 'contacts', 'payments'];
     const { direction, fromDate, fullSync } = options;
 
-    this.logger.log(`Starting ${direction} sync for tenant ${tenantId}: ${entities.join(', ')}`);
+    this.logger.log(
+      `Starting ${direction} sync for tenant ${tenantId}: ${entities.join(', ')}`,
+    );
 
     if (entities.includes('contacts') && direction !== 'pull') {
       await this.runSyncStep('contacts', errors, entitiesSynced, async () => {
         const r = await this.contactService.bulkSyncContacts(tenantId);
-        r.errors.forEach((e) => errors.push({ entityId: e.parentId, error: e.error, code: e.code }));
+        r.errors.forEach((e) =>
+          errors.push({ entityId: e.parentId, error: e.error, code: e.code }),
+        );
         return r.synced;
       });
     }
 
     if (entities.includes('invoices') && direction !== 'pull') {
-      await this.runSyncStep('invoices_pushed', errors, entitiesSynced, async () => {
-        const { accessToken, xeroTenantId } = await this.getCredentials(tenantId);
-        const r = await this.invoiceService.pushInvoices(tenantId, undefined, accessToken, xeroTenantId, false);
-        r.errors.forEach((e) => errors.push({ entityId: e.invoiceId, error: e.error, code: e.code }));
-        return r.pushed;
-      });
+      await this.runSyncStep(
+        'invoices_pushed',
+        errors,
+        entitiesSynced,
+        async () => {
+          const { accessToken, xeroTenantId } =
+            await this.getCredentials(tenantId);
+          const r = await this.invoiceService.pushInvoices(
+            tenantId,
+            undefined,
+            accessToken,
+            xeroTenantId,
+            false,
+          );
+          r.errors.forEach((e) =>
+            errors.push({
+              entityId: e.invoiceId,
+              error: e.error,
+              code: e.code,
+            }),
+          );
+          return r.pushed;
+        },
+      );
     }
 
     if (entities.includes('invoices') && direction !== 'push') {
-      await this.runSyncStep('invoices_pulled', errors, entitiesSynced, async () => {
-        const { accessToken, xeroTenantId } = await this.getCredentials(tenantId);
-        const r = await this.invoiceService.pullInvoices(tenantId, accessToken, xeroTenantId, fromDate);
-        r.errors.forEach((e) => errors.push({ entityId: e.xeroInvoiceId, error: e.error, code: e.code }));
-        return r.imported + r.updated;
-      });
+      await this.runSyncStep(
+        'invoices_pulled',
+        errors,
+        entitiesSynced,
+        async () => {
+          const { accessToken, xeroTenantId } =
+            await this.getCredentials(tenantId);
+          const r = await this.invoiceService.pullInvoices(
+            tenantId,
+            accessToken,
+            xeroTenantId,
+            fromDate,
+          );
+          r.errors.forEach((e) =>
+            errors.push({
+              entityId: e.xeroInvoiceId,
+              error: e.error,
+              code: e.code,
+            }),
+          );
+          return r.imported + r.updated;
+        },
+      );
     }
 
     if (direction !== 'push') {
-      await this.runSyncStep('bank_transactions', errors, entitiesSynced, async () => {
-        const r = await this.bankFeedService.syncTransactions(tenantId, {
-          fromDate: fromDate ? new Date(fromDate) : undefined,
-          forceFullSync: fullSync ?? false,
-        });
-        r.errors.forEach((e) => errors.push({ entityId: e.transactionId, error: e.error, code: e.code }));
-        return r.transactionsCreated;
-      });
+      await this.runSyncStep(
+        'bank_transactions',
+        errors,
+        entitiesSynced,
+        async () => {
+          const r = await this.bankFeedService.syncTransactions(tenantId, {
+            fromDate: fromDate ? new Date(fromDate) : undefined,
+            forceFullSync: fullSync ?? false,
+          });
+          r.errors.forEach((e) =>
+            errors.push({
+              entityId: e.transactionId,
+              error: e.error,
+              code: e.code,
+            }),
+          );
+          return r.transactionsCreated;
+        },
+      );
     }
 
-    return { jobId, success: errors.length === 0, entitiesSynced, errors, completedAt: new Date() };
+    return {
+      jobId,
+      success: errors.length === 0,
+      entitiesSynced,
+      errors,
+      completedAt: new Date(),
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -451,9 +629,13 @@ export class XeroAccountingAdapter implements AccountingProvider {
   }
 
   /** Get Xero OAuth credentials for a tenant via TokenManager. */
-  private async getCredentials(tenantId: string): Promise<{ accessToken: string; xeroTenantId: string }> {
+  private async getCredentials(
+    tenantId: string,
+  ): Promise<{ accessToken: string; xeroTenantId: string }> {
     if (!(await this.tokenManager.hasValidConnection(tenantId))) {
-      throw new Error('No valid Xero connection for this tenant. Please connect to Xero first.');
+      throw new Error(
+        'No valid Xero connection for this tenant. Please connect to Xero first.',
+      );
     }
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
     const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
@@ -473,14 +655,19 @@ export class XeroAccountingAdapter implements AccountingProvider {
   /** Read a required env var or throw. */
   private requireEnv(name: string): string {
     const value = process.env[name];
-    if (!value) throw new Error(`Xero integration not configured: missing ${name}`);
+    if (!value)
+      throw new Error(`Xero integration not configured: missing ${name}`);
     return value;
   }
 
   /** Map an account record to the generic AccountingAccount shape. */
   private mapAccount(
-    id: string, code: string, name: string, type: string,
-    status: string | null | undefined, taxType: string | null | undefined,
+    id: string,
+    code: string,
+    name: string,
+    type: string,
+    status: string | null | undefined,
+    taxType: string | null | undefined,
   ): AccountingAccount {
     return {
       externalAccountId: id,

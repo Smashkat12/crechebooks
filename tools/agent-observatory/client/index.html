@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Observatory</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg-primary:#0f172a;--bg-secondary:#1e293b;--bg-tertiary:#334155;
+    --bg-card:#1e293b;--border:#334155;--border-light:#475569;
+    --text-primary:#f1f5f9;--text-secondary:#94a3b8;--text-muted:#64748b;
+    --accent:#3b82f6;--accent-hover:#2563eb;
+    --success:#22c55e;--error:#ef4444;--warning:#f59e0b;
+    --font-mono:'SF Mono','Cascadia Code','Fira Code',monospace;
+    --font-sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+  }
+  html,body{height:100%;overflow:hidden}
+  body{
+    font-family:var(--font-sans);background:var(--bg-primary);
+    color:var(--text-primary);display:flex;flex-direction:column;
+  }
+
+  /* Header */
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 20px;background:var(--bg-secondary);
+    border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;
+    flex-wrap:wrap;
+  }
+  .header-left{display:flex;align-items:center;gap:12px}
+  .logo{font-size:18px;font-weight:700;letter-spacing:-0.5px;white-space:nowrap}
+  .logo-accent{color:var(--accent)}
+  .conn-status{
+    display:flex;align-items:center;gap:6px;font-size:12px;
+    color:var(--text-muted);padding:4px 10px;border-radius:9999px;
+    background:var(--bg-tertiary);
+  }
+  .conn-dot{width:8px;height:8px;border-radius:50%;background:var(--error);flex-shrink:0}
+  .conn-dot.connected{background:var(--success);box-shadow:0 0 6px var(--success)}
+  .conn-dot.connecting{background:var(--warning);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  select,input[type="text"]{
+    background:var(--bg-tertiary);border:1px solid var(--border);
+    color:var(--text-primary);padding:6px 10px;border-radius:6px;
+    font-size:13px;outline:none;min-width:0;
+  }
+  select:focus,input:focus{border-color:var(--accent)}
+  select{cursor:pointer}
+  button{
+    background:var(--accent);color:#fff;border:none;padding:6px 14px;
+    border-radius:6px;font-size:13px;cursor:pointer;white-space:nowrap;
+  }
+  button:hover{background:var(--accent-hover)}
+  button.secondary{background:var(--bg-tertiary);border:1px solid var(--border)}
+  button.secondary:hover{background:var(--border)}
+
+  /* Stats bar */
+  .stats-bar{
+    display:flex;gap:16px;padding:8px 20px;background:var(--bg-secondary);
+    border-bottom:1px solid var(--border);flex-shrink:0;
+    overflow-x:auto;flex-wrap:wrap;
+  }
+  .stat{display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap}
+  .stat-value{font-weight:700;font-variant-numeric:tabular-nums}
+  .stat-label{color:var(--text-muted)}
+
+  /* Main content */
+  main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+  /* Event stream */
+  .event-stream{
+    flex:1;overflow-y:auto;padding:4px 0;
+    scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+  }
+  .event-stream::-webkit-scrollbar{width:6px}
+  .event-stream::-webkit-scrollbar-track{background:transparent}
+  .event-stream::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+  .event-row{
+    display:grid;
+    grid-template-columns:42px 90px 28px 120px 160px 1fr 28px;
+    align-items:center;gap:4px;padding:5px 20px;font-size:13px;
+    border-bottom:1px solid rgba(51,65,85,0.3);transition:background .15s;
+  }
+  .event-row:hover{background:rgba(51,65,85,0.25)}
+
+  .ev-idx{color:var(--text-muted);font-family:var(--font-mono);font-size:11px;text-align:right}
+  .ev-time{font-family:var(--font-mono);color:var(--text-secondary);font-size:12px}
+  .ev-emoji{font-size:16px;text-align:center}
+  .ev-type{
+    font-family:var(--font-mono);font-size:12px;padding:2px 6px;
+    border-radius:4px;background:var(--bg-tertiary);color:var(--text-secondary);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .ev-agent{
+    font-weight:600;font-size:12px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;
+  }
+  .ev-agent .agent-dot{
+    display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;
+    vertical-align:middle;
+  }
+  .ev-detail{
+    color:var(--text-secondary);font-size:12px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;
+  }
+  .ev-detail code{
+    font-family:var(--font-mono);background:var(--bg-tertiary);
+    padding:1px 4px;border-radius:3px;font-size:11px;
+  }
+  .ev-status{text-align:center;font-size:14px}
+
+  /* Empty state */
+  .empty-state{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:100%;color:var(--text-muted);gap:12px;padding:40px;
+  }
+  .empty-state .icon{font-size:48px;opacity:.5}
+  .empty-state p{font-size:14px;text-align:center;max-width:400px;line-height:1.5}
+
+  /* Responsive */
+  @media(max-width:900px){
+    .event-row{
+      grid-template-columns:36px 70px 24px 100px 1fr 24px;
+      padding:5px 12px;font-size:12px;
+    }
+    .ev-agent{display:none}
+    header{padding:10px 12px}
+    .stats-bar{padding:6px 12px;gap:10px}
+  }
+  @media(max-width:600px){
+    .event-row{
+      grid-template-columns:24px 60px 24px 1fr 24px;
+      padding:4px 8px;
+    }
+    .ev-type{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo">Agent <span class="logo-accent">Observatory</span></div>
+    <div class="conn-status">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connLabel">Disconnected</span>
+    </div>
+  </div>
+  <div class="controls">
+    <select id="sessionSelect" title="Session">
+      <option value="">All Sessions</option>
+    </select>
+    <select id="typeFilter" title="Event type filter">
+      <option value="">All Types</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="Search..." style="width:140px" />
+    <button class="secondary" id="clearBtn" title="Clear events">Clear</button>
+    <button class="secondary" id="pauseBtn" title="Pause auto-scroll">Pause</button>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat"><span class="stat-value" id="statTotal">0</span><span class="stat-label">events</span></div>
+  <div class="stat"><span class="stat-value" id="statAgents">0</span><span class="stat-label">agents</span></div>
+  <div class="stat"><span class="stat-value" id="statSessions">0</span><span class="stat-label">sessions</span></div>
+  <div class="stat" style="color:var(--success)"><span class="stat-value" id="statSuccess">0</span><span class="stat-label">success</span></div>
+  <div class="stat" style="color:var(--error)"><span class="stat-value" id="statError">0</span><span class="stat-label">errors</span></div>
+  <div class="stat"><span class="stat-value" id="statRate">0</span><span class="stat-label">evt/min</span></div>
+</div>
+
+<main>
+  <div class="event-stream" id="eventStream">
+    <div class="empty-state" id="emptyState">
+      <div class="icon">&#x1F50D;</div>
+      <p>No events yet. Connect to the observatory server to start streaming agent activity.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // --- Configuration ---
+  var params = new URLSearchParams(location.search);
+  var SERVER = (params.get('server') || 'http://localhost:4200').replace(/\/+$/, '');
+  var WS_URL = SERVER.replace(/^http/, 'ws') + '/ws';
+  var API_URL = SERVER + '/api/events';
+  var MAX_EVENTS = 5000;
+  var RATE_WINDOW_MS = 60000;
+
+  // --- Tool emoji map ---
+  var TOOL_EMOJI = {
+    edit: '\u270F\uFE0F', write: '\u270F\uFE0F', multiedit: '\u270F\uFE0F',
+    bash: '\uD83D\uDCBB', read: '\uD83D\uDCD6',
+    grep: '\uD83D\uDD0D', glob: '\uD83D\uDD0D',
+    task: '\uD83E\uDD16', agent: '\uD83E\uDD16',
+    pretooluse: '\uD83D\uDEE1\uFE0F', posttooluse: '\u2705',
+    sessionstart: '\u25B6\uFE0F', sessionend: '\u23F9\uFE0F',
+    subagentstart: '\u27A1\uFE0F', subagentstop: '\u2B05\uFE0F',
+    notification: '\uD83D\uDD14'
+  };
+
+  function getToolEmoji(type) {
+    if (!type) return '\u2022';
+    var key = type.toLowerCase().replace(/[^a-z]/g, '');
+    var entries = Object.keys(TOOL_EMOJI);
+    for (var i = 0; i < entries.length; i++) {
+      if (key.indexOf(entries[i]) !== -1) return TOOL_EMOJI[entries[i]];
+    }
+    return '\u2022';
+  }
+
+  // --- Agent color palette ---
+  var AGENT_COLORS = [
+    '#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981',
+    '#06b6d4','#f97316','#a855f7','#14b8a6','#e11d48',
+    '#84cc16','#6366f1','#d946ef','#0ea5e9','#eab308'
+  ];
+  var agentColorMap = {};
+  var colorIdx = 0;
+
+  function getAgentColor(agent) {
+    if (!agent) return '#64748b';
+    if (!agentColorMap[agent]) {
+      agentColorMap[agent] = AGENT_COLORS[colorIdx % AGENT_COLORS.length];
+      colorIdx++;
+    }
+    return agentColorMap[agent];
+  }
+
+  // --- State ---
+  var events = [];
+  var filteredEvents = [];
+  var sessions = {};
+  var agents = {};
+  var eventTypes = {};
+  var successCount = 0;
+  var errorCount = 0;
+  var recentTimestamps = [];
+  var paused = false;
+  var ws = null;
+  var wsRetryDelay = 1000;
+
+  function objSize(o) { return Object.keys(o).length; }
+
+  // --- DOM refs ---
+  var $stream = document.getElementById('eventStream');
+  var $empty = document.getElementById('emptyState');
+  var $connDot = document.getElementById('connDot');
+  var $connLabel = document.getElementById('connLabel');
+  var $sessionSelect = document.getElementById('sessionSelect');
+  var $typeFilter = document.getElementById('typeFilter');
+  var $searchInput = document.getElementById('searchInput');
+  var $clearBtn = document.getElementById('clearBtn');
+  var $pauseBtn = document.getElementById('pauseBtn');
+  var $statTotal = document.getElementById('statTotal');
+  var $statAgents = document.getElementById('statAgents');
+  var $statSessions = document.getElementById('statSessions');
+  var $statSuccess = document.getElementById('statSuccess');
+  var $statError = document.getElementById('statError');
+  var $statRate = document.getElementById('statRate');
+
+  // --- Helpers ---
+  function formatTime(ts) {
+    if (!ts) return '--:--:--';
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return '--:--:--';
+    return d.toLocaleTimeString('en-GB', { hour12: false });
+  }
+
+  function extractDetail(ev) {
+    if (ev.tool) return ev.tool;
+    if (ev.action) return ev.action;
+    if (ev.message) return ev.message;
+    if (ev.file) return ev.file;
+    if (ev.command) return ev.command;
+    if (ev.data && typeof ev.data === 'object') {
+      return ev.data.tool || ev.data.action || ev.data.message || ev.data.file || '';
+    }
+    return '';
+  }
+
+  function isSuccess(ev) {
+    if (ev.success === true || ev.status === 'success' || ev.result === 'success') return true;
+    if (ev.data && (ev.data.success === true || ev.data.status === 'success')) return true;
+    return null;
+  }
+
+  function isError(ev) {
+    if (ev.success === false || ev.status === 'error' || ev.error) return true;
+    if (ev.data && (ev.data.success === false || ev.data.error)) return true;
+    return false;
+  }
+
+  function getAgent(ev) {
+    return ev.agent || ev.agentId || ev.agent_id ||
+           (ev.data && (ev.data.agent || ev.data.agentId)) || '';
+  }
+
+  function getType(ev) {
+    return ev.type || ev.event || ev.eventType ||
+           (ev.data && (ev.data.type || ev.data.event)) || 'unknown';
+  }
+
+  function getSession(ev) {
+    return ev.session || ev.sessionId || ev.session_id ||
+           (ev.data && (ev.data.session || ev.data.sessionId)) || '';
+  }
+
+  // --- Safe DOM construction ---
+  function el(tag, className) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    return node;
+  }
+
+  function createEventRow(ev, idx) {
+    var type = getType(ev);
+    var agent = getAgent(ev);
+    var detail = extractDetail(ev);
+    var emoji = getToolEmoji(type);
+    var color = getAgentColor(agent);
+    var success = isSuccess(ev);
+    var error = isError(ev);
+
+    var row = el('div', 'event-row');
+
+    // Index
+    var idxEl = el('div', 'ev-idx');
+    idxEl.textContent = String(idx);
+    row.appendChild(idxEl);
+
+    // Time
+    var timeEl = el('div', 'ev-time');
+    timeEl.textContent = formatTime(ev.timestamp || ev.ts || ev.time);
+    row.appendChild(timeEl);
+
+    // Emoji
+    var emojiEl = el('div', 'ev-emoji');
+    emojiEl.textContent = emoji;
+    row.appendChild(emojiEl);
+
+    // Type
+    var typeEl = el('div', 'ev-type');
+    typeEl.textContent = type;
+    typeEl.title = type;
+    row.appendChild(typeEl);
+
+    // Agent
+    var agentEl = el('div', 'ev-agent');
+    agentEl.title = agent;
+    if (agent) {
+      var dot = el('span', 'agent-dot');
+      dot.style.background = color;
+      agentEl.appendChild(dot);
+      agentEl.appendChild(document.createTextNode(agent));
+    } else {
+      var placeholder = el('span');
+      placeholder.style.color = 'var(--text-muted)';
+      placeholder.textContent = '--';
+      agentEl.appendChild(placeholder);
+    }
+    row.appendChild(agentEl);
+
+    // Detail
+    var detailEl = el('div', 'ev-detail');
+    detailEl.title = detail;
+    if (detail) {
+      var codeEl = el('code');
+      codeEl.textContent = detail;
+      detailEl.appendChild(codeEl);
+    }
+    row.appendChild(detailEl);
+
+    // Status
+    var statusEl = el('div', 'ev-status');
+    if (success === true) {
+      var sDot = el('span');
+      sDot.style.color = 'var(--success)';
+      sDot.textContent = '\u25CF';
+      statusEl.appendChild(sDot);
+    } else if (error) {
+      var eDot = el('span');
+      eDot.style.color = 'var(--error)';
+      eDot.textContent = '\u25CF';
+      statusEl.appendChild(eDot);
+    }
+    row.appendChild(statusEl);
+
+    return row;
+  }
+
+  function applyFilters() {
+    var sessionVal = $sessionSelect.value;
+    var typeVal = $typeFilter.value;
+    var search = $searchInput.value.toLowerCase().trim();
+
+    filteredEvents = [];
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      if (sessionVal && getSession(ev) !== sessionVal) continue;
+      if (typeVal && getType(ev) !== typeVal) continue;
+      if (search) {
+        var blob = JSON.stringify(ev).toLowerCase();
+        if (blob.indexOf(search) === -1) continue;
+      }
+      filteredEvents.push(ev);
+    }
+  }
+
+  function renderAll() {
+    applyFilters();
+
+    // Remove all event rows
+    var rows = $stream.querySelectorAll('.event-row');
+    for (var i = 0; i < rows.length; i++) rows[i].remove();
+
+    if (filteredEvents.length === 0) {
+      $empty.style.display = '';
+      return;
+    }
+    $empty.style.display = 'none';
+
+    var frag = document.createDocumentFragment();
+    for (var j = 0; j < filteredEvents.length; j++) {
+      frag.appendChild(createEventRow(filteredEvents[j], j + 1));
+    }
+    $stream.appendChild(frag);
+
+    if (!paused) {
+      $stream.scrollTop = $stream.scrollHeight;
+    }
+  }
+
+  function appendEventRow(ev) {
+    var sessionVal = $sessionSelect.value;
+    var typeVal = $typeFilter.value;
+    var search = $searchInput.value.toLowerCase().trim();
+
+    var passes = true;
+    if (sessionVal && getSession(ev) !== sessionVal) passes = false;
+    if (typeVal && getType(ev) !== typeVal) passes = false;
+    if (search && JSON.stringify(ev).toLowerCase().indexOf(search) === -1) passes = false;
+
+    if (!passes) return;
+
+    filteredEvents.push(ev);
+    if ($empty.style.display !== 'none') $empty.style.display = 'none';
+    $stream.appendChild(createEventRow(ev, filteredEvents.length));
+
+    if (!paused) {
+      $stream.scrollTop = $stream.scrollHeight;
+    }
+  }
+
+  function updateStats() {
+    var now = Date.now();
+    var kept = [];
+    for (var i = 0; i < recentTimestamps.length; i++) {
+      if (now - recentTimestamps[i] < RATE_WINDOW_MS) kept.push(recentTimestamps[i]);
+    }
+    recentTimestamps = kept;
+    $statTotal.textContent = String(events.length);
+    $statAgents.textContent = String(objSize(agents));
+    $statSessions.textContent = String(objSize(sessions));
+    $statSuccess.textContent = String(successCount);
+    $statError.textContent = String(errorCount);
+    $statRate.textContent = String(recentTimestamps.length);
+  }
+
+  function updateDropdowns() {
+    // Sessions
+    var currentSession = $sessionSelect.value;
+    var existingSessions = {};
+    var opts = $sessionSelect.querySelectorAll('option');
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].value) existingSessions[opts[i].value] = true;
+    }
+    var sessionKeys = Object.keys(sessions);
+    for (var j = 0; j < sessionKeys.length; j++) {
+      var s = sessionKeys[j];
+      if (!existingSessions[s]) {
+        var opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s.length > 24 ? s.slice(0, 10) + '...' + s.slice(-10) : s;
+        $sessionSelect.appendChild(opt);
+      }
+    }
+    $sessionSelect.value = currentSession;
+
+    // Event types
+    var currentType = $typeFilter.value;
+    var existingTypes = {};
+    var tOpts = $typeFilter.querySelectorAll('option');
+    for (var k = 0; k < tOpts.length; k++) {
+      if (tOpts[k].value) existingTypes[tOpts[k].value] = true;
+    }
+    var sorted = Object.keys(eventTypes).sort();
+    for (var m = 0; m < sorted.length; m++) {
+      var t = sorted[m];
+      if (!existingTypes[t]) {
+        var tOpt = document.createElement('option');
+        tOpt.value = t;
+        tOpt.textContent = t;
+        $typeFilter.appendChild(tOpt);
+      }
+    }
+    $typeFilter.value = currentType;
+  }
+
+  // --- Ingest ---
+  function ingestEvent(ev) {
+    events.push(ev);
+    if (events.length > MAX_EVENTS) {
+      events = events.slice(events.length - MAX_EVENTS);
+    }
+
+    var session = getSession(ev);
+    var agent = getAgent(ev);
+    var type = getType(ev);
+
+    if (session) sessions[session] = true;
+    if (agent) agents[agent] = true;
+    if (type) eventTypes[type] = true;
+    if (isSuccess(ev) === true) successCount++;
+    if (isError(ev)) errorCount++;
+    recentTimestamps.push(Date.now());
+
+    updateDropdowns();
+    updateStats();
+    appendEventRow(ev);
+  }
+
+  function ingestBatch(arr) {
+    if (!Array.isArray(arr)) return;
+    for (var i = 0; i < arr.length; i++) {
+      var ev = arr[i];
+      events.push(ev);
+      var session = getSession(ev);
+      var agent = getAgent(ev);
+      var type = getType(ev);
+      if (session) sessions[session] = true;
+      if (agent) agents[agent] = true;
+      if (type) eventTypes[type] = true;
+      if (isSuccess(ev) === true) successCount++;
+      if (isError(ev)) errorCount++;
+      recentTimestamps.push(Date.now());
+    }
+    if (events.length > MAX_EVENTS) {
+      events = events.slice(events.length - MAX_EVENTS);
+    }
+    updateDropdowns();
+    updateStats();
+    renderAll();
+  }
+
+  // --- Connection status ---
+  function setConnStatus(state) {
+    $connDot.className = 'conn-dot' + (state ? ' ' + state : '');
+    var labels = { connected: 'Connected', connecting: 'Connecting...' };
+    $connLabel.textContent = labels[state] || 'Disconnected';
+  }
+
+  // --- HTTP polling initial load ---
+  function fetchInitialEvents() {
+    setConnStatus('connecting');
+    fetch(API_URL)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var arr = Array.isArray(data) ? data : (data.events || data.data || []);
+        ingestBatch(arr);
+      })
+      .catch(function (err) {
+        console.warn('[Observatory] Initial fetch failed:', err.message);
+      });
+  }
+
+  // --- WebSocket ---
+  function connectWs() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    setConnStatus('connecting');
+
+    try {
+      ws = new WebSocket(WS_URL);
+    } catch (e) {
+      console.warn('[Observatory] WebSocket creation failed:', e.message);
+      scheduleReconnect();
+      return;
+    }
+
+    ws.onopen = function () {
+      setConnStatus('connected');
+      wsRetryDelay = 1000;
+    };
+
+    ws.onmessage = function (msg) {
+      try {
+        var data = JSON.parse(msg.data);
+        if (Array.isArray(data)) {
+          for (var i = 0; i < data.length; i++) ingestEvent(data[i]);
+        } else {
+          ingestEvent(data);
+        }
+      } catch (e) {
+        console.warn('[Observatory] Bad WS message:', e.message);
+      }
+    };
+
+    ws.onclose = function () {
+      setConnStatus('');
+      scheduleReconnect();
+    };
+
+    ws.onerror = function () {
+      setConnStatus('');
+      try { ws.close(); } catch (_) { /* noop */ }
+    };
+  }
+
+  function scheduleReconnect() {
+    setTimeout(function () {
+      wsRetryDelay = Math.min(wsRetryDelay * 1.5, 30000);
+      connectWs();
+    }, wsRetryDelay);
+  }
+
+  // --- Event handlers ---
+  $sessionSelect.addEventListener('change', renderAll);
+  $typeFilter.addEventListener('change', renderAll);
+  $searchInput.addEventListener('input', renderAll);
+
+  $clearBtn.addEventListener('click', function () {
+    events = [];
+    filteredEvents = [];
+    sessions = {};
+    agents = {};
+    eventTypes = {};
+    agentColorMap = {};
+    colorIdx = 0;
+    successCount = 0;
+    errorCount = 0;
+    recentTimestamps = [];
+
+    // Reset dropdowns
+    while ($sessionSelect.options.length > 1) $sessionSelect.remove(1);
+    while ($typeFilter.options.length > 1) $typeFilter.remove(1);
+    $searchInput.value = '';
+
+    var rows = $stream.querySelectorAll('.event-row');
+    for (var i = 0; i < rows.length; i++) rows[i].remove();
+    $empty.style.display = '';
+    updateStats();
+  });
+
+  $pauseBtn.addEventListener('click', function () {
+    paused = !paused;
+    $pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    if (!paused) {
+      $stream.scrollTop = $stream.scrollHeight;
+    }
+  });
+
+  // --- Rate counter refresh ---
+  setInterval(updateStats, 5000);
+
+  // --- Init ---
+  fetchInitialEvents();
+  connectWs();
+})();
+</script>
+</body>
+</html>

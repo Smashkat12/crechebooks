@@ -953,25 +953,70 @@ export class CategorizationService {
     }
 
     // Fallback placeholder (deterministic based on keywords)
+    // This runs only when TransactionCategorizerAgent is not available
     const description = transaction.description.toUpperCase();
     const isCredit = transaction.isCredit;
 
+    // --- Parent fee payments (credits from parents via various SA banking channels) ---
+    if (
+      isCredit &&
+      (description.includes('RTC CREDIT') ||
+        description.includes('MAGTAPE CREDIT') ||
+        description.includes('PAYSHAP CREDIT') ||
+        description.includes('INT-BANKING PMT FRM') ||
+        description.includes('ADT CASH DEPOSIT') ||
+        /FNB APP (?:PAYMENT|TRANSFER) FROM/.test(description))
+    ) {
+      return {
+        accountCode: '4000',
+        accountName: 'School Fees Income',
+        confidenceScore: 88,
+        reasoning: 'Matched parent fee payment pattern',
+        vatType: VatType.EXEMPT,
+        isSplit: false,
+      };
+    }
+
+    // --- Salaries ---
+    if (
+      description.includes('SALARY') ||
+      description.includes('WAGE') ||
+      description.includes('PAYROLL')
+    ) {
+      return {
+        accountCode: '5000',
+        accountName: 'Salaries and Wages',
+        confidenceScore: 92,
+        reasoning: 'Matched payroll/salary payment',
+        vatType: VatType.NO_VAT,
+        isSplit: false,
+      };
+    }
+
+    // --- Groceries & food ---
     if (
       description.includes('WOOLWORTHS') ||
       description.includes('CHECKERS') ||
       description.includes('PICK N PAY') ||
-      description.includes('SPAR')
+      description.includes('SHOPRITE') ||
+      description.includes('BIG SAVE') ||
+      description.includes('BOXER') ||
+      description.includes('STAR SUPERMARK') ||
+      description.includes('WEST PACK') ||
+      /\bSPAR\b/.test(description) ||
+      /\bUSAVE\b(?!.*CAR)/.test(description)
     ) {
       return {
-        accountCode: '5100',
-        accountName: 'Groceries & Supplies',
+        accountCode: '5400',
+        accountName: 'Food and Catering',
         confidenceScore: 85,
-        reasoning: 'Matched grocery store retailer',
+        reasoning: 'Matched grocery/food retailer',
         vatType: VatType.STANDARD,
         isSplit: false,
       };
     }
 
+    // --- Utilities ---
     if (
       description.includes('ELECTRICITY') ||
       description.includes('ESKOM') ||
@@ -988,26 +1033,109 @@ export class CategorizationService {
       };
     }
 
+    // --- Bank charges (FNB #-prefixed fees) ---
     if (
-      description.includes('SALARY') ||
-      description.includes('WAGE') ||
-      description.includes('PAYROLL')
+      description.includes('#MONTHLY ACCOUNT FEE') ||
+      description.includes('#SERVICE FEES') ||
+      description.includes('#CASH DEPOSIT FEE') ||
+      description.includes('#SCHED PMT')
     ) {
       return {
-        accountCode: '5300',
-        accountName: 'Salaries & Wages',
-        confidenceScore: 92,
-        reasoning: 'Matched payroll/salary payment',
+        accountCode: '8100',
+        accountName: 'Bank Charges',
+        confidenceScore: 95,
+        reasoning: 'Matched FNB bank fee',
         vatType: VatType.NO_VAT,
         isSplit: false,
       };
     }
 
+    // --- Fuel / transport ---
+    if (
+      description.includes('FUEL') ||
+      description.includes('ENGEN') ||
+      description.includes('SHELL') ||
+      description.includes('CALTEX') ||
+      description.includes('SCHOOL TRANSPORT')
+    ) {
+      return {
+        accountCode: '5700',
+        accountName: 'Transport',
+        confidenceScore: 85,
+        reasoning: 'Matched fuel/transport payment',
+        vatType: VatType.STANDARD,
+        isSplit: false,
+      };
+    }
+
+    // --- Software subscriptions ---
+    if (
+      description.includes('APPLE') ||
+      description.includes('MICROSOFT') ||
+      description.includes('XERO') ||
+      description.includes('D6 GROUP')
+    ) {
+      return {
+        accountCode: '8350',
+        accountName: 'Software Subscriptions',
+        confidenceScore: 85,
+        reasoning: 'Matched software/subscription payment',
+        vatType: VatType.STANDARD,
+        isSplit: false,
+      };
+    }
+
+    // --- Telecom / internet ---
+    if (
+      description.includes('AFRIHOST') ||
+      description.includes('VODACOM') ||
+      description.includes('MTN') ||
+      description.includes('TELKOM')
+    ) {
+      return {
+        accountCode: '8300',
+        accountName: 'Telephone and Internet',
+        confidenceScore: 90,
+        reasoning: 'Matched telecom provider',
+        vatType: VatType.STANDARD,
+        isSplit: false,
+      };
+    }
+
+    // --- Hardware / maintenance ---
+    if (
+      description.includes('HARDWARE') ||
+      description.includes('BRICKS') ||
+      description.includes('PAINTERS')
+    ) {
+      return {
+        accountCode: '5800',
+        accountName: 'Repairs and Maintenance',
+        confidenceScore: 80,
+        reasoning: 'Matched hardware/maintenance supplier',
+        vatType: VatType.STANDARD,
+        isSplit: false,
+      };
+    }
+
+    // --- Owner loan (credit) ---
+    if (isCredit && description.includes('OWNER')) {
+      return {
+        accountCode: '2300',
+        accountName: 'Owner Loan',
+        confidenceScore: 85,
+        reasoning: 'Owner loan deposit',
+        vatType: VatType.NO_VAT,
+        isSplit: false,
+      };
+    }
+
+    // --- Generic credit (school fee if from a person) ---
     if (isCredit && description.includes('FEE')) {
       return {
-        accountCode: '4100',
-        accountName: 'Fee Income',
-        confidenceScore: 88,
+        accountCode: '4000',
+        accountName: 'School Fees Income',
+        confidenceScore: 80,
         reasoning: 'Matched fee income payment',
         vatType: VatType.EXEMPT,
         isSplit: false,
@@ -1016,10 +1144,10 @@ export class CategorizationService {
 
     if (isCredit) {
       return {
-        accountCode: '4900',
-        accountName: 'Other Income',
+        accountCode: '4000',
+        accountName: 'School Fees Income',
         confidenceScore: 65,
-        reasoning: 'Credit transaction - general income',
+        reasoning: 'Credit transaction - likely school fee payment',
         vatType: VatType.EXEMPT,
         isSplit: false,
       };

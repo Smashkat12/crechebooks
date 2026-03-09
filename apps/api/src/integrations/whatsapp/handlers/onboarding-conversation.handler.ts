@@ -1348,7 +1348,7 @@ export class OnboardingConversationHandler {
         sessionId,
       );
     } else if (selectedByListId) {
-      const idx = parseInt(idMatch![1], 10);
+      const idx = parseInt(idMatch[1], 10);
       const fs = feeStructures[idx];
       data.selectedFeeStructureId = fs.id;
       const amount = (fs.amountCents / 100).toLocaleString('en-ZA', {
@@ -1403,19 +1403,20 @@ export class OnboardingConversationHandler {
   ): Promise<void> {
     const lower = body.toLowerCase().trim();
 
-    const consentMap: Record<string, OnboardingCollectedData['mediaConsent']> = {
-      media_internal: 'internal_only',
-      media_website: 'website',
-      media_social: 'social_media',
-      media_all: 'all',
-      media_none: 'none',
-      // Also accept plain text
-      'internal use only': 'internal_only',
-      'website & promotional': 'website',
-      'social media': 'social_media',
-      'all of the above': 'all',
-      'no photos/videos': 'none',
-    };
+    const consentMap: Record<string, OnboardingCollectedData['mediaConsent']> =
+      {
+        media_internal: 'internal_only',
+        media_website: 'website',
+        media_social: 'social_media',
+        media_all: 'all',
+        media_none: 'none',
+        // Also accept plain text
+        'internal use only': 'internal_only',
+        'website & promotional': 'website',
+        'social media': 'social_media',
+        'all of the above': 'all',
+        'no photos/videos': 'none',
+      };
 
     const consent = consentMap[lower];
     if (consent) {
@@ -1435,11 +1436,31 @@ export class OnboardingConversationHandler {
         'How may we use photos/videos of your child?',
         'Media Consent',
         [
-          { item: 'Internal use only (records)', id: 'media_internal', description: 'School records only' },
-          { item: 'Website & promotional', id: 'media_website', description: 'Website and brochures' },
-          { item: 'Social media platforms', id: 'media_social', description: 'Facebook, Instagram, etc.' },
-          { item: 'All of the above', id: 'media_all', description: 'All usage permitted' },
-          { item: 'No photos/videos', id: 'media_none', description: 'No media consent' },
+          {
+            item: 'Internal use only (records)',
+            id: 'media_internal',
+            description: 'School records only',
+          },
+          {
+            item: 'Website & promotional',
+            id: 'media_website',
+            description: 'Website and brochures',
+          },
+          {
+            item: 'Social media platforms',
+            id: 'media_social',
+            description: 'Facebook, Instagram, etc.',
+          },
+          {
+            item: 'All of the above',
+            id: 'media_all',
+            description: 'All usage permitted',
+          },
+          {
+            item: 'No photos/videos',
+            id: 'media_none',
+            description: 'No media consent',
+          },
         ],
         tenantId,
       );
@@ -2004,11 +2025,31 @@ export class OnboardingConversationHandler {
           'How may we use photos/videos of your child?',
           'Media Consent',
           [
-            { item: 'Internal use only (records)', id: 'media_internal', description: 'School records only' },
-            { item: 'Website & promotional', id: 'media_website', description: 'Website and brochures' },
-            { item: 'Social media platforms', id: 'media_social', description: 'Facebook, Instagram, etc.' },
-            { item: 'All of the above', id: 'media_all', description: 'All usage permitted' },
-            { item: 'No photos/videos', id: 'media_none', description: 'No media consent' },
+            {
+              item: 'Internal use only (records)',
+              id: 'media_internal',
+              description: 'School records only',
+            },
+            {
+              item: 'Website & promotional',
+              id: 'media_website',
+              description: 'Website and brochures',
+            },
+            {
+              item: 'Social media platforms',
+              id: 'media_social',
+              description: 'Facebook, Instagram, etc.',
+            },
+            {
+              item: 'All of the above',
+              id: 'media_all',
+              description: 'All usage permitted',
+            },
+            {
+              item: 'No photos/videos',
+              id: 'media_none',
+              description: 'No media consent',
+            },
           ],
           tenantId,
         );
@@ -2097,7 +2138,9 @@ export class OnboardingConversationHandler {
       if (data.parent.phone) lines.push(`Phone: ${data.parent.phone}`);
       if (data.parent.address) {
         const addr = data.parent.address;
-        const addrParts = [addr.street, addr.city, addr.postalCode].filter(Boolean);
+        const addrParts = [addr.street, addr.city, addr.postalCode].filter(
+          Boolean,
+        );
         lines.push(`Address: ${addrParts.join(', ')}`);
       }
       lines.push('');
@@ -2144,7 +2187,9 @@ export class OnboardingConversationHandler {
         all: 'All usage permitted',
         none: 'No photos/videos',
       };
-      lines.push(`*Media Consent:* ${consentLabels[data.mediaConsent] || data.mediaConsent}`);
+      lines.push(
+        `*Media Consent:* ${consentLabels[data.mediaConsent] || data.mediaConsent}`,
+      );
     }
 
     if (data.authorizedCollectors && data.authorizedCollectors.length > 0) {
@@ -2217,7 +2262,11 @@ export class OnboardingConversationHandler {
 
       // Create Child record(s) and enroll them
       const children = data.children || [];
-      const createdChildren: Array<{ id: string; firstName: string; lastName: string }> = [];
+      const createdChildren: Array<{
+        id: string;
+        firstName: string;
+        lastName: string;
+      }> = [];
       let firstInvoiceTotal = 0;
       let feeStructureName = '';
 
@@ -2259,7 +2308,7 @@ export class OnboardingConversationHandler {
               startDate,
               parent.id, // userId = parent (self-enrolled via WhatsApp)
               !!data.startDate, // allowHistoricDates — true when parent chose a past date
-              true,  // skipWelcomePack — handler sends its own completion message
+              true, // skipWelcomePack — handler sends its own completion message
             );
 
             // Update child status to ENROLLED
@@ -2356,8 +2405,7 @@ export class OnboardingConversationHandler {
           })
         : null;
 
-      let completionMsg =
-        `Enrollment complete for ${childNames || 'your child'}!\n\n`;
+      let completionMsg = `Enrollment complete for ${childNames || 'your child'}!\n\n`;
 
       if (feeStructureName) {
         completionMsg += `Enrolled in ${feeStructureName}\n`;

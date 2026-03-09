@@ -176,19 +176,24 @@ export class ChildController {
     }
 
     // 5. Generate catch-up invoices for past months (if start date is historic)
-    let catchUpInvoices: { generated: number; skipped: number; errors: string[] } | null = null;
+    let catchUpInvoices: {
+      generated: number;
+      skipped: number;
+      errors: string[];
+    } | null = null;
     const startNorm = new Date(dto.start_date);
     startNorm.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (startNorm < today) {
       try {
-        catchUpInvoices = await this.invoiceGenerationService.generateCatchUpInvoices(
-          getTenantId(user),
-          child.id,
-          new Date(dto.start_date),
-          user.id,
-        );
+        catchUpInvoices =
+          await this.invoiceGenerationService.generateCatchUpInvoices(
+            getTenantId(user),
+            child.id,
+            new Date(dto.start_date),
+            user.id,
+          );
         this.logger.log(
           `Catch-up invoices for child ${child.id}: generated=${catchUpInvoices.generated}, skipped=${catchUpInvoices.skipped}`,
         );
@@ -314,19 +319,24 @@ export class ChildController {
     }
 
     // 5. Generate catch-up invoices for past months (if start date is historic)
-    let catchUpInvoices: { generated: number; skipped: number; errors: string[] } | null = null;
+    let catchUpInvoices: {
+      generated: number;
+      skipped: number;
+      errors: string[];
+    } | null = null;
     const existingStartNorm = new Date(dto.start_date);
     existingStartNorm.setHours(0, 0, 0, 0);
     const existingToday = new Date();
     existingToday.setHours(0, 0, 0, 0);
     if (existingStartNorm < existingToday) {
       try {
-        catchUpInvoices = await this.invoiceGenerationService.generateCatchUpInvoices(
-          tenantId,
-          child.id,
-          new Date(dto.start_date),
-          user.id,
-        );
+        catchUpInvoices =
+          await this.invoiceGenerationService.generateCatchUpInvoices(
+            tenantId,
+            child.id,
+            new Date(dto.start_date),
+            user.id,
+          );
         this.logger.log(
           `Catch-up invoices for child ${child.id}: generated=${catchUpInvoices.generated}, skipped=${catchUpInvoices.skipped}`,
         );

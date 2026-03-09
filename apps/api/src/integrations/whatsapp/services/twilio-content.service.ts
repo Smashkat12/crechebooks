@@ -241,18 +241,18 @@ export class TwilioContentService implements OnModuleInit {
       // Check database before hitting Twilio API — the template may already
       // exist from a previous deploy even if the Twilio list didn't return it.
       try {
-        const dbTemplate =
-          await this.prisma.whatsAppContentTemplate.findUnique({
+        const dbTemplate = await this.prisma.whatsAppContentTemplate.findUnique(
+          {
             where: { friendlyName: definition.friendlyName },
-          });
+          },
+        );
 
         if (dbTemplate?.contentSid) {
           this.templateCache.set(definition.friendlyName, {
             sid: dbTemplate.contentSid,
             friendlyName: dbTemplate.friendlyName,
             language: dbTemplate.language,
-            variables:
-              (dbTemplate.variables as Record<string, string>) || {},
+            variables: (dbTemplate.variables as Record<string, string>) || {},
             types: {},
             approvalStatus: dbTemplate.approvalStatus as
               | ContentApprovalStatus

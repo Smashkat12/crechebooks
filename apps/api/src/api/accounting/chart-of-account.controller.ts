@@ -66,11 +66,12 @@ export class ChartOfAccountController {
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(`List accounts: tenant=${tenantId}, type=${type}`);
-    return this.accountService.findAll(tenantId, {
+    const accounts = await this.accountService.findAll(tenantId, {
       type,
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
       search,
     });
+    return { success: true, data: accounts };
   }
 
   @Get('summary')
@@ -79,7 +80,8 @@ export class ChartOfAccountController {
   @ApiResponse({ status: 200, description: 'Account summary' })
   async getSummary(@CurrentUser() user: IUser) {
     const tenantId = getTenantId(user);
-    return this.accountService.getAccountSummary(tenantId);
+    const summary = await this.accountService.getAccountSummary(tenantId);
+    return { success: true, data: summary };
   }
 
   @Get('education-exempt')
@@ -90,7 +92,8 @@ export class ChartOfAccountController {
   @ApiResponse({ status: 200, description: 'Education exempt accounts' })
   async getEducationExempt(@CurrentUser() user: IUser) {
     const tenantId = getTenantId(user);
-    return this.accountService.findEducationExemptAccounts(tenantId);
+    const accounts = await this.accountService.findEducationExemptAccounts(tenantId);
+    return { success: true, data: accounts };
   }
 
   @Get(':id')
@@ -104,7 +107,7 @@ export class ChartOfAccountController {
     if (!account) {
       throw new NotFoundException(`Account ${id} not found`);
     }
-    return account;
+    return { success: true, data: account };
   }
 
   @Get('code/:code')
@@ -118,7 +121,7 @@ export class ChartOfAccountController {
     if (!account) {
       throw new NotFoundException(`Account with code ${code} not found`);
     }
-    return account;
+    return { success: true, data: account };
   }
 
   @Post()
@@ -133,7 +136,8 @@ export class ChartOfAccountController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Create account: tenant=${tenantId}, code=${body.code}`);
-    return this.accountService.create(tenantId, userId, body);
+    const account = await this.accountService.create(tenantId, userId, body);
+    return { success: true, data: account };
   }
 
   @Patch(':id')
@@ -149,7 +153,8 @@ export class ChartOfAccountController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Update account: id=${id}, tenant=${tenantId}`);
-    return this.accountService.update(tenantId, userId, id, body);
+    const account = await this.accountService.update(tenantId, userId, id, body);
+    return { success: true, data: account };
   }
 
   @Post('seed-defaults')
@@ -160,7 +165,8 @@ export class ChartOfAccountController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Seed default accounts: tenant=${tenantId}`);
-    return this.accountService.seedDefaults(tenantId, userId);
+    const result = await this.accountService.seedDefaults(tenantId, userId);
+    return { success: true, data: result };
   }
 
   @Post(':id/deactivate')
@@ -172,7 +178,8 @@ export class ChartOfAccountController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Deactivate account: id=${id}, tenant=${tenantId}`);
-    return this.accountService.deactivate(tenantId, userId, id);
+    const account = await this.accountService.deactivate(tenantId, userId, id);
+    return { success: true, data: account };
   }
 
   @Post(':id/reactivate')
@@ -184,6 +191,7 @@ export class ChartOfAccountController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Reactivate account: id=${id}, tenant=${tenantId}`);
-    return this.accountService.reactivate(tenantId, userId, id);
+    const account = await this.accountService.reactivate(tenantId, userId, id);
+    return { success: true, data: account };
   }
 }

@@ -17,12 +17,25 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { BusinessException } from '../../shared/exceptions';
 import type { AccountingProvider } from '../accounting/interfaces';
 import type {
-  AccountingAccount, BankSyncOptions, BankSyncResult,
-  BulkContactSyncResult, BulkInvoiceSyncResult, ConnectionStatus,
-  ContactSyncResult, InvoicePullFilters, InvoiceSyncResult,
-  JournalEntry, JournalPostResult, PaymentSyncResult,
-  ProviderCapabilities, PulledInvoicesResult, PulledPaymentsResult,
-  PushInvoiceOptions, SyncOptions, SyncResult, SyncItemError,
+  AccountingAccount,
+  BankSyncOptions,
+  BankSyncResult,
+  BulkContactSyncResult,
+  BulkInvoiceSyncResult,
+  ConnectionStatus,
+  ContactSyncResult,
+  InvoicePullFilters,
+  InvoiceSyncResult,
+  JournalEntry,
+  JournalPostResult,
+  PaymentSyncResult,
+  ProviderCapabilities,
+  PulledInvoicesResult,
+  PulledPaymentsResult,
+  PushInvoiceOptions,
+  SyncOptions,
+  SyncResult,
+  SyncItemError,
 } from '../accounting/interfaces/accounting-types';
 import { StubApiClient } from './stub-api.client';
 import type { StubTransactionPayload } from './stub.types';
@@ -81,14 +94,19 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
    * `code` carries the Stub business UID (visible in the Stub dashboard URL).
    * If `code` is 'create', a new business is created in Stub using tenant info.
    */
-  async handleCallback(tenantId: string, code: string, _state: string): Promise<void> {
+  async handleCallback(
+    tenantId: string,
+    code: string,
+    _state: string,
+  ): Promise<void> {
     this.logger.log(`Connecting Stub for tenant ${tenantId}`);
 
     const isValid = await this.stubClient.verifyApiKey();
     if (!isValid) {
       throw new BusinessException(
         'The configured Stub API credentials are invalid. Check STUB_API_KEY and STUB_APP_ID env vars.',
-        'STUB_INVALID_API_KEY', { tenantId },
+        'STUB_INVALID_API_KEY',
+        { tenantId },
       );
     }
 
@@ -106,7 +124,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         email: '',
       });
       businessUid = resp.uid;
-      this.logger.log(`Created Stub business for tenant ${tenantId}: uid=${businessUid}`);
+      this.logger.log(
+        `Created Stub business for tenant ${tenantId}: uid=${businessUid}`,
+      );
     }
 
     await this.ensureConnectionTable();
@@ -117,7 +137,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         stub_business_uid = ${businessUid},
         is_active = true, connected_at = NOW(), error_message = NULL
     `;
-    this.logger.log(`Stub connected for tenant ${tenantId}, uid=${businessUid}`);
+    this.logger.log(
+      `Stub connected for tenant ${tenantId}, uid=${businessUid}`,
+    );
   }
 
   /** Check whether the tenant has a valid Stub connection. */
@@ -131,7 +153,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     }
     const row = rows[0];
     const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId }, select: { name: true },
+      where: { id: tenantId },
+      select: { name: true },
     });
     return {
       isConnected: true,
@@ -139,7 +162,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       organizationName: tenant?.name ?? undefined,
       connectedAt: row.connected_at ?? undefined,
       lastSyncAt: row.last_sync_at ?? undefined,
-      lastSyncStatus: (row.last_sync_status as ConnectionStatus['lastSyncStatus']) ?? undefined,
+      lastSyncStatus:
+        (row.last_sync_status as ConnectionStatus['lastSyncStatus']) ??
+        undefined,
       errorMessage: row.error_message ?? undefined,
     };
   }
@@ -167,7 +192,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
    * Income is only recorded when payment is received via syncPayment().
    */
   async pushInvoice(
-    tenantId: string, invoiceId: string, _options?: PushInvoiceOptions,
+    tenantId: string,
+    invoiceId: string,
+    _options?: PushInvoiceOptions,
   ): Promise<InvoiceSyncResult> {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId },
@@ -175,7 +202,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     });
     if (!invoice) {
       throw new BusinessException(
-        `Invoice ${invoiceId} not found`, 'INVOICE_NOT_FOUND', { invoiceId, tenantId },
+        `Invoice ${invoiceId} not found`,
+        'INVOICE_NOT_FOUND',
+        { invoiceId, tenantId },
       );
     }
 
@@ -199,9 +228,13 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   /** Acknowledge bulk invoice push. Only PAID invoices are pushed immediately. */
   async pushInvoicesBulk(
-    tenantId: string, invoiceIds: string[], _options?: PushInvoiceOptions,
+    tenantId: string,
+    invoiceIds: string[],
+    _options?: PushInvoiceOptions,
   ): Promise<BulkInvoiceSyncResult> {
-    this.logger.log(`Bulk push ${invoiceIds.length} invoices for tenant ${tenantId} (cash-basis)`);
+    this.logger.log(
+      `Bulk push ${invoiceIds.length} invoices for tenant ${tenantId} (cash-basis)`,
+    );
 
     const invoices = await this.prisma.invoice.findMany({
       where: { id: { in: invoiceIds }, tenantId },
@@ -214,7 +247,11 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
     for (const id of invoiceIds) {
       if (!foundIds.has(id)) {
-        errors.push({ entityId: id, error: `Invoice ${id} not found`, code: 'INVOICE_NOT_FOUND' });
+        errors.push({
+          entityId: id,
+          error: `Invoice ${id} not found`,
+          code: 'INVOICE_NOT_FOUND',
+        });
       }
     }
 
@@ -241,31 +278,48 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     }
 
     const pushed = results.filter((r) => r.externalStatus === 'PUSHED').length;
-    const deferred = results.filter((r) => r.externalStatus === 'DEFERRED').length;
+    const deferred = results.filter(
+      (r) => r.externalStatus === 'DEFERRED',
+    ).length;
     if (pushed > 0) await this.updateSyncStatus(tenantId, 'success');
 
-    return { pushed, failed: errors.length, skipped: deferred, results, errors };
+    return {
+      pushed,
+      failed: errors.length,
+      skipped: deferred,
+      results,
+      errors,
+    };
   }
 
   /** Not supported -- Stub uses async webhook-based pulls. */
-  async pullInvoices(_tenantId: string, _filters?: InvoicePullFilters): Promise<PulledInvoicesResult> {
+  async pullInvoices(
+    _tenantId: string,
+    _filters?: InvoicePullFilters,
+  ): Promise<PulledInvoicesResult> {
     throw new BusinessException(
       'Stub.africa does not support synchronous invoice pulling.',
-      'CAPABILITY_NOT_SUPPORTED', { provider: 'stub', capability: 'invoicePull' },
+      'CAPABILITY_NOT_SUPPORTED',
+      { provider: 'stub', capability: 'invoicePull' },
     );
   }
 
   // -- Contacts ---------------------------------------------------------------
 
   /** Stub has no contacts API. Returns a local mapping. */
-  async syncContact(tenantId: string, parentId: string): Promise<ContactSyncResult> {
+  async syncContact(
+    tenantId: string,
+    parentId: string,
+  ): Promise<ContactSyncResult> {
     const parent = await this.prisma.parent.findFirst({
       where: { id: parentId, tenantId },
       select: { id: true, firstName: true, lastName: true, email: true },
     });
     if (!parent) {
       throw new BusinessException(
-        `Parent ${parentId} not found`, 'PARENT_NOT_FOUND', { parentId, tenantId },
+        `Parent ${parentId} not found`,
+        'PARENT_NOT_FOUND',
+        { parentId, tenantId },
       );
     }
     return {
@@ -278,7 +332,10 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
   }
 
   /** Bulk contact sync -- local mappings only. */
-  async syncContactsBulk(tenantId: string, parentIds: string[]): Promise<BulkContactSyncResult> {
+  async syncContactsBulk(
+    tenantId: string,
+    parentIds: string[],
+  ): Promise<BulkContactSyncResult> {
     const results: ContactSyncResult[] = [];
     const errors: SyncItemError[] = [];
     for (const parentId of parentIds) {
@@ -288,11 +345,18 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         errors.push({
           entityId: parentId,
           error: err instanceof Error ? err.message : 'Contact sync failed',
-          code: err instanceof BusinessException ? err.code : 'CONTACT_SYNC_ERROR',
+          code:
+            err instanceof BusinessException ? err.code : 'CONTACT_SYNC_ERROR',
         });
       }
     }
-    return { synced: results.length, failed: errors.length, skipped: 0, results, errors };
+    return {
+      synced: results.length,
+      failed: errors.length,
+      skipped: 0,
+      results,
+      errors,
+    };
   }
 
   // -- Payments ---------------------------------------------------------------
@@ -302,8 +366,14 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
    * This is the primary Stub integration point — cash-basis means income is
    * only recorded when payment is actually received.
    */
-  async syncPayment(tenantId: string, paymentId: string, invoiceRef: string): Promise<PaymentSyncResult> {
-    this.logger.log(`Syncing payment ${paymentId} to Stub for tenant ${tenantId}`);
+  async syncPayment(
+    tenantId: string,
+    paymentId: string,
+    invoiceRef: string,
+  ): Promise<PaymentSyncResult> {
+    this.logger.log(
+      `Syncing payment ${paymentId} to Stub for tenant ${tenantId}`,
+    );
     const uid = await this.getStubUid(tenantId);
 
     const payment = await this.prisma.payment.findFirst({
@@ -316,7 +386,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     });
     if (!payment) {
       throw new BusinessException(
-        `Payment ${paymentId} not found`, 'PAYMENT_NOT_FOUND', { paymentId, tenantId },
+        `Payment ${paymentId} not found`,
+        'PAYMENT_NOT_FOUND',
+        { paymentId, tenantId },
       );
     }
 
@@ -349,17 +421,24 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
   }
 
   /** Not supported -- Stub uses async webhook-based pulls. */
-  async pullPayments(_tenantId: string, _invoiceRef: string): Promise<PulledPaymentsResult> {
+  async pullPayments(
+    _tenantId: string,
+    _invoiceRef: string,
+  ): Promise<PulledPaymentsResult> {
     throw new BusinessException(
       'Stub.africa does not support synchronous payment pulling.',
-      'CAPABILITY_NOT_SUPPORTED', { provider: 'stub', capability: 'paymentPull' },
+      'CAPABILITY_NOT_SUPPORTED',
+      { provider: 'stub', capability: 'paymentPull' },
     );
   }
 
   // -- Bank Feeds -------------------------------------------------------------
 
   /** Initiate bank feed sync. Results arrive via webhook. */
-  async syncBankTransactions(tenantId: string, _options?: BankSyncOptions): Promise<BankSyncResult> {
+  async syncBankTransactions(
+    tenantId: string,
+    _options?: BankSyncOptions,
+  ): Promise<BankSyncResult> {
     this.logger.log(`Initiating Stub bank feed sync for tenant ${tenantId}`);
     const uid = await this.getStubUid(tenantId);
     await this.stubClient.pullBankFeed(uid);
@@ -368,10 +447,14 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Journals (not supported) -----------------------------------------------
 
-  async postJournal(_tenantId: string, _journal: JournalEntry): Promise<JournalPostResult> {
+  async postJournal(
+    _tenantId: string,
+    _journal: JournalEntry,
+  ): Promise<JournalPostResult> {
     throw new BusinessException(
       'Stub.africa does not support journal posting.',
-      'CAPABILITY_NOT_SUPPORTED', { provider: 'stub', capability: 'journals' },
+      'CAPABILITY_NOT_SUPPORTED',
+      { provider: 'stub', capability: 'journals' },
     );
   }
 
@@ -392,7 +475,11 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       throw new BusinessException(
         'Stub.africa only supports push-based sync.',
         'CAPABILITY_NOT_SUPPORTED',
-        { provider: 'stub', capability: 'syncOrchestration', direction: options.direction },
+        {
+          provider: 'stub',
+          capability: 'syncOrchestration',
+          direction: options.direction,
+        },
       );
     }
 
@@ -405,7 +492,10 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       try {
         const paid = await this.findPaidInvoices(tenantId, options.fromDate);
         if (paid.length > 0) {
-          const result = await this.pushInvoicesBulk(tenantId, paid.map((i) => i.id));
+          const result = await this.pushInvoicesBulk(
+            tenantId,
+            paid.map((i) => i.id),
+          );
           entitiesSynced['invoices'] = result.pushed;
           errors.push(...result.errors);
         } else {
@@ -422,7 +512,13 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     if (entities.includes('contacts')) entitiesSynced['contacts'] = 0;
     if (entities.includes('payments')) entitiesSynced['payments'] = 0;
 
-    return { jobId, success: errors.length === 0, entitiesSynced, errors, completedAt: new Date() };
+    return {
+      jobId,
+      success: errors.length === 0,
+      entitiesSynced,
+      errors,
+      completedAt: new Date(),
+    };
   }
 
   // -- Private: Connection Table ----------------------------------------------
@@ -458,7 +554,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     if (rows.length === 0 || !rows[0].stub_business_uid) {
       throw new BusinessException(
         'Stub.africa is not connected for this tenant. Please connect via Settings.',
-        'STUB_NOT_CONNECTED', { tenantId },
+        'STUB_NOT_CONNECTED',
+        { tenantId },
       );
     }
     return rows[0].stub_business_uid;
@@ -466,7 +563,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   /** Update sync status on the connection row. */
   private async updateSyncStatus(
-    tenantId: string, status: string, errorMessage?: string,
+    tenantId: string,
+    status: string,
+    errorMessage?: string,
   ): Promise<void> {
     try {
       await this.prisma.$executeRaw`
@@ -476,7 +575,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         WHERE tenant_id = ${tenantId}
       `;
     } catch (err) {
-      this.logger.warn(`Failed to update Stub sync status: ${err instanceof Error ? err.message : err}`);
+      this.logger.warn(
+        `Failed to update Stub sync status: ${err instanceof Error ? err.message : err}`,
+      );
     }
   }
 
@@ -487,7 +588,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
    * been paid is explicitly pushed, or during sync of paid invoices.
    */
   private async pushPaidInvoiceAsIncome(
-    tenantId: string, invoiceId: string,
+    tenantId: string,
+    invoiceId: string,
   ): Promise<InvoiceSyncResult> {
     const uid = await this.getStubUid(tenantId);
 
@@ -500,14 +602,17 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     });
     if (!invoice) {
       throw new BusinessException(
-        `Invoice ${invoiceId} not found`, 'INVOICE_NOT_FOUND', { invoiceId, tenantId },
+        `Invoice ${invoiceId} not found`,
+        'INVOICE_NOT_FOUND',
+        { invoiceId, tenantId },
       );
     }
 
     const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
-    const description = invoice.lines.length > 0
-      ? invoice.lines.map((l) => l.description).join(', ')
-      : `Invoice ${invoice.invoiceNumber}`;
+    const description =
+      invoice.lines.length > 0
+        ? invoice.lines.map((l) => l.description).join(', ')
+        : `Invoice ${invoice.invoiceNumber}`;
 
     const tx: StubTransactionPayload = {
       id: `cb-inv-${invoiceId}`,
@@ -517,7 +622,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       notes: description,
       currency: 'ZAR',
       amount: this.centsToRands(invoice.totalCents),
-      vat: invoice.vatCents > 0 ? this.centsToRands(invoice.vatCents) : undefined,
+      vat:
+        invoice.vatCents > 0 ? this.centsToRands(invoice.vatCents) : undefined,
     };
     await this.stubClient.pushIncome(uid, tx);
     await this.updateSyncStatus(tenantId, 'success');
@@ -540,15 +646,19 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   /** Find PAID invoices eligible for pushing to Stub (cash-basis). */
   private async findPaidInvoices(
-    tenantId: string, fromDate?: string,
+    tenantId: string,
+    fromDate?: string,
   ): Promise<Array<{ id: string }>> {
     const where: Record<string, unknown> = {
-      tenantId, isDeleted: false,
+      tenantId,
+      isDeleted: false,
       status: 'PAID',
     };
     if (fromDate) where['issueDate'] = { gte: new Date(fromDate) };
     return this.prisma.invoice.findMany({
-      where, select: { id: true }, orderBy: { issueDate: 'asc' },
+      where,
+      select: { id: true },
+      orderBy: { issueDate: 'asc' },
     });
   }
 }

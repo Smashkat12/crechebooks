@@ -202,10 +202,7 @@ export class ParentOnboardingService {
   /**
    * Get fee summary for the parent's enrolled children
    */
-  async getFeeSummary(
-    parentId: string,
-    tenantId: string,
-  ): Promise<FeeSummary> {
+  async getFeeSummary(parentId: string, tenantId: string): Promise<FeeSummary> {
     const parent = await this.prisma.parent.findFirst({
       where: { id: parentId, tenantId },
       include: {

@@ -76,7 +76,45 @@ CB_ENVIRONMENT=production .claude/helpers/cb-db.sh "SELECT ... FROM table WHERE 
 CB_ENVIRONMENT=production .claude/helpers/cb-api.sh GET /endpoint
 ```
 
-See `.claude/commands/crechebooks/_api-guide.md` for the full endpoint reference.
+See `.claude/skills/_api-guide/SKILL.md` for the full endpoint reference (auto-loaded by Claude when relevant).
+
+## Skills Architecture
+
+CrecheBooks uses a layered agentic architecture built on Claude Code skills:
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Skills** (auto-discovery) | `.claude/skills/*/SKILL.md` | Domain capabilities with supporting files |
+| **Commands** (user-triggered) | `.claude/commands/crechebooks/` | Legacy commands (backward-compatible) |
+| **Subagents** (isolated context) | `.claude/agents/` | Specialized workers via `context: fork` |
+| **Shared Context** | `.claude/context/` | Domain data (tax tables, chart of accounts) |
+
+### Available Skills (16)
+
+| Skill | Auto-invoke | Fork | Description |
+|-------|------------|------|-------------|
+| `dashboard` | Yes | No | Revenue, arrears, enrollment metrics |
+| `invoices` | Yes | No | List, generate, send invoices |
+| `payments` | Yes | No | List, match, allocate payments |
+| `banking` | Yes | No | Bank accounts, sync transactions |
+| `transactions` | Yes | No | List, import, categorize transactions |
+| `reconciliation` | Yes | Yes | Bank reconciliation (forked to orchestrator) |
+| `reports` | Yes | No | Arrears, financial, audit reports |
+| `sars` | Yes | No | VAT201, EMP201, EMP501 tax returns |
+| `fee-structures` | Yes | No | Fee types, sibling discounts |
+| `parents` | Yes | No | Parent/guardian records |
+| `children` | Yes | No | Child records, enrollments |
+| `staff` | Yes | No | Staff, leave, onboarding, documents |
+| `communications` | Yes | No | Broadcasts, groups, previews |
+| `tenant` | Yes | No | Tenant settings and info |
+| `monthly-close` | No (manual) | Yes | Month-end close orchestrator |
+| `_api-guide` | Yes (bg) | No | API reference (background knowledge) |
+
+### Skill Conventions
+- Mutation operations (generate, send, create, match) require explicit user invocation
+- Read-only operations auto-invoke when conversation context matches
+- Heavy operations use `context: fork` to run in isolated subagent context
+- All skills reference `cb-api.sh` and `cb-db.sh` helpers for API/DB access
 
 ## CrecheBooks Domain Rules
 

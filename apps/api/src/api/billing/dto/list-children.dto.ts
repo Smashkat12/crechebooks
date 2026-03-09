@@ -77,7 +77,8 @@ export class ListChildrenQueryDto {
   @ApiProperty({
     required: false,
     enum: ChildStatus,
-    description: 'Filter by child status (REGISTERED, ENROLLED, WITHDRAWN, GRADUATED)',
+    description:
+      'Filter by child status (REGISTERED, ENROLLED, WITHDRAWN, GRADUATED)',
   })
   status?: ChildStatus;
 }

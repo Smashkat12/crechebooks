@@ -2395,9 +2395,7 @@ export class ReconciliationController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async previewFeeCorrections(@CurrentUser() user: IUser) {
-    this.logger.log(
-      `Preview fee corrections: tenant=${getTenantId(user)}`,
-    );
+    this.logger.log(`Preview fee corrections: tenant=${getTenantId(user)}`);
 
     const result =
       await this.feeInflationCorrectionService.correctExistingMatches(
@@ -2430,9 +2428,7 @@ export class ReconciliationController {
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
   async applyFeeCorrections(@CurrentUser() user: IUser) {
-    this.logger.log(
-      `Apply fee corrections: tenant=${getTenantId(user)}`,
-    );
+    this.logger.log(`Apply fee corrections: tenant=${getTenantId(user)}`);
 
     const result =
       await this.feeInflationCorrectionService.correctExistingMatches(

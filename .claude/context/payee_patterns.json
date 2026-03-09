@@ -1,8 +1,129 @@
 {
-  "version": "2025.1",
-  "description": "Payee pattern matching rules for SA creche transactions",
+  "version": "2025.2",
+  "description": "Payee pattern matching rules for SA creche transactions. Updated with Elle Elephant-specific patterns from actual FNB bank data.",
   "autoApplyConfidenceThreshold": 0.80,
   "patterns": [
+    {
+      "id": "parent-rtc-credit",
+      "regex": "RTC CREDIT",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.90,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "parent-magtape-credit",
+      "regex": "MAGTAPE CREDIT(?!.*D6 GROUP)",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.90,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "parent-fnb-payment-from",
+      "regex": "FNB APP (?:PAYMENT|TRANSFER) FROM(?!.*OWNER)",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.90,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "parent-adt-cash-deposit",
+      "regex": "ADT CASH DEPOSIT",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.88,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "parent-payshap-credit",
+      "regex": "PAYSHAP CREDIT",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.88,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "parent-intbanking-pmt",
+      "regex": "INT-BANKING PMT FRM",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.88,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "parent-send-money-credit",
+      "regex": "SEND MONEY.*CR",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.85,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "school-fee-deposit",
+      "regex": "DEPOSIT|SCHOOL.*FEE|TUITION|REGISTRATION",
+      "accountCode": "4000",
+      "accountName": "School Fees Income",
+      "confidence": 0.85,
+      "vatType": "EXEMPT",
+      "isCredit": true
+    },
+    {
+      "id": "owner-loan-in",
+      "regex": "FNB APP TRANSFER FROM OWNER|OWNER.*LOAN|DIRECTOR.*LOAN",
+      "accountCode": "2300",
+      "accountName": "Owner Loan",
+      "confidence": 0.90,
+      "vatType": "NO_VAT",
+      "isCredit": true
+    },
+    {
+      "id": "salary-payment",
+      "regex": "SALARY|WAGE|PAY.*EMP",
+      "accountCode": "5000",
+      "accountName": "Salaries and Wages",
+      "confidence": 0.92,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "salary-elle-elephant",
+      "regex": "ELLE.?ELEPHANT.*SALARY|ELLEELEPHANT.*SALARY",
+      "accountCode": "5000",
+      "accountName": "Salaries and Wages",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "transport-school",
+      "regex": "SCHOOL TRANSPORT|SCHOLAR TRANSPORT|TRANSPORT.*SCHOLAR",
+      "accountCode": "5700",
+      "accountName": "Transport",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "bank-fnb-monthly-fee",
+      "regex": "#MONTHLY ACCOUNT FEE|#SERVICE FEES|#CASH DEPOSIT FEE|#SCHED PMT.*CHG",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "bank-fnb-int-pymt-fee",
+      "regex": "#SERVICE FEES#INT PYMT FEE",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.95,
+      "vatType": "NO_VAT"
+    },
     {
       "id": "bank-fnb-cheque",
       "regex": "^FNB CHEQUE",
@@ -52,6 +173,24 @@
       "vatType": "NO_VAT"
     },
     {
+      "id": "bank-card-cashback",
+      "regex": "CARD CASHBACK|CASHB.*745520",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.85,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "bank-atm-withdrawal",
+      "regex": "FNB ATM|ATM.*WITHDRAW",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.80,
+      "vatType": "NO_VAT",
+      "flagForReview": true,
+      "reviewReason": "ATM withdrawal - verify business purpose"
+    },
+    {
       "id": "sars-payment",
       "regex": "^SARS|SOUTH AFRICAN REVENUE",
       "accountCode": "2200",
@@ -63,7 +202,7 @@
     },
     {
       "id": "utility-eskom",
-      "regex": "ESKOM|CITY POWER|MUNICIPALITY.*ELEC",
+      "regex": "ESKOM|CITY POWER|MUNICIPALITY.*ELEC|PREPAID ELECTRICITY",
       "accountCode": "5200",
       "accountName": "Utilities - Electricity",
       "confidence": 0.90,
@@ -118,11 +257,43 @@
       "vatType": "STANDARD"
     },
     {
+      "id": "software-d6-group",
+      "regex": "D6 GROUP|D6_GROUP",
+      "accountCode": "8300",
+      "accountName": "Telephone and Internet",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "software-apple",
+      "regex": "APPLE\\.COM|APPLE STORE|APPLE$",
+      "accountCode": "8350",
+      "accountName": "Software Subscriptions",
+      "confidence": 0.85,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "software-microsoft",
+      "regex": "MICROSOFT",
+      "accountCode": "8350",
+      "accountName": "Software Subscriptions",
+      "confidence": 0.85,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "software-xero",
+      "regex": "XERO",
+      "accountCode": "8350",
+      "accountName": "Software Subscriptions",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
       "id": "groceries-shoprite",
       "regex": "SHOPRITE|CHECKERS",
       "accountCode": "5400",
       "accountName": "Food and Catering",
-      "confidence": 0.75,
+      "confidence": 0.85,
       "vatType": "STANDARD",
       "requiresAmountCheck": true,
       "maxAmountCents": 500000
@@ -132,7 +303,7 @@
       "regex": "PICK N PAY|PNP",
       "accountCode": "5400",
       "accountName": "Food and Catering",
-      "confidence": 0.75,
+      "confidence": 0.85,
       "vatType": "STANDARD",
       "requiresAmountCheck": true,
       "maxAmountCents": 500000
@@ -142,17 +313,17 @@
       "regex": "WOOLWORTHS|WOOLIES",
       "accountCode": "5400",
       "accountName": "Food and Catering",
-      "confidence": 0.75,
+      "confidence": 0.85,
       "vatType": "STANDARD",
       "requiresAmountCheck": true,
       "maxAmountCents": 500000
     },
     {
       "id": "groceries-spar",
-      "regex": "SPAR",
+      "regex": "SPAR(?!C)",
       "accountCode": "5400",
       "accountName": "Food and Catering",
-      "confidence": 0.75,
+      "confidence": 0.85,
       "vatType": "STANDARD",
       "requiresAmountCheck": true,
       "maxAmountCents": 500000
@@ -162,27 +333,106 @@
       "regex": "MAKRO",
       "accountCode": "5400",
       "accountName": "Food and Catering",
-      "confidence": 0.75,
+      "confidence": 0.85,
       "vatType": "STANDARD",
       "requiresAmountCheck": true,
       "maxAmountCents": 500000
     },
     {
-      "id": "school-fee-deposit",
-      "regex": "DEPOSIT|SCHOOL.*FEE|TUITION",
-      "accountCode": "4000",
-      "accountName": "School Fees Income",
-      "confidence": 0.70,
-      "vatType": "EXEMPT",
-      "isCredit": true
+      "id": "groceries-bigsave",
+      "regex": "BIG SAVE|BIGSAVE",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.85,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
     },
     {
-      "id": "salary-payment",
-      "regex": "SALARY|WAGE|PAY.*EMP",
-      "accountCode": "5000",
-      "accountName": "Salaries and Wages",
+      "id": "groceries-usave",
+      "regex": "USAVE(?!.*CAR)|U SAVE(?!.*CAR)",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
       "confidence": 0.85,
-      "vatType": "NO_VAT"
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "groceries-star-supermarket",
+      "regex": "STAR SUPERMARK",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.85,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "groceries-boxer",
+      "regex": "BOXER",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.85,
+      "vatType": "STANDARD",
+      "requiresAmountCheck": true,
+      "maxAmountCents": 500000
+    },
+    {
+      "id": "catering-westpack",
+      "regex": "WEST PACK|WESTPACK",
+      "accountCode": "5400",
+      "accountName": "Food and Catering",
+      "confidence": 0.85,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "fuel-petrol",
+      "regex": "FUEL|ENGEN|SHELL|BP|SASOL|CALTEX|TOTAL ENERGIES",
+      "accountCode": "5700",
+      "accountName": "Transport",
+      "confidence": 0.85,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "vehicle-rental",
+      "regex": "USAVE CAR|CAR.*RENTAL|TRUCK.*RENTAL",
+      "accountCode": "5700",
+      "accountName": "Transport",
+      "confidence": 0.85,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "hardware-maintenance",
+      "regex": "HARDWARE|5 STAR HARDWARE|DISCOUNT.*HARDWARE|MARINGA BRICKS",
+      "accountCode": "5800",
+      "accountName": "Repairs and Maintenance",
+      "confidence": 0.80,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "educational-supplies",
+      "regex": "WALTONS|CNA|TAKEALOT|TAKEALO",
+      "accountCode": "5300",
+      "accountName": "Educational Supplies",
+      "confidence": 0.85,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "uniforms-clothing",
+      "regex": "BOOKS AND UNIFORM|LEOMI FASHIONS|UNIFORM",
+      "accountCode": "5300",
+      "accountName": "Educational Supplies",
+      "confidence": 0.85,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "cleaning-supplies",
+      "regex": "CLICKS|DIS-CHEM|GAME",
+      "accountCode": "5600",
+      "accountName": "Cleaning and Hygiene",
+      "confidence": 0.80,
+      "vatType": "STANDARD"
     },
     {
       "id": "insurance-outsurance",
@@ -241,20 +491,54 @@
       "vatType": "EXEMPT"
     },
     {
-      "id": "cleaning-supplies",
-      "regex": "CLICKS|DIS-CHEM|GAME",
-      "accountCode": "5600",
-      "accountName": "Cleaning and Hygiene",
-      "confidence": 0.70,
+      "id": "freelance-fiverr",
+      "regex": "FIVERR",
+      "accountCode": "8400",
+      "accountName": "Professional Services",
+      "confidence": 0.85,
       "vatType": "STANDARD"
     },
     {
-      "id": "educational-supplies",
-      "regex": "WALTONS|CNA|TAKEALOT",
+      "id": "painters-maintenance",
+      "regex": "PAINTERS",
+      "accountCode": "5800",
+      "accountName": "Repairs and Maintenance",
+      "confidence": 0.80,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "send-money-debit",
+      "regex": "SEND MONEY APP DR",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.80,
+      "vatType": "NO_VAT"
+    },
+    {
+      "id": "magtape-debit-d6",
+      "regex": "MAGTAPE DEBIT D6 GROUP|MAGTAPE DEBIT.*D6",
+      "accountCode": "8300",
+      "accountName": "Telephone and Internet",
+      "confidence": 0.90,
+      "vatType": "STANDARD"
+    },
+    {
+      "id": "starlight-ns",
+      "regex": "STARLIGHT NS",
       "accountCode": "5300",
       "accountName": "Educational Supplies",
       "confidence": 0.75,
       "vatType": "STANDARD"
+    },
+    {
+      "id": "pos-cashback-debit",
+      "regex": "CARD POSCASH|POS.*CASH",
+      "accountCode": "8100",
+      "accountName": "Bank Charges",
+      "confidence": 0.80,
+      "vatType": "NO_VAT",
+      "flagForReview": true,
+      "reviewReason": "POS cashback - verify business purpose"
     }
   ]
 }

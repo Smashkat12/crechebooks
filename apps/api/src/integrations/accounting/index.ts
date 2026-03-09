@@ -7,7 +7,10 @@ export { ACCOUNTING_PROVIDER } from './accounting-provider.token';
 
 // Module
 export { AccountingModule } from './accounting.module';
-export type { AccountingModuleOptions, AccountingProviderType } from './accounting.module';
+export type {
+  AccountingModuleOptions,
+  AccountingProviderType,
+} from './accounting.module';
 
 // Controller
 export { AccountingController } from './accounting.controller';

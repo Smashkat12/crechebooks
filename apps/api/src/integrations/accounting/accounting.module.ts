@@ -64,9 +64,7 @@ export class AccountingModule {
    * Imports the provider-specific module and binds the adapter to ACCOUNTING_PROVIDER.
    */
   private static buildModule(provider: AccountingProviderType): DynamicModule {
-    AccountingModule.logger.log(
-      `Registering accounting provider: ${provider}`,
-    );
+    AccountingModule.logger.log(`Registering accounting provider: ${provider}`);
 
     const { imports, providers } =
       AccountingModule.resolveProviderDependencies(provider);
@@ -91,8 +89,10 @@ export class AccountingModule {
       case 'xero': {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { XeroModule } = require('../xero/xero.module');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { XeroAccountingAdapter } = require('../xero/xero-accounting.adapter');
+
+        const {
+          XeroAccountingAdapter,
+        } = require('../xero/xero-accounting.adapter');
 
         AccountingModule.logger.log(
           'Xero provider selected -- registering XeroAccountingAdapter',
@@ -113,8 +113,10 @@ export class AccountingModule {
       case 'stub': {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { StubModule } = require('../stub/stub.module');
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { StubAccountingAdapter } = require('../stub/stub-accounting.adapter');
+
+        const {
+          StubAccountingAdapter,
+        } = require('../stub/stub-accounting.adapter');
 
         AccountingModule.logger.log(
           'Stub.africa provider selected -- registering StubAccountingAdapter',

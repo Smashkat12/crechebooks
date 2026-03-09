@@ -818,7 +818,12 @@ export class EnrollmentService {
       Date.UTC(startDate.getFullYear(), startDate.getMonth(), 1, 12),
     );
     const dueDate = new Date(
-      Date.UTC(monthEnd.getFullYear(), monthEnd.getMonth(), monthEnd.getDate(), 12),
+      Date.UTC(
+        monthEnd.getFullYear(),
+        monthEnd.getMonth(),
+        monthEnd.getDate(),
+        12,
+      ),
     );
 
     const invoice = await this.invoiceRepo.create({
@@ -890,8 +895,18 @@ export class EnrollmentService {
 
     // Monthly fee line (pro-rated if needed)
     const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     const billingMonthLabel = `${monthNames[startDate.getMonth()]} ${startDate.getFullYear()}`;
     const childFullName = `${child.firstName} ${child.lastName}`;

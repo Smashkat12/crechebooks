@@ -286,11 +286,7 @@ export class ParentMenuHandler {
         await this.sessionHandler.sendBalanceInfo(to, tenantId, parentId);
         break;
       case 'human':
-        await this.sessionHandler.requestHumanCallback(
-          to,
-          tenantId,
-          parentId,
-        );
+        await this.sessionHandler.requestHumanCallback(to, tenantId, parentId);
         break;
       case 'update':
         await this.sessionHandler.sendUpdateDetailsLink(to, tenantId);

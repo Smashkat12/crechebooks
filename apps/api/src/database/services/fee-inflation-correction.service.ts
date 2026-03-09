@@ -165,9 +165,7 @@ export class FeeInflationCorrectionService {
     );
 
     const feeType =
-      calculatedFees.length > 0
-        ? calculatedFees[0].feeType
-        : 'UNKNOWN_FEE';
+      calculatedFees.length > 0 ? calculatedFees[0].feeType : 'UNKNOWN_FEE';
 
     // Calculate confidence using multi-factor scoring:
     // 1. Does the fee match the expected amount for this type?
@@ -187,13 +185,13 @@ export class FeeInflationCorrectionService {
         explanation = `Fee R${(feeDifference / 100).toFixed(2)} matches expected ${transactionType} fee R${(expectedFeeCents / 100).toFixed(2)}`;
       } else if (feeDelta <= 200) {
         // Close match (within R2.00)
-        confidence = 0.90;
+        confidence = 0.9;
         explanation = `Fee R${(feeDifference / 100).toFixed(2)} close to expected ${transactionType} fee R${(expectedFeeCents / 100).toFixed(2)}`;
       } else if (isKnownType && feeRatio <= 0.05) {
         // Known type, fee within 5% of transaction — likely a tiered/variable fee
         confidence = 0.88;
         explanation = `${transactionType} fee R${(feeDifference / 100).toFixed(2)} differs from schedule (R${(expectedFeeCents / 100).toFixed(2)}) but is ${(feeRatio * 100).toFixed(1)}% of amount — likely variable fee`;
-      } else if (isKnownType && feeRatio <= 0.10) {
+      } else if (isKnownType && feeRatio <= 0.1) {
         // Known type, fee within 10% of transaction
         confidence = 0.85;
         explanation = `${transactionType} fee R${(feeDifference / 100).toFixed(2)} differs from schedule but is ${(feeRatio * 100).toFixed(1)}% of amount`;
@@ -211,9 +209,9 @@ export class FeeInflationCorrectionService {
       explanation = `No configured fee for ${transactionType}, but R${(feeDifference / 100).toFixed(2)} is only ${(feeRatio * 100).toFixed(1)}% of amount`;
     } else if (feeRatio <= 0.03) {
       // Unknown type but very small fee relative to amount
-      confidence = 0.80;
+      confidence = 0.8;
       explanation = `Unknown type, but fee R${(feeDifference / 100).toFixed(2)} is only ${(feeRatio * 100).toFixed(1)}% of amount — likely a bank fee`;
-    } else if (feeRatio <= 0.10) {
+    } else if (feeRatio <= 0.1) {
       // Unknown type, fee within 10%
       confidence = 0.5;
       explanation = `No configured fee for ${transactionType}, difference R${(feeDifference / 100).toFixed(2)} is ${(feeRatio * 100).toFixed(1)}% of amount`;

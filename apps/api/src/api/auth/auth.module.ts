@@ -150,8 +150,7 @@ export class AuthModule implements OnModuleInit {
   private validateAuthConfiguration(): void {
     const nodeEnv = this.configService.get<string>('NODE_ENV');
     const appEnv = this.configService.get<string>('APP_ENV'); // staging, production, or unset
-    const isProduction =
-      nodeEnv === 'production' && appEnv !== 'staging';
+    const isProduction = nodeEnv === 'production' && appEnv !== 'staging';
     const isDevelopment = nodeEnv === 'development';
     const authProvider =
       this.configService.get<string>('AUTH_PROVIDER') || 'auth0';

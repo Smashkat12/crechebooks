@@ -632,7 +632,10 @@ export class BankFeeService {
     }
 
     // RTC (Real-Time Clearing) payments — must match before generic PAYMENT
-    if (/RTC\s*(CR|CREDIT|PMT|PAYMENT)?/i.test(text) || /REAL[\s-]*TIME\s*CLEAR/i.test(text)) {
+    if (
+      /RTC\s*(CR|CREDIT|PMT|PAYMENT)?/i.test(text) ||
+      /REAL[\s-]*TIME\s*CLEAR/i.test(text)
+    ) {
       return TransactionType.RTC_PAYMENT;
     }
 

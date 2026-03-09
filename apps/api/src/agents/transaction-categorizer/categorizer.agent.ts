@@ -272,13 +272,13 @@ export class TransactionCategorizerAgent {
           source = 'HISTORICAL';
         } else {
           if (transaction.isCredit) {
-            accountCode = '4100';
-            accountName = 'Other Income';
+            accountCode = '4000';
+            accountName = 'School Fees Income';
             vatType = VatType.EXEMPT;
           } else {
-            accountCode = '8100';
-            accountName = 'Bank Charges';
-            vatType = VatType.NO_VAT;
+            accountCode = '5900';
+            accountName = 'General Expenses';
+            vatType = VatType.STANDARD;
           }
           reasoning = 'No pattern or historical match - using default account';
           source = 'FALLBACK';
@@ -292,15 +292,15 @@ export class TransactionCategorizerAgent {
       reasoning = `Historical match: ${String(historicalMatch.count)} similar transactions for payee "${payee}"`;
       source = 'HISTORICAL';
     } else {
-      // Fallback based on credit/debit (original behavior)
+      // Fallback based on credit/debit
       if (transaction.isCredit) {
-        accountCode = '4100';
-        accountName = 'Other Income';
+        accountCode = '4000';
+        accountName = 'School Fees Income';
         vatType = VatType.EXEMPT;
       } else {
-        accountCode = '8100';
-        accountName = 'Bank Charges';
-        vatType = VatType.NO_VAT;
+        accountCode = '5900';
+        accountName = 'General Expenses';
+        vatType = VatType.STANDARD;
       }
       reasoning = 'No pattern or historical match - using default account';
       source = 'FALLBACK';

@@ -57,7 +57,9 @@ const createMockContentService = () => ({
 });
 
 const createMockEnrollmentService = () => ({
-  enrollChild: jest.fn().mockResolvedValue({ enrollment: { id: 'enr-1' }, invoice: null }),
+  enrollChild: jest
+    .fn()
+    .mockResolvedValue({ enrollment: { id: 'enr-1' }, invoice: null }),
 });
 
 const createMockFeeStructureRepo = () => ({
@@ -74,7 +76,9 @@ const createMockConsentFormsPdfService = () => ({
 });
 
 const createMockMagicLinkService = () => ({
-  generateMagicLinkUrl: jest.fn().mockResolvedValue('https://app.example.com/magic?token=abc'),
+  generateMagicLinkUrl: jest
+    .fn()
+    .mockResolvedValue('https://app.example.com/magic?token=abc'),
 });
 
 const TENANT_ID = 'tenant-123';
@@ -271,7 +275,9 @@ describe('Validation Functions', () => {
       future.setMonth(future.getMonth() + 3);
       const day = String(future.getDate()).padStart(2, '0');
       const month = String(future.getMonth() + 1).padStart(2, '0');
-      const result = validateStartDate(`${day}/${month}/${future.getFullYear()}`);
+      const result = validateStartDate(
+        `${day}/${month}/${future.getFullYear()}`,
+      );
       expect(result.valid).toBe(true);
     });
 
@@ -285,7 +291,9 @@ describe('Validation Functions', () => {
     it('should reject a date more than 6 months in the future', () => {
       const future = new Date();
       future.setMonth(future.getMonth() + 8);
-      const result = validateStartDate(`01/${String(future.getMonth() + 1).padStart(2, '0')}/${future.getFullYear()}`);
+      const result = validateStartDate(
+        `01/${String(future.getMonth() + 1).padStart(2, '0')}/${future.getFullYear()}`,
+      );
       expect(result.valid).toBe(false);
       expect(result.error).toContain('6 months');
     });
@@ -346,8 +354,12 @@ describe('OnboardingConversationHandler', () => {
   let mockContentService: ReturnType<typeof createMockContentService>;
   let mockEnrollmentService: ReturnType<typeof createMockEnrollmentService>;
   let mockFeeStructureRepo: ReturnType<typeof createMockFeeStructureRepo>;
-  let mockFeeAgreementPdfService: ReturnType<typeof createMockFeeAgreementPdfService>;
-  let mockConsentFormsPdfService: ReturnType<typeof createMockConsentFormsPdfService>;
+  let mockFeeAgreementPdfService: ReturnType<
+    typeof createMockFeeAgreementPdfService
+  >;
+  let mockConsentFormsPdfService: ReturnType<
+    typeof createMockConsentFormsPdfService
+  >;
   let mockMagicLinkService: ReturnType<typeof createMockMagicLinkService>;
 
   beforeEach(async () => {
@@ -366,8 +378,14 @@ describe('OnboardingConversationHandler', () => {
         { provide: TwilioContentService, useValue: mockContentService },
         { provide: EnrollmentService, useValue: mockEnrollmentService },
         { provide: FeeStructureRepository, useValue: mockFeeStructureRepo },
-        { provide: ParentFeeAgreementPdfService, useValue: mockFeeAgreementPdfService },
-        { provide: ParentConsentFormsPdfService, useValue: mockConsentFormsPdfService },
+        {
+          provide: ParentFeeAgreementPdfService,
+          useValue: mockFeeAgreementPdfService,
+        },
+        {
+          provide: ParentConsentFormsPdfService,
+          useValue: mockConsentFormsPdfService,
+        },
         { provide: MagicLinkService, useValue: mockMagicLinkService },
       ],
     }).compile();

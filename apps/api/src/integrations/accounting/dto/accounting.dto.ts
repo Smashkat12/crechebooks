@@ -43,7 +43,9 @@ export class ConnectRequestDto {
 
 /** Response after initiating an OAuth connection. */
 export class ConnectResponseDto {
-  @ApiProperty({ description: 'OAuth authorization URL to redirect the user to' })
+  @ApiProperty({
+    description: 'OAuth authorization URL to redirect the user to',
+  })
   authUrl!: string;
 }
 
@@ -60,7 +62,9 @@ export class CallbackQueryDto {
 
 /** Connection status response. */
 export class ConnectionStatusResponseDto {
-  @ApiProperty({ description: 'Whether the tenant is connected to the provider' })
+  @ApiProperty({
+    description: 'Whether the tenant is connected to the provider',
+  })
   isConnected!: boolean;
 
   @ApiProperty({ description: 'Provider name (e.g. xero, stub)' })
@@ -386,7 +390,10 @@ export class PostJournalRequestDto {
   @MinLength(1)
   narration!: string;
 
-  @ApiProperty({ description: 'Journal date (ISO 8601)', example: '2024-01-15' })
+  @ApiProperty({
+    description: 'Journal date (ISO 8601)',
+    example: '2024-01-15',
+  })
   @IsDateString()
   date!: string;
 

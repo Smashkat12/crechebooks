@@ -17,9 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 
-import {
-  ExternalServiceException,
-} from '../../shared/exceptions';
+import { ExternalServiceException } from '../../shared/exceptions';
 import type {
   StubApiError,
   StubBusinessPayload,

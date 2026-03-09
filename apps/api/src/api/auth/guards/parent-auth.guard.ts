@@ -19,9 +19,7 @@ import { MagicLinkService } from '../services/magic-link.service';
 export class ParentAuthGuard implements CanActivate {
   private readonly logger = new Logger(ParentAuthGuard.name);
 
-  constructor(
-    private readonly magicLinkService: MagicLinkService,
-  ) {}
+  constructor(private readonly magicLinkService: MagicLinkService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // ParentAuthGuard always authenticates — it does not check @Public().

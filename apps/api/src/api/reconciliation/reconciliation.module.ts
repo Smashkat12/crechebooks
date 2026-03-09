@@ -61,6 +61,10 @@ import { PrismaModule } from '../../database/prisma';
     XeroTransactionSplitService,
     FeeInflationCorrectionService,
   ],
-  exports: [AccruedBankChargeService, XeroTransactionSplitService, FeeInflationCorrectionService],
+  exports: [
+    AccruedBankChargeService,
+    XeroTransactionSplitService,
+    FeeInflationCorrectionService,
+  ],
 })
 export class ReconciliationModule {}

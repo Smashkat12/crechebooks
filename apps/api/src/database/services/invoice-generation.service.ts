@@ -639,10 +639,20 @@ export class InvoiceGenerationService {
     // Issue date = 1st of billing month, due date = last day of billing month
     // Use UTC noon to avoid timezone drift with @db.Date columns
     const issueDate = new Date(
-      Date.UTC(billingPeriodStart.getFullYear(), billingPeriodStart.getMonth(), 1, 12),
+      Date.UTC(
+        billingPeriodStart.getFullYear(),
+        billingPeriodStart.getMonth(),
+        1,
+        12,
+      ),
     );
     const dueDate = new Date(
-      Date.UTC(billingPeriodEnd.getFullYear(), billingPeriodEnd.getMonth(), billingPeriodEnd.getDate(), 12),
+      Date.UTC(
+        billingPeriodEnd.getFullYear(),
+        billingPeriodEnd.getMonth(),
+        billingPeriodEnd.getDate(),
+        12,
+      ),
     );
 
     // Create invoice
@@ -824,10 +834,20 @@ export class InvoiceGenerationService {
     // Issue date = 1st of billing month, due date = last day of billing month
     // Use UTC noon to avoid timezone drift with @db.Date columns
     const issueDate = new Date(
-      Date.UTC(billingPeriodStart.getFullYear(), billingPeriodStart.getMonth(), 1, 12),
+      Date.UTC(
+        billingPeriodStart.getFullYear(),
+        billingPeriodStart.getMonth(),
+        1,
+        12,
+      ),
     );
     const dueDate = new Date(
-      Date.UTC(billingPeriodEnd.getFullYear(), billingPeriodEnd.getMonth(), billingPeriodEnd.getDate(), 12),
+      Date.UTC(
+        billingPeriodEnd.getFullYear(),
+        billingPeriodEnd.getMonth(),
+        billingPeriodEnd.getDate(),
+        12,
+      ),
     );
 
     // Execute all database operations atomically

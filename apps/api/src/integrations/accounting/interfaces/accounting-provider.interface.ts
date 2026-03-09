@@ -62,10 +62,7 @@ export interface AccountingProvider {
    * @param returnUrl - URL to redirect back to after authorization
    * @returns Object containing the authorization URL
    */
-  getAuthUrl(
-    tenantId: string,
-    returnUrl: string,
-  ): Promise<{ authUrl: string }>;
+  getAuthUrl(tenantId: string, returnUrl: string): Promise<{ authUrl: string }>;
 
   /**
    * Handle the OAuth callback after the user authorizes the connection.
@@ -74,11 +71,7 @@ export interface AccountingProvider {
    * @param code - Authorization code from the OAuth callback
    * @param state - State parameter for CSRF protection
    */
-  handleCallback(
-    tenantId: string,
-    code: string,
-    state: string,
-  ): Promise<void>;
+  handleCallback(tenantId: string, code: string, state: string): Promise<void>;
 
   /**
    * Get the current connection status for a tenant.
@@ -152,10 +145,7 @@ export interface AccountingProvider {
    * @param parentId - CrecheBooks parent ID
    * @returns Contact sync result
    */
-  syncContact(
-    tenantId: string,
-    parentId: string,
-  ): Promise<ContactSyncResult>;
+  syncContact(tenantId: string, parentId: string): Promise<ContactSyncResult>;
 
   /**
    * Sync multiple CrecheBooks parents to external contacts in bulk.

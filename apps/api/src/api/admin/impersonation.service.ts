@@ -158,6 +158,9 @@ export class ImpersonationService {
       throw new NotFoundException(`Tenant ${dto.tenantId} not found`);
     }
 
+    // Clean up expired sessions before checking for conflicts
+    await this.deactivateExpiredSessions(superAdminId);
+
     // Check for existing active session
     const existingSession = await this.prisma.impersonationSession.findFirst({
       where: {
@@ -272,6 +275,9 @@ export class ImpersonationService {
       },
     });
 
+    // Also clean up any stale expired sessions for this admin (housekeeping)
+    await this.deactivateExpiredSessions(superAdminId);
+
     if (!session) {
       return {
         success: true,
@@ -332,6 +338,9 @@ export class ImpersonationService {
   async getCurrentSession(
     superAdminId: string,
   ): Promise<CurrentImpersonationResponseDto> {
+    // Clean up any expired-but-still-active sessions first
+    await this.deactivateExpiredSessions(superAdminId);
+
     const session = await this.prisma.impersonationSession.findFirst({
       where: {
         superAdminId,
@@ -493,6 +502,43 @@ export class ImpersonationService {
       page,
       limit,
     };
+  }
+
+  /**
+   * Deactivate all expired-but-still-active sessions for a user.
+   * This handles the case where logout didn't reach the backend
+   * (e.g., cross-origin SameSite cookie issues, browser closed, etc.)
+   */
+  private async deactivateExpiredSessions(
+    superAdminId: string,
+  ): Promise<number> {
+    try {
+      const result = await this.prisma.impersonationSession.updateMany({
+        where: {
+          superAdminId,
+          isActive: true,
+          expiresAt: { lte: new Date() },
+        },
+        data: {
+          isActive: false,
+          endedAt: new Date(),
+        },
+      });
+
+      if (result.count > 0) {
+        this.logger.log(
+          `Deactivated ${result.count} expired impersonation session(s) for admin ${superAdminId}`,
+        );
+      }
+
+      return result.count;
+    } catch (error) {
+      this.logger.error(
+        `Failed to deactivate expired sessions for admin ${superAdminId}`,
+        error,
+      );
+      return 0;
+    }
   }
 
   /**

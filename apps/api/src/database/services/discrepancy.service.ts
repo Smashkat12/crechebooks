@@ -54,93 +54,65 @@ export class DiscrepancyService {
       throw new NotFoundException('Reconciliation', reconId);
     }
 
-    // Get all transactions in the reconciliation period
-    const allTransactions = await this.prisma.transaction.findMany({
+    // Use bank_statement_matches as the source of truth (populated by reconciliation service)
+    const matches = await this.prisma.bankStatementMatch.findMany({
       where: {
         tenantId,
-        bankAccount: recon.bankAccount,
-        date: { gte: recon.periodStart, lte: recon.periodEnd },
-        isDeleted: false,
+        reconciliationId: reconId,
       },
-      orderBy: { date: 'asc' },
+      orderBy: { bankDate: 'asc' },
     });
 
-    // Split into bank and Xero transactions
-    const bankTransactions = allTransactions.filter(
-      (t) => !t.xeroTransactionId || t.status !== 'SYNCED',
-    );
-    const xeroTransactions = allTransactions.filter(
-      (t) => t.xeroTransactionId && t.status === 'SYNCED',
-    );
-
     const discrepancies: Discrepancy[] = [];
-    const matched = new Set<string>();
 
-    // First pass: Match by reference
-    for (const bankTx of bankTransactions) {
-      if (!bankTx.reference) continue;
-
-      const xeroMatch = xeroTransactions.find(
-        (xt) => xt.reference === bankTx.reference && !matched.has(xt.id),
-      );
-
-      if (xeroMatch) {
-        matched.add(xeroMatch.id);
-        matched.add(bankTx.id);
-
-        // Check for amount or date mismatches
-        const classification = this.classifyDiscrepancy(bankTx, xeroMatch);
-        if (classification.type) {
-          discrepancies.push(
-            this.createDiscrepancy(bankTx, xeroMatch, classification),
-          );
-        }
+    for (const m of matches) {
+      if (
+        m.status === 'MATCHED' ||
+        m.status === 'FEE_ADJUSTED_MATCH'
+      ) {
+        continue; // Successfully matched — not a discrepancy
       }
-    }
 
-    // Second pass: Match by amount and same date
-    for (const bankTx of bankTransactions) {
-      if (matched.has(bankTx.id)) continue;
-
-      const xeroMatch = xeroTransactions.find(
-        (xt) =>
-          !matched.has(xt.id) &&
-          xt.amountCents === bankTx.amountCents &&
-          xt.isCredit === bankTx.isCredit &&
-          this.isSameDate(xt.date, bankTx.date),
-      );
-
-      if (xeroMatch) {
-        matched.add(xeroMatch.id);
-        matched.add(bankTx.id);
-      }
-    }
-
-    // Flag unmatched bank transactions as IN_BANK_NOT_XERO
-    for (const bankTx of bankTransactions) {
-      if (!matched.has(bankTx.id)) {
+      if (m.status === 'IN_BANK_ONLY') {
         discrepancies.push({
           type: DiscrepancyType.IN_BANK_NOT_XERO,
-          transactionId: bankTx.id,
-          description: `Transaction in bank but not in Xero: ${bankTx.description}`,
-          amountCents: bankTx.amountCents,
-          date: bankTx.date,
-          severity: this.calculateSeverity(bankTx.amountCents),
+          transactionId: m.id,
+          description: `Transaction in bank but not in Xero: ${m.bankDescription}`,
+          amountCents: m.bankAmountCents,
+          date: m.bankDate,
+          severity: this.calculateSeverity(m.bankAmountCents),
         });
-      }
-    }
-
-    // Flag unmatched Xero transactions as IN_XERO_NOT_BANK
-    for (const xeroTx of xeroTransactions) {
-      if (!matched.has(xeroTx.id)) {
+      } else if (m.status === 'IN_XERO_ONLY') {
         discrepancies.push({
           type: DiscrepancyType.IN_XERO_NOT_BANK,
-          transactionId: xeroTx.id,
-          xeroTransactionId: xeroTx.xeroTransactionId ?? undefined,
-          description: `Transaction in Xero but not in bank: ${xeroTx.description}`,
-          amountCents: xeroTx.amountCents,
-          date: xeroTx.date,
-          severity: this.calculateSeverity(xeroTx.amountCents),
+          transactionId: m.transactionId ?? m.id,
+          xeroTransactionId: m.transactionId ?? undefined,
+          description: `Transaction in Xero but not in bank: ${m.xeroDescription ?? m.bankDescription}`,
+          amountCents: m.xeroAmountCents ?? m.bankAmountCents,
+          date: m.xeroDate ?? m.bankDate,
+          severity: this.calculateSeverity(m.xeroAmountCents ?? m.bankAmountCents),
+        });
+      } else if (m.status === 'AMOUNT_MISMATCH') {
+        discrepancies.push({
+          type: DiscrepancyType.AMOUNT_MISMATCH,
+          transactionId: m.transactionId ?? m.id,
+          description: `Amount mismatch: Bank ${m.bankAmountCents}c vs Xero ${m.xeroAmountCents ?? 0}c for ${m.bankDescription}`,
+          amountCents: Math.abs(m.bankAmountCents - (m.xeroAmountCents ?? 0)),
+          expectedAmountCents: m.xeroAmountCents ?? undefined,
+          actualAmountCents: m.bankAmountCents,
+          date: m.bankDate,
+          severity: this.calculateSeverity(
+            Math.abs(m.bankAmountCents - (m.xeroAmountCents ?? 0)),
+          ),
+        });
+      } else if (m.status === 'DATE_MISMATCH') {
+        discrepancies.push({
+          type: DiscrepancyType.DATE_MISMATCH,
+          transactionId: m.transactionId ?? m.id,
+          description: `Date mismatch for ${m.bankDescription}`,
+          amountCents: m.bankAmountCents,
+          date: m.bankDate,
+          severity: this.calculateSeverity(m.bankAmountCents),
         });
       }
     }

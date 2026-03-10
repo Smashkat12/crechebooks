@@ -325,6 +325,264 @@ export class BankStatementReconciliationService {
   }
 
   /**
+   * Re-match an existing reconciliation without re-parsing the PDF.
+   * Reuses the bank-side data already stored in bank_statement_matches
+   * and re-runs the matching logic (with boundary-date exclusion).
+   */
+  async rematchReconciliation(
+    tenantId: string,
+    reconciliationId: string,
+    userId: string,
+  ): Promise<BankStatementReconciliationResult> {
+    const reconciliation = await this.prisma.reconciliation.findUnique({
+      where: { id: reconciliationId },
+    });
+
+    if (!reconciliation || reconciliation.tenantId !== tenantId) {
+      throw new NotFoundException('Reconciliation', reconciliationId);
+    }
+
+    if (reconciliation.status === ReconciliationStatus.RECONCILED) {
+      throw new BusinessException(
+        'Period already reconciled',
+        'PERIOD_ALREADY_RECONCILED',
+        { reconciliationId },
+      );
+    }
+
+    this.logger.log(
+      `Re-matching reconciliation ${reconciliationId} (${reconciliation.periodStart.toISOString()} to ${reconciliation.periodEnd.toISOString()})`,
+    );
+
+    // 1. Get existing bank-side entries (the parsed PDF data)
+    const existingMatches = await this.matchRepo.findByReconciliationId(
+      tenantId,
+      reconciliationId,
+    );
+
+    // Extract unique bank transactions (exclude xero-only entries which have no bank data)
+    const bankTransactions: ParsedBankTransaction[] = existingMatches
+      .filter((m) => m.bankDescription && m.bankAmountCents > 0)
+      .reduce(
+        (unique, m) => {
+          // Deduplicate by bank date + description + amount
+          const key = `${m.bankDate.toISOString()}|${m.bankDescription}|${m.bankAmountCents}|${m.bankIsCredit}`;
+          if (!unique.seen.has(key)) {
+            unique.seen.add(key);
+            unique.list.push({
+              date: m.bankDate,
+              description: m.bankDescription,
+              amountCents: m.bankAmountCents,
+              isCredit: m.bankIsCredit,
+            });
+          }
+          return unique;
+        },
+        { seen: new Set<string>(), list: [] as ParsedBankTransaction[] },
+      ).list;
+
+    this.logger.log(
+      `Found ${bankTransactions.length} bank transactions from existing matches`,
+    );
+
+    // 2. Get book transactions, excluding boundary-date duplicates
+    const alreadyMatchedTxIds = await this.prisma.bankStatementMatch
+      .findMany({
+        where: {
+          tenantId,
+          status: { in: ['MATCHED', 'FEE_ADJUSTED_MATCH'] },
+          transactionId: { not: null },
+          reconciliation: {
+            bankAccount: reconciliation.bankAccount,
+            periodStart: { not: reconciliation.periodStart },
+          },
+        },
+        select: { transactionId: true },
+      })
+      .then((rows) =>
+        rows
+          .map((r) => r.transactionId)
+          .filter((id): id is string => id !== null),
+      );
+
+    if (alreadyMatchedTxIds.length > 0) {
+      this.logger.log(
+        `Excluding ${alreadyMatchedTxIds.length} transactions already matched in other reconciliations`,
+      );
+    }
+
+    const xeroTransactions = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        bankAccount: reconciliation.bankAccount,
+        date: {
+          gte: reconciliation.periodStart,
+          lte: reconciliation.periodEnd,
+        },
+        isDeleted: false,
+        ...(alreadyMatchedTxIds.length > 0 && {
+          id: { notIn: alreadyMatchedTxIds },
+        }),
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    this.logger.log(
+      `Found ${xeroTransactions.length} Xero transactions for period`,
+    );
+
+    // 3. Clear existing matches and re-run matching
+    await this.matchRepo.deleteByReconciliationId(reconciliationId);
+
+    const matches = await this.matchTransactions(
+      tenantId,
+      reconciliationId,
+      bankTransactions,
+      xeroTransactions,
+    );
+
+    // 4. Calculate summary and status
+    const matchSummary = this.calculateMatchSummary(matches);
+
+    const balanceDiscrepancy = Math.abs(reconciliation.discrepancyCents);
+
+    const allMatched =
+      matchSummary.inBankOnly === 0 &&
+      matchSummary.inXeroOnly === 0 &&
+      matchSummary.amountMismatch === 0;
+
+    const status =
+      allMatched &&
+      this.toleranceConfig.isBalanceWithinTolerance(balanceDiscrepancy)
+        ? 'RECONCILED'
+        : 'DISCREPANCY';
+
+    // 5. Update reconciliation status
+    await this.prisma.reconciliation.update({
+      where: { id: reconciliationId },
+      data: {
+        status:
+          status === 'RECONCILED'
+            ? ReconciliationStatus.RECONCILED
+            : ReconciliationStatus.DISCREPANCY,
+        reconciledBy: status === 'RECONCILED' ? userId : null,
+        reconciledAt: status === 'RECONCILED' ? new Date() : null,
+      },
+    });
+
+    if (status === 'RECONCILED') {
+      const matchedTxIds = matches
+        .filter(
+          (m) =>
+            m.status === BankStatementMatchStatus.MATCHED && m.transactionId,
+        )
+        .map((m) => m.transactionId!);
+
+      if (matchedTxIds.length > 0) {
+        await this.prisma.transaction.updateMany({
+          where: { id: { in: matchedTxIds } },
+          data: { isReconciled: true, reconciledAt: new Date() },
+        });
+      }
+    }
+
+    this.logger.log(
+      `Re-match ${reconciliationId}: status=${status}, matched=${matchSummary.matched}/${matchSummary.total}`,
+    );
+
+    return {
+      reconciliationId,
+      statementPeriod: {
+        start: reconciliation.periodStart,
+        end: reconciliation.periodEnd,
+      },
+      openingBalanceCents: reconciliation.openingBalanceCents,
+      closingBalanceCents: reconciliation.closingBalanceCents,
+      calculatedBalanceCents: reconciliation.calculatedBalanceCents,
+      discrepancyCents: balanceDiscrepancy,
+      matchSummary,
+      status,
+    };
+  }
+
+  /**
+   * Re-match all DISCREPANCY reconciliations for a tenant (batch).
+   * Processes in chronological order so boundary exclusions cascade correctly.
+   */
+  async rematchAllDiscrepancies(
+    tenantId: string,
+    bankAccount: string,
+    userId: string,
+  ): Promise<
+    Array<{
+      reconciliationId: string;
+      periodStart: string;
+      periodEnd: string;
+      previousStatus: string;
+      newStatus: string;
+      matched: number;
+      total: number;
+    }>
+  > {
+    const discrepancies = await this.prisma.reconciliation.findMany({
+      where: {
+        tenantId,
+        bankAccount,
+        status: ReconciliationStatus.DISCREPANCY,
+      },
+      orderBy: { periodStart: 'asc' },
+    });
+
+    this.logger.log(
+      `Re-matching ${discrepancies.length} DISCREPANCY reconciliations for ${bankAccount}`,
+    );
+
+    const results: Array<{
+      reconciliationId: string;
+      periodStart: string;
+      periodEnd: string;
+      previousStatus: string;
+      newStatus: string;
+      matched: number;
+      total: number;
+    }> = [];
+
+    for (const recon of discrepancies) {
+      try {
+        const result = await this.rematchReconciliation(
+          tenantId,
+          recon.id,
+          userId,
+        );
+        results.push({
+          reconciliationId: recon.id,
+          periodStart: recon.periodStart.toISOString().split('T')[0],
+          periodEnd: recon.periodEnd.toISOString().split('T')[0],
+          previousStatus: 'DISCREPANCY',
+          newStatus: result.status,
+          matched: result.matchSummary.matched,
+          total: result.matchSummary.total,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Re-match failed for ${recon.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        results.push({
+          reconciliationId: recon.id,
+          periodStart: recon.periodStart.toISOString().split('T')[0],
+          periodEnd: recon.periodEnd.toISOString().split('T')[0],
+          previousStatus: 'DISCREPANCY',
+          newStatus: 'ERROR',
+          matched: 0,
+          total: 0,
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Match bank transactions with Xero transactions
    */
   private async matchTransactions(

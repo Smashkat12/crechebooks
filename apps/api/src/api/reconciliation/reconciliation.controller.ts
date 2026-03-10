@@ -1315,6 +1315,158 @@ export class ReconciliationController {
     };
   }
 
+  @Post(':id/rematch')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary:
+      'Re-match a reconciliation without re-parsing the PDF. Uses existing bank data and re-runs matching with boundary-date exclusion.',
+  })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  @ApiResponse({
+    status: 200,
+    type: BankStatementReconciliationResponseDto,
+    description: 'Re-match completed',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  async rematchReconciliation(
+    @Param('id') id: string,
+    @CurrentUser() user: IUser,
+  ): Promise<BankStatementReconciliationResponseDto> {
+    const result =
+      await this.bankStatementReconciliationService.rematchReconciliation(
+        getTenantId(user),
+        id,
+        user.id,
+      );
+
+    const matches =
+      await this.bankStatementReconciliationService.getMatchesByReconciliationId(
+        getTenantId(user),
+        result.reconciliationId,
+      );
+
+    return {
+      success: true,
+      data: {
+        reconciliation_id: result.reconciliationId,
+        period_start: result.statementPeriod.start.toISOString().split('T')[0],
+        period_end: result.statementPeriod.end.toISOString().split('T')[0],
+        opening_balance: result.openingBalanceCents / 100,
+        closing_balance: result.closingBalanceCents / 100,
+        calculated_balance: result.calculatedBalanceCents / 100,
+        discrepancy: result.discrepancyCents / 100,
+        match_summary: {
+          matched: result.matchSummary.matched,
+          in_bank_only: result.matchSummary.inBankOnly,
+          in_xero_only: result.matchSummary.inXeroOnly,
+          amount_mismatch: result.matchSummary.amountMismatch,
+          date_mismatch: result.matchSummary.dateMismatch,
+          fee_adjusted_match: result.matchSummary.feeAdjusted,
+          total: result.matchSummary.total,
+        },
+        status: result.status,
+        matches: matches.map((m) => ({
+          id: m.id,
+          bank_date: m.bankDate.toISOString().split('T')[0],
+          bank_description: m.bankDescription,
+          bank_amount: m.bankAmountCents / 100,
+          bank_is_credit: m.bankIsCredit,
+          transaction_id: m.transactionId,
+          xero_date: m.xeroDate?.toISOString().split('T')[0] ?? null,
+          xero_description: m.xeroDescription,
+          xero_amount: m.xeroAmountCents ? m.xeroAmountCents / 100 : null,
+          xero_is_credit: m.xeroIsCredit,
+          status: m.status,
+          match_confidence: m.matchConfidence
+            ? Number(m.matchConfidence)
+            : null,
+          discrepancy_reason: m.discrepancyReason,
+        })),
+      },
+    };
+  }
+
+  @Post('bank-statement/rematch-all')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary:
+      'Re-match all DISCREPANCY reconciliations without re-parsing PDFs. Processes chronologically so boundary exclusions cascade.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        bank_account: {
+          type: 'string',
+          description: 'Bank account name to filter by',
+        },
+      },
+      required: ['bank_account'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Batch re-match results' })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  async rematchAllDiscrepancies(
+    @Body() body: { bank_account: string },
+    @CurrentUser() user: IUser,
+  ): Promise<{
+    success: boolean;
+    data: {
+      total: number;
+      reconciled: number;
+      still_discrepancy: number;
+      errors: number;
+      results: Array<{
+        reconciliation_id: string;
+        period_start: string;
+        period_end: string;
+        previous_status: string;
+        new_status: string;
+        matched: number;
+        total: number;
+      }>;
+    };
+  }> {
+    const results =
+      await this.bankStatementReconciliationService.rematchAllDiscrepancies(
+        getTenantId(user),
+        body.bank_account,
+        user.id,
+      );
+
+    const reconciled = results.filter(
+      (r) => r.newStatus === 'RECONCILED',
+    ).length;
+    const errors = results.filter((r) => r.newStatus === 'ERROR').length;
+
+    return {
+      success: true,
+      data: {
+        total: results.length,
+        reconciled,
+        still_discrepancy: results.length - reconciled - errors,
+        errors,
+        results: results.map((r) => ({
+          reconciliation_id: r.reconciliationId,
+          period_start: r.periodStart,
+          period_end: r.periodEnd,
+          previous_status: r.previousStatus,
+          new_status: r.newStatus,
+          matched: r.matched,
+          total: r.total,
+        })),
+      },
+    };
+  }
+
   @Get(':id/matches')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)

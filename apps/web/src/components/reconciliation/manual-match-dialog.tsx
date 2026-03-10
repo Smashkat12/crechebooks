@@ -61,19 +61,57 @@ export function ManualMatchDialog({
 
   const manualMatch = useManualMatch();
 
+  // Normalize a description for comparison (lowercase, collapse whitespace, strip common prefixes)
+  const normalizeDesc = (desc: string) =>
+    desc.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  // Calculate bigram similarity between two strings (0-1)
+  const descriptionSimilarity = (a: string, b: string): number => {
+    const na = normalizeDesc(a);
+    const nb = normalizeDesc(b);
+    if (na === nb) return 1;
+    if (na.length < 2 || nb.length < 2) return 0;
+
+    const bigrams = (s: string): Set<string> => {
+      const set = new Set<string>();
+      for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+      return set;
+    };
+
+    const bg1 = bigrams(na);
+    const bg2 = bigrams(nb);
+    let intersection = 0;
+    for (const b of bg1) if (bg2.has(b)) intersection++;
+    return (2 * intersection) / (bg1.size + bg2.size);
+  };
+
   // Filter transactions client-side for instant feedback
   const filteredTransactions = useMemo(() => {
     if (!transactions) return [];
-    if (!searchTerm) return transactions;
 
-    const term = searchTerm.toLowerCase();
-    return transactions.filter(
-      (t) =>
-        t.description.toLowerCase().includes(term) ||
-        t.date.includes(term) ||
-        t.amount.toString().includes(term)
-    );
-  }, [transactions, searchTerm]);
+    let list = transactions;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.description.toLowerCase().includes(term) ||
+          t.date.includes(term) ||
+          t.amount.toString().includes(term)
+      );
+    }
+
+    // Sort by match quality: description similarity + amount closeness
+    return [...list].sort((a, b) => {
+      const aDiff = Math.abs(a.amount - bankTransaction.amount);
+      const bDiff = Math.abs(b.amount - bankTransaction.amount);
+      const aSim = descriptionSimilarity(a.description, bankTransaction.description);
+      const bSim = descriptionSimilarity(b.description, bankTransaction.description);
+      // Score: higher is better (similarity weight + amount exactness)
+      const aScore = aSim + (aDiff < 0.01 ? 1 : 0);
+      const bScore = bSim + (bDiff < 0.01 ? 1 : 0);
+      return bScore - aScore;
+    });
+  }, [transactions, searchTerm, bankTransaction.description, bankTransaction.amount]);
 
   // Get the selected transaction details
   const selectedTransaction = useMemo(() => {
@@ -258,8 +296,13 @@ export function ManualMatchDialog({
               ) : (
                 filteredTransactions.map((transaction) => {
                   const diff = transaction.amount - bankTransaction.amount;
-                  const isExact = Math.abs(diff) < 0.01;
+                  const amountExact = Math.abs(diff) < 0.01;
                   const isFee = diff > 0 && diff <= 100;
+                  const sim = descriptionSimilarity(transaction.description, bankTransaction.description);
+                  // "Exact" = amount matches AND description is similar (>= 0.5)
+                  const isExactMatch = amountExact && sim >= 0.5;
+                  // "Amount Match" = amount matches but description is different
+                  const isAmountOnly = amountExact && sim < 0.5;
 
                   return (
                     <TableRow
@@ -287,8 +330,10 @@ export function ManualMatchDialog({
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {isExact ? (
+                        {isExactMatch ? (
                           <Badge variant="default" className="bg-green-600">Exact</Badge>
+                        ) : isAmountOnly ? (
+                          <Badge variant="secondary" className="bg-yellow-600 text-white">Amount Match</Badge>
                         ) : isFee ? (
                           <Badge variant="secondary" className="text-purple-600">
                             +{formatCurrency(diff)}

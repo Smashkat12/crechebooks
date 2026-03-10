@@ -31,64 +31,67 @@ export class CashFlowController {
   @Get('statement')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Generate cash flow statement' })
-  @ApiQuery({ name: 'fromDate', required: true })
-  @ApiQuery({ name: 'toDate', required: true })
-  @ApiQuery({ name: 'includeComparative', required: false, type: Boolean })
+  @ApiQuery({ name: 'from_date', required: true })
+  @ApiQuery({ name: 'to_date', required: true })
+  @ApiQuery({ name: 'include_comparative', required: false, type: Boolean })
   @ApiResponse({ status: 200, description: 'Cash flow statement' })
   async getStatement(
     @CurrentUser() user: IUser,
-    @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
-    @Query('includeComparative') includeComparative?: string,
+    @Query('from_date') fromDate: string,
+    @Query('to_date') toDate: string,
+    @Query('include_comparative') includeComparative?: string,
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(
       `Generate cash flow statement: tenant=${tenantId}, from=${fromDate}, to=${toDate}`,
     );
-    return this.cashFlowService.generateCashFlowStatement(
+    const statement = await this.cashFlowService.generateCashFlowStatement(
       tenantId,
       new Date(fromDate),
       new Date(toDate),
       includeComparative === 'true',
     );
+    return { success: true, data: statement };
   }
 
   @Get('trend')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get cash flow trend' })
-  @ApiQuery({ name: 'fromDate', required: true })
-  @ApiQuery({ name: 'toDate', required: true })
+  @ApiQuery({ name: 'from_date', required: true })
+  @ApiQuery({ name: 'to_date', required: true })
   @ApiResponse({ status: 200, description: 'Cash flow trend data' })
   async getTrend(
     @CurrentUser() user: IUser,
-    @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
+    @Query('from_date') fromDate: string,
+    @Query('to_date') toDate: string,
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(`Get cash flow trend: tenant=${tenantId}`);
-    return this.cashFlowService.getCashFlowTrend(
+    const trend = await this.cashFlowService.getCashFlowTrend(
       tenantId,
       new Date(fromDate),
       new Date(toDate),
     );
+    return { success: true, data: trend };
   }
 
   @Get('summary')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get cash flow summary' })
-  @ApiQuery({ name: 'fromDate', required: true })
-  @ApiQuery({ name: 'toDate', required: true })
+  @ApiQuery({ name: 'from_date', required: true })
+  @ApiQuery({ name: 'to_date', required: true })
   @ApiResponse({ status: 200, description: 'Cash flow summary' })
   async getSummary(
     @CurrentUser() user: IUser,
-    @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
+    @Query('from_date') fromDate: string,
+    @Query('to_date') toDate: string,
   ) {
     const tenantId = getTenantId(user);
-    return this.cashFlowService.getCashFlowSummary(
+    const summary = await this.cashFlowService.getCashFlowSummary(
       tenantId,
       new Date(fromDate),
       new Date(toDate),
     );
+    return { success: true, data: summary };
   }
 }

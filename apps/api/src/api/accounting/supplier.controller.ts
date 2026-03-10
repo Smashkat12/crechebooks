@@ -50,20 +50,21 @@ export class SupplierController {
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'List suppliers' })
-  @ApiQuery({ name: 'isActive', required: false, type: Boolean })
+  @ApiQuery({ name: 'is_active', required: false, type: Boolean })
   @ApiQuery({ name: 'search', required: false })
   @ApiResponse({ status: 200, description: 'List of suppliers' })
   async list(
     @CurrentUser() user: IUser,
-    @Query('isActive') isActive?: string,
+    @Query('is_active') isActive?: string,
     @Query('search') search?: string,
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(`List suppliers: tenant=${tenantId}`);
-    return this.supplierService.listSuppliers(tenantId, {
+    const suppliers = await this.supplierService.listSuppliers(tenantId, {
       isActive: isActive !== undefined ? isActive === 'true' : undefined,
       search,
     });
+    return { success: true, data: suppliers };
   }
 
   @Get('payables-summary')
@@ -72,7 +73,8 @@ export class SupplierController {
   @ApiResponse({ status: 200, description: 'Payables summary' })
   async getPayablesSummary(@CurrentUser() user: IUser) {
     const tenantId = getTenantId(user);
-    return this.supplierService.getPayablesSummary(tenantId);
+    const summary = await this.supplierService.getPayablesSummary(tenantId);
+    return { success: true, data: summary };
   }
 
   @Get(':id')
@@ -82,29 +84,31 @@ export class SupplierController {
   @ApiResponse({ status: 200, description: 'Supplier details' })
   async getById(@CurrentUser() user: IUser, @Param('id') id: string) {
     const tenantId = getTenantId(user);
-    return this.supplierService.getSupplierById(tenantId, id);
+    const supplier = await this.supplierService.getSupplierById(tenantId, id);
+    return { success: true, data: supplier };
   }
 
   @Get(':id/statement')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get supplier statement' })
   @ApiParam({ name: 'id', description: 'Supplier ID' })
-  @ApiQuery({ name: 'fromDate', required: true })
-  @ApiQuery({ name: 'toDate', required: true })
+  @ApiQuery({ name: 'from_date', required: true })
+  @ApiQuery({ name: 'to_date', required: true })
   @ApiResponse({ status: 200, description: 'Supplier statement' })
   async getStatement(
     @CurrentUser() user: IUser,
     @Param('id') id: string,
-    @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
+    @Query('from_date') fromDate: string,
+    @Query('to_date') toDate: string,
   ) {
     const tenantId = getTenantId(user);
-    return this.supplierService.getSupplierStatement(
+    const statement = await this.supplierService.getSupplierStatement(
       tenantId,
       id,
       new Date(fromDate),
       new Date(toDate),
     );
+    return { success: true, data: statement };
   }
 
   @Post()
@@ -116,7 +120,8 @@ export class SupplierController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Create supplier: tenant=${tenantId}, name=${body.name}`);
-    return this.supplierService.createSupplier(tenantId, userId, body);
+    const supplier = await this.supplierService.createSupplier(tenantId, userId, body);
+    return { success: true, data: supplier };
   }
 
   @Patch(':id')
@@ -132,7 +137,8 @@ export class SupplierController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Update supplier: id=${id}, tenant=${tenantId}`);
-    return this.supplierService.updateSupplier(tenantId, userId, id, body);
+    const supplier = await this.supplierService.updateSupplier(tenantId, userId, id, body);
+    return { success: true, data: supplier };
   }
 
   @Post(':id/bills')
@@ -149,9 +155,9 @@ export class SupplierController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Create bill: supplier=${supplierId}, tenant=${tenantId}`);
-    // Service expects supplierId in the body, not as separate param
     const billData = { ...body, supplierId };
-    return this.supplierService.createBill(tenantId, userId, billData);
+    const bill = await this.supplierService.createBill(tenantId, userId, billData);
+    return { success: true, data: bill };
   }
 
   @Post('bills/:billId/payments')
@@ -168,11 +174,12 @@ export class SupplierController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Record bill payment: bill=${billId}, tenant=${tenantId}`);
-    return this.supplierService.recordBillPayment(
+    const payment = await this.supplierService.recordBillPayment(
       tenantId,
       userId,
       billId,
       body,
     );
+    return { success: true, data: payment };
   }
 }

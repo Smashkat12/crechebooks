@@ -15,7 +15,7 @@
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
-import { resetAuthState, clearAuthState } from '@/lib/api/client';
+import { resetAuthState, clearAuthState, apiClient } from '@/lib/api/client';
 
 export function useAuth() {
   const { data: session, status } = useSession();
@@ -49,18 +49,20 @@ export function useAuth() {
   );
 
   const logout = useCallback(async () => {
-    // Clear client-side auth state first
-    clearAuthState();
-
-    // TASK-UI-001: Call backend logout to clear HttpOnly cookies (access_token and admin_token)
+    // TASK-UI-001: Call backend logout to clear HttpOnly cookies and end impersonation
+    // Uses apiClient (which attaches Authorization header from in-memory token)
+    // instead of raw fetch, because SameSite:lax cookies are NOT sent on
+    // cross-origin POST requests, making the HttpOnly cookie unavailable.
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/v1/auth/logout`, {
-        method: 'POST',
-        credentials: 'include', // Send HttpOnly cookie
-      });
+      await apiClient.post('/auth/logout');
     } catch {
       // Continue with signOut even if backend call fails
     }
+
+    // Clear client-side auth state after backend call (so the token is still
+    // available for the Authorization header during the logout request)
+    clearAuthState();
+
     // Sign out from NextAuth session
     await signOut({ redirect: false });
     router.push('/');

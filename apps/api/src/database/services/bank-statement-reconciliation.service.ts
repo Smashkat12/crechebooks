@@ -560,7 +560,7 @@ export class BankStatementReconciliationService {
           periodEnd: recon.periodEnd.toISOString().split('T')[0],
           previousStatus: 'DISCREPANCY',
           newStatus: result.status,
-          matched: result.matchSummary.matched,
+          matched: result.matchSummary.matched + result.matchSummary.feeAdjusted,
           total: result.matchSummary.total,
         });
       } catch (error) {

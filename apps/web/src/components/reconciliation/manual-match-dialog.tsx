@@ -100,18 +100,24 @@ export function ManualMatchDialog({
       );
     }
 
-    // Sort by match quality: description similarity + amount closeness
+    // Sort by match quality: description similarity + amount closeness + date proximity
+    const bankDate = new Date(bankTransaction.date).getTime();
     return [...list].sort((a, b) => {
       const aDiff = Math.abs(a.amount - bankTransaction.amount);
       const bDiff = Math.abs(b.amount - bankTransaction.amount);
       const aSim = descriptionSimilarity(a.description, bankTransaction.description);
       const bSim = descriptionSimilarity(b.description, bankTransaction.description);
-      // Score: higher is better (similarity weight + amount exactness)
-      const aScore = aSim + (aDiff < 0.01 ? 1 : 0);
-      const bScore = bSim + (bDiff < 0.01 ? 1 : 0);
+      const aDays = Math.abs(new Date(a.date).getTime() - bankDate) / (1000 * 60 * 60 * 24);
+      const bDays = Math.abs(new Date(b.date).getTime() - bankDate) / (1000 * 60 * 60 * 24);
+      // Date score: 1.0 for same day, decays by 0.15 per day, min 0
+      const aDateScore = Math.max(0, 1 - aDays * 0.15);
+      const bDateScore = Math.max(0, 1 - bDays * 0.15);
+      // Combined score: description (weight 2) + amount (weight 1) + date (weight 1)
+      const aScore = aSim * 2 + (aDiff < 0.01 ? 1 : 0) + aDateScore;
+      const bScore = bSim * 2 + (bDiff < 0.01 ? 1 : 0) + bDateScore;
       return bScore - aScore;
     });
-  }, [transactions, searchTerm, bankTransaction.description, bankTransaction.amount]);
+  }, [transactions, searchTerm, bankTransaction.description, bankTransaction.amount, bankTransaction.date]);
 
   // Get the selected transaction details
   const selectedTransaction = useMemo(() => {
@@ -299,10 +305,14 @@ export function ManualMatchDialog({
                   const amountExact = Math.abs(diff) < 0.01;
                   const isFee = diff > 0 && diff <= 100;
                   const sim = descriptionSimilarity(transaction.description, bankTransaction.description);
-                  // "Exact" = amount matches AND description is similar (>= 0.5)
-                  const isExactMatch = amountExact && sim >= 0.5;
+                  const daysDiff = Math.abs(
+                    (new Date(transaction.date).getTime() - new Date(bankTransaction.date).getTime()) / (1000 * 60 * 60 * 24)
+                  );
+                  const sameDate = daysDiff <= 1;
+                  // "Exact" = amount matches AND description similar (>= 0.5) AND same date (within 1 day)
+                  const isExactMatch = amountExact && sim >= 0.5 && sameDate;
                   // "Amount Match" = amount matches but description is different
-                  const isAmountOnly = amountExact && sim < 0.5;
+                  const isAmountOnly = amountExact && !isExactMatch;
 
                   return (
                     <TableRow

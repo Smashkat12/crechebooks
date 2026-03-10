@@ -819,26 +819,39 @@ export class BankStatementReconciliationService {
     const dateMatches = this.toleranceConfig.isDateWithinTolerance(daysDiff);
 
     // Calculate description similarity
-    const descSimilarity = this.calculateSimilarity(
-      bankTx.description.toLowerCase(),
-      xeroTx.description.toLowerCase(),
-    );
+    const bankDesc = bankTx.description.toLowerCase();
+    const xeroDesc = xeroTx.description.toLowerCase();
+    const descSimilarity = this.calculateSimilarity(bankDesc, xeroDesc);
+
+    // Keyword containment: short Xero description found inside long bank description
+    // Handles Xero bank-feed entries with truncated names (e.g. "Xero" matching
+    // "POS Purchase Paystack *Xero S 400568*9888 01 Nov")
+    const keywordMatch =
+      xeroDesc.length >= 3 &&
+      (bankDesc.includes(xeroDesc) || xeroDesc.includes(bankDesc));
 
     // Get description similarity threshold from config
     const descriptionThreshold =
       this.toleranceConfig.descriptionSimilarityThreshold;
 
+    // Effective description match: either Levenshtein similarity OR keyword containment
+    const descriptionMatches =
+      descSimilarity >= descriptionThreshold || keywordMatch;
+
     // Determine status and confidence
-    if (
-      exactAmountMatch &&
-      dateMatches &&
-      descSimilarity >= descriptionThreshold
-    ) {
+    // Use higher of Levenshtein or keyword-based confidence
+    const effectiveDescConfidence = keywordMatch
+      ? Math.max(descSimilarity, 0.75)
+      : descSimilarity;
+
+    if (exactAmountMatch && dateMatches && descriptionMatches) {
       // Exact match - highest confidence
       return {
-        confidence: descSimilarity,
+        confidence: effectiveDescConfidence,
         status: BankStatementMatchStatus.MATCHED,
-        reason: null,
+        reason: keywordMatch && descSimilarity < descriptionThreshold
+          ? `Keyword match: "${xeroDesc}" found in bank description`
+          : null,
       };
     }
 
@@ -846,21 +859,17 @@ export class BankStatementReconciliationService {
       amountMatches &&
       !exactAmountMatch &&
       dateMatches &&
-      descSimilarity >= descriptionThreshold
+      descriptionMatches
     ) {
       // Match within tolerance - still considered matched but with note
       return {
-        confidence: descSimilarity * 0.95,
+        confidence: effectiveDescConfidence * 0.95,
         status: BankStatementMatchStatus.MATCHED,
         reason: `Amount within tolerance: bank ${bankTx.amountCents}c vs Xero ${xeroTx.amountCents}c (diff: ${amountDiff}c)`,
       };
     }
 
-    if (
-      !amountMatches &&
-      dateMatches &&
-      descSimilarity >= descriptionThreshold
-    ) {
+    if (!amountMatches && dateMatches && descriptionMatches) {
       // Amount difference exceeds tolerance - check if this could be a fee-adjusted match
       // Fee-adjusted match: Bank shows NET, Xero shows GROSS (Bank + Fee = Xero)
       const feeDifference = xeroTx.amountCents - bankTx.amountCents;
@@ -873,7 +882,7 @@ export class BankStatementReconciliationService {
       ) {
         // This could be a fee-adjusted match - flag it as such
         return {
-          confidence: descSimilarity * 0.9,
+          confidence: effectiveDescConfidence * 0.9,
           status: BankStatementMatchStatus.FEE_ADJUSTED_MATCH,
           reason: `Possible fee-adjusted match: bank ${bankTx.amountCents}c (NET) + fee ${feeDifference}c = Xero ${xeroTx.amountCents}c (GROSS)`,
         };
@@ -881,21 +890,35 @@ export class BankStatementReconciliationService {
 
       // Regular amount mismatch
       return {
-        confidence: descSimilarity * 0.8,
+        confidence: effectiveDescConfidence * 0.8,
         status: BankStatementMatchStatus.AMOUNT_MISMATCH,
         reason: `Amount differs: bank ${bankTx.amountCents}c vs Xero ${xeroTx.amountCents}c (exceeds tolerance of ${effectiveTolerance.toFixed(0)}c)`,
       };
     }
 
-    if (
-      amountMatches &&
-      !dateMatches &&
-      descSimilarity >= descriptionThreshold
-    ) {
+    if (amountMatches && !dateMatches && descriptionMatches) {
       return {
-        confidence: descSimilarity * 0.9,
+        confidence: effectiveDescConfidence * 0.9,
         status: BankStatementMatchStatus.DATE_MISMATCH,
         reason: `Date differs by ${daysDiff.toFixed(0)} days`,
+      };
+    }
+
+    // Amount+date match without description match (different description sources)
+    // Common when bank feed uses abbreviated names vs full bank statement descriptions
+    if (exactAmountMatch && dateMatches) {
+      return {
+        confidence: 0.7,
+        status: BankStatementMatchStatus.MATCHED,
+        reason: `Amount+date match (descriptions differ: bank="${bankTx.description.substring(0, 40)}" vs book="${xeroTx.description.substring(0, 40)}")`,
+      };
+    }
+
+    if (amountMatches && !exactAmountMatch && dateMatches) {
+      return {
+        confidence: 0.7,
+        status: BankStatementMatchStatus.MATCHED,
+        reason: `Amount+date match within tolerance (diff: ${amountDiff}c, descriptions differ)`,
       };
     }
 

@@ -108,7 +108,36 @@ export class BankStatementReconciliationService {
       `Parsed statement: ${statement.accountNumber}, ${statement.statementPeriod.start.toISOString()} to ${statement.statementPeriod.end.toISOString()}, ${statement.transactions.length} transactions`,
     );
 
-    // 2. Get Xero transactions for the same period
+    // 2. Get Xero transactions for the same period,
+    //    excluding those already matched in other reconciliations (boundary-date overlap fix)
+    const alreadyMatchedTxIds = await this.prisma.bankStatementMatch
+      .findMany({
+        where: {
+          tenantId,
+          status: { in: ['MATCHED', 'FEE_ADJUSTED_MATCH'] },
+          transactionId: { not: null },
+          reconciliation: {
+            // Exclude matches from the current reconciliation being re-processed
+            bankAccount,
+            periodStart: {
+              not: statement.statementPeriod.start,
+            },
+          },
+        },
+        select: { transactionId: true },
+      })
+      .then((rows) =>
+        rows
+          .map((r) => r.transactionId)
+          .filter((id): id is string => id !== null),
+      );
+
+    if (alreadyMatchedTxIds.length > 0) {
+      this.logger.log(
+        `Excluding ${alreadyMatchedTxIds.length} transactions already matched in other reconciliations`,
+      );
+    }
+
     const xeroTransactions = await this.prisma.transaction.findMany({
       where: {
         tenantId,
@@ -118,6 +147,9 @@ export class BankStatementReconciliationService {
           lte: statement.statementPeriod.end,
         },
         isDeleted: false,
+        ...(alreadyMatchedTxIds.length > 0 && {
+          id: { notIn: alreadyMatchedTxIds },
+        }),
       },
       orderBy: { date: 'asc' },
     });

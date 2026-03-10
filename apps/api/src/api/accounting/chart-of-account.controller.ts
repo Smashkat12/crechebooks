@@ -158,7 +158,7 @@ export class ChartOfAccountController {
   }
 
   @Post('seed-defaults')
-  @Roles(UserRole.OWNER)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Seed default SA chart of accounts' })
   @ApiResponse({ status: 200, description: 'Defaults seeded' })
   async seedDefaults(@CurrentUser() user: IUser) {

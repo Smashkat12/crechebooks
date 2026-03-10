@@ -75,32 +75,34 @@ export class QuoteController {
     const tenantId = getTenantId(user);
     this.logger.log(`List quotes: tenant=${tenantId}, status=${status}`);
 
-    return this.quoteService.listQuotes(tenantId, {
+    const quotes = await this.quoteService.listQuotes(tenantId, {
       status,
       parentId,
       recipientEmail,
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
     });
+    return { success: true, data: quotes };
   }
 
   @Get('summary')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get quotes summary' })
-  @ApiQuery({ name: 'fromDate', required: false })
-  @ApiQuery({ name: 'toDate', required: false })
+  @ApiQuery({ name: 'from_date', required: false })
+  @ApiQuery({ name: 'to_date', required: false })
   @ApiResponse({ status: 200, description: 'Quotes summary' })
   async getSummary(
     @CurrentUser() user: IUser,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
+    @Query('from_date') fromDate?: string,
+    @Query('to_date') toDate?: string,
   ) {
     const tenantId = getTenantId(user);
-    return this.quoteService.getQuoteSummary(
+    const summary = await this.quoteService.getQuoteSummary(
       tenantId,
       fromDate ? new Date(fromDate) : undefined,
       toDate ? new Date(toDate) : undefined,
     );
+    return { success: true, data: summary };
   }
 
   @Get(':id')
@@ -112,7 +114,8 @@ export class QuoteController {
   async getById(@CurrentUser() user: IUser, @Param('id') id: string) {
     const tenantId = getTenantId(user);
     this.logger.log(`Get quote: id=${id}, tenant=${tenantId}`);
-    return this.quoteService.getQuoteById(tenantId, id);
+    const quote = await this.quoteService.getQuoteById(tenantId, id);
+    return { success: true, data: quote };
   }
 
   @Post()
@@ -126,7 +129,8 @@ export class QuoteController {
     this.logger.log(
       `Create quote: tenant=${tenantId}, recipient=${body.recipientEmail}`,
     );
-    return this.quoteService.createQuote(tenantId, userId, body);
+    const quote = await this.quoteService.createQuote(tenantId, userId, body);
+    return { success: true, data: quote };
   }
 
   @Patch(':id')
@@ -142,7 +146,8 @@ export class QuoteController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Update quote: id=${id}, tenant=${tenantId}`);
-    return this.quoteService.updateQuote(tenantId, userId, id, body);
+    const quote = await this.quoteService.updateQuote(tenantId, userId, id, body);
+    return { success: true, data: quote };
   }
 
   @Post(':id/send')
@@ -154,7 +159,8 @@ export class QuoteController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Send quote: id=${id}, tenant=${tenantId}`);
-    return this.quoteService.sendQuote(tenantId, userId, id);
+    const result = await this.quoteService.sendQuote(tenantId, userId, id);
+    return { success: true, data: result };
   }
 
   @Post(':id/accept')
@@ -165,7 +171,8 @@ export class QuoteController {
   async accept(@CurrentUser() user: IUser, @Param('id') id: string) {
     const tenantId = getTenantId(user);
     this.logger.log(`Accept quote: id=${id}, tenant=${tenantId}`);
-    return this.quoteService.acceptQuote(tenantId, id);
+    const result = await this.quoteService.acceptQuote(tenantId, id);
+    return { success: true, data: result };
   }
 
   @Post(':id/decline')
@@ -180,7 +187,8 @@ export class QuoteController {
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(`Decline quote: id=${id}, tenant=${tenantId}`);
-    return this.quoteService.declineQuote(tenantId, id, body.reason);
+    const result = await this.quoteService.declineQuote(tenantId, id, body.reason);
+    return { success: true, data: result };
   }
 
   @Post(':id/convert')
@@ -196,12 +204,13 @@ export class QuoteController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Convert quote: id=${id}, tenant=${tenantId}`);
-    return this.quoteService.convertToInvoice(
+    const result = await this.quoteService.convertToInvoice(
       tenantId,
       userId,
       id,
       body.dueDate ? new Date(body.dueDate) : undefined,
       body.notes,
     );
+    return { success: true, data: result };
   }
 }

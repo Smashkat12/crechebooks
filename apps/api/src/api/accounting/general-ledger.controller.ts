@@ -39,85 +39,92 @@ export class GeneralLedgerController {
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get general ledger entries' })
-  @ApiQuery({ name: 'fromDate', required: true })
-  @ApiQuery({ name: 'toDate', required: true })
-  @ApiQuery({ name: 'accountCode', required: false })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({ name: 'from_date', required: true })
+  @ApiQuery({ name: 'to_date', required: true })
+  @ApiQuery({ name: 'account_code', required: false })
+  @ApiQuery({ name: 'source_type', required: false })
   @ApiResponse({ status: 200, description: 'General ledger entries' })
   async getGeneralLedger(
     @CurrentUser() user: IUser,
-    @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
-    @Query('accountCode') accountCode?: string,
+    @Query('from_date') fromDate: string,
+    @Query('to_date') toDate: string,
+    @Query('account_code') accountCode?: string,
+    @Query('source_type') sourceType?: string,
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(
       `Get GL: tenant=${tenantId}, from=${fromDate}, to=${toDate}`,
     );
-    return this.glService.getGeneralLedger({
+    const entries = await this.glService.getGeneralLedger({
       tenantId,
       startDate: new Date(fromDate),
       endDate: new Date(toDate),
       accountCode,
     });
+    return { success: true, data: entries };
   }
 
   @Get('account/:accountCode')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get ledger for specific account' })
   @ApiParam({ name: 'accountCode', description: 'Account code' })
-  @ApiQuery({ name: 'fromDate', required: true })
-  @ApiQuery({ name: 'toDate', required: true })
+  @ApiQuery({ name: 'from_date', required: true })
+  @ApiQuery({ name: 'to_date', required: true })
   @ApiResponse({ status: 200, description: 'Account ledger' })
   async getAccountLedger(
     @CurrentUser() user: IUser,
     @Param('accountCode') accountCode: string,
-    @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
+    @Query('from_date') fromDate: string,
+    @Query('to_date') toDate: string,
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(
       `Get account ledger: tenant=${tenantId}, account=${accountCode}`,
     );
-    return this.glService.getAccountLedger(
+    const ledger = await this.glService.getAccountLedger(
       tenantId,
       accountCode,
       new Date(fromDate),
       new Date(toDate),
     );
+    return { success: true, data: ledger };
   }
 
   @Get('trial-balance')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get trial balance' })
-  @ApiQuery({ name: 'asOfDate', required: true })
+  @ApiQuery({ name: 'as_of_date', required: true })
   @ApiResponse({ status: 200, description: 'Trial balance' })
   async getTrialBalance(
     @CurrentUser() user: IUser,
-    @Query('asOfDate') asOfDate: string,
+    @Query('as_of_date') asOfDate: string,
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(`Get trial balance: tenant=${tenantId}, asOf=${asOfDate}`);
-    return this.glService.getTrialBalance(tenantId, new Date(asOfDate));
+    const trialBalance = await this.glService.getTrialBalance(
+      tenantId,
+      new Date(asOfDate),
+    );
+    return { success: true, data: trialBalance };
   }
 
   @Get('summary')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Get ledger summary' })
-  @ApiQuery({ name: 'fromDate', required: true })
-  @ApiQuery({ name: 'toDate', required: true })
+  @ApiQuery({ name: 'from_date', required: true })
+  @ApiQuery({ name: 'to_date', required: true })
   @ApiResponse({ status: 200, description: 'Ledger summary' })
   async getSummary(
     @CurrentUser() user: IUser,
-    @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
+    @Query('from_date') fromDate: string,
+    @Query('to_date') toDate: string,
   ) {
     const tenantId = getTenantId(user);
-    return this.glService.getLedgerSummary(
+    const summary = await this.glService.getLedgerSummary(
       tenantId,
       new Date(fromDate),
       new Date(toDate),
     );
+    return { success: true, data: summary };
   }
 }

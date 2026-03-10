@@ -135,9 +135,10 @@ const DEFAULT_FNB_FEES: FeeRule[] = [
   {
     feeType: BankFeeType.ATM_FEE,
     transactionTypes: [TransactionType.ATM_WITHDRAWAL],
-    fixedAmountCents: 1200, // R12.00
+    fixedAmountCents: 0,
+    percentageRate: 0.025, // 2.5% of withdrawal amount
     isActive: true,
-    description: 'FNB ATM Withdrawal fee',
+    description: 'FNB ATM Withdrawal fee (2.5%)',
   },
   {
     feeType: BankFeeType.EFT_DEBIT_FEE,
@@ -616,10 +617,12 @@ export class BankFeeService {
     }
 
     // ATM patterns
-    if (/ATM\s*DEP/i.test(text)) {
+    // "ATM Cash Dep" and "ATM Dep" → deposit
+    if (/ATM\s*(CASH\s*)?DEP/i.test(text)) {
       return TransactionType.ATM_DEPOSIT;
     }
-    if (/ATM\s*(WITHDRAWAL|W\/D|WDL)/i.test(text)) {
+    // "ATM Cash 00877436" (FNB format), "ATM Withdrawal", "ATM W/D" → withdrawal
+    if (/ATM\s*(WITHDRAWAL|W\/D|WDL)/i.test(text) || /ATM\s+CASH\b/i.test(text)) {
       return TransactionType.ATM_WITHDRAWAL;
     }
 

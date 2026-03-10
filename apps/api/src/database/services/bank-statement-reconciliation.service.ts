@@ -583,6 +583,105 @@ export class BankStatementReconciliationService {
   }
 
   /**
+   * Accept remaining discrepancies and mark reconciliation as RECONCILED.
+   * Used when 1-2 small items remain that have been manually reviewed.
+   */
+  async acceptDiscrepancies(
+    tenantId: string,
+    reconciliationId: string,
+    userId: string,
+    notes: string,
+  ): Promise<{ reconciliationId: string; status: string; acceptedCount: number }> {
+    const reconciliation = await this.prisma.reconciliation.findUnique({
+      where: { id: reconciliationId },
+    });
+
+    if (!reconciliation || reconciliation.tenantId !== tenantId) {
+      throw new NotFoundException('Reconciliation', reconciliationId);
+    }
+
+    if (reconciliation.status === ReconciliationStatus.RECONCILED) {
+      throw new BusinessException(
+        'Period already reconciled',
+        'PERIOD_ALREADY_RECONCILED',
+        { reconciliationId },
+      );
+    }
+
+    // Count unmatched items
+    const unmatchedCount = await this.prisma.bankStatementMatch.count({
+      where: {
+        reconciliationId,
+        status: {
+          notIn: [
+            BankStatementMatchStatus.MATCHED,
+            BankStatementMatchStatus.FEE_ADJUSTED_MATCH,
+          ],
+        },
+      },
+    });
+
+    // Update reconciliation to RECONCILED with notes
+    await this.prisma.reconciliation.update({
+      where: { id: reconciliationId },
+      data: {
+        status: ReconciliationStatus.RECONCILED,
+        reconciledBy: userId,
+        reconciledAt: new Date(),
+        notes: `Accepted ${unmatchedCount} discrepancies: ${notes}`,
+      },
+    });
+
+    // Mark matched transactions as reconciled
+    const matchedTxIds = await this.prisma.bankStatementMatch
+      .findMany({
+        where: {
+          reconciliationId,
+          status: {
+            in: [
+              BankStatementMatchStatus.MATCHED,
+              BankStatementMatchStatus.FEE_ADJUSTED_MATCH,
+            ],
+          },
+          transactionId: { not: null },
+        },
+        select: { transactionId: true },
+      })
+      .then((rows) =>
+        rows.map((r) => r.transactionId).filter((id): id is string => id !== null),
+      );
+
+    if (matchedTxIds.length > 0) {
+      await this.prisma.transaction.updateMany({
+        where: { id: { in: matchedTxIds } },
+        data: { isReconciled: true, reconciledAt: new Date() },
+      });
+    }
+
+    // Audit log
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId,
+        action: 'RECONCILE',
+        entityType: 'Reconciliation',
+        entityId: reconciliationId,
+        changeSummary: `Accepted ${unmatchedCount} discrepancies for period ${reconciliation.periodStart.toISOString().split('T')[0]} to ${reconciliation.periodEnd.toISOString().split('T')[0]}. Notes: ${notes}`,
+      },
+    });
+
+    this.logger.log(
+      `Accepted ${unmatchedCount} discrepancies for ${reconciliationId}, marked as RECONCILED`,
+    );
+
+    return {
+      reconciliationId,
+      status: 'RECONCILED',
+      acceptedCount: unmatchedCount,
+    };
+  }
+
+  /**
    * Match bank transactions with Xero transactions
    */
   private async matchTransactions(

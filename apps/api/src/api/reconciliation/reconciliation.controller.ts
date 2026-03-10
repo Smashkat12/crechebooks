@@ -1392,6 +1392,38 @@ export class ReconciliationController {
     };
   }
 
+  @Post(':id/accept-discrepancies')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary:
+      'Accept remaining discrepancies and mark reconciliation as RECONCILED. For use after manual review of small items.',
+  })
+  @ApiParam({ name: 'id', description: 'Reconciliation ID' })
+  async acceptDiscrepancies(
+    @Param('id') id: string,
+    @CurrentUser() user: IUser,
+    @Body() body: { notes: string },
+  ) {
+    const result =
+      await this.bankStatementReconciliationService.acceptDiscrepancies(
+        getTenantId(user),
+        id,
+        user.id,
+        body.notes || 'Discrepancies reviewed and accepted',
+      );
+
+    return {
+      success: true,
+      data: {
+        reconciliation_id: result.reconciliationId,
+        status: result.status,
+        accepted_count: result.acceptedCount,
+      },
+    };
+  }
+
   @Post(':id/rematch')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)

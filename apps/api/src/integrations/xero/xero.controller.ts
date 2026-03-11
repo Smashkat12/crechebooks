@@ -69,6 +69,7 @@ import {
 } from '../../database/dto/xero-account.dto';
 import { XeroAccountStatus } from '../../database/entities/xero-account.entity';
 import { XeroAuthService } from './xero-auth.service';
+import { updateTransaction } from '../../mcp/xero-mcp/tools/update-transaction';
 
 @Controller('xero')
 @ApiTags('Xero Integration')
@@ -1429,6 +1430,180 @@ export class XeroController {
         latest: latest?.toISOString().split('T')[0] ?? null,
       },
       catchAllAccountCodes: catchAllCodes,
+    };
+  }
+
+  /**
+   * Push xero_account_code directly to Xero bank transactions
+   * POST /xero/push-account-codes
+   *
+   * Uses xero_account_code from transactions table (not categorization records).
+   * Targets transactions with xero_transaction_id that are coded to catch-all 9999.
+   */
+  @Post('push-account-codes')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Push account codes directly to Xero',
+    description:
+      'Updates Xero bank transactions with xero_account_code from the transactions table. Bypasses categorization requirement.',
+  })
+  @ApiResponse({ status: 200, description: 'Push results' })
+  async pushAccountCodes(
+    @CurrentUser() user: IUser,
+    @Body()
+    body: {
+      fromDate?: string;
+      dryRun?: boolean;
+      transactionIds?: string[];
+    },
+  ) {
+    const tenantId = getTenantId(user);
+
+    // Check Xero connection
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException(
+        'No valid Xero connection. Please connect to Xero first.',
+        'XERO_NOT_CONNECTED',
+      );
+    }
+
+    // Get transactions with xero_transaction_id and a real xero_account_code (not 9999/4110)
+    const where: Record<string, unknown> = {
+      tenantId,
+      xeroTransactionId: { not: null },
+      xeroAccountCode: {
+        notIn: ['9999', '4110', null],
+      },
+      isDeleted: false,
+    };
+
+    if (body.fromDate) {
+      where.date = { gte: new Date(body.fromDate) };
+    }
+
+    if (body.transactionIds && body.transactionIds.length > 0) {
+      where.id = { in: body.transactionIds };
+    }
+
+    const transactions = await this.prisma.transaction.findMany({
+      where,
+      select: {
+        id: true,
+        xeroTransactionId: true,
+        xeroAccountCode: true,
+        description: true,
+        date: true,
+        amountCents: true,
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    if (transactions.length === 0) {
+      return {
+        success: true,
+        message: 'No transactions to push',
+        total: 0,
+        synced: 0,
+        failed: 0,
+        results: [],
+      };
+    }
+
+    // Dry run - just return what would be pushed
+    if (body.dryRun) {
+      return {
+        success: true,
+        dryRun: true,
+        total: transactions.length,
+        transactions: transactions.map((tx) => ({
+          id: tx.id,
+          xeroTransactionId: tx.xeroTransactionId,
+          xeroAccountCode: tx.xeroAccountCode,
+          description: tx.description,
+          date: tx.date,
+          amountCents: tx.amountCents,
+        })),
+      };
+    }
+
+    // Get authenticated Xero client
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    const xeroClient = new XeroClient({
+      clientId: process.env.XERO_CLIENT_ID ?? '',
+      clientSecret: process.env.XERO_CLIENT_SECRET ?? '',
+      redirectUris: [process.env.XERO_REDIRECT_URI ?? ''],
+      scopes: ['openid', 'profile', 'email', 'accounting.transactions'],
+    });
+
+    xeroClient.setTokenSet({
+      access_token: accessToken,
+      token_type: 'Bearer',
+    });
+
+    // Push each transaction
+    const results: Array<{
+      id: string;
+      xeroTransactionId: string;
+      accountCode: string;
+      status: 'success' | 'failed';
+      error?: string;
+    }> = [];
+
+    let synced = 0;
+    let failed = 0;
+
+    for (const tx of transactions) {
+      try {
+        await updateTransaction(
+          xeroClient,
+          xeroTenantId,
+          tx.xeroTransactionId!,
+          tx.xeroAccountCode!,
+        );
+
+        results.push({
+          id: tx.id,
+          xeroTransactionId: tx.xeroTransactionId!,
+          accountCode: tx.xeroAccountCode!,
+          status: 'success',
+        });
+        synced++;
+
+        this.logger.log(
+          `Updated Xero txn ${tx.xeroTransactionId} → ${tx.xeroAccountCode} (${tx.description?.substring(0, 40)})`,
+        );
+
+        // Small delay to avoid Xero rate limits (60 calls/min)
+        if (synced % 10 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      } catch (error) {
+        const errMsg =
+          error instanceof Error ? error.message : String(error);
+        results.push({
+          id: tx.id,
+          xeroTransactionId: tx.xeroTransactionId!,
+          accountCode: tx.xeroAccountCode!,
+          status: 'failed',
+          error: errMsg,
+        });
+        failed++;
+
+        this.logger.error(
+          `Failed to update Xero txn ${tx.xeroTransactionId}: ${errMsg}`,
+        );
+      }
+    }
+
+    return {
+      success: true,
+      total: transactions.length,
+      synced,
+      failed,
+      results,
     };
   }
 }

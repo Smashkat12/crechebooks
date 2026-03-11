@@ -69,7 +69,6 @@ import {
 } from '../../database/dto/xero-account.dto';
 import { XeroAccountStatus } from '../../database/entities/xero-account.entity';
 import { XeroAuthService } from './xero-auth.service';
-import { updateTransaction } from '../../mcp/xero-mcp/tools/update-transaction';
 
 @Controller('xero')
 @ApiTags('Xero Integration')
@@ -1559,50 +1558,59 @@ export class XeroController {
 
     for (const tx of transactions) {
       try {
-        await updateTransaction(
-          xeroClient,
+        // Get existing transaction from Xero
+        const getResp = await xeroClient.accountingApi.getBankTransaction(
           xeroTenantId,
           tx.xeroTransactionId!,
-          tx.xeroAccountCode!,
+        );
+        const existing = getResp.body.bankTransactions?.[0];
+        if (!existing) {
+          results.push({ id: tx.id, xeroTransactionId: tx.xeroTransactionId!, accountCode: tx.xeroAccountCode!, status: 'failed', error: 'Transaction not found in Xero' });
+          failed++;
+          continue;
+        }
+
+        // Update line items with new account code
+        const updatedLineItems = (existing.lineItems ?? []).map((item) => ({
+          ...item,
+          accountCode: tx.xeroAccountCode!,
+        }));
+
+        // Push update
+        await xeroClient.accountingApi.updateBankTransaction(
+          xeroTenantId,
+          tx.xeroTransactionId!,
+          { bankTransactions: [{ ...existing, lineItems: updatedLineItems }] },
         );
 
-        results.push({
-          id: tx.id,
-          xeroTransactionId: tx.xeroTransactionId!,
-          accountCode: tx.xeroAccountCode!,
-          status: 'success',
-        });
+        results.push({ id: tx.id, xeroTransactionId: tx.xeroTransactionId!, accountCode: tx.xeroAccountCode!, status: 'success' });
         synced++;
 
         this.logger.log(
           `Updated Xero txn ${tx.xeroTransactionId} → ${tx.xeroAccountCode} (${tx.description?.substring(0, 40)})`,
         );
 
-        // Small delay to avoid Xero rate limits (60 calls/min)
+        // Rate limit: pause every 10 requests
         if (synced % 10 === 0) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
-        const xeroErr = error as { message?: string; code?: string; context?: Record<string, unknown>; response?: { body?: unknown; statusCode?: number } };
-        const errMsg = xeroErr.message ?? String(error);
-        const detail = xeroErr.response?.body ? JSON.stringify(xeroErr.response.body).substring(0, 200) : xeroErr.context ? JSON.stringify(xeroErr.context).substring(0, 200) : undefined;
-        results.push({
-          id: tx.id,
-          xeroTransactionId: tx.xeroTransactionId!,
-          accountCode: tx.xeroAccountCode!,
-          status: 'failed',
-          error: detail ? `${errMsg} | ${detail}` : errMsg,
-        });
+        const err = error as { message?: string; response?: { statusCode?: number; body?: unknown }; body?: unknown };
+        const body = err.response?.body ?? err.body;
+        const validationMsg = (() => {
+          try {
+            const b = body as { Elements?: Array<{ ValidationErrors?: Array<{ Message?: string }> }>; Message?: string };
+            return b?.Elements?.[0]?.ValidationErrors?.[0]?.Message ?? b?.Message ?? null;
+          } catch { return null; }
+        })();
+        const errMsg = validationMsg ?? err.message ?? String(error);
+        results.push({ id: tx.id, xeroTransactionId: tx.xeroTransactionId!, accountCode: tx.xeroAccountCode!, status: 'failed', error: errMsg });
         failed++;
 
-        this.logger.error(
-          `Failed to update Xero txn ${tx.xeroTransactionId}: ${errMsg}`,
-          detail,
-        );
+        this.logger.error(`Failed to update Xero txn ${tx.xeroTransactionId}: ${errMsg}`);
 
-        // If first failure is auth-related, stop early
-        if (failed === 1 && (errMsg.includes('401') || errMsg.includes('Unauthorized') || errMsg.includes('token'))) {
-          this.logger.error('Auth error on first transaction - aborting batch');
+        // Abort on auth errors
+        if (failed === 1 && (errMsg.includes('401') || errMsg.includes('Unauthorized'))) {
           break;
         }
       }

@@ -871,6 +871,7 @@ export class ReportsService {
     rawData: IncomeStatement | TrialBalance | BalanceSheet,
     type: ReportType,
   ): ReportSummaryDto {
+    // Income Statement
     if (
       'income' in rawData &&
       'expenses' in rawData &&
@@ -897,6 +898,30 @@ export class ReportsService {
       };
     }
 
+    // Balance Sheet — map assets/liabilities/equity to summary fields
+    if ('assets' in rawData && 'liabilities' in rawData && 'equity' in rawData) {
+      const data = rawData as BalanceSheet;
+      const netEquity = data.assets.totalCents - data.liabilities.totalCents;
+      return {
+        totalIncomeCents: data.assets.totalCents,
+        totalIncomeRands: data.assets.totalRands,
+        totalExpensesCents: data.liabilities.totalCents,
+        totalExpensesRands: data.liabilities.totalRands,
+        netProfitCents: netEquity,
+        netProfitRands: new Decimal(netEquity)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        profitMarginPercent: data.assets.totalCents > 0
+          ? new Decimal(netEquity)
+              .dividedBy(data.assets.totalCents)
+              .times(100)
+              .toDecimalPlaces(2)
+              .toNumber()
+          : 0,
+      };
+    }
+
     // Default empty summary
     return {
       totalIncomeCents: 0,
@@ -918,7 +943,12 @@ export class ReportsService {
   ): ReportSectionDto[] {
     const sections: ReportSectionDto[] = [];
 
-    if ('income' in rawData && 'expenses' in rawData) {
+    // Income Statement sections
+    if (
+      'income' in rawData &&
+      'expenses' in rawData &&
+      'netProfitCents' in rawData
+    ) {
       const data = rawData;
 
       sections.push({
@@ -938,6 +968,52 @@ export class ReportsService {
         totalCents: data.expenses.totalCents,
         totalRands: data.expenses.totalRands,
         breakdown: data.expenses.breakdown.map((b) => ({
+          accountCode: b.accountCode,
+          accountName: b.accountName,
+          amountCents: b.amountCents,
+          amountRands: b.amountRands,
+        })),
+      });
+    }
+
+    // Balance Sheet sections
+    if ('assets' in rawData && 'liabilities' in rawData && 'equity' in rawData) {
+      const data = rawData as BalanceSheet;
+
+      sections.push({
+        title: 'Assets',
+        totalCents: data.assets.totalCents,
+        totalRands: data.assets.totalRands,
+        breakdown: [...data.assets.current, ...data.assets.nonCurrent].map(
+          (b) => ({
+            accountCode: b.accountCode,
+            accountName: b.accountName,
+            amountCents: b.amountCents,
+            amountRands: b.amountRands,
+          }),
+        ),
+      });
+
+      sections.push({
+        title: 'Liabilities',
+        totalCents: data.liabilities.totalCents,
+        totalRands: data.liabilities.totalRands,
+        breakdown: [
+          ...data.liabilities.current,
+          ...data.liabilities.nonCurrent,
+        ].map((b) => ({
+          accountCode: b.accountCode,
+          accountName: b.accountName,
+          amountCents: b.amountCents,
+          amountRands: b.amountRands,
+        })),
+      });
+
+      sections.push({
+        title: 'Equity',
+        totalCents: data.equity.totalCents,
+        totalRands: data.equity.totalRands,
+        breakdown: data.equity.breakdown.map((b) => ({
           accountCode: b.accountCode,
           accountName: b.accountName,
           amountCents: b.amountCents,

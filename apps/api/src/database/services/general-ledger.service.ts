@@ -105,6 +105,8 @@ export class GeneralLedgerService {
     endDate: Date,
     accountCode?: string,
   ): Promise<JournalEntry[]> {
+    const BANK_ACCOUNT_CODE = '1035';
+
     // Build account name lookup from xero_accounts
     const xeroAccounts = await this.prisma.xeroAccount.findMany({
       where: { tenantId },
@@ -113,13 +115,20 @@ export class GeneralLedgerService {
     for (const xa of xeroAccounts) {
       accountNameMap.set(xa.accountCode, xa.name);
     }
+    const bankAccountName =
+      accountNameMap.get(BANK_ACCOUNT_CODE) || 'Bank Account';
 
+    // When filtering for bank account (1035), we need ALL categorized transactions
+    // because bank entries are generated from every transaction, not stored as xero_account_code=1035
     const transactions = await this.prisma.transaction.findMany({
       where: {
         tenantId,
         date: { gte: startDate, lte: endDate },
         isDeleted: false,
-        xeroAccountCode: accountCode ? accountCode : { not: null },
+        xeroAccountCode:
+          accountCode && accountCode !== BANK_ACCOUNT_CODE
+            ? accountCode
+            : { not: null },
       },
       orderBy: { date: 'asc' },
     });
@@ -130,41 +139,71 @@ export class GeneralLedgerService {
       const code = tx.xeroAccountCode || '9999';
       const name = accountNameMap.get(code) || code;
 
-      // Each bank transaction is a journal entry against its xero_account_code
+      // Each bank transaction produces TWO journal entries (double-entry):
+      // Credit tx (money in): DR Bank 1035, CR contra account
+      // Debit tx (money out): DR contra account, CR Bank 1035
       if (tx.isCredit) {
-        // Money in: DR Bank, CR Revenue/Equity
-        entries.push({
-          id: tx.id,
-          date: tx.date,
-          description: tx.description,
-          accountCode: code,
-          accountName: name,
-          debitCents: 0,
-          creditCents: tx.amountCents,
-          sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
-          sourceId: tx.id,
-          reference: tx.reference || undefined,
-        });
+        // Contra leg: CR Revenue/Equity/Liability account
+        if (!accountCode || accountCode === code) {
+          entries.push({
+            id: `${tx.id}-CR`,
+            date: tx.date,
+            description: tx.description,
+            accountCode: code,
+            accountName: name,
+            debitCents: 0,
+            creditCents: tx.amountCents,
+            sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
+            sourceId: tx.id,
+            reference: tx.reference || undefined,
+          });
+        }
+        // Bank leg: DR Bank
+        if (!accountCode || accountCode === BANK_ACCOUNT_CODE) {
+          entries.push({
+            id: `${tx.id}-DR`,
+            date: tx.date,
+            description: tx.description,
+            accountCode: BANK_ACCOUNT_CODE,
+            accountName: bankAccountName,
+            debitCents: tx.amountCents,
+            creditCents: 0,
+            sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
+            sourceId: tx.id,
+            reference: tx.reference || undefined,
+          });
+        }
       } else {
-        // Money out: DR Expense, CR Bank
-        entries.push({
-          id: tx.id,
-          date: tx.date,
-          description: tx.description,
-          accountCode: code,
-          accountName: name,
-          debitCents: tx.amountCents,
-          creditCents: 0,
-          sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
-          sourceId: tx.id,
-          reference: tx.reference || undefined,
-        });
-      }
-
-      // If filtering by a specific account and it's not the bank account, skip bank leg
-      // But if no filter or filtering for bank, include the bank contra entry
-      if (!accountCode || accountCode === '1035') {
-        // No bank contra leg needed — we track by account code only
+        // Contra leg: DR Expense/Asset account
+        if (!accountCode || accountCode === code) {
+          entries.push({
+            id: `${tx.id}-DR`,
+            date: tx.date,
+            description: tx.description,
+            accountCode: code,
+            accountName: name,
+            debitCents: tx.amountCents,
+            creditCents: 0,
+            sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
+            sourceId: tx.id,
+            reference: tx.reference || undefined,
+          });
+        }
+        // Bank leg: CR Bank
+        if (!accountCode || accountCode === BANK_ACCOUNT_CODE) {
+          entries.push({
+            id: `${tx.id}-CR`,
+            date: tx.date,
+            description: tx.description,
+            accountCode: BANK_ACCOUNT_CODE,
+            accountName: bankAccountName,
+            debitCents: 0,
+            creditCents: tx.amountCents,
+            sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
+            sourceId: tx.id,
+            reference: tx.reference || undefined,
+          });
+        }
       }
     }
 

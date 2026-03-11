@@ -18,7 +18,12 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { FinancialReportService } from '../../database/services/financial-report.service';
 import { CashFlowReportService } from '../../database/services/cash-flow-report.service';
+import type { CashFlowStatement } from '../../database/services/cash-flow-report.service';
 import { AgedPayablesService } from '../../database/services/aged-payables.service';
+import { ArrearsService } from '../../database/services/arrears.service';
+import type { ArrearsReport } from '../../database/dto/arrears.dto';
+import { VatService } from '../../database/services/vat.service';
+import type { VatCalculationResult } from '../../database/dto/vat.dto';
 import { PdfGeneratorService } from './pdf-generator.service';
 import {
   ReportSynthesisAgent,
@@ -63,6 +68,20 @@ const DATA_CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
 const INSIGHTS_CACHE_TTL_SECONDS = 10 * 60; // 10 minutes
 
 /**
+ * Combined VAT report data for the reports module.
+ */
+interface VatReportData {
+  tenantId: string;
+  period: { start: Date; end: Date };
+  outputVat: VatCalculationResult;
+  inputVat: VatCalculationResult;
+  netVatCents: number;
+  isDueToSars: boolean;
+  flaggedItemCount: number;
+  generatedAt: Date;
+}
+
+/**
  * Export result with buffer and metadata.
  */
 export interface ExportResult {
@@ -84,6 +103,8 @@ export class ReportsService {
     private readonly financialReportService: FinancialReportService,
     private readonly cashFlowReportService: CashFlowReportService,
     private readonly agedPayablesService: AgedPayablesService,
+    private readonly arrearsService: ArrearsService,
+    private readonly vatService: VatService,
     private readonly reportSynthesisAgent: ReportSynthesisAgent,
     private readonly pdfGeneratorService: PdfGeneratorService,
   ) {}
@@ -376,14 +397,22 @@ export class ReportsService {
   // ========================================
 
   /**
-   * Fetch raw report data based on type.
+   * Composite type for all possible raw report data shapes.
    */
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   private async fetchRawData(
     type: ReportType,
     start: Date,
     end: Date,
     tenantId: string,
-  ): Promise<IncomeStatement | TrialBalance | BalanceSheet> {
+  ): Promise<
+    | IncomeStatement
+    | TrialBalance
+    | BalanceSheet
+    | CashFlowStatement
+    | ArrearsReport
+    | VatReportData
+  > {
     switch (type) {
       case ReportType.INCOME_STATEMENT:
         return this.financialReportService.generateIncomeStatement(
@@ -393,11 +422,20 @@ export class ReportsService {
         );
       case ReportType.BALANCE_SHEET:
         return this.financialReportService.generateBalanceSheet(tenantId, end);
-      default:
-        // For other types, return income statement as base
-        this.logger.warn(
-          `Report type ${type} not fully implemented, using income statement`,
+      case ReportType.CASH_FLOW:
+        return this.cashFlowReportService.generateCashFlowStatement(
+          tenantId,
+          start,
+          end,
         );
+      case ReportType.AGED_RECEIVABLES:
+        return this.arrearsService.getArrearsReport(tenantId, {
+          dateFrom: start,
+          dateTo: end,
+        });
+      case ReportType.VAT_REPORT:
+        return this.generateVatReportData(tenantId, start, end);
+      default:
         return this.financialReportService.generateIncomeStatement(
           tenantId,
           start,
@@ -407,10 +445,38 @@ export class ReportsService {
   }
 
   /**
+   * Generate combined VAT report data (output + input + flagged items).
+   */
+  private async generateVatReportData(
+    tenantId: string,
+    start: Date,
+    end: Date,
+  ): Promise<VatReportData> {
+    const [outputVat, inputVat, flaggedItems] = await Promise.all([
+      this.vatService.calculateOutputVat(tenantId, start, end),
+      this.vatService.calculateInputVat(tenantId, start, end),
+      this.vatService.getFlaggedItems(tenantId, start, end),
+    ]);
+
+    const netVatCents = outputVat.vatAmountCents - inputVat.vatAmountCents;
+
+    return {
+      tenantId,
+      period: { start, end },
+      outputVat,
+      inputVat,
+      netVatCents,
+      isDueToSars: netVatCents > 0,
+      flaggedItemCount: flaggedItems.length,
+      generatedAt: new Date(),
+    };
+  }
+
+  /**
    * Prepare chart data for frontend visualization.
    */
   private async prepareChartData(
-    rawData: IncomeStatement | TrialBalance | BalanceSheet,
+    rawData: unknown,
     type: ReportType,
     tenantId: string,
     periodStart: Date,
@@ -501,15 +567,16 @@ export class ReportsService {
    * Build expense breakdown for pie charts.
    */
   private buildExpenseBreakdown(
-    rawData: IncomeStatement | TrialBalance | BalanceSheet,
+    rawData: unknown,
   ): CategoryBreakdownDto[] {
+    const rd = rawData as Record<string, unknown>;
     // Check if it's an income statement
     if (
-      'expenses' in rawData &&
-      typeof rawData.expenses === 'object' &&
-      rawData.expenses !== null
+      'expenses' in rd &&
+      typeof rd.expenses === 'object' &&
+      rd.expenses !== null
     ) {
-      const expenses = rawData.expenses as {
+      const expenses = rd.expenses as {
         totalCents: number;
         breakdown?: Array<{ accountName: string; amountCents: number }>;
       };
@@ -868,16 +935,17 @@ export class ReportsService {
    * Calculate summary from raw data.
    */
   private calculateSummary(
-    rawData: IncomeStatement | TrialBalance | BalanceSheet,
+    rawData: unknown,
     type: ReportType,
   ): ReportSummaryDto {
+    const rd = rawData as Record<string, unknown>;
     // Income Statement
     if (
-      'income' in rawData &&
-      'expenses' in rawData &&
-      'netProfitCents' in rawData
+      'income' in rd &&
+      'expenses' in rd &&
+      'netProfitCents' in rd
     ) {
-      const data = rawData;
+      const data = rawData as unknown as IncomeStatement;
       const profitMarginPercent =
         data.income.totalCents > 0
           ? new Decimal(data.netProfitCents)
@@ -899,8 +967,8 @@ export class ReportsService {
     }
 
     // Balance Sheet — map assets/liabilities/equity to summary fields
-    if ('assets' in rawData && 'liabilities' in rawData && 'equity' in rawData) {
-      const data = rawData as BalanceSheet;
+    if ('assets' in rd && 'liabilities' in rd && 'equity' in rd) {
+      const data = rawData as unknown as BalanceSheet;
       const netEquity = data.assets.totalCents - data.liabilities.totalCents;
       return {
         totalIncomeCents: data.assets.totalCents,
@@ -922,6 +990,74 @@ export class ReportsService {
       };
     }
 
+    // Cash Flow Statement
+    if ('operating' in rd && 'investing' in rd && 'financing' in rd) {
+      const data = rawData as unknown as CashFlowStatement;
+      return {
+        totalIncomeCents: data.operating.total,
+        totalIncomeRands: new Decimal(data.operating.total)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        totalExpensesCents: Math.abs(data.investing.total + data.financing.total),
+        totalExpensesRands: new Decimal(
+          Math.abs(data.investing.total + data.financing.total),
+        )
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        netProfitCents: data.netCashFlow,
+        netProfitRands: new Decimal(data.netCashFlow)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        profitMarginPercent: 0,
+      };
+    }
+
+    // Aged Receivables (ArrearsReport)
+    if ('summary' in rd && 'topDebtors' in rd) {
+      const data = rawData as unknown as ArrearsReport;
+      return {
+        totalIncomeCents: data.summary.totalOutstandingCents,
+        totalIncomeRands: new Decimal(data.summary.totalOutstandingCents)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        totalExpensesCents: data.summary.totalInvoices,
+        totalExpensesRands: data.summary.totalInvoices,
+        netProfitCents: data.summary.totalOutstandingCents,
+        netProfitRands: new Decimal(data.summary.totalOutstandingCents)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        profitMarginPercent: 0,
+      };
+    }
+
+    // VAT Report
+    if ('outputVat' in rd && 'inputVat' in rd) {
+      const data = rawData as unknown as VatReportData;
+      return {
+        totalIncomeCents: data.outputVat.vatAmountCents,
+        totalIncomeRands: new Decimal(data.outputVat.vatAmountCents)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        totalExpensesCents: data.inputVat.vatAmountCents,
+        totalExpensesRands: new Decimal(data.inputVat.vatAmountCents)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        netProfitCents: data.netVatCents,
+        netProfitRands: new Decimal(data.netVatCents)
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        profitMarginPercent: 0,
+      };
+    }
+
     // Default empty summary
     return {
       totalIncomeCents: 0,
@@ -938,36 +1074,37 @@ export class ReportsService {
    * Build sections from raw data.
    */
   private buildSections(
-    rawData: IncomeStatement | TrialBalance | BalanceSheet,
+    rawData: unknown,
     type: ReportType,
   ): ReportSectionDto[] {
     const sections: ReportSectionDto[] = [];
+    const rd = rawData as Record<string, unknown>;
+    const toRands = (cents: number) =>
+      new Decimal(cents).dividedBy(100).toDecimalPlaces(2).toNumber();
 
     // Income Statement sections
     if (
-      'income' in rawData &&
-      'expenses' in rawData &&
-      'netProfitCents' in rawData
+      'income' in rd &&
+      'expenses' in rd &&
+      'netProfitCents' in rd
     ) {
-      const data = rawData;
-
+      const d = rawData as unknown as IncomeStatement;
       sections.push({
         title: 'Income',
-        totalCents: data.income.totalCents,
-        totalRands: data.income.totalRands,
-        breakdown: data.income.breakdown.map((b) => ({
+        totalCents: d.income.totalCents,
+        totalRands: d.income.totalRands,
+        breakdown: d.income.breakdown.map((b) => ({
           accountCode: b.accountCode,
           accountName: b.accountName,
           amountCents: b.amountCents,
           amountRands: b.amountRands,
         })),
       });
-
       sections.push({
         title: 'Expenses',
-        totalCents: data.expenses.totalCents,
-        totalRands: data.expenses.totalRands,
-        breakdown: data.expenses.breakdown.map((b) => ({
+        totalCents: d.expenses.totalCents,
+        totalRands: d.expenses.totalRands,
+        breakdown: d.expenses.breakdown.map((b) => ({
           accountCode: b.accountCode,
           accountName: b.accountName,
           amountCents: b.amountCents,
@@ -977,14 +1114,24 @@ export class ReportsService {
     }
 
     // Balance Sheet sections
-    if ('assets' in rawData && 'liabilities' in rawData && 'equity' in rawData) {
-      const data = rawData as BalanceSheet;
-
+    if ('assets' in rd && 'liabilities' in rd && 'equity' in rd) {
+      const d = rawData as unknown as BalanceSheet;
       sections.push({
         title: 'Assets',
-        totalCents: data.assets.totalCents,
-        totalRands: data.assets.totalRands,
-        breakdown: [...data.assets.current, ...data.assets.nonCurrent].map(
+        totalCents: d.assets.totalCents,
+        totalRands: d.assets.totalRands,
+        breakdown: [...d.assets.current, ...d.assets.nonCurrent].map((b) => ({
+          accountCode: b.accountCode,
+          accountName: b.accountName,
+          amountCents: b.amountCents,
+          amountRands: b.amountRands,
+        })),
+      });
+      sections.push({
+        title: 'Liabilities',
+        totalCents: d.liabilities.totalCents,
+        totalRands: d.liabilities.totalRands,
+        breakdown: [...d.liabilities.current, ...d.liabilities.nonCurrent].map(
           (b) => ({
             accountCode: b.accountCode,
             accountName: b.accountName,
@@ -993,32 +1140,200 @@ export class ReportsService {
           }),
         ),
       });
-
       sections.push({
-        title: 'Liabilities',
-        totalCents: data.liabilities.totalCents,
-        totalRands: data.liabilities.totalRands,
-        breakdown: [
-          ...data.liabilities.current,
-          ...data.liabilities.nonCurrent,
-        ].map((b) => ({
+        title: 'Equity',
+        totalCents: d.equity.totalCents,
+        totalRands: d.equity.totalRands,
+        breakdown: d.equity.breakdown.map((b) => ({
           accountCode: b.accountCode,
           accountName: b.accountName,
           amountCents: b.amountCents,
           amountRands: b.amountRands,
         })),
       });
+    }
 
+    // Cash Flow sections
+    if ('operating' in rd && 'investing' in rd && 'financing' in rd) {
+      const d = rawData as unknown as CashFlowStatement;
       sections.push({
-        title: 'Equity',
-        totalCents: data.equity.totalCents,
-        totalRands: data.equity.totalRands,
-        breakdown: data.equity.breakdown.map((b) => ({
-          accountCode: b.accountCode,
-          accountName: b.accountName,
-          amountCents: b.amountCents,
-          amountRands: b.amountRands,
+        title: 'Operating Activities',
+        totalCents: d.operating.total,
+        totalRands: toRands(d.operating.total),
+        breakdown: d.operating.details.map((item) => ({
+          accountCode: '',
+          accountName: item.name,
+          amountCents: item.amountCents,
+          amountRands: toRands(item.amountCents),
         })),
+      });
+      sections.push({
+        title: 'Investing Activities',
+        totalCents: d.investing.total,
+        totalRands: toRands(d.investing.total),
+        breakdown: d.investing.items.map((item) => ({
+          accountCode: '',
+          accountName: item.name,
+          amountCents: item.amountCents,
+          amountRands: toRands(item.amountCents),
+        })),
+      });
+      sections.push({
+        title: 'Financing Activities',
+        totalCents: d.financing.total,
+        totalRands: toRands(d.financing.total),
+        breakdown: d.financing.items.map((item) => ({
+          accountCode: '',
+          accountName: item.name,
+          amountCents: item.amountCents,
+          amountRands: toRands(item.amountCents),
+        })),
+      });
+      sections.push({
+        title: 'Cash Summary',
+        totalCents: d.netCashFlow,
+        totalRands: toRands(d.netCashFlow),
+        breakdown: [
+          {
+            accountCode: '',
+            accountName: 'Opening Balance',
+            amountCents: d.openingBalance,
+            amountRands: toRands(d.openingBalance),
+          },
+          {
+            accountCode: '',
+            accountName: 'Net Cash Flow',
+            amountCents: d.netCashFlow,
+            amountRands: toRands(d.netCashFlow),
+          },
+          {
+            accountCode: '',
+            accountName: 'Closing Balance',
+            amountCents: d.closingBalance,
+            amountRands: toRands(d.closingBalance),
+          },
+        ],
+      });
+    }
+
+    // Aged Receivables sections
+    if ('summary' in rd && 'topDebtors' in rd && 'invoices' in rd) {
+      const d = rawData as unknown as ArrearsReport;
+      sections.push({
+        title: 'Aging Summary',
+        totalCents: d.summary.totalOutstandingCents,
+        totalRands: toRands(d.summary.totalOutstandingCents),
+        breakdown: [
+          {
+            accountCode: '',
+            accountName: 'Current (1-30 days)',
+            amountCents: d.summary.aging.currentCents,
+            amountRands: toRands(d.summary.aging.currentCents),
+          },
+          {
+            accountCode: '',
+            accountName: '31-60 days',
+            amountCents: d.summary.aging.days30Cents,
+            amountRands: toRands(d.summary.aging.days30Cents),
+          },
+          {
+            accountCode: '',
+            accountName: '61-90 days',
+            amountCents: d.summary.aging.days60Cents,
+            amountRands: toRands(d.summary.aging.days60Cents),
+          },
+          {
+            accountCode: '',
+            accountName: '90+ days',
+            amountCents: d.summary.aging.days90PlusCents,
+            amountRands: toRands(d.summary.aging.days90PlusCents),
+          },
+        ].filter((b) => b.amountCents > 0),
+      });
+      if (d.topDebtors.length > 0) {
+        sections.push({
+          title: 'Top Debtors',
+          totalCents: d.topDebtors.reduce(
+            (sum, db) => sum + db.totalOutstandingCents,
+            0,
+          ),
+          totalRands: toRands(
+            d.topDebtors.reduce(
+              (sum, db) => sum + db.totalOutstandingCents,
+              0,
+            ),
+          ),
+          breakdown: d.topDebtors.map((db) => ({
+            accountCode: '',
+            accountName: `${db.parentName} (${db.invoiceCount} invoices, ${db.maxDaysOverdue}d overdue)`,
+            amountCents: db.totalOutstandingCents,
+            amountRands: toRands(db.totalOutstandingCents),
+          })),
+        });
+      }
+    }
+
+    // VAT Report sections
+    if ('outputVat' in rd && 'inputVat' in rd) {
+      const d = rawData as unknown as VatReportData;
+      sections.push({
+        title: 'Output VAT (Collected)',
+        totalCents: d.outputVat.vatAmountCents,
+        totalRands: toRands(d.outputVat.vatAmountCents),
+        breakdown: [
+          {
+            accountCode: '',
+            accountName: 'Standard Rated (15%)',
+            amountCents: d.outputVat.standardRatedCents,
+            amountRands: toRands(d.outputVat.standardRatedCents),
+          },
+          {
+            accountCode: '',
+            accountName: 'Zero Rated',
+            amountCents: d.outputVat.zeroRatedCents,
+            amountRands: toRands(d.outputVat.zeroRatedCents),
+          },
+          {
+            accountCode: '',
+            accountName: 'Exempt',
+            amountCents: d.outputVat.exemptCents,
+            amountRands: toRands(d.outputVat.exemptCents),
+          },
+        ].filter((b) => b.amountCents > 0),
+      });
+      sections.push({
+        title: 'Input VAT (Claimable)',
+        totalCents: d.inputVat.vatAmountCents,
+        totalRands: toRands(d.inputVat.vatAmountCents),
+        breakdown: [
+          {
+            accountCode: '',
+            accountName: 'Standard Rated (15%)',
+            amountCents: d.inputVat.standardRatedCents,
+            amountRands: toRands(d.inputVat.standardRatedCents),
+          },
+          {
+            accountCode: '',
+            accountName: 'Zero Rated',
+            amountCents: d.inputVat.zeroRatedCents,
+            amountRands: toRands(d.inputVat.zeroRatedCents),
+          },
+        ].filter((b) => b.amountCents > 0),
+      });
+      sections.push({
+        title: d.isDueToSars ? 'Net VAT Due to SARS' : 'Net VAT Refund Due',
+        totalCents: Math.abs(d.netVatCents),
+        totalRands: toRands(Math.abs(d.netVatCents)),
+        breakdown: [
+          {
+            accountCode: '',
+            accountName: d.isDueToSars
+              ? 'Amount payable to SARS'
+              : 'Refund claimable from SARS',
+            amountCents: Math.abs(d.netVatCents),
+            amountRands: toRands(Math.abs(d.netVatCents)),
+          },
+        ],
       });
     }
 

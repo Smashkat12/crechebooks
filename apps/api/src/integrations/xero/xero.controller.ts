@@ -1528,7 +1528,10 @@ export class XeroController {
       // the ex-VAT portion on 9999 = round(amountCents / 1.14)
       const inclusiveCents = Math.abs(tx.amountCents);
       const exVatCents = Math.round(inclusiveCents / 1.14);
-      const isReceive = tx.amountCents > 0;
+      // Accounts 3xxx (equity) and 4xxx (revenue) are RECEIVE type (money in)
+      // Accounts 5xxx-9xxx (expenses) are SPEND type (money out)
+      const code = tx.xeroAccountCode!;
+      const isReceive = code.startsWith('3') || code.startsWith('4');
 
       if (!groups.has(key)) {
         groups.set(key, {
@@ -1678,5 +1681,63 @@ export class XeroController {
       journalsFailed: failed,
       results,
     };
+  }
+
+  /**
+   * Void manual journals by IDs
+   * POST /xero/void-journals
+   */
+  @Post('void-journals')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Void manual journals by ID' })
+  @ApiResponse({ status: 200, description: 'Void results' })
+  async voidJournals(
+    @CurrentUser() user: IUser,
+    @Body() body: { journalIds: string[] },
+  ) {
+    const tenantId = getTenantId(user);
+
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+    }
+
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    let voided = 0;
+    let failed = 0;
+    const results: Array<{ id: string; status: string; error?: string }> = [];
+
+    for (const jid of body.journalIds) {
+      try {
+        const res = await fetch(
+          `https://api.xero.com/api.xro/2.0/ManualJournals/${jid}`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'xero-tenant-id': xeroTenantId,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              ManualJournals: [{ ManualJournalID: jid, Status: 'VOIDED' }],
+            }),
+          },
+        );
+        if (!res.ok) {
+          const errData = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errData.substring(0, 200)}`);
+        }
+        results.push({ id: jid, status: 'voided' });
+        voided++;
+        if (voided % 5 === 0) await new Promise(r => setTimeout(r, 1000));
+      } catch (error) {
+        results.push({ id: jid, status: 'failed', error: error instanceof Error ? error.message : String(error) });
+        failed++;
+      }
+    }
+
+    return { success: true, voided, failed, results };
   }
 }

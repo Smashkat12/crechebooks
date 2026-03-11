@@ -1746,16 +1746,13 @@ export class XeroController {
   }
 
   /**
-   * Get bank transactions on a specific Xero account code
-   * GET /xero/account-transactions?accountCode=9999
+   * List Xero manual journals
+   * GET /xero/manual-journals
    */
-  @Get('account-transactions')
+  @Get('manual-journals')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get Xero bank transactions by account code' })
-  async getAccountTransactions(
-    @CurrentUser() user: IUser,
-    @Query('accountCode') accountCode: string,
-  ) {
+  @ApiOperation({ summary: 'List Xero manual journals' })
+  async listManualJournals(@CurrentUser() user: IUser) {
     const tenantId = getTenantId(user);
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
     if (!hasConnection) {
@@ -1765,10 +1762,8 @@ export class XeroController {
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
     const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
 
-    // Query Xero for bank transactions on this account
-    const where = `AccountCode=="${accountCode}"`;
     const res = await fetch(
-      `https://api.xero.com/api.xro/2.0/BankTransactions?where=${encodeURIComponent(where)}&order=Date`,
+      `https://api.xero.com/api.xro/2.0/ManualJournals?order=Date`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -1784,44 +1779,33 @@ export class XeroController {
     }
 
     const data = await res.json() as {
-      BankTransactions?: Array<{
-        BankTransactionID: string;
-        Type: string;
+      ManualJournals?: Array<{
+        ManualJournalID: string;
+        Narration: string;
         Date: string;
         Status: string;
-        IsReconciled: boolean;
-        Total: number;
-        Contact?: { Name: string };
-        LineItems?: Array<{ Description: string; AccountCode: string; LineAmount: number; TaxType: string }>;
+        JournalLines?: Array<{
+          AccountCode: string;
+          Description: string;
+          LineAmount: number;
+          TaxType: string;
+        }>;
       }>;
     };
 
-    const txns = (data.BankTransactions ?? []).map(t => ({
-      id: t.BankTransactionID,
-      type: t.Type,
-      date: t.Date,
-      status: t.Status,
-      isReconciled: t.IsReconciled,
-      total: t.Total,
-      contact: t.Contact?.Name,
-      description: t.LineItems?.[0]?.Description,
-      lineAccountCode: t.LineItems?.[0]?.AccountCode,
-      lineAmount: t.LineItems?.[0]?.LineAmount,
-      taxType: t.LineItems?.[0]?.TaxType,
+    const journals = (data.ManualJournals ?? []).map(j => ({
+      id: j.ManualJournalID,
+      narration: j.Narration,
+      date: j.Date,
+      status: j.Status,
+      lines: j.JournalLines?.map(l => ({
+        accountCode: l.AccountCode,
+        amount: l.LineAmount,
+        taxType: l.TaxType,
+      })),
     }));
 
-    // Calculate totals
-    const spendTotal = txns.filter(t => t.type === 'SPEND').reduce((s, t) => s + t.total, 0);
-    const receiveTotal = txns.filter(t => t.type === 'RECEIVE').reduce((s, t) => s + t.total, 0);
-
-    return {
-      accountCode,
-      transactionCount: txns.length,
-      spendTotal: spendTotal.toFixed(2),
-      receiveTotal: receiveTotal.toFixed(2),
-      netDebit: (spendTotal - receiveTotal).toFixed(2),
-      transactions: txns,
-    };
+    return { count: journals.length, journals };
   }
 
   /**

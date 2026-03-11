@@ -1083,10 +1083,43 @@ export class XeroController {
           percentage: 75,
         });
 
-        // Sync unreconciled bank statement lines (default: true for complete bank feed data)
+        // Step 2b: Sync from Journals API to catch cash-coded and payment-matched items
+        // getBankTransactions only returns Spend/Receive Money — journals catch everything else
+        this.logger.log(
+          `Syncing from Journals API for tenant ${tenantId}`,
+        );
+
+        this.syncGateway.emitProgress(tenantId, {
+          entity: 'journals',
+          total: 100,
+          processed: 0,
+          percentage: 0,
+        });
+
+        const journalsResult =
+          await this.bankFeedService.syncFromJournals(tenantId, {
+            fromDate: options.fromDate
+              ? new Date(options.fromDate)
+              : undefined,
+            forceFullSync: options.fullSync ?? false,
+          });
+
+        this.logger.log(
+          `Journals sync: ${journalsResult.created} created, ` +
+            `${journalsResult.skipped} skipped (${journalsResult.found} found)`,
+        );
+
+        this.syncGateway.emitProgress(tenantId, {
+          entity: 'journals',
+          total: journalsResult.found,
+          processed: journalsResult.created + journalsResult.skipped,
+          percentage: 100,
+        });
+
+        // Step 2c: Sync unreconciled bank statement lines (requires finance.bankstatementsplus.read scope)
         if (options.includeUnreconciled !== false) {
           this.logger.log(
-            `Fetching unreconciled statement lines for tenant ${tenantId}`,
+            `Fetching statement lines via Finance API for tenant ${tenantId}`,
           );
 
           this.syncGateway.emitProgress(tenantId, {
@@ -1096,25 +1129,36 @@ export class XeroController {
             percentage: 0,
           });
 
-          const unreconciledResult =
-            await this.bankFeedService.syncUnreconciledStatements(tenantId, {
-              fromDate: options.fromDate
-                ? new Date(options.fromDate)
-                : undefined,
-              forceFullSync: options.fullSync ?? false,
+          try {
+            const unreconciledResult =
+              await this.bankFeedService.syncUnreconciledStatements(tenantId, {
+                fromDate: options.fromDate
+                  ? new Date(options.fromDate)
+                  : undefined,
+                forceFullSync: options.fullSync ?? false,
+              });
+
+            this.logger.log(
+              `Finance API sync: ${unreconciledResult.created} created, ` +
+                `${unreconciledResult.skipped} skipped`,
+            );
+
+            this.syncGateway.emitProgress(tenantId, {
+              entity: 'unreconciled',
+              total: unreconciledResult.found,
+              processed: unreconciledResult.created + unreconciledResult.skipped,
+              percentage: 100,
             });
-
-          this.logger.log(
-            `Unreconciled sync: ${unreconciledResult.created} created, ` +
-              `${unreconciledResult.skipped} skipped`,
-          );
-
-          this.syncGateway.emitProgress(tenantId, {
-            entity: 'unreconciled',
-            total: unreconciledResult.found,
-            processed: unreconciledResult.created + unreconciledResult.skipped,
-            percentage: 100,
-          });
+          } catch (financeApiError) {
+            // Finance API requires finance.bankstatementsplus.read scope
+            // which may not be authorized — log and continue
+            this.logger.warn(
+              `Finance API sync skipped (scope may not be authorized)`,
+              financeApiError instanceof Error
+                ? financeApiError.message
+                : String(financeApiError),
+            );
+          }
         }
 
         this.syncGateway.emitProgress(tenantId, {

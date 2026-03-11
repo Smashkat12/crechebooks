@@ -1539,6 +1539,7 @@ export class XeroController {
       scopes: ['openid', 'profile', 'email', 'accounting.transactions'],
     });
 
+    await xeroClient.initialize();
     xeroClient.setTokenSet({
       access_token: accessToken,
       token_type: 'Bearer',
@@ -1582,20 +1583,28 @@ export class XeroController {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
-        const errMsg =
-          error instanceof Error ? error.message : String(error);
+        const xeroErr = error as { message?: string; code?: string; context?: Record<string, unknown>; response?: { body?: unknown; statusCode?: number } };
+        const errMsg = xeroErr.message ?? String(error);
+        const detail = xeroErr.response?.body ? JSON.stringify(xeroErr.response.body).substring(0, 200) : xeroErr.context ? JSON.stringify(xeroErr.context).substring(0, 200) : undefined;
         results.push({
           id: tx.id,
           xeroTransactionId: tx.xeroTransactionId!,
           accountCode: tx.xeroAccountCode!,
           status: 'failed',
-          error: errMsg,
+          error: detail ? `${errMsg} | ${detail}` : errMsg,
         });
         failed++;
 
         this.logger.error(
           `Failed to update Xero txn ${tx.xeroTransactionId}: ${errMsg}`,
+          detail,
         );
+
+        // If first failure is auth-related, stop early
+        if (failed === 1 && (errMsg.includes('401') || errMsg.includes('Unauthorized') || errMsg.includes('token'))) {
+          this.logger.error('Auth error on first transaction - aborting batch');
+          break;
+        }
       }
     }
 

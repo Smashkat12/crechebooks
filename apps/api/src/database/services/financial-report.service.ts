@@ -74,76 +74,87 @@ export class FinancialReportService {
       );
     }
 
-    // Get school fees income from paid invoices (filter by payment date range using payments)
-    const paidInvoices = await this.prisma.invoice.findMany({
-      where: {
-        tenantId,
-        status: { in: ['PAID', 'PARTIALLY_PAID'] },
-        payments: {
-          some: {
-            paymentDate: { gte: periodStart, lte: periodEnd },
-            isReversed: false,
-          },
-        },
-      },
-      include: {
-        lines: true,
-      },
+    // Build account name lookup from xero_accounts (tenant-specific Xero chart)
+    const xeroAccounts = await this.prisma.xeroAccount.findMany({
+      where: { tenantId },
     });
-
-    // Calculate income from invoices (use amountPaidCents as income recognized)
-    const incomeByAccount = new Map<string, Decimal>();
-    for (const invoice of paidInvoices) {
-      const accountCode = DEFAULT_ACCOUNTS.SCHOOL_FEES.code;
-      const current = incomeByAccount.get(accountCode) || new Decimal(0);
-      incomeByAccount.set(accountCode, current.plus(invoice.amountPaidCents));
+    const accountNameMap = new Map<string, string>();
+    for (const xa of xeroAccounts) {
+      accountNameMap.set(xa.accountCode, xa.name);
     }
 
-    // Get expense transactions
+    // Get all non-deleted transactions for the period
     const transactions = await this.prisma.transaction.findMany({
       where: {
         tenantId,
         date: { gte: periodStart, lte: periodEnd },
         isDeleted: false,
       },
-      include: {
-        categorizations: true,
-      },
     });
 
-    // Calculate expenses by account code
+    // Separate income and expenses using xero_account_code
+    const incomeByAccount = new Map<string, Decimal>();
     const expensesByAccount = new Map<string, Decimal>();
-    for (const tx of transactions) {
-      const accountCode =
-        tx.categorizations?.[0]?.accountCode ||
-        DEFAULT_ACCOUNTS.BANK_CHARGES.code;
 
-      // Only include expense accounts (5xxx-8xxx)
-      if (isExpenseAccount(accountCode) && !tx.isCredit) {
-        const current = expensesByAccount.get(accountCode) || new Decimal(0);
-        expensesByAccount.set(accountCode, current.plus(tx.amountCents));
+    for (const tx of transactions) {
+      const accountCode = tx.xeroAccountCode || '9999';
+
+      if (tx.isCredit) {
+        // Credit transactions are income (or equity injections)
+        if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
+          const current = incomeByAccount.get(accountCode) || new Decimal(0);
+          incomeByAccount.set(accountCode, current.plus(tx.amountCents));
+        } else {
+          // Credit to an expense account = refund/reversal, reduce expenses
+          const current = expensesByAccount.get(accountCode) || new Decimal(0);
+          expensesByAccount.set(accountCode, current.minus(tx.amountCents));
+        }
+      } else {
+        // Debit transactions
+        if (isExpenseAccount(accountCode)) {
+          const current = expensesByAccount.get(accountCode) || new Decimal(0);
+          expensesByAccount.set(accountCode, current.plus(tx.amountCents));
+        } else if (isIncomeAccount(accountCode)) {
+          // Debit to income account = reversal/refund, reduce income
+          const current = incomeByAccount.get(accountCode) || new Decimal(0);
+          incomeByAccount.set(accountCode, current.minus(tx.amountCents));
+        }
       }
+    }
+
+    // Remove accounts with zero or negative net balances
+    for (const [code, amount] of expensesByAccount) {
+      if (amount.lte(0)) expensesByAccount.delete(code);
+    }
+    for (const [code, amount] of incomeByAccount) {
+      if (amount.lte(0)) incomeByAccount.delete(code);
     }
 
     // Build income breakdown
     const incomeBreakdown: AccountBreakdown[] = Array.from(
       incomeByAccount.entries(),
-    ).map(([code, amount]) => ({
-      accountCode: code,
-      accountName: DEFAULT_ACCOUNTS.SCHOOL_FEES.name,
-      amountCents: amount.toNumber(),
-      amountRands: amount.dividedBy(100).toDecimalPlaces(2).toNumber(),
-    }));
+    )
+      .map(([code, amount]) => ({
+        accountCode: code,
+        accountName:
+          accountNameMap.get(code) || this.getAccountName(code),
+        amountCents: amount.toNumber(),
+        amountRands: amount.dividedBy(100).toDecimalPlaces(2).toNumber(),
+      }))
+      .sort((a, b) => b.amountCents - a.amountCents);
 
     // Build expense breakdown
     const expenseBreakdown: AccountBreakdown[] = Array.from(
       expensesByAccount.entries(),
-    ).map(([code, amount]) => ({
-      accountCode: code,
-      accountName: this.getAccountName(code),
-      amountCents: amount.toNumber(),
-      amountRands: amount.dividedBy(100).toDecimalPlaces(2).toNumber(),
-    }));
+    )
+      .map(([code, amount]) => ({
+        accountCode: code,
+        accountName:
+          accountNameMap.get(code) || this.getAccountName(code),
+        amountCents: amount.toNumber(),
+        amountRands: amount.dividedBy(100).toDecimalPlaces(2).toNumber(),
+      }))
+      .sort((a, b) => b.amountCents - a.amountCents);
 
     // Calculate totals
     const totalIncomeCents = Array.from(incomeByAccount.values()).reduce(
@@ -343,29 +354,34 @@ export class FinancialReportService {
       `Generating Trial Balance for tenant ${tenantId} as of ${asOfDate.toISOString()}`,
     );
 
-    // Get all transactions up to asOfDate
+    // Build account name lookup from xero_accounts
+    const xeroAccounts = await this.prisma.xeroAccount.findMany({
+      where: { tenantId },
+    });
+    const accountNameMap = new Map<string, string>();
+    for (const xa of xeroAccounts) {
+      accountNameMap.set(xa.accountCode, xa.name);
+    }
+
+    // Get all transactions up to asOfDate using xero_account_code
     const transactions = await this.prisma.transaction.findMany({
       where: {
         tenantId,
         date: { lte: asOfDate },
         isDeleted: false,
       },
-      include: {
-        categorizations: true,
-      },
     });
 
-    // Group by account code
+    // Group by xero_account_code
     const accountBalances = new Map<
       string,
       { debits: Decimal; credits: Decimal; name: string }
     >();
 
     for (const tx of transactions) {
-      const accountCode =
-        tx.categorizations?.[0]?.accountCode ||
-        DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code;
-      const accountName = this.getAccountName(accountCode);
+      const accountCode = tx.xeroAccountCode || '9999';
+      const accountName =
+        accountNameMap.get(accountCode) || this.getAccountName(accountCode);
 
       if (!accountBalances.has(accountCode)) {
         accountBalances.set(accountCode, {
@@ -383,47 +399,25 @@ export class FinancialReportService {
       }
     }
 
-    // Add income from invoices (credits) - use payments to determine date
-    const paidInvoices = await this.prisma.invoice.findMany({
-      where: {
-        tenantId,
-        status: { in: ['PAID', 'PARTIALLY_PAID'] },
-        payments: {
-          some: {
-            paymentDate: { lte: asOfDate },
-            isReversed: false,
-          },
-        },
-      },
-    });
-
-    const incomeAccountCode = DEFAULT_ACCOUNTS.SCHOOL_FEES.code;
-    if (!accountBalances.has(incomeAccountCode)) {
-      accountBalances.set(incomeAccountCode, {
-        debits: new Decimal(0),
-        credits: new Decimal(0),
-        name: DEFAULT_ACCOUNTS.SCHOOL_FEES.name,
-      });
-    }
-
-    const incomeAccount = accountBalances.get(incomeAccountCode)!;
-    for (const invoice of paidInvoices) {
-      incomeAccount.credits = incomeAccount.credits.plus(
-        invoice.amountPaidCents,
-      );
-    }
-
-    // Build trial balance accounts
+    // Build trial balance accounts sorted by code
     const accounts: TrialBalanceAccount[] = Array.from(
       accountBalances.entries(),
-    ).map(([code, balance]) => ({
-      accountCode: code,
-      accountName: balance.name,
-      debitCents: balance.debits.toNumber(),
-      creditCents: balance.credits.toNumber(),
-      debitRands: balance.debits.dividedBy(100).toDecimalPlaces(2).toNumber(),
-      creditRands: balance.credits.dividedBy(100).toDecimalPlaces(2).toNumber(),
-    }));
+    )
+      .map(([code, balance]) => ({
+        accountCode: code,
+        accountName: balance.name,
+        debitCents: balance.debits.toNumber(),
+        creditCents: balance.credits.toNumber(),
+        debitRands: balance.debits
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+        creditRands: balance.credits
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+      }))
+      .sort((a, b) => a.accountCode.localeCompare(b.accountCode));
 
     // Calculate totals
     const totalDebitsCents = accounts.reduce(

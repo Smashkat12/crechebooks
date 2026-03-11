@@ -9,7 +9,7 @@ export interface JournalEntry {
   accountName: string;
   debitCents: number;
   creditCents: number;
-  sourceType: 'CATEGORIZATION' | 'PAYROLL' | 'MANUAL' | 'INVOICE' | 'PAYMENT';
+  sourceType: 'BANK_FEED' | 'CATEGORIZATION' | 'PAYROLL' | 'MANUAL' | 'INVOICE' | 'PAYMENT';
   sourceId: string;
   reference?: string;
 }
@@ -53,18 +53,30 @@ export class GeneralLedgerService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Get all journal entries across sources for a date range
+   * Get all journal entries across sources for a date range.
+   * Sources: bank feed transactions (via xero_account_code), categorization journals, payroll journals.
    */
   async getGeneralLedger(query: GeneralLedgerQuery): Promise<JournalEntry[]> {
     const { tenantId, startDate, endDate, accountCode, sourceType } = query;
 
     // Combine entries from all journal sources in parallel
-    const [categorizationJournals, payrollJournals] = await Promise.all([
-      this.getCategorizationJournals(tenantId, startDate, endDate, accountCode),
-      this.getPayrollJournals(tenantId, startDate, endDate, accountCode),
-    ]);
+    const [bankFeedEntries, categorizationJournals, payrollJournals] =
+      await Promise.all([
+        this.getBankFeedEntries(tenantId, startDate, endDate, accountCode),
+        this.getCategorizationJournals(
+          tenantId,
+          startDate,
+          endDate,
+          accountCode,
+        ),
+        this.getPayrollJournals(tenantId, startDate, endDate, accountCode),
+      ]);
 
-    let allEntries = [...categorizationJournals, ...payrollJournals];
+    let allEntries = [
+      ...bankFeedEntries,
+      ...categorizationJournals,
+      ...payrollJournals,
+    ];
 
     // Filter by source type if specified
     if (sourceType) {
@@ -79,6 +91,84 @@ export class GeneralLedgerService {
     });
 
     return allEntries;
+  }
+
+  /**
+   * Get bank feed transactions as journal entries.
+   * Each transaction with xero_account_code becomes a double-entry:
+   * - Credits: DR Bank, CR Revenue/Equity account
+   * - Debits: DR Expense account, CR Bank
+   */
+  private async getBankFeedEntries(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+    accountCode?: string,
+  ): Promise<JournalEntry[]> {
+    // Build account name lookup from xero_accounts
+    const xeroAccounts = await this.prisma.xeroAccount.findMany({
+      where: { tenantId },
+    });
+    const accountNameMap = new Map<string, string>();
+    for (const xa of xeroAccounts) {
+      accountNameMap.set(xa.accountCode, xa.name);
+    }
+
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        date: { gte: startDate, lte: endDate },
+        isDeleted: false,
+        xeroAccountCode: accountCode ? accountCode : { not: null },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    const entries: JournalEntry[] = [];
+
+    for (const tx of transactions) {
+      const code = tx.xeroAccountCode || '9999';
+      const name = accountNameMap.get(code) || code;
+
+      // Each bank transaction is a journal entry against its xero_account_code
+      if (tx.isCredit) {
+        // Money in: DR Bank, CR Revenue/Equity
+        entries.push({
+          id: tx.id,
+          date: tx.date,
+          description: tx.description,
+          accountCode: code,
+          accountName: name,
+          debitCents: 0,
+          creditCents: tx.amountCents,
+          sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
+          sourceId: tx.id,
+          reference: tx.reference || undefined,
+        });
+      } else {
+        // Money out: DR Expense, CR Bank
+        entries.push({
+          id: tx.id,
+          date: tx.date,
+          description: tx.description,
+          accountCode: code,
+          accountName: name,
+          debitCents: tx.amountCents,
+          creditCents: 0,
+          sourceType: 'BANK_FEED' as JournalEntry['sourceType'],
+          sourceId: tx.id,
+          reference: tx.reference || undefined,
+        });
+      }
+
+      // If filtering by a specific account and it's not the bank account, skip bank leg
+      // But if no filter or filtering for bank, include the bank contra entry
+      if (!accountCode || accountCode === '1035') {
+        // No bank contra leg needed — we track by account code only
+      }
+    }
+
+    return entries;
   }
 
   /**

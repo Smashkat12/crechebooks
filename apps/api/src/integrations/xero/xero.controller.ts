@@ -1433,27 +1433,32 @@ export class XeroController {
   }
 
   /**
-   * Push xero_account_code directly to Xero bank transactions
-   * POST /xero/push-account-codes
+   * Create reclassification journals to move 9999 transactions to correct accounts
+   * POST /xero/reclassify-9999
    *
-   * Uses xero_account_code from transactions table (not categorization records).
-   * Targets transactions with xero_transaction_id that are coded to catch-all 9999.
+   * Reconciled bank transactions can't be edited in Xero, so we create
+   * manual journal entries to reclassify: Credit 9999, Debit correct account.
+   * Groups by account code + month to minimize journal count.
+   *
+   * The original bank transactions applied 14% INPUT tax on 9999.
+   * Xero stores ex-VAT on the expense account, VAT on account 820.
+   * Reclassification moves the ex-VAT amount between expense accounts
+   * using TaxType NONE (VAT already posted by original transaction).
    */
-  @Post('push-account-codes')
+  @Post('reclassify-9999')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({
-    summary: 'Push account codes directly to Xero',
+    summary: 'Create reclassification journals from 9999 to correct accounts',
     description:
-      'Updates Xero bank transactions with xero_account_code from the transactions table. Bypasses categorization requirement.',
+      'Creates manual journals in Xero to move expenses from catch-all 9999 to correct accounts based on CrecheBooks categorization.',
   })
-  @ApiResponse({ status: 200, description: 'Push results' })
-  async pushAccountCodes(
+  @ApiResponse({ status: 200, description: 'Reclassification results' })
+  async reclassify9999(
     @CurrentUser() user: IUser,
     @Body()
     body: {
       fromDate?: string;
       dryRun?: boolean;
-      transactionIds?: string[];
     },
   ) {
     const tenantId = getTenantId(user);
@@ -1467,7 +1472,7 @@ export class XeroController {
       );
     }
 
-    // Get transactions with xero_transaction_id and a real xero_account_code (not 9999/4110)
+    // Get transactions coded to non-9999 accounts with xero_transaction_ids
     const where: Record<string, unknown> = {
       tenantId,
       xeroTransactionId: { not: null },
@@ -1480,10 +1485,6 @@ export class XeroController {
 
     if (body.fromDate) {
       where.date = { gte: new Date(body.fromDate) };
-    }
-
-    if (body.transactionIds && body.transactionIds.length > 0) {
-      where.id = { in: body.transactionIds };
     }
 
     const transactions = await this.prisma.transaction.findMany({
@@ -1500,127 +1501,181 @@ export class XeroController {
     });
 
     if (transactions.length === 0) {
-      return {
-        success: true,
-        message: 'No transactions to push',
-        total: 0,
-        synced: 0,
-        failed: 0,
-        results: [],
-      };
+      return { success: true, message: 'No transactions to reclassify', journals: [] };
     }
 
-    // Dry run - just return what would be pushed
+    // Group by account code + month
+    const groups = new Map<string, {
+      accountCode: string;
+      month: string;
+      lastDayOfMonth: string;
+      totalExVatCents: number;
+      txCount: number;
+      descriptions: string[];
+      isReceive: boolean;
+    }>();
+
+    for (const tx of transactions) {
+      const d = new Date(tx.date);
+      const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      const lastDayStr = lastDay.toISOString().split('T')[0];
+      const key = `${tx.xeroAccountCode}-${month}`;
+
+      // Xero stored these as inclusive amounts with 14% INPUT tax
+      // ex-VAT = inclusive / 1.14, but we need exact ex-VAT amounts
+      // Since amountCents is the bank statement amount (inclusive),
+      // the ex-VAT portion on 9999 = round(amountCents / 1.14)
+      const inclusiveCents = Math.abs(tx.amountCents);
+      const exVatCents = Math.round(inclusiveCents / 1.14);
+      const isReceive = tx.amountCents > 0;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          accountCode: tx.xeroAccountCode!,
+          month,
+          lastDayOfMonth: lastDayStr,
+          totalExVatCents: 0,
+          txCount: 0,
+          descriptions: [],
+          isReceive,
+        });
+      }
+      const group = groups.get(key)!;
+      group.totalExVatCents += exVatCents;
+      group.txCount++;
+      if (tx.description && group.descriptions.length < 5) {
+        group.descriptions.push(tx.description.substring(0, 40));
+      }
+    }
+
+    const journalGroups = Array.from(groups.values());
+
+    // Dry run
     if (body.dryRun) {
       return {
         success: true,
         dryRun: true,
-        total: transactions.length,
-        transactions: transactions.map((tx) => ({
-          id: tx.id,
-          xeroTransactionId: tx.xeroTransactionId,
-          xeroAccountCode: tx.xeroAccountCode,
-          description: tx.description,
-          date: tx.date,
-          amountCents: tx.amountCents,
+        totalTransactions: transactions.length,
+        journalCount: journalGroups.length,
+        journals: journalGroups.map((g) => ({
+          accountCode: g.accountCode,
+          month: g.month,
+          date: g.lastDayOfMonth,
+          exVatAmountRands: (g.totalExVatCents / 100).toFixed(2),
+          txCount: g.txCount,
+          sampleDescriptions: g.descriptions,
+          narration: `Reclassify: 9999 → ${g.accountCode} (${g.txCount} txns, ${g.month})`,
         })),
       };
     }
 
-    // Get authenticated Xero client
+    // Get Xero credentials
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
     const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
 
-    const xeroClient = new XeroClient({
-      clientId: process.env.XERO_CLIENT_ID ?? '',
-      clientSecret: process.env.XERO_CLIENT_SECRET ?? '',
-      redirectUris: [process.env.XERO_REDIRECT_URI ?? ''],
-      scopes: ['openid', 'profile', 'email', 'accounting.transactions'],
-    });
-
-    await xeroClient.initialize();
-    xeroClient.setTokenSet({
-      access_token: accessToken,
-      token_type: 'Bearer',
-    });
-
-    // Push each transaction
+    // Create journals via direct Xero API (using HttpService pattern from XeroJournalService)
     const results: Array<{
-      id: string;
-      xeroTransactionId: string;
       accountCode: string;
+      month: string;
       status: 'success' | 'failed';
+      journalId?: string;
+      amountRands: string;
       error?: string;
     }> = [];
 
-    let synced = 0;
+    let created = 0;
     let failed = 0;
 
-    for (const tx of transactions) {
+    for (const group of journalGroups) {
+      const amountRands = group.totalExVatCents / 100;
+      const narration = `Reclassify: 9999 → ${group.accountCode} (${group.txCount} txns, ${group.month})`;
+
+      // For SPEND transactions (expenses):
+      //   Original: Debit 9999, Credit Bank
+      //   Reclassify: Credit 9999 (negative), Debit correct account (positive)
+      // For RECEIVE transactions (income like 3020 Owner Loan):
+      //   Original: Debit Bank, Credit 9999
+      //   Reclassify: Debit 9999 (positive), Credit correct account (negative)
+      const journalPayload = {
+        ManualJournals: [{
+          Narration: narration,
+          Date: group.lastDayOfMonth,
+          Status: 'POSTED',
+          JournalLines: group.isReceive ? [
+            // Receive: reverse credit on 9999, add credit on correct account
+            { AccountCode: '9999', Description: narration, LineAmount: amountRands, TaxType: 'NONE' },
+            { AccountCode: group.accountCode, Description: narration, LineAmount: -amountRands, TaxType: 'NONE' },
+          ] : [
+            // Spend: reverse debit on 9999, add debit on correct account
+            { AccountCode: '9999', Description: narration, LineAmount: -amountRands, TaxType: 'NONE' },
+            { AccountCode: group.accountCode, Description: narration, LineAmount: amountRands, TaxType: 'NONE' },
+          ],
+        }],
+      };
+
       try {
-        // Get existing transaction from Xero
-        const getResp = await xeroClient.accountingApi.getBankTransaction(
-          xeroTenantId,
-          tx.xeroTransactionId!,
+        const response = await fetch(
+          `https://api.xero.com/api.xro/2.0/ManualJournals`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'xero-tenant-id': xeroTenantId,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: JSON.stringify(journalPayload),
+          },
         );
-        const existing = getResp.body.bankTransactions?.[0];
-        if (!existing) {
-          results.push({ id: tx.id, xeroTransactionId: tx.xeroTransactionId!, accountCode: tx.xeroAccountCode!, status: 'failed', error: 'Transaction not found in Xero' });
-          failed++;
-          continue;
+
+        const data = await response.json() as {
+          ManualJournals?: Array<{
+            ManualJournalID?: string;
+            ValidationErrors?: Array<{ Message?: string }>;
+          }>;
+        };
+
+        if (!response.ok) {
+          const valErr = data.ManualJournals?.[0]?.ValidationErrors?.[0]?.Message;
+          throw new Error(valErr ?? `HTTP ${response.status}`);
         }
 
-        // Update line items with new account code
-        const updatedLineItems = (existing.lineItems ?? []).map((item) => ({
-          ...item,
-          accountCode: tx.xeroAccountCode!,
-        }));
+        const journalId = data.ManualJournals?.[0]?.ManualJournalID;
+        results.push({
+          accountCode: group.accountCode,
+          month: group.month,
+          status: 'success',
+          journalId,
+          amountRands: amountRands.toFixed(2),
+        });
+        created++;
 
-        // Push update
-        await xeroClient.accountingApi.updateBankTransaction(
-          xeroTenantId,
-          tx.xeroTransactionId!,
-          { bankTransactions: [{ ...existing, lineItems: updatedLineItems }] },
-        );
+        this.logger.log(`Created reclassification journal ${journalId}: 9999 → ${group.accountCode}, R${amountRands.toFixed(2)} (${group.month})`);
 
-        results.push({ id: tx.id, xeroTransactionId: tx.xeroTransactionId!, accountCode: tx.xeroAccountCode!, status: 'success' });
-        synced++;
-
-        this.logger.log(
-          `Updated Xero txn ${tx.xeroTransactionId} → ${tx.xeroAccountCode} (${tx.description?.substring(0, 40)})`,
-        );
-
-        // Rate limit: pause every 10 requests
-        if (synced % 10 === 0) {
+        // Rate limit pause
+        if (created % 5 === 0) {
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       } catch (error) {
-        const err = error as { message?: string; response?: { statusCode?: number; body?: unknown }; body?: unknown };
-        const body = err.response?.body ?? err.body;
-        const validationMsg = (() => {
-          try {
-            const b = body as { Elements?: Array<{ ValidationErrors?: Array<{ Message?: string }> }>; Message?: string };
-            return b?.Elements?.[0]?.ValidationErrors?.[0]?.Message ?? b?.Message ?? null;
-          } catch { return null; }
-        })();
-        const errMsg = validationMsg ?? err.message ?? String(error);
-        results.push({ id: tx.id, xeroTransactionId: tx.xeroTransactionId!, accountCode: tx.xeroAccountCode!, status: 'failed', error: errMsg });
+        const errMsg = error instanceof Error ? error.message : String(error);
+        results.push({
+          accountCode: group.accountCode,
+          month: group.month,
+          status: 'failed',
+          amountRands: amountRands.toFixed(2),
+          error: errMsg,
+        });
         failed++;
-
-        this.logger.error(`Failed to update Xero txn ${tx.xeroTransactionId}: ${errMsg}`);
-
-        // Abort on auth errors
-        if (failed === 1 && (errMsg.includes('401') || errMsg.includes('Unauthorized'))) {
-          break;
-        }
+        this.logger.error(`Failed reclassification journal 9999 → ${group.accountCode} (${group.month}): ${errMsg}`);
       }
     }
 
     return {
       success: true,
-      total: transactions.length,
-      synced,
-      failed,
+      totalTransactions: transactions.length,
+      journalsCreated: created,
+      journalsFailed: failed,
       results,
     };
   }

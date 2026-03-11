@@ -331,19 +331,19 @@ export class ReportsController {
           type: ReportType.CASH_FLOW,
           name: 'Cash Flow Statement',
           description: 'Analysis of cash inflows and outflows',
-          available: false,
+          available: true,
         },
         {
           type: ReportType.VAT_REPORT,
           name: 'VAT Report',
           description: 'VAT201 report for SARS submission',
-          available: false,
+          available: true,
         },
         {
           type: ReportType.AGED_RECEIVABLES,
           name: 'Aged Receivables',
           description: 'Outstanding invoices grouped by age',
-          available: false,
+          available: true,
         },
         {
           type: ReportType.AGED_PAYABLES,

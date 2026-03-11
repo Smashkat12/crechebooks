@@ -988,6 +988,264 @@ export class BankFeedService {
   }
 
   /**
+   * Sync transactions from Xero Journals API.
+   * Catches transactions missed by getBankTransactions — specifically:
+   * - Cash-coded items (reconciled via bulk categorization)
+   * - Invoice/bill payments matched to bank feed lines
+   * - Bank transfers
+   *
+   * Uses the accounting.transactions scope (already authorized).
+   * Each journal has lines with accountID — we filter for the FNB bank account.
+   */
+  async syncFromJournals(
+    tenantId: string,
+    options?: BankSyncOptions,
+  ): Promise<{
+    found: number;
+    created: number;
+    skipped: number;
+    errors: BankSyncError[];
+  }> {
+    this.logger.log(`Syncing from Journals API for tenant ${tenantId}`);
+
+    const result = {
+      found: 0,
+      created: 0,
+      skipped: 0,
+      errors: [] as BankSyncError[],
+    };
+
+    // Get connections to sync
+    const connections = await this.prisma.bankConnection.findMany({
+      where: {
+        tenantId,
+        status: BankConnectionStatus.ACTIVE,
+        ...(options?.connectionId && { id: options.connectionId }),
+      },
+    });
+
+    if (connections.length === 0) {
+      this.logger.log('No active bank connections for journals sync');
+      return result;
+    }
+
+    const { client, xeroTenantId } =
+      await this.getAuthenticatedClient(tenantId);
+
+    // Build a set of bank account IDs for quick lookup
+    const bankAccountIds = new Set(
+      connections.map((c) => c.xeroAccountId),
+    );
+    // Map accountID → connection for creating transactions
+    const accountConnectionMap = new Map(
+      connections.map((c) => [c.xeroAccountId, c]),
+    );
+
+    // Determine date range — journals use ifModifiedSince (not date range)
+    const fromDate =
+      options?.fromDate ?? this.getDefaultFromDate(options?.forceFullSync);
+
+    // Fetch journals with pagination (offset-based, 100 per page)
+    let offset = 0;
+    let hasMore = true;
+    const maxPages = 200; // Safety limit: 20,000 journals max
+    let pageCount = 0;
+
+    while (hasMore && pageCount < maxPages) {
+      await this.checkRateLimit(tenantId);
+
+      const journalsResponse = await client.accountingApi.getJournals(
+        xeroTenantId,
+        fromDate, // ifModifiedSince
+        offset,
+        false, // paymentsOnly = false (we want ALL journal types)
+      );
+
+      const journals = journalsResponse.body.journals ?? [];
+      this.logger.log(
+        `Journals page ${pageCount + 1}: ${journals.length} journals (offset ${offset})`,
+      );
+
+      if (journals.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const journal of journals) {
+        if (!journal.journalLines || journal.journalLines.length === 0) {
+          continue;
+        }
+
+        // Find journal lines that reference one of our bank accounts
+        const bankLine = journal.journalLines.find(
+          (line) => line.accountID && bankAccountIds.has(line.accountID),
+        );
+
+        if (!bankLine || !bankLine.accountID) continue;
+        if (!journal.journalDate) continue;
+
+        // Skip if journal source is already covered by getBankTransactions
+        // CASHREC (Receive Money) and CASHPAID (Spend Money) are returned by getBankTransactions
+        // But some cash-coded items use these source types too, so we rely on duplicate detection
+        result.found++;
+
+        const connection = accountConnectionMap.get(bankLine.accountID);
+        if (!connection) continue;
+
+        try {
+          const importResult = await this.importJournalTransaction(
+            tenantId,
+            connection,
+            journal,
+            bankLine,
+          );
+
+          if (importResult === 'created') {
+            result.created++;
+          } else {
+            result.skipped++;
+          }
+        } catch (error) {
+          result.errors.push({
+            transactionId: journal.journalID ?? 'unknown',
+            error: error instanceof Error ? error.message : String(error),
+            code: 'IMPORT_ERROR',
+          });
+        }
+      }
+
+      offset += journals.length;
+      pageCount++;
+
+      if (journals.length < 100) {
+        hasMore = false;
+      }
+    }
+
+    this.logger.log(
+      `Journals sync complete: ${result.created} created, ${result.skipped} skipped, ` +
+        `${result.errors.length} errors (${result.found} found across ${pageCount} pages)`,
+    );
+
+    return result;
+  }
+
+  /**
+   * Import a single transaction from a Xero Journal entry.
+   * Uses journalID for primary duplicate detection, plus amount+date fallback.
+   */
+  private async importJournalTransaction(
+    tenantId: string,
+    connection: PrismaBankConnection,
+    journal: {
+      journalID?: string;
+      journalDate?: string;
+      sourceType?: unknown;
+      sourceID?: string;
+      reference?: string;
+      journalLines?: Array<{
+        accountID?: string;
+        accountCode?: string;
+        accountName?: string;
+        description?: string;
+        netAmount?: number;
+        grossAmount?: number;
+      }>;
+    },
+    bankLine: {
+      accountID?: string;
+      description?: string;
+      netAmount?: number;
+      grossAmount?: number;
+    },
+  ): Promise<'created' | 'duplicate' | 'skipped'> {
+    const journalId = journal.journalID;
+    if (!journalId) return 'skipped';
+
+    // Check for duplicate by journalID
+    const existingByJournal = await this.transactionRepo.findByXeroId(
+      tenantId,
+      journalId,
+    );
+    if (existingByJournal) return 'duplicate';
+
+    // Also check by sourceID (the underlying transaction like InvoiceID, PaymentID)
+    if (journal.sourceID) {
+      const existingBySource = await this.transactionRepo.findByXeroId(
+        tenantId,
+        journal.sourceID,
+      );
+      if (existingBySource) return 'duplicate';
+    }
+
+    // Amount from the bank line (grossAmount includes tax)
+    // In journals: positive netAmount = debit to the account
+    // For bank (asset): debit = money IN, credit = money OUT
+    const grossAmount = bankLine.grossAmount ?? bankLine.netAmount ?? 0;
+    const amountCents = Math.round(grossAmount * 100);
+
+    // For bank account: debit (positive) = money received (isCredit=true in statement terms)
+    const isCredit = amountCents > 0;
+
+    // Date
+    const txDate = journal.journalDate;
+    if (!txDate) return 'skipped';
+
+    // Check for amount+date duplicate (catches items already imported via getBankTransactions)
+    const dayStart = new Date(txDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(txDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const sameDayTx = await this.prisma.transaction.findFirst({
+      where: {
+        tenantId,
+        bankAccount: connection.accountName,
+        amountCents,
+        date: { gte: dayStart, lte: dayEnd },
+        source: ImportSource.BANK_FEED,
+      },
+    });
+
+    if (sameDayTx) return 'duplicate';
+
+    // Build description from the OTHER journal lines (the non-bank account lines)
+    // These contain the category/payee info
+    const otherLines = (journal.journalLines ?? []).filter(
+      (line) => line.accountID !== bankLine.accountID,
+    );
+
+    const description =
+      otherLines[0]?.description?.trim() ||
+      otherLines[0]?.accountName?.trim() ||
+      journal.reference?.trim() ||
+      `${String(journal.sourceType ?? 'Journal')} Transaction`;
+
+    // Detect fee transactions
+    let correctedAmountCents = amountCents;
+    let correctedIsCredit = isCredit;
+
+    if (this.isFeeTransaction(description) && (isCredit || amountCents > 0)) {
+      correctedIsCredit = false;
+      correctedAmountCents = amountCents > 0 ? -amountCents : amountCents;
+    }
+
+    await this.transactionRepo.create({
+      tenantId,
+      xeroTransactionId: journalId,
+      bankAccount: connection.accountName,
+      date: new Date(txDate),
+      description,
+      reference: journal.reference ?? undefined,
+      amountCents: correctedAmountCents,
+      isCredit: correctedIsCredit,
+      source: ImportSource.BANK_FEED,
+    });
+
+    return 'created';
+  }
+
+  /**
    * Import a single statement line from Finance API
    * Handles both reconciled (cash-coded) and unreconciled lines.
    * Duplicate detection uses statementLineId to prevent double-imports

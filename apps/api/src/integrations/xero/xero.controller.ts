@@ -1459,6 +1459,8 @@ export class XeroController {
     body: {
       fromDate?: string;
       dryRun?: boolean;
+      batchSize?: number;
+      batchOffset?: number;
     },
   ) {
     const tenantId = getTenantId(user);
@@ -1498,6 +1500,8 @@ export class XeroController {
         amountCents: true,
       },
       orderBy: { date: 'asc' },
+      ...(body.batchSize ? { take: body.batchSize } : {}),
+      ...(body.batchOffset ? { skip: body.batchOffset } : {}),
     });
 
     if (transactions.length === 0) {

@@ -149,9 +149,10 @@ export class XeroController {
       );
     }
 
-    // Create Xero client with minimal required scopes
+    // Create Xero client with required scopes
     // Note: 'profile' and 'email' require separate enablement in Xero Developer Portal
-    // 'finance.bankstatementsplus.read' requires Bank Feeds API access
+    // 'finance.bankstatementsplus.read' enables Finance API for ALL bank feed lines
+    // (including cash-coded items not returned by getBankTransactions)
     const xeroClient = new XeroClient({
       clientId,
       clientSecret,
@@ -162,6 +163,7 @@ export class XeroController {
         'accounting.transactions',
         'accounting.contacts',
         'accounting.settings',
+        'finance.bankstatementsplus.read',
       ],
     });
 

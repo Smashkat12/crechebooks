@@ -845,7 +845,7 @@ export class BankFeedService {
     errors: BankSyncError[];
   }> {
     this.logger.log(
-      `Fetching unreconciled bank statements for tenant ${tenantId}`,
+      `Fetching bank statements (Finance API) for tenant ${tenantId}`,
     );
 
     const result = {
@@ -865,7 +865,7 @@ export class BankFeedService {
     });
 
     if (connections.length === 0) {
-      this.logger.log('No active bank connections for unreconciled sync');
+      this.logger.log('No active bank connections for Finance API sync');
       return result;
     }
 
@@ -886,7 +886,7 @@ export class BankFeedService {
         await this.checkRateLimit(tenantId);
 
         this.logger.log(
-          `Fetching unreconciled statements for account ${connection.accountName} (${connection.xeroAccountId})`,
+          `Fetching statements for account ${connection.accountName} (${connection.xeroAccountId})`,
         );
 
         // Call Finance API to get bank statement with accounting data
@@ -917,25 +917,35 @@ export class BankFeedService {
             );
           }
 
-          // Filter for unreconciled lines only
-          const unreconciledLines = statementLines.filter(
-            (line) =>
-              !line.isReconciled && !line.isDeleted && !line.isDuplicate,
+          // Process ALL non-deleted, non-duplicate lines (both reconciled and unreconciled)
+          // Cash-coded items in Xero are "reconciled" but don't appear in getBankTransactions API,
+          // so we must import them here. Duplicate detection via xeroTransactionId prevents double-imports.
+          const importableLines = statementLines.filter(
+            (line) => !line.isDeleted && !line.isDuplicate,
           );
+
+          const unreconciledCount = importableLines.filter(
+            (l) => !l.isReconciled,
+          ).length;
+          const reconciledCount = importableLines.filter(
+            (l) => l.isReconciled,
+          ).length;
 
           this.logger.log(
-            `Statement ${statement.statementId}: ${unreconciledLines.length} unreconciled lines ` +
-              `(out of ${statementLines.length} total)`,
+            `Statement ${statement.statementId}: ${importableLines.length} importable lines ` +
+              `(${reconciledCount} reconciled, ${unreconciledCount} unreconciled, ` +
+              `${statementLines.length} total)`,
           );
 
-          result.found += unreconciledLines.length;
+          result.found += importableLines.length;
 
-          for (const line of unreconciledLines) {
+          for (const line of importableLines) {
             try {
               const importResult = await this.importStatementLine(
                 tenantId,
                 connection,
                 line as XeroStatementLine,
+                line.isReconciled ?? false,
               );
 
               if (importResult === 'created') {
@@ -954,7 +964,7 @@ export class BankFeedService {
         }
       } catch (error) {
         this.logger.error(
-          `Failed to fetch unreconciled statements for ${connection.accountName}`,
+          `Failed to fetch statements for ${connection.accountName}`,
           error instanceof Error ? error.stack : String(error),
         );
 
@@ -963,15 +973,15 @@ export class BankFeedService {
           error:
             error instanceof Error
               ? error.message
-              : 'Failed to fetch unreconciled statements',
+              : 'Failed to fetch statements',
           code: 'FINANCE_API_ERROR',
         });
       }
     }
 
     this.logger.log(
-      `Unreconciled sync complete: ${result.created} created, ${result.skipped} skipped, ` +
-        `${result.errors.length} errors`,
+      `Finance API sync complete: ${result.created} created, ${result.skipped} skipped, ` +
+        `${result.errors.length} errors (${result.found} found)`,
     );
 
     return result;
@@ -979,12 +989,17 @@ export class BankFeedService {
 
   /**
    * Import a single statement line from Finance API
+   * Handles both reconciled (cash-coded) and unreconciled lines.
+   * Duplicate detection uses statementLineId to prevent double-imports
+   * when items are also pulled by getBankTransactions.
+   *
    * @returns 'created' | 'duplicate' | 'skipped'
    */
   private async importStatementLine(
     tenantId: string,
     connection: PrismaBankConnection,
     line: XeroStatementLine,
+    isReconciled = false,
   ): Promise<'created' | 'duplicate' | 'skipped'> {
     // Check for duplicate using statement line ID
     const existing = await this.transactionRepo.findByXeroId(
@@ -994,6 +1009,34 @@ export class BankFeedService {
 
     if (existing) {
       return 'duplicate';
+    }
+
+    // Also check if this was already imported via getBankTransactions
+    // by matching amount + date + similar description within the same day
+    // This prevents duplicates when the same transaction appears in both APIs
+    if (isReconciled) {
+      const txDate = line.transactionDate || line.postedDate;
+      if (txDate) {
+        const amountCents = Math.round(line.amount * 100);
+        const dayStart = new Date(txDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(txDate);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const sameDayTx = await this.prisma.transaction.findFirst({
+          where: {
+            tenantId,
+            bankAccount: connection.accountName,
+            amountCents,
+            date: { gte: dayStart, lte: dayEnd },
+            source: ImportSource.BANK_FEED,
+          },
+        });
+
+        if (sameDayTx) {
+          return 'duplicate';
+        }
+      }
     }
 
     // TASK-RECON-038: Preserve Xero's sign - DO NOT use Math.abs()
@@ -1018,13 +1061,18 @@ export class BankFeedService {
       return 'skipped';
     }
 
-    // Create transaction with [UNRECONCILED] prefix to distinguish
+    // Prefix unreconciled items to distinguish them
+    const finalDescription = isReconciled
+      ? description
+      : `[UNRECONCILED] ${description}`;
+
+    // Create transaction
     await this.transactionRepo.create({
       tenantId,
       xeroTransactionId: line.statementLineId,
       bankAccount: connection.accountName,
       date: new Date(txDate),
-      description: `[UNRECONCILED] ${description}`,
+      description: finalDescription,
       payeeName: line.payee ?? undefined,
       reference: line.reference ?? undefined,
       amountCents,

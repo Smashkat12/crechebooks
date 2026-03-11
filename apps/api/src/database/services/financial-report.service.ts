@@ -27,6 +27,8 @@ import {
   isAssetAccount,
   isLiabilityAccount,
   isEquityAccount,
+  isCurrentAsset,
+  isCurrentLiability,
   DEFAULT_ACCOUNTS,
 } from '../constants/chart-of-accounts.constants';
 import { BusinessException } from '../../shared/exceptions';
@@ -213,6 +215,75 @@ export class FinancialReportService {
       `Generating Balance Sheet for tenant ${tenantId} as of ${asOfDate.toISOString()}`,
     );
 
+    // Build account name lookup from xero_accounts
+    const xeroAccounts = await this.prisma.xeroAccount.findMany({
+      where: { tenantId },
+    });
+    const accountNameMap = new Map<string, string>();
+    for (const xa of xeroAccounts) {
+      accountNameMap.set(xa.accountCode, xa.name);
+    }
+
+    // Get all non-deleted transactions up to asOfDate
+    const transactions = await this.prisma.transaction.findMany({
+      where: {
+        tenantId,
+        date: { lte: asOfDate },
+        isDeleted: false,
+      },
+    });
+
+    // Calculate bank balance (all transactions flow through the bank account)
+    let bankBalanceCents = new Decimal(0);
+    // Track balances for non-bank asset, liability, and equity accounts
+    const accountBalances = new Map<string, Decimal>();
+    // Track accumulated income and expenses for retained earnings
+    let totalIncomeCents = new Decimal(0);
+    let totalExpensesCents = new Decimal(0);
+
+    for (const tx of transactions) {
+      const accountCode = tx.xeroAccountCode || '9999';
+
+      // Every transaction affects the bank balance
+      if (tx.isCredit) {
+        bankBalanceCents = bankBalanceCents.plus(tx.amountCents);
+      } else {
+        bankBalanceCents = bankBalanceCents.minus(tx.amountCents);
+      }
+
+      // Track income and expenses for retained earnings calculation
+      if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
+        if (tx.isCredit) {
+          totalIncomeCents = totalIncomeCents.plus(tx.amountCents);
+        } else {
+          totalIncomeCents = totalIncomeCents.minus(tx.amountCents);
+        }
+      } else if (isExpenseAccount(accountCode)) {
+        if (tx.isCredit) {
+          // Refund reduces expenses
+          totalExpensesCents = totalExpensesCents.minus(tx.amountCents);
+        } else {
+          totalExpensesCents = totalExpensesCents.plus(tx.amountCents);
+        }
+      } else if (isAssetAccount(accountCode) && accountCode !== '1035') {
+        // Non-bank asset account — debit increases, credit decreases
+        const current = accountBalances.get(accountCode) || new Decimal(0);
+        if (tx.isCredit) {
+          accountBalances.set(accountCode, current.minus(tx.amountCents));
+        } else {
+          accountBalances.set(accountCode, current.plus(tx.amountCents));
+        }
+      } else if (isLiabilityAccount(accountCode)) {
+        // Liability account — credit increases, debit decreases
+        const current = accountBalances.get(accountCode) || new Decimal(0);
+        if (tx.isCredit) {
+          accountBalances.set(accountCode, current.plus(tx.amountCents));
+        } else {
+          accountBalances.set(accountCode, current.minus(tx.amountCents));
+        }
+      }
+    }
+
     // Calculate accounts receivable from outstanding invoices
     const outstandingInvoices = await this.prisma.invoice.findMany({
       where: {
@@ -227,48 +298,118 @@ export class FinancialReportService {
       new Decimal(0),
     );
 
-    // Get bank balance from transactions up to asOfDate
-    const bankTransactions = await this.prisma.transaction.findMany({
-      where: {
-        tenantId,
-        date: { lte: asOfDate },
-        isDeleted: false,
-      },
-    });
+    // Build current assets
+    const currentAssets: AccountBreakdown[] = [];
 
-    let bankBalanceCents = new Decimal(0);
-    for (const tx of bankTransactions) {
-      if (tx.isCredit) {
-        bankBalanceCents = bankBalanceCents.plus(tx.amountCents);
-      } else {
-        bankBalanceCents = bankBalanceCents.minus(tx.amountCents);
-      }
-    }
-
-    // Build asset accounts
-    const currentAssets: AccountBreakdown[] = [
-      {
+    // Bank account
+    if (!bankBalanceCents.isZero()) {
+      currentAssets.push({
         accountCode: DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code,
-        accountName: DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.name,
+        accountName:
+          accountNameMap.get(DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.code) ||
+          DEFAULT_ACCOUNTS.SAVINGS_ACCOUNT.name,
         amountCents: bankBalanceCents.toNumber(),
         amountRands: bankBalanceCents
           .dividedBy(100)
           .toDecimalPlaces(2)
           .toNumber(),
-      },
-      {
+      });
+    }
+
+    // Accounts receivable
+    if (!accountsReceivableCents.isZero()) {
+      currentAssets.push({
         accountCode: DEFAULT_ACCOUNTS.ACCOUNTS_RECEIVABLE.code,
-        accountName: DEFAULT_ACCOUNTS.ACCOUNTS_RECEIVABLE.name,
+        accountName:
+          accountNameMap.get(DEFAULT_ACCOUNTS.ACCOUNTS_RECEIVABLE.code) ||
+          DEFAULT_ACCOUNTS.ACCOUNTS_RECEIVABLE.name,
         amountCents: accountsReceivableCents.toNumber(),
         amountRands: accountsReceivableCents
           .dividedBy(100)
           .toDecimalPlaces(2)
           .toNumber(),
-      },
-    ];
+      });
+    }
 
+    // Other asset accounts from transactions
     const nonCurrentAssets: AccountBreakdown[] = [];
+    for (const [code, balance] of accountBalances) {
+      if (!isAssetAccount(code) || balance.isZero()) continue;
+      const item: AccountBreakdown = {
+        accountCode: code,
+        accountName: accountNameMap.get(code) || this.getAccountName(code),
+        amountCents: balance.toNumber(),
+        amountRands: balance.dividedBy(100).toDecimalPlaces(2).toNumber(),
+      };
+      if (isCurrentAsset(code)) {
+        currentAssets.push(item);
+      } else {
+        nonCurrentAssets.push(item);
+      }
+    }
 
+    // Sort by account code
+    currentAssets.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+    nonCurrentAssets.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+
+    // Build liabilities from transaction-based accounts
+    const currentLiabilities: AccountBreakdown[] = [];
+    const nonCurrentLiabilities: AccountBreakdown[] = [];
+    for (const [code, balance] of accountBalances) {
+      if (!isLiabilityAccount(code) || balance.isZero()) continue;
+      const item: AccountBreakdown = {
+        accountCode: code,
+        accountName: accountNameMap.get(code) || this.getAccountName(code),
+        amountCents: balance.toNumber(),
+        amountRands: balance.dividedBy(100).toDecimalPlaces(2).toNumber(),
+      };
+      if (isCurrentLiability(code)) {
+        currentLiabilities.push(item);
+      } else {
+        nonCurrentLiabilities.push(item);
+      }
+    }
+    currentLiabilities.sort((a, b) =>
+      a.accountCode.localeCompare(b.accountCode),
+    );
+    nonCurrentLiabilities.sort((a, b) =>
+      a.accountCode.localeCompare(b.accountCode),
+    );
+
+    // Build equity — retained earnings = cumulative net profit (income - expenses)
+    const retainedEarningsCents = totalIncomeCents.minus(totalExpensesCents);
+    const equityBreakdown: AccountBreakdown[] = [];
+
+    // Add any direct equity transactions
+    for (const [code, balance] of accountBalances) {
+      if (!isEquityAccount(code) || balance.isZero()) continue;
+      equityBreakdown.push({
+        accountCode: code,
+        accountName: accountNameMap.get(code) || this.getAccountName(code),
+        amountCents: balance.toNumber(),
+        amountRands: balance.dividedBy(100).toDecimalPlaces(2).toNumber(),
+      });
+    }
+
+    // Add retained earnings
+    if (!retainedEarningsCents.isZero()) {
+      equityBreakdown.push({
+        accountCode: DEFAULT_ACCOUNTS.RETAINED_EARNINGS.code,
+        accountName:
+          accountNameMap.get(DEFAULT_ACCOUNTS.RETAINED_EARNINGS.code) ||
+          DEFAULT_ACCOUNTS.RETAINED_EARNINGS.name,
+        amountCents: retainedEarningsCents.toNumber(),
+        amountRands: retainedEarningsCents
+          .dividedBy(100)
+          .toDecimalPlaces(2)
+          .toNumber(),
+      });
+    }
+    equityBreakdown.sort((a, b) =>
+      a.accountCode.localeCompare(b.accountCode),
+    );
+
+    // Calculate totals
     const totalAssetsCents = currentAssets
       .reduce((sum, acc) => sum.plus(acc.amountCents), new Decimal(0))
       .plus(
@@ -277,11 +418,6 @@ export class FinancialReportService {
           new Decimal(0),
         ),
       );
-
-    // For now, no liabilities or equity data (would come from other sources)
-    const currentLiabilities: AccountBreakdown[] = [];
-    const nonCurrentLiabilities: AccountBreakdown[] = [];
-    const equityBreakdown: AccountBreakdown[] = [];
 
     const totalLiabilitiesCents = currentLiabilities
       .reduce((sum, acc) => sum.plus(acc.amountCents), new Decimal(0))

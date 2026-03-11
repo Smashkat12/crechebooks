@@ -1535,41 +1535,49 @@ export class XeroController {
 
     for (let i = 0; i < transactions.length; i++) {
       const tx = transactions[i];
-      try {
-        const getResp = await xeroClient.accountingApi.getBankTransaction(
-          xeroTenantId,
-          tx.xeroTransactionId!,
-        );
-        const xeroTxn = getResp.body.bankTransactions?.[0];
-        if (!xeroTxn) {
-          checkErrors.push({ id: tx.id, error: 'Not found in Xero' });
-          continue;
-        }
+      // Retry up to 2 times on rate limit
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const getResp = await xeroClient.accountingApi.getBankTransaction(
+            xeroTenantId,
+            tx.xeroTransactionId!,
+          );
+          const xeroTxn = getResp.body.bankTransactions?.[0];
+          if (!xeroTxn) {
+            checkErrors.push({ id: tx.id, error: 'Not found in Xero' });
+            break;
+          }
 
-        const currentCode = xeroTxn.lineItems?.[0]?.accountCode;
-        if (currentCode === '9999') {
-          // Still on 9999 — needs reclassification
-          const exVatAmount = Math.abs(xeroTxn.lineItems?.[0]?.lineAmount ?? 0);
-          needsReclassification.push({
-            id: tx.id,
-            xeroTransactionId: tx.xeroTransactionId!,
-            targetAccountCode: tx.xeroAccountCode!,
-            date: tx.date,
-            xeroExVatAmount: exVatAmount,
-            xeroType: String(xeroTxn.type ?? 'SPEND'),
-            description: tx.description ?? '',
-          });
-        } else {
-          alreadyCorrect.push(tx.id);
+          const currentCode = xeroTxn.lineItems?.[0]?.accountCode;
+          if (currentCode === '9999') {
+            const exVatAmount = Math.abs(xeroTxn.lineItems?.[0]?.lineAmount ?? 0);
+            needsReclassification.push({
+              id: tx.id,
+              xeroTransactionId: tx.xeroTransactionId!,
+              targetAccountCode: tx.xeroAccountCode!,
+              date: tx.date,
+              xeroExVatAmount: exVatAmount,
+              xeroType: String(xeroTxn.type ?? 'SPEND'),
+              description: tx.description ?? '',
+            });
+          } else {
+            alreadyCorrect.push(tx.id);
+          }
+          break; // Success, exit retry loop
+        } catch (error) {
+          const errStr = error instanceof Error ? error.message : JSON.stringify(error);
+          if (errStr.includes('429') && attempt < 2) {
+            this.logger.warn(`Rate limited on transaction ${i + 1}, waiting 30s before retry...`);
+            await new Promise((resolve) => setTimeout(resolve, 30000));
+            continue;
+          }
+          checkErrors.push({ id: tx.id, error: errStr.substring(0, 200) });
+          break;
         }
-
-        // Rate limit: pause every 20 requests
-        if ((i + 1) % 20 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      } catch (error) {
-        checkErrors.push({ id: tx.id, error: error instanceof Error ? error.message : String(error) });
       }
+
+      // Rate limit: Xero allows 60 calls/min, pause 1.5s between each call
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     this.logger.log(`Xero check complete: ${needsReclassification.length} need reclassification, ${alreadyCorrect.length} already correct, ${checkErrors.length} errors`);

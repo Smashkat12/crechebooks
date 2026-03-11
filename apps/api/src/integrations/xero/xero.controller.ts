@@ -1473,7 +1473,8 @@ export class XeroController {
       tenantId,
       xeroTransactionId: { not: null },
       xeroAccountCode: {
-        notIn: ['9999', '4110', null],
+        not: null,
+        notIn: ['9999', '4110'],
       },
       isDeleted: false,
     };

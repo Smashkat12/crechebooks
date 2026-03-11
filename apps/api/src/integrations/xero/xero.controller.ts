@@ -1085,36 +1085,46 @@ export class XeroController {
 
         // Step 2b: Sync from Journals API to catch cash-coded and payment-matched items
         // getBankTransactions only returns Spend/Receive Money — journals catch everything else
-        this.logger.log(
-          `Syncing from Journals API for tenant ${tenantId}`,
-        );
+        try {
+          this.logger.log(
+            `Syncing from Journals API for tenant ${tenantId}`,
+          );
 
-        this.syncGateway.emitProgress(tenantId, {
-          entity: 'journals',
-          total: 100,
-          processed: 0,
-          percentage: 0,
-        });
-
-        const journalsResult =
-          await this.bankFeedService.syncFromJournals(tenantId, {
-            fromDate: options.fromDate
-              ? new Date(options.fromDate)
-              : undefined,
-            forceFullSync: options.fullSync ?? false,
+          this.syncGateway.emitProgress(tenantId, {
+            entity: 'journals',
+            total: 100,
+            processed: 0,
+            percentage: 0,
           });
 
-        this.logger.log(
-          `Journals sync: ${journalsResult.created} created, ` +
-            `${journalsResult.skipped} skipped (${journalsResult.found} found)`,
-        );
+          const journalsResult =
+            await this.bankFeedService.syncFromJournals(tenantId, {
+              fromDate: options.fromDate
+                ? new Date(options.fromDate)
+                : undefined,
+              forceFullSync: options.fullSync ?? false,
+            });
 
-        this.syncGateway.emitProgress(tenantId, {
-          entity: 'journals',
-          total: journalsResult.found,
-          processed: journalsResult.created + journalsResult.skipped,
-          percentage: 100,
-        });
+          this.logger.log(
+            `Journals sync: ${journalsResult.created} created, ` +
+              `${journalsResult.skipped} skipped (${journalsResult.found} found)`,
+          );
+
+          this.syncGateway.emitProgress(tenantId, {
+            entity: 'journals',
+            total: journalsResult.found,
+            processed: journalsResult.created + journalsResult.skipped,
+            percentage: 100,
+          });
+        } catch (journalsError) {
+          // Journals API may fail on Starter plans or with insufficient scopes — log and continue
+          this.logger.warn(
+            `Journals sync failed, continuing with remaining sync steps`,
+            journalsError instanceof Error
+              ? journalsError.message
+              : String(journalsError),
+          );
+        }
 
         // Step 2c: Sync unreconciled bank statement lines (requires finance.bankstatementsplus.read scope)
         if (options.includeUnreconciled !== false) {

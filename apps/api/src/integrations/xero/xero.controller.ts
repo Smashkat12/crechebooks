@@ -1819,6 +1819,87 @@ export class XeroController {
   }
 
   /**
+   * Get Xero bank transactions with tax details (paginated)
+   * GET /xero/bank-transactions
+   */
+  @Get('bank-transactions')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'List Xero bank transactions with tax info' })
+  async listBankTransactions(
+    @CurrentUser() user: IUser,
+    @Query('bankAccountId') bankAccountId?: string,
+    @Query('page') page?: string,
+  ) {
+    const tenantId = getTenantId(user);
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+    }
+
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    const pageNum = parseInt(page ?? '1', 10);
+    let url = `https://api.xero.com/api.xro/2.0/BankTransactions?page=${pageNum}`;
+    if (bankAccountId) {
+      url += `&where=BankAccount.AccountID==Guid("${bankAccountId}")`;
+    }
+
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'xero-tenant-id': xeroTenantId,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new BusinessException(`Xero API error: ${res.status} ${errText.substring(0, 200)}`, 'XERO_API_ERROR');
+    }
+
+    const data = await res.json() as {
+      BankTransactions?: Array<{
+        BankTransactionID: string;
+        Type: string;
+        Date: string;
+        Reference?: string;
+        Status: string;
+        Total: number;
+        TotalTax: number;
+        LineItems?: Array<{
+          AccountCode: string;
+          Description: string;
+          LineAmount: number;
+          TaxAmount: number;
+          TaxType: string;
+        }>;
+        BankAccount?: { AccountID: string; Code: string };
+      }>;
+    };
+
+    const txns = (data.BankTransactions ?? []).map(t => ({
+      id: t.BankTransactionID,
+      type: t.Type,
+      date: t.Date,
+      reference: t.Reference,
+      status: t.Status,
+      total: t.Total,
+      totalTax: t.TotalTax,
+      lines: t.LineItems?.map(l => ({
+        accountCode: l.AccountCode,
+        description: l.Description,
+        lineAmount: l.LineAmount,
+        taxAmount: l.TaxAmount,
+        taxType: l.TaxType,
+      })),
+      bankAccount: t.BankAccount?.Code,
+    }));
+
+    return { page: pageNum, count: txns.length, transactions: txns };
+  }
+
+  /**
    * List Xero manual journals
    * GET /xero/manual-journals
    */

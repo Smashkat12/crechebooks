@@ -1938,4 +1938,107 @@ export class XeroController {
 
     return { success: true, voided, failed, results };
   }
+
+  /**
+   * Create manual journals in Xero
+   * POST /xero/create-journals
+   */
+  @Post('create-journals')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create manual journals in Xero' })
+  @ApiResponse({ status: 200, description: 'Creation results' })
+  async createJournals(
+    @CurrentUser() user: IUser,
+    @Body()
+    body: {
+      journals: Array<{
+        narration: string;
+        date: string;
+        lines: Array<{
+          accountCode: string;
+          description: string;
+          lineAmount: number;
+          taxType?: string;
+        }>;
+      }>;
+    },
+  ) {
+    const tenantId = getTenantId(user);
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+    }
+
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    let created = 0;
+    let failed = 0;
+    const results: Array<{ narration: string; status: string; journalId?: string; error?: string }> = [];
+
+    for (const journal of body.journals) {
+      const payload = {
+        ManualJournals: [{
+          Narration: journal.narration,
+          Date: journal.date,
+          Status: 'POSTED',
+          JournalLines: journal.lines.map((l) => ({
+            AccountCode: l.accountCode,
+            Description: l.description,
+            LineAmount: l.lineAmount,
+            TaxType: l.taxType ?? 'NONE',
+          })),
+        }],
+      };
+
+      try {
+        let retries = 0;
+        let response: globalThis.Response | null = null;
+        while (retries < 3) {
+          response = await fetch('https://api.xero.com/api.xro/2.0/ManualJournals', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'xero-tenant-id': xeroTenantId,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+          if (response.status === 429) {
+            retries++;
+            await new Promise((r) => setTimeout(r, 30000));
+            continue;
+          }
+          break;
+        }
+
+        const data = (await response!.json()) as {
+          ManualJournals?: Array<{
+            ManualJournalID?: string;
+            ValidationErrors?: Array<{ Message?: string }>;
+          }>;
+        };
+
+        if (!response!.ok) {
+          const valErr = data.ManualJournals?.[0]?.ValidationErrors?.[0]?.Message;
+          throw new Error(valErr ?? `HTTP ${response!.status}`);
+        }
+
+        const journalId = data.ManualJournals?.[0]?.ManualJournalID;
+        results.push({ narration: journal.narration, status: 'success', journalId });
+        created++;
+
+        if (created % 5 === 0) {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        results.push({ narration: journal.narration, status: 'failed', error: errMsg });
+        failed++;
+      }
+    }
+
+    return { success: true, created, failed, results };
+  }
 }

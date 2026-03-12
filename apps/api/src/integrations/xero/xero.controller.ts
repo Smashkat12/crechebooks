@@ -1583,7 +1583,7 @@ export class XeroController {
       where: {
         tenantId,
         xeroTransactionId: { in: Array.from(xero9999Map.keys()) },
-        xeroAccountCode: { not: null, notIn: ['9999', '4110'] },
+        xeroAccountCode: { not: null, notIn: ['9999'] },
         isDeleted: false,
       },
       select: {

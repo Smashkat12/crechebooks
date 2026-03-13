@@ -2122,4 +2122,104 @@ export class XeroController {
 
     return { success: true, created, failed, results };
   }
+
+  /**
+   * Create bank transactions in Xero (for items that can't be manual journals)
+   * POST /xero/create-bank-transactions
+   */
+  @Post('create-bank-transactions')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create bank transactions in Xero' })
+  async createBankTransactions(
+    @CurrentUser() user: IUser,
+    @Body()
+    body: {
+      transactions: Array<{
+        type: 'RECEIVE' | 'SPEND';
+        date: string;
+        bankAccountId: string;
+        accountCode: string;
+        description: string;
+        amount: number;
+        reference?: string;
+        taxType?: string;
+      }>;
+    },
+  ) {
+    const tenantId = getTenantId(user);
+    const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
+    if (!hasConnection) {
+      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+    }
+
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    let created = 0;
+    let failed = 0;
+    const results: Array<{ description: string; status: string; id?: string; error?: string }> = [];
+
+    for (const txn of body.transactions) {
+      const payload = {
+        BankTransactions: [{
+          Type: txn.type,
+          Date: txn.date,
+          BankAccount: { AccountID: txn.bankAccountId },
+          LineItems: [{
+            AccountCode: txn.accountCode,
+            Description: txn.description,
+            LineAmount: txn.amount,
+            TaxType: txn.taxType ?? 'NONE',
+          }],
+          Reference: txn.reference,
+          Status: 'AUTHORISED',
+        }],
+      };
+
+      try {
+        let retries = 0;
+        let response: globalThis.Response | null = null;
+        while (retries < 3) {
+          response = await fetch('https://api.xero.com/api.xro/2.0/BankTransactions', {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'xero-tenant-id': xeroTenantId,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+          if (response.status === 429) {
+            retries++;
+            await new Promise((r) => setTimeout(r, 30000));
+            continue;
+          }
+          break;
+        }
+
+        const data = (await response!.json()) as {
+          BankTransactions?: Array<{
+            BankTransactionID?: string;
+            ValidationErrors?: Array<{ Message?: string }>;
+          }>;
+        };
+
+        if (!response!.ok) {
+          const valErr = data.BankTransactions?.[0]?.ValidationErrors?.[0]?.Message;
+          throw new Error(valErr ?? `HTTP ${response!.status}`);
+        }
+
+        const txnId = data.BankTransactions?.[0]?.BankTransactionID;
+        results.push({ description: txn.description, status: 'success', id: txnId });
+        created++;
+      } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        results.push({ description: txn.description, status: 'failed', error: errMsg });
+        failed++;
+      }
+    }
+
+    return { success: true, created, failed, results };
+  }
 }

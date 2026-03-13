@@ -2201,16 +2201,15 @@ export class XeroController {
           break;
         }
 
-        const data = (await response!.json()) as {
-          BankTransactions?: Array<{
-            BankTransactionID?: string;
-            ValidationErrors?: Array<{ Message?: string }>;
-          }>;
-        };
+        const responseText = await response!.text();
+        let data: any;
+        try { data = JSON.parse(responseText); } catch { data = {}; }
 
         if (!response!.ok) {
-          const valErr = data.BankTransactions?.[0]?.ValidationErrors?.[0]?.Message;
-          throw new Error(valErr ?? `HTTP ${response!.status}: ${JSON.stringify(data).substring(0, 500)}`);
+          const valErr = data.BankTransactions?.[0]?.ValidationErrors?.[0]?.Message
+            || (data as any).Message
+            || (data as any).Detail;
+          throw new Error(valErr ?? `HTTP ${response!.status}: ${responseText.substring(0, 500)}`);
         }
 
         const txnId = data.BankTransactions?.[0]?.BankTransactionID;

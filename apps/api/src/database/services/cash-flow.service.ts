@@ -401,16 +401,9 @@ export class CashFlowService {
     const calculatedClosingBalance =
       openingCashBalanceCents + netCashChangeCents;
 
-    // Get actual closing balance for reconciliation
-    const actualClosingBalance = await this.getCashBalance(
-      tenantId,
-      new Date(endDate.getTime() + 24 * 60 * 60 * 1000),
-    );
-
-    // Check if cash reconciles (within a small tolerance for rounding)
-    const tolerance = 100; // 1 Rand tolerance
-    const cashReconciles =
-      Math.abs(calculatedClosingBalance - actualClosingBalance) <= tolerance;
+    // Use reconciliations table as source of truth for reconciliation status.
+    // A period is reconciled if a RECONCILED record covers it.
+    const cashReconciles = await this.isReconciled(tenantId, startDate, endDate);
 
     return {
       netCashChangeCents,
@@ -418,6 +411,58 @@ export class CashFlowService {
       closingCashBalanceCents: calculatedClosingBalance,
       cashReconciles,
     };
+  }
+
+  /**
+   * Check if a period is reconciled by looking up the reconciliations table.
+   * Returns true if all months in the range have RECONCILED records.
+   */
+  private async isReconciled(
+    tenantId: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<boolean> {
+    // Find reconciliation records that overlap with this period
+    const reconciliations = await this.prisma.reconciliation.findMany({
+      where: {
+        tenantId,
+        status: 'RECONCILED',
+        // Period overlaps: rec.period_start < endDate AND rec.period_end > startDate
+        periodStart: { lt: endDate },
+        periodEnd: { gt: startDate },
+      },
+      select: { periodStart: true, periodEnd: true },
+    });
+
+    if (reconciliations.length === 0) {
+      return false;
+    }
+
+    // For single-month queries, one overlapping RECONCILED record is sufficient
+    const periodDays =
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (periodDays <= 32) {
+      return true;
+    }
+
+    // For multi-month ranges, check that every month in the range is covered
+    const current = new Date(startDate);
+    while (current < endDate) {
+      const monthStart = new Date(current);
+      const monthEnd = new Date(current);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+
+      const covered = reconciliations.some(
+        (r) => r.periodStart < monthEnd && r.periodEnd > monthStart,
+      );
+      if (!covered) {
+        return false;
+      }
+
+      current.setMonth(current.getMonth() + 1);
+    }
+
+    return true;
   }
 
   /**

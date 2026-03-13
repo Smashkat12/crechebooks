@@ -21,6 +21,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Delete,
 } from '@nestjs/common';
 import { getTenantId } from '../../api/auth/utils/tenant-assertions';
 import type { Response } from 'express';
@@ -2223,6 +2224,36 @@ export class XeroController {
     }
 
     return { success: true, created, failed, results };
+  }
+
+  @Delete('bank-transactions/:id')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Delete a Xero bank transaction' })
+  async deleteBankTransaction(
+    @CurrentUser() user: IUser,
+    @Param('id') bankTransactionId: string,
+  ) {
+    const tenantId = getTenantId(user);
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    const response = await fetch('https://api.xero.com/api.xro/2.0/BankTransactions/' + bankTransactionId, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'xero-tenant-id': xeroTenantId,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        BankTransactions: [{ BankTransactionID: bankTransactionId, Status: 'DELETED' }],
+      }),
+    });
+
+    const text = await response.text();
+    let data: any;
+    try { data = JSON.parse(text); } catch { data = text; }
+    return { status: response.status, success: response.ok, body: data };
   }
 
   @Post('xero-proxy')

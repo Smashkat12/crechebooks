@@ -12,6 +12,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
+import { CombinedAuthGuard } from './api/auth/guards/api-key-auth.guard';
 import { TenantGuard } from './api/auth/guards/tenant.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';
 import { CustomThrottlerGuard } from './common/guards/throttle.guard';
@@ -87,10 +88,12 @@ import { ReportsModule } from './modules/reports';
       provide: APP_GUARD,
       useClass: CustomThrottlerGuard,
     },
-    // Apply JwtAuthGuard globally - use @Public() to skip
+    // Apply CombinedAuthGuard globally - supports both API key and JWT auth
+    // API keys (x-api-key header with cb_ prefix) are checked first,
+    // falls back to JWT auth if no API key present. Use @Public() to skip.
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard,
+      useClass: CombinedAuthGuard,
     },
     // TASK-SEC-105: Apply TenantGuard globally - ensures tenant context for non-admin routes
     {

@@ -2224,4 +2224,33 @@ export class XeroController {
 
     return { success: true, created, failed, results };
   }
+
+  @Post('xero-proxy')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Debug: proxy raw Xero API call' })
+  async xeroProxy(
+    @CurrentUser() user: IUser,
+    @Body() body: { method: string; path: string; payload?: any },
+  ) {
+    const tenantId = getTenantId(user);
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    const response = await fetch(`https://api.xero.com/api.xro/2.0${body.path}`, {
+      method: body.method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'xero-tenant-id': xeroTenantId,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: body.payload ? JSON.stringify(body.payload) : undefined,
+    });
+
+    const text = await response.text();
+    let json: any;
+    try { json = JSON.parse(text); } catch { json = null; }
+
+    return { status: response.status, body: json ?? text };
+  }
 }

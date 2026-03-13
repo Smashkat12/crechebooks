@@ -2143,6 +2143,7 @@ export class XeroController {
         amount: number;
         reference?: string;
         taxType?: string;
+        contactName?: string;
       }>;
     },
   ) {
@@ -2164,11 +2165,13 @@ export class XeroController {
         BankTransactions: [{
           Type: txn.type,
           Date: txn.date,
+          Contact: { Name: txn.contactName || 'Owner' },
           BankAccount: { AccountID: txn.bankAccountId },
           LineItems: [{
-            AccountCode: txn.accountCode,
             Description: txn.description,
-            LineAmount: txn.amount,
+            Quantity: 1,
+            UnitAmount: txn.amount,
+            AccountCode: txn.accountCode,
             TaxType: txn.taxType ?? 'NONE',
           }],
           Reference: txn.reference,
@@ -2207,7 +2210,7 @@ export class XeroController {
 
         if (!response!.ok) {
           const valErr = data.BankTransactions?.[0]?.ValidationErrors?.[0]?.Message;
-          throw new Error(valErr ?? `HTTP ${response!.status}`);
+          throw new Error(valErr ?? `HTTP ${response!.status}: ${JSON.stringify(data).substring(0, 500)}`);
         }
 
         const txnId = data.BankTransactions?.[0]?.BankTransactionID;

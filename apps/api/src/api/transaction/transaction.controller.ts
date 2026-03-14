@@ -498,7 +498,7 @@ export class TransactionController {
     // Handle income allocation to parent account
     // When parent_id is provided for income categories on credit transactions,
     // auto-allocate to outstanding invoices (FIFO - oldest first)
-    if (dto.parent_id && dto.account_code.startsWith('4')) {
+    if (dto.parent_id && dto.account_code.startsWith('41')) {
       // Get the full transaction to check if it's a credit
       const fullTransaction = await this.transactionRepo.findById(
         getTenantId(user),

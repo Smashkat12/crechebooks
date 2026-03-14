@@ -184,21 +184,23 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Invoices ---------------------------------------------------------------
   //
-  // TASK-STUB-PARITY: Invoices are pushed to Stub as sales via /api/push/sale.
-  // Unpaid invoices appear as outstanding AR. Paid invoices include payment details.
+  // TASK-STUB-PARITY: Stub /api/push/sale requires `payment` as mandatory,
+  // so unpaid invoices are DEFERRED until payment. PAID invoices are pushed
+  // as sales with payment details, giving Stub the full picture.
 
   /**
-   * Push an invoice to Stub as a sale (accounts receivable).
-   * Uses /api/push/sale — creates an outstanding sale if unpaid,
-   * or a paid sale if the invoice status is PAID.
+   * Push an invoice to Stub.
+   * - PAID invoices: pushed as a sale via /api/push/sale (with payment)
+   * - Unpaid invoices: DEFERRED — income is recorded via syncPayment() when paid
+   *
+   * NOTE: Stub /api/push/sale requires `payment` as mandatory. There is no
+   * unpaid AR concept in their API.
    */
   async pushInvoice(
     tenantId: string,
     invoiceId: string,
     _options?: PushInvoiceOptions,
   ): Promise<InvoiceSyncResult> {
-    const uid = await this.getStubUid(tenantId);
-
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId },
       include: {
@@ -214,7 +216,25 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       );
     }
 
+    // Unpaid invoices are deferred — Stub has no unpaid AR concept
+    if (invoice.status !== 'PAID') {
+      this.logger.log(
+        `Invoice ${invoice.invoiceNumber} deferred — Stub requires payment for /api/push/sale`,
+      );
+      return {
+        invoiceId,
+        externalInvoiceId: `cb-inv-${invoiceId}`,
+        externalInvoiceNumber: invoice.invoiceNumber,
+        externalStatus: 'DEFERRED',
+        syncedAt: new Date(),
+      };
+    }
+
+    // PAID: push as sale with payment details
+    const uid = await this.getStubUid(tenantId);
     const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+    const primaryAccountCode = invoice.lines[0]?.accountCode ?? '4110';
+    const category = getStubCategory(primaryAccountCode, true);
 
     const salePayload: StubSalePayload = {
       id: `cb-inv-${invoiceId}`,
@@ -229,13 +249,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         name: parentName,
         email: invoice.parent.email ?? undefined,
       },
-    };
-
-    // If paid, include payment details so Stub marks the sale as settled
-    if (invoice.status === 'PAID') {
-      const primaryAccountCode = invoice.lines[0]?.accountCode ?? '4110';
-      const category = getStubCategory(primaryAccountCode, true);
-      salePayload.payment = {
+      payment: {
         id: `cb-inv-pmt-${invoiceId}`,
         date: invoice.issueDate.toISOString().split('T')[0],
         name: `${invoice.invoiceNumber} - ${parentName}`,
@@ -243,8 +257,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         currency: 'ZAR',
         amount: this.centsToRands(invoice.totalCents),
         vat: invoice.vatCents > 0 ? this.centsToRands(invoice.vatCents) : undefined,
-      };
-    }
+      },
+    };
 
     await this.stubClient.pushSale(uid, salePayload);
     await this.updateSyncStatus(tenantId, 'success');
@@ -253,7 +267,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       invoiceId,
       externalInvoiceId: salePayload.id,
       externalInvoiceNumber: invoice.invoiceNumber,
-      externalStatus: invoice.status === 'PAID' ? 'PAID' : 'OUTSTANDING',
+      externalStatus: 'PAID',
       syncedAt: new Date(),
     };
   }
@@ -563,8 +577,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
     if (entities.includes('invoices')) {
       try {
-        // TASK-STUB-PARITY: Push ALL invoices as sales, not just paid ones
-        const allInvoices = await this.findAllInvoices(tenantId, options.fromDate);
+        // Only PAID invoices can be pushed — Stub /api/push/sale requires payment
+        const allInvoices = await this.findPaidInvoices(tenantId, options.fromDate);
         if (allInvoices.length > 0) {
           const result = await this.pushInvoicesBulk(
             tenantId,

@@ -39,9 +39,6 @@ import { useCategorizeTransaction } from '@/hooks/use-transactions';
 import { useParentsList } from '@/hooks/use-parents';
 import { useToast } from '@/hooks/use-toast';
 
-// Income categories that require parent allocation
-const INCOME_CATEGORIES = ['4000', '4100', '4200', '4900'];
-
 interface CategorizationDialogProps {
   transaction: ITransaction | null;
   open: boolean;
@@ -83,8 +80,8 @@ export function CategorizationDialog({
   const hasAiSuggestion = transaction.categoryId && transaction.confidence;
   const isLowConfidence = transaction.confidence !== undefined && transaction.confidence < 0.5;
 
-  // Check if this is an income category AND a credit (positive) transaction
-  const isIncomeCategory = INCOME_CATEGORIES.includes(selectedCategory);
+  // Check if this is an income category (4xxx) AND a credit (positive) transaction
+  const isIncomeCategory = selectedCategory.startsWith('4');
   const isCreditTransaction = transaction.amount > 0;
   const requiresParentAllocation = isIncomeCategory && isCreditTransaction;
 

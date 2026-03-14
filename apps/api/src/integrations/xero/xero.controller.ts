@@ -2222,6 +2222,72 @@ export class XeroController {
     return { success: true, created, failed, results };
   }
 
+  /**
+   * Create accounts in Xero Chart of Accounts
+   * POST /xero/create-accounts
+   */
+  @Post('create-accounts')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create accounts in Xero Chart of Accounts' })
+  async createAccounts(
+    @CurrentUser() user: IUser,
+    @Body()
+    body: {
+      accounts: Array<{
+        code: string;
+        name: string;
+        type: string;
+        taxType?: string;
+      }>;
+    },
+  ) {
+    const tenantId = getTenantId(user);
+    const accessToken = await this.tokenManager.getAccessToken(tenantId);
+    const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
+
+    const results: Array<{ code: string; name: string; status: string; error?: string }> = [];
+
+    for (const acct of body.accounts) {
+      const payload = {
+        Code: acct.code,
+        Name: acct.name,
+        Type: acct.type,
+        TaxType: acct.taxType ?? 'NONE',
+      };
+
+      try {
+        const response = await fetch('https://api.xero.com/api.xro/2.0/Accounts', {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'xero-tenant-id': xeroTenantId,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json() as any;
+        if (!response.ok) {
+          const errMsg = data.Elements?.[0]?.ValidationErrors?.[0]?.Message
+            || data.Message || `HTTP ${response.status}`;
+          throw new Error(errMsg);
+        }
+
+        results.push({ code: acct.code, name: acct.name, status: 'created' });
+      } catch (error) {
+        results.push({
+          code: acct.code,
+          name: acct.name,
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return { success: true, results };
+  }
+
   @Delete('bank-transactions/:id')
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   @ApiOperation({ summary: 'Delete a Xero bank transaction' })

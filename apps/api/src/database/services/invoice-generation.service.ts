@@ -21,7 +21,9 @@
  *           to prevent race conditions in concurrent invoice creation.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
+import { ACCOUNTING_PROVIDER } from '../../integrations/accounting/accounting-provider.token';
+import type { AccountingProvider } from '../../integrations/accounting/interfaces';
 import { Invoice, InvoiceLine, AdHocCharge, Prisma } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
@@ -88,6 +90,9 @@ export class InvoiceGenerationService {
     private readonly proRataService: ProRataService,
     private readonly creditBalanceService: CreditBalanceService,
     private readonly invoiceNumberService: InvoiceNumberService,
+    // TASK-STUB-PARITY: Provider-agnostic invoice push
+    @Inject(ACCOUNTING_PROVIDER) @Optional()
+    private readonly accountingProvider?: AccountingProvider,
   ) {}
 
   /**
@@ -1107,20 +1112,53 @@ export class InvoiceGenerationService {
   }
 
   /**
-   * Sync invoice to Xero as DRAFT via MCP
+   * Sync invoice to accounting provider (Xero or Stub).
+   * TASK-STUB-PARITY: Tries AccountingProvider.pushInvoice() first, then
+   * falls back to XeroSyncService.createInvoiceDraft() for Xero-specific features.
    *
    * @param invoice - Invoice to sync (must have id and invoiceNumber)
-   * @returns Xero invoice ID, or null if sync failed (logged but not thrown)
+   * @returns External invoice ID, or null if sync failed (logged but not thrown)
    *
    * CRITICAL: Errors are logged but DO NOT fail the invoice creation.
-   * This follows the fail-fast principle for local operations while
-   * gracefully handling external service failures.
    */
   async syncToXero(invoice: Invoice): Promise<string | null> {
-    this.logger.log(`Syncing invoice ${invoice.invoiceNumber} to Xero`);
+    this.logger.log(
+      `Syncing invoice ${invoice.invoiceNumber} to accounting provider`,
+    );
 
+    // TASK-STUB-PARITY: Try provider-agnostic path first
+    if (this.accountingProvider) {
+      try {
+        const result = await this.accountingProvider.pushInvoice(
+          invoice.tenantId,
+          invoice.id,
+        );
+        if (result.externalInvoiceId) {
+          this.logger.log(
+            `Invoice ${invoice.invoiceNumber} synced via ${this.accountingProvider.providerName}: ${result.externalInvoiceId}`,
+          );
+          return result.externalInvoiceId;
+        }
+        this.logger.debug(
+          `Provider returned no external ID for invoice ${invoice.invoiceNumber}`,
+        );
+      } catch (providerError) {
+        // For non-Xero providers, log and return null
+        if (this.accountingProvider.providerName !== 'xero') {
+          this.logger.error(
+            `Failed to sync invoice ${invoice.id} via ${this.accountingProvider.providerName}: ${providerError instanceof Error ? providerError.message : String(providerError)}`,
+          );
+          return null;
+        }
+        // For Xero, fall through to XeroSyncService below
+        this.logger.debug(
+          `AccountingProvider push failed, falling back to XeroSyncService`,
+        );
+      }
+    }
+
+    // Fallback: XeroSyncService for Xero-specific invoice creation
     try {
-      // Get parent to find Xero contact ID
       const parent = await this.parentRepo.findById(
         invoice.parentId,
         invoice.tenantId,
@@ -1128,29 +1166,27 @@ export class InvoiceGenerationService {
 
       if (!parent) {
         this.logger.warn(
-          `Cannot sync invoice ${invoice.id} to Xero: Parent ${invoice.parentId} not found`,
+          `Cannot sync invoice ${invoice.id}: Parent ${invoice.parentId} not found`,
         );
         return null;
       }
 
       if (!parent.xeroContactId) {
         this.logger.warn(
-          `Cannot sync invoice ${invoice.id} to Xero: Parent ${invoice.parentId} has no Xero contact ID`,
+          `Cannot sync invoice ${invoice.id}: Parent ${invoice.parentId} has no Xero contact ID`,
         );
         return null;
       }
 
-      // Build Xero line items
       const xeroLineItems = await this.buildXeroLineItems(invoice.id);
 
       if (xeroLineItems.length === 0) {
         this.logger.warn(
-          `Cannot sync invoice ${invoice.id} to Xero: No line items found`,
+          `Cannot sync invoice ${invoice.id}: No line items found`,
         );
         return null;
       }
 
-      // Create invoice draft in Xero via XeroSyncService
       const xeroInvoiceId = await this.xeroSyncService.createInvoiceDraft(
         invoice.tenantId,
         invoice.invoiceNumber,
@@ -1171,8 +1207,6 @@ export class InvoiceGenerationService {
 
       return xeroInvoiceId;
     } catch (error) {
-      // Log error but DO NOT throw - invoice creation should succeed locally
-      // even if Xero sync fails
       this.logger.error(
         `Failed to sync invoice ${invoice.id} to Xero: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,

@@ -207,6 +207,28 @@ export interface PulledPaymentsResult {
 }
 
 // ---------------------------------------------------------------------------
+// Expenses (amounts in cents)
+// ---------------------------------------------------------------------------
+
+/** Result of syncing a single expense/categorized transaction. */
+export interface ExpenseSyncResult {
+  /** CrecheBooks transaction ID */
+  transactionId: string;
+  /** Provider-assigned expense ID */
+  externalExpenseId: string;
+  /** Account code the expense was posted to */
+  accountCode: string;
+  /** Expense amount in ZAR cents */
+  amountCents: number;
+  /** Whether the sync succeeded */
+  synced: boolean;
+  /** When the sync occurred */
+  syncedAt: Date;
+  /** Error message if sync failed */
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
 // Bank Feeds
 // ---------------------------------------------------------------------------
 

@@ -1,10 +1,10 @@
 /**
  * Stub.africa Accounting Adapter -- AccountingProvider for Stub Connect API.
  *
- * CASH-BASIS: Stub is a cash-basis bookkeeping tool. Invoices are NOT pushed
- * until payment is received. When a payment is synced, income is recorded in
- * Stub with the invoice reference. This avoids recording revenue before cash
- * is actually received.
+ * TASK-STUB-PARITY: Pushes invoices as sales (accounts receivable) via
+ * /api/push/sale, expenses via /api/push/expense, and payments as income
+ * via /api/push/income. This ensures Stub tells the same financial story
+ * as Xero -- every invoice, payment, and expense is visible.
  *
  * Per-tenant business UID stored in `stub_connections`.
  * Global API key + App ID from env vars (STUB_API_KEY, STUB_APP_ID).
@@ -24,6 +24,7 @@ import type {
   BulkInvoiceSyncResult,
   ConnectionStatus,
   ContactSyncResult,
+  ExpenseSyncResult,
   InvoicePullFilters,
   InvoiceSyncResult,
   JournalEntry,
@@ -38,7 +39,7 @@ import type {
   SyncItemError,
 } from '../accounting/interfaces/accounting-types';
 import { StubApiClient } from './stub-api.client';
-import type { StubTransactionPayload } from './stub.types';
+import type { StubTransactionPayload, StubSalePayload } from './stub.types';
 import { getStubCategory } from './stub-category-map';
 
 interface StubConnectionRow {
@@ -183,23 +184,27 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Invoices ---------------------------------------------------------------
   //
-  // Stub is cash-basis: invoices are NOT pushed until payment is received.
-  // pushInvoice / pushInvoicesBulk acknowledge the request but defer the
-  // actual Stub push to syncPayment(). This avoids recording revenue before
-  // cash is in the bank.
+  // TASK-STUB-PARITY: Invoices are pushed to Stub as sales via /api/push/sale.
+  // Unpaid invoices appear as outstanding AR. Paid invoices include payment details.
 
   /**
-   * Acknowledge an invoice push request. No data is sent to Stub yet.
-   * Income is only recorded when payment is received via syncPayment().
+   * Push an invoice to Stub as a sale (accounts receivable).
+   * Uses /api/push/sale — creates an outstanding sale if unpaid,
+   * or a paid sale if the invoice status is PAID.
    */
   async pushInvoice(
     tenantId: string,
     invoiceId: string,
     _options?: PushInvoiceOptions,
   ): Promise<InvoiceSyncResult> {
+    const uid = await this.getStubUid(tenantId);
+
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId },
-      select: { id: true, invoiceNumber: true, status: true },
+      include: {
+        parent: { select: { id: true, firstName: true, lastName: true, email: true } },
+        lines: { orderBy: { sortOrder: 'asc' } },
+      },
     });
     if (!invoice) {
       throw new BusinessException(
@@ -209,85 +214,82 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       );
     }
 
-    // If the invoice is already paid, push now as income
+    const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+
+    const salePayload: StubSalePayload = {
+      id: `cb-inv-${invoiceId}`,
+      items: invoice.lines.map((line) => ({
+        id: `cb-line-${line.id}`,
+        name: line.description,
+        price: this.centsToRands(line.unitPriceCents),
+        quantity: Number(line.quantity),
+      })),
+      customer: {
+        id: `cb-parent-${invoice.parent.id}`,
+        name: parentName,
+        email: invoice.parent.email ?? undefined,
+      },
+    };
+
+    // If paid, include payment details so Stub marks the sale as settled
     if (invoice.status === 'PAID') {
-      return this.pushPaidInvoiceAsIncome(tenantId, invoiceId);
+      const primaryAccountCode = invoice.lines[0]?.accountCode ?? '4110';
+      const category = getStubCategory(primaryAccountCode, true);
+      salePayload.payment = {
+        id: `cb-inv-pmt-${invoiceId}`,
+        date: invoice.issueDate.toISOString().split('T')[0],
+        name: `${invoice.invoiceNumber} - ${parentName}`,
+        category,
+        currency: 'ZAR',
+        amount: this.centsToRands(invoice.totalCents),
+        vat: invoice.vatCents > 0 ? this.centsToRands(invoice.vatCents) : undefined,
+      };
     }
 
-    this.logger.log(
-      `Invoice ${invoice.invoiceNumber} deferred — Stub is cash-basis, will push when paid`,
-    );
+    await this.stubClient.pushSale(uid, salePayload);
+    await this.updateSyncStatus(tenantId, 'success');
 
     return {
       invoiceId,
-      externalInvoiceId: `cb-inv-${invoiceId}`,
+      externalInvoiceId: salePayload.id,
       externalInvoiceNumber: invoice.invoiceNumber,
-      externalStatus: 'DEFERRED',
+      externalStatus: invoice.status === 'PAID' ? 'PAID' : 'OUTSTANDING',
       syncedAt: new Date(),
     };
   }
 
-  /** Acknowledge bulk invoice push. Only PAID invoices are pushed immediately. */
+  /** Push multiple invoices to Stub as sales. */
   async pushInvoicesBulk(
     tenantId: string,
     invoiceIds: string[],
     _options?: PushInvoiceOptions,
   ): Promise<BulkInvoiceSyncResult> {
     this.logger.log(
-      `Bulk push ${invoiceIds.length} invoices for tenant ${tenantId} (cash-basis)`,
+      `Bulk push ${invoiceIds.length} invoices as sales for tenant ${tenantId}`,
     );
 
-    const invoices = await this.prisma.invoice.findMany({
-      where: { id: { in: invoiceIds }, tenantId },
-      select: { id: true, invoiceNumber: true, status: true },
-    });
-
-    const foundIds = new Set(invoices.map((i) => i.id));
     const results: InvoiceSyncResult[] = [];
     const errors: SyncItemError[] = [];
 
     for (const id of invoiceIds) {
-      if (!foundIds.has(id)) {
-        errors.push({
-          entityId: id,
-          error: `Invoice ${id} not found`,
-          code: 'INVOICE_NOT_FOUND',
-        });
-      }
-    }
-
-    for (const inv of invoices) {
       try {
-        if (inv.status === 'PAID') {
-          results.push(await this.pushPaidInvoiceAsIncome(tenantId, inv.id));
-        } else {
-          results.push({
-            invoiceId: inv.id,
-            externalInvoiceId: `cb-inv-${inv.id}`,
-            externalInvoiceNumber: inv.invoiceNumber,
-            externalStatus: 'DEFERRED',
-            syncedAt: new Date(),
-          });
-        }
+        results.push(await this.pushInvoice(tenantId, id));
       } catch (err) {
         errors.push({
-          entityId: inv.id,
+          entityId: id,
           error: err instanceof Error ? err.message : 'Push failed',
-          code: 'STUB_PUSH_FAILED',
+          code: err instanceof BusinessException ? err.code : 'STUB_PUSH_FAILED',
         });
       }
     }
 
-    const pushed = results.filter((r) => r.externalStatus === 'PUSHED').length;
-    const deferred = results.filter(
-      (r) => r.externalStatus === 'DEFERRED',
-    ).length;
+    const pushed = results.length;
     if (pushed > 0) await this.updateSyncStatus(tenantId, 'success');
 
     return {
       pushed,
       failed: errors.length,
-      skipped: deferred,
+      skipped: 0,
       results,
       errors,
     };
@@ -441,6 +443,58 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     );
   }
 
+  // -- Expenses ---------------------------------------------------------------
+
+  /**
+   * Push a categorized expense/transaction to Stub.
+   * Uses /api/push/expense with the transaction's account code mapped to a
+   * Stub category.
+   */
+  async syncExpense(
+    tenantId: string,
+    transactionId: string,
+    accountCode: string,
+  ): Promise<ExpenseSyncResult> {
+    this.logger.log(
+      `Syncing expense ${transactionId} to Stub for tenant ${tenantId}`,
+    );
+    const uid = await this.getStubUid(tenantId);
+
+    const transaction = await this.prisma.transaction.findFirst({
+      where: { id: transactionId, tenantId },
+    });
+    if (!transaction) {
+      throw new BusinessException(
+        `Transaction ${transactionId} not found`,
+        'TRANSACTION_NOT_FOUND',
+        { transactionId, tenantId },
+      );
+    }
+
+    const category = getStubCategory(accountCode, false);
+
+    const tx: StubTransactionPayload = {
+      id: `cb-exp-${transactionId}`,
+      date: transaction.date.toISOString().split('T')[0],
+      name: transaction.description,
+      category,
+      notes: transaction.reference ?? undefined,
+      currency: 'ZAR',
+      amount: this.centsToRands(Math.abs(transaction.amountCents)),
+    };
+    await this.stubClient.pushExpense(uid, tx);
+    await this.updateSyncStatus(tenantId, 'success');
+
+    return {
+      transactionId,
+      externalExpenseId: tx.id,
+      accountCode,
+      amountCents: Math.abs(transaction.amountCents),
+      synced: true,
+      syncedAt: new Date(),
+    };
+  }
+
   // -- Bank Feeds -------------------------------------------------------------
 
   /** Initiate bank feed sync. Results arrive via webhook. */
@@ -486,7 +540,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Sync Orchestration -----------------------------------------------------
 
-  /** Cash-basis sync: only pushes PAID invoices as income to Stub. */
+  /** Push all invoices as sales, expenses, and payments to Stub. */
   async sync(tenantId: string, options: SyncOptions): Promise<SyncResult> {
     this.logger.log(`Stub sync for tenant ${tenantId}: ${options.direction}`);
 
@@ -509,11 +563,12 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
     if (entities.includes('invoices')) {
       try {
-        const paid = await this.findPaidInvoices(tenantId, options.fromDate);
-        if (paid.length > 0) {
+        // TASK-STUB-PARITY: Push ALL invoices as sales, not just paid ones
+        const allInvoices = await this.findAllInvoices(tenantId, options.fromDate);
+        if (allInvoices.length > 0) {
           const result = await this.pushInvoicesBulk(
             tenantId,
-            paid.map((i) => i.id),
+            allInvoices.map((i) => i.id),
           );
           entitiesSynced['invoices'] = result.pushed;
           errors.push(...result.errors);
@@ -600,66 +655,6 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     }
   }
 
-  // -- Private: Push Paid Invoice as Income -----------------------------------
-
-  /**
-   * Push a PAID invoice to Stub as income. Used when an invoice that's already
-   * been paid is explicitly pushed, or during sync of paid invoices.
-   */
-  private async pushPaidInvoiceAsIncome(
-    tenantId: string,
-    invoiceId: string,
-  ): Promise<InvoiceSyncResult> {
-    const uid = await this.getStubUid(tenantId);
-
-    const invoice = await this.prisma.invoice.findFirst({
-      where: { id: invoiceId, tenantId },
-      include: {
-        parent: { select: { firstName: true, lastName: true } },
-        lines: { orderBy: { sortOrder: 'asc' } },
-      },
-    });
-    if (!invoice) {
-      throw new BusinessException(
-        `Invoice ${invoiceId} not found`,
-        'INVOICE_NOT_FOUND',
-        { invoiceId, tenantId },
-      );
-    }
-
-    const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
-    const description =
-      invoice.lines.length > 0
-        ? invoice.lines.map((l) => l.description).join(', ')
-        : `Invoice ${invoice.invoiceNumber}`;
-
-    // Determine Stub category from the primary invoice line's account code
-    const primaryAccountCode = invoice.lines[0]?.accountCode ?? '4110';
-    const category = getStubCategory(primaryAccountCode, true);
-
-    const tx: StubTransactionPayload = {
-      id: `cb-inv-${invoiceId}`,
-      date: invoice.issueDate.toISOString().split('T')[0],
-      name: `${invoice.invoiceNumber} - ${parentName}`,
-      category,
-      notes: description,
-      currency: 'ZAR',
-      amount: this.centsToRands(invoice.totalCents),
-      vat:
-        invoice.vatCents > 0 ? this.centsToRands(invoice.vatCents) : undefined,
-    };
-    await this.stubClient.pushIncome(uid, tx);
-    await this.updateSyncStatus(tenantId, 'success');
-
-    return {
-      invoiceId,
-      externalInvoiceId: tx.id,
-      externalInvoiceNumber: invoice.invoiceNumber,
-      externalStatus: 'PUSHED',
-      syncedAt: new Date(),
-    };
-  }
-
   // -- Private: Data Conversion -----------------------------------------------
 
   /** Convert ZAR cents to Rands using Decimal.js for precision. */
@@ -676,6 +671,24 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       tenantId,
       isDeleted: false,
       status: 'PAID',
+    };
+    if (fromDate) where['issueDate'] = { gte: new Date(fromDate) };
+    return this.prisma.invoice.findMany({
+      where,
+      select: { id: true },
+      orderBy: { issueDate: 'asc' },
+    });
+  }
+
+  /** Find ALL non-deleted invoices for pushing as sales. */
+  private async findAllInvoices(
+    tenantId: string,
+    fromDate?: string,
+  ): Promise<Array<{ id: string }>> {
+    const where: Record<string, unknown> = {
+      tenantId,
+      isDeleted: false,
+      status: { notIn: ['VOID'] },
     };
     if (fromDate) where['issueDate'] = { gte: new Date(fromDate) };
     return this.prisma.invoice.findMany({

@@ -71,6 +71,7 @@ export class AccountingModule {
 
     return {
       module: AccountingModule,
+      global: true,
       imports: [ConfigModule, ...(imports ?? [])],
       controllers: [AccountingController],
       providers: [...providers],

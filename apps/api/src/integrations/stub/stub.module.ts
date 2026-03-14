@@ -16,6 +16,7 @@ import { HttpModule } from '@nestjs/axios';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { StubApiClient } from './stub-api.client';
 import { StubAccountingAdapter } from './stub-accounting.adapter';
+import { StubWebhookController } from './stub-webhook.controller';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { StubAccountingAdapter } from './stub-accounting.adapter';
       maxRedirects: 5,
     }),
   ],
+  controllers: [StubWebhookController],
   providers: [StubApiClient, StubAccountingAdapter],
   exports: [StubApiClient, StubAccountingAdapter],
 })

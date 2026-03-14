@@ -70,9 +70,6 @@ import { SuggestionsResponseDto } from './dto/suggestions.dto';
 export class TransactionController {
   private readonly logger = new Logger(TransactionController.name);
 
-  // Income category codes (4000-4999 range)
-  private readonly INCOME_CATEGORIES = ['4000', '4100', '4200', '4900'];
-
   constructor(
     private readonly transactionRepo: TransactionRepository,
     private readonly categorizationRepo: CategorizationRepository,
@@ -501,7 +498,7 @@ export class TransactionController {
     // Handle income allocation to parent account
     // When parent_id is provided for income categories on credit transactions,
     // auto-allocate to outstanding invoices (FIFO - oldest first)
-    if (dto.parent_id && this.INCOME_CATEGORIES.includes(dto.account_code)) {
+    if (dto.parent_id && dto.account_code.startsWith('4')) {
       // Get the full transaction to check if it's a credit
       const fullTransaction = await this.transactionRepo.findById(
         getTenantId(user),

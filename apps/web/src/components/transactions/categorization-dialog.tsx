@@ -80,12 +80,13 @@ export function CategorizationDialog({
   const hasAiSuggestion = transaction.categoryId && transaction.confidence;
   const isLowConfidence = transaction.confidence !== undefined && transaction.confidence < 0.5;
 
-  // Check if this is a fee-based income category (41xx) AND a credit (positive) transaction
-  // Only tuition, registration, activity, transport, after care, and holiday fees require parent allocation
-  // Other revenue (subsidies, grants, donations, sales, interest) does not
-  const isFeeCategory = selectedCategory.startsWith('41');
+  // Check if this is a parent-facing income category AND a credit (positive) transaction
+  // 41xx = fees (tuition, registration, activity, transport, after care, holiday)
+  // 44xx = sales (uniforms, books, stationery) — parents are the buyers
+  // Other revenue (subsidies, grants, donations, interest) does not require parent allocation
+  const isParentCategory = selectedCategory.startsWith('41') || selectedCategory.startsWith('44');
   const isCreditTransaction = transaction.amount > 0;
-  const requiresParentAllocation = isFeeCategory && isCreditTransaction;
+  const requiresParentAllocation = isParentCategory && isCreditTransaction;
 
   const handleSave = async () => {
     if (!selectedCategory) return;

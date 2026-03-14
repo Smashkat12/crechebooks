@@ -17,7 +17,6 @@ import {
   Body,
   Res,
   Logger,
-  UseGuards,
   HttpCode,
   HttpStatus,
   Param,
@@ -42,8 +41,6 @@ import { BankFeedService } from './bank-feed.service';
 import { XeroSyncGateway } from './xero.gateway';
 import { XeroSyncService } from '../../database/services/xero-sync.service';
 import { CurrentUser } from '../../api/auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../api/auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../api/auth/guards/roles.guard';
 import { Roles } from '../../api/auth/decorators/roles.decorator';
 import { Public } from '../../api/auth/decorators/public.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -74,7 +71,6 @@ import { XeroAuthService } from './xero-auth.service';
 @Controller('xero')
 @ApiTags('Xero Integration')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class XeroController {
   private readonly logger = new Logger(XeroController.name);
   private readonly tokenManager: TokenManager;

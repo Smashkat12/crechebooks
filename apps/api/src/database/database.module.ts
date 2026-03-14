@@ -129,6 +129,7 @@ import { ConversationalModule } from '../agents/conversational/conversational.mo
 import { RolloutModule } from '../agents/rollout/rollout.module';
 // TASK-FIX-004: Exchange Rate Integration
 import { ExchangeRateModule } from '../integrations/exchange-rates';
+// TASK-STUB-PARITY: ACCOUNTING_PROVIDER is globally available via AccountingModule.forRoot()
 
 @Module({
   imports: [

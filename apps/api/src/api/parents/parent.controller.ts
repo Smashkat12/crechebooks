@@ -13,7 +13,11 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Inject,
+  Optional,
 } from '@nestjs/common';
+import { ACCOUNTING_PROVIDER } from '../../integrations/accounting/accounting-provider.token';
+import type { AccountingProvider } from '../../integrations/accounting/interfaces';
 import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
@@ -76,6 +80,9 @@ export class ParentController {
     private readonly parentRepository: ParentRepository,
     private readonly xeroSyncService: XeroSyncService,
     private readonly magicLinkService: MagicLinkService,
+    // TASK-STUB-PARITY: Provider-agnostic contact sync
+    @Inject(ACCOUNTING_PROVIDER) @Optional()
+    private readonly accountingProvider?: AccountingProvider,
   ) {}
 
   @Get()
@@ -205,12 +212,38 @@ export class ParentController {
   }
 
   /**
-   * Auto-sync parent to Xero as a contact
-   * Called asynchronously after parent creation
+   * Auto-sync parent to accounting provider as a contact.
+   * TASK-STUB-PARITY: Uses AccountingProvider first, falls back to XeroSyncService.
+   * Called asynchronously after parent creation.
    */
   private async syncToXero(tenantId: string, parent: Parent): Promise<void> {
+    // TASK-STUB-PARITY: Try provider-agnostic path first
+    if (this.accountingProvider) {
+      try {
+        const result = await this.accountingProvider.syncContact(
+          tenantId,
+          parent.id,
+        );
+        this.logger.log(
+          `Parent ${parent.id} synced via ${this.accountingProvider.providerName}: ${result.externalContactId}`,
+        );
+        return;
+      } catch (providerError) {
+        if (this.accountingProvider.providerName !== 'xero') {
+          this.logger.error(
+            `Failed to sync parent ${parent.id} via ${this.accountingProvider.providerName}`,
+            providerError instanceof Error
+              ? providerError.stack
+              : String(providerError),
+          );
+          return;
+        }
+        // For Xero, fall through to XeroSyncService
+      }
+    }
+
+    // Fallback: XeroSyncService for direct Xero contact creation
     try {
-      // Check if Xero is connected for this tenant
       const isConnected =
         await this.xeroSyncService.hasValidConnection(tenantId);
       if (!isConnected) {
@@ -220,7 +253,6 @@ export class ParentController {
         return;
       }
 
-      // Create contact in Xero
       const xeroContactId = await this.xeroSyncService.createContactForParent(
         tenantId,
         {
@@ -238,7 +270,6 @@ export class ParentController {
         );
       }
     } catch (error) {
-      // Log but don't throw - parent creation should succeed even if Xero sync fails
       this.logger.error(
         `Failed to sync parent ${parent.id} to Xero`,
         error instanceof Error ? error.stack : String(error),

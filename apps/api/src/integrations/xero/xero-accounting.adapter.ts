@@ -33,6 +33,7 @@ import type {
   BulkInvoiceSyncResult,
   ConnectionStatus,
   ContactSyncResult,
+  ExpenseSyncResult,
   InvoicePullFilters,
   InvoiceSyncResult,
   JournalEntry,

@@ -9,7 +9,7 @@
  * All amounts are in CENTS as integers. Uses Decimal.js for precise calculations.
  */
 
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { Payment, Invoice, InvoiceStatus } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
@@ -35,6 +35,8 @@ import {
   AllocateTransactionInput,
 } from '../dto/payment-allocation.dto';
 import { XeroTransactionSplitService } from './xero-transaction-split.service';
+import { ACCOUNTING_PROVIDER } from '../../integrations/accounting/accounting-provider.token';
+import type { AccountingProvider } from '../../integrations/accounting/interfaces';
 
 @Injectable()
 export class PaymentAllocationService {
@@ -50,6 +52,8 @@ export class PaymentAllocationService {
     private readonly creditBalanceService: CreditBalanceService,
     private readonly xeroSyncService: XeroSyncService,
     private readonly xeroSplitService: XeroTransactionSplitService,
+    // TASK-STUB-PARITY: Provider-agnostic accounting sync
+    @Inject(ACCOUNTING_PROVIDER) @Optional() private readonly accountingProvider?: AccountingProvider,
     // TASK-WA-007: Optional WhatsApp service for payment confirmations
     @Optional() private readonly twilioWhatsAppService?: TwilioWhatsAppService,
   ) {}
@@ -962,12 +966,50 @@ export class PaymentAllocationService {
     });
   }
 
+  /**
+   * Sync payment to accounting provider (Xero or Stub).
+   * TASK-STUB-PARITY: Tries AccountingProvider first, falls back to XeroSyncService.
+   */
   private async syncToXero(
     payment: Payment,
     invoice: Invoice,
   ): Promise<XeroSyncStatus> {
+    // TASK-STUB-PARITY: Try provider-agnostic path first
+    if (this.accountingProvider) {
+      try {
+        const externalInvoiceId =
+          invoice.xeroInvoiceId ?? `cb-inv-${invoice.id}`;
+        const result = await this.accountingProvider.syncPayment(
+          invoice.tenantId,
+          payment.id,
+          externalInvoiceId,
+        );
+        if (result) {
+          this.logger.log(
+            `Payment ${payment.id} synced via ${this.accountingProvider.providerName}: ${result.externalPaymentId}`,
+          );
+          return XeroSyncStatus.SUCCESS;
+        }
+        return XeroSyncStatus.SKIPPED;
+      } catch (error) {
+        // If accounting provider is not xero, don't fall back
+        if (this.accountingProvider.providerName !== 'xero') {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          this.logger.error(
+            `${this.accountingProvider.providerName} payment sync error: ${errorMessage}`,
+          );
+          return XeroSyncStatus.FAILED;
+        }
+        // For xero provider, fall through to XeroSyncService for direct API support
+        this.logger.debug(
+          `AccountingProvider sync failed, falling back to XeroSyncService: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    // Fallback: Direct XeroSyncService for Xero-specific features
     try {
-      // Get parent for contact info
       const parent = await this.parentRepo.findById(
         invoice.parentId,
         invoice.tenantId,
@@ -979,7 +1021,6 @@ export class PaymentAllocationService {
         return XeroSyncStatus.SKIPPED;
       }
 
-      // Sync via XeroSyncService
       const xeroPaymentId = await this.xeroSyncService.syncPayment(
         payment,
         invoice,
@@ -993,7 +1034,6 @@ export class PaymentAllocationService {
         return XeroSyncStatus.SUCCESS;
       }
 
-      // No Xero connection or invoice not synced - skip without error
       return XeroSyncStatus.SKIPPED;
     } catch (error) {
       const errorMessage =

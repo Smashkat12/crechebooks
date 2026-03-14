@@ -21,6 +21,7 @@ import type {
   BulkInvoiceSyncResult,
   ConnectionStatus,
   ContactSyncResult,
+  ExpenseSyncResult,
   InvoicePullFilters,
   InvoiceSyncResult,
   JournalEntry,
@@ -188,6 +189,25 @@ export interface AccountingProvider {
     tenantId: string,
     invoiceRef: string,
   ): Promise<PulledPaymentsResult>;
+
+  // ---------------------------------------------------------------------------
+  // Expenses (optional)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sync a categorized expense/transaction to the external accounting system.
+   * Only available when the provider supports expense push.
+   *
+   * @param tenantId - CrecheBooks tenant ID
+   * @param transactionId - CrecheBooks transaction ID
+   * @param accountCode - Account code to post the expense to
+   * @returns Expense sync result
+   */
+  syncExpense?(
+    tenantId: string,
+    transactionId: string,
+    accountCode: string,
+  ): Promise<ExpenseSyncResult>;
 
   // ---------------------------------------------------------------------------
   // Bank Feeds (optional)

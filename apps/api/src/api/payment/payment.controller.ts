@@ -17,7 +17,6 @@ import {
   Res,
   Logger,
   HttpCode,
-  UseGuards,
   StreamableFile,
   NotFoundException,
 } from '@nestjs/common';
@@ -40,8 +39,6 @@ import { ArrearsService } from '../../database/services/arrears.service';
 import { PaymentRepository } from '../../database/repositories/payment.repository';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import type { PaymentFilterDto } from '../../database/dto/payment.dto';
@@ -82,7 +79,6 @@ export class PaymentController {
   @Post()
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Manually allocate payment to invoices',
     description:
@@ -159,7 +155,7 @@ export class PaymentController {
    */
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.VIEWER, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'List payments with optional filters',
     description:
@@ -269,7 +265,7 @@ export class PaymentController {
   @Post('match')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Trigger AI payment matching',
     description:
@@ -358,7 +354,7 @@ export class PaymentController {
    */
   @Get('arrears')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Get arrears dashboard report',
     description:
@@ -446,7 +442,7 @@ export class PaymentController {
   @Post(':paymentId/receipt')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Generate payment receipt PDF',
     description:
@@ -513,7 +509,7 @@ export class PaymentController {
    */
   @Get(':paymentId/receipt')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Download payment receipt PDF',
     description:

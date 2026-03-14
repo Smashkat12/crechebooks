@@ -1,185 +1,164 @@
 /**
- * Mapping from CrecheBooks account codes to Stub.africa category names.
+ * Mapping from CrecheBooks account codes to Stub.africa account names.
  *
- * Stub uses simple predefined category names (no numbered codes).
- * This map translates our Chart of Accounts codes to the closest
- * Stub category for push operations.
+ * Stub accounts are now aligned with CrecheBooks/Xero using identical
+ * names with the account code in parentheses (e.g. "Monthly Tuition Fees (4110)").
  *
- * Stub Income categories:
- *   Sales, Interest Earned, Tips & Donations, Refunds,
- *   Asset Sales, Asset Disposal, Foreign Exchange, Write Offs
- *
- * Stub Expense categories:
- *   Advertising & Marketing, Bank Charges, Cleaning, Contract Workers,
- *   Cost of Goods Sold, Deliveries & Shipping, Depreciation, Donations,
- *   Equipment Rental, Fines & Penalties, Fuel, Garden Services, Gifts,
- *   Insurance, Interest Paid, Internet & Phone, Meals & Entertainment,
- *   Medical, Merchant Fees, Office Supplies, Packaging, Professional Fees,
- *   Rent, Repairs & Maintenance, Salaries & Wages, Software & Subscriptions,
- *   Training & Education, Travel, Utilities
+ * For codes without a custom Stub account, falls back to Stub's default categories.
  */
 
-// -- INCOME codes → Stub income category --
-const INCOME_MAP: Record<string, string> = {
-  // Fee Income (41xx) → Sales
-  '4110': 'Sales',        // Monthly Tuition Fees
-  '4115': 'Sales',        // Registration Fees
-  '4120': 'Sales',        // Activity Fees
-  '4125': 'Sales',        // Transport Fees
-  '4130': 'Sales',        // After Care Fees
-  '4135': 'Sales',        // Holiday Program Fees
+const ACCOUNT_MAP: Record<string, string> = {
+  // ── Income (41xx) ──────────────────────────────────────────────
+  '4110': 'Monthly Tuition Fees (4110)',
+  '4115': 'Registration Fees (4115)',
+  '4120': 'Activity Fees (4120)',
+  '4125': 'Transport Fees (4125)',
+  '4130': 'After Care Fees (4130)',
+  '4135': 'Holiday Program Fees (4135)',
 
-  // Subsidies & Grants (42xx) → Sales
-  '4210': 'Sales',        // Provincial ECD Subsidy
-  '4215': 'Sales',        // Municipal ECD Grant
-  '4220': 'Sales',        // National School Nutrition Grant
-  '4225': 'Sales',        // School Trip Income
+  // ── Subsidies & Grants (42xx) ──────────────────────────────────
+  '4210': 'Provincial ECD Subsidy (4210)',
+  '4215': 'Municipal ECD Grant (4215)',
+  '4220': 'National School Nutrition Grant (4220)',
+  '4225': 'School Trip Income (4225)',
 
-  // Donations (43xx) → Tips & Donations
-  '4310': 'Tips & Donations', // Cash Donations
-  '4315': 'Tips & Donations', // In-Kind Donations
-  '4320': 'Tips & Donations', // Corporate Sponsorships
-  '4325': 'Tips & Donations', // Fundraising Events
+  // ── Donations (43xx) ───────────────────────────────────────────
+  '4310': 'Cash Donations (4310)',
+  '4315': 'In-Kind Donations (4315)',
+  '4320': 'Corporate Sponsorships (4320)',
+  '4325': 'Fundraising Events (4325)',
 
-  // Merchandise Sales (44xx) → Sales
-  '4410': 'Sales',        // Uniform Sales
-  '4415': 'Sales',        // Book Sales
-  '4420': 'Sales',        // Stationery Sales
+  // ── Merchandise Sales (44xx) ───────────────────────────────────
+  '4410': 'Uniform Sales (4410)',
+  '4415': 'Book Sales (4415)',
+  '4420': 'Stationery Sales (4420)',
 
-  // Interest (45xx) → Interest Earned
-  '4510': 'Interest Earned', // Interest Income - Bank
-};
+  // ── Interest (45xx) ────────────────────────────────────────────
+  '4510': 'Interest Income - Bank (4510)',
 
-// -- EXPENSE codes → Stub expense category --
-const EXPENSE_MAP: Record<string, string> = {
-  // Salaries & Benefits (51xx) → Salaries & Wages
-  '5100': 'Salaries & Wages', // Overtime Pay
-  '5110': 'Salaries & Wages', // Principal Salary
-  '5115': 'Salaries & Wages', // Teacher Salaries
-  '5120': 'Salaries & Wages', // Assistant Teacher Salaries
-  '5125': 'Salaries & Wages', // Administrative Staff Salaries
-  '5130': 'Salaries & Wages', // Kitchen Staff Salaries
-  '5135': 'Salaries & Wages', // Cleaning Staff Salaries
-  '5210': 'Salaries & Wages', // Medical Aid Contributions
-  '5215': 'Salaries & Wages', // Pension Fund Contributions
-  '5220': 'Salaries & Wages', // UIF Contributions
-  '5225': 'Salaries & Wages', // WCA Contributions
-  '5230': 'Salaries & Wages', // SDL Contributions
-  '5240': 'Salaries & Wages', // Staff Bonuses
+  // ── Salaries & Benefits (51xx-52xx) ────────────────────────────
+  '5100': 'Overtime Pay (5100)',
+  '5110': 'Principal Salary (5110)',
+  '5115': 'Teacher Salaries (5115)',
+  '5120': 'Assistant Teacher Salaries (5120)',
+  '5125': 'Administrative Staff Salaries (5125)',
+  '5130': 'Kitchen Staff Salaries (5130)',
+  '5135': 'Cleaning Staff Salaries (5135)',
+  '5210': 'Medical Aid Contributions (5210)',
+  '5215': 'Pension Fund Contributions (5215)',
+  '5220': 'UIF Contributions (5220)',
+  '5225': 'WCA Contributions (5225)',
+  '5230': 'SDL Contributions (5230)',
+  '5240': 'Staff Bonuses (5240)',
 
-  // Training (53xx) → Training & Education
-  '5310': 'Training & Education', // Training Course Fees
-  '5315': 'Training & Education', // Conference Attendance
+  // ── Training (53xx) ────────────────────────────────────────────
+  '5310': 'Training Course Fees (5310)',
+  '5315': 'Conference Attendance (5315)',
 
-  // Educational Supplies (61xx) → Cost of Goods Sold
-  '6110': 'Cost of Goods Sold', // Textbooks and Workbooks
-  '6115': 'Cost of Goods Sold', // Art and Craft Supplies
-  '6120': 'Cost of Goods Sold', // Educational Toys and Games
-  '6135': 'Software & Subscriptions', // Technology and Software
-  '6140': 'Cost of Goods Sold', // Library Books
+  // ── Educational Supplies (61xx) ────────────────────────────────
+  '6110': 'Textbooks and Workbooks (6110)',
+  '6115': 'Art and Craft Supplies (6115)',
+  '6120': 'Educational Toys and Games (6120)',
+  '6135': 'Technology and Software (6135)',
+  '6140': 'Library Books (6140)',
 
-  // Events & Activities (62xx) → Meals & Entertainment
-  '6210': 'Meals & Entertainment', // Field Trip Expenses
-  '6215': 'Professional Fees',     // Guest Speaker Fees
-  '6260': 'Meals & Entertainment', // Graduation Expenses
+  // ── Events & Activities (62xx) ─────────────────────────────────
+  '6210': 'Field Trip Expenses (6210)',
+  '6215': 'Guest Speaker Fees (6215)',
+  '6260': 'Graduation Expenses (6260)',
 
-  // Food & Nutrition (63xx) → Cost of Goods Sold
-  '6310': 'Cost of Goods Sold', // Food Purchases
-  '6315': 'Cost of Goods Sold', // Kitchen Supplies
+  // ── Food & Nutrition (63xx) ────────────────────────────────────
+  '6310': 'Food Purchases (6310)',
+  '6315': 'Kitchen Supplies (6315)',
 
-  // Health & Safety (64xx) → Medical / Cleaning
-  '6410': 'Medical',    // First Aid Supplies
-  '6415': 'Cleaning',   // Safety Equipment
-  '6425': 'Cleaning',   // Cleaning Supplies
+  // ── Health & Safety (64xx) ─────────────────────────────────────
+  '6410': 'First Aid Supplies (6410)',
+  '6415': 'Safety Equipment (6415)',
+  '6425': 'Cleaning Supplies (6425)',
 
-  // Premises & Facilities (65xx-66xx) → Rent / Utilities / Repairs
-  '6510': 'Cost of Goods Sold', // Cost of Uniforms Sold
-  '6520': 'Rent',               // Rent - Building
-  '6525': 'Utilities',          // Electricity
-  '6530': 'Utilities',          // Water and Sewer
-  '6540': 'Utilities',          // Refuse Collection
-  '6545': 'Insurance',          // Security Services
-  '6610': 'Repairs & Maintenance', // Building Maintenance
-  '6615': 'Repairs & Maintenance', // Plumbing Repairs
-  '6620': 'Repairs & Maintenance', // Electrical Repairs
-  '6635': 'Repairs & Maintenance', // Equipment Repairs
+  // ── Premises & Facilities (65xx-66xx) ──────────────────────────
+  '6510': 'Cost of Uniforms Sold (6510)',
+  '6520': 'Rent - Building (6520)',
+  '6525': 'Electricity (6525)',
+  '6530': 'Water and Sewer (6530)',
+  '6540': 'Refuse Collection (6540)',
+  '6545': 'Security Services (6545)',
+  '6610': 'Building Maintenance (6610)',
+  '6615': 'Plumbing Repairs (6615)',
+  '6620': 'Electrical Repairs (6620)',
+  '6635': 'Equipment Repairs (6635)',
 
-  // Insurance (67xx) → Insurance
-  '6710': 'Insurance',  // Property Insurance
-  '6715': 'Insurance',  // Property Taxes
+  // ── Insurance & Property (67xx) ────────────────────────────────
+  '6710': 'Property Insurance (6710)',
+  '6715': 'Property Taxes (6715)',
 
-  // General wages (70xx) → Salaries & Wages
-  '7010': 'Salaries & Wages', // Wages and Salaries
+  // ── General Wages (70xx) ───────────────────────────────────────
+  '7010': 'Wages and Salaries (7010)',
 
-  // Office & Admin (71xx) → Office Supplies / Software
-  '7110': 'Office Supplies',          // Stationery Supplies
-  '7115': 'Office Supplies',          // Printing and Photocopying
-  '7125': 'Internet & Phone',         // Telephone and Internet
-  '7135': 'Software & Subscriptions', // Computer Software
+  // ── Office & Admin (71xx) ──────────────────────────────────────
+  '7110': 'Stationery Supplies (7110)',
+  '7115': 'Printing and Photocopying (7115)',
+  '7125': 'Telephone and Internet (7125)',
+  '7135': 'Computer Software (7135)',
 
-  // Professional (72xx) → Professional Fees
-  '7210': 'Professional Fees', // Accounting Fees
-  '7215': 'Professional Fees', // Audit Fees
-  '7220': 'Professional Fees', // Legal Fees
-  '7230': 'Professional Fees', // Payroll Processing
+  // ── Professional Services (72xx) ───────────────────────────────
+  '7210': 'Accounting Fees (7210)',
+  '7215': 'Audit Fees (7215)',
+  '7220': 'Legal Fees (7220)',
+  '7230': 'Payroll Processing (7230)',
 
-  // Marketing (73xx) → Advertising & Marketing
-  '7310': 'Advertising & Marketing', // Advertising Costs
-  '7315': 'Software & Subscriptions', // Website Maintenance
-  '7320': 'Advertising & Marketing', // Brochures and Flyers
+  // ── Marketing (73xx) ──────────────────────────────────────────
+  '7310': 'Advertising Costs (7310)',
+  '7315': 'Website Maintenance (7315)',
+  '7320': 'Brochures and Flyers (7320)',
 
-  // Compliance (74xx) → Professional Fees
-  '7410': 'Professional Fees', // License Fees
-  '7415': 'Professional Fees', // Registration Fees
+  // ── Compliance (74xx) ──────────────────────────────────────────
+  '7410': 'License Fees (7410)',
+  '7415': 'Registration Fees - Compliance (7415)',
 
-  // Vehicle (75xx) → Fuel / Travel
-  '7520': 'Fuel',                // Vehicle Fuel
-  '7525': 'Insurance',           // Vehicle Insurance
-  '7530': 'Repairs & Maintenance', // Vehicle Maintenance
-  '7531': 'Bank Charges',        // Cash Withdrawals
+  // ── Vehicle (75xx) ─────────────────────────────────────────────
+  '7520': 'Vehicle Fuel (7520)',
+  '7525': 'Vehicle Insurance (7525)',
+  '7530': 'Vehicle Maintenance (7530)',
+  '7531': 'Cash Withdrawals (7531)',
 
-  // Insurance (76xx) → Insurance
-  '7610': 'Insurance', // Public Liability Insurance
-  '7615': 'Insurance', // Professional Indemnity Insurance
+  // ── Liability Insurance (76xx) ─────────────────────────────────
+  '7610': 'Public Liability Insurance (7610)',
+  '7615': 'Professional Indemnity Insurance (7615)',
 
-  // Financial (77xx) → Bank Charges / Interest
-  '7710': 'Bank Charges',  // Bank Charges
-  '7715': 'Merchant Fees', // Credit Card Fees
-  '7720': 'Interest Paid', // Interest on Overdraft
-  '7725': 'Interest Paid', // Loan Interest
+  // ── Financial (77xx) ──────────────────────────────────────────
+  '7710': 'Bank Charges',  // Stub default — no custom needed
+  '7715': 'Credit Card Fees (7715)',
+  '7720': 'Interest on Overdraft (7720)',
+  '7725': 'Loan Interest (7725)',
 
-  // Miscellaneous (78xx)
-  '7810': 'Software & Subscriptions', // Subscriptions and Memberships
-  '7820': 'Cost of Goods Sold',       // Bad Debts Written Off
+  // ── Miscellaneous (78xx) ───────────────────────────────────────
+  '7810': 'Subscriptions and Memberships (7810)',
+  '7820': 'Bad Debts Written Off (7820)',
 
-  // Equity/Other
-  '3020': 'Sales', // Founder Capital (mapped to generic)
-  '9999': 'Cost of Goods Sold', // To Be Categorized
+  // ── Other ──────────────────────────────────────────────────────
+  '3020': 'Sales',  // Founder Capital → Stub default
+  '9999': 'Sales',  // To Be Categorized → fallback
 };
 
 /**
- * Get Stub category name for a CrecheBooks account code.
- * Returns the mapped category, or a sensible default.
+ * Get Stub category/account name for a CrecheBooks account code.
  */
 export function getStubCategory(accountCode: string, isCredit: boolean): string {
-  // Try exact match
-  const incomeMatch = INCOME_MAP[accountCode];
-  if (incomeMatch) return incomeMatch;
+  const match = ACCOUNT_MAP[accountCode];
+  if (match) return match;
 
-  const expenseMatch = EXPENSE_MAP[accountCode];
-  if (expenseMatch) return expenseMatch;
-
-  // Fallback by prefix
-  if (accountCode.startsWith('4')) return 'Sales';
+  // Fallback to Stub defaults by prefix
+  if (accountCode.startsWith('41')) return 'Sales';
+  if (accountCode.startsWith('42')) return 'Sales';
+  if (accountCode.startsWith('43')) return 'Tips & Donations';
+  if (accountCode.startsWith('44')) return 'Sales';
+  if (accountCode.startsWith('45')) return 'Interest Earned';
   if (accountCode.startsWith('5')) return 'Salaries & Wages';
   if (accountCode.startsWith('6')) return 'Cost of Goods Sold';
   if (accountCode.startsWith('7')) return 'Office Supplies';
 
-  // Last resort
   return isCredit ? 'Sales' : 'Cost of Goods Sold';
 }
 
-/**
- * Full mapping for reference/display.
- */
-export const STUB_CATEGORY_MAP = { ...INCOME_MAP, ...EXPENSE_MAP };
+export const STUB_CATEGORY_MAP = ACCOUNT_MAP;

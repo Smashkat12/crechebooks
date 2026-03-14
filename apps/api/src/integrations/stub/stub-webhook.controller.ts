@@ -17,6 +17,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { Public } from '../../api/auth/decorators/public.decorator';
 import { createHmac } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -55,6 +56,7 @@ export class StubWebhookController {
   }
 
   @Post()
+  @Public()
   @HttpCode(HttpStatus.OK)
   async handleWebhook(
     @Body() payload: StubWebhookPayload,

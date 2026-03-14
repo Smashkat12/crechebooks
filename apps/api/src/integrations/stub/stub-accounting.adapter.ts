@@ -39,6 +39,7 @@ import type {
 } from '../accounting/interfaces/accounting-types';
 import { StubApiClient } from './stub-api.client';
 import type { StubTransactionPayload } from './stub.types';
+import { getStubCategory } from './stub-category-map';
 
 interface StubConnectionRow {
   tenant_id: string;
@@ -63,7 +64,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     journals: false,
     bulkInvoicePush: true,
     invoicePull: false,
-    chartOfAccounts: false,
+    chartOfAccounts: true,
     syncOrchestration: false,
   };
 
@@ -397,11 +398,19 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       ? `${parent.firstName} ${parent.lastName}`
       : 'Unknown';
 
+    // Look up the invoice's fee line to determine the Stub category
+    const invoiceLine = await this.prisma.invoiceLine.findFirst({
+      where: { invoiceId: payment.invoiceId },
+      select: { accountCode: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+    const category = getStubCategory(invoiceLine?.accountCode ?? '4110', true);
+
     const tx: StubTransactionPayload = {
       id: `cb-pmt-${paymentId}`,
       date: payment.paymentDate.toISOString().split('T')[0],
       name: `${invoiceRef} - ${parentName}`,
-      category: 'Tuition Fees',
+      category,
       notes: payment.reference
         ? `Ref: ${payment.reference}`
         : `Payment for ${invoiceRef}`,
@@ -460,9 +469,19 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
 
   // -- Chart of Accounts ------------------------------------------------------
 
-  /** Stub has no chart of accounts API. */
-  async getAccounts(_tenantId: string): Promise<AccountingAccount[]> {
-    return [];
+  /** Return CrecheBooks accounts with Stub category mappings. */
+  async getAccounts(tenantId: string): Promise<AccountingAccount[]> {
+    const accounts = await this.prisma.xeroAccount.findMany({
+      where: { tenantId, status: 'ACTIVE' },
+      orderBy: { accountCode: 'asc' },
+    });
+    return accounts.map((a) => ({
+      externalAccountId: a.xeroAccountId ?? a.id,
+      code: a.accountCode,
+      name: `${a.name} → ${getStubCategory(a.accountCode, a.type === 'REVENUE')}`,
+      type: a.type as string,
+      status: a.status as 'ACTIVE' | 'ARCHIVED',
+    }));
   }
 
   // -- Sync Orchestration -----------------------------------------------------
@@ -614,11 +633,15 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         ? invoice.lines.map((l) => l.description).join(', ')
         : `Invoice ${invoice.invoiceNumber}`;
 
+    // Determine Stub category from the primary invoice line's account code
+    const primaryAccountCode = invoice.lines[0]?.accountCode ?? '4110';
+    const category = getStubCategory(primaryAccountCode, true);
+
     const tx: StubTransactionPayload = {
       id: `cb-inv-${invoiceId}`,
       date: invoice.issueDate.toISOString().split('T')[0],
       name: `${invoice.invoiceNumber} - ${parentName}`,
-      category: 'Tuition Fees',
+      category,
       notes: description,
       currency: 'ZAR',
       amount: this.centsToRands(invoice.totalCents),

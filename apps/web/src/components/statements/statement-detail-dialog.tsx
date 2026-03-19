@@ -161,6 +161,7 @@ export function StatementDetailDialog({
                         {new Date(line.date).toLocaleDateString('en-ZA', {
                           day: 'numeric',
                           month: 'short',
+                          year: 'numeric',
                         })}
                       </TableCell>
                       <TableCell>{line.description}</TableCell>

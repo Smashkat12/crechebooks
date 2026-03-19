@@ -43,7 +43,6 @@ import { StatementRepository } from '../../database/repositories/statement.repos
 import { ParentAccountService } from '../../database/services/parent-account.service';
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -82,7 +81,6 @@ import {
 @Controller('statements')
 @ApiTags('Statements')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard)
 export class StatementController {
   private readonly logger = new Logger(StatementController.name);
 
@@ -375,7 +373,7 @@ export class StatementController {
   @Post('generate')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Generate statement for a single parent',
     description:
@@ -486,7 +484,7 @@ export class StatementController {
   @Post('generate/bulk')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Bulk generate statements',
     description:
@@ -552,7 +550,7 @@ export class StatementController {
   @Post(':id/finalize')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Finalize a statement',
     description:
@@ -764,7 +762,7 @@ export class StatementController {
   @Post(':id/deliver')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Deliver statement to parent',
     description:
@@ -833,7 +831,7 @@ export class StatementController {
   @Post('deliver/bulk')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Bulk deliver statements',
     description: 'Sends multiple statements to their respective parents',
@@ -890,7 +888,7 @@ export class StatementController {
   @Post('schedule')
   @HttpCode(202)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Schedule monthly statement generation',
     description:

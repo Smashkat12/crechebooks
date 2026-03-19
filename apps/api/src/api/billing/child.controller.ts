@@ -45,7 +45,6 @@ import { EnrollmentService } from '../../database/services/enrollment.service';
 import { InvoiceGenerationService } from '../../database/services/invoice-generation.service';
 import { WelcomePackDeliveryService } from '../../database/services/welcome-pack-delivery.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -80,7 +79,7 @@ export class ChildController {
   @Post()
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Register a new child with initial enrollment',
     description:
@@ -249,7 +248,7 @@ export class ChildController {
   @Post('enroll')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Enroll an existing child in a fee structure',
     description:
@@ -389,7 +388,7 @@ export class ChildController {
   @Post(':childId/enrollments/:enrollmentId/resend-welcome-pack')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Resend welcome pack email for enrollment',
     description:
@@ -723,7 +722,7 @@ export class ChildController {
   @Put(':id')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @ApiOperation({
     summary: 'Update child details',
     description:

@@ -52,8 +52,9 @@ export function InvoiceFilters({
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="sent">Sent</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="partially_paid">Partially Paid</SelectItem>
               <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="void">Void</SelectItem>
             </SelectContent>
           </Select>
         </div>

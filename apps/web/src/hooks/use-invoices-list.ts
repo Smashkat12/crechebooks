@@ -97,7 +97,12 @@ export function useInvoicesList(
         const meta = data.meta || data.pagination || {};
 
         // Transform API response to frontend format
-        const transformedInvoices = rawInvoices.map(transformInvoice);
+        let transformedInvoices = rawInvoices.map(transformInvoice);
+
+        // Exclude voided invoices by default (unless explicitly filtering for void)
+        if (!params.status || params.status === 'all') {
+          transformedInvoices = transformedInvoices.filter(inv => inv.status !== 'void');
+        }
 
         setInvoices(transformedInvoices);
         setPaginationState((prev) => ({

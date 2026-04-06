@@ -90,8 +90,8 @@ export function ParentNotificationBell() {
           <div className="divide-y">
             {notifications.map((n) => (
               <NotificationItemComponent
-                key={(n as NotificationItem).id}
-                notification={n as NotificationItem}
+                key={n.id}
+                notification={n}
                 onClick={handleClick}
               />
             ))}

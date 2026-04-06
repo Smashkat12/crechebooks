@@ -78,6 +78,7 @@ const STRONG_NAME_PATTERNS = [
   'exact name match',
   'first and last name found',
   'initial + surname match',
+  'family initial + surname match',
   'strong name match',
 ];
 
@@ -721,28 +722,47 @@ export class PaymentMatchingService {
       };
     }
 
-    // 5. Initial + surname match (e.g., "M MOSAKA" → first="Mmatseleng", last="Mosaka")
-    //    Pattern: single char that matches firstName[0] + lastName
+    // 5. Initial + surname match
+    //    Two sub-patterns:
+    //    a) Known initial: "M MOSAKA" where M = firstName[0] → 18 pts (strong)
+    //    b) Unknown initial: "K RAMATLHATSE" where K ≠ any registered name →
+    //       family member paying with their initial + family surname → 15 pts
+    //    In SA creche payments, any family member may pay using "[Initial] [Surname]"
     if (normLast.length >= 3) {
       const sourceWords = sourceLower.split(/\s+/);
       for (let i = 0; i < sourceWords.length - 1; i++) {
         const word = sourceWords[i];
         const nextWord = sourceWords.slice(i + 1).join(' ');
-        if (
-          word.length === 1 &&
-          word === firstName[0] &&
-          this.normalizeString(nextWord) === normLast
-        ) {
-          return { score: 18, label: 'Initial + surname match' };
+        if (word.length === 1 && this.normalizeString(nextWord) === normLast) {
+          if (word === firstName[0]) {
+            return { score: 18, label: 'Initial + surname match' };
+          }
+          // Unknown initial but surname matches — family member paying
+          return { score: 15, label: 'Family initial + surname match' };
         }
       }
-      // Also handle concatenated initial: "mmosaka", "nmalinga"
+      // Also handle concatenated initial: "mmosaka", "nmalinga", "kramatlhatse"
       if (
         normalizedSource.length >= normLast.length + 1 &&
-        normalizedSource[0] === normFirst[0] &&
-        normalizedSource.slice(1) === normLast
+        normalizedSource.length <= normLast.length + 2 &&
+        normalizedSource.endsWith(normLast)
       ) {
-        return { score: 18, label: 'Initial + surname match (concatenated)' };
+        const prefix = normalizedSource.slice(
+          0,
+          normalizedSource.length - normLast.length,
+        );
+        if (prefix.length === 1) {
+          if (prefix === normFirst[0]) {
+            return {
+              score: 18,
+              label: 'Initial + surname match (concatenated)',
+            };
+          }
+          return {
+            score: 15,
+            label: 'Family initial + surname match (concatenated)',
+          };
+        }
       }
     }
 

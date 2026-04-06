@@ -394,24 +394,26 @@ export class PaymentMatchingService {
     const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
 
     // 1. REFERENCE MATCH (0-40 points)
+    let referenceScore = 0;
     if (transaction.reference) {
       const normalizedRef = this.normalizeString(transaction.reference);
       const normalizedInvoice = this.normalizeString(invoice.invoiceNumber);
 
       if (normalizedRef === normalizedInvoice) {
-        score += 40;
+        referenceScore = 40;
         reasons.push('Exact reference match');
       } else if (normalizedRef.includes(normalizedInvoice)) {
-        score += 30;
+        referenceScore = 30;
         reasons.push('Reference contains invoice number');
       } else if (
         normalizedInvoice.length >= 4 &&
         normalizedRef.endsWith(normalizedInvoice.slice(-4))
       ) {
-        score += 15;
+        referenceScore = 15;
         reasons.push('Reference ends with invoice suffix');
       }
     }
+    score += referenceScore;
 
     // 2. AMOUNT MATCH (0-40 points)
     // TASK-RECON-001: Use tolerance-based matching for bank fees and rounding
@@ -455,11 +457,26 @@ export class PaymentMatchingService {
       reasons.push('Partial payment (less than outstanding)');
     }
 
-    // 3. NAME SIMILARITY (0-20 points)
+    // 3. NAME SIMILARITY (0-20 base points, boosted when no reference)
     // Check both payeeName and description for name matches
     const nameScore = this.calculateNameMatchScore(transaction, invoice);
     if (nameScore.score > 0) {
-      score += nameScore.score;
+      let effectiveNameScore = nameScore.score;
+
+      // REFERENCE-ABSENT NAME BOOST:
+      // SA creche parents almost never include invoice reference numbers.
+      // When no reference is found, name is the primary identifier — boost
+      // strong name matches (>= 15 pts) by up to 15 extra points so that
+      // name + amount + date can realistically exceed the 80% auto-apply
+      // threshold. Without this, max achievable is ~80 (name 20 + amount 40
+      // + date 20), meaning even perfect matches barely qualify.
+      if (referenceScore === 0 && nameScore.score >= 15) {
+        const nameBoost = Math.round((nameScore.score / 20) * 15);
+        effectiveNameScore += nameBoost;
+        reasons.push(`Name boost (no reference): +${nameBoost}`);
+      }
+
+      score += effectiveNameScore;
       reasons.push(...nameScore.reasons);
     }
 

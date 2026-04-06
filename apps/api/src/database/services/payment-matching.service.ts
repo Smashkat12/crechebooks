@@ -504,7 +504,15 @@ export class PaymentMatchingService {
 
   /**
    * Calculate name match score from transaction against invoice parent/child names
-   * Searches both payeeName and description for matches
+   * Searches both payeeName and description for matches.
+   *
+   * Handles real-world SA banking patterns:
+   * - Full names: "Bokamoso Mbewe" → child Bokamoso Mbewe (20 pts)
+   * - Concatenated: "SSkhosana" → parent Simphiwe Skhosana (18 pts)
+   * - Initial + surname: "M MOSAKA" → parent Mmatseleng Mosaka (18 pts)
+   * - Surname only: "Gosiame Khoza" → child Kagoyarona Khoza via surname (12 pts)
+   * - First name only: "Onthatile" → child Onthatile Mohlabeng (15 pts)
+   *
    * @returns Score 0-20 with reasons
    */
   private calculateNameMatchScore(
@@ -515,11 +523,11 @@ export class PaymentMatchingService {
     const reasons: string[] = [];
 
     // Names to match against
-    const parentFirstName = invoice.parent.firstName.toLowerCase();
-    const parentLastName = invoice.parent.lastName.toLowerCase();
+    const parentFirstName = invoice.parent.firstName.toLowerCase().trim();
+    const parentLastName = invoice.parent.lastName.toLowerCase().trim();
     const parentFullName = `${parentFirstName} ${parentLastName}`;
-    const childFirstName = invoice.child.firstName.toLowerCase();
-    const childLastName = invoice.child.lastName.toLowerCase();
+    const childFirstName = invoice.child.firstName.toLowerCase().trim();
+    const childLastName = invoice.child.lastName.toLowerCase().trim();
     const childFullName = `${childFirstName} ${childLastName}`;
 
     // Sources to search for names (payeeName and description)
@@ -528,7 +536,6 @@ export class PaymentMatchingService {
       searchSources.push(transaction.payeeName);
     }
     if (transaction.description) {
-      // Extract potential names from description by removing banking prefixes
       const extractedNames = this.extractNamesFromDescription(
         transaction.description,
       );
@@ -537,112 +544,40 @@ export class PaymentMatchingService {
 
     for (const source of searchSources) {
       const normalizedSource = this.normalizeString(source);
+      const sourceLower = source.toLowerCase().trim();
 
-      // Check child name match (prioritize since real data shows child names in payments)
-      const childFullSimilarity = this.calculateStringSimilarity(
+      // --- CHILD NAME MATCHING ---
+      const childScore = this.matchNameAgainst(
         normalizedSource,
-        childFullName.replace(/[^a-z0-9]/g, ''),
+        sourceLower,
+        childFirstName,
+        childLastName,
+        childFullName,
       );
-      const childFirstSimilarity = this.calculateStringSimilarity(
-        normalizedSource,
-        childFirstName.replace(/[^a-z0-9]/g, ''),
-      );
-      const containsChildFirst =
-        normalizedSource.includes(childFirstName.replace(/[^a-z0-9]/g, '')) &&
-        childFirstName.length >= 3;
-      const containsChildLast =
-        normalizedSource.includes(childLastName.replace(/[^a-z0-9]/g, '')) &&
-        childLastName.length >= 3;
 
-      // Child full name match (highest priority)
-      if (childFullSimilarity === 1) {
-        if (bestScore < 20) {
-          bestScore = 20;
-          reasons.length = 0;
-          reasons.push(
-            `Exact child name match: ${invoice.child.firstName} ${invoice.child.lastName}`,
-          );
-        }
-      } else if (
-        childFullSimilarity > 0.8 ||
-        (containsChildFirst && containsChildLast)
-      ) {
-        if (bestScore < 18) {
-          bestScore = 18;
-          reasons.length = 0;
-          reasons.push(
-            `Strong child name match: ${invoice.child.firstName} ${invoice.child.lastName}`,
-          );
-        }
-      } else if (
-        childFullSimilarity > 0.6 ||
-        containsChildFirst ||
-        containsChildLast
-      ) {
-        if (bestScore < 15) {
-          bestScore = 15;
-          reasons.length = 0;
-          const matched = containsChildFirst
-            ? invoice.child.firstName
-            : invoice.child.lastName;
-          reasons.push(`Child name found: ${matched}`);
-        }
+      if (childScore.score > bestScore) {
+        bestScore = childScore.score;
+        reasons.length = 0;
+        reasons.push(
+          `${childScore.label}: ${invoice.child.firstName} ${invoice.child.lastName}`,
+        );
       }
 
-      // Check parent name match
-      const parentFullSimilarity = this.calculateStringSimilarity(
+      // --- PARENT NAME MATCHING ---
+      const parentScore = this.matchNameAgainst(
         normalizedSource,
-        parentFullName.replace(/[^a-z0-9]/g, ''),
+        sourceLower,
+        parentFirstName,
+        parentLastName,
+        parentFullName,
       );
-      const containsParentFirst =
-        normalizedSource.includes(parentFirstName.replace(/[^a-z0-9]/g, '')) &&
-        parentFirstName.length >= 3;
-      const containsParentLast =
-        normalizedSource.includes(parentLastName.replace(/[^a-z0-9]/g, '')) &&
-        parentLastName.length >= 3;
 
-      if (parentFullSimilarity === 1) {
-        if (bestScore < 20) {
-          bestScore = 20;
-          reasons.length = 0;
-          reasons.push('Exact parent name match');
-        }
-      } else if (containsParentFirst && containsParentLast) {
-        // Both first and last name found (even if order is different, e.g., "SMITH JOHN" for "John Smith")
-        // This is as strong as an exact match since both names are present
-        if (bestScore < 20) {
-          bestScore = 20;
-          reasons.length = 0;
-          reasons.push('Parent first and last name both found');
-        }
-      } else if (parentFullSimilarity > 0.8) {
-        if (bestScore < 15) {
-          bestScore = 15;
-          reasons.length = 0;
-          reasons.push(
-            `Strong parent name similarity (${Math.round(parentFullSimilarity * 100)}%)`,
-          );
-        }
-      } else if (
-        parentFullSimilarity > 0.6 ||
-        containsParentFirst ||
-        containsParentLast
-      ) {
-        if (bestScore < 10) {
-          bestScore = 10;
-          reasons.length = 0;
-          reasons.push(
-            `Good parent name similarity (${Math.round(parentFullSimilarity * 100)}%)`,
-          );
-        }
-      } else if (parentFullSimilarity > 0.4) {
-        if (bestScore < 5) {
-          bestScore = 5;
-          reasons.length = 0;
-          reasons.push(
-            `Weak name similarity (${Math.round(parentFullSimilarity * 100)}%)`,
-          );
-        }
+      if (parentScore.score > bestScore) {
+        bestScore = parentScore.score;
+        reasons.length = 0;
+        reasons.push(
+          `${parentScore.label}: ${invoice.parent.firstName} ${invoice.parent.lastName}`,
+        );
       }
     }
 
@@ -650,29 +585,154 @@ export class PaymentMatchingService {
   }
 
   /**
+   * Match a source string against a person's first/last/full name.
+   * Returns a score (0-20) and descriptive label.
+   *
+   * Handles: exact full name, contains both parts, concatenated forms,
+   * initial + surname, first-name-only, surname-only, and fuzzy similarity.
+   */
+  private matchNameAgainst(
+    normalizedSource: string,
+    sourceLower: string,
+    firstName: string,
+    lastName: string,
+    fullName: string,
+  ): { score: number; label: string } {
+    const normFirst = firstName.replace(/[^a-z0-9]/g, '');
+    const normLast = lastName.replace(/[^a-z0-9]/g, '');
+    const normFull = fullName.replace(/[^a-z0-9]/g, '');
+
+    // 1. Exact full name (normalized) → 20 points
+    if (normalizedSource === normFull) {
+      return { score: 20, label: 'Exact name match' };
+    }
+
+    // 2. Full-name Levenshtein similarity
+    const fullSimilarity = this.calculateStringSimilarity(
+      normalizedSource,
+      normFull,
+    );
+
+    // 3. Contains both first AND last name → 20 points
+    const containsFirst =
+      normFirst.length >= 3 && normalizedSource.includes(normFirst);
+    const containsLast =
+      normLast.length >= 3 && normalizedSource.includes(normLast);
+
+    if (containsFirst && containsLast) {
+      return { score: 20, label: 'First and last name found' };
+    }
+
+    // 4. Concatenated name match (e.g., "bokamosombewe" or "sskhosana")
+    //    Check if source without spaces matches fullName without spaces
+    if (fullSimilarity > 0.85) {
+      return {
+        score: 18,
+        label: `Strong name match (${Math.round(fullSimilarity * 100)}%)`,
+      };
+    }
+
+    // 5. Initial + surname match (e.g., "M MOSAKA" → first="Mmatseleng", last="Mosaka")
+    //    Pattern: single char that matches firstName[0] + lastName
+    if (normLast.length >= 3) {
+      const sourceWords = sourceLower.split(/\s+/);
+      for (let i = 0; i < sourceWords.length - 1; i++) {
+        const word = sourceWords[i];
+        const nextWord = sourceWords.slice(i + 1).join(' ');
+        if (
+          word.length === 1 &&
+          word === firstName[0] &&
+          this.normalizeString(nextWord) === normLast
+        ) {
+          return { score: 18, label: 'Initial + surname match' };
+        }
+      }
+      // Also handle concatenated initial: "mmosaka", "nmalinga"
+      if (
+        normalizedSource.length >= normLast.length + 1 &&
+        normalizedSource[0] === normFirst[0] &&
+        normalizedSource.slice(1) === normLast
+      ) {
+        return { score: 18, label: 'Initial + surname match (concatenated)' };
+      }
+    }
+
+    // 6. Contains first name (child-first-name-only is common in SA payments)
+    if (containsFirst && normFirst.length >= 4) {
+      return { score: 15, label: 'First name found' };
+    }
+
+    // 7. Contains last name (someone else in family paying, e.g., "Gosiame Khoza" for child "Kagoyarona Khoza")
+    if (containsLast && normLast.length >= 4) {
+      return { score: 12, label: 'Surname match' };
+    }
+
+    // 8. Good overall similarity (handles typos, truncation)
+    if (fullSimilarity > 0.7) {
+      return {
+        score: 12,
+        label: `Good name similarity (${Math.round(fullSimilarity * 100)}%)`,
+      };
+    }
+
+    // 9. Partial first or last name match (short names, 3 chars)
+    if (containsFirst || containsLast) {
+      return {
+        score: 10,
+        label: containsFirst ? 'First name found' : 'Surname found',
+      };
+    }
+
+    // 10. Moderate similarity
+    if (fullSimilarity > 0.5) {
+      return {
+        score: 5,
+        label: `Weak name similarity (${Math.round(fullSimilarity * 100)}%)`,
+      };
+    }
+
+    return { score: 0, label: '' };
+  }
+
+  /**
    * Extract potential names from bank transaction description
-   * Removes common banking prefixes and returns potential name strings
+   * Removes SA banking prefixes, hex hashes, account numbers, and
+   * non-name suffixes (Trip, Fees, Books, Uniform, etc.)
+   *
+   * Handles real-world patterns observed in FNB/Capitec/ABSA/Nedbank statements:
+   * - "Payshap Credit Bokamoso Mbewe"
+   * - "Magtape Credit Capitec Thatego Mphela"
+   * - "ADT Cash Deposit 00686117 Phenyo Nthite"
+   * - "ADT Cash Deposit Bloedstr Phetogo Mbezi"
+   * - "Rtc Credit Kefentse Motsepe 34C7D697C1"
+   * - "CAPITEC M MOSAKA"
+   * - "Payshap Credit SSkhosana" (concatenated)
+   * - "FNBOBPmt Kgetoentle Moqau Mog" (truncated)
    */
   private extractNamesFromDescription(description: string): string[] {
-    // Common South African banking prefixes to remove
+    // SA banking prefixes (ordered longest-first for greedy match)
     const bankingPrefixes = [
       /^FNB App Payment From\s*/i,
       /^FNB App Transfer From\s*/i,
-      /^Magtape Credit Capitec\s*/i,
-      /^Magtape Credit\s*/i,
-      /^ADT Cash Deposit\s*/i,
-      /^Payshap Credit\s*/i,
-      /^Int-Banking Pmt Frm\s*/i,
-      /^Rtc Credit\s*/i,
       /^Scheduled Pymt From\s*/i,
-      /^Debit Order\s*/i,
+      /^Int-Banking Pmt Frm\s*/i,
+      /^Magtape Credit ABSABank\s*/i,
+      /^Magtape Credit Capitec\s*/i,
+      /^Magtape Credit Investec\w*\s*/i,
+      /^Magtape Credit\s*/i,
+      /^Payshap Credit\s*/i,
+      /^Rtc Credit\s*/i,
+      /^ADT Cash Deposit\s*/i,
+      /^FNBOBPmt\s*/i,
       /^EFT Credit\s*/i,
+      /^Debit Order\s*/i,
       /^Internet Transfer\s*/i,
       /^Mobile Transfer\s*/i,
+      /^Credit Voucher\s*/i,
+      /^CAPITEC\s*/i,
       /^ABSA\s*/i,
       /^NEDBANK\s*/i,
       /^STANDARD BANK\s*/i,
-      /^CAPITEC\s*/i,
     ];
 
     let cleaned = description;
@@ -682,27 +742,87 @@ export class PaymentMatchingService {
       cleaned = cleaned.replace(prefix, '');
     }
 
-    // Remove account numbers (sequences of 8+ digits)
+    // Remove ADT branch/location names that precede the actual payer name
+    // e.g., "Bloedstr NSeitshokelo" → "NSeitshokelo", "Brooklyn Oabile" → "Oabile"
+    cleaned = cleaned.replace(
+      /^(Bloedstr|Brooklyn|Sandton|Menlyn|Hatfield|Centurion|Pretoria|Midrand|Rosebank)\s+/i,
+      '',
+    );
+
+    // Remove account/reference numbers (8+ digits)
     cleaned = cleaned.replace(/\d{8,}/g, '');
 
-    // Remove short number sequences but keep the rest
-    cleaned = cleaned.replace(/\b\d{1,4}\b/g, '');
+    // Remove hex transaction hashes (e.g., 34C7D697C1, 3Afb41Ef75)
+    // These are 8+ char mixed alphanumeric with at least one digit and one letter
+    cleaned = cleaned.replace(
+      /\b[0-9A-Fa-f]{2,}\s*[0-9A-Fa-f]{2,}\s*[0-9A-Fa-f]*\s*[0-9A-Fa-f]*\b/g,
+      (match) => {
+        // Only strip if it looks like a hex hash (has both digits and letters, 8+ alphanumeric chars)
+        const stripped = match.replace(/\s/g, '');
+        const hasDigit = /\d/.test(stripped);
+        const hasLetter = /[A-Fa-f]/i.test(stripped);
+        if (hasDigit && hasLetter && stripped.length >= 8) return '';
+        return match;
+      },
+    );
 
-    // Clean up extra whitespace
+    // Remove standalone short hex-like tokens (e.g., "18Bo722285")
+    cleaned = cleaned.replace(/\b\w*\d+[A-Fa-f]+\w*\b/g, (match) => {
+      if (match.length >= 8 && /\d/.test(match) && /[A-Fa-f]/i.test(match))
+        return '';
+      return match;
+    });
+
+    // Remove short number sequences
+    cleaned = cleaned.replace(/\b\d{1,7}\b/g, '');
+
+    // Remove non-name suffixes (payment purpose descriptors)
+    cleaned = cleaned.replace(
+      /\b(Trip|Fees?|Books?|Uniform|Workbo\w*|Graduation\w*|Entrance|Photo\w*|Tshirt|Grad)\b/gi,
+      '',
+    );
+
+    // Remove card/voucher references
+    cleaned = cleaned.replace(/\b(Vouch|Paystack|Apple|S\d+\**\d+)\b/gi, '');
+    cleaned = cleaned.replace(/\*+/g, '');
+
+    // Clean up extra whitespace and trim
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
 
+    // Remove dangling single characters (except valid initials at start)
+    cleaned = cleaned.replace(/\s+[a-z]\s+/gi, ' ').trim();
+
     const results: string[] = [];
+
+    // Skip known non-person descriptions
+    const nonPersonDescriptions = [
+      'owner loan',
+      'g suite',
+      'elle elephant',
+      'capitec bank',
+      'kc',
+      'elle',
+      'mini',
+      'david',
+      'fridge',
+      'elephant',
+    ];
+    if (nonPersonDescriptions.includes(cleaned.toLowerCase())) {
+      return results;
+    }
 
     // Add the full cleaned string
     if (cleaned.length > 2) {
       results.push(cleaned);
     }
 
-    // Also add individual words that could be names (3+ chars, no numbers)
+    // Also add individual words that could be names (3+ chars, no digits)
     const words = cleaned
       .split(/\s+/)
       .filter((word) => word.length >= 3 && !/\d/.test(word));
-    results.push(...words);
+    if (words.length > 0 && words.join(' ') !== cleaned) {
+      results.push(words.join(' '));
+    }
 
     return results;
   }

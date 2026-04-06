@@ -44,14 +44,14 @@ export interface PayeTaxBracket {
 export const TAX_BRACKETS_2025: PayeTaxBracket[] = [
   {
     minIncomeCents: 0,
-    maxIncomeCents: 23710000, // R237,100
+    maxIncomeCents: 23740000, // R237,400
     baseAmountCents: 0,
     rate: new Decimal('0.18'), // 18%
   },
   {
-    minIncomeCents: 23710100, // R237,101
+    minIncomeCents: 23740100, // R237,401
     maxIncomeCents: 37050000, // R370,500
-    baseAmountCents: 4267800, // R42,678
+    baseAmountCents: 4273200, // R42,732 (R237,400 * 18%)
     rate: new Decimal('0.26'), // 26%
   },
   {
@@ -147,14 +147,14 @@ export const PAY_FREQUENCY_MULTIPLIERS = {
 export const TAX_BRACKETS_2026: PayeTaxBracket[] = [
   {
     minIncomeCents: 0,
-    maxIncomeCents: 23710000, // R237,100
+    maxIncomeCents: 23740000, // R237,400
     baseAmountCents: 0,
     rate: new Decimal('0.18'), // 18%
   },
   {
-    minIncomeCents: 23710001, // R237,100.01
+    minIncomeCents: 23740001, // R237,400.01
     maxIncomeCents: 37050000, // R370,500
-    baseAmountCents: 4267800, // R42,678
+    baseAmountCents: 4273200, // R42,732 (R237,400 * 18%)
     rate: new Decimal('0.26'), // 26%
   },
   {

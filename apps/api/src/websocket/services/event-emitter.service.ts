@@ -19,6 +19,8 @@ import {
   createInvoiceStatusChangedEvent,
   createArrearsAlertEvent,
   createMetricsUpdatedEvent,
+  NotificationCreatedData,
+  createNotificationCreatedEvent,
   getTenantRoom,
 } from '../events/dashboard.events';
 
@@ -96,6 +98,14 @@ export class EventEmitterService {
    */
   emitMetricsUpdated(tenantId: string, data: MetricsUpdatedData): boolean {
     const event = createMetricsUpdatedEvent(tenantId, data);
+    return this.emitToTenant(tenantId, event);
+  }
+
+  /**
+   * Emit a notification created event to a tenant's room
+   */
+  emitNotificationCreated(tenantId: string, data: NotificationCreatedData): boolean {
+    const event = createNotificationCreatedEvent(tenantId, data);
     return this.emitToTenant(tenantId, event);
   }
 

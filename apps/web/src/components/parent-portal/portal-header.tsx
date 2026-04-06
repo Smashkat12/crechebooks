@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Menu, X, User, LogOut, HelpCircle } from 'lucide-react';
+import { ParentNotificationBell } from './parent-notification-bell';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -129,6 +130,9 @@ export function PortalHeader() {
                     <span className="sr-only">Help</span>
                   </Link>
                 </Button>
+
+                {/* Notification bell */}
+                {!isLoading && user && <ParentNotificationBell />}
 
                 {/* User menu */}
                 {!isLoading && user && (

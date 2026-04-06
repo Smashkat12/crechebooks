@@ -9,6 +9,8 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { ReconciliationCompletedEvent } from '../events/domain-events';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { LLMWhispererParser } from '../parsers/llmwhisperer-parser';
@@ -85,6 +87,7 @@ export class BankStatementReconciliationService {
     private readonly accruedChargeService: AccruedBankChargeService,
     private readonly bankFeeService: BankFeeService,
     private readonly feeInflationService: FeeInflationCorrectionService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -309,6 +312,22 @@ export class BankStatementReconciliationService {
       `Reconciliation ${reconciliation.id}: status=${status}, matched=${matchSummary.matched}/${matchSummary.total}`,
     );
 
+    // Emit reconciliation domain event (non-blocking)
+    try {
+      const eventName = status === 'RECONCILED' ? 'reconciliation.completed' : 'reconciliation.discrepancy';
+      this.eventEmitter.emit(eventName, {
+        tenantId,
+        period: `${statement.statementPeriod.start.toISOString().slice(0, 10)} to ${statement.statementPeriod.end.toISOString().slice(0, 10)}`,
+        matchedCount: matchSummary.matched,
+        unmatchedCount: matchSummary.inBankOnly + matchSummary.inXeroOnly,
+        discrepancyCount: matchSummary.amountMismatch,
+      } satisfies ReconciliationCompletedEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit reconciliation event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
+
     return {
       reconciliationId: reconciliation.id,
       statementPeriod: statement.statementPeriod,
@@ -489,6 +508,22 @@ export class BankStatementReconciliationService {
     this.logger.log(
       `Re-match ${reconciliationId}: status=${status}, matched=${matchSummary.matched}/${matchSummary.total}`,
     );
+
+    // Emit reconciliation domain event (non-blocking)
+    try {
+      const eventName = status === 'RECONCILED' ? 'reconciliation.completed' : 'reconciliation.discrepancy';
+      this.eventEmitter.emit(eventName, {
+        tenantId,
+        period: `${reconciliation.periodStart.toISOString().slice(0, 10)} to ${reconciliation.periodEnd.toISOString().slice(0, 10)}`,
+        matchedCount: matchSummary.matched,
+        unmatchedCount: matchSummary.inBankOnly + matchSummary.inXeroOnly,
+        discrepancyCount: matchSummary.amountMismatch,
+      } satisfies ReconciliationCompletedEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit reconciliation event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
 
     return {
       reconciliationId,

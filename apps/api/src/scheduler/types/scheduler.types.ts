@@ -9,6 +9,7 @@ export const QUEUE_NAMES = {
   WHATSAPP_RETRY: 'whatsapp-retry',
   /** TASK-COMM-002: Queue for broadcast message processing */
   BROADCAST: 'broadcast',
+  NOTIFICATION: 'notification',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

@@ -266,12 +266,20 @@ export class CategorizationService {
       : TransactionStatus.REVIEW_REQUIRED;
 
     // Create categorization record
+    // When a pattern match exists, use the pattern's account code (user-validated)
+    // rather than the AI fallback. The pattern represents a learned correction.
     const categorizationDto: CreateCategorizationDto = {
       transactionId,
-      accountCode: aiResult.accountCode,
-      accountName: aiResult.accountName,
+      accountCode: patternMatch
+        ? patternMatch.pattern.defaultAccountCode
+        : aiResult.accountCode,
+      accountName: patternMatch
+        ? patternMatch.pattern.defaultAccountName
+        : aiResult.accountName,
       confidenceScore: finalConfidence,
-      reasoning: aiResult.reasoning,
+      reasoning: patternMatch
+        ? `Pattern match: ${patternMatch.pattern.payeePattern} → ${patternMatch.pattern.defaultAccountCode}. ${aiResult.reasoning}`
+        : aiResult.reasoning,
       source: isAutoApply ? source : CategorizationSource.AI_SUGGESTED,
       isSplit: aiResult.isSplit,
       splitAmountCents: aiResult.isSplit ? transaction.amountCents : undefined,
@@ -309,7 +317,7 @@ export class CategorizationService {
           transactionId,
           confidence: finalConfidence,
           isAutoApplied: isAutoApply,
-          accountCode: aiResult.accountCode,
+          accountCode: categorizationDto.accountCode,
         });
       } catch (error) {
         // Log but don't fail - metrics tracking is non-critical
@@ -323,8 +331,8 @@ export class CategorizationService {
     return {
       transactionId,
       status,
-      accountCode: aiResult.accountCode,
-      accountName: aiResult.accountName,
+      accountCode: categorizationDto.accountCode,
+      accountName: categorizationDto.accountName,
       confidenceScore: finalConfidence,
       source: categorizationDto.source,
     };

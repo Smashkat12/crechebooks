@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Menu, X, User, LogOut, HelpCircle, Building2, Clock } from 'lucide-react';
+import { StaffNotificationBell } from './staff-notification-bell';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -162,6 +163,9 @@ export function StaffHeader() {
                   <span className="sr-only">Help</span>
                 </Link>
               </Button>
+
+              {/* Notification bell */}
+              {!isLoading && user && <StaffNotificationBell />}
 
               {/* User menu */}
               {!isLoading && user && (

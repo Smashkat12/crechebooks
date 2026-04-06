@@ -42,7 +42,7 @@ export interface ToleranceConfig {
   /**
    * Date tolerance in days.
    * Used for matching transactions with date differences.
-   * Default: 1 day - accounts for processing delays
+   * Default: 3 days - accounts for bank processing delays
    */
   dateTolerance: number;
 
@@ -75,14 +75,14 @@ export interface ToleranceConfig {
  * - 1 cent for exact matches (rounding edge cases)
  * - R1 for balance validation (minor bank charges)
  * - R5 for bank fees (typical debit order fees)
- * - 1 day for date tolerance (processing delays)
+ * - 3 days for date tolerance (bank processing delays)
  * - 0.5% for large amounts (scales with transaction size)
  */
 export const DEFAULT_TOLERANCE_CONFIG: ToleranceConfig = {
   amountMatchingTolerance: 1, // 1 cent
   balanceValidationTolerance: 100, // R1.00
   bankFeeTolerance: 500, // R5.00
-  dateTolerance: 1, // 1 day
+  dateTolerance: 3, // 3 days — accounts for bank processing delays (TASK-RECON-016)
   percentageTolerance: 0.005, // 0.5%
   largeAmountThreshold: 1000000, // R10,000
   descriptionSimilarityThreshold: 0.7, // 70%

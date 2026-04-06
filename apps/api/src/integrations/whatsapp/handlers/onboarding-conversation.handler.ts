@@ -2309,6 +2309,7 @@ export class OnboardingConversationHandler {
               parent.id, // userId = parent (self-enrolled via WhatsApp)
               !!data.startDate, // allowHistoricDates — true when parent chose a past date
               true, // skipWelcomePack — handler sends its own completion message
+              'whatsapp_onboarding',
             );
 
             // Update child status to ENROLLED
@@ -2427,26 +2428,8 @@ export class OnboardingConversationHandler {
         tenantId,
       );
 
-      // TASK-WA-014: Notify admin users of completed onboarding
-      try {
-        const admins = await this.prisma.user.findMany({
-          where: {
-            tenantId,
-            role: { in: ['ADMIN', 'OWNER'] },
-            isActive: true,
-          },
-          select: { email: true, name: true },
-        });
-
-        this.logger.log(
-          `New WhatsApp onboarding complete: ${data.parent?.firstName} ${data.parent?.surname}, ` +
-            `${children.length} child(ren). Notifying ${admins.length} admin(s).`,
-        );
-      } catch (adminError) {
-        this.logger.warn(
-          `Failed to notify admins: ${adminError instanceof Error ? adminError.message : String(adminError)}`,
-        );
-      }
+      // TASK-WA-014: Admin notification now handled by enrollment.completed event
+      // (emitted from EnrollmentService.enrollChild → EnrollmentCompletedHandler)
 
       this.logger.log(`Onboarding completed for session ${sessionId}`);
     } catch (error) {

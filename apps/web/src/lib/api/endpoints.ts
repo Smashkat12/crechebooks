@@ -215,4 +215,22 @@ export const endpoints = {
     history: (parentId: string) => `/whatsapp/history/${parentId}`,
     status: (parentId: string) => `/whatsapp/status/${parentId}`,
   },
+  // In-App Notification System
+  notifications: {
+    list: '/notifications',
+    unreadCount: '/notifications/unread-count',
+    markRead: (id: string) => `/notifications/${id}/read`,
+    markAllRead: '/notifications/read-all',
+    delete: (id: string) => `/notifications/${id}`,
+    // Parent portal
+    parentList: '/parent-portal/notifications',
+    parentUnreadCount: '/parent-portal/notifications/unread-count',
+    parentMarkRead: (id: string) => `/parent-portal/notifications/${id}/read`,
+    parentMarkAllRead: '/parent-portal/notifications/read-all',
+    // Staff portal
+    staffList: '/staff-portal/notifications',
+    staffUnreadCount: '/staff-portal/notifications/unread-count',
+    staffMarkRead: (id: string) => `/staff-portal/notifications/${id}/read`,
+    staffMarkAllRead: '/staff-portal/notifications/read-all',
+  },
 } as const;

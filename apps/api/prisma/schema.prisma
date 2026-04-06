@@ -484,6 +484,37 @@ enum ApiKeyScope {
   FULL_ACCESS
 }
 
+// In-App Notification System
+enum NotificationType {
+  ENROLLMENT_COMPLETED
+  PAYMENT_RECEIVED
+  PAYMENT_ALLOCATED
+  INVOICE_GENERATED
+  INVOICE_SENT
+  INVOICE_DELIVERY_FAILED
+  ARREARS_NEW
+  ARREARS_ESCALATION
+  SARS_DEADLINE
+  RECONCILIATION_COMPLETE
+  RECONCILIATION_DISCREPANCY
+  XERO_SYNC_FAILURE
+  STAFF_LEAVE_REQUEST
+  STAFF_LEAVE_DECISION
+  STAFF_ONBOARDING_COMPLETE
+  PAYSLIP_AVAILABLE
+  STATEMENT_AVAILABLE
+  BROADCAST_SUMMARY
+  TRIAL_EXPIRING
+  SYSTEM_ALERT
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 // ============================================
 // MODELS
 // ============================================
@@ -702,6 +733,10 @@ model Tenant {
 
   // TASK-WA-011: WhatsApp Onboarding Sessions
   whatsAppOnboardingSessions WhatsAppOnboardingSession[]
+
+  // In-App Notification System
+  notifications Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("tenants")
 }
@@ -4078,4 +4113,56 @@ model VectorEmbedding {
   @@index([tenantId, contentType])
   @@index([contentHash])
   @@map("vector_embeddings")
+}
+
+// ============================================
+// In-App Notification System
+// Persistent notifications for admin, parent, and staff portals
+// ============================================
+model Notification {
+  id            String               @id @default(uuid())
+  tenantId      String               @map("tenant_id")
+  recipientType String               @map("recipient_type") @db.VarChar(20)
+  recipientId   String               @map("recipient_id")
+  type          NotificationType
+  priority      NotificationPriority @default(NORMAL)
+  title         String               @db.VarChar(200)
+  body          String               @db.Text
+  actionUrl     String?              @map("action_url") @db.VarChar(500)
+  metadata      Json?
+  isRead        Boolean              @default(false) @map("is_read")
+  readAt        DateTime?            @map("read_at")
+  expiresAt     DateTime?            @map("expires_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, recipientType, recipientId, isRead])
+  @@index([tenantId, recipientId, createdAt])
+  @@index([expiresAt])
+  @@map("notifications")
+}
+
+// ============================================
+// Notification Preferences (Phase 5)
+// Per-user/parent/staff notification settings
+// ============================================
+model NotificationPreference {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  recipientType     String   @map("recipient_type") @db.VarChar(20)
+  recipientId       String   @map("recipient_id")
+  disabledTypes     String[] @default([]) @map("disabled_types")
+  quietHoursEnabled Boolean  @default(false) @map("quiet_hours_enabled")
+  quietHoursStart   String?  @map("quiet_hours_start") @db.VarChar(5)
+  quietHoursEnd     String?  @map("quiet_hours_end") @db.VarChar(5)
+  inAppEnabled      Boolean  @default(true) @map("in_app_enabled")
+  emailDigest       Boolean  @default(false) @map("email_digest")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, recipientType, recipientId])
+  @@map("notification_preferences")
 }

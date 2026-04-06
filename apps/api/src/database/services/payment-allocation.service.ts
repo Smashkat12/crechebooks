@@ -10,6 +10,8 @@
  */
 
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { PaymentAllocatedEvent } from '../events/domain-events';
 import { Payment, Invoice, InvoiceStatus } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
@@ -52,6 +54,7 @@ export class PaymentAllocationService {
     private readonly creditBalanceService: CreditBalanceService,
     private readonly xeroSyncService: XeroSyncService,
     private readonly xeroSplitService: XeroTransactionSplitService,
+    private readonly eventEmitter: EventEmitter2,
     // TASK-STUB-PARITY: Provider-agnostic accounting sync
     @Inject(ACCOUNTING_PROVIDER) @Optional() private readonly accountingProvider?: AccountingProvider,
     // TASK-WA-007: Optional WhatsApp service for payment confirmations
@@ -246,7 +249,27 @@ export class PaymentAllocationService {
       payment.id,
     );
 
-    // 11. Return AllocationResult
+    // 11. Emit payment.allocated domain event (non-blocking)
+    try {
+      const parent = await this.parentRepo.findById(invoice.parentId, dto.tenantId!);
+      const child = await this.prisma.child.findUnique({ where: { id: invoice.childId }, select: { firstName: true, lastName: true } });
+      this.eventEmitter.emit('payment.allocated', {
+        tenantId: dto.tenantId!,
+        paymentId: payment.id,
+        invoiceId: allocation.invoiceId,
+        invoiceNumber: invoice.invoiceNumber,
+        amountCents: allocation.amountCents,
+        parentId: invoice.parentId,
+        parentName: parent ? `${parent.firstName} ${parent.lastName}`.trim() : 'Unknown',
+        childName: child ? `${child.firstName} ${child.lastName}`.trim() : 'Unknown',
+      } satisfies PaymentAllocatedEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit payment.allocated event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
+
+    // 12. Return AllocationResult
     // TASK-RECON-040: Use effectiveAmountCents (NET from split if applicable) for unallocated calculation
     const totalAllocated = new Decimal(allocation.amountCents);
     const transactionAmountForCalc = new Decimal(effectiveAmountCents);
@@ -460,7 +483,7 @@ export class PaymentAllocationService {
       }
     }
 
-    // 4. Audit log each allocation
+    // 4. Audit log each allocation + emit payment.allocated events
     for (const payment of createdPayments) {
       await this.auditLogService.logAction({
         tenantId: dto.tenantId!,
@@ -477,6 +500,27 @@ export class PaymentAllocationService {
         },
         changeSummary: `Multi-invoice allocation: ${payment.amountCents} cents to invoice ${payment.invoiceId}`,
       });
+
+      // Emit payment.allocated domain event (non-blocking)
+      try {
+        const invoice = await this.invoiceRepo.findById(payment.invoiceId, dto.tenantId!);
+        const parent = invoice ? await this.parentRepo.findById(invoice.parentId, dto.tenantId!) : null;
+        const child = invoice ? await this.prisma.child.findUnique({ where: { id: invoice.childId }, select: { firstName: true, lastName: true } }) : null;
+        this.eventEmitter.emit('payment.allocated', {
+          tenantId: dto.tenantId!,
+          paymentId: payment.id,
+          invoiceId: payment.invoiceId,
+          invoiceNumber: invoice?.invoiceNumber ?? 'Unknown',
+          amountCents: payment.amountCents,
+          parentId: invoice?.parentId ?? 'Unknown',
+          parentName: parent ? `${parent.firstName} ${parent.lastName}`.trim() : 'Unknown',
+          childName: child ? `${child.firstName} ${child.lastName}`.trim() : 'Unknown',
+        } satisfies PaymentAllocatedEvent);
+      } catch (eventError) {
+        this.logger.warn(
+          `Failed to emit payment.allocated event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+        );
+      }
     }
 
     return {

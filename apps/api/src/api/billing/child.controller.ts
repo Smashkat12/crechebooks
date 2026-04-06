@@ -154,6 +154,8 @@ export class ChildController {
       new Date(dto.start_date),
       user.id,
       true, // Allow historic dates for data imports
+      false, // Don't skip welcome pack
+      'admin_api',
     );
 
     this.logger.log(`Created enrollment: ${enrollment.id}`);
@@ -305,6 +307,8 @@ export class ChildController {
       new Date(dto.start_date),
       user.id,
       true, // Allow historic dates for flexibility
+      false, // Don't skip welcome pack
+      'admin_api',
     );
 
     // 4. Update child status to ENROLLED

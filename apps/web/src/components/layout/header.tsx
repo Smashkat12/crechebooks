@@ -14,6 +14,7 @@ import { MobileNav } from './mobile-nav';
 import { UserNav } from './user-nav';
 import { ThemeToggle } from './theme-toggle';
 import { Breadcrumbs } from './breadcrumbs';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { cn } from '@/lib/utils';
 
 export function Header() {
@@ -39,6 +40,7 @@ export function Header() {
 
       {/* Actions with touch-friendly spacing */}
       <div className="flex items-center gap-1 sm:gap-2">
+        <NotificationBell />
         <ThemeToggle />
         <UserNav />
       </div>

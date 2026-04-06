@@ -206,4 +206,10 @@ export const queryKeys = {
     banks: () => [...queryKeys.bankFees.all, 'banks'] as const,
     bankDefaults: (bankCode: string) => [...queryKeys.bankFees.all, 'defaults', bankCode] as const,
   },
+  // In-App Notifications
+  notifications: {
+    all: ['notifications'] as const,
+    list: (params?: Record<string, unknown>) => ['notifications', 'list', params] as const,
+    unreadCount: () => ['notifications', 'unread-count'] as const,
+  },
 } as const;

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerStorage } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import { ConfigModule } from './config/config.module';
@@ -30,6 +31,8 @@ import { ReportsModule } from './modules/reports';
 @Module({
   imports: [
     ConfigModule,
+    // Global event emitter for domain events (enrollment.completed, staff.created, etc.)
+    EventEmitterModule.forRoot(),
     // TASK-INFRA-005: Structured JSON logging with correlation ID
     LoggerModule,
     // Email service for notifications

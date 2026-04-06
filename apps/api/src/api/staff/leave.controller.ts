@@ -13,6 +13,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Param,
   Body,
   Query,
@@ -42,6 +43,8 @@ import {
   Max,
   IsISO8601,
 } from 'class-validator';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { StaffLeaveRequestedEvent, StaffLeaveDecisionEvent } from '../../database/events/domain-events';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -141,6 +144,15 @@ class ApiCreateLeaveRequestDto {
   reason?: string;
 }
 
+/**
+ * API DTO for rejecting a leave request
+ */
+class ApiRejectLeaveRequestDto {
+  @ApiProperty({ description: 'Reason for rejection' })
+  @IsString()
+  reason: string;
+}
+
 @ApiTags('Staff Leave')
 @ApiBearerAuth()
 @Controller('staff')
@@ -152,6 +164,7 @@ export class LeaveController {
     private readonly simplePayLeaveService: SimplePayLeaveService,
     private readonly staffRepository: StaffRepository,
     private readonly leaveRequestRepository: LeaveRequestRepository,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -414,6 +427,23 @@ export class LeaveController {
         `Created leave request ${leaveRequest.id} for staff ${staffId}`,
       );
 
+      // Emit staff.leave.requested domain event (non-blocking)
+      try {
+        this.eventEmitter.emit('staff.leave.requested', {
+          tenantId: getTenantId(user),
+          staffId,
+          staffName: `${staff.firstName} ${staff.lastName}`.trim(),
+          leaveType: dto.leave_type_name,
+          startDate: startDate,
+          endDate: endDate,
+          days: dto.total_days,
+        } satisfies StaffLeaveRequestedEvent);
+      } catch (eventError) {
+        this.logger.warn(
+          `Failed to emit staff.leave.requested event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+        );
+      }
+
       // Return snake_case response
       return {
         id: leaveRequest.id,
@@ -448,5 +478,104 @@ export class LeaveController {
           : 'Failed to create leave request',
       );
     }
+  }
+
+  /**
+   * Approve a leave request
+   */
+  @Patch('leave/:leaveRequestId/approve')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve a leave request' })
+  @ApiParam({ name: 'leaveRequestId', description: 'Leave request ID' })
+  @ApiResponse({ status: 200, description: 'Leave request approved' })
+  @ApiResponse({ status: 404, description: 'Leave request not found' })
+  async approveLeaveRequest(
+    @CurrentUser() user: IUser,
+    @Param('leaveRequestId') leaveRequestId: string,
+  ): Promise<Record<string, unknown>> {
+    const tenantId = getTenantId(user);
+    const leaveRequest = await this.leaveRequestRepository.approve(
+      leaveRequestId,
+      tenantId,
+      user.id,
+    );
+
+    // Look up staff for event
+    const staff = await this.staffRepository.findById(leaveRequest.staffId, tenantId);
+
+    // Emit staff.leave.decided domain event (non-blocking)
+    try {
+      this.eventEmitter.emit('staff.leave.decided', {
+        tenantId,
+        staffId: leaveRequest.staffId,
+        staffName: staff ? `${staff.firstName} ${staff.lastName}`.trim() : 'Unknown',
+        decision: 'APPROVED',
+        leaveType: leaveRequest.leaveTypeName,
+        startDate: leaveRequest.startDate,
+        endDate: leaveRequest.endDate,
+      } satisfies StaffLeaveDecisionEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit staff.leave.decided event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
+
+    return {
+      id: leaveRequest.id,
+      status: leaveRequest.status,
+      approved_by: leaveRequest.approvedBy,
+      approved_at: leaveRequest.approvedAt,
+    };
+  }
+
+  /**
+   * Reject a leave request
+   */
+  @Patch('leave/:leaveRequestId/reject')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reject a leave request' })
+  @ApiParam({ name: 'leaveRequestId', description: 'Leave request ID' })
+  @ApiResponse({ status: 200, description: 'Leave request rejected' })
+  @ApiResponse({ status: 404, description: 'Leave request not found' })
+  async rejectLeaveRequest(
+    @CurrentUser() user: IUser,
+    @Param('leaveRequestId') leaveRequestId: string,
+    @Body() dto: ApiRejectLeaveRequestDto,
+  ): Promise<Record<string, unknown>> {
+    const tenantId = getTenantId(user);
+    const leaveRequest = await this.leaveRequestRepository.reject(
+      leaveRequestId,
+      tenantId,
+      user.id,
+      dto.reason,
+    );
+
+    // Look up staff for event
+    const staff = await this.staffRepository.findById(leaveRequest.staffId, tenantId);
+
+    // Emit staff.leave.decided domain event (non-blocking)
+    try {
+      this.eventEmitter.emit('staff.leave.decided', {
+        tenantId,
+        staffId: leaveRequest.staffId,
+        staffName: staff ? `${staff.firstName} ${staff.lastName}`.trim() : 'Unknown',
+        decision: 'REJECTED',
+        leaveType: leaveRequest.leaveTypeName,
+        startDate: leaveRequest.startDate,
+        endDate: leaveRequest.endDate,
+      } satisfies StaffLeaveDecisionEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit staff.leave.decided event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
+
+    return {
+      id: leaveRequest.id,
+      status: leaveRequest.status,
+      rejected_reason: leaveRequest.rejectedReason,
+    };
   }
 }

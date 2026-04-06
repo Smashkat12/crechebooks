@@ -9,6 +9,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Enrollment, FeeStructure, Invoice } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import Decimal from 'decimal.js';
 import { EnrollmentRepository } from '../repositories/enrollment.repository';
 import { ChildRepository } from '../repositories/child.repository';
@@ -34,6 +35,12 @@ import {
   YearEndReviewResult,
 } from '../dto/year-end-review.dto';
 import { WelcomePackDeliveryService } from './welcome-pack-delivery.service';
+import type {
+  EnrollmentSource,
+  EnrollmentCompletedEvent,
+} from '../events/enrollment.events';
+
+export type { EnrollmentSource, EnrollmentCompletedEvent };
 
 // Configure Decimal.js for banker's rounding
 Decimal.set({
@@ -79,6 +86,7 @@ export class EnrollmentService {
     private readonly auditLogService: AuditLogService,
     private readonly invoiceNumberService: InvoiceNumberService,
     private readonly welcomePackDeliveryService: WelcomePackDeliveryService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -90,6 +98,7 @@ export class EnrollmentService {
    * @param userId - User performing the enrollment
    * @param allowHistoricDates - If true, allows historical start dates (for data imports)
    * @param skipWelcomePack - If true, skips welcome pack delivery (e.g. WhatsApp onboarding sends its own completion message)
+   * @param source - Where the enrollment originated ('admin_api' or 'whatsapp_onboarding')
    * @returns Created enrollment with generated invoice (if any)
    * @throws NotFoundException if child or fee structure doesn't exist
    * @throws ConflictException if child already has active enrollment
@@ -103,6 +112,7 @@ export class EnrollmentService {
     userId: string,
     allowHistoricDates = false,
     skipWelcomePack = false,
+    source: EnrollmentSource = 'admin_api',
   ): Promise<EnrollChildResult> {
     // 1. Validate child exists and belongs to tenant
     const child = await this.childRepo.findById(childId, tenantId);
@@ -244,6 +254,30 @@ export class EnrollmentService {
     this.logger.log(
       `Successfully enrolled child ${childId} in enrollment ${enrollment.id}${invoiceError ? ' (invoice creation failed)' : ''}${!welcomePackResult.sent ? ' (welcome pack not sent)' : ''}`,
     );
+
+    // 9. Emit enrollment.completed event for admin notification (non-blocking)
+    try {
+      const parent = await this.parentRepo.findById(child.parentId, tenantId);
+      this.eventEmitter.emit('enrollment.completed', {
+        tenantId,
+        enrollmentId: enrollment.id,
+        childId,
+        childName: `${child.firstName} ${child.lastName}`,
+        parentName: parent
+          ? `${parent.firstName} ${parent.lastName}`
+          : 'Unknown',
+        parentEmail: parent?.email ?? null,
+        feeStructureName: feeStructure.name,
+        monthlyFeeCents: feeStructure.amountCents,
+        startDate,
+        invoiceNumber: enrollmentInvoice?.invoiceNumber ?? null,
+        source,
+      } satisfies EnrollmentCompletedEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit enrollment.completed event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
 
     return {
       enrollment: enrollment as IEnrollment,

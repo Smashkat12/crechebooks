@@ -27,6 +27,7 @@ export enum EmailTemplateName {
   PAYMENT_RECEIPT = 'payment_receipt',
   WELCOME_PACK_EMAIL = 'welcome_pack_email',
   QUOTE_EMAIL = 'quote_email', // TASK-QUOTE-001
+  ENROLLMENT_NOTIFICATION = 'enrollment_notification',
 }
 
 /**
@@ -206,6 +207,21 @@ export interface QuoteEmailData extends BaseEmailTemplateData {
 }
 
 /**
+ * Enrollment notification email data (admin notification)
+ */
+export interface EnrollmentNotificationData extends BaseEmailTemplateData {
+  childName: string;
+  parentName: string;
+  parentEmail: string | null;
+  feeStructureName: string;
+  monthlyFee: string;
+  startDate: string;
+  enrollmentSource: string;
+  invoiceNumber: string | null;
+  dashboardUrl?: string;
+}
+
+/**
  * Union type for all template data types
  */
 export type EmailTemplateData =
@@ -214,7 +230,8 @@ export type EmailTemplateData =
   | ReminderEmailData
   | PaymentReceiptData
   | WelcomePackEmailData
-  | QuoteEmailData;
+  | QuoteEmailData
+  | EnrollmentNotificationData;
 
 /**
  * Rendered email result
@@ -437,6 +454,16 @@ export class EmailTemplateService implements OnModuleInit {
       Handlebars.compile(this.getEmbeddedQuoteTextTemplate()),
     );
 
+    // Enrollment notification template
+    this.templates.set(
+      EmailTemplateName.ENROLLMENT_NOTIFICATION,
+      Handlebars.compile(this.getEmbeddedEnrollmentNotificationHtmlTemplate()),
+    );
+    this.textTemplates.set(
+      EmailTemplateName.ENROLLMENT_NOTIFICATION,
+      Handlebars.compile(this.getEmbeddedEnrollmentNotificationTextTemplate()),
+    );
+
     this.logger.log('Loaded embedded templates');
   }
 
@@ -593,6 +620,15 @@ export class EmailTemplateService implements OnModuleInit {
   }
 
   /**
+   * Render enrollment notification email (admin notification)
+   */
+  renderEnrollmentNotification(
+    data: EnrollmentNotificationData,
+  ): RenderedEmail {
+    return this.render(EmailTemplateName.ENROLLMENT_NOTIFICATION, data);
+  }
+
+  /**
    * Generate email subject based on template type
    */
   private generateSubject(
@@ -624,6 +660,8 @@ export class EmailTemplateService implements OnModuleInit {
           typeof data.quoteNumber === 'string' ? data.quoteNumber : '';
         return `Quote ${quoteNumber} from ${tenantName}`;
       }
+      case EmailTemplateName.ENROLLMENT_NOTIFICATION:
+        return `New Enrollment: ${(data as unknown as EnrollmentNotificationData).childName || 'New Student'} at ${tenantName}`;
       default:
         return `Message from ${tenantName}`;
     }
@@ -1771,6 +1809,124 @@ We look forward to welcoming you!
 {{#if supportEmail}}
 Questions? Contact us at {{supportEmail}}{{#if supportPhone}} | {{supportPhone}}{{/if}}
 {{/if}}
+
+(c) {{currentYear}} {{tenantName}}`;
+  }
+
+  private getEmbeddedEnrollmentNotificationHtmlTemplate(): string {
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Enrollment Notification</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f7;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:20px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="background-color:{{#if primaryColor}}{{primaryColor}}{{else}}#2563eb{{/if}};padding:24px;text-align:center;">
+              {{#if tenantLogo}}<img src="{{tenantLogo}}" alt="{{tenantName}}" style="max-height:48px;margin-bottom:8px;"><br>{{/if}}
+              <span style="color:#ffffff;font-size:20px;font-weight:bold;">New Student Enrolled</span>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:32px 24px;">
+              <p style="color:#374151;font-size:16px;margin:0 0 16px;">Hi {{recipientName}},</p>
+              <p style="color:#374151;font-size:16px;margin:0 0 24px;">A new student has been enrolled at <strong>{{tenantName}}</strong>.</p>
+              <!-- Details Card -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:24px;">
+                <tr>
+                  <td style="padding:20px;">
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:6px 0;color:#6b7280;font-size:14px;width:140px;">Student</td>
+                        <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:600;">{{childName}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;color:#6b7280;font-size:14px;">Parent/Guardian</td>
+                        <td style="padding:6px 0;color:#111827;font-size:14px;">{{parentName}}{{#if parentEmail}} ({{parentEmail}}){{/if}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;color:#6b7280;font-size:14px;">Fee Structure</td>
+                        <td style="padding:6px 0;color:#111827;font-size:14px;">{{feeStructureName}} — {{monthlyFee}}/month</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;color:#6b7280;font-size:14px;">Start Date</td>
+                        <td style="padding:6px 0;color:#111827;font-size:14px;">{{startDate}}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;color:#6b7280;font-size:14px;">Enrolled via</td>
+                        <td style="padding:6px 0;color:#111827;font-size:14px;">{{enrollmentSource}}</td>
+                      </tr>
+                      {{#if invoiceNumber}}
+                      <tr>
+                        <td style="padding:6px 0;color:#6b7280;font-size:14px;">Invoice</td>
+                        <td style="padding:6px 0;color:#111827;font-size:14px;">{{invoiceNumber}}</td>
+                      </tr>
+                      {{/if}}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              {{#if dashboardUrl}}
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">
+                    <a href="{{dashboardUrl}}" style="display:inline-block;background-color:{{#if primaryColor}}{{primaryColor}}{{else}}#2563eb{{/if}};color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:600;">View Dashboard</a>
+                  </td>
+                </tr>
+              </table>
+              {{/if}}
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f9fafb;padding:16px 24px;border-top:1px solid #e5e7eb;">
+              <p style="color:#9ca3af;font-size:12px;margin:0;text-align:center;">
+                This is an automated notification from {{tenantName}}.
+                {{#if supportEmail}}Contact: {{supportEmail}}{{/if}}
+              </p>
+              {{#if footerText}}<p style="color:#9ca3af;font-size:12px;margin:4px 0 0;text-align:center;">{{footerText}}</p>{{/if}}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  }
+
+  private getEmbeddedEnrollmentNotificationTextTemplate(): string {
+    return `{{tenantName}}
+NEW STUDENT ENROLLED
+====================
+
+Hi {{recipientName}},
+
+A new student has been enrolled at {{tenantName}}.
+
+ENROLLMENT DETAILS
+------------------
+Student: {{childName}}
+Parent/Guardian: {{parentName}}{{#if parentEmail}} ({{parentEmail}}){{/if}}
+Fee Structure: {{feeStructureName}} — {{monthlyFee}}/month
+Start Date: {{startDate}}
+Enrolled via: {{enrollmentSource}}
+{{#if invoiceNumber}}Invoice: {{invoiceNumber}}{{/if}}
+
+{{#if dashboardUrl}}
+View Dashboard: {{dashboardUrl}}
+{{/if}}
+
+---
+This is an automated notification from {{tenantName}}.
+{{#if supportEmail}}Contact: {{supportEmail}}{{#if supportPhone}} | {{supportPhone}}{{/if}}{{/if}}
 
 (c) {{currentYear}} {{tenantName}}`;
   }

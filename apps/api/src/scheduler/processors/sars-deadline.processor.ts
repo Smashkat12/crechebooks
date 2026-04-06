@@ -14,6 +14,8 @@ import { SarsDeadlineService } from '../../sars/sars-deadline.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { UpcomingDeadline } from '../../sars/types/deadline.types';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { SarsDeadlineEvent } from '../../database/events/domain-events';
 
 @Injectable()
 @Processor(QUEUE_NAMES.SARS_DEADLINE)
@@ -24,6 +26,7 @@ export class SarsDeadlineProcessor extends BaseProcessor<SarsDeadlineJobData> {
     private readonly deadlineService: SarsDeadlineService,
     private readonly auditLogService: AuditLogService,
     private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super(QUEUE_NAMES.SARS_DEADLINE);
   }
@@ -141,6 +144,20 @@ export class SarsDeadlineProcessor extends BaseProcessor<SarsDeadlineJobData> {
           channel,
           recipients: prefs.recipientEmails,
         });
+
+        // Emit sars.deadline.approaching domain event (non-blocking)
+        try {
+          this.eventEmitter.emit('sars.deadline.approaching', {
+            tenantId,
+            returnType: deadline.type,
+            dueDate: deadline.deadline,
+            daysRemaining,
+          } satisfies SarsDeadlineEvent);
+        } catch (eventError) {
+          this.logger.warn(
+            `Failed to emit sars.deadline.approaching event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+          );
+        }
 
         this.logger.log(
           `Sent ${channel} reminder for ${deadline.type} ${deadline.period} to tenant ${tenantId}`,

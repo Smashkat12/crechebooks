@@ -32,6 +32,7 @@ import { InvoiceEventsHandler } from './handlers/invoice-events.handler';
 import { SarsDeadlineHandler } from './handlers/sars-deadline.handler';
 import { ReconciliationHandler } from './handlers/reconciliation.handler';
 import { StaffEventsHandler } from './handlers/staff-events.handler';
+import { RolloutModule } from '../agents/rollout/rollout.module';
 import { SMS_GATEWAY_TOKEN } from './interfaces/sms-gateway.interface';
 import { MockSmsGateway } from './gateways/mock-sms.gateway';
 import { AfricasTalkingSmsGateway } from './gateways/africastalking-sms.gateway';
@@ -43,6 +44,7 @@ const logger = new Logger('NotificationModule');
     forwardRef(() => DatabaseModule),
     ConfigModule,
     WebSocketModule,
+    RolloutModule,
     BullModule.registerQueue({ name: 'notification' }),
   ],
   providers: [

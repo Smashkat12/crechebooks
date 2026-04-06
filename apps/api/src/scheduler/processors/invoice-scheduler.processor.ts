@@ -23,6 +23,8 @@ import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { EnrollmentStatus } from '../../database/entities/enrollment.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { InvoiceBatchCompletedEvent } from '../../database/events/domain-events';
 
 /** Batch size for processing enrollments */
 const BATCH_SIZE = 10;
@@ -47,6 +49,7 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
     private readonly invoiceGenerationService: InvoiceGenerationService,
     private readonly auditLogService: AuditLogService,
     private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super(QUEUE_NAMES.INVOICE_GENERATION);
   }
@@ -112,6 +115,22 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
 
       // Send admin notification
       await this.sendAdminNotification(tenantId, billingMonth, result);
+
+      // Emit invoice.batch.completed domain event (non-blocking)
+      try {
+        this.eventEmitter.emit('invoice.batch.completed', {
+          tenantId,
+          billingMonth,
+          successCount: result.successCount,
+          errorCount: result.errorCount,
+          skippedCount: result.skippedCount,
+          totalEnrollments: result.totalEnrollments,
+        } satisfies InvoiceBatchCompletedEvent);
+      } catch (eventError) {
+        this.logger.warn(
+          `Failed to emit invoice.batch.completed event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+        );
+      }
 
       // Mark job as complete
       await job.progress(100);

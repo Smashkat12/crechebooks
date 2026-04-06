@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationProcessor } from '../notification.processor';
 import { InAppNotificationService } from '../../in-app-notification.service';
 import { InAppPreferenceService } from '../../in-app-preference.service';
+import { FeatureFlagService } from '../../../agents/rollout/feature-flags.service';
 import { EventEmitterService } from '../../../websocket/services/event-emitter.service';
 import { NotificationJobData } from '../../types/in-app-notification.types';
 
@@ -9,6 +10,7 @@ describe('NotificationProcessor', () => {
   let processor: NotificationProcessor;
   let inAppService: { create: jest.Mock };
   let preferenceService: { getPreferences: jest.Mock; shouldNotify: jest.Mock };
+  let featureFlagService: { isEnabled: jest.Mock };
   let eventEmitter: { emitNotificationCreated: jest.Mock };
 
   const notificationInput = {
@@ -55,6 +57,7 @@ describe('NotificationProcessor', () => {
       }),
       shouldNotify: jest.fn().mockReturnValue(true),
     };
+    featureFlagService = { isEnabled: jest.fn().mockResolvedValue(true) };
     eventEmitter = { emitNotificationCreated: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -62,6 +65,7 @@ describe('NotificationProcessor', () => {
         NotificationProcessor,
         { provide: InAppNotificationService, useValue: inAppService },
         { provide: InAppPreferenceService, useValue: preferenceService },
+        { provide: FeatureFlagService, useValue: featureFlagService },
         { provide: EventEmitterService, useValue: eventEmitter },
       ],
     }).compile();

@@ -12,6 +12,7 @@ import { Logger } from '@nestjs/common';
 import * as Bull from 'bull';
 import { InAppNotificationService } from '../in-app-notification.service';
 import { InAppPreferenceService } from '../in-app-preference.service';
+import { FeatureFlagService } from '../../agents/rollout/feature-flags.service';
 import { EventEmitterService } from '../../websocket/services/event-emitter.service';
 import {
   DashboardEventType,
@@ -27,6 +28,7 @@ export class NotificationProcessor {
   constructor(
     private readonly inAppNotificationService: InAppNotificationService,
     private readonly preferenceService: InAppPreferenceService,
+    private readonly featureFlagService: FeatureFlagService,
     private readonly eventEmitterService: EventEmitterService,
   ) {}
 
@@ -38,6 +40,28 @@ export class NotificationProcessor {
       this.logger.debug(
         `Processing notification job ${job.id} for ${notification.recipientType}:${notification.recipientId}`,
       );
+
+      // Check feature flags for parent/staff notifications
+      if (notification.recipientType === 'PARENT') {
+        const isEnabled = await this.featureFlagService.isEnabled(
+          notification.tenantId,
+          'PARENT_NOTIFICATIONS_ENABLED',
+        );
+        if (!isEnabled) {
+          this.logger.debug(`Parent notifications disabled for tenant ${notification.tenantId}`);
+          return;
+        }
+      }
+      if (notification.recipientType === 'STAFF') {
+        const isEnabled = await this.featureFlagService.isEnabled(
+          notification.tenantId,
+          'STAFF_NOTIFICATIONS_ENABLED',
+        );
+        if (!isEnabled) {
+          this.logger.debug(`Staff notifications disabled for tenant ${notification.tenantId}`);
+          return;
+        }
+      }
 
       // Check preferences before creating
       try {

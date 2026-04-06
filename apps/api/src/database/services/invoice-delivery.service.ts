@@ -18,6 +18,8 @@
  */
 
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { InvoiceSentEvent, InvoiceDeliveryFailedEvent } from '../events/domain-events';
 import { Invoice } from '@prisma/client';
 import { InvoiceRepository } from '../repositories/invoice.repository';
 import { InvoiceLineRepository } from '../repositories/invoice-line.repository';
@@ -68,6 +70,7 @@ export class InvoiceDeliveryService {
     private readonly whatsAppService: WhatsAppService,
     private readonly emailTemplateService: EmailTemplateService,
     private readonly invoicePdfService: InvoicePdfService,
+    private readonly eventEmitter: EventEmitter2,
     // TASK-WA-007: WhatsApp provider service for Twilio/Meta routing
     @Optional()
     private readonly whatsAppProviderService?: WhatsAppProviderService,
@@ -543,6 +546,23 @@ Please ensure payment is made by the due date.
       },
       changeSummary: `Invoice ${invoice.invoiceNumber} delivered via ${channel}`,
     });
+
+    // Emit invoice.sent domain event (non-blocking)
+    try {
+      const parent = await this.parentRepo.findById(invoice.parentId, invoice.tenantId);
+      this.eventEmitter.emit('invoice.sent', {
+        tenantId: invoice.tenantId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        parentId: invoice.parentId,
+        parentName: parent ? `${parent.firstName} ${parent.lastName}`.trim() : 'Unknown',
+        amountCents: invoice.totalCents,
+      } satisfies InvoiceSentEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit invoice.sent event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
   }
 
   /**
@@ -570,5 +590,22 @@ Please ensure payment is made by the due date.
       },
       changeSummary: `Invoice ${invoice.invoiceNumber} delivery failed via ${channel}: ${errorMessage}`,
     });
+
+    // Emit invoice.delivery.failed domain event (non-blocking)
+    try {
+      const parent = await this.parentRepo.findById(invoice.parentId, invoice.tenantId);
+      this.eventEmitter.emit('invoice.delivery.failed', {
+        tenantId: invoice.tenantId,
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        parentName: parent ? `${parent.firstName} ${parent.lastName}`.trim() : 'Unknown',
+        channel,
+        error: errorMessage,
+      } satisfies InvoiceDeliveryFailedEvent);
+    } catch (eventError) {
+      this.logger.warn(
+        `Failed to emit invoice.delivery.failed event: ${eventError instanceof Error ? eventError.message : String(eventError)}`,
+      );
+    }
   }
 }

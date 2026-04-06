@@ -530,9 +530,11 @@ describe('PaymentMatchingService - Agent Integration', () => {
     });
 
     it('should NOT invoke agent when no high-confidence matches exist', async () => {
-      // Arrange: Transaction that matches poorly (low confidence)
+      // Arrange: Transaction with no recognizable name or reference
       const poorMatchTransaction = {
         ...mockTransaction,
+        description: 'ATM Cash Withdrawal',
+        payeeName: 'ATM Cash Withdrawal',
         reference: 'UNKNOWN-REF',
         amountCents: 50000, // Different amount
       };

@@ -59,6 +59,28 @@ import { TOLERANCE_DEFAULTS } from '../constants/tolerance.constants';
 /** Confidence threshold for auto-apply (single high-confidence match) */
 const AUTO_APPLY_THRESHOLD = 80;
 
+/**
+ * Lower threshold for name-identified matches.
+ * In SA creche payments, the child name in the bank description IS the
+ * payment reference. When a strong name match (full name, initial+surname)
+ * uniquely identifies one parent, auto-apply even with partial payments.
+ */
+const NAME_IDENTIFIED_THRESHOLD = 55;
+
+/**
+ * Match reason substrings that indicate a strong, unambiguous name match.
+ * These patterns identify the payer with high certainty — full child/parent
+ * name found, initial+surname, or high string similarity (>85%).
+ * First-name-only and surname-only are excluded as they can be ambiguous
+ * (e.g., "Thatego" matches both Thatego Mphela and Thatego Madisa).
+ */
+const STRONG_NAME_PATTERNS = [
+  'exact name match',
+  'first and last name found',
+  'initial + surname match',
+  'strong name match',
+];
+
 /** Confidence threshold for agent decision (ambiguous matches) */
 const AGENT_CONFIDENCE_HIGH = 85;
 
@@ -224,14 +246,64 @@ export class PaymentMatchingService {
           reviewRequired++;
         }
       } else {
-        // No high-confidence match - require review
-        results.push({
-          transactionId: transaction.id,
-          status: 'REVIEW_REQUIRED',
-          candidates: partialMatches.slice(0, MAX_CANDIDATES),
-          reason: 'No high-confidence match found',
-        });
-        reviewRequired++;
+        // NAME-IDENTIFIED FAST PATH:
+        // SA creche parents use child names as payment references, not invoice
+        // numbers. When a strong name match (full name / initial+surname)
+        // uniquely identifies ONE parent, auto-apply even with partial payments.
+        const nameIdentified = partialMatches.filter(
+          (m) =>
+            m.confidenceScore >= NAME_IDENTIFIED_THRESHOLD &&
+            m.matchReasons.some((r) =>
+              STRONG_NAME_PATTERNS.some((p) => r.toLowerCase().includes(p)),
+            ),
+        );
+
+        // De-duplicate by parentId — if multiple invoices for same parent
+        // match, pick the one with highest score (oldest outstanding via
+        // the invoice sort order will naturally surface)
+        const uniqueParents = new Map<string, MatchCandidate>();
+        for (const m of nameIdentified) {
+          const existing = uniqueParents.get(m.parentId);
+          if (!existing || m.confidenceScore > existing.confidenceScore) {
+            uniqueParents.set(m.parentId, m);
+          }
+        }
+
+        if (uniqueParents.size === 1) {
+          // Single parent identified by name — auto-apply
+          const best = [...uniqueParents.values()][0];
+          const applied = await this.autoApplyMatch(best, dto.tenantId!);
+          results.push({
+            transactionId: transaction.id,
+            status: 'AUTO_APPLIED',
+            appliedMatch: applied,
+            reason: `Name-identified match (${best.confidenceScore}%): ${best.parentName}`,
+          });
+          autoApplied++;
+        } else if (uniqueParents.size > 1) {
+          // Multiple parents matched by name — ambiguous, invoke agent
+          const agentResult = await this.resolveAmbiguousMatch(
+            transaction,
+            partialMatches,
+            dto.tenantId!,
+          );
+          if (agentResult.status === 'AUTO_APPLIED') {
+            results.push(agentResult);
+            autoApplied++;
+          } else {
+            results.push(agentResult);
+            reviewRequired++;
+          }
+        } else {
+          // No name-identified match — require review
+          results.push({
+            transactionId: transaction.id,
+            status: 'REVIEW_REQUIRED',
+            candidates: partialMatches.slice(0, MAX_CANDIDATES),
+            reason: 'No high-confidence match found',
+          });
+          reviewRequired++;
+        }
       }
     }
 

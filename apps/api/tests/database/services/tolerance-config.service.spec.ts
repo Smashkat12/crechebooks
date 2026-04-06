@@ -64,7 +64,7 @@ describe('ToleranceConfigService', () => {
       expect(service.dateTolerance).toBe(
         DEFAULT_TOLERANCE_CONFIG.dateTolerance,
       );
-      expect(service.dateTolerance).toBe(1);
+      expect(service.dateTolerance).toBe(3);
     });
 
     it('should return default percentageTolerance when no env var', () => {
@@ -291,14 +291,20 @@ describe('ToleranceConfigService', () => {
       expect(service.isDateWithinTolerance(1)).toBe(true);
     });
 
-    it('should return false for 2+ days difference', () => {
-      expect(service.isDateWithinTolerance(2)).toBe(false);
+    it('should return true for 2-3 days difference (TASK-RECON-016: 3-day window)', () => {
+      expect(service.isDateWithinTolerance(2)).toBe(true);
+      expect(service.isDateWithinTolerance(3)).toBe(true);
+    });
+
+    it('should return false for 4+ days difference', () => {
+      expect(service.isDateWithinTolerance(4)).toBe(false);
       expect(service.isDateWithinTolerance(5)).toBe(false);
     });
 
     it('should handle fractional days', () => {
       expect(service.isDateWithinTolerance(0.5)).toBe(true);
-      expect(service.isDateWithinTolerance(1.5)).toBe(false);
+      expect(service.isDateWithinTolerance(2.5)).toBe(true);
+      expect(service.isDateWithinTolerance(3.5)).toBe(false);
     });
   });
 
@@ -387,8 +393,8 @@ describe('ToleranceConfigService', () => {
       // R5 for bank fees - typical debit order/transaction fees
       expect(DEFAULT_TOLERANCE_CONFIG.bankFeeTolerance).toBe(500);
 
-      // 1 day for date tolerance - processing delays
-      expect(DEFAULT_TOLERANCE_CONFIG.dateTolerance).toBe(1);
+      // 3 days for date tolerance - bank processing delays (TASK-RECON-016)
+      expect(DEFAULT_TOLERANCE_CONFIG.dateTolerance).toBe(3);
 
       // 0.5% for large amounts - scales appropriately
       expect(DEFAULT_TOLERANCE_CONFIG.percentageTolerance).toBe(0.005);

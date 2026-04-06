@@ -21,6 +21,10 @@ export enum DashboardEventType {
   HEARTBEAT = 'heartbeat',
   /** Connection established confirmation */
   CONNECTED = 'connected',
+  /** Fired when a new child is enrolled */
+  ENROLLMENT_COMPLETED = 'enrollment_completed',
+  /** Fired when a notification is created */
+  NOTIFICATION_CREATED = 'notification_created',
   /** Error event */
   ERROR = 'error',
 }
@@ -90,6 +94,17 @@ export interface MetricsUpdatedData {
 }
 
 /**
+ * Enrollment completed event data
+ */
+export interface EnrollmentCompletedData {
+  enrollmentId: string;
+  childName: string;
+  parentName: string;
+  feeStructureName: string;
+  source: 'admin_api' | 'whatsapp_onboarding';
+}
+
+/**
  * Connection confirmation data
  */
 export interface ConnectedData {
@@ -105,6 +120,18 @@ export interface ErrorData {
   code: string;
   message: string;
   details?: unknown;
+}
+
+/**
+ * Notification created event data
+ */
+export interface NotificationCreatedData {
+  notificationId: string;
+  type: string; // NotificationType value
+  priority: string;
+  title: string;
+  recipientType: string;
+  recipientId: string;
 }
 
 /**
@@ -158,12 +185,36 @@ export function createMetricsUpdatedEvent(
   };
 }
 
+export function createEnrollmentCompletedEvent(
+  tenantId: string,
+  data: EnrollmentCompletedData,
+): DashboardEvent<EnrollmentCompletedData> {
+  return {
+    type: DashboardEventType.ENROLLMENT_COMPLETED,
+    timestamp: new Date().toISOString(),
+    tenantId,
+    data,
+  };
+}
+
 export function createConnectedEvent(
   tenantId: string,
   data: ConnectedData,
 ): DashboardEvent<ConnectedData> {
   return {
     type: DashboardEventType.CONNECTED,
+    timestamp: new Date().toISOString(),
+    tenantId,
+    data,
+  };
+}
+
+export function createNotificationCreatedEvent(
+  tenantId: string,
+  data: NotificationCreatedData,
+): DashboardEvent<NotificationCreatedData> {
+  return {
+    type: DashboardEventType.NOTIFICATION_CREATED,
     timestamp: new Date().toISOString(),
     tenantId,
     data,

@@ -70,3 +70,8 @@ export * from './use-bank-fees';
 
 // TASK-WA-004: WhatsApp Opt-In Management hooks
 export * from './use-whatsapp';
+
+// Notification hooks
+export * from './use-notifications';
+export { useWebSocket } from './use-websocket';
+export { useNotificationSocket } from './use-notification-socket';

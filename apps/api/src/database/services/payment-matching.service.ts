@@ -158,19 +158,21 @@ export class PaymentMatchingService {
     );
 
     // Build unique first name set for this tenant's children
-    // A name is "unique" if only one child has it — safe for first-name-only matching
-    const firstNameCounts = new Map<string, number>();
+    // A name is "unique" if only one distinct child has it — safe for first-name-only matching
+    // Count by childId (not invoice) to avoid duplicates from multiple invoices per child
+    const childNameMap = new Map<string, Set<string>>(); // firstName → set of childIds
     for (const inv of outstandingInvoices) {
       const name = inv.child.firstName.toLowerCase().trim();
-      firstNameCounts.set(name, (firstNameCounts.get(name) ?? 0) + 1);
+      if (!childNameMap.has(name)) childNameMap.set(name, new Set());
+      childNameMap.get(name)!.add(inv.childId);
     }
     this.uniqueFirstNames = new Set(
-      [...firstNameCounts.entries()]
-        .filter(([, count]) => count === 1)
+      [...childNameMap.entries()]
+        .filter(([, childIds]) => childIds.size === 1)
         .map(([name]) => name),
     );
     this.logger.log(
-      `Unique first names: ${this.uniqueFirstNames.size} of ${firstNameCounts.size}`,
+      `Unique first names: ${this.uniqueFirstNames.size} of ${childNameMap.size}`,
     );
 
     if (outstandingInvoices.length === 0) {

@@ -71,8 +71,14 @@ const NAME_IDENTIFIED_THRESHOLD = 55;
  * Match reason substrings that indicate a strong, unambiguous name match.
  * These patterns identify the payer with high certainty — full child/parent
  * name found, initial+surname, or high string similarity (>85%).
- * First-name-only and surname-only are excluded as they can be ambiguous
- * (e.g., "Thatego" matches both Thatego Mphela and Thatego Madisa).
+ *
+ * "Unique first name" is also strong: if only one child in the entire tenant
+ * has that first name, it's unambiguous (e.g., "Leano" → Leano Mogashoa,
+ * "Sethu" → Siphosethu Skhosana). This is safe because the name-identified
+ * path already de-duplicates by parentId.
+ *
+ * Excluded: generic "First name found" and "Surname match" when the name
+ * is shared (e.g., "Thatego" matches both Mphela and Madisa).
  */
 const STRONG_NAME_PATTERNS = [
   'exact name match',
@@ -80,6 +86,7 @@ const STRONG_NAME_PATTERNS = [
   'initial + surname match',
   'family initial + surname match',
   'strong name match',
+  'unique first name match', // covers both exact and similarity variants
 ];
 
 /** Confidence threshold for agent decision (ambiguous matches) */
@@ -103,6 +110,14 @@ type InvoiceWithRelations = Invoice & { parent: Parent; child: Child };
 @Injectable()
 export class PaymentMatchingService {
   private readonly logger = new Logger(PaymentMatchingService.name);
+
+  /**
+   * Set of child first names (lowercased) that are unique across the tenant.
+   * Built at the start of each matchPayments batch from outstanding invoices.
+   * Used by matchNameAgainst to upgrade first-name-only matches to strong
+   * when the name is unambiguous.
+   */
+  private uniqueFirstNames: Set<string> = new Set();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -140,6 +155,22 @@ export class PaymentMatchingService {
     // 2. Get outstanding invoices with parent/child relations
     const outstandingInvoices = await this.getOutstandingInvoices(
       dto.tenantId!,
+    );
+
+    // Build unique first name set for this tenant's children
+    // A name is "unique" if only one child has it — safe for first-name-only matching
+    const firstNameCounts = new Map<string, number>();
+    for (const inv of outstandingInvoices) {
+      const name = inv.child.firstName.toLowerCase().trim();
+      firstNameCounts.set(name, (firstNameCounts.get(name) ?? 0) + 1);
+    }
+    this.uniqueFirstNames = new Set(
+      [...firstNameCounts.entries()]
+        .filter(([, count]) => count === 1)
+        .map(([name]) => name),
+    );
+    this.logger.log(
+      `Unique first names: ${this.uniqueFirstNames.size} of ${firstNameCounts.size}`,
     );
 
     if (outstandingInvoices.length === 0) {
@@ -768,7 +799,32 @@ export class PaymentMatchingService {
 
     // 6. Contains first name (child-first-name-only is common in SA payments)
     if (containsFirst && normFirst.length >= 4) {
+      // If this first name is unique across the tenant, it's unambiguous
+      if (this.uniqueFirstNames.has(normFirst)) {
+        return { score: 18, label: 'Unique first name match' };
+      }
       return { score: 15, label: 'First name found' };
+    }
+
+    // 6b. First name similarity — handles typos/misspellings in ADT deposits
+    //     e.g., "Tshegfatso" vs "Tshegofatso", "Segofatso" vs "Tshegofatso"
+    if (normFirst.length >= 5) {
+      const firstNameSimilarity = this.calculateStringSimilarity(
+        normalizedSource,
+        normFirst,
+      );
+      if (firstNameSimilarity > 0.8) {
+        if (this.uniqueFirstNames.has(normFirst)) {
+          return {
+            score: 16,
+            label: `Unique first name match (${Math.round(firstNameSimilarity * 100)}% similar)`,
+          };
+        }
+        return {
+          score: 12,
+          label: `First name similar (${Math.round(firstNameSimilarity * 100)}%)`,
+        };
+      }
     }
 
     // 7. Contains last name (someone else in family paying, e.g., "Gosiame Khoza" for child "Kagoyarona Khoza")

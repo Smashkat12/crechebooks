@@ -809,17 +809,25 @@ export class PaymentMatchingService {
     }
 
     // 6a. Nickname/suffix matching — handles common SA name shortenings
-    //     e.g., "Sethu" is suffix of "Siphosethu", "Kgomotso" suffix of longer name
-    //     The source IS the nickname, and it appears as a suffix of the registered first name
-    if (
-      normFirst.length >= 8 &&
-      normalizedSource.length >= 4 &&
-      normFirst.endsWith(normalizedSource)
-    ) {
-      if (this.uniqueFirstNames.has(normFirst)) {
-        return { score: 18, label: 'Unique first name match (nickname)' };
+    //     e.g., "Sethu" is suffix of "Siphosethu"
+    //     Check both the full normalizedSource AND individual words from sourceLower
+    //     (because normalizedSource strips spaces: "sethuskhosana" won't suffix-match)
+    if (normFirst.length >= 8) {
+      const isSuffix =
+        normalizedSource.length >= 4 && normFirst.endsWith(normalizedSource);
+      const wordIsSuffix = sourceLower
+        .split(/\s+/)
+        .some(
+          (w) =>
+            w.length >= 4 &&
+            normFirst.endsWith(w.replace(/[^a-z]/g, '')),
+        );
+      if (isSuffix || wordIsSuffix) {
+        if (this.uniqueFirstNames.has(normFirst)) {
+          return { score: 18, label: 'Unique first name match (nickname)' };
+        }
+        return { score: 15, label: 'First name match (nickname)' };
       }
-      return { score: 15, label: 'First name match (nickname)' };
     }
 
     // 6b. First name similarity — handles typos/misspellings in ADT deposits

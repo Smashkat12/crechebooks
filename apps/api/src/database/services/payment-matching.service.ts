@@ -86,7 +86,7 @@ const STRONG_NAME_PATTERNS = [
   'initial + surname match',
   'family initial + surname match',
   'strong name match',
-  'unique first name match', // covers both exact and similarity variants
+  'unique first name match', // covers exact, similarity, and nickname variants
 ];
 
 /** Confidence threshold for agent decision (ambiguous matches) */
@@ -806,6 +806,20 @@ export class PaymentMatchingService {
         return { score: 18, label: 'Unique first name match' };
       }
       return { score: 15, label: 'First name found' };
+    }
+
+    // 6a. Nickname/suffix matching — handles common SA name shortenings
+    //     e.g., "Sethu" is suffix of "Siphosethu", "Kgomotso" suffix of longer name
+    //     The source IS the nickname, and it appears as a suffix of the registered first name
+    if (
+      normFirst.length >= 8 &&
+      normalizedSource.length >= 4 &&
+      normFirst.endsWith(normalizedSource)
+    ) {
+      if (this.uniqueFirstNames.has(normFirst)) {
+        return { score: 18, label: 'Unique first name match (nickname)' };
+      }
+      return { score: 15, label: 'First name match (nickname)' };
     }
 
     // 6b. First name similarity — handles typos/misspellings in ADT deposits

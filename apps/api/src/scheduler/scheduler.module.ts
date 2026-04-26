@@ -12,7 +12,6 @@ import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
-import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { CircuitBreakerModule } from '../integrations/circuit-breaker';
 import { EmailModule } from '../integrations/email/email.module';
 
@@ -115,7 +114,7 @@ const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
     ScheduleModule.forRoot(), // TASK-REL-101: Enable cron scheduling
     ...bullImports,
   ],
-  providers: [...schedulerProviders, ...cronProviders, ReminderTemplateService],
+  providers: [...schedulerProviders, ...cronProviders],
   exports: [
     ...(isRedisConfigured() ? [SchedulerService, BullModule] : []),
     XeroSyncRecoveryProcessor, // TASK-REL-101: Export for manual triggering

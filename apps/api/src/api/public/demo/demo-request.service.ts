@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma';
-import { EmailService } from '../../../common/email';
+import { EmailService } from '../../../integrations/email';
 import {
   CreateDemoRequestDto,
   DemoRequestResponseDto,

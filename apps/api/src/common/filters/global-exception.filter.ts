@@ -33,7 +33,7 @@ import {
   sanitizeErrorDetails,
   sanitizeMessage,
   sanitizeStackTrace,
-} from '../utils/sanitizer';
+} from '../utils/error-pii-redactor';
 
 /**
  * Standard error response format for all API errors

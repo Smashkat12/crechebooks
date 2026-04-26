@@ -54,7 +54,6 @@ async function bootstrap(): Promise<void> {
 
   // Webhook signature headers that require raw body preservation
   const webhookSignatureHeaders = [
-    'stripe-signature',
     'x-hub-signature-256',
     'x-signature',
     'x-whatsapp-signature',

@@ -16,6 +16,25 @@ import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { BusinessException } from '../../shared/exceptions';
 
+export interface ContactSubmission {
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+  submittedAt: Date;
+}
+
+export interface DemoRequest {
+  fullName: string;
+  email: string;
+  phone: string;
+  crecheName: string;
+  childrenCount: number;
+  province: string;
+  submittedAt: Date;
+}
+
 export interface EmailAttachment {
   filename: string;
   content: Buffer | string;
@@ -403,5 +422,135 @@ export class EmailService implements OnModuleInit {
     });
 
     return { messageId: result.messageId };
+  }
+
+  /**
+   * Send admin-alert email notification for a new contact form submission.
+   * Fire-and-forget: errors are logged but not re-thrown.
+   */
+  async sendContactNotification(contact: ContactSubmission): Promise<void> {
+    const recipient = process.env.SUPPORT_EMAIL ?? 'hello@crechebooks.co.za';
+    const frontendUrl =
+      process.env.FRONTEND_URL ?? 'https://app.elleelephant.co.za';
+
+    try {
+      await this.sendEmailWithOptions({
+        to: recipient,
+        subject: `🔔 New Contact Form - ${contact.name}`,
+        body: `New contact form submission from ${contact.name} (${contact.email})`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0EA5E9;">📧 New Contact Form Submission</h2>
+
+            <div style="background-color: #F0F9FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Name:</strong> ${contact.name}</p>
+              <p><strong>Email:</strong> <a href="mailto:${contact.email}">${contact.email}</a></p>
+              ${contact.phone ? `<p><strong>Phone:</strong> <a href="tel:${contact.phone}">${contact.phone}</a></p>` : ''}
+              ${contact.subject ? `<p><strong>Subject:</strong> ${contact.subject}</p>` : ''}
+            </div>
+
+            <div style="background-color: #FFFFFF; padding: 20px; border: 1px solid #E5E7EB; border-radius: 8px;">
+              <h3 style="margin-top: 0;">Message:</h3>
+              <p style="white-space: pre-wrap;">${contact.message}</p>
+            </div>
+
+            <p style="color: #6B7280; font-size: 14px; margin-top: 20px;">
+              <strong>Submitted:</strong> ${contact.submittedAt.toLocaleString(
+                'en-ZA',
+                {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                },
+              )}
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
+
+            <p style="font-size: 12px; color: #6B7280;">
+              View all submissions in your <a href="${frontendUrl}/dashboard">CrecheBooks Dashboard</a>
+            </p>
+          </div>
+        `,
+      });
+      this.logger.log(`Contact notification sent for ${contact.email}`);
+    } catch (error) {
+      this.logger.error(
+        'Failed to send contact notification via email',
+        error instanceof Error ? error.message : String(error),
+      );
+      // Don't throw - fire-and-forget
+    }
+  }
+
+  /**
+   * Send admin-alert email notification for a new demo request.
+   * Fire-and-forget: errors are logged but not re-thrown.
+   */
+  async sendDemoRequestNotification(demo: DemoRequest): Promise<void> {
+    const recipient = process.env.SUPPORT_EMAIL ?? 'hello@crechebooks.co.za';
+    const frontendUrl =
+      process.env.FRONTEND_URL ?? 'https://app.elleelephant.co.za';
+
+    try {
+      await this.sendEmailWithOptions({
+        to: recipient,
+        subject: `🎯 New Demo Request - ${demo.crecheName}`,
+        body: `New demo request from ${demo.fullName} (${demo.email}) for ${demo.crecheName}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #0EA5E9;">🎯 New Demo Request</h2>
+
+            <div style="background-color: #FEF3C7; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="margin: 0;"><strong>⚡ Action Required:</strong> Please follow up within 24 hours!</p>
+            </div>
+
+            <div style="background-color: #F0F9FF; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Contact Information</h3>
+              <p><strong>Name:</strong> ${demo.fullName}</p>
+              <p><strong>Email:</strong> <a href="mailto:${demo.email}">${demo.email}</a></p>
+              <p><strong>Phone:</strong> <a href="tel:${demo.phone}">${demo.phone}</a></p>
+            </div>
+
+            <div style="background-color: #FFFFFF; padding: 20px; border: 1px solid #E5E7EB; border-radius: 8px;">
+              <h3 style="margin-top: 0;">Crèche Details</h3>
+              <p><strong>Crèche Name:</strong> ${demo.crecheName}</p>
+              <p><strong>Number of Children:</strong> ${demo.childrenCount}</p>
+              <p><strong>Province:</strong> ${demo.province}</p>
+            </div>
+
+            <p style="color: #6B7280; font-size: 14px; margin-top: 20px;">
+              <strong>Submitted:</strong> ${demo.submittedAt.toLocaleString(
+                'en-ZA',
+                {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                },
+              )}
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 30px 0;">
+
+            <p style="font-size: 12px; color: #6B7280;">
+              View all demo requests in your <a href="${frontendUrl}/dashboard">CrecheBooks Dashboard</a>
+            </p>
+          </div>
+        `,
+      });
+      this.logger.log(`Demo request notification sent for ${demo.email}`);
+    } catch (error) {
+      this.logger.error(
+        'Failed to send demo request notification via email',
+        error instanceof Error ? error.message : String(error),
+      );
+      // Don't throw - fire-and-forget
+    }
   }
 }

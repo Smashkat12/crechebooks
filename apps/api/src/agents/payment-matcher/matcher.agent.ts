@@ -172,6 +172,7 @@ export class PaymentMatcherAgent {
         confidence: 0,
         action: 'NO_MATCH',
         reasoning: 'No matching invoices found',
+        source,
         alternatives: [],
       };
 
@@ -197,6 +198,7 @@ export class PaymentMatcherAgent {
         confidence: best.confidence,
         action: 'AUTO_APPLY',
         reasoning: best.matchReasons.join('; '),
+        source,
         alternatives: validCandidates
           .filter((c) => c.invoice.id !== best.invoice.id)
           .slice(0, 4)
@@ -273,6 +275,7 @@ export class PaymentMatcherAgent {
           confidence: best.confidence,
           action: 'REVIEW_REQUIRED',
           reasoning: `Ambiguous: ${currentHighConfidence.length} high-confidence matches found`,
+          source,
           alternatives: validCandidates.slice(0, 5).map((c) => ({
             invoiceId: c.invoice.id,
             invoiceNumber: c.invoice.invoiceNumber,
@@ -313,6 +316,7 @@ export class PaymentMatcherAgent {
           confidence: best.confidence,
           action: 'REVIEW_REQUIRED',
           reasoning: `Confidence ${best.confidence}% below threshold ${autoApplyThreshold}%`,
+          source,
           alternatives: validCandidates.slice(0, 5).map((c) => ({
             invoiceId: c.invoice.id,
             invoiceNumber: c.invoice.invoiceNumber,
@@ -419,6 +423,7 @@ export class PaymentMatcherAgent {
           confidence: best.confidence,
           action: 'AUTO_APPLY',
           reasoning: best.matchReasons.join('; '),
+          source,
           alternatives: validCandidates
             .filter((c) => c.invoice.id !== best.invoice.id)
             .slice(0, 4)
@@ -547,6 +552,7 @@ export class PaymentMatcherAgent {
         confidence: sdkResult.confidence,
         action,
         reasoning: reasonParts.join('; '),
+        source,
         alternatives: validCandidates
           .filter((c) => c.invoice.id !== sdkResult.bestMatchInvoiceId)
           .slice(0, 4)

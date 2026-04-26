@@ -8,6 +8,7 @@
  */
 
 import { IsUUID, IsArray, IsOptional, IsInt, Min } from 'class-validator';
+import type { MatchSource } from '../../agents/payment-matcher/interfaces/sdk-matcher.interface';
 
 /**
  * Confidence level categories for match scoring
@@ -99,6 +100,9 @@ export interface AppliedMatch {
 
   /** Confidence score of the match */
   confidenceScore: number;
+
+  /** Which subsystem produced the match decision */
+  source: MatchSource;
 }
 
 /**

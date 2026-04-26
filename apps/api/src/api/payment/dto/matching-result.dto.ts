@@ -31,6 +31,13 @@ export class ApiMatchedPaymentDto {
     example: ['Exact reference match', 'Exact amount match'],
   })
   match_reasons!: string[];
+
+  @ApiProperty({
+    enum: ['deterministic', 'deterministic+ruvector', 'sdk'],
+    description: 'Which subsystem produced the match',
+    example: 'deterministic',
+  })
+  source!: string;
 }
 
 /**

@@ -49,6 +49,7 @@ import {
   MatchDecision,
   InvoiceCandidate,
 } from '../../agents/payment-matcher/interfaces/matcher.interface';
+import type { MatchSource } from '../../agents/payment-matcher/interfaces/sdk-matcher.interface';
 import {
   isAmountWithinTolerance,
   AmountToleranceConfig,
@@ -818,9 +819,7 @@ export class PaymentMatchingService {
       const wordIsSuffix = sourceLower
         .split(/\s+/)
         .some(
-          (w) =>
-            w.length >= 4 &&
-            normFirst.endsWith(w.replace(/[^a-z]/g, '')),
+          (w) => w.length >= 4 && normFirst.endsWith(w.replace(/[^a-z]/g, '')),
         );
       if (isSuffix || wordIsSuffix) {
         if (this.uniqueFirstNames.has(normFirst)) {
@@ -1023,6 +1022,7 @@ export class PaymentMatchingService {
   async autoApplyMatch(
     candidate: MatchCandidate,
     tenantId: string,
+    source: MatchSource = 'deterministic',
   ): Promise<AppliedMatch> {
     // Double-check not already allocated (race condition protection)
     if (await this.isTransactionAllocated(candidate.transactionId)) {
@@ -1084,6 +1084,7 @@ export class PaymentMatchingService {
       invoiceNumber: candidate.invoiceNumber,
       amountCents: candidate.transactionAmountCents,
       confidenceScore: candidate.confidenceScore,
+      source,
     };
   }
 
@@ -1189,6 +1190,7 @@ export class PaymentMatchingService {
       invoiceNumber: invoice.invoiceNumber,
       amountCents,
       confidenceScore: 0, // Manual match has no confidence score
+      source: 'deterministic' as MatchSource,
     };
   }
 
@@ -1462,7 +1464,11 @@ export class PaymentMatchingService {
         };
       }
 
-      const applied = await this.autoApplyMatch(selectedCandidate, tenantId);
+      const applied = await this.autoApplyMatch(
+        selectedCandidate,
+        tenantId,
+        agentDecision.source ?? 'deterministic',
+      );
 
       return {
         transactionId: transaction.id,

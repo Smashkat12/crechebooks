@@ -1,0 +1,54 @@
+# Planning-lead mental model — CrecheBooks
+
+product_themes:
+  - theme: "Smart Transaction Categorization"
+    spec: specs/functional/transaction-categorization.md
+    target_accuracy: "95%+ overall, 99%+ after 3 months"
+    flag_threshold: "<80% confidence → human review"
+  - theme: "Automated Fee Billing"
+    spec: specs/functional/fee-billing.md
+    notes: "Variable fees (full/half-day, sibling discounts). Xero draft creation. Email + WhatsApp delivery."
+  - theme: "Payment Matching & Arrears"
+    spec: specs/functional/payment-matching.md
+    notes: "Matches by reference + amount + payer. Partial payments supported. 30/60/90-day aging."
+  - theme: "SARS Compliance Engine"
+    spec: specs/functional/sars-compliance.md
+    notes: "VAT201, EMP201, IRP5 generation. Currently STUBBED — eFiling API not yet integrated."
+  - theme: "Intelligent Reconciliation"
+    spec: specs/functional/reconciliation.md
+    notes: "Auto-reconcile matched, flag discrepancies, P&L + balance sheet."
+
+team_strengths:
+  product-manager: "Concrete acceptance criteria, BDD user stories, spec writing."
+  ux-researcher:   "Creche owner persona, mobile-first journey, SA market constraints."
+
+recurring_constraints:
+  - "ZAR cents integer. Banker's rounding via Decimal.js. NEVER JS Number."
+  - "POPIA compliance: PII redaction in logs, 5-year retention, no cross-tenant leakage."
+  - "SARS format compliance: deadlines, submission record format, immutable audit trail."
+  - "FNB primary bank; Xero mandatory accounting software."
+  - "Mobile-first by default — owners check on phones."
+
+spec_quality_patterns:
+  template_style: "XML-like structured markup. user-stories (BDD: Given/When/Then). requirements table (ID/priority/rationale). edge cases. traceability matrix."
+  baseline: "specs/constitution.md is immutable — tech stack, naming, anti-patterns."
+  good: ["explicit in/out of scope", "testable acceptance criteria as checkboxes", "open-questions section"]
+  bad: ["adjective-heavy criteria like 'intuitive UX'", "mixing two features into one spec"]
+
+roadmap:
+  phase_1_mvp:    "Transactions, Billing, Payments, SARS, Reconciliation."
+  phase_2_plus:   "Parent self-service portal, direct SARS eFiling API, multi-branch, budgeting, payroll integrations, mobile app."
+
+decisions_log:
+  - date: "2025-12-19"
+    decision: "Claude Code CLI subscription over direct API (cost)"
+    source: "CrecheBookkeeper-PRD.md:10-22"
+  - date: "2025-12-19"
+    decision: "L4 autonomy for high-confidence categorization; L2 for low-confidence and SARS"
+    source: "CrecheBookkeeper-PRD.md:692-714"
+
+session_observations: []
+
+open_questions:
+  - "(unresolved) Subscription tier pricing not finalised in PRD"
+  - "(unresolved) Many 'AI' claims in PRD don't match implementation — see engineering-lead mental model (`ai_agent_authenticity_audit`) and platform-engineer mental model"

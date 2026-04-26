@@ -1,0 +1,80 @@
+# Orchestrator mental model — CrecheBooks
+# Working memory across sessions. Update as you learn.
+
+product:
+  what: "AI-powered bookkeeping system for South African creches and pre-schools."
+  who: "Creche owner-operators (20-80 children, time-poor, not accounting-trained)."
+  problem_solved: "10-15 hours/month manual bookkeeping → daily 5-10 min engagement."
+  monetisation: "SaaS subscription (tier model not finalised in PRD)."
+  status: "MVP in flight; staging branch active."
+
+stack_at_a_glance:
+  api: "NestJS 11 + Prisma 7 + Postgres 16 (pgvector) + Redis 7 + Bull"
+  web: "Next.js 15 (App Router) + React 19 + Radix UI + Tailwind + TanStack Query + Zustand"
+  cli: "packages/cli (`cb` command) — TypeScript + Commander + vitest"
+  deploy: "Railway (Docker / nixpacks fallback). Postgres + Redis as services."
+  auth: "Auth0 OIDC (JWT via JWKS). API key auth (`cb_` prefix) as secondary."
+
+team_strengths:
+  planning-lead:    "Spec decomposition, scope, prioritization. 5 functional specs already exist."
+  engineering-lead: "Module decomposition, architecture, dependency edges. 8 domain engineers under it."
+  operate-lead:     "Drives the running system via cb-api.sh / cb-db.sh. 4 operators (financial / tax / comms / data)."
+  validation-lead:  "Pre-merge sanity, security review, schema-drift detection. Owns ship/fix/dont-ship verdicts."
+
+build_vs_operate:
+  build_path: "Engineering writes code → Validation gates ship/no-ship → if ship-it, you authorise engineering-lead to delegate to release-manager. Triggered by 'implement', 'fix', 'refactor', 'add', 'change'."
+  operate_path: "Operations drives live system data. Triggered by 'run', 'send', 'match', 'generate', 'draft', 'check', 'pull', 'list', 'broadcast'."
+  ambiguous: "When the verb could be either, ask — or default to operate-lead for live-system asks and engineering-lead for code asks."
+
+ship_flow:
+  - "engineering-lead delegates to one or more *-engineer (or schema-guardian via validation-lead)"
+  - "engineer reports back with Verify: PASS block; engineering-lead refuses without it"
+  - "engineering-lead composes, returns the diff/summary to you"
+  - "you (orchestrator) decide whether to route to validation-lead (often yes for any change touching money / tenant / public endpoints / schema)"
+  - "validation-lead emits verdict tool: ship-it | ship-with-fixes | dont-ship"
+  - "if ship-it: you authorise engineering-lead to delegate to release-manager with type/scope/target-branch"
+  - "release-manager opens the PR; engineering-lead returns the PR URL to you"
+  - "you report back to the user with the PR URL and the validation-lead summary"
+
+routing_rules:
+  general:
+    - "Spec-shaped asks (write a spec) → planning-lead. Don't engineer before spec exists."
+    - "Implementation, refactor, bug fix → engineering-lead. They route internally to the right domain engineer."
+    - "Run / send / generate / match / pull / draft against live system → operate-lead. They route to the right operator."
+    - "Audit / risk / 'is X actually working?' → validation-lead, often in parallel with engineering-lead or operate-lead."
+    - "Anything touching tenant_id, deleted_at, money_in_cents → validation-lead must see it (security-reviewer + schema-guardian)."
+  environment_default: "Operations work defaults to staging. Production requires explicit user authorisation in the message — restate it when delegating to operate-lead."
+  by_domain_for_visibility_only:
+    # Engineering-lead does the actual routing — these are listed so the orchestrator
+    # knows which lead to call when the user asks about a specific surface.
+    - "Invoicing / fees / statements → engineering-lead (billing-engineer internally)."
+    - "Payments / matching / allocation → engineering-lead (payments-engineer)."
+    - "Bank feeds / reconciliation / categorization → engineering-lead (banking-engineer)."
+    - "SARS / payroll / staff → engineering-lead (tax-payroll-engineer)."
+    - "Parents / children / dashboard → engineering-lead (people-engineer)."
+    - "Broadcasts / notifications / WhatsApp → engineering-lead (comms-engineer)."
+    - "Web app / UI / frontend → engineering-lead (frontend-engineer)."
+    - "DB / scheduler / integrations / auth / agent platform → engineering-lead (platform-engineer)."
+    - "Schema / migration / drift → validation-lead (schema-guardian)."
+
+constraints_to_remember:
+  - "All money is integer cents (ZAR). Decimal.js + banker's rounding for calculations. Never use JS Number."
+  - "POPIA + SARS-format compliance is non-negotiable; 5-year financial record retention."
+  - "Multi-tenancy is row-level via tenantId. Tenant isolation guards (TenantGuard) enforce on every request."
+  - "VAT 15% fixed. SA tax year March-Feb. UIF 2% (1+1)."
+  - "Xero is mandatory in MVP — no alternative accounting software."
+
+known_issues_to_watch:
+  - "Tenant-isolation retrofit debt: fix-*.py + final-*.sh scripts at api root. Schema was tenant-unaware initially."
+  - "AI authenticity gap: only ~3 of ~10 'agents' actually call an LLM. The rest are stubs that throw and fall back to templates. See engineering-lead's mental model for specifics."
+  - "Conversational agent endpoint always falls back to keyword regex; PRD claims natural-language queries."
+  - "ANTHROPIC_API_KEY may not be set in prod; .env.example ships placeholder. Without it, every 'AI' path silently degrades."
+
+session_observations: []
+  # - date: "2026-04-26"
+  #   note: "First session in CrecheBooks. Five research agents mapped the codebase."
+
+open_questions:
+  - "(unresolved) Is ANTHROPIC_API_KEY actually set in Railway staging/prod?"
+  - "(unresolved) Are SdkSarsExplainer / SdkSemanticValidator / ConversationalAgent intended to be wired, or rebranded as deterministic?"
+  - "(unresolved) Is the 99%+ categorization-accuracy claim measured against any benchmark?"

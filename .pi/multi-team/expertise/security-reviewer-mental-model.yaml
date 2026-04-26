@@ -1,0 +1,57 @@
+# Security-reviewer mental model — CrecheBooks
+
+auth_conventions:
+  pattern: "Auth0 OIDC + Passport JWT (RS256, JWKS via jwks-rsa). API-key fallback (`cb_` prefix)."
+  middleware_path: "apps/api/src/api/auth/"
+  guards_chain: "CustomThrottlerGuard → CombinedAuthGuard (JWT or API-key) → TenantGuard → RolesGuard"
+  jwt_claim_mapping: "sub (Auth0 user ID) → internal userId. tenantId from JWT custom claim or request header (TenantGuard)."
+  weakness_history:
+    - "Tenant nulls retrofitted post-launch (fix-*.py scripts). Verify any new auth-bypassing path."
+
+input_validation:
+  approach: "class-validator decorators on DTOs. ValidationPipe globally applied (whitelist + forbidNonWhitelisted)."
+  forms_lib: "Zod 3.24 on frontend (lib/validation/schemas.ts)."
+  custom_sa_validators: ["SA ID number Luhn", "SA phone normalize", "SA tax number", "SA bank account"]
+  gaps_seen:
+    - "Confirm DTOs cover every controller method — newer modules sometimes ship without DTOs initially."
+
+secrets_handling:
+  storage: "Env vars (Railway). Never committed."
+  required_keys:
+    - "AUTH0_ISSUER / AUTH0_AUDIENCE / AUTH0_DOMAIN / AUTH0_CLIENT_ID / AUTH0_CLIENT_SECRET"
+    - "DATABASE_URL"
+    - "JWT_SECRET / TOKEN_ENCRYPTION_KEY"
+    - "REDIS_HOST / REDIS_PORT / REDIS_DB"
+    - "XERO_* (Xero OAuth)"
+    - "ANTHROPIC_API_KEY (used as Requesty API key) + ANTHROPIC_BASE_URL"
+    - "MAILGUN_*, AFRICASTALKING_*, YOCO_*, STITCH_*, SIMPLEPAY_*"
+  redaction:
+    - "Pino logger configured via StructuredLoggerService. Verify password / token / authorization headers redacted."
+  rotation: "No documented rotation cadence. Schedule quarterly?"
+
+dependency_concerns: []
+
+threat_model_assumptions:
+  - "Trust boundary at the API layer. Frontend is hostile."
+  - "PII (parent/child names, ID numbers, contact info) stays in primary DB. No third-party except Xero / Mailgun / WhatsApp / SARS / SimplePay."
+  - "POPIA: PII redaction in logs; 5-year financial-record retention; explicit consent for marketing channels."
+  - "SARS audit reconstruction: immutable audit-trail table for every money-affecting event."
+
+south_african_compliance:
+  popia: "Protection of Personal Information Act. PII categories: child-name, parent-name, SA ID, contact, financial."
+  sars_format: "VAT201, EMP201, IRP5 — strict format. Submission record immutable."
+  retention: "5 years for financial records (deleted_at soft-delete keeps the rows)."
+  vat_rate: "15% (fixed by law)."
+
+recurring_findings_severity:
+  critical_count: 0
+  high_count: 0
+  med_count: 0
+  low_count: 0
+
+session_observations: []
+
+open_questions:
+  - "(unresolved) Are JWT exp claims actually verified? Confirm in CombinedAuthGuard."
+  - "(unresolved) Rate-limit tuning per route — global ThrottlerGuard, but SARS submission endpoints may need a stricter cap."
+  - "(unresolved) Webhook signature verification — Xero/Yoco/Stripe/WhatsApp all signature-checked? Confirm each."

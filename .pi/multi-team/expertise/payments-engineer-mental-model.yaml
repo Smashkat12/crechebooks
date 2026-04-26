@@ -1,0 +1,46 @@
+# Payments-engineer mental model — CrecheBooks
+
+purpose: |
+  Payment ingestion → AI matching → allocation to invoice. The matcher is a
+  hybrid: deterministic similarity + LLM ambiguity resolution.
+
+primary_paths:
+  apps/api/src/api/payment/:                            "REST endpoints — POST /payments, /allocations, /payment-links"
+  apps/api/src/agents/payment-matcher/:                 "Matcher agent — sdk-matcher.ts holds the LLM seam"
+  apps/api/src/database/services/payment-matching.*:    "DB-side matching service + DTO + spec"
+
+scoring_strategy:
+  ordered_signals:
+    - "Exact reference match (invoice number / payer ref) — confidence 1.0"
+    - "Description first-name match (with sibling-counting rule)"
+    - "Nickname / suffix word match (recently added — see commits)"
+    - "Typo similarity (Levenshtein/Jaro) for ADT-style deposits"
+    - "Amount + date proximity"
+  llm_seam: "sdk-matcher.ts:resolveAmbiguity — only fires on multi-candidate ambiguity"
+
+confidence_thresholds:
+  auto_apply: ">= 0.80"
+  suggest:    ">= 0.50"
+  reject:     "<  0.50"
+
+prisma_models_in_scope:
+  - Payment
+  - PaymentLink
+  - PaymentGatewayTransaction
+  - MatchedBy            # enum
+  - AgentDecision        # for audit (write via agents/audit, read here)
+
+cross_team_handoffs:
+  banking-engineer: "Transaction ingestion + categorization is theirs. We consume Payment-shaped output."
+  billing-engineer: "Once allocated, Invoice.status flips. They own that side."
+  platform-engineer: "claude-client.service.ts (Requesty wrapper) is theirs."
+  schema-guardian: "All schema changes route via validation-lead."
+
+known_quirks:
+  - "ADT (FNB ATM cash deposit) descriptions are heavily abbreviated — needs typo-tolerant matching."
+  - "Sibling counting: count unique first names by Child, not by Invoice (see commit a6348f0)."
+  - "Suffix/nickname matching checks individual words, not full source string (see commit 9c068db)."
+  - "ANTHROPIC_API_KEY missing in env → resolveAmbiguity silently falls back to deterministic. Verify env before claiming AI works."
+
+session_observations: []
+open_questions: []

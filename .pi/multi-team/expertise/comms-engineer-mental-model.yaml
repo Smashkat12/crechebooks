@@ -1,0 +1,58 @@
+# Comms-engineer mental model — CrecheBooks
+
+purpose: |
+  Multi-channel message delivery: broadcasts, notifications, WhatsApp / email /
+  SMS. Two WhatsApp providers (Meta direct vs Twilio). Mailgun for email.
+
+primary_paths:
+  apps/api/src/api/communications/:    "Broadcast + recipient-group REST"
+  apps/api/src/api/whatsapp/:          "WhatsApp-specific REST"
+  apps/api/src/api/notifications/:     "Notification preferences + delivery"
+  apps/api/src/communications/:        "Broadcast processor + dispatcher"
+  apps/api/src/notifications/:         "Notification dispatcher"
+
+staging_safety:
+  rule: "NEVER trigger real sends from staging. Staging holds real parent data; no feature flag exists for disabling comms. Production only, only when the brief explicitly authorises a send."
+  dangerous_endpoints:
+    - "POST /invoices/send"
+    - "POST /communications/broadcast"
+    - "any /delivery or /reminder endpoint"
+  dangerous_services:
+    - InvoiceDeliveryService
+    - BroadcastProcessor
+    - ArrearReminderJob
+    - ReminderService
+    - WelcomePackDeliveryService
+
+whatsapp_architecture:
+  facade:        "WhatsAppProviderService"
+  meta_direct:   "WhatsAppService (Meta Cloud API)"
+  twilio:        "TwilioWhatsAppService"
+  selector_env:  "WHATSAPP_PROVIDER (currently 'twilio' in production)"
+  templates:     "TwilioContentService — in-memory cache + DB persistence"
+
+prisma_models_in_scope:
+  - WhatsAppMessage
+  - WhatsAppContentTemplate
+  - BroadcastMessage
+  - MessageRecipient
+  - RecipientGroup
+  - InvoiceDeliveryLog        # write side; billing reads
+  - Notification
+  - NotificationPreference
+  - Reminder
+  - ReminderTemplate
+  - ReminderConfig
+
+cross_team_handoffs:
+  platform-engineer: "Mailgun + WhatsApp Cloud + Twilio integration adapters are theirs."
+  billing-engineer: "Invoice delivery — they hand us a DeliveryRequest, we resolve channels and dispatch."
+  people-engineer: "Recipient resolution from Parent/Child data."
+  schema-guardian: "Schema changes via validation-lead."
+
+known_quirks:
+  - "Twilio Content API templates require pre-approval — don't add ad-hoc templates without product sign-off."
+  - "InvoiceDeliveryLog row is the audit anchor for any invoice send."
+
+session_observations: []
+open_questions: []

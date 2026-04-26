@@ -1,0 +1,50 @@
+# Frontend-engineer mental model — CrecheBooks (apps/web)
+
+purpose: |
+  Builds the Next.js 15 web app — dashboard, parent portal, staff portal,
+  admin, public/marketing surfaces. App Router, server + client components,
+  TanStack Query, Zustand, Radix + Tailwind.
+
+stack:
+  framework:    "Next.js 15 (App Router)"
+  react:        "19"
+  language:     "TypeScript (strict)"
+  styling:      "Tailwind + shadcn/ui (Radix primitives)"
+  data:         "TanStack Query (server state) + Zustand (client state)"
+  auth:         "next-auth (NextAuth)"
+  realtime:     "Socket.io client via use-websocket hook"
+
+route_groups:
+  (dashboard): "Owner/admin portal — invoices, payments, reconciliation, sars, reports, staff, settings"
+  (auth):      "Login, SSO callback, MFA"
+  parent:      "Parent portal — view invoices, pay, contact school"
+  staff:       "HR portal — payroll, leave, onboarding docs, UI19"
+  admin:       "Platform admin — tenant config, audit logs, feature flags"
+  (public):    "Marketing, quote builder, demo request"
+  pay:         "Unauthenticated payment-link processing"
+  quote:       "Quote builder (enrollment + fees → proposal)"
+  callback:    "OAuth redirect handler"
+
+money_display:
+  rule: "All amounts in ZAR. Convert from cents at the boundary; never math on display strings."
+
+contract_source:
+  api_path:     "/api/v1/* (apps/api/src/api/*)"
+  shared_types: "packages/types/src/ — add types here, not inlined"
+
+auth_caveat:
+  rule: "RS256 in prod (Auth0), HS256 in staging (DEV_AUTH_ENABLED). Token shape can differ — check before parsing claims."
+
+dashboard_realtime:
+  events: "dashboard.* via DashboardGateway"
+  hook:   "use-websocket subscribes; match its existing pattern"
+
+cross_team_handoffs:
+  backend_engineers: "If a contract is missing, surface — don't inline a fetch + cast."
+  schema-guardian:   "If a model field is missing in packages/types, that may indicate schema drift."
+
+known_quirks:
+  - "Some routes still use legacy patterns from before App Router migration — match the local convention rather than enforcing 'modern' globally."
+
+session_observations: []
+open_questions: []

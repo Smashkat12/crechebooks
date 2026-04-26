@@ -1,0 +1,44 @@
+# Financial-ops mental model — CrecheBooks
+
+purpose: |
+  Operates the money flow. Read-current-state then run-the-routine pattern.
+  Routines: invoice generation, payment matcher, statement generation,
+  reconciliation status, arrears pull.
+
+monthly_close_outline:
+  prerequisites:
+    - "All bank transactions imported for the period (banking-engineer's responsibility, but verify count)"
+    - "Categorization complete (cb-api.sh GET /transactions?categorized=false should return zero)"
+    - "Payment matcher pass complete with low-confidence cases triaged"
+  steps:
+    - "Confirm prerequisites, capture counts."
+    - "Generate invoices: cb-api.sh POST /billing/invoices/generate { month: YYYY-MM, dryRun: true } → review → dryRun:false."
+    - "Run matcher pass: cb-api.sh POST /payments/match { since: ... } → review thresholds."
+    - "Generate statements: cb-api.sh POST /billing/statements/generate { month: YYYY-MM, dryRun: true } → review → dryRun:false."
+    - "Hand off to comms-ops for delivery (production only)."
+    - "Pull arrears: cb-api.sh GET /reports/arrears?asOf=YYYY-MM-DD."
+    - "Pull reconciliation status: cb-api.sh GET /reconciliation/status."
+
+useful_queries:
+  unmatched_payments_count: |
+    cb-db.sh "SELECT count(*) FROM payments WHERE tenant_id = '$TENANT' AND status = 'UNMATCHED' AND deleted_at IS NULL"
+  draft_invoices_count: |
+    cb-db.sh "SELECT count(*) FROM invoices WHERE tenant_id = '$TENANT' AND status = 'DRAFT' AND deleted_at IS NULL"
+  open_reconciliations: |
+    cb-db.sh "SELECT bank_account, period, status FROM reconciliations WHERE tenant_id = '$TENANT' AND status != 'RECONCILED' ORDER BY period DESC"
+
+matcher_threshold_reminder:
+  auto_apply: ">= 0.80 → matcher allocates automatically"
+  suggest:    ">= 0.50 → human review"
+  reject:     "<  0.50"
+  rule:       "Never auto-allocate around the threshold. List low-confidence cases for the lead to review."
+
+scheduler_awareness:
+  invoice-scheduler:    "Configurable cadence (weekly/monthly). Scheduler may auto-run; coordinate to avoid duplicate runs."
+  statement-scheduler:  "Monthly. Same caveat."
+  payment-reminder:     "Escalating cadence. Production-only pipeline."
+  active_in_staging:    "Unknown — verify before triggering manual runs that overlap with scheduled runs."
+
+session_observations: []
+open_questions:
+  - "(unresolved) Which scheduler processors are active in staging vs production? Could double-trigger."

@@ -111,3 +111,7 @@ test-results/
 # Local docs
 docs/company-docs/
 docs/data
+
+# pi multi-team — ephemeral runtime state
+.pi/multi-team/sessions/
+.pi/multi-team/logs/

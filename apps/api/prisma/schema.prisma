@@ -423,28 +423,6 @@ enum BillStatus {
   OVERDUE
 }
 
-// TASK-ACCT-011: Payment Gateway
-enum PaymentLinkStatus {
-  ACTIVE
-  EXPIRED
-  USED
-  CANCELLED
-}
-
-enum PaymentLinkType {
-  INVOICE
-  OUTSTANDING
-  CUSTOM
-  REGISTRATION
-}
-
-enum PaymentGatewayStatus {
-  PENDING
-  SUCCESSFUL
-  FAILED
-  REFUNDED
-}
-
 // TASK-ACCT-003: Opening Balances
 enum OpeningBalanceImportStatus {
   DRAFT
@@ -707,10 +685,6 @@ model Tenant {
   suppliers            Supplier[]
   supplierBills        SupplierBill[]
   supplierBillPayments SupplierBillPayment[]
-
-  // TASK-ACCT-011: Payment Gateway
-  paymentLinks               PaymentLink[]
-  paymentGatewayTransactions PaymentGatewayTransaction[]
 
   // TASK-ACCT-014: Onboarding Wizard
   onboardingProgress OnboardingProgress?
@@ -1095,10 +1069,6 @@ model Parent {
   // TASK-ACCT-012: Quotes for parent
   quotes Quote[]
 
-  // TASK-ACCT-011: Payment links and gateway transactions
-  paymentLinks               PaymentLink[]
-  paymentGatewayTransactions PaymentGatewayTransaction[]
-
   // TASK-ONBOARD: Parent onboarding documents
   generatedDocuments ParentGeneratedDocument[]
 
@@ -1247,10 +1217,6 @@ model Invoice {
   // TASK-ACCT-012: Quotes converted to this invoice
   quotesConverted Quote[]
 
-  // TASK-ACCT-011: Payment gateway
-  paymentLinks               PaymentLink[]
-  paymentGatewayTransactions PaymentGatewayTransaction[]
-
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, parentId])
   @@index([tenantId, status])
@@ -1360,9 +1326,6 @@ model Payment {
 
   // TASK-XERO-010: Xero Payment Mapping
   xeroPaymentMapping XeroPaymentMapping?
-
-  // TASK-ACCT-011: Payment gateway transactions linked to this payment
-  gatewayTransactions PaymentGatewayTransaction[]
 
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
@@ -3797,80 +3760,6 @@ model SupplierBillPayment {
   @@index([billId])
   @@index([transactionId])
   @@map("supplier_bill_payments")
-}
-
-// ============================================
-// TASK-ACCT-011: Payment Gateway (Yoco)
-// ============================================
-model PaymentLink {
-  id          String            @id @default(uuid())
-  tenantId    String            @map("tenant_id")
-  parentId    String            @map("parent_id")
-  invoiceId   String?           @map("invoice_id")
-  type        PaymentLinkType   @default(INVOICE)
-  amountCents Int               @map("amount_cents")
-  shortCode   String            @unique @map("short_code") @db.VarChar(20)
-  description String?           @db.VarChar(200)
-  status      PaymentLinkStatus @default(ACTIVE)
-  expiresAt   DateTime?         @map("expires_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant              Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent              Parent                      @relation(fields: [parentId], references: [id])
-  invoice             Invoice?                    @relation(fields: [invoiceId], references: [id])
-  gatewayTransactions PaymentGatewayTransaction[]
-
-  @@index([tenantId, status])
-  @@index([shortCode])
-  @@map("payment_links")
-}
-
-model PaymentGatewayTransaction {
-  id            String  @id @default(uuid())
-  tenantId      String  @map("tenant_id")
-  paymentLinkId String? @map("payment_link_id")
-  parentId      String  @map("parent_id")
-  invoiceId     String? @map("invoice_id")
-
-  // Gateway details
-  gateway           String               @db.VarChar(30)
-  gatewayId         String               @map("gateway_id") @db.VarChar(100)
-  gatewayCheckoutId String?              @map("gateway_checkout_id") @db.VarChar(100)
-  status            PaymentGatewayStatus @default(PENDING)
-
-  // Amounts
-  amountCents    Int  @map("amount_cents")
-  feeCents       Int? @map("fee_cents")
-  netAmountCents Int? @map("net_amount_cents")
-
-  // Card details (masked)
-  cardBrand       String? @map("card_brand") @db.VarChar(20)
-  cardLastFour    String? @map("card_last_four") @db.VarChar(4)
-  cardExpiryMonth Int?    @map("card_expiry_month")
-  cardExpiryYear  Int?    @map("card_expiry_year")
-
-  // Payment record
-  paymentId String? @map("payment_id")
-
-  // Metadata
-  metadata     Json?
-  errorMessage String? @map("error_message") @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  paymentLink PaymentLink? @relation(fields: [paymentLinkId], references: [id])
-  parent      Parent       @relation(fields: [parentId], references: [id])
-  invoice     Invoice?     @relation(fields: [invoiceId], references: [id])
-  payment     Payment?     @relation(fields: [paymentId], references: [id])
-
-  @@unique([gateway, gatewayId])
-  @@index([tenantId, status])
-  @@index([paymentLinkId])
-  @@map("payment_gateway_transactions")
 }
 
 // ============================================

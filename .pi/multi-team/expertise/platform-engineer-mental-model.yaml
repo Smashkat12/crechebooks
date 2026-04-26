@@ -1,0 +1,75 @@
+# Platform-engineer mental model — CrecheBooks
+
+purpose: |
+  The plumbing: DB layer (PrismaService + repositories + cross-domain services),
+  schedulers, queues, integrations (Xero, Stitch, Stub.africa, SimplePay,
+  WhatsApp, Mailgun, etc.), shared agent SDK, platform-level agents (audit,
+  memory, orchestrator, rollout, extraction-validator, report-synthesis), auth
+  flow, common guards/decorators/filters, infra modules.
+
+stack:
+  framework: "NestJS 11"
+  orm:       "Prisma 7 + Postgres 16 (with pgvector for embeddings)"
+  queues:    "Bull 4.16 (NOT BullMQ) on Redis 7 (ioredis)"
+  cron:      "@nestjs/schedule"
+  auth:      "Auth0 OIDC + Passport JWT (jwks-rsa) + API-key (cb_*) fallback"
+  realtime:  "Socket.io 4.8 via @nestjs/platform-socket.io"
+  config:    "@nestjs/config + Joi schema"
+  logging:   "Pino + StructuredLoggerService (correlation IDs)"
+
+guards_chain_order:
+  - CustomThrottlerGuard
+  - CombinedAuthGuard      # Auth0 JWT primary, cb_ API key fallback
+  - TenantGuard
+  - RolesGuard
+
+ai_agent_audit_summary:
+  real_llm_calls:
+    - "agents/payment-matcher/sdk-matcher.ts (resolveAmbiguity, multi-candidate only)"
+    - "agents/transaction-categorizer/sdk-categorizer.ts (pattern <80% only)"
+    - "agents/report-synthesis/synthesis.agent.ts (statement narratives)"
+    - "health/ai-health.controller.ts (diagnostic only)"
+  fake_or_lying_stubs:
+    - "agents/orchestrator/sdk-orchestrator.ts (Promise.allSettled dispatcher)"
+    - "agents/conversational/conversational.agent.ts (throws SDK not wired)"
+    - "agents/sars-agent/sdk-sars-explainer.ts (throws agentic-flow not installed — IT IS)"
+    - "agents/extraction-validator/sdk-validator.ts (same false throw)"
+    - "agents/shared/{accuracy-tracker, scoring-router, hybrid-scorer}.ts (defaults)"
+  rule: "If you stub, stub honestly with NotImplementedError — don't claim non-installation."
+
+llm_provider:
+  endpoint:    "https://router.requesty.ai/v1/messages (Requesty proxy, NOT Anthropic direct)"
+  wrapper:     "agents/sdk/claude-client.service.ts"
+  env_var:     "ANTHROPIC_API_KEY required (despite proxy). .env.example ships placeholder."
+
+integrations:
+  pattern: "All wrapped in opossum CircuitBreaker"
+  list:
+    - xero
+    - yoco
+    - stitch          # bank feeds
+    - stub-africa     # bank feeds
+    - simplepay       # payroll import
+    - whatsapp
+    - sars            # currently STUBBED
+    - mailgun
+    - exchange-rates
+
+webhooks:
+  rule:    "All inbound webhook handlers MUST signature-verify"
+  sources: [Xero, Yoco, Stitch, Stripe, WhatsApp, SARS]
+
+graceful_shutdown:
+  rule: "main.ts drains Bull queues on SIGTERM (TASK-INFRA-007). Don't break this."
+
+cross_team_handoffs:
+  schema-guardian: "Prisma schema + migrations are theirs. We can read but not edit."
+  domain_engineers: "Domain logic (billing rules, matching heuristics, tax calc, comms flow) is NOT yours. Route back."
+
+load_bearing_todos:
+  - "transaction.repository.ts: 'Add proper currency fields' — multi-currency incomplete"
+  - "sars-submission-retry.service.ts: 'Integrate with actual SARS eFiling API' — currently stubbed"
+  - "statement-generation.service.ts: 'Implement proper pagination for very large tenant datasets'"
+
+session_observations: []
+open_questions: []

@@ -1,0 +1,248 @@
+# pi-agents — multi-team CLI shortcuts.
+#
+# `just` is at /home/smash/.local/bin/just (added by install.sh).
+# When imported via `mod pi '.pi/justfile'` from the project root justfile,
+# recipes here run with cwd = parent project root (so `.pi/multi-team/...`
+# paths resolve correctly).
+
+set working-directory := '..'
+
+# Default model for the orchestrator (interactive root session).
+# Override with: `just orchestrator-model=anthropic/claude-opus-4-6 chat`
+orchestrator-model := "anthropic/claude-sonnet-4-6"
+
+# The tool set the orchestrator gets exposed to. The agent definition lists more
+# but at the root level we lock the LLM to delegate-flavored work only.
+orchestrator-tools := "read,grep,find,ls,delegate"
+
+# Cheap model used by `test*` recipes — wiring smoke only, output quality
+# unimportant. Override with: `just test-model=anthropic/claude-sonnet-4-6 test "..."`
+test-model := "anthropic/claude-haiku-4-5"
+
+# ─── Default ────────────────────────────────────────────────────────────────
+
+default:
+    @just --list --unsorted
+
+# ─── Interactive ────────────────────────────────────────────────────────────
+
+# Start an interactive orchestrator session.
+chat:
+    pi --model {{orchestrator-model}} --tools {{orchestrator-tools}}
+
+# Same, but with the orchestrator's full system prompt pre-rendered and injected.
+# Useful if you want the orchestrator to load its skills + expertise on the root.
+chat-full:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just _render-orchestrator-prompt > /tmp/pi-agents-orch-prompt.md
+    pi --model {{orchestrator-model}} \
+       --tools {{orchestrator-tools}} \
+       --append-system-prompt /tmp/pi-agents-orch-prompt.md
+
+# ─── Smoke tests (one-shot) ─────────────────────────────────────────────────
+
+# Ping: orchestrator only, no delegation. Verifies the system loads.
+ping:
+    @echo "→ orchestrator ping (no delegation)"
+    pi --model {{orchestrator-model}} --tools {{orchestrator-tools}} \
+       -p "Ping. Just respond with 'pong' and nothing else."
+
+# Ping each lead in turn (sequential). Shows the orchestrator routing.
+ping-leads:
+    @echo "→ orchestrator pings each team lead"
+    pi --model {{orchestrator-model}} --tools {{orchestrator-tools}} \
+       -p "Use the delegate tool four times: send 'ping' to planning-lead, then to engineering-lead, then to operate-lead, then to validation-lead. Each lead just responds with 'pong'. Report all four responses in a numbered list."
+
+# Ask all teams the same question. Multi-perspective answer.
+ask-all QUESTION:
+    @echo "→ orchestrator asks all teams: {{QUESTION}}"
+    pi --model {{orchestrator-model}} --tools {{orchestrator-tools}} \
+       -p "Use the delegate tool to ask all four team leads (planning-lead, engineering-lead, operate-lead, validation-lead) the following question, then synthesize the responses into a single multi-perspective answer.\n\nQuestion: {{QUESTION}}"
+
+# ─── Cheap-mode wiring tests ────────────────────────────────────────────────
+# All `test-*` recipes force every agent (orchestrator + leads + workers) onto
+# {{test-model}} via MULTI_TEAM_MODEL_OVERRIDE, so smoke runs cost cents.
+# Use these to verify routing/tool-invocation, not output quality.
+
+# Generic test runner — accepts any prompt.
+test PROMPT:
+    @echo "→ test [{{test-model}}]: {{PROMPT}}"
+    MULTI_TEAM_MODEL_OVERRIDE={{test-model}} \
+        pi --model {{test-model}} --tools {{orchestrator-tools}} \
+           -p "{{PROMPT}}"
+
+# Cheap version of ping-leads.
+test-ping-leads:
+    @echo "→ ping-leads [{{test-model}}]"
+    MULTI_TEAM_MODEL_OVERRIDE={{test-model}} \
+        pi --model {{test-model}} --tools {{orchestrator-tools}} \
+           -p "Use the delegate tool four times: send 'ping' to planning-lead, then to engineering-lead, then to operate-lead, then to validation-lead. Each lead just responds with 'pong'. Report all four responses in a numbered list."
+
+# Sequential workflow: plan → engineer → validate.
+plan-engineer-validate TASK:
+    @echo "→ plan → engineer → validate: {{TASK}}"
+    pi --model {{orchestrator-model}} --tools {{orchestrator-tools}} \
+       -p "Run this task through the full team workflow:\n\n1. Delegate to planning-lead: produce a 1-page spec for: {{TASK}}\n2. Delegate to engineering-lead: review the spec and identify the technical decomposition.\n3. Delegate to validation-lead: review the plan and flag testing/security risks.\n\nReturn a synthesized verdict with each lead's contribution clearly attributed."
+
+# ─── Resume ─────────────────────────────────────────────────────────────────
+
+# Resume an existing session by id. Continues writing to the same conversation log.
+# Look up sids with `just sessions-list`.
+resume SID:
+    MULTI_TEAM_SESSION_DIR="$(pwd)/.pi/multi-team/sessions/{{SID}}" \
+        pi --model {{orchestrator-model}} --tools {{orchestrator-tools}}
+
+# Resume the most-recent session.
+resume-last:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    SID=$(ls -t .pi/multi-team/sessions/ 2>/dev/null | head -1)
+    if [ -z "$SID" ]; then echo "(no sessions to resume)"; exit 1; fi
+    echo "→ resuming $SID"
+    MULTI_TEAM_SESSION_DIR="$(pwd)/.pi/multi-team/sessions/$SID" \
+        pi --model {{orchestrator-model}} --tools {{orchestrator-tools}}
+
+# ─── Inspection ─────────────────────────────────────────────────────────────
+
+# List all sessions (most recent first), bare ids.
+sessions:
+    @ls -t .pi/multi-team/sessions/ 2>/dev/null | head -20 || echo "(no sessions yet)"
+
+# Rich session listing with start time + entry count + cost (if tracked).
+sessions-list:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    DIR=".pi/multi-team/sessions"
+    if [ ! -d "$DIR" ] || [ -z "$(ls -A $DIR 2>/dev/null)" ]; then
+        echo "(no sessions yet)"; exit 0
+    fi
+    printf "%-30s  %-20s  %5s  %8s\n" "SESSION ID" "STARTED (UTC)" "MSGS" "COST"
+    printf "%-30s  %-20s  %5s  %8s\n" "------------------------------" "--------------------" "-----" "--------"
+    for sid in $(ls -t "$DIR"); do
+        SDIR="$DIR/$sid"
+        [ -d "$SDIR" ] || continue
+        if [ -f "$SDIR/session.json" ]; then
+            STARTED=$(jq -r '.started // "?"' "$SDIR/session.json" 2>/dev/null | sed 's/T/ /;s/\..*//' || echo "?")
+        else
+            STARTED="?"
+        fi
+        if [ -f "$SDIR/conversation.jsonl" ]; then
+            MSGS=$(wc -l < "$SDIR/conversation.jsonl" | tr -d ' ')
+        else
+            MSGS=0
+        fi
+        if [ -f "$SDIR/cost.json" ]; then
+            COST=$(jq -r 'if .total_usd then "$\(.total_usd | tostring | .[0:7])" else "-" end' "$SDIR/cost.json" 2>/dev/null || echo "-")
+        else
+            COST="-"
+        fi
+        printf "%-30s  %-20s  %5s  %8s\n" "$sid" "$STARTED" "$MSGS" "$COST"
+    done
+
+# Pretty-print the most recent session's conversation log.
+last-session:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    LATEST=$(ls -t .pi/multi-team/sessions/ 2>/dev/null | head -1)
+    if [ -z "$LATEST" ]; then
+        echo "(no sessions yet)"
+        exit 0
+    fi
+    echo "session: $LATEST"
+    echo "path:    .pi/multi-team/sessions/$LATEST/conversation.jsonl"
+    echo "---"
+    just _pretty-log ".pi/multi-team/sessions/$LATEST/conversation.jsonl"
+
+# Show pretty conversation for a specific session id.
+session SID:
+    @just _pretty-log ".pi/multi-team/sessions/{{SID}}/conversation.jsonl"
+
+# Internal: render a JSONL conversation log compactly using jq.
+_pretty-log FILE:
+    @jq -r '"[\(.ts[11:19])] \(.role)/\(.agent) \(.type)\(if .target then " → \(.target)" else "" end)\(if .from then " ← \(.from)" else "" end): \(.content[:160])\(if (.content|length) > 160 then "..." else "" end)"' "{{FILE}}"
+
+# Clean up old sessions (older than N days, default 7).
+clean-sessions DAYS="7":
+    find .pi/multi-team/sessions/ -mindepth 1 -maxdepth 1 -type d -mtime +{{DAYS}} -exec rm -rf {} \; -print 2>/dev/null
+
+# ─── Compaction ─────────────────────────────────────────────────────────────
+
+# Summarize old conversation entries into conversation-summary.md and truncate the JSONL.
+# SID defaults to most-recent session. HOURS = age cutoff (entries older than this get summarized).
+compact-log SID="" HOURS="24":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    SID="{{SID}}"
+    if [ -z "$SID" ]; then SID=$(ls -t .pi/multi-team/sessions/ | head -1); fi
+    DIR=".pi/multi-team/sessions/$SID"
+    LOG="$DIR/conversation.jsonl"
+    if [ ! -f "$LOG" ]; then echo "no log at $LOG"; exit 1; fi
+
+    CUTOFF=$(date -u -d "{{HOURS}} hours ago" +%FT%TZ)
+    OLD=$(mktemp); NEW=$(mktemp)
+    jq -c "select(.ts < \"$CUTOFF\")" "$LOG" > "$OLD" || true
+    jq -c "select(.ts >= \"$CUTOFF\")" "$LOG" > "$NEW" || true
+
+    OLD_LINES=$(wc -l < "$OLD" | tr -d ' ')
+    if [ "$OLD_LINES" -lt 1 ]; then
+        echo "(nothing older than {{HOURS}}h to compact)"
+        rm -f "$OLD" "$NEW"; exit 0
+    fi
+
+    echo "→ summarizing $OLD_LINES entries older than $CUTOFF"
+
+    PROMPT=$(mktemp)
+    {
+        echo "Summarize this multi-team agent conversation log into 5-15 bullets capturing key decisions, deliverables, and open threads. Skip routine pings. Group related sub-conversations. Format as markdown."
+        echo "---"
+        jq -r '"[\(.ts)] \(.role)/\(.agent) \(.type)\(if .target then " → \(.target)" else "" end)\(if .from then " ← \(.from)" else "" end): \(.content)"' "$OLD"
+    } > "$PROMPT"
+
+    SUMMARY=$(pi --model anthropic/claude-haiku-4-5 -p "$(cat "$PROMPT")" 2>/dev/null || echo "(summarization failed)")
+
+    SUMFILE="$DIR/conversation-summary.md"
+    {
+        echo
+        echo "## Compaction $(date -u +%FT%TZ)"
+        echo "Compacted $OLD_LINES entries with timestamps before $CUTOFF."
+        echo
+        echo "$SUMMARY"
+        echo
+    } >> "$SUMFILE"
+
+    # Replace log: 1 system marker + recent entries
+    {
+        echo "{\"ts\":\"$(date -u +%FT%TZ)\",\"role\":\"system\",\"agent\":\"compactor\",\"type\":\"system-event\",\"content\":\"Compacted $OLD_LINES entries (before $CUTOFF) into conversation-summary.md.\"}"
+        cat "$NEW"
+    } > "$LOG"
+
+    rm -f "$OLD" "$NEW" "$PROMPT"
+    echo "✓ Compacted $OLD_LINES entries -> $SUMFILE"
+
+# ─── Helpers (internal) ─────────────────────────────────────────────────────
+
+# Pre-render the orchestrator's full system prompt to stdout. Used by chat-full.
+_render-orchestrator-prompt:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    REPO_ROOT="$(pwd)"
+    SESSION_DIR="$REPO_ROOT/.pi/multi-team/sessions/_preview"
+    LOG="$SESSION_DIR/conversation.jsonl"
+    echo "# Runtime context (pre-rendered for interactive root session)"
+    echo
+    echo "- AGENT_NAME: orchestrator"
+    echo "- CALLER: user"
+    echo "- SESSION_DIR: $SESSION_DIR"
+    echo "- CONVERSATION_LOG: $LOG"
+    echo "- REPO_ROOT: $REPO_ROOT"
+    echo
+    for skill in conversational-response mental-model active-listener zero-micromanagement high-autonomy; do
+        echo "## skill: $skill"
+        echo
+        cat ".pi/multi-team/skills/${skill}.md" 2>/dev/null
+        echo
+    done
+    echo "## Orchestrator instructions"
+    echo
+    awk 'BEGIN{p=0} /^---$/{c++; if(c==2){p=1; next}} p' .pi/multi-team/agents/orchestrator.md

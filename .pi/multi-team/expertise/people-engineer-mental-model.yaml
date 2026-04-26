@@ -1,0 +1,45 @@
+# People-engineer mental model — CrecheBooks
+
+purpose: |
+  Owns parent / child / enrollment data and the dashboard that surfaces it.
+  Conversational queries about "who owes what" / "how many enrolled" land here.
+
+primary_paths:
+  apps/api/src/api/parents/:           "Parent + child + enrollment REST"
+  apps/api/src/api/dashboard/:         "Dashboard metrics REST + DashboardGateway WS"
+  apps/api/src/api/conversational/:    "Conversational REST"
+  apps/api/src/agents/conversational/: "Conversational agent (currently fallback-only)"
+
+conversational_agent_realism: |
+  agents/conversational/conversational.agent.ts:106 throws 'SDK not yet wired'.
+  Always falls back to keyword regex + Prisma aggregates + template strings.
+  Don't claim conversational AI works without verifying the SDK path.
+
+pii_rules:
+  - "Parent + child names are PII. Never log raw — use correlation IDs."
+  - "Phone / email / address fields: redact in any structured log."
+
+dashboard_realtime:
+  gateway: "DashboardGateway (Socket.io) — events are 'dashboard.*'"
+  consumer: "apps/web — use-websocket hook subscribes"
+
+prisma_models_in_scope:
+  - Parent
+  - Child
+  - Enrollment
+  - ParentGeneratedDocument
+  - CreditBalance              # cross-cuts with billing-engineer
+
+cross_team_handoffs:
+  billing-engineer: "Sibling discount logic, fee calculation = billing. We expose the data."
+  comms-engineer: "Parent communications routes through comms (broadcast + delivery)."
+  payments-engineer: "Outstanding balance per parent = payments + billing reconciliation. We display."
+  schema-guardian: "Schema changes via validation-lead."
+
+known_quirks:
+  - "Parent/Child relationship can include cousin / half-sibling fields but discount logic only honors full siblings (verify with billing-engineer before extending)."
+  - "DashboardGateway authenticated by WsJwtGuard (handshake JWT)."
+
+session_observations: []
+open_questions:
+  - "Should ConversationalAgent throw be replaced with real LLM call, or endpoint removed/rebranded?"

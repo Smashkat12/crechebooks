@@ -1,0 +1,119 @@
+# QA-engineer mental model — CrecheBooks
+
+test_layout:
+  api_unit:        "apps/api/tests/**/*.spec.ts"
+  api_e2e:         "apps/api/test/**/*.e2e(-|.)spec.ts (jest --config test/jest-e2e.json)"
+  api_setup:       "apps/api/test/jest-setup.ts"
+  web_unit:        "apps/web/src/__tests__/**/*.test.ts"
+  web_e2e:         "apps/web/e2e/**/*.spec.ts (Playwright)"
+  cli:             "packages/cli/ — vitest"
+  naming:          "*.spec.ts (api), *.test.ts (web). Unit & e2e mirror src/."
+
+test_command_cheatsheet:
+  all:                "pnpm test"
+  cov:                "pnpm test:cov"
+  api:                "pnpm test:api"
+  web:                "pnpm test:web"
+  api_e2e:            "cd apps/api && npm run test:e2e"
+  web_e2e:            "cd apps/web && npm run test:e2e"
+  web_e2e_headed:     "cd apps/web && npm run test:e2e:headed"
+  web_e2e_ui:         "cd apps/web && npm run test:e2e:ui"
+  single_api_file:    "cd apps/api && npx jest path/to/file.spec.ts"
+  single_web_file:    "cd apps/web && npx jest path/to/file.test.ts"
+  lint:               "pnpm lint"
+  type_check_api:     "cd apps/api && npm run type-check"
+  type_check_web:     "cd apps/web && npm run type-check"
+
+ci:
+  trigger: "PR → main, push → main. Concurrency cancels in-progress on same ref."
+  required_checks: "lint+type-check → test-api (4 shards) + test-web → build → ci-summary"
+  api_test_sharding: "4-shard matrix, continue-on-error (FK cleanup flake)"
+  web_test_coverage: "Codecov upload from apps/web/coverage/lcov.info"
+  pr_only: "docker-build smoke test (no push)"
+
+env_drift_notes:
+  - "Local dev uses Postgres 16 + pgvector via docker-compose.dev.yml on port 5433."
+  - "CI uses Postgres test service. No version drift documented."
+  - "Some tests need real Postgres — no in-memory fallback."
+
+flaky_tests:
+  - test: "apps/api/test/* — FK constraint cleanup race"
+    reason: "Tests don't fully cascade-delete or wrap in transactions; jest-e2e.json runs continue-on-error"
+    fix_direction: "Wrap each test in `prisma.$transaction` and rollback in afterEach"
+
+skipped_tests:
+  - file: "apps/web/src/__tests__/date-utils.test.ts"
+    why:  "it.skip — function has internal bug. Investigate."
+  - file: "apps/api/tests/audit-log.service.spec.ts"
+    why:  "it.skip x2 — PostgreSQL RULES not available in test env"
+  - file: "apps/api/tests/tesseract-ocr-parser.spec.ts"
+    why:  "it.skip — real PDF processing too heavy for test"
+
+regression_history: []
+
+ai_authenticity_audit:
+  date: "2026-04-26"
+  claude_client:
+    real_llm: true
+    path: "apps/api/src/agents/sdk/claude-client.service.ts"
+    fetch_call: "line 165 — POST ${baseUrl}/messages (Requesty proxy)"
+    key_guard: "line 93 — warns on missing key, sets initialized=false; NO startup crash"
+  agents:
+    conversational:
+      real_llm: false
+      stub_line: "conversational/conversational.agent.ts:106 — throw new Error('SDK not yet wired')"
+      fallback: "Regex keyword classifier → Prisma queries → template strings"
+      fallback_labeled: "YES — metadata.source: 'FALLBACK' in API response"
+      llm_test_coverage: NONE
+    extraction_validator:
+      real_llm: false
+      stub_line: "extraction-validator/sdk-validator.ts:286 — executeSdkInference always rejects"
+      hardcoded_value: "sdk-validator.ts:299 — semanticConfidence: 75 (hardcoded in buildDefaultResult)"
+      fallback: "Deterministic scoring (balance/OCR/date checks) + hardcoded semantic pass"
+      fallback_labeled: "PARTIAL — semantic summary says 'skipped'; main confidence unlabeled"
+      llm_test_coverage: NONE
+    sars_agent:
+      real_llm: false  # explanations only; core math is deterministic (correct behavior)
+      stub_line: "sars-agent/sdk-sars-explainer.ts:144 — executeSdkInference always rejects"
+      fallback: "Template-based explanations via buildFallbackExplanation()"
+      fallback_labeled: "PARTIAL — humanExplanation has no source marker; indistinguishable from AI"
+      llm_test_coverage: NONE  # tests force SDK_DISABLED=true
+    orchestrator:
+      real_llm: false  # delegates; no own LLM calls
+      fallback: "Sequential sub-agent dispatch"
+      fallback_labeled: "YES — transparent"
+      llm_test_coverage: PARTIAL
+    payment_matcher:
+      real_llm: true  # conditional on ANTHROPIC_API_KEY
+      llm_call: "payment-matcher/sdk-matcher.ts:105 — claudeClient.sendMessage()"
+      fallback: "{confidence:0, bestMatchInvoiceId:null} → deterministic matching"
+      fallback_labeled: "PARTIAL — decision logger has source field but MatchDecision API response does not"
+      llm_test_coverage: PARTIAL  # mocked claudeClient; no test would catch if sendMessage removed
+    transaction_categorizer:
+      real_llm: true  # conditional on ANTHROPIC_API_KEY
+      llm_call: "transaction-categorizer/sdk-categorizer.ts:320 — claudeClient.sendMessage()"
+      fallback: "pattern → historical → hardcoded defaults (4000/5900)"
+      fallback_labeled: "YES internally — CategorizationResult.source = 'LLM'/'PATTERN'/'HISTORICAL'/'FALLBACK'; NOT exposed in HTTP response"
+      llm_test_coverage: PARTIAL  # mocked claudeClient; tests don't guard against sendMessage removal
+    report_synthesis:
+      real_llm: true
+      llm_call: "report-synthesis/synthesis.agent.ts:156 — claudeClient.sendMessage()"
+      fallback: "Rule-based analysis; confidenceScore:50; text says 'rule-based fallback'"
+      fallback_labeled: "YES — AIInsights.source: 'SDK'|'FALLBACK' in API response DTO"
+      llm_test_coverage: GOOD  # synthesis.agent.spec.ts mocks sendMessage, asserts it's called
+
+weakly_tested_areas:
+  - "LLM paths in conversational, extraction-validator, sars-agent — never exercised (stubs)"
+  - "payment-matcher and transaction-categorizer LLM paths — mocked but not guarded against removal"
+  - "SARS humanExplanation source labeling — no test verifies the absence of source marker"
+
+pre_commit:
+  husky:        "Not configured. No git hooks."
+  lint_staged:  "Not configured."
+  manual:       "Run `pnpm lint` and `pnpm type-check` before pushing."
+
+session_observations: []
+
+open_questions:
+  - "(unresolved) FK cleanup race in api e2e — schedule a fix or live with continue-on-error?"
+  - "(unresolved) Visual regression / screenshot tests on web? Not seen yet."

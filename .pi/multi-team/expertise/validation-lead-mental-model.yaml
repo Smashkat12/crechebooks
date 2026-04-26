@@ -1,0 +1,74 @@
+# Validation-lead mental model — CrecheBooks
+
+risk_patterns:
+  always_check:
+    - "Tenant isolation: any new endpoint, table, or background job — tenantId filter present?"
+    - "Money correctness: integer cents? Decimal.js? banker's rounding? no JS Number?"
+    - "Soft-delete: read paths filter `deletedAt: null`?"
+    - "Migrations forward-compatible: can old code read new schema?"
+    - "Auth context propagation: background jobs / scheduled tasks attach the right tenantId?"
+    - "PII: any new logged field that should be redacted (POPIA)?"
+    - "External-API call: wrapped in CircuitBreaker (opossum)?"
+    - "AI authenticity: a feature labelled 'AI' — does the code actually call an LLM, or stub?"
+  rarely_an_issue:
+    - "Lint / formatting (CI catches)."
+
+team_strengths:
+  qa-engineer:       "Edge cases, regression risks, integration boundaries, FK cleanup pitfalls."
+  security-reviewer: "Auth flows, tenant isolation, secrets, supply-chain. SA POPIA + SARS specifics."
+  schema-guardian:   "Prisma schema authoring, migration drift detection (schema vs migrations vs prod DB), tenant/soft-delete/money invariants enforced at DB layer."
+
+routing_rules:
+  schema_change_pattern: |
+    Engineering-lead requests a schema change for one of their domain engineers.
+    Route: validation-lead → schema-guardian (writes migration + schema delta).
+    Once shipped, the domain engineer does downstream code work via engineering-lead.
+  parallel_default:
+    - "qa-engineer + security-reviewer for any change touching user data, money, or public-facing endpoints"
+    - "schema-guardian + qa-engineer when a change adds/modifies a Prisma model"
+  hard_vetoes:
+    - "security-reviewer says no on tenant-isolation/POPIA/auth"
+    - "schema-guardian says backwards-incompatible without rollback path"
+
+ai_authenticity_audit_pattern:
+  steps:
+    - "Read the file. Look for actual LLM SDK calls (or fetch to a /v1/{messages,chat/completions} URL)."
+    - "Check the fallback path. Does it throw and degrade silently to template strings?"
+    - "Verify the env var that gates the LLM call — is it set in production?"
+    - "Check whether the fallback is INTENDED behavior or a 'temporary' stub that has rotted."
+  known_stubs_in_codebase:
+    - "agents/conversational/conversational.agent.ts:106 — always throws + regex fallback"
+    - "agents/sars-agent/sdk-sars-explainer.ts:142 — false 'agentic-flow not installed' message"
+    - "agents/extraction-validator/sdk-validator.ts:280 — always returns 75% confidence"
+    - "agents/orchestrator/sdk-orchestrator.ts — Promise.allSettled, no LLM"
+
+shipped_with_fixes: []
+
+dont_ship_history: []
+
+recurring_failure_modes:
+  - "FK constraint cleanup: e2e tests have FK leaks; jest-e2e.json runs continue-on-error. Fix tests, don't suppress."
+  - "Multi-tenancy regressions: `tenantId` left null in new tables. Five fix scripts at api root attest to this."
+  - "Stale-read after migration: front-end caches via React Query; manual invalidation needed on schema-affecting deploys."
+
+ship_checklist_for_changes_touching:
+  money:
+    - "All math via Decimal.js? grep for `\\.toFixed(` and parseFloat — both forbidden in money paths."
+    - "Stored as cents integer? grep schema for any DECIMAL or FLOAT money column."
+    - "Banker's rounding applied at every aggregation boundary?"
+  tenancy:
+    - "New table has `tenantId` NOT NULL?"
+    - "All read queries filter `tenantId` and `deletedAt: null`?"
+    - "Background job attaches tenantId from job payload, not request context?"
+  sars:
+    - "Output format matches SARS spec (test against fixture)?"
+    - "Audit-trail entry written and immutable?"
+    - "Five-year retention policy on the new data?"
+  ai:
+    - "If labelled 'AI', is there an actual LLM call?"
+    - "Is the fallback path documented and intentional?"
+    - "Does the response include source: 'SDK' | 'FALLBACK' so users know?"
+
+session_observations: []
+
+open_questions: []

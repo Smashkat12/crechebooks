@@ -1,0 +1,52 @@
+# UX-researcher mental model — CrecheBooks
+
+personas:
+  - name: "Creche Owner-Operator (primary)"
+    role: "Owns / runs a 20-80 child creche."
+    goals: "Spend 5-10 min/day on bookkeeping vs current 10-15 hr/month."
+    constraints:
+      - "Not accounting-trained. Doesn't speak Decimal/VAT/PAYE jargon."
+      - "Mobile-first. Checks the dashboard on phone between class transitions."
+      - "Time-poor. Will abandon a 3-step flow if step 1 isn't obvious."
+    success_signal: "All payments matched to invoices by end of day with zero manual entry."
+
+  - name: "Creche Administrator (secondary)"
+    role: "Dedicated admin at a larger creche (80-200 children)."
+    goals: "Same as owner but in higher volume. Cares about bulk actions, exports."
+    constraints: ["Has accounting fluency. Wants raw data + audit trail access."]
+
+  - name: "External Accountant (tertiary)"
+    role: "Reviews creches' books at month/year end."
+    goals: "Trust the numbers. Pull P&L / Balance Sheet / VAT201 cleanly."
+    constraints: ["Wants Xero, not a custom UI."]
+
+  - name: "SARS Auditor (rare but real)"
+    role: "Auditing the creche during a SARS review."
+    goals: "Reconstruct a historical period exactly."
+    constraints: ["Requires immutable audit trail; 5-year retention."]
+
+journey_patterns:
+  - "First-time login: needs a 30s 'why this exists' moment + guided Xero connect."
+  - "Daily run: dashboard at-a-glance, scan low-confidence categorizations, approve in one tap."
+  - "Month-end: invoice generation flow + payment-matching review + arrears chase."
+  - "Tax filing: VAT201 / EMP201 generation must produce SARS-formatted file with no manual touch-up."
+
+friction_patterns_to_watch:
+  - "Modal-heavy flows kill mobile use. Prefer in-page sheets / progressive disclosure."
+  - "Confirm-by-default before money moves. Undo is acceptable; modal is not."
+  - "Don't expose Xero/SARS jargon in primary UI — translate (e.g. 'sent to your accountant' not 'pushed to Xero')."
+
+heuristic_violations_seen: []
+
+sa_market_specifics:
+  - "South African English spellings only (organise, programme, colour)."
+  - "Currency display: R 1,234.56 (Rand symbol, comma thousands, dot decimal)."
+  - "Phone numbers: +27... or 0... acceptable; UI normalises."
+  - "Date format: DD/MM/YYYY (not ISO) in user-facing screens."
+  - "ID number validation: SA ID (13 digits, Luhn) — already implemented in lib/validation/schemas.ts."
+
+session_observations: []
+
+open_questions:
+  - "(unresolved) Are Afrikaans / isiZulu translations on roadmap? (PRD says English-only for MVP)"
+  - "(unresolved) Mobile responsive — fully tested on the small screens owners actually use?"

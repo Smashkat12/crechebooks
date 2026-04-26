@@ -1,0 +1,54 @@
+# Comms-ops mental model — CrecheBooks
+
+purpose: |
+  Operates parent communications. Preview-default in staging. Production sends
+  only with explicit authorisation.
+
+staging_safety:
+  rule: "Real parent contact info exists in staging. There is no flag to disable comms. NEVER send from staging — preview only."
+  forbidden_endpoints_in_staging:
+    - "POST /invoices/send"
+    - "POST /communications/broadcast"
+    - "any /delivery or /reminder endpoint"
+  forbidden_services_in_staging:
+    - InvoiceDeliveryService
+    - BroadcastProcessor
+    - ArrearReminderJob
+    - ReminderService
+    - WelcomePackDeliveryService
+  scheduler_caveat: "invoice-scheduler / statement-scheduler / sars-deadline / payment-reminder / broadcast.processor / whatsapp-retry.processor / simplepay-sync — verify which are active in staging before kicking off any manual run."
+
+provider_facade:
+  service:       "WhatsAppProviderService"
+  meta_direct:   "WhatsAppService (Meta Cloud API)"
+  twilio:        "TwilioWhatsAppService"
+  selector_env:  "WHATSAPP_PROVIDER (currently 'twilio' in production)"
+  templates:     "TwilioContentService — pre-approval required for new templates"
+
+production_send_checklist:
+  required_in_brief:
+    - "Explicit user authorisation: 'send', not 'check' or 'preview'"
+    - "Recipient group: source query or group-id"
+    - "Template name AND approved status"
+    - "Channel: email / whatsapp / both"
+    - "Expected delivery window"
+  before_sending:
+    - "Preview to single test recipient if available"
+    - "Confirm recipient count (sanity-check against expected)"
+    - "Confirm template approved-status (Twilio)"
+  after_sending:
+    - "Capture broadcast id"
+    - "Watch delivery status: cb-api.sh GET /communications/{id}/status"
+    - "Report delivery counts (sent / delivered / failed / opt-out)"
+
+useful_queries:
+  preview_broadcast: |
+    cb-api.sh POST /communications/broadcast { groupId, templateId, dryRun: true }
+  delivery_status: |
+    cb-api.sh GET /communications/{id}/status
+  recipient_group_size: |
+    cb-db.sh "SELECT count(*) FROM message_recipients WHERE group_id = '{id}'"
+
+session_observations: []
+open_questions:
+  - "(unresolved) Is there a staging-flag for disabling actual sends, or is preview-only the only safe mode?"

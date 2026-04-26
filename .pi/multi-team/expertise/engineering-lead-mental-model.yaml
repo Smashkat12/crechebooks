@@ -1,0 +1,156 @@
+# Engineering-lead mental model — CrecheBooks
+
+monorepo_layout:
+  workspace: pnpm 9.15 (pnpm-workspace.yaml)
+  apps:
+    api:  apps/api      # NestJS 11
+    web:  apps/web      # Next.js 15
+  packages:
+    types: packages/types     # Shared TS types (workspace:*)
+    cli:   packages/cli       # `cb` command (Commander + vitest)
+
+team_routing:
+  billing-engineer:
+    writable: ["apps/api/src/api/billing/", "apps/api/src/billing/"]
+    owns: "Invoice generation, fee structures, statements, ad-hoc charges, sibling-discount logic, invoice numbering."
+  payments-engineer:
+    writable:
+      - "apps/api/src/api/payment/"
+      - "apps/api/src/agents/payment-matcher/"
+      - "apps/api/src/database/services/payment-matching.*"
+    owns: "Payment ingestion, AI matching (deterministic + LLM ambiguity), allocation, payment links."
+  banking-engineer:
+    writable:
+      - "apps/api/src/api/{transaction,reconciliation,banking}/"
+      - "apps/api/src/agents/transaction-categorizer/"
+      - "apps/api/src/database/services/categorization.*"
+    owns: "Bank feeds, transaction normalization, AI categorization, reconciliation, fee detection."
+  tax-payroll-engineer:
+    writable:
+      - "apps/api/src/sars/"
+      - "apps/api/src/api/sars/"
+      - "apps/api/src/api/staff/"
+      - "apps/api/src/api/payroll/"
+      - "apps/api/src/agents/sars-agent/"
+    owns: "SARS (VAT201/EMP201/EMP501), payroll calc, staff lifecycle, leave, SimplePay-imported payslips."
+  people-engineer:
+    writable:
+      - "apps/api/src/api/parents/"
+      - "apps/api/src/api/dashboard/"
+      - "apps/api/src/api/conversational/"
+      - "apps/api/src/agents/conversational/"
+    owns: "Parent / child / enrollment data, dashboard metrics, conversational fallbacks, PII rules."
+  comms-engineer:
+    writable:
+      - "apps/api/src/api/{communications,whatsapp,notifications}/"
+      - "apps/api/src/communications/"
+      - "apps/api/src/notifications/"
+    owns: "Broadcast, notifications, WhatsApp / email / SMS dispatch, templates, delivery tracking."
+  platform-engineer:
+    writable: "Everything under apps/api/src/ NOT owned by a domain engineer (database, scheduler, integrations, common, shared, config, health, metrics, webhooks, jobs, mcp, websocket, agents/{audit,memory,orchestrator,rollout,sdk,shared,extraction-validator,report-synthesis}, api/{auth,admin,settings,integrations,xero,public,csp,accounting,arrears}, main.ts, app.module.ts)."
+    owns: "Plumbing — DB layer, queues, integrations, auth, common guards/decorators, agent platform."
+  frontend-engineer:
+    writable: ["apps/web/", "packages/types/src/"]
+    owns: "Next.js 15 app — dashboard, parent, staff, admin, public surfaces."
+  release-manager:
+    writable: ["only mental model — no source edits"]
+    owns: "Branch creation, conventional commits, gh PR open. Final step after work is verified."
+    handoff: "Engineer reports Verify:PASS → engineering-lead composes → orchestrator routes to validation-lead → if ship-it → orchestrator authorises ship → engineering-lead delegates to release-manager."
+
+ship_flow:
+  steps:
+    - "1. Engineer codes + self-verifies (verify-before-done skill)"
+    - "2. Engineer Report includes Verify: PASS block"
+    - "3. Engineering-lead refuses Reports without Verify: PASS"
+    - "4. Engineering-lead composes, returns to orchestrator"
+    - "5. Orchestrator may route to validation-lead for QA/security/schema review"
+    - "6. validation-lead emits verdict tool: ship-it | ship-with-fixes | dont-ship"
+    - "7. If ship-it: orchestrator authorises engineering-lead to delegate to release-manager"
+    - "8. Release-manager: branch + conventional commit + gh PR create"
+    - "9. Engineering-lead reports PR URL to orchestrator"
+
+cross_team_routing:
+  schema-guardian:
+    team: "Validation"
+    when: "Any Prisma schema delta. Bounce to orchestrator → validation-lead → schema-guardian."
+    after: "Schema-guardian writes migration + schema. Then domain engineer does downstream code."
+
+architecture_decisions:
+  - date: "2025-12-19"
+    decision: "Claude Code subscription via Requesty proxy (router.requesty.ai/v1/messages) instead of direct Anthropic SDK"
+    reason: "Cost optimization. apps/api/src/agents/sdk/claude-client.service.ts wraps fetch."
+  - date: "2025-12-19"
+    decision: "MCP servers in-process (crechebooks-mcp, xero-mcp) for AI tool access"
+  - date: "2025-12-19"
+    decision: "Auth0 issuer + JWKS for JWT, API-key (`cb_` prefix) as secondary"
+  - date: "2025-12-19"
+    decision: "Bull (not BullMQ) for background jobs"
+
+dependency_edges:
+  - "Frontend depends on backend /api/v1/* contracts — coordinate breaking changes"
+  - "WebSocket DashboardGateway events: dashboard.* → web's use-websocket hook subscribes"
+  - "Shared types live in packages/types — change there, both apps update on rebuild"
+
+decomposition_patterns:
+  parallel_safe:
+    - "Independent domain slices (e.g. billing-engineer + tax-payroll-engineer on unrelated features)"
+    - "New backend endpoint (one engineer) + corresponding web page (frontend-engineer) once contract is fixed"
+    - "Test additions (qa-engineer) on Validation side + feature work on Engineering side"
+  must_serialize:
+    - "DB schema change → schema-guardian first → then any domain engineer that touches the affected models"
+    - "Prisma schema change → run `pnpm prisma:generate` before any service that uses the new model"
+    - "API contract change → backend engineer first, THEN frontend-engineer (and packages/types update if needed)"
+    - "Payment contract change in payments-engineer → propagate to banking-engineer's reconciliation flow"
+    - "Billing pipeline change that affects scheduler → billing-engineer first, then platform-engineer to wire the processor"
+
+api_module_inventory:
+  business:
+    - "billing/    — Invoice generation, payment scheduling, arrears reminders"
+    - "communications/ — Multi-channel notifications dispatcher"
+    - "notifications/ — In-app + SMS (AfricasTalking) + WhatsApp"
+    - "sars/       — SA Revenue Service deadline tracking + compliance"
+    - "scheduler/  — Cron jobs via @nestjs/schedule"
+    - "jobs/       — Bull queue jobs: arrears-reminder, bank-sync"
+  cross_cutting:
+    - "common/     — Pino logger, Redis client, rate limiting, guards, decorators, filters"
+    - "config/     — @nestjs/config + Joi schema (.env loading)"
+    - "database/   — Prisma client + repositories + services"
+    - "shared/     — Shared business logic, exception classes"
+  integrations:
+    - "integrations/{xero, yoco, banking (Stitch), accounting (Stub.africa), simplepay, whatsapp, sars, mailgun, exchange-rates}/"
+  ai_and_mcp:
+    - "agents/     — sdk/, payment-matcher/, transaction-categorizer/, conversational/, sars-agent/, extraction-validator/, report-synthesis/, orchestrator/"
+    - "mcp/        — crechebooks-mcp (data + mutations), xero-mcp (Xero ops)"
+  ops:
+    - "health/     — / and /health/ai endpoints"
+    - "metrics/    — Prometheus DB pool metrics"
+
+ai_agent_authenticity_audit:
+  real_llm_calls:
+    - "agents/payment-matcher/sdk-matcher.ts:105 — resolveAmbiguity (haiku/sonnet via Requesty). Only on multi-candidate ambiguity."
+    - "agents/transaction-categorizer/sdk-categorizer.ts:320 — Only when pattern match <80%."
+    - "agents/report-synthesis/synthesis.agent.ts:156 — Income statement / balance sheet / aged-receivables narrative."
+    - "health/ai-health.controller.ts:128,199 — Diagnostic only."
+  fake_or_stub:
+    - "agents/orchestrator/sdk-orchestrator.ts — Promise.allSettled dispatcher. Never calls LLM despite 'orchestrator' name."
+    - "agents/conversational/conversational.agent.ts:106 — Throws 'SDK not yet wired'. Always falls back to keyword regex + template strings."
+    - "agents/sars-agent/sdk-sars-explainer.ts:142 — Throws 'agentic-flow not installed'. (It IS installed.) Returns hand-written templates."
+    - "agents/extraction-validator/sdk-validator.ts:280 — Throws same error. Always returns {isSemanticValid:true, semanticConfidence:75}."
+    - "agents/shared/{accuracy-tracker, scoring-router, hybrid-scorer}.ts — Stubs returning defaults."
+  load_bearing:
+    - "ANTHROPIC_API_KEY may not be set in Railway. .env.example ships placeholder '<your-requesty-api-key>'. Without it, all 'AI' silently degrades to deterministic."
+
+recurring_technical_risks:
+  - "Tenant isolation: 5+ fix-*.py / final-*.sh scripts at api root signal historical retrofit. Always verify new tables/columns are tenant-scoped."
+  - "Money: every aggregate/sum/diff must use Decimal.js + banker's rounding. JS Number is forbidden."
+  - "Soft-delete: include `deletedAt: null` filter on every read query."
+  - "Migration ordering: 56 Prisma migrations in 3 months. New ones must be backwards-compatible with the prior code."
+
+load_bearing_todos:
+  - "src/database/repositories/transaction.repository.ts: 'Add proper currency fields' — multi-currency incomplete"
+  - "src/database/services/sars-submission-retry.service.ts: 'Integrate with actual SARS eFiling API' — currently stubbed"
+  - "src/database/services/statement-generation.service.ts: 'Implement proper pagination for very large tenant datasets'"
+
+session_observations: []
+
+open_questions: []

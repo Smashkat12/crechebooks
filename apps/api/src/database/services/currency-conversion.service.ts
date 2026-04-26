@@ -1,22 +1,17 @@
 /**
  * Currency Conversion Service
  * TXN-004: Fix Currency Conversion
- * TASK-FIX-004: Real FX Rate Integration via Open Exchange Rates API
  *
- * Supports multi-currency transactions with ZAR as base currency:
- * - Store original currency and converted amount
- * - Use exchange rate at transaction date
- * - Track exchange rate source and timestamp
- * - Support manual, SARB, and third-party rates
- * - Fetch real rates from Open Exchange Rates API (when configured)
+ * Supports multi-currency transactions with ZAR as base currency.
+ * Hardcoded rates only — OpenExchangeRates integration removed in audit;
+ * all current creches are ZAR-only so live FX adds no value.
  */
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ValidationException,
   BusinessException,
 } from '../../shared/exceptions';
-import { ExchangeRateClient } from '../../integrations/exchange-rates/exchange-rate.client';
 
 /**
  * Supported currencies (ISO 4217 codes)
@@ -44,7 +39,6 @@ export enum ExchangeRateSource {
   SARB = 'SARB', // South African Reserve Bank
   OANDA = 'OANDA', // OANDA API
   XE = 'XE', // XE.com
-  OPENEXCHANGE = 'OPENEXCHANGE', // Open Exchange Rates
 }
 
 /**
@@ -115,10 +109,7 @@ export class CurrencyConversionService {
   private rateCache: Map<string, ExchangeRate> = new Map();
   private readonly cacheTtlMs = 60 * 60 * 1000; // 1 hour
 
-  constructor(
-    private readonly prisma: PrismaService,
-    @Optional() private readonly exchangeRateClient?: ExchangeRateClient,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Convert an amount from one currency to another
@@ -404,68 +395,6 @@ export class CurrencyConversionService {
   }
 
   /**
-   * Fetch exchange rate from external API (async)
-   * TASK-FIX-004: Now integrates with Open Exchange Rates API
-   *
-   * Priority order:
-   * 1. CMA currencies always use 1:1 rate (no API call needed)
-   * 2. Open Exchange Rates API if configured
-   * 3. Falls back to default rates if API unavailable or fails
-   */
-  private async fetchExternalRateAsync(
-    fromCurrency: Currency,
-    toCurrency: Currency,
-    effectiveDate?: Date,
-  ): Promise<ExchangeRate> {
-    // For CMA currencies, use 1:1 rate (no external call needed)
-    if (
-      this.isCommonMonetaryArea(fromCurrency) &&
-      this.isCommonMonetaryArea(toCurrency)
-    ) {
-      this.logger.debug(
-        `CMA currency pair ${fromCurrency}/${toCurrency} - using 1:1 rate`,
-      );
-      return {
-        fromCurrency,
-        toCurrency,
-        rate: 1.0,
-        inverseRate: 1.0,
-        source: ExchangeRateSource.SARB,
-        effectiveDate: effectiveDate || new Date(),
-        timestamp: new Date(),
-      };
-    }
-
-    // Try external API if available and configured
-    if (this.exchangeRateClient?.isConfigured()) {
-      try {
-        this.logger.debug(
-          `Fetching external rate for ${fromCurrency}/${toCurrency}`,
-        );
-        return await this.exchangeRateClient.getRate(
-          fromCurrency,
-          toCurrency,
-          effectiveDate,
-        );
-      } catch (error) {
-        this.logger.warn(
-          `External rate API failed for ${fromCurrency}/${toCurrency}, falling back to defaults: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        // Fall through to use default rates
-      }
-    } else {
-      this.logger.debug(
-        `Exchange rate client not configured - using default rates for ${fromCurrency}/${toCurrency}`,
-      );
-    }
-
-    // Fallback to default rates
-    return this.calculateDefaultRate(fromCurrency, toCurrency, effectiveDate);
-  }
-
-  /**
    * Fetch exchange rate (synchronous version for backward compatibility)
    * For CMA currencies and default rates only - async method handles API calls
    */
@@ -557,66 +486,19 @@ export class CurrencyConversionService {
     };
   }
 
-  // ============================================================================
-  // ASYNC METHODS - TASK-FIX-004: Real FX Rate Integration
-  // These methods support external API calls and should be used when real-time
-  // exchange rates are needed.
-  // ============================================================================
-
   /**
-   * Get exchange rate between two currencies (async version for API support)
-   * TASK-FIX-004: Async method that supports external API calls
-   *
-   * Use this method when you need real-time rates from the external API.
-   * Falls back gracefully to cached or default rates if API is unavailable.
+   * Get exchange rate between two currencies (async version, delegates to sync path)
    */
   async getExchangeRateAsync(
     fromCurrency: Currency,
     toCurrency: Currency,
     effectiveDate?: Date,
   ): Promise<ExchangeRate> {
-    const dateKey = effectiveDate
-      ? effectiveDate.toISOString().split('T')[0]
-      : 'latest';
-    const cacheKey = `${fromCurrency}_${toCurrency}_${dateKey}`;
-
-    // Check cache first
-    const cached = this.rateCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp.getTime() < this.cacheTtlMs) {
-      this.logger.debug(
-        `Using cached rate for ${fromCurrency}/${toCurrency}: ${cached.rate}`,
-      );
-      return cached;
-    }
-
-    // Fetch rate (from API or defaults)
-    const rate = await this.fetchExternalRateAsync(
-      fromCurrency,
-      toCurrency,
-      effectiveDate,
-    );
-
-    // Cache the rate
-    this.rateCache.set(cacheKey, rate);
-
-    // Also cache inverse rate
-    const inverseCacheKey = `${toCurrency}_${fromCurrency}_${dateKey}`;
-    this.rateCache.set(inverseCacheKey, {
-      ...rate,
-      fromCurrency: toCurrency,
-      toCurrency: fromCurrency,
-      rate: rate.inverseRate,
-      inverseRate: rate.rate,
-    });
-
-    return rate;
+    return this.getExchangeRate(fromCurrency, toCurrency, effectiveDate);
   }
 
   /**
-   * Convert currency (async version for API support)
-   * TASK-FIX-004: Async method that supports external API calls
-   *
-   * Use this method when you need real-time conversion with external rates.
+   * Convert currency (async convenience wrapper)
    */
   async convertCurrencyAsync(
     amountCents: number,
@@ -663,8 +545,7 @@ export class CurrencyConversionService {
   }
 
   /**
-   * Convert to ZAR (async version for API support)
-   * TASK-FIX-004: Async method that supports external API calls
+   * Convert to ZAR (async convenience wrapper)
    */
   async convertToZARAsync(
     amountCents: number,
@@ -680,8 +561,7 @@ export class CurrencyConversionService {
   }
 
   /**
-   * Convert from ZAR (async version for API support)
-   * TASK-FIX-004: Async method that supports external API calls
+   * Convert from ZAR (async convenience wrapper)
    */
   async convertFromZARAsync(
     amountCents: number,
@@ -694,56 +574,5 @@ export class CurrencyConversionService {
       toCurrency,
       effectiveDate,
     );
-  }
-
-  /**
-   * Refresh exchange rates from external API
-   * TASK-FIX-004: Force refresh rates from external source
-   *
-   * Use this to manually trigger a rate refresh, e.g., at scheduled intervals
-   * or when rates seem stale.
-   */
-  async refreshRates(): Promise<void> {
-    if (!this.exchangeRateClient?.isConfigured()) {
-      this.logger.warn(
-        'Cannot refresh rates - exchange rate client not configured',
-      );
-      return;
-    }
-
-    try {
-      this.logger.log('Refreshing exchange rates from external API...');
-
-      // Fetch latest rates for common currency pairs
-      const baseCurrencies = [Currency.ZAR, Currency.USD, Currency.EUR];
-      const refreshPromises: Promise<ExchangeRate>[] = [];
-
-      for (const from of baseCurrencies) {
-        for (const to of Object.values(Currency)) {
-          if (from !== to && !this.isCommonMonetaryArea(to)) {
-            refreshPromises.push(this.getExchangeRateAsync(from, to));
-          }
-        }
-      }
-
-      await Promise.all(refreshPromises);
-
-      this.logger.log(
-        `Exchange rates refreshed successfully. Cache now contains ${this.rateCache.size} rates.`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to refresh exchange rates: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Check if the external rate API is configured and available
-   * TASK-FIX-004: Utility method to check API availability
-   */
-  isExternalApiConfigured(): boolean {
-    return this.exchangeRateClient?.isConfigured() ?? false;
   }
 }

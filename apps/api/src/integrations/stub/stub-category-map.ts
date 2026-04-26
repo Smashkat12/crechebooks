@@ -127,7 +127,7 @@ const ACCOUNT_MAP: Record<string, string> = {
   '7615': 'Professional Indemnity Insurance (7615)',
 
   // ── Financial (77xx) ──────────────────────────────────────────
-  '7710': 'Bank Charges',  // Stub default — no custom needed
+  '7710': 'Bank Charges', // Stub default — no custom needed
   '7715': 'Credit Card Fees (7715)',
   '7720': 'Interest on Overdraft (7720)',
   '7725': 'Loan Interest (7725)',
@@ -137,14 +137,17 @@ const ACCOUNT_MAP: Record<string, string> = {
   '7820': 'Bad Debts Written Off (7820)',
 
   // ── Other ──────────────────────────────────────────────────────
-  '3020': 'Sales',  // Founder Capital → Stub default
-  '9999': 'Sales',  // To Be Categorized → fallback
+  '3020': 'Sales', // Founder Capital → Stub default
+  '9999': 'Sales', // To Be Categorized → fallback
 };
 
 /**
  * Get Stub category/account name for a CrecheBooks account code.
  */
-export function getStubCategory(accountCode: string, isCredit: boolean): string {
+export function getStubCategory(
+  accountCode: string,
+  isCredit: boolean,
+): string {
   const match = ACCOUNT_MAP[accountCode];
   if (match) return match;
 

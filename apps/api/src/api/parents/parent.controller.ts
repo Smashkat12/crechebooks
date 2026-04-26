@@ -80,7 +80,8 @@ export class ParentController {
     private readonly xeroSyncService: XeroSyncService,
     private readonly magicLinkService: MagicLinkService,
     // TASK-STUB-PARITY: Provider-agnostic contact sync
-    @Inject(ACCOUNTING_PROVIDER) @Optional()
+    @Inject(ACCOUNTING_PROVIDER)
+    @Optional()
     private readonly accountingProvider?: AccountingProvider,
   ) {}
 

@@ -24,10 +24,9 @@ import { AuditLogService } from '../database/services/audit-log.service';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { IdempotencyGuard } from '../common/guards/idempotency.guard';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
-import { YocoModule } from '../integrations/yoco/yoco.module';
 
 @Module({
-  imports: [ConfigModule, WhatsAppModule, YocoModule],
+  imports: [ConfigModule, WhatsAppModule],
   controllers: [WebhookController],
   providers: [
     WebhookService,

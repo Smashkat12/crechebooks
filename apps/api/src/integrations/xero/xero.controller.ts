@@ -1083,9 +1083,7 @@ export class XeroController {
         // Step 2b: Sync from Journals API to catch cash-coded and payment-matched items
         // getBankTransactions only returns Spend/Receive Money — journals catch everything else
         try {
-          this.logger.log(
-            `Syncing from Journals API for tenant ${tenantId}`,
-          );
+          this.logger.log(`Syncing from Journals API for tenant ${tenantId}`);
 
           this.syncGateway.emitProgress(tenantId, {
             entity: 'journals',
@@ -1094,13 +1092,15 @@ export class XeroController {
             percentage: 0,
           });
 
-          const journalsResult =
-            await this.bankFeedService.syncFromJournals(tenantId, {
+          const journalsResult = await this.bankFeedService.syncFromJournals(
+            tenantId,
+            {
               fromDate: options.fromDate
                 ? new Date(options.fromDate)
                 : undefined,
               forceFullSync: options.fullSync ?? false,
-            });
+            },
+          );
 
           this.logger.log(
             `Journals sync: ${journalsResult.created} created, ` +
@@ -1153,7 +1153,8 @@ export class XeroController {
             this.syncGateway.emitProgress(tenantId, {
               entity: 'unreconciled',
               total: unreconciledResult.found,
-              processed: unreconciledResult.created + unreconciledResult.skipped,
+              processed:
+                unreconciledResult.created + unreconciledResult.skipped,
               percentage: 100,
             });
           } catch (financeApiError) {
@@ -1459,7 +1460,10 @@ export class XeroController {
     const tenantId = getTenantId(user);
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
     if (!hasConnection) {
-      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+      throw new BusinessException(
+        'No valid Xero connection',
+        'XERO_NOT_CONNECTED',
+      );
     }
 
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
@@ -1498,7 +1502,9 @@ export class XeroController {
         });
         if (resp.status === 429) {
           retries++;
-          this.logger.warn(`Rate limited on page ${page}, waiting 30s (attempt ${retries})...`);
+          this.logger.warn(
+            `Rate limited on page ${page}, waiting 30s (attempt ${retries})...`,
+          );
           await new Promise((r) => setTimeout(r, 30000));
           continue;
         }
@@ -1723,12 +1729,32 @@ export class XeroController {
             Status: 'POSTED',
             JournalLines: group.isReceive
               ? [
-                  { AccountCode: '9999', Description: narration, LineAmount: amountRands, TaxType: 'NONE' },
-                  { AccountCode: group.accountCode, Description: narration, LineAmount: -amountRands, TaxType: 'NONE' },
+                  {
+                    AccountCode: '9999',
+                    Description: narration,
+                    LineAmount: amountRands,
+                    TaxType: 'NONE',
+                  },
+                  {
+                    AccountCode: group.accountCode,
+                    Description: narration,
+                    LineAmount: -amountRands,
+                    TaxType: 'NONE',
+                  },
                 ]
               : [
-                  { AccountCode: '9999', Description: narration, LineAmount: -amountRands, TaxType: 'NONE' },
-                  { AccountCode: group.accountCode, Description: narration, LineAmount: amountRands, TaxType: 'NONE' },
+                  {
+                    AccountCode: '9999',
+                    Description: narration,
+                    LineAmount: -amountRands,
+                    TaxType: 'NONE',
+                  },
+                  {
+                    AccountCode: group.accountCode,
+                    Description: narration,
+                    LineAmount: amountRands,
+                    TaxType: 'NONE',
+                  },
                 ],
           },
         ],
@@ -1738,19 +1764,24 @@ export class XeroController {
         let retries = 0;
         let response: globalThis.Response | null = null;
         while (retries < 3) {
-          response = await fetch('https://api.xero.com/api.xro/2.0/ManualJournals', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'xero-tenant-id': xeroTenantId,
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
+          response = await fetch(
+            'https://api.xero.com/api.xro/2.0/ManualJournals',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'xero-tenant-id': xeroTenantId,
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify(journalPayload),
             },
-            body: JSON.stringify(journalPayload),
-          });
+          );
           if (response.status === 429) {
             retries++;
-            this.logger.warn(`Rate limited creating journal, waiting 30s (attempt ${retries})...`);
+            this.logger.warn(
+              `Rate limited creating journal, waiting 30s (attempt ${retries})...`,
+            );
             await new Promise((r) => setTimeout(r, 30000));
             continue;
           }
@@ -1765,7 +1796,8 @@ export class XeroController {
         };
 
         if (!response!.ok) {
-          const valErr = data.ManualJournals?.[0]?.ValidationErrors?.[0]?.Message;
+          const valErr =
+            data.ManualJournals?.[0]?.ValidationErrors?.[0]?.Message;
           throw new Error(valErr ?? `HTTP ${response!.status}`);
         }
 
@@ -1830,7 +1862,10 @@ export class XeroController {
     const tenantId = getTenantId(user);
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
     if (!hasConnection) {
-      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+      throw new BusinessException(
+        'No valid Xero connection',
+        'XERO_NOT_CONNECTED',
+      );
     }
 
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
@@ -1844,18 +1879,21 @@ export class XeroController {
 
     const res = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         'xero-tenant-id': xeroTenantId,
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
     });
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new BusinessException(`Xero API error: ${res.status} ${errText.substring(0, 200)}`, 'XERO_API_ERROR');
+      throw new BusinessException(
+        `Xero API error: ${res.status} ${errText.substring(0, 200)}`,
+        'XERO_API_ERROR',
+      );
     }
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       BankTransactions?: Array<{
         BankTransactionID: string;
         Type: string;
@@ -1875,7 +1913,7 @@ export class XeroController {
       }>;
     };
 
-    const txns = (data.BankTransactions ?? []).map(t => ({
+    const txns = (data.BankTransactions ?? []).map((t) => ({
       id: t.BankTransactionID,
       type: t.Type,
       date: t.Date,
@@ -1883,7 +1921,7 @@ export class XeroController {
       status: t.Status,
       total: t.Total,
       totalTax: t.TotalTax,
-      lines: t.LineItems?.map(l => ({
+      lines: t.LineItems?.map((l) => ({
         accountCode: l.AccountCode,
         description: l.Description,
         lineAmount: l.LineAmount,
@@ -1907,7 +1945,10 @@ export class XeroController {
     const tenantId = getTenantId(user);
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
     if (!hasConnection) {
-      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+      throw new BusinessException(
+        'No valid Xero connection',
+        'XERO_NOT_CONNECTED',
+      );
     }
 
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
@@ -1917,19 +1958,22 @@ export class XeroController {
       `https://api.xero.com/api.xro/2.0/ManualJournals?order=Date`,
       {
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           'xero-tenant-id': xeroTenantId,
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
       },
     );
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new BusinessException(`Xero API error: ${res.status} ${errText.substring(0, 200)}`, 'XERO_API_ERROR');
+      throw new BusinessException(
+        `Xero API error: ${res.status} ${errText.substring(0, 200)}`,
+        'XERO_API_ERROR',
+      );
     }
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       ManualJournals?: Array<{
         ManualJournalID: string;
         Narration: string;
@@ -1944,12 +1988,12 @@ export class XeroController {
       }>;
     };
 
-    const journals = (data.ManualJournals ?? []).map(j => ({
+    const journals = (data.ManualJournals ?? []).map((j) => ({
       id: j.ManualJournalID,
       narration: j.Narration,
       date: j.Date,
       status: j.Status,
-      lines: j.JournalLines?.map(l => ({
+      lines: j.JournalLines?.map((l) => ({
         accountCode: l.AccountCode,
         amount: l.LineAmount,
         taxType: l.TaxType,
@@ -1975,7 +2019,10 @@ export class XeroController {
 
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
     if (!hasConnection) {
-      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+      throw new BusinessException(
+        'No valid Xero connection',
+        'XERO_NOT_CONNECTED',
+      );
     }
 
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
@@ -1992,7 +2039,7 @@ export class XeroController {
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
+              Authorization: `Bearer ${accessToken}`,
               'xero-tenant-id': xeroTenantId,
               'Content-Type': 'application/json',
             },
@@ -2007,9 +2054,13 @@ export class XeroController {
         }
         results.push({ id: jid, status: 'voided' });
         voided++;
-        if (voided % 5 === 0) await new Promise(r => setTimeout(r, 1000));
+        if (voided % 5 === 0) await new Promise((r) => setTimeout(r, 1000));
       } catch (error) {
-        results.push({ id: jid, status: 'failed', error: error instanceof Error ? error.message : String(error) });
+        results.push({
+          id: jid,
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+        });
         failed++;
       }
     }
@@ -2044,7 +2095,10 @@ export class XeroController {
     const tenantId = getTenantId(user);
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
     if (!hasConnection) {
-      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+      throw new BusinessException(
+        'No valid Xero connection',
+        'XERO_NOT_CONNECTED',
+      );
     }
 
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
@@ -2052,37 +2106,47 @@ export class XeroController {
 
     let created = 0;
     let failed = 0;
-    const results: Array<{ narration: string; status: string; journalId?: string; error?: string }> = [];
+    const results: Array<{
+      narration: string;
+      status: string;
+      journalId?: string;
+      error?: string;
+    }> = [];
 
     for (const journal of body.journals) {
       const payload = {
-        ManualJournals: [{
-          Narration: journal.narration,
-          Date: journal.date,
-          Status: 'POSTED',
-          JournalLines: journal.lines.map((l) => ({
-            AccountCode: l.accountCode,
-            Description: l.description,
-            LineAmount: l.lineAmount,
-            TaxType: l.taxType ?? 'NONE',
-          })),
-        }],
+        ManualJournals: [
+          {
+            Narration: journal.narration,
+            Date: journal.date,
+            Status: 'POSTED',
+            JournalLines: journal.lines.map((l) => ({
+              AccountCode: l.accountCode,
+              Description: l.description,
+              LineAmount: l.lineAmount,
+              TaxType: l.taxType ?? 'NONE',
+            })),
+          },
+        ],
       };
 
       try {
         let retries = 0;
         let response: globalThis.Response | null = null;
         while (retries < 3) {
-          response = await fetch('https://api.xero.com/api.xro/2.0/ManualJournals', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'xero-tenant-id': xeroTenantId,
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
+          response = await fetch(
+            'https://api.xero.com/api.xro/2.0/ManualJournals',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'xero-tenant-id': xeroTenantId,
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify(payload),
             },
-            body: JSON.stringify(payload),
-          });
+          );
           if (response.status === 429) {
             retries++;
             await new Promise((r) => setTimeout(r, 30000));
@@ -2099,12 +2163,17 @@ export class XeroController {
         };
 
         if (!response!.ok) {
-          const valErr = data.ManualJournals?.[0]?.ValidationErrors?.[0]?.Message;
+          const valErr =
+            data.ManualJournals?.[0]?.ValidationErrors?.[0]?.Message;
           throw new Error(valErr ?? `HTTP ${response!.status}`);
         }
 
         const journalId = data.ManualJournals?.[0]?.ManualJournalID;
-        results.push({ narration: journal.narration, status: 'success', journalId });
+        results.push({
+          narration: journal.narration,
+          status: 'success',
+          journalId,
+        });
         created++;
 
         if (created % 5 === 0) {
@@ -2112,7 +2181,11 @@ export class XeroController {
         }
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        results.push({ narration: journal.narration, status: 'failed', error: errMsg });
+        results.push({
+          narration: journal.narration,
+          status: 'failed',
+          error: errMsg,
+        });
         failed++;
       }
     }
@@ -2147,7 +2220,10 @@ export class XeroController {
     const tenantId = getTenantId(user);
     const hasConnection = await this.tokenManager.hasValidConnection(tenantId);
     if (!hasConnection) {
-      throw new BusinessException('No valid Xero connection', 'XERO_NOT_CONNECTED');
+      throw new BusinessException(
+        'No valid Xero connection',
+        'XERO_NOT_CONNECTED',
+      );
     }
 
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
@@ -2155,41 +2231,53 @@ export class XeroController {
 
     let created = 0;
     let failed = 0;
-    const results: Array<{ description: string; status: string; id?: string; error?: string }> = [];
+    const results: Array<{
+      description: string;
+      status: string;
+      id?: string;
+      error?: string;
+    }> = [];
 
     for (const txn of body.transactions) {
       const payload = {
-        BankTransactions: [{
-          Type: txn.type,
-          Date: txn.date,
-          Contact: { Name: txn.contactName || 'Owner' },
-          BankAccount: { AccountID: txn.bankAccountId },
-          LineItems: [{
-            Description: txn.description,
-            Quantity: 1,
-            UnitAmount: txn.amount,
-            AccountCode: txn.accountCode,
-            TaxType: txn.taxType ?? 'NONE',
-          }],
-          Reference: txn.reference,
-          Status: 'AUTHORISED',
-        }],
+        BankTransactions: [
+          {
+            Type: txn.type,
+            Date: txn.date,
+            Contact: { Name: txn.contactName || 'Owner' },
+            BankAccount: { AccountID: txn.bankAccountId },
+            LineItems: [
+              {
+                Description: txn.description,
+                Quantity: 1,
+                UnitAmount: txn.amount,
+                AccountCode: txn.accountCode,
+                TaxType: txn.taxType ?? 'NONE',
+              },
+            ],
+            Reference: txn.reference,
+            Status: 'AUTHORISED',
+          },
+        ],
       };
 
       try {
         let retries = 0;
         let response: globalThis.Response | null = null;
         while (retries < 3) {
-          response = await fetch('https://api.xero.com/api.xro/2.0/BankTransactions', {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'xero-tenant-id': xeroTenantId,
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
+          response = await fetch(
+            'https://api.xero.com/api.xro/2.0/BankTransactions',
+            {
+              method: 'PUT',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'xero-tenant-id': xeroTenantId,
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify(payload),
             },
-            body: JSON.stringify(payload),
-          });
+          );
           if (response.status === 429) {
             retries++;
             await new Promise((r) => setTimeout(r, 30000));
@@ -2200,21 +2288,37 @@ export class XeroController {
 
         const responseText = await response!.text();
         let data: any;
-        try { data = JSON.parse(responseText); } catch { data = {}; }
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          data = {};
+        }
 
         if (!response!.ok) {
-          const valErr = data.BankTransactions?.[0]?.ValidationErrors?.[0]?.Message
-            || (data as any).Message
-            || (data as any).Detail;
-          throw new Error(valErr ?? `HTTP ${response!.status}: ${responseText.substring(0, 500)}`);
+          const valErr =
+            data.BankTransactions?.[0]?.ValidationErrors?.[0]?.Message ||
+            data.Message ||
+            data.Detail;
+          throw new Error(
+            valErr ??
+              `HTTP ${response!.status}: ${responseText.substring(0, 500)}`,
+          );
         }
 
         const txnId = data.BankTransactions?.[0]?.BankTransactionID;
-        results.push({ description: txn.description, status: 'success', id: txnId });
+        results.push({
+          description: txn.description,
+          status: 'success',
+          id: txnId,
+        });
         created++;
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
-        results.push({ description: txn.description, status: 'failed', error: errMsg });
+        results.push({
+          description: txn.description,
+          status: 'failed',
+          error: errMsg,
+        });
         failed++;
       }
     }
@@ -2245,7 +2349,12 @@ export class XeroController {
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
     const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
 
-    const results: Array<{ code: string; name: string; status: string; error?: string }> = [];
+    const results: Array<{
+      code: string;
+      name: string;
+      status: string;
+      error?: string;
+    }> = [];
 
     for (const acct of body.accounts) {
       const payload = {
@@ -2256,21 +2365,26 @@ export class XeroController {
       };
 
       try {
-        const response = await fetch('https://api.xero.com/api.xro/2.0/Accounts', {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'xero-tenant-id': xeroTenantId,
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
+        const response = await fetch(
+          'https://api.xero.com/api.xro/2.0/Accounts',
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'xero-tenant-id': xeroTenantId,
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify(payload),
           },
-          body: JSON.stringify(payload),
-        });
+        );
 
-        const data = await response.json() as any;
+        const data = await response.json();
         if (!response.ok) {
-          const errMsg = data.Elements?.[0]?.ValidationErrors?.[0]?.Message
-            || data.Message || `HTTP ${response.status}`;
+          const errMsg =
+            data.Elements?.[0]?.ValidationErrors?.[0]?.Message ||
+            data.Message ||
+            `HTTP ${response.status}`;
           throw new Error(errMsg);
         }
 
@@ -2299,22 +2413,31 @@ export class XeroController {
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
     const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
 
-    const response = await fetch('https://api.xero.com/api.xro/2.0/BankTransactions/' + bankTransactionId, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'xero-tenant-id': xeroTenantId,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
+    const response = await fetch(
+      'https://api.xero.com/api.xro/2.0/BankTransactions/' + bankTransactionId,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'xero-tenant-id': xeroTenantId,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          BankTransactions: [
+            { BankTransactionID: bankTransactionId, Status: 'DELETED' },
+          ],
+        }),
       },
-      body: JSON.stringify({
-        BankTransactions: [{ BankTransactionID: bankTransactionId, Status: 'DELETED' }],
-      }),
-    });
+    );
 
     const text = await response.text();
     let data: any;
-    try { data = JSON.parse(text); } catch { data = text; }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
     return { status: response.status, success: response.ok, body: data };
   }
 
@@ -2329,20 +2452,27 @@ export class XeroController {
     const accessToken = await this.tokenManager.getAccessToken(tenantId);
     const xeroTenantId = await this.tokenManager.getXeroTenantId(tenantId);
 
-    const response = await fetch(`https://api.xero.com/api.xro/2.0${body.path}`, {
-      method: body.method,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'xero-tenant-id': xeroTenantId,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
+    const response = await fetch(
+      `https://api.xero.com/api.xro/2.0${body.path}`,
+      {
+        method: body.method,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'xero-tenant-id': xeroTenantId,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: body.payload ? JSON.stringify(body.payload) : undefined,
       },
-      body: body.payload ? JSON.stringify(body.payload) : undefined,
-    });
+    );
 
     const text = await response.text();
     let json: any;
-    try { json = JSON.parse(text); } catch { json = null; }
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
 
     return { status: response.status, body: json ?? text };
   }

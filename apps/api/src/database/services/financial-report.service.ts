@@ -138,8 +138,7 @@ export class FinancialReportService {
     )
       .map(([code, amount]) => ({
         accountCode: code,
-        accountName:
-          accountNameMap.get(code) || this.getAccountName(code),
+        accountName: accountNameMap.get(code) || this.getAccountName(code),
         amountCents: amount.toNumber(),
         amountRands: amount.dividedBy(100).toDecimalPlaces(2).toNumber(),
       }))
@@ -151,8 +150,7 @@ export class FinancialReportService {
     )
       .map(([code, amount]) => ({
         accountCode: code,
-        accountName:
-          accountNameMap.get(code) || this.getAccountName(code),
+        accountName: accountNameMap.get(code) || this.getAccountName(code),
         amountCents: amount.toNumber(),
         amountRands: amount.dividedBy(100).toDecimalPlaces(2).toNumber(),
       }))
@@ -405,9 +403,7 @@ export class FinancialReportService {
           .toNumber(),
       });
     }
-    equityBreakdown.sort((a, b) =>
-      a.accountCode.localeCompare(b.accountCode),
-    );
+    equityBreakdown.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
 
     // Calculate totals
     const totalAssetsCents = currentAssets
@@ -544,10 +540,7 @@ export class FinancialReportService {
         accountName: balance.name,
         debitCents: balance.debits.toNumber(),
         creditCents: balance.credits.toNumber(),
-        debitRands: balance.debits
-          .dividedBy(100)
-          .toDecimalPlaces(2)
-          .toNumber(),
+        debitRands: balance.debits.dividedBy(100).toDecimalPlaces(2).toNumber(),
         creditRands: balance.credits
           .dividedBy(100)
           .toDecimalPlaces(2)

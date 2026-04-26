@@ -44,7 +44,10 @@ import {
   IsISO8601,
 } from 'class-validator';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { StaffLeaveRequestedEvent, StaffLeaveDecisionEvent } from '../../database/events/domain-events';
+import type {
+  StaffLeaveRequestedEvent,
+  StaffLeaveDecisionEvent,
+} from '../../database/events/domain-events';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -502,14 +505,19 @@ export class LeaveController {
     );
 
     // Look up staff for event
-    const staff = await this.staffRepository.findById(leaveRequest.staffId, tenantId);
+    const staff = await this.staffRepository.findById(
+      leaveRequest.staffId,
+      tenantId,
+    );
 
     // Emit staff.leave.decided domain event (non-blocking)
     try {
       this.eventEmitter.emit('staff.leave.decided', {
         tenantId,
         staffId: leaveRequest.staffId,
-        staffName: staff ? `${staff.firstName} ${staff.lastName}`.trim() : 'Unknown',
+        staffName: staff
+          ? `${staff.firstName} ${staff.lastName}`.trim()
+          : 'Unknown',
         decision: 'APPROVED',
         leaveType: leaveRequest.leaveTypeName,
         startDate: leaveRequest.startDate,
@@ -553,14 +561,19 @@ export class LeaveController {
     );
 
     // Look up staff for event
-    const staff = await this.staffRepository.findById(leaveRequest.staffId, tenantId);
+    const staff = await this.staffRepository.findById(
+      leaveRequest.staffId,
+      tenantId,
+    );
 
     // Emit staff.leave.decided domain event (non-blocking)
     try {
       this.eventEmitter.emit('staff.leave.decided', {
         tenantId,
         staffId: leaveRequest.staffId,
-        staffName: staff ? `${staff.firstName} ${staff.lastName}`.trim() : 'Unknown',
+        staffName: staff
+          ? `${staff.firstName} ${staff.lastName}`.trim()
+          : 'Unknown',
         decision: 'REJECTED',
         leaveType: leaveRequest.leaveTypeName,
         startDate: leaveRequest.startDate,

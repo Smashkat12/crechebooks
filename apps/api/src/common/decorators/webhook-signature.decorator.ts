@@ -16,12 +16,7 @@ import { SetMetadata } from '@nestjs/common';
 /**
  * Supported webhook providers
  */
-export type WebhookProvider =
-  | 'sendgrid'
-  | 'whatsapp'
-  | 'stripe'
-  | 'xero'
-  | 'simplepay';
+export type WebhookProvider = 'whatsapp' | 'xero' | 'simplepay';
 
 /**
  * Metadata key for webhook provider
@@ -32,7 +27,7 @@ export const WEBHOOK_SIGNATURE_KEY = 'webhookProvider';
 /**
  * Decorator to specify the webhook provider for signature verification
  *
- * @param provider - The webhook provider (sendgrid, whatsapp, stripe, xero, simplepay)
+ * @param provider - The webhook provider (whatsapp, xero, simplepay)
  * @returns MethodDecorator that sets the webhook provider metadata
  *
  * @example
@@ -44,14 +39,6 @@ export const WEBHOOK_SIGNATURE_KEY = 'webhookProvider';
  *   // Signature has been verified by the guard
  * }
  *
- * @example
- * // On a class (applies to all methods)
- * @Controller('webhooks/stripe')
- * @UseGuards(WebhookSignatureGuard)
- * @WebhookSignature('stripe')
- * export class StripeWebhookController {
- *   // All methods use Stripe signature verification
- * }
  */
 export const WebhookSignature = (provider: WebhookProvider) =>
   SetMetadata(WEBHOOK_SIGNATURE_KEY, provider);

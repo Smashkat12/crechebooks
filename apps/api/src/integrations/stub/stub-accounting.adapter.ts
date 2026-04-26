@@ -204,7 +204,9 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id: invoiceId, tenantId },
       include: {
-        parent: { select: { id: true, firstName: true, lastName: true, email: true } },
+        parent: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
         lines: { orderBy: { sortOrder: 'asc' } },
       },
     });
@@ -256,7 +258,10 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         category,
         currency: 'ZAR',
         amount: this.centsToRands(invoice.totalCents),
-        vat: invoice.vatCents > 0 ? this.centsToRands(invoice.vatCents) : undefined,
+        vat:
+          invoice.vatCents > 0
+            ? this.centsToRands(invoice.vatCents)
+            : undefined,
       },
     };
 
@@ -292,7 +297,8 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
         errors.push({
           entityId: id,
           error: err instanceof Error ? err.message : 'Push failed',
-          code: err instanceof BusinessException ? err.code : 'STUB_PUSH_FAILED',
+          code:
+            err instanceof BusinessException ? err.code : 'STUB_PUSH_FAILED',
         });
       }
     }
@@ -547,7 +553,7 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
       externalAccountId: a.xeroAccountId ?? a.id,
       code: a.accountCode,
       name: `${a.name} → ${getStubCategory(a.accountCode, a.type === 'REVENUE')}`,
-      type: a.type as string,
+      type: a.type,
       status: a.status as 'ACTIVE' | 'ARCHIVED',
     }));
   }
@@ -578,7 +584,10 @@ export class StubAccountingAdapter implements AccountingProvider, OnModuleInit {
     if (entities.includes('invoices')) {
       try {
         // Only PAID invoices can be pushed — Stub /api/push/sale requires payment
-        const allInvoices = await this.findPaidInvoices(tenantId, options.fromDate);
+        const allInvoices = await this.findPaidInvoices(
+          tenantId,
+          options.fromDate,
+        );
         if (allInvoices.length > 0) {
           const result = await this.pushInvoicesBulk(
             tenantId,

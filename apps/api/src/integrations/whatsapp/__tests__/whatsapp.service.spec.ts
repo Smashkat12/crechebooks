@@ -249,10 +249,14 @@ describe('WhatsAppService', () => {
         }),
       });
 
-      const result = await service.sendReminder(parentId, 'invoice_reminder', {
-        amount: 'R 1,500.00',
-        due_date: '15 February 2024',
-      });
+      const result = await service.sendReminder(
+        parentId,
+        'invoice_notification',
+        {
+          amount: 'R 1,500.00',
+          due_date: '15 February 2024',
+        },
+      );
 
       expect(result.messageId).toBe('msg-123');
       expect(result.status).toBe('sent');

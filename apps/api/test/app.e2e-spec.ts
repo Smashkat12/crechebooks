@@ -15,10 +15,7 @@ interface HealthResponse {
   version: string;
 }
 
-// SKIP: This test has a module configuration issue with BillingSchedulerModule
-// when Redis is not configured. The 119 other E2E tests pass.
-// TODO: Fix circular dependency between SchedulerModule and BillingSchedulerModule
-describe.skip('CrecheBooks API (e2e)', () => {
+describe('CrecheBooks API (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {

@@ -738,6 +738,9 @@ model Tenant {
   notifications Notification[]
   notificationPreferences NotificationPreference[]
 
+  // Stub.africa Integration
+  stubConnection StubConnection?
+
   @@map("tenants")
 }
 
@@ -4093,6 +4096,13 @@ model WhatsAppOnboardingSession {
 // Persists vector embeddings for AI agents (categorization, payment matching, semantic search)
 // Uses pgvector extension for efficient similarity search via HNSW index
 
+// INTENTIONAL SCHEMA DRIFT: The DB carries `vector_embeddings_embedding_idx`
+// (HNSW cosine index, m=16, ef_construction=64) which is NOT declared here.
+// Prisma cannot represent HNSW indexes on Unsupported() columns without
+// previewFeatures = ["postgresqlExtensions"] — out of scope for this change.
+// This index IS required for pgvector cosine-search performance and must not
+// be dropped. `prisma migrate diff` will report it as drift permanently.
+// See: migrations/20260426145222_align_vector_embeddings_to_schema/migration.sql
 model VectorEmbedding {
   id          String   @id @default(uuid())
   tenantId    String   @map("tenant_id")
@@ -4165,4 +4175,27 @@ model NotificationPreference {
 
   @@unique([tenantId, recipientType, recipientId])
   @@map("notification_preferences")
+}
+
+// ============================================
+// Stub.africa Integration — one connection per tenant
+// ============================================
+
+model StubConnection {
+  tenantId        String    @id @map("tenant_id") @db.VarChar(50)
+  stubBusinessUid String?   @map("stub_business_uid") @db.VarChar(100)
+  isActive        Boolean   @default(false) @map("is_active")
+  connectedAt     DateTime  @default(now()) @map("connected_at") @db.Timestamptz
+  lastSyncAt      DateTime? @map("last_sync_at") @db.Timestamptz
+  lastSyncStatus  String?   @map("last_sync_status") @db.VarChar(20)
+  errorMessage    String?   @map("error_message") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // onDelete/onUpdate: NoAction matches the live DB FK created by the runtime
+  // bootstrap in stub-accounting.adapter.ts. Schema describes reality, not the
+  // Prisma default of Restrict/Cascade.
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("stub_connections")
 }

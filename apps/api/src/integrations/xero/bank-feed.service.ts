@@ -1033,9 +1033,7 @@ export class BankFeedService {
       await this.getAuthenticatedClient(tenantId);
 
     // Build a set of bank account IDs for quick lookup
-    const bankAccountIds = new Set(
-      connections.map((c) => c.xeroAccountId),
-    );
+    const bankAccountIds = new Set(connections.map((c) => c.xeroAccountId));
     // Map accountID → connection for creating transactions
     const accountConnectionMap = new Map(
       connections.map((c) => [c.xeroAccountId, c]),

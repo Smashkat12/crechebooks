@@ -11,7 +11,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 
 export class ListNotificationsQueryDto {
-  @ApiPropertyOptional({ description: 'Cursor for pagination (notification ID)' })
+  @ApiPropertyOptional({
+    description: 'Cursor for pagination (notification ID)',
+  })
   @IsOptional()
   @IsString()
   cursor?: string;

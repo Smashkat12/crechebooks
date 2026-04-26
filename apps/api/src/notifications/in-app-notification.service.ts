@@ -37,7 +37,9 @@ export class InAppNotificationService {
         recipientType: input.recipientType,
         recipientId: input.recipientId,
         type: input.type as any,
-        priority: (input.priority as NotificationPriority) ?? NotificationPriority.NORMAL,
+        priority:
+          (input.priority as NotificationPriority) ??
+          NotificationPriority.NORMAL,
         title: input.title,
         body: input.body,
         actionUrl: input.actionUrl ?? null,
@@ -49,7 +51,9 @@ export class InAppNotificationService {
     });
   }
 
-  async listForRecipient(query: NotificationListQuery): Promise<NotificationListResponse> {
+  async listForRecipient(
+    query: NotificationListQuery,
+  ): Promise<NotificationListResponse> {
     const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
 
     const where: Prisma.NotificationWhereInput = {
@@ -82,7 +86,8 @@ export class InAppNotificationService {
 
     const hasMore = items.length > limit;
     const data = hasMore ? items.slice(0, limit) : items;
-    const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null;
+    const nextCursor =
+      hasMore && data.length > 0 ? data[data.length - 1].id : null;
 
     return {
       data: data.map(this.toNotificationItem),

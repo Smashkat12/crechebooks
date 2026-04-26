@@ -92,7 +92,8 @@ export class ChartOfAccountController {
   @ApiResponse({ status: 200, description: 'Education exempt accounts' })
   async getEducationExempt(@CurrentUser() user: IUser) {
     const tenantId = getTenantId(user);
-    const accounts = await this.accountService.findEducationExemptAccounts(tenantId);
+    const accounts =
+      await this.accountService.findEducationExemptAccounts(tenantId);
     return { success: true, data: accounts };
   }
 
@@ -153,7 +154,12 @@ export class ChartOfAccountController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Update account: id=${id}, tenant=${tenantId}`);
-    const account = await this.accountService.update(tenantId, userId, id, body);
+    const account = await this.accountService.update(
+      tenantId,
+      userId,
+      id,
+      body,
+    );
     return { success: true, data: account };
   }
 

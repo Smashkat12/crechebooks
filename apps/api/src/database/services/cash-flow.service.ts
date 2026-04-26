@@ -403,7 +403,11 @@ export class CashFlowService {
 
     // Use reconciliations table as source of truth for reconciliation status.
     // A period is reconciled if a RECONCILED record covers it.
-    const cashReconciles = await this.isReconciled(tenantId, startDate, endDate);
+    const cashReconciles = await this.isReconciled(
+      tenantId,
+      startDate,
+      endDate,
+    );
 
     return {
       netCashChangeCents,

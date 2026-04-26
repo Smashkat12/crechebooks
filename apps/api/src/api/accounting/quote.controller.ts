@@ -146,7 +146,12 @@ export class QuoteController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Update quote: id=${id}, tenant=${tenantId}`);
-    const quote = await this.quoteService.updateQuote(tenantId, userId, id, body);
+    const quote = await this.quoteService.updateQuote(
+      tenantId,
+      userId,
+      id,
+      body,
+    );
     return { success: true, data: quote };
   }
 
@@ -187,7 +192,11 @@ export class QuoteController {
   ) {
     const tenantId = getTenantId(user);
     this.logger.log(`Decline quote: id=${id}, tenant=${tenantId}`);
-    const result = await this.quoteService.declineQuote(tenantId, id, body.reason);
+    const result = await this.quoteService.declineQuote(
+      tenantId,
+      id,
+      body.reason,
+    );
     return { success: true, data: result };
   }
 

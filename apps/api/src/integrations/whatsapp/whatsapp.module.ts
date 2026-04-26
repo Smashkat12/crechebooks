@@ -40,7 +40,6 @@ import { OnboardingExpiryJob } from './jobs/onboarding-expiry.job';
 import { OnboardingController } from './controllers/onboarding.controller';
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../../api/auth/auth.module';
-import { YocoModule } from '../yoco/yoco.module';
 import { QUEUE_NAMES } from '../../scheduler/types/scheduler.types';
 
 const logger = new Logger('WhatsAppModule');
@@ -119,7 +118,6 @@ const retryProviders = isRedisConfigured()
   imports: [
     forwardRef(() => DatabaseModule),
     forwardRef(() => AuthModule), // TASK-WA-015: MagicLinkService for onboarding completion
-    forwardRef(() => YocoModule), // TASK-ACCT-011: Yoco payment link creation from WhatsApp
     ConfigModule,
     ScheduleModule.forRoot(), // TASK-WA-013: Enable @Cron for OnboardingExpiryJob
     JwtModule.registerAsync({

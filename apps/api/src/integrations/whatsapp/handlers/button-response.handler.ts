@@ -17,8 +17,7 @@
  * IMPORTANT: All responses use tenant.tradingName for branding, NOT "CrecheBooks"
  */
 
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from '@nestjs/common';
 import { Tenant } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
@@ -30,7 +29,6 @@ import {
   ButtonAction,
   ParsedButtonPayload,
 } from '../types/button.types';
-import { YocoService } from '../../yoco/yoco.service';
 
 /**
  * Result of button response handling
@@ -57,8 +55,6 @@ export class ButtonResponseHandler {
     private readonly contentService: TwilioContentService,
     private readonly documentUrlService: DocumentUrlService,
     private readonly auditLogService: AuditLogService,
-    private readonly configService: ConfigService,
-    @Optional() @Inject(YocoService) private readonly yocoService?: YocoService,
   ) {}
 
   /**
@@ -175,10 +171,9 @@ export class ButtonResponseHandler {
   }
 
   /**
-   * PAY NOW - Create Yoco payment link or send EFT details
+   * PAY NOW - Send EFT bank details
    *
-   * If Yoco is configured: creates a payment link and sends the URL.
-   * If Yoco is not configured: sends tenant EFT bank details as fallback.
+   * Sends tenant EFT bank details so the parent can make a manual payment.
    */
   private async handlePayNow(
     to: string,
@@ -216,41 +211,7 @@ export class ButtonResponseHandler {
       return;
     }
 
-    // Try Yoco payment link if service is available and configured
-    const yocoSecretKey = this.configService.get<string>('YOCO_SECRET_KEY');
-    if (this.yocoService && yocoSecretKey) {
-      try {
-        const paymentLink = await this.yocoService.createPaymentLink(
-          tenant.id,
-          'system',
-          {
-            parentId: invoice.parentId,
-            amountCents: balanceDue,
-            type: 'INVOICE',
-            invoiceId: invoice.id,
-          },
-        );
-
-        await this.contentService.sendSessionMessage(
-          to,
-          `Here's your secure payment link for ${tenantName}:\n\n${paymentLink.paymentUrl}\n\nAmount: R ${(balanceDue / 100).toFixed(2)}\nInvoice: ${invoiceNumber}\n\nThis link will remain active for 7 days.`,
-          tenant.id,
-        );
-
-        this.logger.log(
-          `Yoco payment link ${paymentLink.shortCode} sent for invoice ${invoiceNumber} to ${to}`,
-        );
-        return;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Failed to create Yoco payment link, falling back to EFT: ${errorMessage}`,
-        );
-      }
-    }
-
-    // EFT fallback: send bank details
+    // Send EFT bank details
     const bankDetails = [
       `Bank: ${(tenant as any).bankName || 'Contact us for details'}`,
       (tenant as any).bankAccountNumber

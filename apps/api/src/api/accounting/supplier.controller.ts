@@ -120,7 +120,11 @@ export class SupplierController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Create supplier: tenant=${tenantId}, name=${body.name}`);
-    const supplier = await this.supplierService.createSupplier(tenantId, userId, body);
+    const supplier = await this.supplierService.createSupplier(
+      tenantId,
+      userId,
+      body,
+    );
     return { success: true, data: supplier };
   }
 
@@ -137,7 +141,12 @@ export class SupplierController {
     const tenantId = getTenantId(user);
     const userId = user.id;
     this.logger.log(`Update supplier: id=${id}, tenant=${tenantId}`);
-    const supplier = await this.supplierService.updateSupplier(tenantId, userId, id, body);
+    const supplier = await this.supplierService.updateSupplier(
+      tenantId,
+      userId,
+      id,
+      body,
+    );
     return { success: true, data: supplier };
   }
 
@@ -156,7 +165,11 @@ export class SupplierController {
     const userId = user.id;
     this.logger.log(`Create bill: supplier=${supplierId}, tenant=${tenantId}`);
     const billData = { ...body, supplierId };
-    const bill = await this.supplierService.createBill(tenantId, userId, billData);
+    const bill = await this.supplierService.createBill(
+      tenantId,
+      userId,
+      billData,
+    );
     return { success: true, data: bill };
   }
 

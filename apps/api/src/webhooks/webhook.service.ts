@@ -18,12 +18,10 @@ import { AuditLogService } from '../database/services/audit-log.service';
 import { AuditAction } from '../database/entities/audit-log.entity';
 import { BusinessException } from '../shared/exceptions';
 import {
-  EmailEvent,
   WhatsAppEvent,
   WhatsAppWebhookPayload,
   WebhookProcessingResult,
   DeliveryStatus,
-  mapEmailEventToStatus,
   mapWhatsAppStatusToDeliveryStatus,
   mapMailgunEventToStatus,
   shouldUpdateStatus,
@@ -34,7 +32,6 @@ import {
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
-  private readonly sendgridWebhookKey: string | undefined;
   private readonly whatsappAppSecret: string | undefined;
   private readonly whatsappVerifyToken: string | undefined;
   private readonly mailgunWebhookSigningKey: string | undefined;
@@ -45,9 +42,6 @@ export class WebhookService {
     private readonly configService: ConfigService,
     private readonly auditLogService: AuditLogService,
   ) {
-    this.sendgridWebhookKey = this.configService.get<string>(
-      'SENDGRID_WEBHOOK_KEY',
-    );
     this.whatsappAppSecret = this.configService.get<string>(
       'WHATSAPP_APP_SECRET',
     );
@@ -58,68 +52,6 @@ export class WebhookService {
       'MAILGUN_WEBHOOK_SIGNING_KEY',
     );
     this.twilioAuthToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
-  }
-
-  /**
-   * Verify SendGrid webhook signature
-   * @see https://docs.sendgrid.com/for-developers/tracking-events/getting-started-event-webhook-security-features
-   *
-   * CRITICAL: NEVER skip verification - FAIL FAST if secret not configured
-   *
-   * @param payload - Raw request body as string
-   * @param signature - x-twilio-email-event-webhook-signature header
-   * @param timestamp - x-twilio-email-event-webhook-timestamp header
-   * @returns true if signature is valid
-   * @throws Error if webhook secret not configured (FAIL FAST)
-   */
-  verifyEmailSignature(
-    payload: string,
-    signature: string,
-    timestamp: string,
-  ): boolean {
-    // SECURITY: FAIL FAST - Never process webhooks without verification
-    if (!this.sendgridWebhookKey) {
-      this.logger.error(
-        'SECURITY: SendGrid webhook key (SENDGRID_WEBHOOK_KEY) not configured. ' +
-          'Webhook signature verification is REQUIRED in ALL environments. ' +
-          'Configure the webhook secret or disable email webhooks.',
-      );
-      throw new Error(
-        'Webhook verification failed: SENDGRID_WEBHOOK_KEY not configured',
-      );
-    }
-
-    if (!signature || !timestamp) {
-      this.logger.warn(
-        'Missing signature or timestamp headers in email webhook request',
-      );
-      return false;
-    }
-
-    try {
-      // SendGrid uses ECDSA signature verification
-      // For HMAC fallback (older setup), use:
-      const payloadToSign = timestamp + payload;
-      const expectedSignature = crypto
-        .createHmac('sha256', this.sendgridWebhookKey)
-        .update(payloadToSign)
-        .digest('base64');
-
-      // Use constant-time comparison to prevent timing attacks
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature),
-      );
-
-      if (!isValid) {
-        this.logger.warn('Email webhook signature verification failed');
-      }
-
-      return isValid;
-    } catch (error) {
-      this.logger.error('Error verifying email signature', error);
-      return false;
-    }
   }
 
   /**
@@ -270,80 +202,6 @@ export class WebhookService {
 
     this.logger.log('WhatsApp webhook subscription verified');
     return challenge;
-  }
-
-  /**
-   * Process email delivery events
-   *
-   * @param events - Array of SendGrid events
-   * @returns Processing result with counts and errors
-   */
-  async processEmailEvent(
-    events: EmailEvent[],
-  ): Promise<WebhookProcessingResult> {
-    const result: WebhookProcessingResult = {
-      processed: 0,
-      skipped: 0,
-      errors: [],
-    };
-
-    for (const event of events) {
-      try {
-        const invoiceId = event.invoiceId;
-        const tenantId = event.tenantId;
-
-        // Skip if no invoice ID in custom args
-        if (!invoiceId || !tenantId) {
-          this.logger.debug(
-            `Skipping email event ${event.sg_message_id}: no invoiceId or tenantId`,
-          );
-          result.skipped++;
-          continue;
-        }
-
-        // Map event to delivery status
-        const newStatus = mapEmailEventToStatus(event.event);
-        if (!newStatus) {
-          this.logger.debug(
-            `Skipping email event ${event.event}: not a status change event`,
-          );
-          result.skipped++;
-          continue;
-        }
-
-        // Update delivery status
-        await this.updateDeliveryStatus(
-          invoiceId,
-          tenantId,
-          'email',
-          newStatus,
-          {
-            event: event.event,
-            messageId: event.sg_message_id,
-            email: event.email,
-            timestamp: event.timestamp,
-            bounceReason: event.reason,
-            url: event.url,
-          },
-        );
-
-        result.processed++;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        result.errors.push({
-          eventId: event.sg_message_id || 'unknown',
-          error: errorMessage,
-        });
-        this.logger.error(`Error processing email event: ${errorMessage}`);
-      }
-    }
-
-    this.logger.log(
-      `Email events processed: ${result.processed}, skipped: ${result.skipped}, errors: ${result.errors.length}`,
-    );
-
-    return result;
   }
 
   /**

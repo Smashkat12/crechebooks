@@ -201,42 +201,6 @@ export const CRECHEBOOKS_TEMPLATES: Record<
     },
   },
 
-  invoice_reminder: {
-    name: 'invoice_reminder',
-    description: 'Payment reminder for overdue invoice',
-    language: 'en',
-    category: 'UTILITY',
-    body: {
-      text: 'Hello {{1}},\n\nThis is a friendly reminder that invoice {{2}} for {{3}} is {{4}} overdue.\n\nAmount Due: {{5}}\nOriginal Due Date: {{6}}\n\nPlease arrange payment at your earliest convenience.',
-      parameters: [
-        { name: 'parentName', type: 'text', required: true, maxLength: 50 },
-        { name: 'invoiceNumber', type: 'text', required: true, maxLength: 20 },
-        { name: 'amount', type: 'currency', required: true },
-        { name: 'daysOverdue', type: 'text', required: true, maxLength: 10 },
-        { name: 'amountDue', type: 'currency', required: true },
-        {
-          name: 'dueDate',
-          type: 'date_time',
-          required: true,
-          format: 'DD MMM YYYY',
-        },
-      ],
-    },
-    footer: 'CrecheBooks - Childcare Management',
-    buttons: [
-      {
-        type: 'url',
-        text: 'Pay Now',
-        url: 'https://app.crechebooks.co.za/pay/{{1}}',
-      },
-    ],
-    compliance: {
-      requiresOptIn: true,
-      dataRetentionDays: 365,
-      purpose: 'Payment reminder as part of billing service',
-    },
-  },
-
   payment_received: {
     name: 'payment_received',
     description: 'Payment confirmation notification',

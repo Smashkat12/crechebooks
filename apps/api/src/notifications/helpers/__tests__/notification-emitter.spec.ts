@@ -22,10 +22,9 @@ describe('NotificationEmitter', () => {
     mockQueue = { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
     mockPrisma = {
       user: {
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'admin-1' },
-          { id: 'admin-2' },
-        ]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'admin-1' }, { id: 'admin-2' }]),
       },
     };
 

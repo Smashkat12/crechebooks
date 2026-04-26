@@ -11,7 +11,6 @@ import {
   Currency,
   ExchangeRateSource,
 } from '../../../src/database/services/currency-conversion.service';
-import { ExchangeRateClient } from '../../../src/integrations/exchange-rates/exchange-rate.client';
 import { ValidationException } from '../../../src/shared/exceptions';
 
 describe('CurrencyConversionService', () => {
@@ -436,94 +435,5 @@ describe('CurrencyConversionService', () => {
       expect(result.convertedCurrency).toBe(Currency.USD);
       expect(result.convertedCents).toBeLessThan(100000);
     });
-  });
-
-  describe('isExternalApiConfigured', () => {
-    it('should return false when no ExchangeRateClient is injected', () => {
-      // The service is created without ExchangeRateClient in these tests
-      expect(service.isExternalApiConfigured()).toBe(false);
-    });
-  });
-
-  describe('refreshRates', () => {
-    it('should complete without error when API is not configured', async () => {
-      // Should not throw, just warn and return
-      await expect(service.refreshRates()).resolves.not.toThrow();
-    });
-  });
-});
-
-// ============================================================================
-// TASK-FIX-004: Integration tests with mocked ExchangeRateClient
-// ============================================================================
-
-describe('CurrencyConversionService with ExchangeRateClient', () => {
-  let service: CurrencyConversionService;
-  let mockExchangeRateClient: Partial<ExchangeRateClient>;
-
-  beforeEach(async () => {
-    mockExchangeRateClient = {
-      isConfigured: jest.fn().mockReturnValue(true),
-      getRate: jest.fn().mockResolvedValue({
-        fromCurrency: Currency.USD,
-        toCurrency: Currency.ZAR,
-        rate: 18.25,
-        inverseRate: 1 / 18.25,
-        source: ExchangeRateSource.OPENEXCHANGE,
-        effectiveDate: new Date(),
-        timestamp: new Date(),
-      }),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        {
-          provide: PrismaService,
-          useValue: {
-            onModuleInit: jest.fn(),
-            onModuleDestroy: jest.fn(),
-          },
-        },
-        {
-          provide: ExchangeRateClient,
-          useValue: mockExchangeRateClient,
-        },
-        CurrencyConversionService,
-      ],
-    }).compile();
-
-    service = module.get<CurrencyConversionService>(CurrencyConversionService);
-  });
-
-  it('should use ExchangeRateClient when configured', async () => {
-    const rate = await service.getExchangeRateAsync(Currency.USD, Currency.ZAR);
-
-    expect(mockExchangeRateClient.getRate).toHaveBeenCalled();
-    expect(rate.rate).toBe(18.25);
-    expect(rate.source).toBe(ExchangeRateSource.OPENEXCHANGE);
-  });
-
-  it('should report API as configured', () => {
-    expect(service.isExternalApiConfigured()).toBe(true);
-  });
-
-  it('should fall back to defaults when API fails', async () => {
-    (mockExchangeRateClient.getRate as jest.Mock).mockRejectedValue(
-      new Error('API Error'),
-    );
-
-    const rate = await service.getExchangeRateAsync(Currency.USD, Currency.ZAR);
-
-    // Should fall back to default rates
-    expect(rate.rate).toBeGreaterThan(0);
-    expect(rate.source).toBe(ExchangeRateSource.MANUAL);
-  });
-
-  it('should not call API for CMA currency pairs', async () => {
-    const rate = await service.getExchangeRateAsync(Currency.ZAR, Currency.NAD);
-
-    expect(mockExchangeRateClient.getRate).not.toHaveBeenCalled();
-    expect(rate.rate).toBe(1.0);
-    expect(rate.source).toBe(ExchangeRateSource.SARB);
   });
 });

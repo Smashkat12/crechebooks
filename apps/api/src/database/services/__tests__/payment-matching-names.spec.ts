@@ -42,9 +42,7 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
     service = module.get<PaymentMatchingService>(PaymentMatchingService);
   });
 
-  function makeTransaction(
-    overrides: Partial<Transaction> = {},
-  ): Transaction {
+  function makeTransaction(overrides: Partial<Transaction> = {}): Transaction {
     return {
       id: 'txn-1',
       tenantId,
@@ -142,8 +140,8 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
         medicalInfo: null,
         allergies: null,
         emergencyContact: null,
-      } as Child,
-    } as InvoiceWithRelations;
+      } as unknown as Child,
+    } as unknown as InvoiceWithRelations;
   }
 
   // ───────────────────────────────────────────────────
@@ -152,13 +150,7 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
   // ──���────────────────────────────────────────────────
 
   describe('Name extraction from SA banking descriptions', () => {
-    const invoice = makeInvoice(
-      'Rose',
-      'Nthite',
-      'Phenyo',
-      'Nthite',
-      150000,
-    );
+    const invoice = makeInvoice('Rose', 'Nthite', 'Phenyo', 'Nthite', 150000);
 
     const testCases: Array<{
       description: string;
@@ -381,13 +373,7 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
   });
 
   describe('Non-person transaction exclusion', () => {
-    const invoice = makeInvoice(
-      'Rose',
-      'Nqunqa',
-      'Enelo',
-      'Nqunqa',
-      150000,
-    );
+    const invoice = makeInvoice('Rose', 'Nqunqa', 'Enelo', 'Nqunqa', 150000);
 
     const nonPersonDescriptions = [
       'Owner Loan',

@@ -440,6 +440,7 @@ export class TransactionCategorizerAgent {
       vatType: vatType!,
       isSplit: false,
       autoApplied,
+      source,
       patternId,
     };
   }

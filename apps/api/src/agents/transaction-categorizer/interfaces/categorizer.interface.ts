@@ -116,5 +116,7 @@ export interface CategorizationResult {
   vatType: VatType;
   isSplit: boolean;
   autoApplied: boolean;
+  /** Which subsystem produced the categorization */
+  source: 'PATTERN' | 'HISTORICAL' | 'FALLBACK' | 'LLM';
   patternId?: string;
 }

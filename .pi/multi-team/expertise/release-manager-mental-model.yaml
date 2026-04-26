@@ -92,6 +92,14 @@ session_observations:
       — not blocking, noted for engineering-lead awareness.
       Credential helper warning (`git: 'credential-!aws' is not a git command`)
       appeared on push — non-fatal, push succeeded normally.
+  - date: "2026-04-26"
+    note: |
+      Shipped chore(pi): commit multi-team agent harness + convention doc
+      Commit 2d48145 pushed to origin/staging (63733dd..2d48145).
+      61 files: 23 agents, 24 expertise (incl. .gitkeep), 9 skills, 1 config,
+      1 extensions/multi-team/index.ts, 1 justfile, 1 CONVENTION.pi.md, 1 .gitignore.
+      sessions/ and logs/ gitignored by new block appended to .gitignore.
+      Credential helper warning (non-fatal) + 120 Dependabot vulns (pre-existing).
 open_questions:
   - "(unresolved) Does staging have branch protection requiring CI green before merge?"
   - "(unresolved) Is there a code-owners policy for any directory?"

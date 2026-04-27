@@ -260,7 +260,25 @@ describe('WhatsAppTemplateService', () => {
   });
 
   describe('buildWelcomeMessage', () => {
-    it('should build welcome message', () => {
+    it('should build welcome message with explicit portal URL', () => {
+      const built = service.buildWelcomeMessage({
+        crecheName: 'Happy Kids Daycare',
+        parentName: 'John',
+        childName: 'Jane',
+        portalUrl: 'https://app.crechebooks.co.za/portal',
+      });
+
+      expect(built).toBeDefined();
+      expect(built?.name).toBe('registration_welcome');
+
+      const bodyComponent = built?.components.find((c) => c.type === 'body');
+      expect(bodyComponent?.parameters?.length).toBe(4);
+      expect(bodyComponent?.parameters?.[3].text).toBe(
+        'https://app.crechebooks.co.za/portal',
+      );
+    });
+
+    it('should use default portal URL when none supplied', () => {
       const built = service.buildWelcomeMessage({
         crecheName: 'Happy Kids Daycare',
         parentName: 'John',
@@ -269,6 +287,12 @@ describe('WhatsAppTemplateService', () => {
 
       expect(built).toBeDefined();
       expect(built?.name).toBe('registration_welcome');
+
+      const bodyComponent = built?.components.find((c) => c.type === 'body');
+      expect(bodyComponent?.parameters?.length).toBe(4);
+      expect(bodyComponent?.parameters?.[3].text).toBe(
+        'https://app.crechebooks.co.za/portal',
+      );
     });
   });
 

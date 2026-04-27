@@ -492,11 +492,14 @@ export class WhatsAppTemplateService {
     crecheName: string;
     parentName: string;
     childName: string;
+    /** Parent portal URL — defaults to https://app.crechebooks.co.za/portal */
+    portalUrl?: string;
   }): BuiltTemplate | null {
     const params: TemplateParameterValues = {
       crecheName: data.crecheName,
       parentName: data.parentName,
       childName: data.childName,
+      portalUrl: data.portalUrl ?? 'https://app.crechebooks.co.za/portal',
     };
 
     return this.buildTemplate('registration_welcome', params);

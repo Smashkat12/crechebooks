@@ -13,6 +13,15 @@
  *  4. All-uppercase AND contains [A-Z] → Title Case each whitespace token
  *  5. All-lowercase AND contains [a-z] → Title Case each whitespace token
  *  6. Anything else (already mixed-case) → return trimmed unchanged
+ *
+ * Decorator division of responsibilities:
+ *  - @SanitizeName() (sanitize.utils.ts): XSS/HTML-strip + control-char removal
+ *    + whitespace collapse. Applies to ALL string name fields including
+ *    non-person strings (e.g. bankName). Declared below @Transform so it runs
+ *    FIRST in class-transformer's bottom-up evaluation order.
+ *  - @Transform(normalizeName): Title-Case correction for person-name fields only
+ *    (firstName, lastName). Declared above @SanitizeName so it runs SECOND,
+ *    operating on already-sanitized input. Do NOT apply to institution names.
  */
 
 /**

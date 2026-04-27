@@ -441,8 +441,8 @@ export class AccountingController {
       (this.provider as unknown as Record<string, unknown>).__pending === true
     ) {
       const name =
-        (this.provider as unknown as Record<string, unknown>)?.providerName ??
-        'unknown';
+        (this.provider as unknown as Record<string, string | undefined>)
+          ?.providerName ?? 'unknown';
       throw new BusinessException(
         `Accounting provider '${name}' is not yet configured. ` +
           'An adapter must be registered for this provider.',

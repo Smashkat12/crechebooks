@@ -91,9 +91,11 @@ export class AccountingModule {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { XeroModule } = require('../xero/xero.module');
 
+        /* eslint-disable @typescript-eslint/no-require-imports */
         const {
           XeroAccountingAdapter,
         } = require('../xero/xero-accounting.adapter');
+        /* eslint-enable @typescript-eslint/no-require-imports */
 
         AccountingModule.logger.log(
           'Xero provider selected -- registering XeroAccountingAdapter',
@@ -115,9 +117,11 @@ export class AccountingModule {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { StubModule } = require('../stub/stub.module');
 
+        /* eslint-disable @typescript-eslint/no-require-imports */
         const {
           StubAccountingAdapter,
         } = require('../stub/stub-accounting.adapter');
+        /* eslint-enable @typescript-eslint/no-require-imports */
 
         AccountingModule.logger.log(
           'Stub.africa provider selected -- registering StubAccountingAdapter',

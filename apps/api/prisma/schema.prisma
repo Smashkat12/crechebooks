@@ -718,6 +718,9 @@ model Tenant {
   // Class Groups (foundation for daily attendance, reports, parent visibility)
   classGroups ClassGroup[]
 
+  // Daily Attendance (#6) — foundation for Today admin tile (#8), parent absence reporting (#9), daily class reports (#10)
+  attendanceRecords AttendanceRecord[]
+
   @@map("tenants")
 }
 
@@ -799,6 +802,9 @@ model User {
 
   // TASK-CLI-001: API Keys created by this user
   apiKeys ApiKey[] @relation("ApiKeyCreatedBy")
+
+  // Daily Attendance (#6) — back-relation for AttendanceRecord.markedBy
+  attendanceRecordsMarked AttendanceRecord[] @relation("AttendanceRecordMarkedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1171,6 +1177,9 @@ model Child {
   enrollments Enrollment[]
   invoices    Invoice[]
 
+  // Daily Attendance (#6)
+  attendanceRecords AttendanceRecord[]
+
   @@index([tenantId])
   @@index([tenantId, parentId])
   @@index([tenantId, isActive])
@@ -1201,10 +1210,53 @@ model ClassGroup {
   tenant   Tenant  @relation(fields: [tenantId], references: [id])
   children Child[]
 
+  // Daily Attendance (#6) — snapshot of class group at time of attendance
+  attendanceRecords AttendanceRecord[]
+
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
   @@index([tenantId, deletedAt])
   @@map("class_groups")
+}
+
+// Daily Attendance — backlog #6. Foundation for Today admin tile (#8),
+// parent absence reporting (#9), and daily class report (#10).
+// One row per child per day. classGroupId is a snapshot (not a live FK to
+// the child's current group) so historical reports remain accurate when a
+// child changes groups.
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  EARLY_PICKUP
+}
+
+model AttendanceRecord {
+  id           String           @id @default(uuid())
+  tenantId     String           @map("tenant_id")
+  childId      String           @map("child_id")
+  classGroupId String?          @map("class_group_id") // snapshot at time of attendance
+  date         DateTime         @db.Date // the day this record represents
+  status       AttendanceStatus
+  arrivalAt    DateTime?        @map("arrival_at") // optional drop-off time
+  departureAt  DateTime?        @map("departure_at") // optional pickup time
+  note         String?          @db.VarChar(500)
+  markedById   String           @map("marked_by_id") // user (staff) who recorded
+  markedAt     DateTime         @default(now()) @map("marked_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  child      Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  classGroup ClassGroup? @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
+  markedBy   User        @relation("AttendanceRecordMarkedBy", fields: [markedById], references: [id])
+
+  @@unique([childId, date]) // one record per child per day
+  @@index([tenantId, date])
+  @@index([tenantId, classGroupId, date])
+  @@index([tenantId, status, date])
+  @@map("attendance_records")
 }
 
 model Invoice {

@@ -13,9 +13,11 @@
  * - Photo placeholder
  */
 
-import { Baby, Calendar, GraduationCap, Clock } from 'lucide-react';
+import { Baby, Calendar, GraduationCap, Clock, Pencil } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDate } from '@/lib/utils';
 import type { ParentChild } from '@/hooks/parent-portal/use-parent-profile';
@@ -80,6 +82,7 @@ function getAttendanceConfig(type: ParentChild['attendanceType']): {
 }
 
 export function ChildCard({ child }: ChildCardProps) {
+  const router = useRouter();
   const age = child.dateOfBirth ? calculateAge(child.dateOfBirth) : null;
   const attendanceConfig = getAttendanceConfig(child.attendanceType);
 
@@ -162,6 +165,27 @@ export function ChildCard({ child }: ChildCardProps) {
               </Badge>
             </div>
           )}
+        </div>
+
+        {/* Actions */}
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-2"
+            onClick={() => router.push(`/parent/children/${child.id}`)}
+          >
+            View details
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-2"
+            onClick={() => router.push(`/parent/children/${child.id}/edit`)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
         </div>
       </CardContent>
     </Card>

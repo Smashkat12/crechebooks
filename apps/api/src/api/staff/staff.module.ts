@@ -13,9 +13,16 @@ import { DatabaseModule } from '../../database/database.module';
 import { EmailModule } from '../../integrations/email/email.module';
 import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
 import { AuthModule } from '../auth/auth.module';
+import { StorageModule } from '../../integrations/storage/storage.module';
 
 @Module({
-  imports: [DatabaseModule, EmailModule, SimplePayModule, AuthModule],
+  imports: [
+    DatabaseModule,
+    EmailModule,
+    SimplePayModule,
+    AuthModule,
+    StorageModule,
+  ],
   controllers: [
     StaffController,
     StaffOnboardingController,

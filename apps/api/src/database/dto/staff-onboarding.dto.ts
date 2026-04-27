@@ -17,7 +17,6 @@ import {
   IsInt,
   Min,
   IsUUID,
-  IsUrl,
   MaxLength,
   IsArray,
   ValidateNested,
@@ -54,7 +53,7 @@ export class CreateStaffDocumentDto {
   @MaxLength(255)
   fileName!: string;
 
-  @IsUrl()
+  @IsString()
   @MaxLength(500)
   fileUrl!: string;
 

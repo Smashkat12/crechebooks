@@ -22,8 +22,9 @@ import {
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IsSAIDNumber } from '../../../shared/validators';
+import { normalizeName } from '../../../common/utils/name-normalizer';
 
 /**
  * API DTO for creating staff - accepts snake_case from frontend.
@@ -31,12 +32,14 @@ import { IsSAIDNumber } from '../../../shared/validators';
  */
 export class ApiCreateStaffDto {
   @ApiProperty({ example: 'Jane' })
+  @Transform(({ value }) => normalizeName(value))
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   first_name!: string;
 
   @ApiProperty({ example: 'Mokgadi' })
+  @Transform(({ value }) => normalizeName(value))
   @IsString()
   @MinLength(1)
   @MaxLength(100)

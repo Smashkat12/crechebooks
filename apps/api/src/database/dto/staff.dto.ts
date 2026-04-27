@@ -32,8 +32,9 @@ import {
   MaxLength,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { EmploymentType, PayFrequency } from '../entities/staff.entity';
+import { normalizeName } from '../../common/utils/name-normalizer';
 import {
   IsSAIDNumber,
   IsSAPhoneNumber,
@@ -66,12 +67,14 @@ export class CreateStaffDto {
   @MaxLength(50)
   employeeNumber?: string;
 
+  @Transform(({ value }) => normalizeName(value))
   @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   firstName!: string;
 
+  @Transform(({ value }) => normalizeName(value))
   @SanitizeName()
   @IsString()
   @MinLength(1)

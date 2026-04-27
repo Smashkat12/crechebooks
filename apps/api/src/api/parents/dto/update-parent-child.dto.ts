@@ -1,11 +1,19 @@
 /**
  * Update Parent Child DTO
- * Parent portal: whitelisted partial update of non-identity child fields.
+ * Parent portal: whitelisted partial update of identity + non-identity child fields.
  *
- * Editable fields (Option A — medicalNotes is the catch-all for allergies/conditions):
+ * Editable by parent (Option A — medicalNotes is the catch-all for allergies/conditions):
+ *   - firstName:         identity field; sanitized + normalized; max 100 chars
+ *   - lastName:          identity field; sanitized + normalized; max 100 chars
+ *   - gender:            identity field; Gender enum (MALE | FEMALE | OTHER); max 30 chars
  *   - medicalNotes:      free text; HTML-stripped; max 2000 chars
  *   - emergencyContact:  free-text contact description; HTML-stripped; max 200 chars
  *   - emergencyPhone:    SA phone format; sanitized + pattern-validated; max 20 chars
+ *
+ * NOT editable by parent (admin-only):
+ *   - dateOfBirth: drives graduation-cohort flag in enrollment.service.ts:1079-1081; admin only
+ *
+ * TODO: middleName once 20260427172829_add_middle_name_to_children_parents lands
  *
  * Schema reality: the Child model has `emergencyContact` (VarChar 200) and
  * `emergencyPhone` (VarChar 20) as its emergency fields. The separate
@@ -13,7 +21,7 @@
  * exist only on the Staff model, not Child.
  */
 
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, IsEnum } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
@@ -23,8 +31,58 @@ import {
 } from '../../../common/utils/sanitize.utils';
 import { IsSAPhoneNumber } from '../../../shared/validators';
 import { normalizeName } from '../../../common/utils/name-normalizer';
+import { Gender } from '../../../database/entities/child.entity';
 
 export class UpdateParentChildDto {
+  /**
+   * Child's first name.
+   * HTML-stripped, control-char-collapsed, and case-normalized (all-caps/all-lower corrected).
+   * Max 100 chars.
+   */
+  @ApiPropertyOptional({
+    description: "Child's first name. Max 100 chars.",
+    maxLength: 100,
+    example: 'Amelia',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
+  firstName?: string;
+
+  /**
+   * Child's last name.
+   * HTML-stripped, control-char-collapsed, and case-normalized (all-caps/all-lower corrected).
+   * Max 100 chars.
+   */
+  @ApiPropertyOptional({
+    description: "Child's last name. Max 100 chars.",
+    maxLength: 100,
+    example: 'Smith',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
+  lastName?: string;
+
+  /**
+   * Child's gender (MALE | FEMALE | OTHER).
+   * Uses the Prisma-generated Gender enum. Max 30 chars.
+   */
+  @ApiPropertyOptional({
+    description: "Child's gender.",
+    enum: Gender,
+    example: Gender.FEMALE,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  @IsEnum(Gender)
+  gender?: Gender;
+
   /**
    * Medical notes / allergy notes for the child.
    * Use this field for allergies, conditions, medications, dietary requirements.
@@ -85,11 +143,20 @@ export class UpdateParentChildDto {
 
 /**
  * Whitelisted shape returned to the parent after a successful update.
- * Only non-identity, non-sensitive fields are exposed.
+ * Includes identity fields that the parent is now allowed to edit.
  */
 export class ParentChildUpdateResponseDto {
   @ApiPropertyOptional({ description: 'Child ID' })
   id: string;
+
+  @ApiPropertyOptional({ description: "Child's first name" })
+  firstName: string | null;
+
+  @ApiPropertyOptional({ description: "Child's last name" })
+  lastName: string | null;
+
+  @ApiPropertyOptional({ description: "Child's gender", enum: Gender })
+  gender: Gender | null;
 
   @ApiPropertyOptional({ description: 'Medical notes / allergies' })
   medicalNotes: string | null;

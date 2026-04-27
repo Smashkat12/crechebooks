@@ -261,11 +261,18 @@ export const CRECHEBOOKS_TEMPLATES: Record<
     language: 'en',
     category: 'UTILITY',
     body: {
-      text: 'Welcome to {{1}}, {{2}}!\n\nThank you for registering {{3}} with us.\n\nYou will receive invoices and important updates via WhatsApp.\n\nTo manage your notification preferences, visit your parent portal.',
+      text: 'Welcome to {{1}}, {{2}}!\n\nThank you for registering {{3}} with us.\n\nYou will receive invoices and important updates via WhatsApp.\n\nTo manage your notification preferences, visit your parent portal:\n{{4}}',
       parameters: [
         { name: 'crecheName', type: 'text', required: true, maxLength: 100 },
         { name: 'parentName', type: 'text', required: true, maxLength: 50 },
         { name: 'childName', type: 'text', required: true, maxLength: 50 },
+        {
+          name: 'portalUrl',
+          type: 'text',
+          required: true,
+          maxLength: 200,
+          description: 'Parent portal URL',
+        },
       ],
     },
     footer: 'CrecheBooks - Childcare Management',

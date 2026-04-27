@@ -19,6 +19,7 @@ import { PayrollModule } from './payroll/payroll.module';
 import { WhatsAppApiModule } from './whatsapp/whatsapp-api.module';
 import { NotificationApiModule } from './notifications/notification-api.module';
 import { ClassGroupsModule } from './class-groups/class-groups.module';
+import { AttendanceModule } from './attendance/attendance.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ClassGroupsModule } from './class-groups/class-groups.module';
     WhatsAppApiModule, // TASK-WA-004: WhatsApp opt-in management
     NotificationApiModule, // In-App Notification System (Phase 1)
     ClassGroupsModule, // Class Groups CRUD — foundation for attendance (#6, #8, #9, #10)
+    AttendanceModule, // Daily Attendance API (#6) — admin+parent endpoints
   ],
   exports: [
     AuthModule,
@@ -63,6 +65,7 @@ import { ClassGroupsModule } from './class-groups/class-groups.module';
     PayrollModule,
     WhatsAppApiModule,
     ClassGroupsModule,
+    AttendanceModule,
   ],
 })
 export class ApiModule {}

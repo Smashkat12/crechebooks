@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useAdminAuditLogs, useAuditLogStats, useAuditLogFilters } from '@/hooks/use-admin-audit-logs';
+import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollText, Clock, Activity } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { ScrollText, Clock, Activity, Download } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const actionColors: Record<string, string> = {
@@ -32,15 +34,93 @@ const actionColors: Record<string, string> = {
   LOGOUT: 'bg-gray-100 text-gray-800',
 };
 
+const MAX_EXPORT_DAYS = 366;
+
+function today(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
 export default function AuditLogsPage() {
   const [search, setSearch] = useState('');
   const [action, setAction] = useState<string>('');
   const [resourceType, setResourceType] = useState<string>('');
   const [page, setPage] = useState(1);
 
+  // Export date range — default to current month
+  const [exportFrom, setExportFrom] = useState<string>(
+    today().slice(0, 8) + '01', // first of current month
+  );
+  const [exportTo, setExportTo] = useState<string>(today());
+  const [isExporting, setIsExporting] = useState(false);
+
+  const { toast } = useToast();
+
   const { data: logsData, isLoading } = useAdminAuditLogs({ search, action, resourceType, page });
   const { data: stats } = useAuditLogStats();
   const { data: filterOptions } = useAuditLogFilters();
+
+  const handleExportCsv = async () => {
+    // Client-side validation
+    if (!exportFrom || !exportTo) {
+      toast({ title: 'Date range required', description: 'Please set both From and To dates before exporting.', variant: 'destructive' });
+      return;
+    }
+
+    const from = new Date(exportFrom);
+    const to = new Date(exportTo);
+
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      toast({ title: 'Invalid dates', description: 'Dates must be in YYYY-MM-DD format.', variant: 'destructive' });
+      return;
+    }
+
+    if (from > to) {
+      toast({ title: 'Invalid range', description: '"From" date must be on or before "To" date.', variant: 'destructive' });
+      return;
+    }
+
+    const diffDays = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays > MAX_EXPORT_DAYS) {
+      toast({
+        title: 'Range too large',
+        description: `Maximum export range is ${MAX_EXPORT_DAYS} days. Current range is ${Math.ceil(diffDays)} days.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams({ from: exportFrom, to: exportTo });
+      if (action) params.set('action', action);
+      if (resourceType) params.set('resourceType', resourceType);
+
+      const response = await apiClient.get(`/admin/audit-logs/export?${params}`, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-logs-${exportFrom}-to-${exportTo}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      toast({ title: 'Export complete', description: `audit-logs-${exportFrom}-to-${exportTo}.csv downloaded.` });
+    } catch (err) {
+      console.error('Audit log export failed:', err);
+      toast({ title: 'Export failed', description: 'Could not download audit logs. Please try again.', variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -80,8 +160,8 @@ export default function AuditLogsPage() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-4 flex-wrap">
+      {/* Filters + Export */}
+      <div className="flex gap-4 flex-wrap items-end">
         <Input
           placeholder="Search logs..."
           value={search}
@@ -110,6 +190,40 @@ export default function AuditLogsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {/* Export controls */}
+        <div className="flex items-end gap-2 ml-auto">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">From</label>
+            <Input
+              type="date"
+              value={exportFrom}
+              max={exportTo || today()}
+              onChange={(e) => setExportFrom(e.target.value)}
+              className="w-36"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">To</label>
+            <Input
+              type="date"
+              value={exportTo}
+              min={exportFrom}
+              max={exportFrom ? addDays(exportFrom, MAX_EXPORT_DAYS) : today()}
+              onChange={(e) => setExportTo(e.target.value)}
+              className="w-36"
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleExportCsv}
+            disabled={isExporting}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {isExporting ? 'Exporting...' : 'Download CSV'}
+          </Button>
+        </div>
       </div>
 
       {/* Log Table */}

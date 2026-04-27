@@ -7,6 +7,9 @@ import {
   Body,
   Query,
   Logger,
+  Res,
+  BadRequestException,
+  StreamableFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,7 +19,9 @@ import {
   ApiUnauthorizedResponse,
   ApiForbiddenResponse,
   ApiQuery,
+  ApiProduces,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminService } from './admin.service';
@@ -51,7 +56,11 @@ import {
   ListAuditLogsQueryDto,
   AuditLogStatsDto,
   AuditLogsListResponseDto,
+  AuditLogExportQueryDto,
 } from './dto/audit-logs.dto';
+
+/** Max export window: 366 days (accounts for leap years) */
+const MAX_EXPORT_DAYS = 366;
 
 @Controller('admin')
 @ApiTags('Admin')
@@ -635,6 +644,82 @@ export class AdminController {
   // ============================================
   // AUDIT LOGS
   // ============================================
+
+  @Get('audit-logs/export')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiProduces('text/csv')
+  @ApiOperation({
+    summary: 'Export audit logs as CSV',
+    description:
+      'Streams audit log rows as RFC 4180 CSV. ' +
+      'Both `from` and `to` (YYYY-MM-DD) are required. ' +
+      'Max range: 366 days. Rows are paged 500 at a time — safe for large volumes.',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: true,
+    type: String,
+    example: '2025-01-01',
+  })
+  @ApiQuery({ name: 'to', required: true, type: String, example: '2025-01-31' })
+  @ApiQuery({ name: 'tenantId', required: false, type: String })
+  @ApiQuery({ name: 'userId', required: false, type: String })
+  @ApiQuery({
+    name: 'action',
+    required: false,
+    enum: ['CREATE', 'UPDATE', 'DELETE'],
+  })
+  @ApiQuery({ name: 'resourceType', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'CSV stream' })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - valid JWT token required',
+  })
+  @ApiForbiddenResponse({
+    description: 'Forbidden - SUPER_ADMIN role required',
+  })
+  async exportAuditLogs(
+    @Query() query: AuditLogExportQueryDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    // Validate required fields
+    if (!query.from || !query.to) {
+      throw new BadRequestException(
+        'Both `from` and `to` date parameters are required',
+      );
+    }
+
+    const fromDate = new Date(query.from);
+    const toDate = new Date(query.to);
+
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+      throw new BadRequestException('Invalid date format — use YYYY-MM-DD');
+    }
+
+    if (fromDate > toDate) {
+      throw new BadRequestException('`from` must be on or before `to`');
+    }
+
+    const diffDays =
+      (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (diffDays > MAX_EXPORT_DAYS) {
+      throw new BadRequestException(
+        `Date range exceeds maximum of ${MAX_EXPORT_DAYS} days (got ${Math.ceil(diffDays)} days)`,
+      );
+    }
+
+    this.logger.log(
+      `Exporting audit logs CSV: from=${query.from} to=${query.to} tenant=${query.tenantId ?? 'all'}`,
+    );
+
+    const filename = `audit-logs-${query.from}-to-${query.to}.csv`;
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+    });
+
+    const stream = this.adminService.exportAuditLogsCsv(query);
+    return new StreamableFile(stream);
+  }
 
   @Get('audit-logs')
   @Roles(UserRole.SUPER_ADMIN)

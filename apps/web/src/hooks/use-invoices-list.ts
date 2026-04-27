@@ -100,7 +100,7 @@ export function useInvoicesList(
         let transformedInvoices = rawInvoices.map(transformInvoice);
 
         // Exclude voided invoices by default (unless explicitly filtering for void)
-        if (!params.status || params.status === 'all') {
+        if (!params.status) {
           transformedInvoices = transformedInvoices.filter(inv => inv.status !== 'void');
         }
 

@@ -3,15 +3,18 @@ export type InvoiceStatus =
   | "pending"
   | "sent"
   | "paid"
+  | "partially_paid"
   | "overdue"
   | "cancelled"
+  | "void"
   // Uppercase variants from API
   | "DRAFT"
   | "SENT"
   | "PAID"
   | "PARTIALLY_PAID"
   | "OVERDUE"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "VOID";
 
 /**
  * TASK-BILL-038: Line types for VAT categorization

@@ -13,6 +13,7 @@ import {
   SanitizeEmail,
   SanitizeName,
 } from '../../../../common/decorators';
+import { normalizeName } from '../../../../common/utils/name-normalizer';
 
 export class SignupDto {
   @ApiProperty({
@@ -36,7 +37,7 @@ export class SignupDto {
   @IsString()
   @MaxLength(100)
   @SanitizeName()
-  @Transform(({ value }) => value?.trim())
+  @Transform(({ value }) => normalizeName(value))
   adminName: string;
 
   @ApiProperty({

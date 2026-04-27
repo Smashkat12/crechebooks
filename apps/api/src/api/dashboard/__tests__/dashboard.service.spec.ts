@@ -186,9 +186,12 @@ describe('DashboardService', () => {
       const result = await service.getMetrics(tenantId);
 
       expect(result.arrears.count).toBe(3); // 3 unique parents
-      expect(result.arrears.overdueBy30).toBe(100); // 10000 / 100
-      expect(result.arrears.overdueBy60).toBe(150); // (20000 - 5000) / 100
-      expect(result.arrears.overdueBy90).toBe(300); // 30000 / 100
+      // Bucket model: 1-7d, 8-14d, 15-30d (overdueBy30), 31-60d (overdueBy60), 60+d (overdueOver60)
+      // thirtyOneDaysAgo (31 days) → overdueBy60 bucket: 10000 cents = R100
+      // sixtyOneDaysAgo  (61 days) → overdueOver60 bucket: (20000-5000) = 15000 cents = R150
+      // ninetyOneDaysAgo (91 days) → overdueOver60 bucket: 30000 cents = R300
+      expect(result.arrears.overdueBy60).toBe(100); // 10000 / 100
+      expect(result.arrears.overdueOver60).toBe(450); // (15000 + 30000) / 100
       expect(result.arrears.total).toBe(550); // Sum of all buckets
     });
 

@@ -7,6 +7,7 @@ import {
   Receipt,
   User,
   ChevronRight,
+  UploadCloud,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -41,6 +42,12 @@ const actions: QuickAction[] = [
     description: 'Manage your account',
     icon: User,
     href: '/parent/profile',
+  },
+  {
+    title: 'Upload proof of payment',
+    description: 'Submit EFT or payment proof',
+    icon: UploadCloud,
+    href: '/parent/payment-attachments',
   },
 ];
 

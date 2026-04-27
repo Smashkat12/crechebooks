@@ -52,10 +52,13 @@ export interface UpdateParentProfileDto {
   address?: ParentAddress;
 }
 
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+
 export interface ParentChild {
   id: string;
   firstName: string;
   lastName: string;
+  gender?: Gender | null;
   dateOfBirth?: string;
   enrollmentDate?: string;
   className?: string;
@@ -68,6 +71,9 @@ export interface ParentChild {
 }
 
 export interface UpdateParentChildDto {
+  firstName?: string;
+  lastName?: string;
+  gender?: Gender;
   medicalNotes?: string;
   emergencyContact?: string;
   emergencyPhone?: string;
@@ -75,6 +81,9 @@ export interface UpdateParentChildDto {
 
 export interface ParentChildUpdateResponse {
   id: string;
+  firstName: string;
+  lastName: string;
+  gender: Gender | null;
   medicalNotes: string | null;
   emergencyContact: string | null;
   emergencyPhone: string | null;
@@ -268,6 +277,9 @@ export function useUpdateParentChild(childId: string) {
             c.id === childId
               ? {
                   ...c,
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  gender: data.gender,
                   medicalNotes: data.medicalNotes,
                   emergencyContact: data.emergencyContact,
                   emergencyPhone: data.emergencyPhone,

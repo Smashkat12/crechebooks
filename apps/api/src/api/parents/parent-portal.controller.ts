@@ -12,6 +12,7 @@ import {
   Logger,
   NotFoundException,
   StreamableFile,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -49,6 +50,11 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { ParentOnboardingService } from '../../database/services/parent-onboarding.service';
 import type { SignDocumentDto } from '../../database/services/parent-onboarding.service';
 import { InvoiceStatus } from '@prisma/client';
+import { ParentPortalChildService } from './parent-portal-child.service';
+import {
+  UpdateParentChildDto,
+  ParentChildUpdateResponseDto,
+} from './dto/update-parent-child.dto';
 
 @ApiTags('Parent Portal')
 @ApiBearerAuth()
@@ -61,6 +67,7 @@ export class ParentPortalController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly parentOnboarding: ParentOnboardingService,
+    private readonly parentPortalChild: ParentPortalChildService,
   ) {}
 
   // ============================================================================
@@ -1716,6 +1723,45 @@ export class ParentPortalController {
         photoUrl: null, // Photos not stored in current schema
       };
     });
+  }
+
+  // ============================================================================
+  // Parent Portal Child Info Edit — data-ops audit self-serve flow
+  // ============================================================================
+
+  @Put('children/:childId')
+  @ApiOperation({
+    summary: 'Update whitelisted non-identity fields on a linked child',
+    description:
+      'Parents may update medicalNotes, emergencyContact, and emergencyPhone on their own children. ' +
+      'Identity fields (name, DOB) cannot be changed via this endpoint. ' +
+      'Allergies should be recorded in medicalNotes (Option A). ' +
+      'Returns 403 if the parent does not own the child.',
+  })
+  @ApiParam({ name: 'childId', description: 'Child ID' })
+  @ApiBody({ type: UpdateParentChildDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Updated child info (whitelisted fields only)',
+    type: ParentChildUpdateResponseDto,
+  })
+  @ApiResponse({ status: 403, description: 'Child not linked to this parent' })
+  async updateChild(
+    @CurrentParent() session: ParentSession,
+    @Param('childId') childId: string,
+    @Body() dto: UpdateParentChildDto,
+  ): Promise<ParentChildUpdateResponseDto> {
+    this.logger.debug(
+      `updateChild: childId=${childId} parentId=${session.parentId} tenantId=${session.tenantId}`,
+    );
+
+    return this.parentPortalChild.updateChildForParent(
+      session.parentId,
+      childId,
+      dto,
+      session.tenantId,
+      session.id, // actor id for audit log
+    );
   }
 
   @Post('delete-request')

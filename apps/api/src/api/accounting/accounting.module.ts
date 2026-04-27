@@ -6,6 +6,7 @@ import { SupplierController } from './supplier.controller';
 import { ChartOfAccountController } from './chart-of-account.controller';
 import { GeneralLedgerController } from './general-ledger.controller';
 import { CashFlowController } from './cash-flow.controller';
+import { MonthEndPackService } from './month-end-pack.service';
 
 /**
  * Accounting Module
@@ -18,6 +19,7 @@ import { CashFlowController } from './cash-flow.controller';
  * - Chart of accounts
  * - General ledger views
  * - Cash flow reports
+ * - Month-end export pack
  */
 @Module({
   imports: [DatabaseModule],
@@ -29,5 +31,6 @@ import { CashFlowController } from './cash-flow.controller';
     GeneralLedgerController,
     CashFlowController,
   ],
+  providers: [MonthEndPackService],
 })
 export class AccountingModule {}

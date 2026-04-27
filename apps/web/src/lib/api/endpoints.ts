@@ -187,6 +187,7 @@ export const endpoints = {
     accountLedger: (accountCode: string) => `/general-ledger/account/${accountCode}`,
     trialBalance: '/general-ledger/trial-balance',
     summary: '/general-ledger/summary',
+    monthEndPack: (period: string) => `/general-ledger/month-end-pack?period=${period}`,
   },
   quotes: {
     list: '/quotes',

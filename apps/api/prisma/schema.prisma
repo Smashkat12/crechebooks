@@ -1461,7 +1461,9 @@ model Payment {
   xeroPaymentMapping XeroPaymentMapping?
 
   // Backlog #11 — proof-of-payment uploads (one payment may have multiple attachments)
-  attachments PaymentAttachment[]
+  attachments             PaymentAttachment[]
+  // Backlog #11 part 2 — OCR matcher suggests this payment for proof attachments
+  suggestedForAttachments PaymentAttachment[] @relation("PaymentAttachmentSuggested")
 
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
@@ -2221,16 +2223,27 @@ model PaymentAttachment {
   createdAt    DateTime                @default(now()) @map("created_at")
   updatedAt    DateTime                @updatedAt @map("updated_at")
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  payment    Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  parent     Parent?  @relation(fields: [parentId], references: [id], onDelete: SetNull)
-  uploadedBy User?    @relation("PaymentAttachmentUploadedBy", fields: [uploadedById], references: [id])
-  reviewedBy User?    @relation("PaymentAttachmentReviewedBy", fields: [reviewedById], references: [id])
+  // Backlog #11 part 2 — OCR extraction + match suggestion fields (populated async after APPROVED)
+  ocrText            String?   @map("ocr_text") @db.Text
+  extractedAmount    Int?      @map("extracted_amount")
+  extractedDate      DateTime? @map("extracted_date")
+  extractedReference String?   @map("extracted_reference") @db.VarChar(200)
+  matchAttemptedAt   DateTime? @map("match_attempted_at")
+  suggestedPaymentId String?   @map("suggested_payment_id")
+  matchConfidence    Decimal?  @map("match_confidence") @db.Decimal(5, 4)
+
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  payment          Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  parent           Parent?  @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  uploadedBy       User?    @relation("PaymentAttachmentUploadedBy", fields: [uploadedById], references: [id])
+  reviewedBy       User?    @relation("PaymentAttachmentReviewedBy", fields: [reviewedById], references: [id])
+  suggestedPayment Payment? @relation("PaymentAttachmentSuggested", fields: [suggestedPaymentId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, uploadedAt])
   @@index([tenantId, paymentId])
   @@index([tenantId, reviewStatus])
   @@index([parentId, uploadedAt])
+  @@index([tenantId, suggestedPaymentId])
   @@map("payment_attachments")
 }
 

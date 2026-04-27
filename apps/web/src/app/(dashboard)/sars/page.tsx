@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils/format';
+import { SarsReadinessChecklist } from '@/components/sars/readiness-checklist';
 
 export default function SarsPage() {
   const now = new Date();
@@ -39,6 +40,9 @@ export default function SarsPage() {
           Manage VAT and payroll tax submissions
         </p>
       </div>
+
+      {/* Filing readiness checklist — surfaces blockers for the next deadline */}
+      <SarsReadinessChecklist />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

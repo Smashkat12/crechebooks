@@ -51,6 +51,7 @@ export const endpoints = {
     emp201: '/sars/emp201',
     submit: (id: string) => `/sars/${id}/submit`,
     submissions: '/sars/submissions',
+    readiness: '/sars/readiness',
   },
   reconciliation: {
     list: '/reconciliation',

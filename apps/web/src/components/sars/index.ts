@@ -5,3 +5,4 @@ export { VAT201Preview } from './vat201-preview';
 export { EMP201Preview } from './emp201-preview';
 export { ExportDialog } from './export-dialog';
 export { SubmissionHistory } from './submission-history';
+export { SarsReadinessChecklist } from './readiness-checklist';

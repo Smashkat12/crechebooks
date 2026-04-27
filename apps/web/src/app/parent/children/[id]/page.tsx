@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Baby,
   Calendar,
+  CalendarCheck,
   Clock,
   GraduationCap,
   Loader2,
@@ -128,13 +129,23 @@ function ChildDetailContent({ childId }: { childId: string }) {
             <p className="text-muted-foreground mt-1">{age} old</p>
           )}
         </div>
-        <Button
-          onClick={() => router.push(`/parent/children/${childId}/edit`)}
-          className="gap-2 shrink-0"
-        >
-          <Pencil className="h-4 w-4" />
-          Edit child info
-        </Button>
+        <div className="flex gap-2 flex-wrap shrink-0">
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/parent/children/${childId}/attendance`)}
+            className="gap-2"
+          >
+            <CalendarCheck className="h-4 w-4" />
+            Attendance
+          </Button>
+          <Button
+            onClick={() => router.push(`/parent/children/${childId}/edit`)}
+            className="gap-2"
+          >
+            <Pencil className="h-4 w-4" />
+            Edit child info
+          </Button>
+        </div>
       </div>
 
       {/* Avatar + Status */}

@@ -100,6 +100,7 @@ describe('ChildController', () => {
     id: 'child-001',
     tenantId: mockTenantId,
     parentId: 'parent-001',
+    classGroupId: null,
     firstName: 'Emma',
     middleName: null,
     lastName: 'Smith',

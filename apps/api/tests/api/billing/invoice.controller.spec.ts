@@ -67,6 +67,7 @@ describe('InvoiceController', () => {
     id: 'child-001',
     tenantId: 'tenant-456',
     parentId: 'parent-001',
+    classGroupId: null,
     firstName: 'Emma',
     middleName: null,
     lastName: 'Smith',

@@ -532,7 +532,7 @@ model Tenant {
   bankSwiftCode     String? @map("bank_swift_code") @db.VarChar(20)
 
   // TASK-FIX-005: Bank fee configuration for multi-bank support
-  bankFeeConfig     Json?   @map("bank_fee_config")
+  bankFeeConfig Json? @map("bank_fee_config")
 
   // TASK-ENROL-006: Parent welcome pack customization
   parentWelcomeMessage String? @map("parent_welcome_message") @db.Text
@@ -694,26 +694,29 @@ model Tenant {
   correctionFeedback CorrectionFeedback[]
 
   // TASK-SDK-011: Structured Audit Trail
-  agentAuditLogs     AgentAuditLog[]
+  agentAuditLogs AgentAuditLog[]
 
   // TASK-SDK-012: Feature Flags for SDK Rollout
-  featureFlags       FeatureFlag[]
+  featureFlags FeatureFlag[]
 
   // TASK-CLI-001: API Keys for CLI/MCP Access
-  apiKeys            ApiKey[]
+  apiKeys ApiKey[]
 
   // PGVECTOR: AI Embedding Storage
-  vectorEmbeddings   VectorEmbedding[]
+  vectorEmbeddings VectorEmbedding[]
 
   // TASK-WA-011: WhatsApp Onboarding Sessions
   whatsAppOnboardingSessions WhatsAppOnboardingSession[]
 
   // In-App Notification System
-  notifications Notification[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
 
   // Stub.africa Integration
   stubConnection StubConnection?
+
+  // Class Groups (foundation for daily attendance, reports, parent visibility)
+  classGroups ClassGroup[]
 
   @@map("tenants")
 }
@@ -1086,21 +1089,21 @@ model Parent {
 // TASK-ONBOARD: Parent Generated Documents
 // Stores fee agreements, consent forms, and other onboarding documents
 model ParentGeneratedDocument {
-  id           String   @id @default(uuid())
-  parentId     String   @map("parent_id")
-  tenantId     String   @map("tenant_id")
-  documentType String   @map("document_type") @db.VarChar(50) // FEE_AGREEMENT, CONSENT_FORMS, WELCOME_PACK
-  fileName     String   @map("file_name") @db.VarChar(255)
-  filePath     String   @map("file_path") @db.VarChar(500)
-  mimeType     String   @default("application/pdf") @map("mime_type") @db.VarChar(100)
-  generatedAt  DateTime @default(now()) @map("generated_at")
+  id           String    @id @default(uuid())
+  parentId     String    @map("parent_id")
+  tenantId     String    @map("tenant_id")
+  documentType String    @map("document_type") @db.VarChar(50) // FEE_AGREEMENT, CONSENT_FORMS, WELCOME_PACK
+  fileName     String    @map("file_name") @db.VarChar(255)
+  filePath     String    @map("file_path") @db.VarChar(500)
+  mimeType     String    @default("application/pdf") @map("mime_type") @db.VarChar(100)
+  generatedAt  DateTime  @default(now()) @map("generated_at")
   signedAt     DateTime? @map("signed_at")
-  signedByName String?  @map("signed_by_name") @db.VarChar(200)
-  signedByIp   String?  @map("signed_by_ip") @db.VarChar(45)
-  acknowledged Boolean  @default(false)
-  metadata     String?  // JSON for media consent, authorized collectors, etc.
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  signedByName String?   @map("signed_by_name") @db.VarChar(200)
+  signedByIp   String?   @map("signed_by_ip") @db.VarChar(45)
+  acknowledged Boolean   @default(false)
+  metadata     String? // JSON for media consent, authorized collectors, etc.
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
 
@@ -1142,26 +1145,29 @@ model CreditBalance {
 }
 
 model Child {
-  id               String    @id @default(uuid())
-  tenantId         String    @map("tenant_id")
-  parentId         String    @map("parent_id")
-  firstName        String    @map("first_name") @db.VarChar(100)
-  middleName       String?   @map("middle_name") @db.VarChar(100)
-  lastName         String    @map("last_name") @db.VarChar(100)
-  dateOfBirth      DateTime  @map("date_of_birth") @db.Date
+  id               String      @id @default(uuid())
+  tenantId         String      @map("tenant_id")
+  parentId         String      @map("parent_id")
+  firstName        String      @map("first_name") @db.VarChar(100)
+  middleName       String?     @map("middle_name") @db.VarChar(100)
+  lastName         String      @map("last_name") @db.VarChar(100)
+  dateOfBirth      DateTime    @map("date_of_birth") @db.Date
   gender           Gender?
-  medicalNotes     String?   @map("medical_notes")
-  emergencyContact String?   @map("emergency_contact") @db.VarChar(200)
-  emergencyPhone   String?      @map("emergency_phone") @db.VarChar(20)
-  status           ChildStatus  @default(REGISTERED)
-  isActive         Boolean      @default(true) @map("is_active")
+  medicalNotes     String?     @map("medical_notes")
+  emergencyContact String?     @map("emergency_contact") @db.VarChar(200)
+  emergencyPhone   String?     @map("emergency_phone") @db.VarChar(20)
+  status           ChildStatus @default(REGISTERED)
+  isActive         Boolean     @default(true) @map("is_active")
+  // Foundation for daily attendance / today admin tile / parent absence reporting
+  classGroupId     String?     @map("class_group_id")
   // TASK-DATA-003: Soft delete support
-  deletedAt        DateTime?    @map("deleted_at")
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?   @map("deleted_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   parent      Parent       @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  classGroup  ClassGroup?  @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
   enrollments Enrollment[]
   invoices    Invoice[]
 
@@ -1170,7 +1176,35 @@ model Child {
   @@index([tenantId, isActive])
   @@index([tenantId, deletedAt])
   @@index([tenantId, status])
+  @@index([classGroupId])
   @@map("children")
+}
+
+// Class Groups — foundation for daily attendance (#6), Today admin tile (#8),
+// parent absence reporting (#9), and daily class reports (#10).
+// Children with classGroupId = NULL remain valid; not all tenants assign groups.
+model ClassGroup {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  name         String    @db.VarChar(120)
+  code         String?   @db.VarChar(20)
+  description  String?   @db.Text
+  ageMinMonths Int?      @map("age_min_months")
+  ageMaxMonths Int?      @map("age_max_months")
+  capacity     Int?
+  displayOrder Int       @default(0) @map("display_order")
+  isActive     Boolean   @default(true) @map("is_active")
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  children Child[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+  @@map("class_groups")
 }
 
 model Invoice {
@@ -3801,19 +3835,19 @@ model OnboardingProgress {
 // ============================================
 
 model AgentDecision {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  agentType       String   @map("agent_type") @db.VarChar(30)
-  inputHash       String   @map("input_hash") @db.VarChar(64)
-  decision        Json
-  confidence      Int      // 0-100
-  source          String   @db.VarChar(20) // 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID'
-  wasCorrect      Boolean? @map("was_correct")
-  correctedTo     Json?    @map("corrected_to")
-  transactionId   String?  @map("transaction_id")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  agentType     String   @map("agent_type") @db.VarChar(30)
+  inputHash     String   @map("input_hash") @db.VarChar(64)
+  decision      Json
+  confidence    Int // 0-100
+  source        String   @db.VarChar(20) // 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID'
+  wasCorrect    Boolean? @map("was_correct")
+  correctedTo   Json?    @map("corrected_to")
+  transactionId String?  @map("transaction_id")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   corrections CorrectionFeedback[]
 
   @@index([tenantId, agentType])
@@ -3824,15 +3858,15 @@ model AgentDecision {
 }
 
 model CorrectionFeedback {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  agentDecisionId String   @map("agent_decision_id")
-  originalValue   Json     @map("original_value")
-  correctedValue  Json     @map("corrected_value")
-  correctedBy     String   @map("corrected_by")
-  reason          String?
-  appliedToPattern Boolean @default(false) @map("applied_to_pattern")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  agentDecisionId  String   @map("agent_decision_id")
+  originalValue    Json     @map("original_value")
+  correctedValue   Json     @map("corrected_value")
+  correctedBy      String   @map("corrected_by")
+  reason           String?
+  appliedToPattern Boolean  @default(false) @map("applied_to_pattern")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   agentDecision AgentDecision @relation(fields: [agentDecisionId], references: [id], onDelete: Cascade)
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -3847,22 +3881,22 @@ model CorrectionFeedback {
 // ============================================
 
 model AgentAuditLog {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  agentType       String   @map("agent_type") @db.VarChar(30)
-  eventType       String   @map("event_type") @db.VarChar(30)
-  workflowId      String?  @map("workflow_id")
-  transactionId   String?  @map("transaction_id")
-  decision        String   @db.VarChar(50)
-  confidence      Int?
-  source          String?  @db.VarChar(20)
-  autoApplied     Boolean  @default(false) @map("auto_applied")
-  details         Json
-  reasoning       String?  @db.Text
-  durationMs      Int?     @map("duration_ms")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  agentType     String   @map("agent_type") @db.VarChar(30)
+  eventType     String   @map("event_type") @db.VarChar(30)
+  workflowId    String?  @map("workflow_id")
+  transactionId String?  @map("transaction_id")
+  decision      String   @db.VarChar(50)
+  confidence    Int?
+  source        String?  @db.VarChar(20)
+  autoApplied   Boolean  @default(false) @map("auto_applied")
+  details       Json
+  reasoning     String?  @db.Text
+  durationMs    Int?     @map("duration_ms")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, agentType])
   @@index([tenantId, eventType])
@@ -3877,16 +3911,16 @@ model AgentAuditLog {
 // ============================================
 
 model FeatureFlag {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  flag        String   @db.VarChar(50)
-  enabled     Boolean  @default(false)
-  mode        String   @default("SHADOW") @db.VarChar(20)
-  metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  flag      String   @db.VarChar(50)
+  enabled   Boolean  @default(false)
+  mode      String   @default("SHADOW") @db.VarChar(20)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, flag])
   @@index([tenantId])
@@ -3911,10 +3945,10 @@ model ShadowComparison {
   // NOTE: No foreign keys — intentional for immutability (audit data)
   // NOTE: No @updatedAt — this table is APPEND-ONLY
 
-  @@map("shadow_comparisons")
   @@index([tenantId, agentType, createdAt])
   @@index([agentType, createdAt])
   @@index([resultsMatch, agentType])
+  @@map("shadow_comparisons")
 }
 
 // ============================================
@@ -3929,9 +3963,9 @@ enum OnboardingStep {
   PARENT_SURNAME
   PARENT_EMAIL
   PARENT_ID_NUMBER
-  PARENT_ADDRESS          // TASK-WA-015: Collect physical address
+  PARENT_ADDRESS // TASK-WA-015: Collect physical address
   CHILD_NAME
-  CHILD_SURNAME           // TASK-WA-015: Per-child surname
+  CHILD_SURNAME // TASK-WA-015: Per-child surname
   CHILD_DOB
   CHILD_ALLERGIES
   CHILD_ANOTHER
@@ -3939,12 +3973,12 @@ enum OnboardingStep {
   EMERGENCY_CONTACT_PHONE
   EMERGENCY_CONTACT_RELATION
   ID_DOCUMENT
-  FEE_SELECTION           // TASK-WA-015: Select fee structure
+  FEE_SELECTION // TASK-WA-015: Select fee structure
   FEE_AGREEMENT
-  START_DATE              // When the child will start attending
-  MEDIA_CONSENT           // TASK-WA-015: Photo/video consent
-  AUTHORIZED_COLLECTORS   // TASK-WA-015: Authorized pickup persons
-  CONSENT_AGREEMENT       // TASK-WA-015: Legal consents acknowledgment
+  START_DATE // When the child will start attending
+  MEDIA_CONSENT // TASK-WA-015: Photo/video consent
+  AUTHORIZED_COLLECTORS // TASK-WA-015: Authorized pickup persons
+  CONSENT_AGREEMENT // TASK-WA-015: Legal consents acknowledgment
   COMMUNICATION_PREFS
   CONFIRMATION
   COMPLETE
@@ -3995,18 +4029,18 @@ model WhatsAppOnboardingSession {
 // be dropped. `prisma migrate diff` will report it as drift permanently.
 // See: migrations/20260426145222_align_vector_embeddings_to_schema/migration.sql
 model VectorEmbedding {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  collection  String   @db.VarChar(50)  // e.g., 'decisions', 'patterns', 'transactions'
-  contentId   String   @map("content_id") @db.VarChar(100)  // ID of the embedded content
-  contentType String   @map("content_type") @db.VarChar(30) // e.g., 'transaction', 'pattern', 'decision'
-  contentHash String   @map("content_hash") @db.VarChar(64) // SHA-256 of content for dedup
-  embedding   Unsupported("vector(384)")  // pgvector type - 384d MiniLM embeddings
+  id          String                     @id @default(uuid())
+  tenantId    String                     @map("tenant_id")
+  collection  String                     @db.VarChar(50) // e.g., 'decisions', 'patterns', 'transactions'
+  contentId   String                     @map("content_id") @db.VarChar(100) // ID of the embedded content
+  contentType String                     @map("content_type") @db.VarChar(30) // e.g., 'transaction', 'pattern', 'decision'
+  contentHash String                     @map("content_hash") @db.VarChar(64) // SHA-256 of content for dedup
+  embedding   Unsupported("vector(384)") // pgvector type - 384d MiniLM embeddings
   metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, collection, contentId])
   @@index([tenantId])
@@ -4036,7 +4070,7 @@ model Notification {
   expiresAt     DateTime?            @map("expires_at")
   createdAt     DateTime             @default(now()) @map("created_at")
 
-  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, recipientType, recipientId, isRead])
   @@index([tenantId, recipientId, createdAt])
@@ -4062,7 +4096,7 @@ model NotificationPreference {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, recipientType, recipientId])
   @@map("notification_preferences")
@@ -4086,7 +4120,7 @@ model StubConnection {
   // onDelete/onUpdate: NoAction matches the live DB FK created by the runtime
   // bootstrap in stub-accounting.adapter.ts. Schema describes reality, not the
   // Prisma default of Restrict/Cascade.
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("stub_connections")
 }

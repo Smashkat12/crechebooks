@@ -9,6 +9,8 @@ import { PaymentReminderProcessor } from './processors/payment-reminder.processo
 import { StatementSchedulerProcessor } from './processors/statement-scheduler.processor';
 import { XeroSyncRecoveryProcessor } from './processors/xero-sync-recovery.processor';
 import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
+import { StaffInvitationCleanupJob } from '../jobs/staff-invitation-cleanup.job';
+import { StaffModule } from '../api/staff/staff.module';
 import { InvoiceScheduleService } from '../billing/invoice-schedule.service';
 import { PaymentReminderService } from '../billing/payment-reminder.service';
 import { QUEUE_NAMES } from './types/scheduler.types';
@@ -104,8 +106,13 @@ const schedulerProviders = isRedisConfigured()
 
 // TASK-REL-101: XeroSyncRecoveryProcessor uses @nestjs/schedule, not Bull
 // TASK-FEAT-102: ArrearsReminderJob uses @nestjs/schedule for daily reminders
+// TASK-STAFF-INVITE-001: StaffInvitationCleanupJob — daily 03:00 SAST invite expiry
 // Always register them as they use NestJS cron scheduling
-const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
+const cronProviders = [
+  XeroSyncRecoveryProcessor,
+  ArrearsReminderJob,
+  StaffInvitationCleanupJob,
+];
 
 // TASK-BILL-016 / TASK-PAY-015: tenant-customisable scheduling services.
 // Dissolved from BillingSchedulerModule (which was never wired into the app graph)
@@ -124,6 +131,7 @@ const billingSchedulingProviders = isRedisConfigured()
     DatabaseModule,
     CircuitBreakerModule,
     EmailModule, // TASK-BILL-013: Email service for arrears reminders
+    StaffModule, // TASK-STAFF-INVITE-001: Provides StaffInvitationService for cleanup job
     ScheduleModule.forRoot(), // TASK-REL-101: Enable cron scheduling
     ...bullImports,
   ],
@@ -143,6 +151,7 @@ const billingSchedulingProviders = isRedisConfigured()
       : []),
     XeroSyncRecoveryProcessor, // TASK-REL-101: Export for manual triggering
     ArrearsReminderJob, // TASK-FEAT-102: Export for manual triggering
+    StaffInvitationCleanupJob, // TASK-STAFF-INVITE-001: Export for manual triggering
   ],
 })
 export class SchedulerModule {}

@@ -6,10 +6,11 @@
 
 import { Module, Global } from '@nestjs/common';
 import { MailgunService } from './mailgun.service';
+import { CommsGuardService } from '../../common/services/comms-guard/comms-guard.service';
 
 @Global()
 @Module({
-  providers: [MailgunService],
-  exports: [MailgunService],
+  providers: [CommsGuardService, MailgunService],
+  exports: [CommsGuardService, MailgunService],
 })
 export class MailgunModule {}

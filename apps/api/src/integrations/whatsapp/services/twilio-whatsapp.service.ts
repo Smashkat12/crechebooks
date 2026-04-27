@@ -23,6 +23,7 @@ import { PrismaService } from '../../../database/prisma/prisma.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { AuditAction } from '../../../database/entities/audit-log.entity';
 import { BusinessException } from '../../../shared/exceptions';
+import { CommsGuardService } from '../../../common/services/comms-guard/comms-guard.service';
 import { WhatsAppMessageEntity } from '../entities/whatsapp-message.entity';
 import {
   WhatsAppMessageStatus,
@@ -77,6 +78,7 @@ export class TwilioWhatsAppService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
+    private readonly commsGuard: CommsGuardService,
     @Optional() private readonly messageEntity?: WhatsAppMessageEntity,
     @Optional() private readonly contentService?: TwilioContentService,
   ) {
@@ -193,6 +195,13 @@ export class TwilioWhatsAppService {
       contextId?: string;
     },
   ): Promise<TwilioMessageResult> {
+    if (this.commsGuard.isDisabled()) {
+      this.logger.warn(
+        `[COMMS_DISABLED] Skipping Twilio WhatsApp message to ${to}`,
+      );
+      return { success: true, messageId: 'comms-disabled-noop' };
+    }
+
     const config = this.ensureConfigured();
     this.checkRateLimit();
 

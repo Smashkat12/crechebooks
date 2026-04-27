@@ -20,7 +20,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ChildStatus } from '@prisma/client';
 import { Gender } from '../entities/child.entity';
 import {
@@ -28,6 +28,7 @@ import {
   SanitizeText,
   SanitizePhone,
 } from '../../common/utils/sanitize.utils';
+import { normalizeName } from '../../common/utils/name-normalizer';
 
 export class CreateChildDto {
   @IsUUID()
@@ -36,12 +37,14 @@ export class CreateChildDto {
   @IsUUID()
   parentId!: string;
 
+  @Transform(({ value }) => normalizeName(value))
   @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   firstName!: string;
 
+  @Transform(({ value }) => normalizeName(value))
   @SanitizeName()
   @IsString()
   @MinLength(1)

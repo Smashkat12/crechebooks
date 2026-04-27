@@ -17,14 +17,17 @@ import {
   MaxLength,
   Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Gender } from '../../../database/entities/child.entity';
+import { normalizeName } from '../../../common/utils/name-normalizer';
 
 /**
  * API-layer DTO for updating a child (all fields optional)
  */
 export class UpdateChildDto {
   @IsOptional()
+  @Transform(({ value }) => normalizeName(value))
   @IsString()
   @MinLength(1)
   @MaxLength(100)
@@ -32,6 +35,7 @@ export class UpdateChildDto {
   first_name?: string;
 
   @IsOptional()
+  @Transform(({ value }) => normalizeName(value))
   @IsString()
   @MinLength(1)
   @MaxLength(100)

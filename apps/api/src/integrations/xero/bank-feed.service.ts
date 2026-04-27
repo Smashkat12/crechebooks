@@ -1217,7 +1217,7 @@ export class BankFeedService {
       otherLines[0]?.description?.trim() ||
       otherLines[0]?.accountName?.trim() ||
       journal.reference?.trim() ||
-      `${String(journal.sourceType ?? 'Journal')} Transaction`;
+      `${(journal.sourceType as string | undefined) ?? 'Journal'} Transaction`;
 
     // Detect fee transactions
     let correctedAmountCents = amountCents;

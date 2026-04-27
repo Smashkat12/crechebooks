@@ -22,6 +22,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
+  NotFound,
   NoSuchKey,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -210,6 +212,45 @@ export class StorageService {
     } catch (err) {
       if (err instanceof NoSuchKey) {
         throw new NotFoundException(`Object not found: ${key}`);
+      }
+      throw err;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Object existence check (HEAD)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns true if the object exists in the bucket, false otherwise.
+   * Used to verify a client-uploaded file actually landed in S3 before we
+   * create a PaymentAttachment DB row.
+   */
+  async objectExists(
+    tenantId: string,
+    kind: StorageKind,
+    key: string,
+  ): Promise<boolean> {
+    this.assertTenantOwnsKey(tenantId, kind, key);
+
+    try {
+      await this.s3.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return true;
+    } catch (err) {
+      if (err instanceof NotFound || err instanceof NoSuchKey) {
+        return false;
+      }
+      // S3 also returns a 404-shaped error with name 'NotFound' in some SDK versions
+      if (
+        err instanceof Error &&
+        ('$metadata' in err
+          ? (err as unknown as { $metadata: { httpStatusCode?: number } })
+              .$metadata?.httpStatusCode === 404
+          : false)
+      ) {
+        return false;
       }
       throw err;
     }

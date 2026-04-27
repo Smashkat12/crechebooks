@@ -40,6 +40,7 @@ import { OnboardingExpiryJob } from './jobs/onboarding-expiry.job';
 import { OnboardingController } from './controllers/onboarding.controller';
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../../api/auth/auth.module';
+import { MailgunModule } from '../mailgun/mailgun.module';
 import { QUEUE_NAMES } from '../../scheduler/types/scheduler.types';
 
 const logger = new Logger('WhatsAppModule');
@@ -118,6 +119,7 @@ const retryProviders = isRedisConfigured()
   imports: [
     forwardRef(() => DatabaseModule),
     forwardRef(() => AuthModule), // TASK-WA-015: MagicLinkService for onboarding completion
+    MailgunModule, // Provides CommsGuardService for outbound suppression
     ConfigModule,
     ScheduleModule.forRoot(), // TASK-WA-013: Enable @Cron for OnboardingExpiryJob
     JwtModule.registerAsync({

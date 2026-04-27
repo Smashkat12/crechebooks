@@ -15,6 +15,7 @@ import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { BusinessException } from '../../shared/exceptions';
+import { CommsGuardService } from '../../common/services/comms-guard/comms-guard.service';
 
 export interface ContactSubmission {
   name: string;
@@ -90,6 +91,8 @@ export class EmailService implements OnModuleInit {
   private mailgunDomain: string = '';
   private mailgunFromEmail: string = '';
   private provider: EmailProvider = 'none';
+
+  constructor(private readonly commsGuard: CommsGuardService) {}
 
   async onModuleInit(): Promise<void> {
     // Try Mailgun first (preferred), then SMTP
@@ -188,6 +191,13 @@ export class EmailService implements OnModuleInit {
    * @throws BusinessException if email service not configured or send fails
    */
   async sendEmailWithOptions(options: EmailOptions): Promise<EmailResult> {
+    if (this.commsGuard.isDisabled()) {
+      this.logger.warn(
+        `[COMMS_DISABLED] Skipping email (${this.provider}) to ${options.to}: ${options.subject}`,
+      );
+      return { messageId: 'comms-disabled-noop', status: 'sent' };
+    }
+
     if (this.provider === 'none') {
       this.logger.error('Email send failed: No email provider configured');
       throw new BusinessException(

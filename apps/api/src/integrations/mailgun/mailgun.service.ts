@@ -13,6 +13,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { BusinessException } from '../../shared/exceptions';
+import { CommsGuardService } from '../../common/services/comms-guard/comms-guard.service';
 
 export interface MailgunAttachment {
   filename: string;
@@ -61,6 +62,8 @@ export class MailgunService implements OnModuleInit {
   private client: IMailgunClient | null = null;
   private domain: string = '';
   private fromEmail: string = '';
+
+  constructor(private readonly commsGuard: CommsGuardService) {}
 
   async onModuleInit(): Promise<void> {
     await this.initializeClient();
@@ -111,6 +114,18 @@ export class MailgunService implements OnModuleInit {
    * @throws BusinessException if Mailgun not configured or send fails
    */
   async sendEmail(options: MailgunEmailOptions): Promise<MailgunEmailResult> {
+    if (this.commsGuard.isDisabled()) {
+      const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+      this.logger.warn(
+        `[COMMS_DISABLED] Skipping Mailgun email to ${to}: ${options.subject}`,
+      );
+      return {
+        id: 'comms-disabled-noop',
+        message: 'Comms disabled',
+        status: 'queued',
+      };
+    }
+
     if (!this.client) {
       this.logger.error('Email send failed: Mailgun client not configured');
       throw new BusinessException(

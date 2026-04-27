@@ -298,6 +298,24 @@ enum StaffInvitationStatus {
   REVOKED
 }
 
+// Backlog #11: parent proof-of-payment uploads.
+// Distinguishes the kind of attachment so the same table can hold receipts and
+// other future categories without schema churn.
+enum PaymentAttachmentKind {
+  PROOF_OF_PAYMENT
+  RECEIPT
+  OTHER
+}
+
+// Backlog #11: review workflow for proof-of-payment uploads.
+// Admin reviews PENDING uploads; APPROVED proofs may be linked to a Payment;
+// REJECTED proofs require the parent to re-upload.
+enum PaymentAttachmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // TASK-STAFF-001: Staff Onboarding Document Types
 // DSD Compliance document categories for childcare workers
 enum DocumentType {
@@ -735,6 +753,9 @@ model Tenant {
   // Backlog #7 — per-staff invite + login flow
   staffInvitations StaffInvitation[]
 
+  // Backlog #11 — parent proof-of-payment uploads
+  paymentAttachments PaymentAttachment[]
+
   @@map("tenants")
 }
 
@@ -822,6 +843,10 @@ model User {
 
   // Backlog #7 — staff invitations sent by this user (audit trail)
   staffInvitationsSent StaffInvitation[] @relation("StaffInvitationInvitedBy")
+
+  // Backlog #11 — payment attachments (proof-of-payment) uploaded / reviewed by this user
+  paymentAttachmentsUploaded PaymentAttachment[] @relation("PaymentAttachmentUploadedBy")
+  paymentAttachmentsReviewed PaymentAttachment[] @relation("PaymentAttachmentReviewedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1101,6 +1126,9 @@ model Parent {
 
   // TASK-WA-011: WhatsApp Onboarding Sessions
   whatsAppOnboardingSessions WhatsAppOnboardingSession[]
+
+  // Backlog #11 — proof-of-payment uploads from parent portal
+  paymentAttachments PaymentAttachment[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1431,6 +1459,9 @@ model Payment {
 
   // TASK-XERO-010: Xero Payment Mapping
   xeroPaymentMapping XeroPaymentMapping?
+
+  // Backlog #11 — proof-of-payment uploads (one payment may have multiple attachments)
+  attachments PaymentAttachment[]
 
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
@@ -2152,6 +2183,55 @@ model StaffInvitation {
   @@index([tokenHash])
   @@index([expiresAt])
   @@map("staff_invitations")
+}
+
+// Backlog #11: parent proof-of-payment uploads.
+// Parents upload EFT screenshots / deposit slips from the portal. Files live in
+// S3 under StorageKind.ProofOfPayment; this row stores the metadata + review state.
+//
+// Design notes:
+// - paymentId is nullable: parents often upload BEFORE the bank transaction
+//   lands in the system. Admin (or the AI matcher) attaches the proof to a
+//   Payment later. ON DELETE SET NULL preserves the upload for audit if the
+//   Payment is later removed.
+// - parentId is nullable to cover admin-side uploads on behalf of a parent.
+// - uploadedById captures the user (admin/staff) when uploaded via admin UI;
+//   null for parent-portal uploads (parents are not Users).
+// - reviewStatus drives the workflow: PENDING → APPROVED (linkable to a
+//   Payment) or REJECTED (parent re-uploads).
+// - s3Key stores the FULL key including the StorageKind.ProofOfPayment prefix
+//   (`tenants/{tenantId}/proof-of-payments/...`). Never a presigned URL — the
+//   server generates download URLs on demand.
+model PaymentAttachment {
+  id           String                  @id @default(uuid())
+  tenantId     String                  @map("tenant_id")
+  paymentId    String?                 @map("payment_id")
+  parentId     String?                 @map("parent_id")
+  uploadedById String?                 @map("uploaded_by_id")
+  kind         PaymentAttachmentKind   @default(PROOF_OF_PAYMENT)
+  s3Key        String                  @map("s3_key") @db.VarChar(500)
+  filename     String                  @db.VarChar(200)
+  contentType  String                  @map("content_type") @db.VarChar(100)
+  fileSize     Int                     @map("file_size")
+  note         String?                 @db.VarChar(500)
+  uploadedAt   DateTime                @default(now()) @map("uploaded_at")
+  reviewedAt   DateTime?               @map("reviewed_at")
+  reviewedById String?                 @map("reviewed_by_id")
+  reviewStatus PaymentAttachmentStatus @default(PENDING) @map("review_status")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  payment    Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  parent     Parent?  @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  uploadedBy User?    @relation("PaymentAttachmentUploadedBy", fields: [uploadedById], references: [id])
+  reviewedBy User?    @relation("PaymentAttachmentReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([tenantId, uploadedAt])
+  @@index([tenantId, paymentId])
+  @@index([tenantId, reviewStatus])
+  @@index([parentId, uploadedAt])
+  @@map("payment_attachments")
 }
 
 // TASK-STMT-001: Statement Entity and Data Model (Phase 12)

@@ -4,19 +4,8 @@
  * TASK-PAY-015: Payment Reminder Scheduler Service
  * TASK-PAY-017: Tenant-Customizable Reminder Template Entity
  *
- * Provides billing services including invoice and payment reminder scheduling,
- * and customizable reminder templates.
+ * NOTE: BillingSchedulerModule was dissolved into SchedulerModule because it was
+ * never imported into the app module graph, causing its providers to be unreachable.
+ * InvoiceScheduleService and PaymentReminderService now live in SchedulerModule.
+ * This file is retained for the remaining type / DTO exports consumed via billing/index.ts.
  */
-
-import { Module } from '@nestjs/common';
-import { InvoiceScheduleService } from './invoice-schedule.service';
-import { PaymentReminderService } from './payment-reminder.service';
-import { SchedulerModule } from '../scheduler/scheduler.module';
-import { DatabaseModule } from '../database/database.module';
-
-@Module({
-  imports: [SchedulerModule, DatabaseModule],
-  providers: [InvoiceScheduleService, PaymentReminderService],
-  exports: [InvoiceScheduleService, PaymentReminderService],
-})
-export class BillingSchedulerModule {}

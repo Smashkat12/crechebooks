@@ -9,6 +9,8 @@ import { PaymentReminderProcessor } from './processors/payment-reminder.processo
 import { StatementSchedulerProcessor } from './processors/statement-scheduler.processor';
 import { XeroSyncRecoveryProcessor } from './processors/xero-sync-recovery.processor';
 import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
+import { InvoiceScheduleService } from '../billing/invoice-schedule.service';
+import { PaymentReminderService } from '../billing/payment-reminder.service';
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
@@ -105,6 +107,17 @@ const schedulerProviders = isRedisConfigured()
 // Always register them as they use NestJS cron scheduling
 const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
 
+// TASK-BILL-016 / TASK-PAY-015: tenant-customisable scheduling services.
+// Dissolved from BillingSchedulerModule (which was never wired into the app graph)
+// to avoid a redundant module shell. DatabaseModule (already imported above) provides
+// PrismaService + AuditLogService; SchedulerService is in schedulerProviders.
+// These are not yet called by any controller; they are preserved for future wiring.
+// Guard behind isRedisConfigured() because both services inject SchedulerService,
+// which is only provided when Bull queues are available.
+const billingSchedulingProviders = isRedisConfigured()
+  ? [InvoiceScheduleService, PaymentReminderService]
+  : [];
+
 @Module({
   imports: [
     SarsSchedulerModule,
@@ -114,9 +127,20 @@ const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
     ScheduleModule.forRoot(), // TASK-REL-101: Enable cron scheduling
     ...bullImports,
   ],
-  providers: [...schedulerProviders, ...cronProviders],
+  providers: [
+    ...schedulerProviders,
+    ...cronProviders,
+    ...billingSchedulingProviders,
+  ],
   exports: [
-    ...(isRedisConfigured() ? [SchedulerService, BullModule] : []),
+    ...(isRedisConfigured()
+      ? [
+          SchedulerService,
+          BullModule,
+          InvoiceScheduleService, // TASK-BILL-016: Available for future controller wiring
+          PaymentReminderService, // TASK-PAY-015: Available for future controller wiring
+        ]
+      : []),
     XeroSyncRecoveryProcessor, // TASK-REL-101: Export for manual triggering
     ArrearsReminderJob, // TASK-FEAT-102: Export for manual triggering
   ],

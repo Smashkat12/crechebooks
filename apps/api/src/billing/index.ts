@@ -5,7 +5,7 @@
  * TASK-PAY-017: Tenant-Customizable Reminder Template Entity
  */
 
-export { BillingSchedulerModule } from './billing.module';
+// BillingSchedulerModule dissolved into SchedulerModule (TASK-BILL-016/TASK-PAY-015 fix)
 export { InvoiceScheduleService } from './invoice-schedule.service';
 export { PaymentReminderService } from './payment-reminder.service';
 export { ReminderTemplateService } from './reminder-template.service';

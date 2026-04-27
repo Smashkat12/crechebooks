@@ -12,11 +12,9 @@
  */
 
 import { SetMetadata } from '@nestjs/common';
+import type { WebhookProvider } from '../../webhooks/guards/webhook-signature.guard';
 
-/**
- * Supported webhook providers
- */
-export type WebhookProvider = 'whatsapp' | 'xero' | 'simplepay';
+export type { WebhookProvider };
 
 /**
  * Metadata key for webhook provider

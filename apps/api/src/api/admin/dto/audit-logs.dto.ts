@@ -8,6 +8,7 @@ import {
   Min,
   Max,
   IsDateString,
+  Matches,
 } from 'class-validator';
 
 // ============================================
@@ -137,4 +138,46 @@ export class AuditLogsListResponseDto {
     total: number;
     totalPages: number;
   };
+}
+
+// ============================================
+// Export Query DTO
+// ============================================
+
+export class AuditLogExportQueryDto {
+  @ApiProperty({
+    description: 'Start date (YYYY-MM-DD, inclusive). Required.',
+    example: '2025-01-01',
+  })
+  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'from must be YYYY-MM-DD' })
+  from!: string;
+
+  @ApiProperty({
+    description: 'End date (YYYY-MM-DD, inclusive). Required.',
+    example: '2025-01-31',
+  })
+  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'to must be YYYY-MM-DD' })
+  to!: string;
+
+  @ApiPropertyOptional({ description: 'Filter by tenant ID' })
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by user ID' })
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
+  @ApiPropertyOptional({ enum: AuditAction })
+  @IsOptional()
+  @IsEnum(AuditAction)
+  action?: AuditAction;
+
+  @ApiPropertyOptional({ description: 'Filter by resource / entity type' })
+  @IsOptional()
+  @IsString()
+  resourceType?: string;
 }

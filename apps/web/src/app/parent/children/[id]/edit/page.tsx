@@ -2,16 +2,21 @@
 
 /**
  * Parent Portal — Edit Child Info Page
- * Roadmap feature #9 (API: b82fc49)
+ * Roadmap feature #9 (API: b82fc49, extended in a80459d)
  *
- * Allows parents to self-serve update the three whitelisted fields
- * on their child's record:
- *   - medicalNotes   (allergies, conditions, dietary)
- *   - emergencyContact (free text name)
- *   - emergencyPhone  (SA phone format)
+ * Allows parents to self-serve update the following fields on their child's record:
+ *   Identity (a80459d):
+ *     - firstName    (max 100, normalizeName + sanitize server-side)
+ *     - lastName     (max 100, normalizeName + sanitize server-side)
+ *     - gender       (MALE | FEMALE | OTHER)
+ *   Medical & Emergency (b82fc49):
+ *     - medicalNotes   (allergies, conditions, dietary)
+ *     - emergencyContact (free text name)
+ *     - emergencyPhone  (SA phone format)
  *
  * All changes are audit-logged server-side with via: 'parent-portal'.
- * Fields managed by the creche (name, DOB) are not exposed here.
+ * Identity changes also trigger an admin in-app notification.
+ * Date of birth is admin-only and is NOT exposed here.
  */
 
 import { useCallback, useEffect, useState, Suspense } from 'react';
@@ -36,11 +41,19 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
   useParentChild,
   useUpdateParentChild,
+  type Gender,
 } from '@/hooks/parent-portal/use-parent-profile';
 
 // ============================================================================
@@ -56,6 +69,12 @@ function isValidSAPhone(value: string): boolean {
   const cleaned = value.replace(/[\s\-\(\)]/g, '');
   return /^(\+27|0)[1-9][0-9]{8}$/.test(cleaned);
 }
+
+const GENDER_OPTIONS: { value: Gender; label: string }[] = [
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+  { value: 'OTHER', label: 'Other' },
+];
 
 // ============================================================================
 // Edit form inner component
@@ -75,6 +94,9 @@ function EditChildFormContent({ childId }: { childId: string }) {
   const updateMutation = useUpdateParentChild(childId);
 
   // Controlled field state — initialised from query data once loaded
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [gender, setGender] = useState<Gender | ''>('');
   const [medicalNotes, setMedicalNotes] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
@@ -94,6 +116,9 @@ function EditChildFormContent({ childId }: { childId: string }) {
   // Populate form once child data arrives
   useEffect(() => {
     if (child && !hydrated) {
+      setFirstName(child.firstName ?? '');
+      setLastName(child.lastName ?? '');
+      setGender(child.gender ?? '');
       setMedicalNotes(child.medicalNotes ?? '');
       setEmergencyContact(child.emergencyContact ?? '');
       setEmergencyPhone(child.emergencyPhone ?? '');
@@ -103,6 +128,22 @@ function EditChildFormContent({ childId }: { childId: string }) {
 
   const validate = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
+
+    if (!firstName.trim()) {
+      newErrors.firstName = 'First name is required';
+    } else if (firstName.length > 100) {
+      newErrors.firstName = 'Must be 100 characters or fewer';
+    }
+
+    if (!lastName.trim()) {
+      newErrors.lastName = 'Last name is required';
+    } else if (lastName.length > 100) {
+      newErrors.lastName = 'Must be 100 characters or fewer';
+    }
+
+    if (gender && !['MALE', 'FEMALE', 'OTHER'].includes(gender)) {
+      newErrors.gender = 'Please select a valid gender';
+    }
 
     if (medicalNotes.length > 2000) {
       newErrors.medicalNotes = 'Must be 2000 characters or fewer';
@@ -121,7 +162,7 @@ function EditChildFormContent({ childId }: { childId: string }) {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [medicalNotes, emergencyContact, emergencyPhone]);
+  }, [firstName, lastName, gender, medicalNotes, emergencyContact, emergencyPhone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,6 +171,9 @@ function EditChildFormContent({ childId }: { childId: string }) {
 
     try {
       await updateMutation.mutateAsync({
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        gender: gender || undefined,
         medicalNotes: medicalNotes.trim() || undefined,
         emergencyContact: emergencyContact.trim() || undefined,
         emergencyPhone: emergencyPhone.trim() || undefined,
@@ -224,27 +268,95 @@ function EditChildFormContent({ childId }: { childId: string }) {
         <p className="text-muted-foreground mt-1">{childFullName}</p>
       </div>
 
-      {/* Managed-by-creche notice */}
-      <Alert>
-        <AlertDescription>
-          Some fields are managed by the creche office. To update your child&apos;s
-          name or date of birth, please contact the office.
-        </AlertDescription>
-      </Alert>
-
       {/* Edit Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5" />
-            Health &amp; Emergency Details
-          </CardTitle>
-          <CardDescription>
-            Update medical information and emergency contacts for {child.firstName}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {/* Identity section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Identity
+            </CardTitle>
+            <CardDescription>
+              Name changes are logged for the creche admin&apos;s records. Date of
+              birth can only be changed by the creche office.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* First Name */}
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First name</Label>
+              <Input
+                id="firstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="e.g. Amara"
+                maxLength={100}
+                autoComplete="given-name"
+                className={errors.firstName ? 'border-destructive' : ''}
+              />
+              {errors.firstName && (
+                <p className="text-sm text-destructive">{errors.firstName}</p>
+              )}
+            </div>
+
+            {/* Last Name */}
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last name</Label>
+              <Input
+                id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="e.g. Nkosi"
+                maxLength={100}
+                autoComplete="family-name"
+                className={errors.lastName ? 'border-destructive' : ''}
+              />
+              {errors.lastName && (
+                <p className="text-sm text-destructive">{errors.lastName}</p>
+              )}
+            </div>
+
+            {/* Gender */}
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender</Label>
+              <Select
+                value={gender}
+                onValueChange={(val) => setGender(val as Gender)}
+              >
+                <SelectTrigger
+                  id="gender"
+                  className={errors.gender ? 'border-destructive' : ''}
+                >
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GENDER_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.gender && (
+                <p className="text-sm text-destructive">{errors.gender}</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Medical & Emergency section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              Health &amp; Emergency Details
+            </CardTitle>
+            <CardDescription>
+              Update medical information and emergency contacts for {child.firstName}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
             {/* Medical Notes / Allergies */}
             <div className="space-y-2">
               <Label htmlFor="medicalNotes">Medical notes / allergies</Label>
@@ -340,14 +452,14 @@ function EditChildFormContent({ childId }: { childId: string }) {
                 )}
               </Button>
             </div>
-          </form>
+          </CardContent>
+        </Card>
 
-          {/* Audit footnote */}
-          <p className="text-xs text-muted-foreground mt-4 pt-4 border-t">
-            Changes are logged for the creche admin&apos;s records.
-          </p>
-        </CardContent>
-      </Card>
+        {/* Audit footnote */}
+        <p className="text-xs text-muted-foreground pt-1">
+          All changes are logged for the creche admin&apos;s records.
+        </p>
+      </form>
     </div>
   );
 }

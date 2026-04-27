@@ -200,6 +200,60 @@ function ChildDetailContent({ childId }: { childId: string }) {
         </CardContent>
       </Card>
 
+      {/* Child details card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Child details
+          </CardTitle>
+          <CardDescription>
+            Name and gender on record. Date of birth can only be changed by the creche office.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* First name */}
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">First name</p>
+            <p className="text-sm">{child.firstName}</p>
+          </div>
+
+          {/* Last name */}
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">Last name</p>
+            <p className="text-sm">{child.lastName}</p>
+          </div>
+
+          {/* Gender */}
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">Gender</p>
+            {child.gender ? (
+              <p className="text-sm">
+                {child.gender === 'MALE'
+                  ? 'Male'
+                  : child.gender === 'FEMALE'
+                    ? 'Female'
+                    : 'Other'}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Not recorded</p>
+            )}
+          </div>
+
+          <div className="pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/parent/children/${childId}/edit`)}
+              className="gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit child info
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Health & Emergency card */}
       <Card>
         <CardHeader>
@@ -267,7 +321,7 @@ function ChildDetailContent({ childId }: { childId: string }) {
       {/* Read-only notice */}
       <Alert>
         <AlertDescription>
-          To update your child&apos;s name or date of birth, please contact the creche office.
+          To update your child&apos;s date of birth, please contact the creche office.
         </AlertDescription>
       </Alert>
     </div>

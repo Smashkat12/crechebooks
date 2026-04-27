@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import type { NotificationItem } from '@/types/notification.types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -68,15 +69,13 @@ export function useStaffMarkAllAsRead() {
 }
 
 export function useStaffNotificationList() {
-  const [notifications, setNotifications] = useState<
-    Array<Record<string, unknown>>
-  >([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
       const data = await fetchStaffApi<{
-        data: Array<Record<string, unknown>>;
+        data: NotificationItem[];
         meta: Record<string, unknown>;
       }>('/staff-portal/notifications?limit=20');
       setNotifications(data.data);

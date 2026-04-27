@@ -38,6 +38,8 @@ import { SarsSubmissionRepository } from '../../database/repositories/sars-submi
 import { Vat201Service } from '../../database/services/vat201.service';
 import { Emp201Service } from '../../database/services/emp201.service';
 import { SarsFileGeneratorService } from '../../database/services/sars-file-generator.service';
+import { SarsReadinessService } from './sars-readiness.service';
+import { SarsReadinessResponseDto } from './dto/readiness.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -67,7 +69,57 @@ export class SarsController {
     private readonly vat201Service: Vat201Service,
     private readonly emp201Service: Emp201Service,
     private readonly sarsFileGenerator: SarsFileGeneratorService,
+    private readonly sarsReadiness: SarsReadinessService,
   ) {}
+
+  /**
+   * GET /sars/readiness?period=YYYY-MM
+   *
+   * Returns the next SARS filing deadline and any data-completeness blockers.
+   * Read-only — no mutations.  Tenant-scoped from JWT.
+   *
+   * period (optional): YYYY-MM reference date; defaults to today.
+   *
+   * Deadlines computed (EMP201 §3, VAT201 §6 Category A, EMP501 §2):
+   *   EMP201  — 7th of following month
+   *   VAT201  — 25th of month after bi-monthly period (Category A; see service TODO)
+   *   EMP501  — May 31 (interim) / Oct 31 (annual)
+   */
+  @Get('readiness')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary: 'Filing readiness checklist for the next SARS deadline',
+    description:
+      'Aggregates uncategorised transactions, unreconciled bank lines, missing payslips (EMP201), and VAT gaps (VAT201) to surface what is blocking the next submission.',
+  })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    description: 'Reference period YYYY-MM. Defaults to current month.',
+    example: '2026-04',
+  })
+  @ApiResponse({ status: 200, type: SarsReadinessResponseDto })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getReadiness(
+    @Query('period') period: string | undefined,
+    @CurrentUser() user: IUser,
+  ): Promise<SarsReadinessResponseDto> {
+    const tenantId = getTenantId(user);
+    this.logger.log(
+      `Readiness check: tenant=${tenantId}, period=${period ?? 'auto'}`,
+    );
+
+    // Validate period format if supplied
+    if (period && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+      throw new BadRequestException('period must be in YYYY-MM format');
+    }
+
+    return this.sarsReadiness.getReadiness(tenantId, period);
+  }
 
   @Post(':id/submit')
   @HttpCode(200)

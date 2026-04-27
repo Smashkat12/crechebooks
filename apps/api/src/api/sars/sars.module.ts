@@ -7,6 +7,7 @@
  */
 import { Module } from '@nestjs/common';
 import { SarsController } from './sars.controller';
+import { SarsReadinessService } from './sars-readiness.service';
 import { SarsSubmissionRepository } from '../../database/repositories/sars-submission.repository';
 import { Vat201Service } from '../../database/services/vat201.service';
 import { VatService } from '../../database/services/vat.service';
@@ -30,6 +31,7 @@ import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
     SarsFileGeneratorService,
     PayeService,
     UifService,
+    SarsReadinessService,
   ],
 })
 export class SarsApiModule {}

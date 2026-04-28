@@ -45,6 +45,7 @@ import { IdempotencyService } from '../common/services/idempotency.service';
 import { OnboardingConversationHandler } from '../integrations/whatsapp/handlers/onboarding-conversation.handler';
 import { ParentMenuHandler } from '../integrations/whatsapp/handlers/parent-menu.handler';
 import { PrismaService } from '../database/prisma/prisma.service';
+import { InboundMessagePersistenceService } from '../api/whatsapp/inbound-message-persistence.service';
 
 /**
  * Public webhook endpoints (no auth required, signature verified)
@@ -61,6 +62,7 @@ export class WebhookController {
     private readonly onboardingHandler: OnboardingConversationHandler,
     private readonly parentMenuHandler: ParentMenuHandler,
     private readonly prisma: PrismaService,
+    private readonly inboundPersistence: InboundMessagePersistenceService,
   ) {}
 
   /**
@@ -427,6 +429,42 @@ export class WebhookController {
     if (!tenantId) {
       this.logger.warn(`No tenant found for incoming message from ${waId}`);
       return '<Response></Response>';
+    }
+
+    // ------------------------------------------------------------------
+    // Persist inbound message BEFORE routing (Step 2 — Item #12)
+    // Failures here are non-fatal: we log and continue so routing still
+    // runs and Twilio gets a 200 response to prevent retries.
+    // ------------------------------------------------------------------
+    try {
+      // Collect all media items (Twilio sends MediaUrl0..N)
+      const twilioMediaItems: Array<{ url: string; contentType: string }> = [];
+      for (let i = 0; i < numMedia; i++) {
+        const u = body[`MediaUrl${i}`];
+        const ct = body[`MediaContentType${i}`];
+        if (u && ct) {
+          twilioMediaItems.push({ url: u, contentType: ct });
+        }
+      }
+
+      // Normalise fromPhone: strip "whatsapp:" prefix, keep "+" if present
+      const fromPhoneNorm = from.startsWith('whatsapp:')
+        ? from.slice('whatsapp:'.length)
+        : from;
+
+      await this.inboundPersistence.persist(
+        tenantId,
+        fromPhoneNorm,
+        messageBody,
+        messageSid,
+        twilioMediaItems,
+      );
+    } catch (persistErr) {
+      this.logger.error(
+        `[InboundPersist] Failed to persist inbound message from ${waId}: ` +
+          `${persistErr instanceof Error ? persistErr.message : String(persistErr)}`,
+        persistErr instanceof Error ? persistErr.stack : undefined,
+      );
     }
 
     try {

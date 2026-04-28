@@ -241,14 +241,16 @@ export class BankFeedService {
       syncedAt: new Date(),
     };
 
-    // Get connections to sync
+    // Get connections to sync.
+    // Include ERROR connections so the auto-sync job's retry policy can attempt
+    // recovery.  DISCONNECTED is intentional user action and must never be retried.
     const whereClause: {
       tenantId: string;
-      status: BankConnectionStatus;
+      status: { in: BankConnectionStatus[] };
       id?: string;
     } = {
       tenantId,
-      status: BankConnectionStatus.ACTIVE,
+      status: { in: [BankConnectionStatus.ACTIVE, BankConnectionStatus.ERROR] },
     };
 
     if (options?.connectionId) {

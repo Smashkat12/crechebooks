@@ -47,6 +47,7 @@ export interface ParentProfile {
 
 export interface UpdateParentProfileDto {
   firstName?: string;
+  middleName?: string | null;
   lastName?: string;
   phone?: string;
   alternativePhone?: string;

@@ -51,7 +51,11 @@ describe('XeroController.getSyncStatus', () => {
     bankConnection: { findFirst: jest.Mock; findMany: jest.Mock };
     tenant: { findUnique: jest.Mock };
   };
-  let mockAutoSyncJob: { isInFlight: jest.Mock; runAutoSync: jest.Mock };
+  let mockAutoSyncJob: {
+    isInFlight: jest.Mock;
+    runAutoSync: jest.Mock;
+    getRetryState: jest.Mock;
+  };
 
   beforeEach(async () => {
     mockPrisma = {
@@ -71,6 +75,7 @@ describe('XeroController.getSyncStatus', () => {
     mockAutoSyncJob = {
       isInFlight: jest.fn().mockReturnValue(false),
       runAutoSync: jest.fn(),
+      getRetryState: jest.fn().mockReturnValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -199,6 +204,61 @@ describe('XeroController.getSyncStatus', () => {
     expect(result.currentJob).not.toBeNull();
     expect(result.currentJob?.status).toBe('RUNNING');
     expect(result.currentJob?.id).toBe(`auto-sync-${TENANT_ID}`);
+  });
+
+  it('returns errorRetryState populated when connection is ERROR and backoff is active', async () => {
+    const now = Date.now();
+    const nextRetryAt = now + 2 * 60 * 60 * 1000; // 2h from now
+
+    mockPrisma.xeroToken.findUnique.mockResolvedValue({
+      tenantId: TENANT_ID,
+      tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+      updatedAt: new Date(),
+    });
+
+    mockPrisma.bankConnection.findFirst.mockResolvedValue({
+      lastSyncAt: new Date('2026-04-26T08:00:00.000Z'),
+      status: 'ERROR',
+      errorMessage: 'HTTP 429: Too Many Requests: Rate limit exceeded.',
+    });
+
+    mockAutoSyncJob.getRetryState.mockReturnValue({
+      nextRetryAt,
+      consecutiveFailures: 1,
+    });
+
+    const result = await controller.getSyncStatus(mockUser);
+
+    expect(result.lastSyncStatus).toBe('FAILED');
+    expect(result.errorRetryState).not.toBeNull();
+    expect(result.errorRetryState!.consecutiveFailures).toBe(1);
+    expect(result.errorRetryState!.nextRetryAt).toBe(
+      new Date(nextRetryAt).toISOString(),
+    );
+  });
+
+  it('returns errorRetryState=null when connection is ACTIVE (no backoff)', async () => {
+    const now = Date.now();
+
+    mockPrisma.xeroToken.findUnique.mockResolvedValue({
+      tenantId: TENANT_ID,
+      tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+      updatedAt: new Date(),
+    });
+
+    mockPrisma.bankConnection.findFirst.mockResolvedValue({
+      lastSyncAt: new Date('2026-04-27T10:00:00.000Z'),
+      status: 'ACTIVE',
+      errorMessage: null,
+    });
+
+    // getRetryState returns undefined — no backoff recorded
+    mockAutoSyncJob.getRetryState.mockReturnValue(undefined);
+
+    const result = await controller.getSyncStatus(mockUser);
+
+    expect(result.lastSyncStatus).toBe('COMPLETED');
+    expect(result.errorRetryState).toBeNull();
   });
 
   it('returns nextScheduledSyncAt as the next :00 UTC hour boundary', async () => {

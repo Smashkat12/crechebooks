@@ -44,7 +44,7 @@ import { CurrentUser } from '../../api/auth/decorators/current-user.decorator';
 import { Roles } from '../../api/auth/decorators/roles.decorator';
 import { Public } from '../../api/auth/decorators/public.decorator';
 import type { IUser } from '../../database/entities/user.entity';
-import { BusinessException, NotFoundException } from '../../shared/exceptions';
+import { BusinessException } from '../../shared/exceptions';
 import {
   SyncRequestDto,
   ConnectResponseDto,
@@ -66,7 +66,6 @@ import {
   ListAccountsResponseDto,
   ValidateAccountCodeResponseDto,
 } from '../../database/dto/xero-account.dto';
-import { XeroAccountStatus } from '../../database/entities/xero-account.entity';
 import { XeroAuthService } from './xero-auth.service';
 import { XeroAutoSyncJob } from './xero-auto-sync.job';
 

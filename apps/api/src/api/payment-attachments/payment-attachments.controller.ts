@@ -218,6 +218,26 @@ export class PaymentAttachmentsController {
   }
 
   // ------------------------------------------------------------------
+  // POST /payment-attachments/:id/run-matcher  — manually trigger OCR + match
+  // ------------------------------------------------------------------
+  @Post(':id/run-matcher')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Manually trigger OCR + auto-match pipeline on an APPROVED attachment',
+  })
+  @ApiParam({ name: 'id', description: 'PaymentAttachment ID' })
+  @ApiResponse({ status: 200, description: '{ message: string }' })
+  @ApiResponse({
+    status: 400,
+    description: 'Attachment not APPROVED or not found',
+  })
+  async runMatcher(@CurrentUser() user: IUser, @Param('id') id: string) {
+    return this.attachmentsService.runMatcher(getTenantId(user), id);
+  }
+
+  // ------------------------------------------------------------------
   // DELETE /payment-attachments/:id  — hard delete (admin only, deletes S3)
   // ------------------------------------------------------------------
   @Delete(':id')

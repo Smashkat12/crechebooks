@@ -11,17 +11,19 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../auth/auth.module';
 import { StorageModule } from '../../integrations/storage/storage.module';
+import { OcrModule } from '../../integrations/ocr/ocr.module';
 import { PaymentAttachmentsController } from './payment-attachments.controller';
 import { ParentPaymentAttachmentsController } from './parent-payment-attachments.controller';
 import { PaymentAttachmentsService } from './payment-attachments.service';
+import { PaymentAttachmentMatcherService } from './payment-attachment-matcher.service';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, StorageModule],
+  imports: [DatabaseModule, AuthModule, StorageModule, OcrModule],
   controllers: [
     PaymentAttachmentsController,
     ParentPaymentAttachmentsController,
   ],
-  providers: [PaymentAttachmentsService],
-  exports: [PaymentAttachmentsService],
+  providers: [PaymentAttachmentsService, PaymentAttachmentMatcherService],
+  exports: [PaymentAttachmentsService, PaymentAttachmentMatcherService],
 })
 export class PaymentAttachmentsModule {}

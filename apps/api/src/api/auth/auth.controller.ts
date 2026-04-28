@@ -358,9 +358,12 @@ export class AuthController {
   async logout(
     @CurrentUser() user: IUser,
     @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
   ): Promise<{
     success: boolean;
     message: string;
+    /** Auth0 /v2/logout URL — frontend must redirect browser here to clear Auth0 session cookie */
+    auth0LogoutUrl?: string;
   }> {
     this.logger.debug(`Processing logout request for user ${user?.id}`);
 
@@ -382,9 +385,24 @@ export class AuthController {
     // TASK-UI-001: Clear HttpOnly cookie
     this.clearAccessTokenCookie(res);
 
+    // Build Auth0 logout URL from server-side config so the frontend does not need
+    // NEXT_PUBLIC_AUTH0_DOMAIN / NEXT_PUBLIC_AUTH0_CLIENT_ID env vars.
+    // The frontend must redirect window.location.href here to clear the Auth0
+    // session cookie (the root cause of sessions persisting after NextAuth signOut).
+    const origin =
+      (req.headers['origin'] as string) ||
+      (req.headers['referer']
+        ? new URL(req.headers['referer']).origin
+        : undefined);
+    const returnTo =
+      origin || process.env.FRONTEND_URL || 'https://app.elleelephant.co.za';
+    const auth0LogoutUrl =
+      this.authService.getAuth0LogoutUrl(returnTo) ?? undefined;
+
     return {
       success: true,
       message: 'Logged out successfully',
+      ...(auth0LogoutUrl ? { auth0LogoutUrl } : {}),
     };
   }
 

@@ -132,6 +132,24 @@ export class AuthService {
   }
 
   /**
+   * Build the Auth0 /v2/logout URL so the frontend can redirect the browser there.
+   * This clears the Auth0 session cookie (on the Auth0 domain) which is the
+   * source of silent re-authentication after NextAuth signOut.
+   *
+   * Returns null when AUTH0_DOMAIN or AUTH0_CLIENT_ID are not configured (JWT mode).
+   */
+  getAuth0LogoutUrl(returnTo: string): string | null {
+    if (!this.auth0Domain || !this.auth0ClientId) {
+      return null;
+    }
+    const params = new URLSearchParams({
+      client_id: this.auth0ClientId,
+      returnTo,
+    });
+    return `https://${this.auth0Domain}/v2/logout?${params.toString()}`;
+  }
+
+  /**
    * Handle OAuth callback and exchange code for tokens
    */
   async handleCallback(code: string, state: string): Promise<AuthResult> {

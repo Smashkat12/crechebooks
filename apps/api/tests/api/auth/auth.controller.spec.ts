@@ -28,6 +28,7 @@ describe('AuthController', () => {
     handleCallback: jest.fn(),
     refreshAccessToken: jest.fn(),
     devLogin: jest.fn(),
+    getAuth0LogoutUrl: jest.fn().mockReturnValue(null),
   };
 
   const mockImpersonationService = {
@@ -62,6 +63,12 @@ describe('AuthController', () => {
       cookie: jest.fn(),
       clearCookie: jest.fn(),
     }) as unknown as Response;
+
+  // Minimal mock Request for logout (provides headers needed for Auth0 logout URL)
+  const createMockRequest = () =>
+    ({
+      headers: { origin: 'https://app.elleelephant.co.za' },
+    }) as unknown as import('express').Request;
 
   beforeEach(async () => {
     // Create fresh mock response for each test
@@ -468,7 +475,11 @@ describe('AuthController', () => {
 
     describe('POST /auth/logout - Cookie Clearing', () => {
       it('should clear HttpOnly cookie on logout', async () => {
-        const result = await controller.logout(mockUser, mockResponse);
+        const result = await controller.logout(
+          mockUser,
+          mockResponse,
+          createMockRequest(),
+        );
 
         expect(result).toEqual({
           success: true,
@@ -488,7 +499,7 @@ describe('AuthController', () => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = 'production';
 
-        await controller.logout(mockUser, mockResponse);
+        await controller.logout(mockUser, mockResponse, createMockRequest());
 
         // Cookie uses sameSite: 'lax' consistently for cross-origin compatibility
         // and to ensure cookies set during impersonation (which use 'lax') are properly cleared
@@ -510,7 +521,11 @@ describe('AuthController', () => {
           message: 'Impersonation ended',
         });
 
-        await controller.logout(mockSuperAdminUser, mockResponse);
+        await controller.logout(
+          mockSuperAdminUser,
+          mockResponse,
+          createMockRequest(),
+        );
 
         expect(mockImpersonationService.endImpersonation).toHaveBeenCalledWith(
           mockSuperAdminUser.id,
@@ -518,7 +533,7 @@ describe('AuthController', () => {
       });
 
       it('should not call endImpersonation for non-SUPER_ADMIN users', async () => {
-        await controller.logout(mockUser, mockResponse);
+        await controller.logout(mockUser, mockResponse, createMockRequest());
 
         expect(
           mockImpersonationService.endImpersonation,
@@ -533,6 +548,7 @@ describe('AuthController', () => {
         const result = await controller.logout(
           mockSuperAdminUser,
           mockResponse,
+          createMockRequest(),
         );
 
         expect(result).toEqual({
@@ -540,6 +556,40 @@ describe('AuthController', () => {
           message: 'Logged out successfully',
         });
         expect(mockResponse.clearCookie).toHaveBeenCalled();
+      });
+
+      it('should return auth0LogoutUrl when Auth0 is configured', async () => {
+        const expectedUrl =
+          'https://tenant.auth0.com/v2/logout?client_id=abc&returnTo=https%3A%2F%2Fapp.elleelephant.co.za';
+        mockAuthService.getAuth0LogoutUrl.mockReturnValue(expectedUrl);
+
+        const result = await controller.logout(
+          mockUser,
+          mockResponse,
+          createMockRequest(),
+        );
+
+        expect(result).toEqual({
+          success: true,
+          message: 'Logged out successfully',
+          auth0LogoutUrl: expectedUrl,
+        });
+      });
+
+      it('should not include auth0LogoutUrl when Auth0 is not configured (JWT mode)', async () => {
+        mockAuthService.getAuth0LogoutUrl.mockReturnValue(null);
+
+        const result = await controller.logout(
+          mockUser,
+          mockResponse,
+          createMockRequest(),
+        );
+
+        expect(result).toEqual({
+          success: true,
+          message: 'Logged out successfully',
+        });
+        expect(result).not.toHaveProperty('auth0LogoutUrl');
       });
     });
 

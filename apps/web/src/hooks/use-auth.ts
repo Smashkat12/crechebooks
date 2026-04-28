@@ -53,8 +53,10 @@ export function useAuth() {
     // Uses apiClient (which attaches Authorization header from in-memory token)
     // instead of raw fetch, because SameSite:lax cookies are NOT sent on
     // cross-origin POST requests, making the HttpOnly cookie unavailable.
+    let auth0LogoutUrl: string | undefined;
     try {
-      await apiClient.post('/auth/logout');
+      const { data } = await apiClient.post<{ success: boolean; auth0LogoutUrl?: string }>('/auth/logout');
+      auth0LogoutUrl = data?.auth0LogoutUrl;
     } catch {
       // Continue with signOut even if backend call fails
     }
@@ -63,8 +65,19 @@ export function useAuth() {
     // available for the Authorization header during the logout request)
     clearAuthState();
 
-    // Sign out from NextAuth session
+    // Sign out from NextAuth session (clears authjs.session-token / __Secure-authjs.session-token)
     await signOut({ redirect: false });
+
+    // TASK-AUTH-002: Redirect to Auth0 /v2/logout to clear the Auth0 session cookie.
+    // Without this, Auth0 silently re-issues a session on the next page load, making
+    // logout appear to have no effect on refresh (the primary reported bug).
+    // The URL is built server-side so no NEXT_PUBLIC_AUTH0_* env vars are needed.
+    if (auth0LogoutUrl) {
+      window.location.href = auth0LogoutUrl;
+      return; // Auth0 will redirect back to the app's origin (returnTo)
+    }
+
+    // JWT-only mode (staging/dev): no Auth0, just navigate home
     router.push('/');
     router.refresh();
   }, [router]);

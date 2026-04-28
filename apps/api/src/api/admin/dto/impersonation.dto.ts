@@ -124,6 +124,16 @@ export class ImpersonationResponseDto {
 
   @ApiProperty({ description: 'Seconds until session expires' })
   expiresIn: number;
+
+  /**
+   * TASK-ADMIN-001: Impersonation JWT token returned in body so the frontend
+   * can update its in-memory bearer token (apiClient uses Authorization header,
+   * not the HttpOnly cookie, so the cookie alone is insufficient).
+   */
+  @ApiPropertyOptional({
+    description: 'Impersonation access token for Bearer header',
+  })
+  accessToken?: string;
 }
 
 export class EndImpersonationResponseDto {
@@ -135,6 +145,17 @@ export class EndImpersonationResponseDto {
 
   @ApiPropertyOptional({ description: 'Ended session details' })
   session?: ImpersonationSessionDto;
+}
+
+export class EndImpersonationWithTokenResponseDto extends EndImpersonationResponseDto {
+  /**
+   * Restored admin access token — frontend must update its in-memory token so
+   * subsequent Bearer-authenticated requests use the original admin JWT.
+   */
+  @ApiPropertyOptional({
+    description: 'Restored admin access token for Bearer header',
+  })
+  accessToken?: string;
 }
 
 export class CurrentImpersonationResponseDto {

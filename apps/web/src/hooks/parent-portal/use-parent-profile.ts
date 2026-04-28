@@ -283,6 +283,7 @@ export function useUpdateParentChild(childId: string) {
               ? {
                   ...c,
                   firstName: data.firstName,
+                  middleName: data.middleName,
                   lastName: data.lastName,
                   gender: data.gender,
                   medicalNotes: data.medicalNotes,

@@ -73,6 +73,13 @@ export class ChildDetailDataDto {
   @ApiProperty({ description: 'Child first name' })
   first_name!: string;
 
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    description: 'Child middle name',
+  })
+  middle_name?: string | null;
+
   @ApiProperty({ description: 'Child last name' })
   last_name!: string;
 
@@ -125,6 +132,13 @@ export class ChildListItemDto {
 
   @ApiProperty({ description: 'Child first name' })
   first_name!: string;
+
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    description: 'Child middle name',
+  })
+  middle_name?: string | null;
 
   @ApiProperty({ description: 'Child last name' })
   last_name!: string;

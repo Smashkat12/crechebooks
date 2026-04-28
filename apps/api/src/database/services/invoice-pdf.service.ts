@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { InvoiceRepository } from '../repositories/invoice.repository';
 import { NotFoundException } from '../../shared/exceptions';
+import { formatFullName } from '../../common/utils/name-formatter';
 
 interface InvoiceWithRelations {
   id: string;
@@ -39,6 +40,7 @@ interface InvoiceWithRelations {
   };
   parent: {
     firstName: string;
+    middleName?: string | null;
     lastName: string;
     email: string | null;
     phone: string | null;
@@ -46,6 +48,7 @@ interface InvoiceWithRelations {
   };
   child: {
     firstName: string;
+    middleName?: string | null;
     lastName: string;
   };
   lines: Array<{
@@ -192,7 +195,7 @@ export class InvoicePdfService {
           .font('Helvetica-Bold')
           .text('Bill To:', 320, invoiceDetailsY);
         doc.fontSize(9).font('Helvetica');
-        doc.text(`${invoice.parent.firstName} ${invoice.parent.lastName}`, 320);
+        doc.text(formatFullName(invoice.parent), 320);
         if (invoice.parent.address) {
           doc.text(invoice.parent.address, 320);
         }
@@ -208,10 +211,7 @@ export class InvoicePdfService {
         doc
           .fontSize(10)
           .font('Helvetica-Bold')
-          .text(
-            `Child: ${invoice.child.firstName} ${invoice.child.lastName}`,
-            50,
-          );
+          .text(`Child: ${formatFullName(invoice.child)}`, 50);
 
         // Line Items Table
         doc.moveDown(1.5);
@@ -223,7 +223,7 @@ export class InvoicePdfService {
 
         // Banking Details
         doc.moveDown(2);
-        const childFullName = `${invoice.child.firstName} ${invoice.child.lastName}`;
+        const childFullName = formatFullName(invoice.child);
         this.addBankingDetails(doc, invoice.tenant, childFullName);
 
         // Notes

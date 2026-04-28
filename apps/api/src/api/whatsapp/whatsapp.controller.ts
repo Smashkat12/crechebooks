@@ -226,7 +226,7 @@ export class WhatsAppController {
       status: msg.status as WhatsAppMessageStatusDto,
       contextType: msg.contextType as WhatsAppContextTypeDto,
       contextId: msg.contextId ?? undefined,
-      templateName: msg.templateName,
+      templateName: msg.templateName ?? '',
       recipientPhone: msg.recipientPhone,
       createdAt: msg.createdAt.toISOString(),
       sentAt: msg.sentAt?.toISOString(),

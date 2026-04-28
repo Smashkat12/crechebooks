@@ -860,6 +860,9 @@ model User {
   paymentAttachmentsUploaded PaymentAttachment[] @relation("PaymentAttachmentUploadedBy")
   paymentAttachmentsReviewed PaymentAttachment[] @relation("PaymentAttachmentReviewedBy")
 
+  // Item #12 — inbound WhatsApp messages this admin has marked read (audit)
+  whatsAppMessagesReadBy WhatsAppMessage[] @relation("WhatsAppMessageReadBy")
+
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([auth0Id])
@@ -3424,6 +3427,13 @@ enum WhatsAppContextType {
   ARREARS
 }
 
+// Item #12: WhatsApp inbound persistence — distinguishes inbound parent
+// messages (from webhook) from outbound platform-initiated sends.
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
 model PendingSync {
   id          String                @id @default(cuid())
   tenantId    String                @map("tenant_id")
@@ -3457,7 +3467,10 @@ model WhatsAppMessage {
   tenantId       String  @map("tenant_id")
   parentId       String? @map("parent_id")
   recipientPhone String  @map("recipient_phone") @db.VarChar(20)
-  templateName   String  @map("template_name") @db.VarChar(100)
+  // Item #12: nullable — inbound messages have no template (raw user content).
+  // All existing rows are OUTBOUND template sends and already have a value;
+  // ALTER drops the NOT NULL constraint, doesn't touch data.
+  templateName   String? @map("template_name") @db.VarChar(100)
   templateParams Json?   @map("template_params")
 
   // Message identifiers from Meta
@@ -3470,25 +3483,61 @@ model WhatsAppMessage {
   errorMessage    String?               @map("error_message") @db.Text
 
   // Context - links to invoices, statements, etc.
-  contextType WhatsAppContextType @map("context_type")
-  contextId   String?             @map("context_id") @db.VarChar(100)
+  // Item #12: nullable — inbound messages have no platform-side context.
+  contextType WhatsAppContextType? @map("context_type")
+  contextId   String?              @map("context_id") @db.VarChar(100)
 
   // Timestamps
   sentAt      DateTime? @map("sent_at")
   deliveredAt DateTime? @map("delivered_at")
+  // readAt = WhatsApp protocol read receipt (when the customer's WhatsApp
+  // marked our outbound message read). Distinct from adminReadAt below.
   readAt      DateTime? @map("read_at")
   failedAt    DateTime? @map("failed_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  // Item #12: inbound persistence extensions
+  // direction defaults to OUTBOUND so existing 17 staging rows (all outbound
+  // template sends) are auto-backfilled by the column DEFAULT.
+  direction        MessageDirection @default(OUTBOUND)
+  // Inbound text body (or quick-reply payload echo). Outbound rows leave NULL
+  // because their content is reconstituted from templateName + templateParams.
+  body             String?          @map("body") @db.Text
+  // Snapshot of sender phone for inbound rows where parentId may be NULL
+  // (unrecognised number) — preserves who messaged us regardless of match.
+  fromPhone        String?          @map("from_phone") @db.VarChar(20)
+  // Array of { url, contentType, s3Key? } objects (JSONB).
+  mediaUrls        Json?            @map("media_urls")
+  // Admin "marked-as-read" flag for the inbox unread badge. Distinct from
+  // protocol-level readAt (which only applies to outbound deliveries).
+  isRead           Boolean          @default(false) @map("is_read")
+  readByUserId     String?          @map("read_by_user_id")
+  // Renamed from proposed `readAt` because that name was already taken by
+  // the WhatsApp protocol read receipt (existing column). adminReadAt is
+  // when an admin user clicked "mark as read" on the inbound thread view.
+  adminReadAt      DateTime?        @map("admin_read_at")
+  // Self-FK: outbound replies link back to the inbound they answer (or
+  // inbound replies to a previous outbound) — supports thread/quote views.
+  replyToMessageId String?          @map("reply_to_message_id")
+
   // Relations
   tenant Tenant  @relation(fields: [tenantId], references: [id])
   parent Parent? @relation(fields: [parentId], references: [id])
+
+  // Item #12: new relations
+  readByUser User?             @relation("WhatsAppMessageReadBy", fields: [readByUserId], references: [id])
+  replyTo    WhatsAppMessage?  @relation("WhatsAppMessageReply", fields: [replyToMessageId], references: [id])
+  replies    WhatsAppMessage[] @relation("WhatsAppMessageReply")
 
   @@index([tenantId, parentId])
   @@index([tenantId, status])
   @@index([tenantId, contextType, contextId])
   @@index([wamid])
+  // Item #12: query patterns
+  @@index([tenantId, direction, isRead]) // admin unread badge
+  @@index([tenantId, parentId, createdAt]) // conversation thread view
+  @@index([tenantId, direction, createdAt]) // inbound timeline
   @@map("whatsapp_messages")
 }
 

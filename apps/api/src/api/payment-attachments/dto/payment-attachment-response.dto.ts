@@ -26,6 +26,7 @@ export interface PaymentAttachmentResponseDto {
   parent?: {
     id: string;
     firstName: string;
+    middle_name?: string | null;
     lastName: string;
   } | null;
   /** Populated on admin detail endpoint */
@@ -61,6 +62,7 @@ export interface PaymentAttachmentResponseDto {
     parent?: {
       id: string;
       firstName: string;
+      middle_name?: string | null;
       lastName: string;
     } | null;
   } | null;

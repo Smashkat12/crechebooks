@@ -4,6 +4,13 @@
  *
  * Reference: https://www.sars.gov.za/tax-rates/income-tax/rates-of-tax-for-individuals/
  * Tax Year: 1 March 2024 - 28 February 2025
+ *
+ * Bracket boundary fix (2026-04-28):
+ * TAX_BRACKETS_2025[0].maxIncomeCents was incorrectly set to 23740000 (R237,400).
+ * SARS official table has bracket 1 ceiling at R237,100 (23710000 cents) and
+ * bracket 2 floor at R237,101 (23710100 cents). This spec always reflected the
+ * correct values — the constants were wrong. Fixed in paye.constants.ts.
+ * Same drift was present in TAX_BRACKETS_2026 and is now also corrected.
  */
 import Decimal from 'decimal.js';
 import {

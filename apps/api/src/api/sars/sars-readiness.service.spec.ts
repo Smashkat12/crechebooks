@@ -5,6 +5,7 @@
  * a real database (PrismaService is fully mocked).
  */
 import { Test, TestingModule } from '@nestjs/testing';
+import { VatCategory } from '@prisma/client';
 import { SarsReadinessService } from './sars-readiness.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 
@@ -12,6 +13,7 @@ const TENANT = 'tenant-readiness-test-uuid';
 
 // Minimal Prisma mock — each test overrides the methods it needs
 const mockPrisma = {
+  tenant: { findUnique: jest.fn() },
   transaction: { count: jest.fn() },
   bankStatementMatch: { count: jest.fn() },
   staff: { findMany: jest.fn() },
@@ -25,7 +27,8 @@ describe('SarsReadinessService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    // Default: no blockers
+    // Default: no blockers, tenant with Cat A (most common default)
+    mockPrisma.tenant.findUnique.mockResolvedValue({ vatCategory: 'A' });
     mockPrisma.transaction.count.mockResolvedValue(0);
     mockPrisma.bankStatementMatch.count.mockResolvedValue(0);
     mockPrisma.staff.findMany.mockResolvedValue([]);
@@ -179,6 +182,162 @@ describe('SarsReadinessService', () => {
       period: expect.any(String),
       dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       daysRemaining: expect.any(Number),
+    });
+  });
+
+  // ─── vat201Window per category (VAT Act 89/1991 §27–28) ─────────────────
+
+  describe('vat201Window — Category A (bi-monthly, period ends even months)', () => {
+    // Cat A: Jan-Feb period → due Mar 25
+    it('returns Mar 25 for a ref date in Feb (Jan-Feb period)', () => {
+      const ref = new Date(2026, 1, 10); // Feb 10 2026
+      const w = service.vat201Window(ref, 'A' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 2, 25)); // Mar 25
+      expect(w!.period).toBe('2026-01/2026-02');
+    });
+
+    // Cat A: Mar-Apr period → due May 25
+    it('returns May 25 for a ref date in Apr (Mar-Apr period)', () => {
+      const ref = new Date(2026, 3, 1); // Apr 1 2026
+      const w = service.vat201Window(ref, 'A' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 4, 25)); // May 25
+      expect(w!.period).toBe('2026-03/2026-04');
+    });
+
+    // Cat A: Nov-Dec period → due Jan 25 next year
+    it('returns Jan 25 next year for a ref date after Nov 25 (Nov-Dec period wraps)', () => {
+      const ref = new Date(2026, 11, 1); // Dec 1 2026 — Nov period due was Dec 25, past; next is Jan 25 2027
+      const w = service.vat201Window(ref, 'A' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2027, 0, 25)); // Jan 25 2027
+      expect(w!.period).toBe('2026-11/2026-12');
+    });
+
+    // Cat A: after Mar 25, next due is May 25 (May-Jun period)
+    it('advances to next period when Mar 25 has passed (ref = Mar 26)', () => {
+      const ref = new Date(2026, 2, 26); // Mar 26 — Mar 25 is past
+      const w = service.vat201Window(ref, 'A' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 4, 25)); // May 25
+      expect(w!.period).toBe('2026-03/2026-04');
+    });
+  });
+
+  describe('vat201Window — Category B (bi-monthly, period ends odd months)', () => {
+    // Cat B: Dec-Jan period → due Feb 25
+    it('returns Feb 25 for a ref date in Jan (Dec-Jan period)', () => {
+      const ref = new Date(2026, 0, 10); // Jan 10 2026
+      const w = service.vat201Window(ref, 'B' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 1, 25)); // Feb 25
+    });
+
+    // Cat B: Feb-Mar period → due Apr 25
+    it('returns Apr 25 for a ref date in Mar (Feb-Mar period)', () => {
+      const ref = new Date(2026, 2, 1); // Mar 1 2026
+      const w = service.vat201Window(ref, 'B' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 3, 25)); // Apr 25
+      expect(w!.period).toBe('2026-02/2026-03');
+    });
+
+    // Cat B: Oct-Nov period → due Dec 25
+    it('returns Dec 25 for a ref date in Nov (Oct-Nov period)', () => {
+      const ref = new Date(2026, 10, 1); // Nov 1 2026
+      const w = service.vat201Window(ref, 'B' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 11, 25)); // Dec 25
+      expect(w!.period).toBe('2026-10/2026-11');
+    });
+  });
+
+  describe('vat201Window — Category C (monthly)', () => {
+    // Cat C: on Apr 10, prior month = Mar, due Apr 25
+    it('returns Apr 25 for Mar period when ref is Apr 10', () => {
+      const ref = new Date(2026, 3, 10); // Apr 10 2026
+      const w = service.vat201Window(ref, 'C' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 3, 25)); // Apr 25
+      expect(w!.period).toBe('2026-03');
+    });
+
+    // Cat C: on Apr 26 (25th passed), prior month = Apr, due May 25
+    it('advances to May 25 when Apr 25 has passed (ref = Apr 26)', () => {
+      const ref = new Date(2026, 3, 26); // Apr 26 2026
+      const w = service.vat201Window(ref, 'C' as VatCategory);
+      expect(w).not.toBeNull();
+      expect(w!.dueDate).toEqual(new Date(2026, 4, 25)); // May 25
+      expect(w!.period).toBe('2026-04');
+    });
+  });
+
+  describe('vat201Window — Categories D, E, F (manual cadence)', () => {
+    it('returns null for Category D (not auto-scheduled)', () => {
+      const ref = new Date(2026, 3, 1);
+      expect(service.vat201Window(ref, 'D' as VatCategory)).toBeNull();
+    });
+
+    it('returns null for Category E (not auto-scheduled)', () => {
+      const ref = new Date(2026, 3, 1);
+      expect(service.vat201Window(ref, 'E' as VatCategory)).toBeNull();
+    });
+
+    it('returns null for Category F (not auto-scheduled)', () => {
+      const ref = new Date(2026, 3, 1);
+      expect(service.vat201Window(ref, 'F' as VatCategory)).toBeNull();
+    });
+  });
+
+  describe('vat201Window — null vatCategory defaults to Cat A', () => {
+    it('defaults to Cat A behaviour when vatCategory is null', () => {
+      const ref = new Date(2026, 1, 10); // Feb 10
+      const wNull = service.vat201Window(ref, null);
+      const wA = service.vat201Window(ref, 'A' as VatCategory);
+      expect(wNull).not.toBeNull();
+      expect(wNull!.dueDate).toEqual(wA!.dueDate);
+      expect(wNull!.period).toBe(wA!.period);
+    });
+  });
+
+  describe('getReadiness — vatCategory integration', () => {
+    it('fetches tenant vatCategory and passes it to vat201 calculation', async () => {
+      // Mock tenant with Cat B
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        vatCategory: 'B' as VatCategory,
+      });
+      // On Apr 1, Cat B Mar-Apr (period end Mar) → Apr 25. EMP201 also Apr 7 (nearer).
+      const result = await service.getReadiness(TENANT, '2026-04');
+      // EMP201 Apr 7 is nearer than VAT201 Cat B Apr 25
+      expect(result.nextDeadline.type).toBe('EMP201');
+      // Tenant findUnique was called with the correct tenantId
+      expect(mockPrisma.tenant.findUnique).toHaveBeenCalledWith({
+        where: { id: TENANT },
+        select: { vatCategory: true },
+      });
+    });
+
+    it('excludes VAT201 from candidates when tenant is Cat D', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        vatCategory: 'D' as VatCategory,
+      });
+      // With no VAT201 candidate, only EMP201 and EMP501 compete
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(['EMP201', 'EMP501']).toContain(result.nextDeadline.type);
+    });
+
+    it('falls back to Cat A when tenant.vatCategory is null', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({ vatCategory: null });
+      const result = await service.getReadiness(TENANT, '2026-04');
+      // Cat A behaviour: next VAT201 is May 25 (far); EMP201 Apr 7 wins
+      expect(result.nextDeadline.type).toBe('EMP201');
+    });
+
+    it('falls back to Cat A when tenant record is not found', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue(null);
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.nextDeadline.type).toBe('EMP201');
     });
   });
 });

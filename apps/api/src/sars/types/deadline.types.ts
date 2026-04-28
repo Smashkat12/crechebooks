@@ -52,18 +52,60 @@ export interface DeadlineReminder {
 export const DEFAULT_REMINDER_DAYS = [30, 14, 7, 3, 1] as const;
 
 /**
+ * VAT201 filing frequency per SARS VAT category (VAT Act 89/1991 §27–28).
+ *
+ * Cat A/B → BIMONTHLY (bi-monthly, alternating pairs of calendar months).
+ * Cat C   → MONTHLY   (turnover ≥ R30M or SARS-directed).
+ * Cat D   → BIANNUAL  (farming / select industries).
+ * Cat E   → ANNUAL    (small-scale specific).
+ * Cat F   → QUADMONTHLY (4-monthly, small business).
+ *
+ * Returns null for unknown/unregistered — caller should treat as not applicable.
+ */
+export type Vat201FilingFrequency =
+  | 'BIMONTHLY'
+  | 'MONTHLY'
+  | 'BIANNUAL'
+  | 'ANNUAL'
+  | 'QUADMONTHLY';
+
+export function getVat201Frequency(
+  vatCategory: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | null | undefined,
+): Vat201FilingFrequency | null {
+  switch (vatCategory) {
+    case 'A':
+    case 'B':
+      return 'BIMONTHLY';
+    case 'C':
+      return 'MONTHLY';
+    case 'D':
+      return 'BIANNUAL';
+    case 'E':
+      return 'ANNUAL';
+    case 'F':
+      return 'QUADMONTHLY';
+    default:
+      return null;
+  }
+}
+
+/**
  * SARS deadline calendar
- * Defines when each return type is due
+ * Defines when each return type is due.
+ *
+ * Note: VAT201.frequency reflects the most common category (A/B = BIMONTHLY).
+ * For per-tenant frequency resolution use getVat201Frequency(tenant.vatCategory).
  */
 export const SARS_DEADLINE_CALENDAR = {
   /**
-   * VAT201: Due 25th of following month
-   * Returns filed monthly
+   * VAT201: Due 25th of month following bi-monthly period end (Cat A/B).
+   * Cat C is monthly; Cat D/E/F are rare manual cadences.
+   * Default shown here is BIMONTHLY (Cat A/B — most common).
    */
   VAT201: {
     dayOfMonth: 25,
-    monthOffset: 1, // Following month
-    frequency: 'MONTHLY' as const,
+    monthOffset: 1, // Following month after period end
+    frequency: 'BIMONTHLY' as const,
   },
   /**
    * EMP201: Due 7th of following month

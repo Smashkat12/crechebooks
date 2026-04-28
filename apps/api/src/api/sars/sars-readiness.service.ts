@@ -6,13 +6,16 @@
  *
  * Deadline constants:
  *  EMP201  — 7th of month following reporting month (EMP201 §3)
- *  VAT201  — Category A: 25th of month following bi-monthly period (VAT201 §6)
- *             eFiling effectively extends to last business day of that month.
- *             Defaulted to Category A; TODO: read tenant vat_category from settings
- *             when that field is available.
+ *  VAT201  — Due 25th of month following bi-monthly period end (VAT201 §6).
+ *             Cat A: periods end Feb/Apr/Jun/Aug/Oct/Dec, due next-month 25th.
+ *             Cat B: periods end Jan/Mar/May/Jul/Sep/Nov, due next-month 25th.
+ *             Cat C: monthly, due 25th of current month.
+ *             Cat D/E/F: rare manual cadences — window returns null (not auto-scheduled).
+ *             Reads tenant.vatCategory; defaults to Cat A when null (VAT Act 89/1991 §27).
  *  EMP501  — Interim May 31; annual Oct 31 (EMP501 §2)
  */
 import { Injectable, Logger } from '@nestjs/common';
+import { VatCategory } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import {
   SarsReadinessResponseDto,
@@ -49,7 +52,15 @@ export class SarsReadinessService {
     const ref = periodRef ? this.parseYearMonth(periodRef) : new Date();
     ref.setHours(0, 0, 0, 0);
 
-    const window = this.nextDeadlineWindow(ref);
+    // Fetch tenant vatCategory for VAT201 cadence selection (VAT Act 89/1991 §27).
+    // Defaults to Cat A when null (most common SARS default for newly-registered vendors).
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { vatCategory: true },
+    });
+    const vatCategory: VatCategory | null = tenant?.vatCategory ?? null;
+
+    const window = this.nextDeadlineWindow(ref, vatCategory);
     this.logger.debug(
       `Readiness check: tenant=${tenantId} type=${window.type} due=${window.dueDate.toISOString()}`,
     );
@@ -160,13 +171,20 @@ export class SarsReadinessService {
   /**
    * Return the soonest upcoming deadline window relative to `ref`.
    * Evaluates EMP201 and VAT201 (and EMP501 bi-annually) and picks the nearest.
+   * VAT201 is omitted from candidates when vatCategory is D/E/F (manual cadence).
    */
-  private nextDeadlineWindow(ref: Date): DeadlineWindow {
+  private nextDeadlineWindow(
+    ref: Date,
+    vatCategory: VatCategory | null,
+  ): DeadlineWindow {
+    const vat201 = this.vat201Window(ref, vatCategory);
     const candidates: DeadlineWindow[] = [
       this.emp201Window(ref),
-      this.vat201Window(ref),
       this.emp501Window(ref),
     ];
+    if (vat201 !== null) {
+      candidates.push(vat201);
+    }
 
     // Sort by due date ascending and return nearest
     candidates.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
@@ -207,20 +225,73 @@ export class SarsReadinessService {
   }
 
   /**
-   * VAT201 Category A: bi-monthly periods ending Feb/Apr/Jun/Aug/Oct/Dec.
-   * Due 25th of the month following the two-month period end.
-   * e.g. Mar+Apr period → due May 25.
-   * TODO: if tenant has Category B/C settings, adjust period end months.
+   * VAT201 window calculation per tenant VAT category (VAT Act 89/1991 §27–28).
+   *
+   * Cat A (default): bi-monthly, periods end Feb/Apr/Jun/Aug/Oct/Dec.
+   *   e.g. Jan-Feb period → due Mar 25; Mar-Apr period → due May 25.
+   * Cat B: bi-monthly, periods end Jan/Mar/May/Jul/Sep/Nov.
+   *   e.g. Dec-Jan period → due Feb 25; Feb-Mar period → due Apr 25.
+   * Cat C: monthly. Period = prior calendar month. Due 25th of current month.
+   *   e.g. on any day in Apr → prior period = Mar, due Apr 25.
+   * Cat D/E/F: rare manual cadences — returns null (not auto-scheduled).
+   *
+   * Defaults to Cat A when vatCategory is null (SARS default for new registrants).
+   *
+   * @returns DeadlineWindow or null for Cat D/E/F manual-filing categories.
    */
-  private vat201Window(ref: Date): DeadlineWindow {
-    // Category A period-end months (0-indexed): Jan(0), Mar(2), May(4), Jul(6), Sep(8), Nov(10)
-    // Actually periods are Jan-Feb, Mar-Apr, May-Jun, Jul-Aug, Sep-Oct, Nov-Dec
-    // Period ends: Feb(1), Apr(3), Jun(5), Aug(7), Oct(9), Dec(11)
-    // Due: 25th of Mar(2), May(4), Jul(6), Sep(8), Nov(10), Jan(0 of next year)
+  vat201Window(
+    ref: Date,
+    vatCategory: VatCategory | null,
+  ): DeadlineWindow | null {
+    const effective = vatCategory ?? 'A'; // SARS default is Cat A
 
-    const periodEndMonths = [1, 3, 5, 7, 9, 11]; // Feb, Apr, Jun, Aug, Oct, Dec
+    // ── Cat D / E / F: manual cadence — not auto-scheduled ──────────────────
+    if (effective === 'D' || effective === 'E' || effective === 'F') {
+      return null;
+    }
 
-    // Find the next due date (25th of month after periodEndMonth)
+    // ── Cat C: monthly, due 25th of current month for prior month ────────────
+    if (effective === 'C') {
+      const y = ref.getFullYear();
+      const m = ref.getMonth(); // 0-indexed current month
+
+      // Due date: 25th of current month (covers prior month)
+      let dueDate = new Date(y, m, 25);
+      if (dueDate <= ref) {
+        // 25th already passed — next due is 25th of next month
+        dueDate = new Date(y, m + 1, 25);
+      }
+
+      // Reporting period: the month before the due date
+      const repMonth = new Date(
+        dueDate.getFullYear(),
+        dueDate.getMonth() - 1,
+        1,
+      );
+      const reportingStart = new Date(
+        repMonth.getFullYear(),
+        repMonth.getMonth(),
+        1,
+      );
+      const reportingEnd = new Date(
+        repMonth.getFullYear(),
+        repMonth.getMonth() + 1,
+        0,
+      );
+      const period = this.formatYearMonth(repMonth);
+      return { type: 'VAT201', period, dueDate, reportingStart, reportingEnd };
+    }
+
+    // ── Cat A / B: bi-monthly ────────────────────────────────────────────────
+    // Cat A: period-end months = Feb(1), Apr(3), Jun(5), Aug(7), Oct(9), Dec(11)
+    //        due dates          = Mar 25, May 25, Jul 25, Sep 25, Nov 25, Jan 25
+    // Cat B: period-end months = Jan(0), Mar(2), May(4), Jul(6), Sep(8), Nov(10)
+    //        due dates          = Feb 25, Apr 25, Jun 25, Aug 25, Oct 25, Dec 25
+    const periodEndMonths =
+      effective === 'A'
+        ? [1, 3, 5, 7, 9, 11] // Feb, Apr, Jun, Aug, Oct, Dec
+        : [0, 2, 4, 6, 8, 10]; // Jan, Mar, May, Jul, Sep, Nov
+
     const y = ref.getFullYear();
     let dueDate: Date | null = null;
     let periodEndMonth = -1;
@@ -234,18 +305,26 @@ export class SarsReadinessService {
       }
     }
 
-    // If none found this year, wrap to first period of next year (Jan 25 due → Nov-Dec period)
+    // Wrap to first period of next year if none found this year
     if (!dueDate) {
-      dueDate = new Date(y + 1, 0, 25); // Jan 25 of next year
-      periodEndMonth = 11; // December
+      // Cat A: Dec period → Jan 25 next year. Cat B: Nov period → Dec 25 this year
+      // (Dec 25 next year's first would be: Cat B Jan → Feb 25 next year)
+      // The last entry in periodEndMonths wraps via pem+1 → next year for Cat A (Dec→Jan)
+      // For Cat B the last entry is Nov(10) → Dec 25 same year, which won't be missed
+      // unless ref is already past Dec 25. Handle generically:
+      const firstPem = periodEndMonths[0];
+      dueDate = new Date(y + 1, firstPem + 1, 25);
+      periodEndMonth = firstPem;
     }
 
     const periodEndYear =
-      periodEndMonth === 11 && dueDate.getFullYear() === y + 1
-        ? y
+      dueDate.getFullYear() === y + 1 &&
+      periodEndMonths[periodEndMonths.length - 1] === periodEndMonth
+        ? y // last period of year, due date rolled to next year (Cat A Dec→Jan)
         : dueDate.getFullYear();
+
     const reportingEnd = new Date(periodEndYear, periodEndMonth + 1, 0); // last day of period-end month
-    const reportingStart = new Date(periodEndYear, periodEndMonth - 1, 1); // first day, two months back
+    const reportingStart = new Date(periodEndYear, periodEndMonth - 1, 1); // first of two-months-back
 
     const startStr = this.formatYearMonth(reportingStart);
     const endStr = this.formatYearMonth(reportingEnd);

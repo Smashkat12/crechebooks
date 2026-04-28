@@ -11,8 +11,10 @@ export type {
   DeadlineReminderPrefs,
   DeadlineReminder,
   SarsDeadlineCheckJobData,
+  Vat201FilingFrequency,
 } from './types/deadline.types';
 export {
   DEFAULT_REMINDER_DAYS,
   SARS_DEADLINE_CALENDAR,
+  getVat201Frequency,
 } from './types/deadline.types';

@@ -14,6 +14,7 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { FeeStructureRepository } from '../../../src/database/repositories/fee-structure.repository';
 import { EnrollmentRepository } from '../../../src/database/repositories/enrollment.repository';
 import { EnrollmentService } from '../../../src/database/services/enrollment.service';
+import { InvoiceGenerationService } from '../../../src/database/services/invoice-generation.service';
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
 import {
   UserRole,
@@ -183,6 +184,13 @@ describe('ChildController', () => {
               },
               invoice: null,
             }),
+          },
+        },
+        {
+          provide: InvoiceGenerationService,
+          useValue: {
+            generateMonthlyInvoices: jest.fn(),
+            generateInvoiceForChild: jest.fn(),
           },
         },
         {

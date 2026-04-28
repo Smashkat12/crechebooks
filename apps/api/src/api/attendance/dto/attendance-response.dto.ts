@@ -42,7 +42,13 @@ export class AttendanceSummaryDto {
   lateCount: number;
   excusedCount: number;
   earlyPickupCount: number;
+  /** Children with no attendance_records row for today */
   unmarkedCount: number;
+  /**
+   * Subset of unmarkedCount: unmarked children who have an active parent
+   * pre-report for today. These appear in the Today tile as "REPORTED_ABSENT".
+   */
+  reportedAbsentCount: number;
 }
 
 export class ClassGroupDailyReportDto {
@@ -63,4 +69,26 @@ export class ParentAttendanceSummaryDto {
   lateDays: number;
   excusedDays: number;
   totalSchoolDays: number;
+}
+
+/**
+ * Slim shape for a parent absence pre-report, embedded in AdminDayViewDto.
+ */
+export class ParentPreReportDto {
+  reportId: string;
+  childId: string;
+  parentId: string;
+  reason: string | null;
+  reportedAt: string; // ISO 8601
+}
+
+/**
+ * Admin day-view response: full attendance records + any parent pre-reports for
+ * children who do not yet have an attendance_records row on that date.
+ * parentPreReports lists children not yet marked whose parent has sent a report.
+ */
+export class AdminDayViewDto {
+  date: string; // YYYY-MM-DD
+  records: AttendanceResponseDto[];
+  parentPreReports: ParentPreReportDto[]; // pre-reports for still-unmarked children
 }

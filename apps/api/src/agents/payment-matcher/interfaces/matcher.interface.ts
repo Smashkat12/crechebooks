@@ -80,6 +80,7 @@ export interface InvoiceCandidate {
     parentId: string;
     parent: {
       firstName: string;
+      middleName?: string | null;
       lastName: string;
     };
     child: {

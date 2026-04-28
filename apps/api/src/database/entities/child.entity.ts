@@ -14,6 +14,7 @@ export interface IChild {
   tenantId: string;
   parentId: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   dateOfBirth: Date;
   gender: Gender | null;

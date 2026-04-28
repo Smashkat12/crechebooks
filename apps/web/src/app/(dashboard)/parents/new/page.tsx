@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ParentForm } from '@/components/parents';
 import { useCreateParent } from '@/hooks/use-parents';
 import { useToast } from '@/hooks/use-toast';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 export default function NewParentPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function NewParentPage() {
 
   const handleSave = async (data: {
     firstName: string;
+    middleName?: string | null;
     lastName: string;
     email: string;
     phone?: string;
@@ -29,7 +31,7 @@ export default function NewParentPage() {
       await createParentMutation.mutateAsync(data);
       toast({
         title: 'Parent Created',
-        description: `${data.firstName} ${data.lastName} has been added successfully.`,
+        description: `${formatFullName(data)} has been added successfully.`,
       });
       router.push('/parents');
     } catch (error) {

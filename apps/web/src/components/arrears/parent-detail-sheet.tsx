@@ -21,6 +21,7 @@ import { useParent } from "@/hooks/use-parents";
 import { useInvoicesList } from "@/hooks/use-invoices";
 import { usePaymentsList } from "@/hooks/use-payments";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatFullName } from "@/lib/utils/name-formatter";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ParentDetailSheetProps {
@@ -82,7 +83,7 @@ export function ParentDetailSheet({
           ) : parent ? (
             <div>
               <h3 className="text-sm font-medium text-muted-foreground">Parent</h3>
-              <p className="text-lg font-semibold">{parent.firstName} {parent.lastName}</p>
+              <p className="text-lg font-semibold">{formatFullName(parent)}</p>
               <p className="text-sm text-muted-foreground">{parent.email}</p>
               {parent.phone && (
                 <p className="text-sm text-muted-foreground">{parent.phone}</p>

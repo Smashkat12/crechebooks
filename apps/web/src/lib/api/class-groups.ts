@@ -19,6 +19,7 @@ export interface ClassGroup {
 export interface ClassGroupChild {
   id: string;
   first_name: string;
+  middle_name?: string | null;
   last_name: string;
   date_of_birth: string | null;
   parent: {

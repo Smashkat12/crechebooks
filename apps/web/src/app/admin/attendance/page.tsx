@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/table';
 import { CalendarDays, CheckCircle2, Users, Search, BellOff } from 'lucide-react';
 import type { AttendanceStatus } from '@/lib/api/attendance';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 // ─── Status config ─────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ function todayIso(): string {
 interface ChildRow {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   classGroupName?: string;
 }
@@ -92,6 +94,7 @@ export default function AttendanceMarkingPage() {
       return (allChildrenResp?.data ?? []).map((c) => ({
         id: c.id,
         firstName: c.first_name,
+        middleName: c.middle_name,
         lastName: c.last_name,
       }));
     }
@@ -100,6 +103,7 @@ export default function AttendanceMarkingPage() {
     return (groupChildren ?? []).map((c) => ({
       id: c.id,
       firstName: c.first_name,
+      middleName: c.middle_name,
       lastName: c.last_name,
       classGroupName: groupName,
     }));
@@ -136,7 +140,7 @@ export default function AttendanceMarkingPage() {
 
   const displayedChildren = useMemo(() => {
     return childRows.filter((c) => {
-      const name = `${c.firstName} ${c.lastName}`.toLowerCase();
+      const name = formatFullName(c).toLowerCase();
       if (search && !name.includes(search.toLowerCase())) return false;
       if (showUnmarkedOnly && attendanceMap.has(c.id)) return false;
       return true;
@@ -360,7 +364,7 @@ export default function AttendanceMarkingPage() {
                           href={`/admin/children/${child.id}/attendance`}
                           className="font-medium hover:underline"
                         >
-                          {child.firstName} {child.lastName}
+                          {formatFullName(child)}
                         </Link>
                         {preReport && (
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">

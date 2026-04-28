@@ -1,88 +1,89 @@
 {
+  "_note": "Naming convention: file uses 'starting year' (2025 = March 2025 start). SARS year by end-year convention would name this sars_tables_2026.json. Kept as sars_tables_2025.json per existing codebase convention (starting year). Source of truth: apps/api/src/database/constants/paye.constants.ts (TAX_BRACKETS_2026 / REBATES_2026 / MEDICAL_CREDITS_2026 / TAX_THRESHOLDS_2026). Values synced 2026-04-28 per commit 4ad18e0.",
   "version": "2025",
   "effectiveFrom": "2025-03-01",
   "effectiveTo": "2026-02-28",
-  "source": "SARS Tax Tables 2025",
+  "source": "SARS Tax Tables 2025/2026 — synced from production paye.constants.ts TAX_BRACKETS_2026",
   "paye": {
-    "taxYear": "2025",
+    "taxYear": "2025/2026",
     "description": "Individual tax brackets - values in CENTS",
     "taxBrackets": [
       {
         "bracketNumber": 1,
         "fromCents": 0,
-        "toCents": 23740000,
+        "toCents": 23710000,
         "rate": 0.18,
         "baseTaxCents": 0
       },
       {
         "bracketNumber": 2,
-        "fromCents": 23740001,
-        "toCents": 37080000,
+        "fromCents": 23710100,
+        "toCents": 37050000,
         "rate": 0.26,
-        "baseTaxCents": 427320
+        "baseTaxCents": 4267800
       },
       {
         "bracketNumber": 3,
-        "fromCents": 37080001,
-        "toCents": 51210000,
+        "fromCents": 37050100,
+        "toCents": 51280000,
         "rate": 0.31,
-        "baseTaxCents": 773760
+        "baseTaxCents": 7736200
       },
       {
         "bracketNumber": 4,
-        "fromCents": 51210001,
-        "toCents": 67340000,
+        "fromCents": 51280100,
+        "toCents": 67300000,
         "rate": 0.36,
-        "baseTaxCents": 1211100
+        "baseTaxCents": 12147500
       },
       {
         "bracketNumber": 5,
-        "fromCents": 67340001,
-        "toCents": 85710000,
+        "fromCents": 67300100,
+        "toCents": 85790000,
         "rate": 0.39,
-        "baseTaxCents": 1791780
+        "baseTaxCents": 17914700
       },
       {
         "bracketNumber": 6,
-        "fromCents": 85710001,
-        "toCents": 181270000,
+        "fromCents": 85790100,
+        "toCents": 181700000,
         "rate": 0.41,
-        "baseTaxCents": 2509050
+        "baseTaxCents": 25125800
       },
       {
         "bracketNumber": 7,
-        "fromCents": 181270001,
-        "toCents": 999999999999,
+        "fromCents": 181700100,
+        "toCents": null,
         "rate": 0.45,
-        "baseTaxCents": 6425670
+        "baseTaxCents": 64448900
       }
     ],
     "rebates": {
       "description": "Tax rebates in CENTS - deducted from calculated tax",
       "primary": {
-        "amountCents": 1760000,
+        "amountCents": 1723500,
         "ageRequirement": null
       },
       "secondary": {
-        "amountCents": 975000,
+        "amountCents": 944400,
         "ageRequirement": 65
       },
       "tertiary": {
-        "amountCents": 325500,
+        "amountCents": 314500,
         "ageRequirement": 75
       }
     },
     "taxThresholds": {
       "description": "Annual income below which no tax is payable (in CENTS)",
-      "under65": 9540000,
-      "age65to74": 14795800,
-      "age75plus": 16531400
+      "under65": 9575000,
+      "age65to74": 14821700,
+      "age75plus": 16568900
     },
     "medicalTaxCredits": {
       "description": "Monthly medical aid tax credits in CENTS",
       "mainMember": 36400,
       "firstDependant": 36400,
-      "additionalDependant": 24500
+      "additionalDependant": 24600
     }
   },
   "uif": {

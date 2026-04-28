@@ -482,6 +482,8 @@ export class AttendanceService {
 
   // ------------------------------------------------------------------
   // CLASS GROUP DAILY REPORT
+  // Returns status counts, per-child records, and parent pre-reports for
+  // children in this group who have NOT yet been marked on this date.
   // ------------------------------------------------------------------
   async classGroupDailyReport(
     tenantId: string,
@@ -498,16 +500,62 @@ export class AttendanceService {
 
     const dateVal = parseDate(dateStr);
 
-    const records = await this.prisma.attendanceRecord.findMany({
-      where: { tenantId, classGroupId, date: dateVal },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        child: { select: { firstName: true, lastName: true } },
-        classGroup: { select: { name: true } },
-      },
-    });
+    // Fetch attendance records and the group's current active children in parallel.
+    // We need the child list to know which childIds to query for pre-reports and
+    // to restrict pre-reports to THIS group only (prevent leaking other groups).
+    const [records, groupChildren] = await Promise.all([
+      this.prisma.attendanceRecord.findMany({
+        where: { tenantId, classGroupId, date: dateVal },
+        orderBy: { createdAt: 'asc' },
+        include: {
+          child: { select: { firstName: true, lastName: true } },
+          classGroup: { select: { name: true } },
+        },
+      }),
+      this.prisma.child.findMany({
+        where: { tenantId, classGroupId, deletedAt: null, isActive: true },
+        select: { id: true },
+      }),
+    ]);
 
     const dtos = records.map(toDto);
+    const markedChildIds = new Set(dtos.map((r) => r.childId));
+    const groupChildIds = groupChildren.map((c) => c.id);
+
+    // Only fetch pre-reports for children that:
+    //   (a) belong to this class group (groupChildIds), and
+    //   (b) have not yet been marked today (not in markedChildIds).
+    // This ensures we never leak pre-reports for children in other groups.
+    const unmarkedGroupChildIds = groupChildIds.filter(
+      (id) => !markedChildIds.has(id),
+    );
+
+    let parentPreReports: ParentPreReportDto[] = [];
+    if (unmarkedGroupChildIds.length > 0) {
+      const rawReports = await this.prisma.parentAbsenceReport.findMany({
+        where: {
+          tenantId,
+          childId: { in: unmarkedGroupChildIds },
+          date: dateVal,
+          cancelledAt: null,
+        },
+        select: {
+          id: true,
+          childId: true,
+          parentId: true,
+          reason: true,
+          reportedAt: true,
+        },
+      });
+
+      parentPreReports = rawReports.map((pr) => ({
+        reportId: pr.id,
+        childId: pr.childId,
+        parentId: pr.parentId,
+        reason: pr.reason,
+        reportedAt: pr.reportedAt.toISOString(),
+      }));
+    }
 
     return {
       classGroupId,
@@ -519,6 +567,7 @@ export class AttendanceService {
       excusedCount: dtos.filter((r) => r.status === 'EXCUSED').length,
       earlyPickupCount: dtos.filter((r) => r.status === 'EARLY_PICKUP').length,
       records: dtos,
+      parentPreReports,
     };
   }
 

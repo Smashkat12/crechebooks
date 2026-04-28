@@ -61,6 +61,12 @@ export class ClassGroupDailyReportDto {
   excusedCount: number;
   earlyPickupCount: number;
   records: AttendanceResponseDto[];
+  /**
+   * Active parent pre-reports for children in this class group that have NOT
+   * yet been marked by admin on this date. Teachers see "Lebo: REPORTED ABSENT"
+   * rather than just "Lebo: unmarked".
+   */
+  parentPreReports: ParentPreReportDto[];
 }
 
 export class ParentAttendanceSummaryDto {

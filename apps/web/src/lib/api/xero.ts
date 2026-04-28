@@ -5,8 +5,11 @@
  * Client functions for Xero integration API endpoints.
  */
 
+import type { XeroSyncStatusResponse } from '@crechebooks/types';
 import { apiClient } from './client';
 import { endpoints } from './endpoints';
+
+export type { XeroSyncStatusResponse } from '@crechebooks/types';
 
 export interface XeroConnectionStatusResponse {
   isConnected: boolean;
@@ -56,6 +59,16 @@ async function getStatus(): Promise<XeroConnectionStatus> {
     lastSyncStatus: data.lastSyncStatus,
     errorMessage: data.errorMessage,
   };
+}
+
+/**
+ * Get Xero sync status (job tracking, schedule, token info)
+ */
+async function getSyncStatus(): Promise<XeroSyncStatusResponse> {
+  const response = await apiClient.get<XeroSyncStatusResponse>(
+    endpoints.xero.syncStatus
+  );
+  return response.data;
 }
 
 /**
@@ -163,6 +176,7 @@ async function disconnectBankAccount(connectionId: string): Promise<{ success: b
 
 export const xeroApi = {
   getStatus,
+  getSyncStatus,
   syncNow,
   connect,
   disconnect,

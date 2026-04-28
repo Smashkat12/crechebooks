@@ -149,7 +149,25 @@ export class SarsReadinessService {
       }
     }
 
-    // TODO: blocker — missing tax certificates (IRP5 / IT3a) for EMP501
+    // ── Blocker 5 (EMP501 only): active staff not linked to SimplePay ────────
+    // EMP501 generation (EMP501 §4) iterates staff via simplePayMapping to pull
+    // IRP5 data from SimplePay. Any active staff member without a mapping will
+    // be silently skipped, producing an incomplete reconciliation file.
+    // Surface as warning so the user can sync missing staff before download.
+    if (window.type === 'EMP501') {
+      const unlinkedCount = await this.countStaffNotLinkedToSimplePay(tenantId);
+      if (unlinkedCount > 0) {
+        blockers.push({
+          severity: 'warning',
+          label: `${unlinkedCount} staff member${unlinkedCount === 1 ? '' : 's'} not linked to SimplePay`,
+          description:
+            'Active employees without a SimplePay mapping will be excluded from the EMP501 IRP5 data. Sync them in Staff settings before downloading the reconciliation file.',
+          deepLinkUrl: '/staff',
+          count: unlinkedCount,
+        });
+      }
+    }
+
     // TODO: blocker — undeclared income (transactions not linked to an invoice)
 
     const ready = !blockers.some((b) => b.severity === 'critical');
@@ -453,6 +471,24 @@ export class SarsReadinessService {
     ]);
 
     return activeStaff.filter((s) => !coveredIds.has(s.id)).length;
+  }
+
+  /**
+   * For EMP501: count active staff with no simplePayMapping row (EMP501 §4).
+   * Staff without a mapping are skipped by SarsFileGeneratorService.generateEmp501Csv()
+   * and will be absent from the IRP5 section of the reconciliation file.
+   */
+  private async countStaffNotLinkedToSimplePay(
+    tenantId: string,
+  ): Promise<number> {
+    return this.prisma.staff.count({
+      where: {
+        tenantId,
+        isActive: true,
+        deletedAt: null,
+        simplePayMapping: null,
+      },
+    });
   }
 
   /**

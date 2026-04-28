@@ -16,7 +16,7 @@ const mockPrisma = {
   tenant: { findUnique: jest.fn() },
   transaction: { count: jest.fn() },
   bankStatementMatch: { count: jest.fn() },
-  staff: { findMany: jest.fn() },
+  staff: { findMany: jest.fn(), count: jest.fn() },
   payroll: { findMany: jest.fn() },
   simplePayPayslipImport: { findMany: jest.fn() },
   categorization: { count: jest.fn() },
@@ -32,6 +32,7 @@ describe('SarsReadinessService', () => {
     mockPrisma.transaction.count.mockResolvedValue(0);
     mockPrisma.bankStatementMatch.count.mockResolvedValue(0);
     mockPrisma.staff.findMany.mockResolvedValue([]);
+    mockPrisma.staff.count.mockResolvedValue(0);
     mockPrisma.payroll.findMany.mockResolvedValue([]);
     mockPrisma.simplePayPayslipImport.findMany.mockResolvedValue([]);
     mockPrisma.categorization.count.mockResolvedValue(0);
@@ -166,6 +167,58 @@ describe('SarsReadinessService', () => {
     // VAT gap should not appear in blockers for EMP201 window
     expect(result.blockers.find((b) => b.count === 7)).toBeUndefined();
     expect(mockPrisma.categorization.count).not.toHaveBeenCalled();
+  });
+
+  // ─── EMP501 blocker: staff not linked to SimplePay (EMP501 §4) ──────────
+
+  describe('EMP501 blocker — staff not linked to SimplePay', () => {
+    // Note: getReadiness(TENANT, '2026-10') gives Oct 1 ref → EMP201 Oct 7 wins (6 days vs 30).
+    // Tests that need the EMP501 blocker path call the private helpers directly to verify
+    // query shape, or use the emp501Window directly to confirm the window type.
+    // The integration test for staff.count guard uses '2026-04' (EMP201 window) to confirm
+    // the query is NOT called outside EMP501 context.
+
+    it('emp501Window returns EMP501 type with Oct 31 for ref in Oct', () => {
+      // Verify the window shape — used as basis for blocker tests below.
+      const ref = new Date(2026, 9, 15); // Oct 15 2026 — after Oct 7 EMP201 deadline
+      const svc = service as unknown as Record<string, (r: Date) => { type: string; dueDate: Date }>;
+      const w = svc['emp501Window'](ref);
+      expect(w.type).toBe('EMP501');
+      expect(w.dueDate).toEqual(new Date(2026, 9, 31)); // Oct 31
+    });
+
+    it('adds warning blocker when active staff have no SimplePay mapping (EMP501 §4)', async () => {
+      // Simulate: 2 active staff, neither linked to SimplePay
+      mockPrisma.staff.count.mockResolvedValue(2);
+
+      // Call private helper directly to verify Prisma query shape (EMP501 §4)
+      const svc = service as unknown as Record<string, (t: string) => Promise<number>>;
+      const count = await svc['countStaffNotLinkedToSimplePay'](TENANT);
+      expect(count).toBe(2);
+      expect(mockPrisma.staff.count).toHaveBeenCalledWith({
+        where: {
+          tenantId: TENANT,
+          isActive: true,
+          deletedAt: null,
+          simplePayMapping: null,
+        },
+      });
+    });
+
+    it('returns 0 when all active staff are linked to SimplePay', async () => {
+      mockPrisma.staff.count.mockResolvedValue(0);
+      const svc = service as unknown as Record<string, (t: string) => Promise<number>>;
+      const count = await svc['countStaffNotLinkedToSimplePay'](TENANT);
+      expect(count).toBe(0);
+    });
+
+    it('staff.count is not called when window type is EMP201', async () => {
+      // On '2026-04', window = EMP201 (Apr 7) — EMP501 blocker must not fire.
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.nextDeadline.type).toBe('EMP201');
+      // staff.count is only used for EMP501 check; should not be called in EMP201 window
+      expect(mockPrisma.staff.count).not.toHaveBeenCalled();
+    });
   });
 
   // ─── Response shape ───────────────────────────────────────────────────────

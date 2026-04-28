@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsString,
+  IsOptional,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { SanitizeName } from '../../../common/utils/sanitize.utils';
+import { normalizeName } from '../../../common/utils/name-normalizer';
 
 /**
  * Invoice item in dashboard response
@@ -657,6 +664,18 @@ export class UpdateParentProfileDto {
   @IsOptional()
   @IsString()
   firstName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Middle name. Max 100 chars. Pass null to clear.',
+    maxLength: 100,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
+  middleName?: string | null;
 
   @ApiPropertyOptional({ description: 'Last name' })
   @IsOptional()

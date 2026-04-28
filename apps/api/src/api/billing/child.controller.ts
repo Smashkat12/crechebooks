@@ -212,6 +212,7 @@ export class ChildController {
         child: {
           id: child.id,
           first_name: child.firstName,
+          middle_name: child.middleName ?? null,
           last_name: child.lastName,
         },
         enrollment: {
@@ -357,6 +358,7 @@ export class ChildController {
         child: {
           id: child.id,
           first_name: child.firstName,
+          middle_name: child.middleName ?? null,
           last_name: child.lastName,
         },
         enrollment: {
@@ -595,6 +597,7 @@ export class ChildController {
       return {
         id: child.id,
         first_name: child.firstName,
+        middle_name: child.middleName ?? null,
         last_name: child.lastName,
         date_of_birth: child.dateOfBirth.toISOString().split('T')[0],
         parent,
@@ -704,6 +707,7 @@ export class ChildController {
       data: {
         id: child.id,
         first_name: child.firstName,
+        middle_name: child.middleName ?? null,
         last_name: child.lastName,
         date_of_birth: child.dateOfBirth.toISOString().split('T')[0],
         gender: child.gender as

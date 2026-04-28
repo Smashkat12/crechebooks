@@ -318,7 +318,15 @@ export class AuditLogService {
   }
 
   /**
-   * Export audit logs to CSV or JSON format
+   * Export audit logs to CSV or JSON format.
+   *
+   * CSV path: fetches in cursor-based batches of 500 rows so no more than
+   * 500 Prisma model objects are in memory at once. Row objects are released
+   * after each batch is serialised to string.
+   *
+   * JSON path: still fetches all matching rows — callers that need JSON for
+   * large datasets should use a streaming approach instead.
+   *
    * @param tenantId - Tenant ID for isolation
    * @param options - Query options for filtering
    * @param format - Export format (csv or json)
@@ -329,20 +337,33 @@ export class AuditLogService {
     options: AuditLogQueryOptions,
     format: ExportFormat = 'csv',
   ): Promise<Buffer> {
-    // For exports, remove pagination limits but enforce date range
-    const exportOptions = {
-      ...options,
-      offset: 0,
-      limit: 10000, // Max records for export
-    };
-
-    const { data } = await this.findAll(tenantId, exportOptions);
-
     if (format === 'json') {
+      // JSON: fetch all rows (bounded by caller — acceptable for small exports)
+      const exportOptions = { ...options, offset: 0, limit: 10000 };
+      const { data } = await this.findAll(tenantId, exportOptions);
       return Buffer.from(JSON.stringify(data, null, 2));
     }
 
-    // CSV format
+    // CSV path: cursor-based pagination, at most BATCH_SIZE rows in memory at once
+    const BATCH_SIZE = 500;
+
+    const where: import('@prisma/client').Prisma.AuditLogWhereInput = {
+      tenantId,
+      ...(options.startDate && { createdAt: { gte: options.startDate } }),
+      ...(options.endDate && {
+        createdAt: {
+          ...(options.startDate ? { gte: options.startDate } : {}),
+          lte: options.endDate,
+        },
+      }),
+      ...(options.entityType && { entityType: options.entityType }),
+      ...(options.action && {
+        action: options.action as import('@prisma/client').AuditAction,
+      }),
+      ...(options.userId && { userId: options.userId }),
+      ...(options.entityId && { entityId: options.entityId }),
+    };
+
     const headers = [
       'id',
       'createdAt',
@@ -355,23 +376,50 @@ export class AuditLogService {
       'ipAddress',
     ];
 
-    const rows = data.map((log) => [
-      log.id,
-      log.createdAt.toISOString(),
-      log.entityType,
-      log.entityId,
-      log.action,
-      log.userId || '',
-      log.agentId || '',
-      (log.changeSummary || '').replace(/"/g, '""'),
-      log.ipAddress || '',
-    ]);
+    const csvLines: string[] = [headers.join(',')];
+    let cursor: string | undefined;
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-    ].join('\n');
+    for (;;) {
+      const batch = await this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        take: BATCH_SIZE,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        select: {
+          id: true,
+          createdAt: true,
+          entityType: true,
+          entityId: true,
+          action: true,
+          userId: true,
+          agentId: true,
+          changeSummary: true,
+          ipAddress: true,
+        },
+      });
 
-    return Buffer.from(csvContent);
+      if (batch.length === 0) break;
+
+      for (const log of batch) {
+        const row = [
+          log.id,
+          log.createdAt.toISOString(),
+          log.entityType,
+          log.entityId,
+          log.action,
+          log.userId || '',
+          log.agentId || '',
+          (log.changeSummary || '').replace(/"/g, '""'),
+          log.ipAddress || '',
+        ];
+        csvLines.push(row.map((cell) => `"${cell}"`).join(','));
+      }
+
+      cursor = batch[batch.length - 1].id;
+
+      if (batch.length < BATCH_SIZE) break;
+    }
+
+    return Buffer.from(csvLines.join('\n'));
   }
 }

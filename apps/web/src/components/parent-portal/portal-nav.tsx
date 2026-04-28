@@ -8,6 +8,7 @@ import {
   Receipt,
   CreditCard,
   User,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,11 @@ const navItems: NavItem[] = [
     href: '/parent/payments',
     label: 'Payments',
     icon: CreditCard,
+  },
+  {
+    href: '/parent/messages',
+    label: 'Messages',
+    icon: MessageSquare,
   },
   {
     href: '/parent/profile',

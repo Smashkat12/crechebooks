@@ -396,18 +396,18 @@ export class BankFeedService {
         );
 
         // Mark connection as error state
+        const errorMessage = this.extractXeroErrorMessage(error);
         await this.prisma.bankConnection.update({
           where: { id: connection.id },
           data: {
             status: BankConnectionStatus.ERROR,
-            errorMessage:
-              error instanceof Error ? error.message : 'Sync failed',
+            errorMessage,
           },
         });
 
         result.errors.push({
           transactionId: `connection:${connection.id}`,
-          error: error instanceof Error ? error.message : 'Sync failed',
+          error: errorMessage,
           code: 'CONNECTION_ERROR',
         });
       }
@@ -1337,6 +1337,71 @@ export class BankFeedService {
     });
 
     return 'created';
+  }
+
+  /**
+   * Extract a human-readable error message from any thrown value.
+   *
+   * The xero-node SDK rejects HTTP errors as a plain object
+   * `{ response: { status: number, body: unknown }, body: unknown }`
+   * rather than an Error instance.  `error instanceof Error` returns false
+   * for these, so the naive fallback produces "[object Object]" or the
+   * opaque string "Sync failed".
+   *
+   * This helper extracts the most informative string available and caps it
+   * at 1 000 chars so it never overflows the DB column.
+   */
+  extractXeroErrorMessage(error: unknown): string {
+    const MAX = 1000;
+
+    // Standard Error (most common for Prisma / validation errors)
+    if (error instanceof Error) {
+      return error.message.slice(0, MAX);
+    }
+
+    // xero-node HTTP rejection: { response: { status, body }, body }
+    if (error !== null && typeof error === 'object') {
+      const err = error as Record<string, unknown>;
+
+      // Prefer response.status + body detail
+      const responseObj = err['response'] as
+        | Record<string, unknown>
+        | undefined;
+      const statusCode =
+        (responseObj?.['status'] as number | undefined) ??
+        (responseObj?.['statusCode'] as number | undefined);
+
+      const bodyObj =
+        (responseObj?.['body'] as Record<string, unknown> | undefined) ??
+        (err['body'] as Record<string, unknown> | undefined);
+
+      const detail =
+        (bodyObj?.['Detail'] as string | undefined) ??
+        (bodyObj?.['detail'] as string | undefined) ??
+        (bodyObj?.['message'] as string | undefined) ??
+        (bodyObj?.['Message'] as string | undefined);
+
+      const title =
+        (bodyObj?.['Title'] as string | undefined) ??
+        (bodyObj?.['title'] as string | undefined) ??
+        (bodyObj?.['Type'] as string | undefined);
+
+      if (statusCode) {
+        const parts: string[] = [`HTTP ${statusCode}`];
+        if (title) parts.push(title);
+        if (detail) parts.push(detail);
+        return parts.join(': ').slice(0, MAX);
+      }
+
+      // JSON stringify as last resort
+      try {
+        return JSON.stringify(error).slice(0, MAX);
+      } catch {
+        // fall through
+      }
+    }
+
+    return String(error).slice(0, MAX);
   }
 
   /**

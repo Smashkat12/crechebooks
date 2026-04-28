@@ -5,3 +5,4 @@
 
 export * from './AccountMappingsTable';
 export * from './PayrollJournalsTable';
+export * from './XeroSyncStatusCard';

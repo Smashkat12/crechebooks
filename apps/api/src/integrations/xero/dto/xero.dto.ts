@@ -293,3 +293,67 @@ export class TransactionsNeedingReviewDto {
   @ApiProperty({ description: 'Account codes detected as catch-all' })
   catchAllAccountCodes!: string[];
 }
+
+/**
+ * TASK-XERO-011: Auto-sync status response
+ * Returned by GET /xero/sync-status
+ */
+export class XeroSyncStatusDto {
+  @ApiProperty({ description: 'Whether Xero is connected for this tenant' })
+  connected!: boolean;
+
+  @ApiPropertyOptional({
+    description: 'When the access token expires (ISO 8601)',
+    example: '2026-04-28T12:00:00.000Z',
+  })
+  tokenExpiresAt!: string | null;
+
+  @ApiProperty({
+    description:
+      'Whether the refresh token is still usable (access token is valid or was refreshed successfully)',
+  })
+  refreshTokenValid!: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Timestamp of the last completed sync (ISO 8601)',
+  })
+  lastSyncAt!: string | null;
+
+  @ApiPropertyOptional({
+    enum: ['COMPLETED', 'FAILED', 'RUNNING'],
+    description:
+      'Status of the last sync. Derived from bankConnection.status. ' +
+      'No dedicated sync-job tracking table exists yet — see TODO in source.',
+  })
+  lastSyncStatus!: 'COMPLETED' | 'FAILED' | 'RUNNING' | null;
+
+  @ApiPropertyOptional({
+    description: 'Error message from the last sync, if any',
+  })
+  lastSyncError!: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Number of records imported in the last sync. ' +
+      'Not tracked yet — null until a sync-job tracking table is added.',
+  })
+  lastSyncRecordsImported!: number | null;
+
+  @ApiPropertyOptional({
+    description:
+      'In-flight auto-sync job details. ' +
+      'Populated when the hourly cron is actively syncing this tenant.',
+  })
+  currentJob!: {
+    id: string;
+    status: 'RUNNING';
+    startedAt: string;
+  } | null;
+
+  @ApiProperty({
+    description:
+      'ISO 8601 timestamp of the next scheduled hourly auto-sync (next :00 UTC).',
+    example: '2026-04-28T13:00:00.000Z',
+  })
+  nextScheduledSyncAt!: string;
+}

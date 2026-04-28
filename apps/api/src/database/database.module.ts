@@ -112,7 +112,6 @@ import { ParentOnboardingService } from './services/parent-onboarding.service';
 // TASK-REPORTS-005: Missing Report Types
 import { CashFlowReportService } from './services/cash-flow-report.service';
 import { AgedPayablesService } from './services/aged-payables.service';
-import { CurrencyConversionService } from './services/currency-conversion.service'; // TASK-FIX-004
 import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
@@ -262,8 +261,6 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
     AgedPayablesService,
-    // TASK-FIX-004: Currency Conversion with Real FX Rates
-    CurrencyConversionService,
     // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
     ReminderTemplateService,
   ],
@@ -383,8 +380,6 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
     AgedPayablesService,
-    // TASK-FIX-004: Currency Conversion with Real FX Rates
-    CurrencyConversionService,
     // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
     ReminderTemplateService,
   ],

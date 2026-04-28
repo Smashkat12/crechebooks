@@ -34,6 +34,7 @@ import {
   TenantsForImpersonationResponseDto,
   CurrentImpersonationResponseDto,
   EndImpersonationResponseDto,
+  EndImpersonationWithTokenResponseDto,
   ImpersonationSessionHistoryDto,
   ListImpersonationSessionsQueryDto,
 } from './dto/impersonation.dto';
@@ -141,7 +142,11 @@ export class ImpersonationController {
       path: '/',
     });
 
-    return response;
+    // TASK-ADMIN-001: Also return accessToken in body so frontend can update its
+    // in-memory bearer token. apiClient uses Authorization header (not HttpOnly cookie),
+    // so without this the bearer stays as the original admin JWT, causing 403s on
+    // all tenant endpoints during impersonation.
+    return { ...response, accessToken };
   }
 
   @Post('end')
@@ -166,7 +171,7 @@ export class ImpersonationController {
     @CurrentUser() user: IUser,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<EndImpersonationResponseDto> {
+  ): Promise<EndImpersonationWithTokenResponseDto> {
     this.logger.debug(`Ending impersonation for admin ${user.id}`);
 
     const ipAddress = this.getClientIp(req);
@@ -199,7 +204,11 @@ export class ImpersonationController {
       });
     }
 
-    return response;
+    // TASK-ADMIN-001: Return restored admin token in body so frontend can update its
+    // in-memory bearer token (apiClient uses Authorization header, not HttpOnly cookie).
+    // If no admin_token cookie exists (edge case: direct logout without cookie), accessToken
+    // will be undefined and the frontend should fall back to re-authenticating.
+    return adminToken ? { ...response, accessToken: adminToken } : response;
   }
 
   @Get('current')

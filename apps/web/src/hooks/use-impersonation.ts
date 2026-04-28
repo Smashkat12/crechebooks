@@ -4,7 +4,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, setAuthToken } from '@/lib/api/client';
 
 // Types matching backend DTOs
 export type ImpersonationRole = 'OWNER' | 'ADMIN' | 'ACCOUNTANT' | 'VIEWER';
@@ -49,6 +49,8 @@ export interface ImpersonationResponse {
   message: string;
   session: ImpersonationSession;
   expiresIn: number;
+  /** Impersonation JWT — use as Bearer token so tenant endpoints get the impersonation context */
+  accessToken?: string;
 }
 
 export interface CurrentImpersonationResponse {
@@ -61,6 +63,8 @@ export interface EndImpersonationResponse {
   success: boolean;
   message: string;
   session?: ImpersonationSession;
+  /** Restored admin JWT — update in-memory bearer token so subsequent requests use admin context */
+  accessToken?: string;
 }
 
 export interface ImpersonationSessionHistory {
@@ -95,7 +99,16 @@ export function useStartImpersonation() {
       const { data } = await apiClient.post('/admin/impersonate/start', request);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // TASK-ADMIN-001: Update in-memory bearer token with impersonation JWT.
+      // apiClient uses Authorization: Bearer <token> (not the HttpOnly cookie), so
+      // without this every tenant-scoped request sends the original admin JWT which
+      // has no impersonation claim, causing TenantGuard to return 403 on all
+      // tenant endpoints and the dashboard to hang.
+      if (data.accessToken) {
+        setAuthToken(data.accessToken);
+      }
+
       // Clear all cached queries to avoid using stale data with old context
       // Don't refetch immediately - let the new page load fresh
       queryClient.clear();
@@ -118,7 +131,19 @@ export function useEndImpersonation() {
       const { data } = await apiClient.post('/admin/impersonate/end');
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // TASK-ADMIN-001: Restore the original admin JWT in-memory so subsequent
+      // Bearer-authenticated requests stop using the impersonation token.
+      // Without this the next API calls from the admin portal would still send
+      // the old impersonation bearer and get 403s on admin-only endpoints.
+      if (data.accessToken) {
+        setAuthToken(data.accessToken);
+      } else {
+        // No restored token available (edge case) — clear the stale impersonation
+        // token so the request interceptor falls back to the NextAuth session JWT.
+        setAuthToken(null);
+      }
+
       // Clear all cached queries to avoid using stale data with old context
       queryClient.clear();
 

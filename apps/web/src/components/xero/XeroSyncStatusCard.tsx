@@ -54,6 +54,40 @@ function isRunning(data: XeroSyncStatusResponse): boolean {
   );
 }
 
+/**
+ * Returns a human-friendly retry countdown string, e.g.:
+ *   "Auto-retry in 3h 24m (failure #2)"
+ *   "Auto-retry in 47m (failure #1)"
+ *   "Retrying soon... (failure #3)"
+ */
+function retryCountdown(errorRetryState: XeroSyncStatusResponse['errorRetryState']): string | null {
+  if (!errorRetryState) return null;
+  const { nextRetryAt, consecutiveFailures } = errorRetryState;
+  const failureSuffix = `(failure #${consecutiveFailures})`;
+
+  if (!nextRetryAt) return `Retrying soon… ${failureSuffix}`;
+
+  try {
+    const msUntil = parseISO(nextRetryAt).getTime() - Date.now();
+    if (msUntil <= 0) return `Retrying soon… ${failureSuffix}`;
+
+    const totalMinutes = Math.ceil(msUntil / 60_000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    const duration =
+      hours > 0
+        ? minutes > 0
+          ? `${hours}h ${minutes}m`
+          : `${hours}h`
+        : `${minutes}m`;
+
+    return `Auto-retry in ${duration} ${failureSuffix}`;
+  } catch {
+    return null;
+  }
+}
+
 // ─── sub-components ──────────────────────────────────────────────────────────
 
 function SyncStatusBadge({ status }: { status: XeroSyncStatusResponse['lastSyncStatus'] }) {
@@ -230,6 +264,14 @@ export function XeroSyncStatusCard() {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Last status</span>
               <SyncStatusBadge status={data.lastSyncStatus} />
+            </div>
+          )}
+
+          {/* Auto-retry countdown (only when in ERROR backoff) */}
+          {retryCountdown(data.errorRetryState) && (
+            <div className="flex items-center gap-1.5 text-muted-foreground pl-0.5">
+              <Clock className="h-3 w-3 shrink-0" />
+              <span className="text-xs">{retryCountdown(data.errorRetryState)}</span>
             </div>
           )}
 

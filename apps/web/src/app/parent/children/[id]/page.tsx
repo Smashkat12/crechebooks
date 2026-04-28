@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils';
 import { useParentChild } from '@/hooks/parent-portal/use-parent-profile';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 // ============================================================================
 // Helpers (mirrored from ChildCard)
@@ -124,7 +125,7 @@ function ChildDetailContent({ childId }: { childId: string }) {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Baby className="h-6 w-6" />
-            {child.firstName} {child.lastName}
+            {formatFullName(child)}
           </h1>
           {age && (
             <p className="text-muted-foreground mt-1">{age} old</p>
@@ -165,7 +166,7 @@ function ChildDetailContent({ childId }: { childId: string }) {
               {child.photoUrl ? (
                 <AvatarImage
                   src={child.photoUrl}
-                  alt={`${child.firstName} ${child.lastName}`}
+                  alt={formatFullName(child)}
                 />
               ) : null}
               <AvatarFallback className="bg-primary/10 text-primary text-xl font-medium">
@@ -175,7 +176,7 @@ function ChildDetailContent({ childId }: { childId: string }) {
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-semibold">
-                  {child.firstName} {child.lastName}
+                  {formatFullName(child)}
                 </h2>
                 <Badge variant={child.isActive ? 'default' : 'secondary'}>
                   {child.isActive ? 'Active' : 'Inactive'}

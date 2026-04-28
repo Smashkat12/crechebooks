@@ -11,6 +11,7 @@ import { ParentForm } from './parent-form';
 import { ChildForm } from './child-form';
 import { CommunicationMethod, EnrollmentStatus } from '@crechebooks/types';
 import type { IParent, IChild } from '@crechebooks/types';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 interface ParentDetailProps {
   parent: IParent;
@@ -49,7 +50,7 @@ export function ParentDetail({
           <div className="flex items-start justify-between">
             <div>
               <CardTitle className="text-2xl">
-                {parent.firstName} {parent.lastName}
+                {formatFullName(parent)}
               </CardTitle>
               <CardDescription>Parent Details</CardDescription>
             </div>

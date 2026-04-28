@@ -22,6 +22,7 @@ import {
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
+import { formatFullName } from '../../common/utils';
 import {
   ApiTags,
   ApiOperation,
@@ -158,11 +159,9 @@ export class EnrollmentController {
       enrichedEnrollments.push({
         id: enrollment.id,
         child_id: child.id,
-        child_name: `${child.firstName} ${child.lastName}`,
+        child_name: formatFullName(child),
         parent_id: parent?.id || '',
-        parent_name: parent
-          ? `${parent.firstName} ${parent.lastName}`
-          : 'Unknown',
+        parent_name: parent ? formatFullName(parent) : 'Unknown',
         fee_tier_id: feeStructure?.id || '',
         fee_tier_name: feeStructure?.name || 'Unknown',
         start_date: enrollment.startDate.toISOString().split('T')[0],
@@ -230,11 +229,9 @@ export class EnrollmentController {
       data: {
         id: enrollment.id,
         child_id: child.id,
-        child_name: `${child.firstName} ${child.lastName}`,
+        child_name: formatFullName(child),
         parent_id: parent?.id || '',
-        parent_name: parent
-          ? `${parent.firstName} ${parent.lastName}`
-          : 'Unknown',
+        parent_name: parent ? formatFullName(parent) : 'Unknown',
         fee_tier_id: feeStructure?.id || '',
         fee_tier_name: feeStructure?.name || 'Unknown',
         start_date: enrollment.startDate.toISOString().split('T')[0],
@@ -303,11 +300,9 @@ export class EnrollmentController {
       data: {
         id: updated.id,
         child_id: child.id,
-        child_name: `${child.firstName} ${child.lastName}`,
+        child_name: formatFullName(child),
         parent_id: parent?.id || '',
-        parent_name: parent
-          ? `${parent.firstName} ${parent.lastName}`
-          : 'Unknown',
+        parent_name: parent ? formatFullName(parent) : 'Unknown',
         fee_tier_id: feeStructure?.id || '',
         fee_tier_name: feeStructure?.name || 'Unknown',
         start_date: updated.startDate.toISOString().split('T')[0],

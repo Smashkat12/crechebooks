@@ -17,6 +17,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException } from '../../shared/exceptions';
+import { formatFullName } from '../../common/utils';
 
 export interface FeeAgreementData {
   parentId: string;
@@ -112,6 +113,7 @@ export class ParentFeeAgreementPdfService {
     parent: {
       id: string;
       firstName: string;
+      middleName?: string | null;
       lastName: string;
       email: string | null;
       phone: string | null;
@@ -130,6 +132,7 @@ export class ParentFeeAgreementPdfService {
     },
     children: Array<{
       firstName: string;
+      middleName?: string | null;
       lastName: string;
       dateOfBirth: Date | null;
     }>,
@@ -148,7 +151,7 @@ export class ParentFeeAgreementPdfService {
         size: 'A4',
         bufferPages: true,
         info: {
-          Title: `Fee Agreement - ${parent.firstName} ${parent.lastName}`,
+          Title: `Fee Agreement - ${formatFullName(parent)}`,
           Author: tenant.name,
           Subject: 'Childcare Fee Agreement',
           Creator: 'CrecheBooks',
@@ -206,7 +209,7 @@ export class ParentFeeAgreementPdfService {
           `Address: ${tenant.addressLine1 || 'N/A'}, ${tenant.city || ''}, ${tenant.province || ''}\n` +
           `Contact: ${tenant.email || 'N/A'} | ${tenant.phone || 'N/A'}\n\n` +
           'AND\n\n' +
-          `The Parent/Guardian: ${parent.firstName} ${parent.lastName}\n` +
+          `The Parent/Guardian: ${formatFullName(parent)}\n` +
           `ID Number: ${parent.idNumber || 'N/A'}\n` +
           `Email: ${parent.email}\n` +
           `Phone: ${parent.phone || 'N/A'}`,
@@ -223,7 +226,7 @@ export class ParentFeeAgreementPdfService {
         const dob = child.dateOfBirth
           ? this.formatDate(child.dateOfBirth)
           : 'N/A';
-        childrenText += `${index + 1}. ${child.firstName} ${child.lastName} (DOB: ${dob})\n`;
+        childrenText += `${index + 1}. ${formatFullName(child)} (DOB: ${dob})\n`;
       });
       doc
         .fontSize(10)
@@ -385,7 +388,7 @@ export class ParentFeeAgreementPdfService {
       doc.fontSize(10).font('Helvetica');
       doc.text('Signature: _________________________', 50);
       doc.moveDown(0.5);
-      doc.text(`Full Name: ${parent.firstName} ${parent.lastName}`, 50);
+      doc.text(`Full Name: ${formatFullName(parent)}`, 50);
       doc.moveDown(0.5);
       doc.text(
         `ID Number: ${parent.idNumber || '_________________________'}`,

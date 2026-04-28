@@ -14,6 +14,7 @@ import { XeroController } from '../xero.controller';
 import { XeroSyncGateway } from '../xero.gateway';
 import { BankFeedService } from '../bank-feed.service';
 import { XeroAuthService } from '../xero-auth.service';
+import { XeroAutoSyncJob } from '../xero-auto-sync.job';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { TransactionRepository } from '../../../database/repositories/transaction.repository';
 import { AuditLogService } from '../../../database/services/audit-log.service';
@@ -64,6 +65,14 @@ describe('XeroController', () => {
             isConnected: jest.fn().mockResolvedValue(true),
             getAuthUrl: jest.fn().mockReturnValue('http://mock-auth-url'),
             handleCallback: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: XeroAutoSyncJob,
+          useValue: {
+            isInFlight: jest.fn().mockReturnValue(false),
+            runAutoSync: jest.fn().mockResolvedValue(undefined),
+            getRetryState: jest.fn().mockReturnValue(undefined),
           },
         },
       ],

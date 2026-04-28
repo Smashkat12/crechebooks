@@ -47,7 +47,16 @@ export interface ThreadListResult {
   total: number;
 }
 
+export interface ThreadParent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  whatsapp: string | null;
+}
+
 export interface ThreadMessagesResult {
+  parent: ThreadParent;
   messages: WhatsAppMessage[];
   total: number;
 }
@@ -173,8 +182,22 @@ export class AdminMessagesService {
     offset: number,
     order: 'asc' | 'desc',
   ): Promise<ThreadMessagesResult> {
-    // Verify parent belongs to tenant
-    await this.assertParentInTenant(tenantId, parentId);
+    // Fetch parent (also verifies it belongs to this tenant)
+    const parentRow = await this.prisma.parent.findUnique({
+      where: { id: parentId },
+      select: {
+        id: true,
+        tenantId: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        whatsapp: true,
+      },
+    });
+
+    if (!parentRow || parentRow.tenantId !== tenantId) {
+      throw new NotFoundException(`Parent ${parentId} not found`);
+    }
 
     const [messages, total] = await Promise.all([
       this.prisma.whatsAppMessage.findMany({
@@ -188,7 +211,15 @@ export class AdminMessagesService {
       }),
     ]);
 
-    return { messages, total };
+    const parent: ThreadParent = {
+      id: parentRow.id,
+      firstName: parentRow.firstName,
+      lastName: parentRow.lastName,
+      phone: parentRow.phone,
+      whatsapp: parentRow.whatsapp,
+    };
+
+    return { parent, messages, total };
   }
 
   // -----------------------------------------------------------------------

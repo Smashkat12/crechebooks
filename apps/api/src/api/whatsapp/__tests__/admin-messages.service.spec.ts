@@ -186,10 +186,14 @@ describe('listThreads', () => {
 // ---------------------------------------------------------------------------
 
 describe('getThread', () => {
-  it('3. known parent → returns paginated messages', async () => {
+  it('3. known parent → returns paginated messages with parent metadata', async () => {
     prisma.parent.findUnique.mockResolvedValue({
       id: PARENT_A,
       tenantId: TENANT_A,
+      firstName: 'Alice',
+      lastName: 'Smith',
+      phone: '+27821234567',
+      whatsapp: '+27821234567',
     });
     prisma.whatsAppMessage.findMany.mockResolvedValue([makeMsg()]);
     prisma.whatsAppMessage.count.mockResolvedValue(1);
@@ -198,6 +202,11 @@ describe('getThread', () => {
 
     expect(result.messages).toHaveLength(1);
     expect(result.total).toBe(1);
+    expect(result.parent.id).toBe(PARENT_A);
+    expect(result.parent.firstName).toBe('Alice');
+    expect(result.parent.lastName).toBe('Smith');
+    expect(result.parent.phone).toBe('+27821234567');
+    expect(result.parent.whatsapp).toBe('+27821234567');
   });
 
   it('4. unknown parent → NotFoundException', async () => {

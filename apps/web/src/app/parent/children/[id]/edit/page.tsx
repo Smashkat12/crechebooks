@@ -95,6 +95,7 @@ function EditChildFormContent({ childId }: { childId: string }) {
 
   // Controlled field state — initialised from query data once loaded
   const [firstName, setFirstName] = useState('');
+  const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
   const [gender, setGender] = useState<Gender | ''>('');
   const [medicalNotes, setMedicalNotes] = useState('');
@@ -117,6 +118,7 @@ function EditChildFormContent({ childId }: { childId: string }) {
   useEffect(() => {
     if (child && !hydrated) {
       setFirstName(child.firstName ?? '');
+      setMiddleName(child.middleName ?? '');
       setLastName(child.lastName ?? '');
       setGender(child.gender ?? '');
       setMedicalNotes(child.medicalNotes ?? '');
@@ -133,6 +135,10 @@ function EditChildFormContent({ childId }: { childId: string }) {
       newErrors.firstName = 'First name is required';
     } else if (firstName.length > 100) {
       newErrors.firstName = 'Must be 100 characters or fewer';
+    }
+
+    if (middleName.length > 100) {
+      newErrors.middleName = 'Must be 100 characters or fewer';
     }
 
     if (!lastName.trim()) {
@@ -162,7 +168,7 @@ function EditChildFormContent({ childId }: { childId: string }) {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [firstName, lastName, gender, medicalNotes, emergencyContact, emergencyPhone]);
+  }, [firstName, middleName, lastName, gender, medicalNotes, emergencyContact, emergencyPhone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,6 +178,7 @@ function EditChildFormContent({ childId }: { childId: string }) {
     try {
       await updateMutation.mutateAsync({
         firstName: firstName.trim() || undefined,
+        middleName: middleName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         gender: gender || undefined,
         medicalNotes: medicalNotes.trim() || undefined,
@@ -297,6 +304,23 @@ function EditChildFormContent({ childId }: { childId: string }) {
               />
               {errors.firstName && (
                 <p className="text-sm text-destructive">{errors.firstName}</p>
+              )}
+            </div>
+
+            {/* Middle Name */}
+            <div className="space-y-2">
+              <Label htmlFor="middleName">Middle name</Label>
+              <Input
+                id="middleName"
+                value={middleName}
+                onChange={(e) => setMiddleName(e.target.value)}
+                placeholder="Optional"
+                maxLength={100}
+                autoComplete="additional-name"
+                className={errors.middleName ? 'border-destructive' : ''}
+              />
+              {errors.middleName && (
+                <p className="text-sm text-destructive">{errors.middleName}</p>
               )}
             </div>
 

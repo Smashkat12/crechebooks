@@ -51,6 +51,13 @@ export class CreateChildDto {
   @MaxLength(100)
   lastName!: string;
 
+  @IsOptional()
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
+  @IsString()
+  @MaxLength(100)
+  middleName?: string | null;
+
   @Type(() => Date)
   @IsDate()
   dateOfBirth!: Date;

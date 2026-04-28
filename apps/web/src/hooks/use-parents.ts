@@ -246,6 +246,7 @@ export function useSendOnboardingInvite() {
 interface UpdateParentParams {
   id: string;
   firstName?: string;
+  middleName?: string;
   lastName?: string;
   email?: string;
   phone?: string;
@@ -306,6 +307,7 @@ export function useUpdateParent() {
     mutationFn: async ({ id, ...params }) => {
       const { data } = await apiClient.put<IParent>(endpoints.parents.detail(id), {
         firstName: params.firstName,
+        middleName: params.middleName || null,
         lastName: params.lastName,
         email: params.email,
         phone: params.phone || null,

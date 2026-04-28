@@ -27,6 +27,7 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
 
   const [formData, setFormData] = useState({
     firstName: '',
+    middleName: '',
     lastName: '',
     email: '',
     phone: '',
@@ -41,6 +42,7 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
     if (parent) {
       setFormData({
         firstName: parent.firstName || '',
+        middleName: parent.middleName || '',
         lastName: parent.lastName || '',
         email: parent.email || '',
         phone: parent.phone || '',
@@ -69,6 +71,7 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
       await updateParentMutation.mutateAsync({
         id,
         firstName: formData.firstName,
+        middleName: formData.middleName || undefined,
         lastName: formData.lastName,
         email: formData.email,
         phone: formData.phone || undefined,
@@ -134,7 +137,7 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
             <CardTitle>Parent Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name *</Label>
                 <Input
@@ -142,6 +145,15 @@ export default function ParentEditPage({ params }: ParentEditPageProps) {
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   placeholder="Enter first name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="middleName">Middle Name</Label>
+                <Input
+                  id="middleName"
+                  value={formData.middleName}
+                  onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+                  placeholder="Optional"
                 />
               </div>
               <div className="space-y-2">

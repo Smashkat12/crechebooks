@@ -60,6 +60,13 @@ export class CreateParentDto {
   lastName!: string;
 
   @IsOptional()
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
+  @IsString()
+  @MaxLength(100)
+  middleName?: string | null;
+
+  @IsOptional()
   @SanitizeEmail()
   @IsEmail()
   email?: string;

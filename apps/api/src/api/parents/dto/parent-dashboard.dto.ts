@@ -621,6 +621,9 @@ export class ParentProfileDto {
   @ApiProperty({ description: 'First name' })
   firstName: string;
 
+  @ApiPropertyOptional({ description: 'Middle name', nullable: true })
+  middleName?: string | null;
+
   @ApiProperty({ description: 'Last name' })
   lastName: string;
 
@@ -714,6 +717,9 @@ export class ParentChildDto {
 
   @ApiProperty({ description: 'First name' })
   firstName: string;
+
+  @ApiPropertyOptional({ description: 'Middle name', nullable: true })
+  middleName?: string | null;
 
   @ApiProperty({ description: 'Last name' })
   lastName: string;

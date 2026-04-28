@@ -28,6 +28,7 @@ const ADMIN_USER_ID = 'user-admin-001';
 const CHILD_ROW = {
   id: CHILD_ID,
   firstName: 'Jane',
+  middleName: null,
   lastName: 'Doe',
   gender: null,
   medicalNotes: null,

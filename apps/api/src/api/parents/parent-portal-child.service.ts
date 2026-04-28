@@ -32,7 +32,12 @@ import {
 } from './dto/update-parent-child.dto';
 
 /** Identity fields the parent may change — triggers admin notification on change. */
-const IDENTITY_FIELDS = ['firstName', 'lastName', 'gender'] as const;
+const IDENTITY_FIELDS = [
+  'firstName',
+  'middleName',
+  'lastName',
+  'gender',
+] as const;
 type IdentityField = (typeof IDENTITY_FIELDS)[number];
 
 @Injectable()
@@ -91,6 +96,7 @@ export class ParentPortalChildService {
       select: {
         id: true,
         firstName: true,
+        middleName: true,
         lastName: true,
         gender: true,
         medicalNotes: true,
@@ -158,6 +164,7 @@ export class ParentPortalChildService {
     const updateData: Prisma.ChildUpdateInput = {};
 
     if (dto.firstName !== undefined) updateData.firstName = dto.firstName;
+    if (dto.middleName !== undefined) updateData.middleName = dto.middleName;
     if (dto.lastName !== undefined) updateData.lastName = dto.lastName;
     if (dto.gender !== undefined) updateData.gender = dto.gender;
     if (dto.medicalNotes !== undefined)
@@ -177,6 +184,7 @@ export class ParentPortalChildService {
         select: {
           id: true,
           firstName: true,
+          middleName: true,
           lastName: true,
           gender: true,
           medicalNotes: true,
@@ -236,6 +244,7 @@ export class ParentPortalChildService {
     return {
       id: updated.id,
       firstName: updated.firstName ?? null,
+      middleName: updated.middleName ?? null,
       lastName: updated.lastName ?? null,
       gender:
         (updated.gender as ParentChildUpdateResponseDto['gender']) ?? null,

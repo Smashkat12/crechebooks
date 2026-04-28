@@ -1486,6 +1486,7 @@ export class ParentPortalController {
     return {
       id: parent.id,
       firstName: parent.firstName,
+      middleName: parent.middleName ?? null,
       lastName: parent.lastName,
       email: parent.email || '',
       phone: parent.phone || undefined,
@@ -1711,6 +1712,7 @@ export class ParentPortalController {
       return {
         id: child.id,
         firstName: child.firstName,
+        middleName: child.middleName ?? null,
         lastName: child.lastName,
         dateOfBirth: child.dateOfBirth?.toISOString() || undefined,
         enrollmentDate:

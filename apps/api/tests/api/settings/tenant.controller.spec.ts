@@ -27,6 +27,7 @@ describe('TenantController', () => {
     tradingName: null,
     registrationNumber: 'REG123456',
     vatNumber: 'VAT123456',
+    vatCategory: null,
     taxStatus: 'NOT_REGISTERED' as any,
     vatRegistrationDate: null,
     cumulativeTurnoverCents: BigInt(0),

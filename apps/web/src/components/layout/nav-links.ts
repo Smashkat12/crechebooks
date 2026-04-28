@@ -19,6 +19,7 @@ import {
   BookOpen,
   FilePlus2,
   TrendingUp,
+  Inbox,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -47,6 +48,7 @@ export const managementNavLinks: NavLink[] = [
   { title: 'Staff', href: '/staff', icon: Users },
   { title: 'Payroll', href: '/staff/payroll', icon: FileSpreadsheet },
   { title: 'Communications', href: '/communications', icon: Megaphone },
+  { title: 'Inbox', href: '/communications/inbox', icon: Inbox },
 ];
 
 export const complianceNavLinks: NavLink[] = [

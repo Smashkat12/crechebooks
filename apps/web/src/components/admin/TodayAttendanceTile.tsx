@@ -84,9 +84,16 @@ export function TodayAttendanceTile() {
                 </Badge>
               )}
               {summary.unmarkedCount > 0 && (
-                <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100 font-normal text-xs">
-                  Unmarked {summary.unmarkedCount}
-                </Badge>
+                <div className="flex flex-col gap-0.5">
+                  <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100 font-normal text-xs">
+                    Unmarked {summary.unmarkedCount}
+                  </Badge>
+                  {(summary.reportedAbsentCount ?? 0) > 0 && (
+                    <span className="text-xs text-muted-foreground pl-0.5">
+                      {summary.reportedAbsentCount} reported absent
+                    </span>
+                  )}
+                </div>
               )}
               {summary.absentCount === 0 &&
                 summary.lateCount === 0 &&

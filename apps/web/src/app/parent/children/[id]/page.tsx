@@ -16,6 +16,7 @@ import {
   Baby,
   Calendar,
   CalendarCheck,
+  CalendarX,
   Clock,
   GraduationCap,
   Loader2,
@@ -137,6 +138,14 @@ function ChildDetailContent({ childId }: { childId: string }) {
           >
             <CalendarCheck className="h-4 w-4" />
             Attendance
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push(`/parent/children/${childId}/absences`)}
+            className="gap-2"
+          >
+            <CalendarX className="h-4 w-4" />
+            Report absence
           </Button>
           <Button
             onClick={() => router.push(`/parent/children/${childId}/edit`)}

@@ -44,7 +44,7 @@ import type {
   PaymentAttachmentResponseDto,
   AdminAttachmentListFilters,
 } from './dto/payment-attachment-response.dto';
-import type { PaymentAttachmentMatcherService } from './payment-attachment-matcher.service';
+import { PaymentAttachmentMatcherService } from './payment-attachment-matcher.service';
 
 /** Max rows returned by admin list */
 const ADMIN_LIST_CAP = 200;

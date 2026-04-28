@@ -25,6 +25,7 @@ import {
   AgeCategory,
   TAX_YEAR_2024_2025,
   TAX_YEAR_2025_2026,
+  TAX_YEAR_2026_2027,
   TAX_TABLE_CACHE_TTL,
   TAX_TABLE_CACHE_KEY,
 } from '../constants/tax-tables.constants';
@@ -73,6 +74,12 @@ export class TaxTableService {
     // Seed 2025/2026 tax year
     const taxYear2025 = this.createTaxYearFromSeed(TAX_YEAR_2025_2026);
     this.taxYears.set(taxYear2025.id, taxYear2025);
+
+    // Seed 2026/2027 tax year — unblocks payroll runs from 2026-03-01 onwards.
+    // Values copied from 2025/2026; verify against SARS gazette before
+    // first EMP201 submission for the 2026/2027 year.
+    const taxYear2026 = this.createTaxYearFromSeed(TAX_YEAR_2026_2027);
+    this.taxYears.set(taxYear2026.id, taxYear2026);
 
     this.logger.log(
       `Initialized ${this.taxYears.size} tax years from seed data`,

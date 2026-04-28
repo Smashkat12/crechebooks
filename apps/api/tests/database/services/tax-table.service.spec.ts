@@ -16,6 +16,7 @@ import {
   TaxBracket,
   CreateTaxYearDto,
   TAX_YEAR_2024_2025,
+  TAX_YEAR_2026_2027,
 } from '../../../src/database/constants/tax-tables.constants';
 
 // Configure Decimal.js
@@ -56,6 +57,17 @@ describe('TaxTableService', () => {
       expect(taxYear).toBeDefined();
       expect(taxYear.yearCode).toBe('2025/2026');
     });
+
+    it('should have 2026/2027 tax year available', () => {
+      const taxYear = service.getTaxYearByCode('2026/2027');
+      expect(taxYear).toBeDefined();
+      expect(taxYear.yearCode).toBe('2026/2027');
+    });
+
+    it('should have at least 3 tax years loaded', () => {
+      const taxYears = service.getAllTaxYears();
+      expect(taxYears.length).toBeGreaterThanOrEqual(3);
+    });
   });
 
   describe('getTaxYearForDate', () => {
@@ -71,6 +83,34 @@ describe('TaxTableService', () => {
       const taxYear = service.getTaxYearForDate(date);
 
       expect(taxYear.yearCode).toBe('2025/2026');
+    });
+
+    it('should return 2026/2027 tax year for date in that period', () => {
+      const date = new Date('2026-06-15'); // June 2026
+      const taxYear = service.getTaxYearForDate(date);
+
+      expect(taxYear.yearCode).toBe('2026/2027');
+    });
+
+    it('should return 2026/2027 tax year for 2026-03-01 (first day)', () => {
+      const date = new Date('2026-03-01');
+      const taxYear = service.getTaxYearForDate(date);
+
+      expect(taxYear.yearCode).toBe('2026/2027');
+    });
+
+    it('should return 2026/2027 tax year for 2027-02-28 (last day)', () => {
+      const date = new Date('2027-02-28');
+      const taxYear = service.getTaxYearForDate(date);
+
+      expect(taxYear.yearCode).toBe('2026/2027');
+    });
+
+    it('should throw NotFoundException for 2027-03-01 (no 2027/2028 seeded yet)', () => {
+      const date = new Date('2027-03-01');
+      expect(() => service.getTaxYearForDate(date)).toThrow(
+        'No active tax year found',
+      );
     });
 
     it('should throw NotFoundException for date with no tax year', () => {
@@ -97,12 +137,21 @@ describe('TaxTableService', () => {
 
   describe('getCurrentTaxYear', () => {
     it('should return a valid tax year', () => {
-      // This test depends on current date - using a safe assumption
-      // that we're testing during 2024/2025 or 2025/2026 tax years
       const taxYear = service.getCurrentTaxYear();
 
       expect(taxYear).toBeDefined();
       expect(taxYear.yearCode).toMatch(/^\d{4}\/\d{4}$/);
+    });
+
+    it('should return 2026/2027 for today (2026-04-28)', () => {
+      // Today is 2026-04-28, which falls in the 2026/2027 tax year
+      // (1 March 2026 - 28 February 2027). This test documents the fix
+      // that unblocked payroll runs — TASK-TAX-YEAR-2027.
+      const taxYear = service.getCurrentTaxYear();
+
+      expect(taxYear.yearCode).toBe('2026/2027');
+      expect(taxYear.effectiveFrom).toEqual(new Date('2026-03-01'));
+      expect(taxYear.effectiveTo).toEqual(new Date('2027-02-28'));
     });
   });
 
@@ -151,10 +200,11 @@ describe('TaxTableService', () => {
   });
 
   describe('createTaxYear', () => {
+    // Use 2027/2028 since 2026/2027 is now seeded by default
     const validDto: CreateTaxYearDto = {
-      yearCode: '2026/2027',
-      effectiveFrom: new Date('2026-03-01'),
-      effectiveTo: new Date('2027-02-28'),
+      yearCode: '2027/2028',
+      effectiveFrom: new Date('2027-03-01'),
+      effectiveTo: new Date('2028-02-29'),
       primaryRebateCents: 1800000,
       secondaryRebateCents: 1000000,
       tertiaryRebateCents: 350000,
@@ -192,7 +242,7 @@ describe('TaxTableService', () => {
     it('should create a new tax year', () => {
       const result = service.createTaxYear(validDto, 'test-user');
 
-      expect(result.yearCode).toBe('2026/2027');
+      expect(result.yearCode).toBe('2027/2028');
       expect(result.primaryRebateCents).toBe(1800000);
       expect(result.brackets.length).toBe(3);
       expect(result.createdBy).toBe('test-user');
@@ -810,6 +860,67 @@ describe('TaxTableService', () => {
     it('should have correct effective date range', () => {
       expect(TAX_YEAR_2024_2025.effectiveFrom).toEqual(new Date('2024-03-01'));
       expect(TAX_YEAR_2024_2025.effectiveTo).toEqual(new Date('2025-02-28'));
+    });
+  });
+
+  describe('2026/2027 Tax Year Seed Data Verification (TASK-TAX-YEAR-2027)', () => {
+    it('should have correct effective date range', () => {
+      expect(TAX_YEAR_2026_2027.effectiveFrom).toEqual(new Date('2026-03-01'));
+      expect(TAX_YEAR_2026_2027.effectiveTo).toEqual(new Date('2027-02-28'));
+    });
+
+    it('should be active', () => {
+      expect(TAX_YEAR_2026_2027.isActive).toBe(true);
+    });
+
+    it('should have rebates defined', () => {
+      expect(TAX_YEAR_2026_2027.primaryRebateCents).toBeGreaterThan(0);
+      expect(TAX_YEAR_2026_2027.secondaryRebateCents).toBeGreaterThan(0);
+      expect(TAX_YEAR_2026_2027.tertiaryRebateCents).toBeGreaterThan(0);
+    });
+
+    it('should have thresholds defined and increasing with age', () => {
+      expect(TAX_YEAR_2026_2027.taxThresholdCents).toBeGreaterThan(0);
+      expect(TAX_YEAR_2026_2027.taxThresholdOver65Cents).toBeGreaterThan(
+        TAX_YEAR_2026_2027.taxThresholdCents,
+      );
+      expect(TAX_YEAR_2026_2027.taxThresholdOver75Cents).toBeGreaterThan(
+        TAX_YEAR_2026_2027.taxThresholdOver65Cents,
+      );
+    });
+
+    it('should have 7 tax brackets', () => {
+      expect(TAX_YEAR_2026_2027.brackets.length).toBe(7);
+    });
+
+    it('should have last bracket with null upper bound', () => {
+      const last = TAX_YEAR_2026_2027.brackets[6];
+      expect(last.upperBoundCents).toBeNull();
+      expect(last.marginalRate.toNumber()).toBe(0.45);
+    });
+
+    it('should be retrievable from service by code', () => {
+      const taxYear = service.getTaxYearByCode('2026/2027');
+      expect(taxYear.yearCode).toBe('2026/2027');
+      expect(taxYear.effectiveFrom).toEqual(new Date('2026-03-01'));
+      expect(taxYear.effectiveTo).toEqual(new Date('2027-02-28'));
+    });
+
+    it('should be returned by getTaxYearForDate for 2026-04-28', () => {
+      const taxYear = service.getTaxYearForDate(new Date('2026-04-28'));
+      expect(taxYear.yearCode).toBe('2026/2027');
+    });
+
+    it('should support calculatePAYE for dates in 2026/2027 tax year', () => {
+      // R360,000/year → bracket 2 (26%)
+      const result = service.calculatePAYE(
+        36000000,
+        30,
+        new Date('2026-04-28'),
+      );
+      expect(result.taxYearCode).toBe('2026/2027');
+      expect(result.bracketIndex).toBe(1);
+      expect(result.taxAfterRebatesCents).toBeGreaterThan(0);
     });
   });
 });

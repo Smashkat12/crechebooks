@@ -420,6 +420,205 @@ describe('XeroAutoSyncJob', () => {
       // Accounting API sync still completed
       expect(bankFeed.syncTransactions).toHaveBeenCalledTimes(1);
     });
+
+    describe('ERROR connection backoff (Guard 4)', () => {
+      it('records backoff state on first failure with 2h initial delay', async () => {
+        const tenantId = 'tenant-backoff-first';
+        const now = Date.now();
+
+        prisma.xeroToken.findMany.mockResolvedValue([
+          {
+            tenantId,
+            tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+            updatedAt: new Date(now - 5 * 60 * 1000),
+          },
+        ]);
+        getTokenManagerHasValidConnection().mockResolvedValue(true);
+        prisma.bankConnection.findFirst.mockResolvedValue(null);
+        bankFeed.syncTransactions.mockRejectedValue(new Error('FNB feed down'));
+
+        const beforeMs = Date.now();
+        await job.runAutoSync();
+        const afterMs = Date.now();
+
+        const state = job.getRetryState(tenantId);
+        expect(state).toBeDefined();
+        expect(state!.consecutiveFailures).toBe(1);
+        // nextRetryAt should be ~2h from now
+        const INITIAL_MS = 2 * 60 * 60 * 1000;
+        expect(state!.nextRetryAt).toBeGreaterThanOrEqual(
+          beforeMs + INITIAL_MS,
+        );
+        expect(state!.nextRetryAt).toBeLessThanOrEqual(
+          afterMs + INITIAL_MS + 100,
+        );
+      });
+
+      it('doubles the backoff on a second consecutive failure', async () => {
+        const tenantId = 'tenant-backoff-double';
+        const now = Date.now();
+
+        prisma.xeroToken.findMany.mockResolvedValue([
+          {
+            tenantId,
+            tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+            updatedAt: new Date(now - 5 * 60 * 1000),
+          },
+        ]);
+        getTokenManagerHasValidConnection().mockResolvedValue(true);
+        prisma.bankConnection.findFirst.mockResolvedValue(null);
+        bankFeed.syncTransactions.mockRejectedValue(new Error('still down'));
+
+        // Seed first failure state as if it already happened
+        const INITIAL_MS = 2 * 60 * 60 * 1000;
+        (
+          job as unknown as {
+            errorRetryState: Map<
+              string,
+              { nextRetryAt: number; consecutiveFailures: number }
+            >;
+          }
+        ).errorRetryState.set(tenantId, {
+          nextRetryAt: now - 1,
+          consecutiveFailures: 1,
+        });
+
+        const beforeMs = Date.now();
+        await job.runAutoSync();
+        const afterMs = Date.now();
+
+        const state = job.getRetryState(tenantId);
+        expect(state).toBeDefined();
+        expect(state!.consecutiveFailures).toBe(2);
+        // Second failure delay = 2h * 2^(2-1) = 4h
+        const expectedDelay = INITIAL_MS * 2;
+        expect(state!.nextRetryAt).toBeGreaterThanOrEqual(
+          beforeMs + expectedDelay,
+        );
+        expect(state!.nextRetryAt).toBeLessThanOrEqual(
+          afterMs + expectedDelay + 100,
+        );
+      });
+
+      it('caps backoff at 24h regardless of failure count', async () => {
+        const tenantId = 'tenant-backoff-cap';
+        const now = Date.now();
+
+        prisma.xeroToken.findMany.mockResolvedValue([
+          {
+            tenantId,
+            tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+            updatedAt: new Date(now - 5 * 60 * 1000),
+          },
+        ]);
+        getTokenManagerHasValidConnection().mockResolvedValue(true);
+        prisma.bankConnection.findFirst.mockResolvedValue(null);
+        bankFeed.syncTransactions.mockRejectedValue(new Error('persistent'));
+
+        // Seed many failures so formula would exceed 24h without the cap
+        (
+          job as unknown as {
+            errorRetryState: Map<
+              string,
+              { nextRetryAt: number; consecutiveFailures: number }
+            >;
+          }
+        ).errorRetryState.set(tenantId, {
+          nextRetryAt: now - 1,
+          consecutiveFailures: 20,
+        });
+
+        const beforeMs = Date.now();
+        await job.runAutoSync();
+        const afterMs = Date.now();
+
+        const MAX_MS = 24 * 60 * 60 * 1000;
+        const state = job.getRetryState(tenantId);
+        expect(state).toBeDefined();
+        expect(state!.nextRetryAt).toBeLessThanOrEqual(afterMs + MAX_MS + 100);
+        expect(state!.consecutiveFailures).toBe(21);
+      });
+
+      it('skips the tenant when backoff is still active (guard 4)', async () => {
+        const tenantId = 'tenant-backoff-skip';
+        const now = Date.now();
+
+        prisma.xeroToken.findMany.mockResolvedValue([
+          {
+            tenantId,
+            tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+            updatedAt: new Date(now - 5 * 60 * 1000),
+          },
+        ]);
+        getTokenManagerHasValidConnection().mockResolvedValue(true);
+        prisma.bankConnection.findFirst.mockResolvedValue(null);
+
+        // nextRetryAt is 1h in the future — backoff still active
+        (
+          job as unknown as {
+            errorRetryState: Map<
+              string,
+              { nextRetryAt: number; consecutiveFailures: number }
+            >;
+          }
+        ).errorRetryState.set(tenantId, {
+          nextRetryAt: now + 60 * 60 * 1000,
+          consecutiveFailures: 1,
+        });
+
+        await job.runAutoSync();
+
+        // Sync must NOT have been attempted
+        expect(bankFeed.syncTransactions).not.toHaveBeenCalled();
+      });
+
+      it('clears backoff state after a successful sync', async () => {
+        const tenantId = 'tenant-backoff-clear';
+        const now = Date.now();
+
+        prisma.xeroToken.findMany.mockResolvedValue([
+          {
+            tenantId,
+            tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+            updatedAt: new Date(now - 5 * 60 * 1000),
+          },
+        ]);
+        getTokenManagerHasValidConnection().mockResolvedValue(true);
+        prisma.bankConnection.findFirst.mockResolvedValue(null);
+
+        // Seed prior failure state with nextRetryAt in the past (backoff expired)
+        (
+          job as unknown as {
+            errorRetryState: Map<
+              string,
+              { nextRetryAt: number; consecutiveFailures: number }
+            >;
+          }
+        ).errorRetryState.set(tenantId, {
+          nextRetryAt: now - 1,
+          consecutiveFailures: 2,
+        });
+
+        bankFeed.syncTransactions.mockResolvedValue({
+          transactionsCreated: 3,
+          duplicatesSkipped: 0,
+          errors: [],
+          transactionsFound: 3,
+          connectionId: 'all',
+          syncedAt: new Date(),
+        });
+        bankFeed.syncFromJournals.mockResolvedValue({
+          created: 0,
+          skipped: 0,
+          found: 0,
+        });
+
+        await job.runAutoSync();
+
+        // Backoff state must be cleared
+        expect(job.getRetryState(tenantId)).toBeUndefined();
+      });
+    });
   });
 
   describe('isInFlight', () => {

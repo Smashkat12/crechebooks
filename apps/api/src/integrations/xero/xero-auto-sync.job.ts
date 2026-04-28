@@ -41,6 +41,31 @@ const REFRESH_TOKEN_STALE_AFTER_MS = 60 * 24 * 60 * 60 * 1000; // 60 days
 /** Default lookback when no prior sync is found. */
 const DEFAULT_LOOKBACK_DAYS = 30;
 
+/**
+ * Self-healing retry backoff for ERROR connections.
+ *
+ * When a tenant's bank feed sync fails, the connection is marked ERROR and the
+ * hourly cron would previously skip it forever (WHERE status = ACTIVE).  The fix
+ * widens the query to include ERROR connections, but without throttling that means
+ * a genuinely-broken feed hammers Xero every hour indefinitely.
+ *
+ * Strategy (Option 2 — in-memory backoff):
+ *   - Track { nextRetryAt, consecutiveFailures } per tenantId in a Map.
+ *   - First failure  → retry after INITIAL_RETRY_MS  (2 h)
+ *   - Each subsequent failure doubles the interval, capped at MAX_RETRY_MS (24 h).
+ *   - On a successful sync, clear the entry so normal hourly cadence resumes.
+ *   - Map is lost on process restart — that is intentional: restart = fresh attempt.
+ *
+ * No schema changes required.  The map is local to this singleton NestJS service.
+ */
+const INITIAL_RETRY_MS = 2 * 60 * 60 * 1000; // 2 hours
+const MAX_RETRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface RetryState {
+  nextRetryAt: number; // epoch ms
+  consecutiveFailures: number;
+}
+
 @Injectable()
 export class XeroAutoSyncJob {
   private readonly logger = new Logger(XeroAutoSyncJob.name);
@@ -48,6 +73,12 @@ export class XeroAutoSyncJob {
 
   /** Per-tenant lock — prevents concurrent auto-syncs for the same tenant. */
   private readonly inFlightTenants = new Set<string>();
+
+  /**
+   * In-memory backoff state for tenants whose bank feed is in ERROR.
+   * Cleared on successful sync; doubled on each failure; capped at MAX_RETRY_MS.
+   */
+  private readonly errorRetryState = new Map<string, RetryState>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -125,6 +156,22 @@ export class XeroAutoSyncJob {
         continue;
       }
 
+      // --- Guard 4: exponential backoff for ERROR connections ---
+      // If this tenant's feed previously failed, respect the computed nextRetryAt
+      // so we don't hammer Xero every hour while the feed is genuinely broken.
+      const retryState = this.errorRetryState.get(tenantId);
+      if (retryState && Date.now() < retryState.nextRetryAt) {
+        const minutesLeft = Math.ceil(
+          (retryState.nextRetryAt - Date.now()) / 60_000,
+        );
+        this.logger.log(
+          `XeroAutoSync: tenant ${tenantId} — ERROR backoff active, ` +
+            `next retry in ${minutesLeft} min ` +
+            `(failure #${retryState.consecutiveFailures})`,
+        );
+        continue;
+      }
+
       // --- Determine fromDate ---
       const lastSync = await this.prisma.bankConnection.findFirst({
         where: { tenantId },
@@ -175,6 +222,8 @@ export class XeroAutoSyncJob {
         }
 
         synced++;
+        // Successful sync — clear any prior error backoff so hourly cadence resumes.
+        this.errorRetryState.delete(tenantId);
       } catch (err) {
         failed++;
         const errorMessage = this.bankFeedService.extractXeroErrorMessage(err);
@@ -185,6 +234,22 @@ export class XeroAutoSyncJob {
           function: 'runAutoSync',
           timestamp: new Date().toISOString(),
         });
+
+        // Update backoff state: double delay on each consecutive failure, cap at MAX_RETRY_MS.
+        const prior = this.errorRetryState.get(tenantId);
+        const consecutiveFailures = (prior?.consecutiveFailures ?? 0) + 1;
+        const delayMs = Math.min(
+          INITIAL_RETRY_MS * Math.pow(2, consecutiveFailures - 1),
+          MAX_RETRY_MS,
+        );
+        this.errorRetryState.set(tenantId, {
+          nextRetryAt: Date.now() + delayMs,
+          consecutiveFailures,
+        });
+        this.logger.warn(
+          `XeroAutoSync: tenant ${tenantId} — failure #${consecutiveFailures}, ` +
+            `next retry in ${Math.round((delayMs / 3_600_000) * 10) / 10} h`,
+        );
 
         // Persist the actual error to the most-recently-synced bank connection
         // so /xero/sync-status can surface it as lastSyncError.
@@ -222,5 +287,13 @@ export class XeroAutoSyncJob {
    */
   isInFlight(tenantId: string): boolean {
     return this.inFlightTenants.has(tenantId);
+  }
+
+  /**
+   * Expose error backoff state — used by tests and sync-status endpoint.
+   * Returns the current retry state for a tenant, or undefined if none.
+   */
+  getRetryState(tenantId: string): RetryState | undefined {
+    return this.errorRetryState.get(tenantId);
   }
 }

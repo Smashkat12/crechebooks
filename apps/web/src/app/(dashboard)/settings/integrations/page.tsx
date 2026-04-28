@@ -7,14 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { XCircle, CheckCircle2, Link2, RefreshCw, Loader2, AlertCircle, Building2, Plus, Trash2, Shield, ArrowRight } from 'lucide-react';
 import { useXeroStatus } from '@/hooks/useXeroStatus';
+import { useXeroSyncStatus, useTriggerXeroSync } from '@/hooks/admin/use-xero-sync-status';
 import { xeroApi, XeroBankAccount, BankConnection } from '@/lib/api/xero';
+import { XeroSyncStatusCard } from '@/components/xero/XeroSyncStatusCard';
 import { useSimplePayStatus } from '@/hooks/use-simplepay';
+import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 
 export default function IntegrationsSettingsPage() {
   const searchParams = useSearchParams();
-  const { status, isLoading, error, syncNow, isSyncing } = useXeroStatus();
+  const { status, isLoading, error } = useXeroStatus();
+  const { data: syncStatus } = useXeroSyncStatus();
+  const triggerSync = useTriggerXeroSync();
+  const { toast } = useToast();
   const { status: simplePayStatus, isLoading: simplePayLoading } = useSimplePayStatus();
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -117,6 +123,26 @@ export default function IntegrationsSettingsPage() {
   };
 
   const isConnected = status?.isConnected ?? false;
+
+  // Derived from the new sync-status endpoint — job is RUNNING or PENDING
+  const isSyncing =
+    triggerSync.isPending ||
+    syncStatus?.currentJob?.status === 'RUNNING' ||
+    syncStatus?.currentJob?.status === 'PENDING' ||
+    syncStatus?.lastSyncStatus === 'RUNNING';
+
+  const handleSyncNow = async () => {
+    try {
+      await triggerSync.mutateAsync();
+      toast({ title: 'Sync triggered', description: 'Xero sync job has been queued.' });
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Sync failed',
+        description: err instanceof Error ? err.message : 'Could not trigger Xero sync.',
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -226,7 +252,7 @@ export default function IntegrationsSettingsPage() {
               <>
                 <Button
                   variant="outline"
-                  onClick={() => syncNow()}
+                  onClick={handleSyncNow}
                   disabled={isSyncing}
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -254,6 +280,9 @@ export default function IntegrationsSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Sync Status Card - Only shown when Xero is connected */}
+      {isConnected && <XeroSyncStatusCard />}
 
       {/* Bank Accounts Section - Only shown when Xero is connected */}
       {isConnected && (

@@ -12,3 +12,6 @@ export * from './statements';
 
 // Shared constants
 export * from './payroll-constants';
+
+// Integrations
+export * from './xero';

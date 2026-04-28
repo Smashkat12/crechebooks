@@ -117,6 +117,7 @@ export const queryKeys = {
   xero: {
     all: ['xero'] as const,
     status: () => [...queryKeys.xero.all, 'status'] as const,
+    syncStatus: () => [...queryKeys.xero.all, 'sync-status'] as const,
     syncJobs: () => [...queryKeys.xero.all, 'sync-jobs'] as const,
   },
   // Xero Payroll Journals

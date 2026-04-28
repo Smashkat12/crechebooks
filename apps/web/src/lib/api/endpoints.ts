@@ -99,6 +99,7 @@ export const endpoints = {
   },
   xero: {
     status: '/xero/status',
+    syncStatus: '/xero/sync-status',
     sync: '/xero/sync',
     connect: '/xero/connect',
     disconnect: '/xero/disconnect',

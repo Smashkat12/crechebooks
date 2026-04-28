@@ -57,6 +57,7 @@ import {
   PushCategorizationsResponseDto,
   XeroSetupGuideDto,
   TransactionsNeedingReviewDto,
+  XeroSyncStatusDto,
 } from './dto/xero.dto';
 import {
   SyncAccountsRequestDto,
@@ -67,6 +68,7 @@ import {
 } from '../../database/dto/xero-account.dto';
 import { XeroAccountStatus } from '../../database/entities/xero-account.entity';
 import { XeroAuthService } from './xero-auth.service';
+import { XeroAutoSyncJob } from './xero-auto-sync.job';
 
 @Controller('xero')
 @ApiTags('Xero Integration')
@@ -85,6 +87,7 @@ export class XeroController {
     private readonly syncGateway: XeroSyncGateway,
     private readonly xeroSyncService: XeroSyncService,
     private readonly xeroAuthService: XeroAuthService,
+    private readonly xeroAutoSyncJob: XeroAutoSyncJob,
   ) {
     this.tokenManager = new TokenManager(this.prisma);
   }
@@ -458,6 +461,111 @@ export class XeroController {
             : undefined,
       errorMessage: latestConnection?.errorMessage ?? undefined,
     };
+  }
+
+  /**
+   * Get auto-sync and connection status
+   * GET /xero/sync-status
+   * TASK-XERO-011: Detailed sync status including cron schedule info
+   *
+   * TODO: lastSyncRecordsImported and per-job tracking require a sync-job
+   * tracking table (schema-guardian dispatch needed to add XeroSyncLog model).
+   * Until then those fields return null.
+   */
+  @Get('sync-status')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'Get Xero auto-sync status',
+    description:
+      'Returns Xero connection health, last sync details, current in-flight job, and next scheduled sync time.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Sync status retrieved',
+    type: XeroSyncStatusDto,
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getSyncStatus(@CurrentUser() user: IUser): Promise<XeroSyncStatusDto> {
+    const tenantId = getTenantId(user);
+    this.logger.debug(`Getting Xero sync-status for tenant ${tenantId}`);
+
+    // Get stored token record (may not exist if never connected)
+    const xeroToken = await this.prisma.xeroToken.findUnique({
+      where: { tenantId },
+    });
+
+    if (!xeroToken) {
+      return {
+        connected: false,
+        tokenExpiresAt: null,
+        refreshTokenValid: false,
+        lastSyncAt: null,
+        lastSyncStatus: null,
+        lastSyncError: null,
+        lastSyncRecordsImported: null,
+        currentJob: null,
+        nextScheduledSyncAt: this.nextHourUtc(),
+      };
+    }
+
+    // Determine if we can still refresh (try without triggering an actual refresh)
+    const refreshTokenValid =
+      await this.tokenManager.hasValidConnection(tenantId);
+
+    // Last sync from bankConnection (most recently synced connection)
+    const latestConnection = await this.prisma.bankConnection.findFirst({
+      where: { tenantId },
+      orderBy: { lastSyncAt: 'desc' },
+    });
+
+    // Derive status from bankConnection.status
+    // ACTIVE → last sync was successful; ERROR → last sync failed; RUNNING is approximated
+    // via the in-memory inFlightTenants set on XeroAutoSyncJob.
+    const autoSyncInFlight = this.xeroAutoSyncJob.isInFlight(tenantId);
+    let lastSyncStatus: XeroSyncStatusDto['lastSyncStatus'] = null;
+    if (autoSyncInFlight) {
+      lastSyncStatus = 'RUNNING';
+    } else if (latestConnection) {
+      lastSyncStatus =
+        latestConnection.status === 'ACTIVE'
+          ? 'COMPLETED'
+          : latestConnection.status === 'ERROR'
+            ? 'FAILED'
+            : null;
+    }
+
+    // currentJob — only populated when the auto-sync cron is in flight.
+    // No persistent job-tracking table exists yet (see TODO above).
+    const currentJob: XeroSyncStatusDto['currentJob'] = autoSyncInFlight
+      ? {
+          id: `auto-sync-${tenantId}`,
+          status: 'RUNNING',
+          startedAt: new Date().toISOString(),
+        }
+      : null;
+
+    return {
+      connected: true,
+      tokenExpiresAt: xeroToken.tokenExpiresAt.toISOString(),
+      refreshTokenValid,
+      lastSyncAt: latestConnection?.lastSyncAt?.toISOString() ?? null,
+      lastSyncStatus,
+      lastSyncError: latestConnection?.errorMessage ?? null,
+      lastSyncRecordsImported: null, // TODO: requires XeroSyncLog table (schema-guardian)
+      currentJob,
+      nextScheduledSyncAt: this.nextHourUtc(),
+    };
+  }
+
+  /**
+   * Calculate the next :00 UTC timestamp (next hour boundary).
+   */
+  private nextHourUtc(): string {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCMinutes(0, 0, 0);
+    next.setUTCHours(next.getUTCHours() + 1);
+    return next.toISOString();
   }
 
   /**

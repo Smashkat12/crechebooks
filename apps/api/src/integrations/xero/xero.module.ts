@@ -31,10 +31,12 @@ import { XeroRateLimiter } from './xero-rate-limiter.service';
 import { XeroInvoiceService } from './xero-invoice.service';
 import { XeroContactService } from './xero-contact.service';
 import { XeroPaymentService } from './xero-payment.service';
+import { XeroAutoSyncJob } from './xero-auto-sync.job';
 import { PrismaModule } from '../../database/prisma/prisma.module';
 import { DatabaseModule } from '../../database/database.module';
 import { TransactionRepository } from '../../database/repositories/transaction.repository';
 import { AuditLogService } from '../../database/services/audit-log.service';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { AuditLogService } from '../../database/services/audit-log.service';
       timeout: 30000,
       maxRedirects: 5,
     }),
+    ScheduleModule.forRoot(), // TASK-XERO-011: Enable @Cron on XeroAutoSyncJob
   ],
   controllers: [XeroController],
   providers: [
@@ -56,6 +59,7 @@ import { AuditLogService } from '../../database/services/audit-log.service';
     XeroInvoiceService,
     XeroContactService,
     XeroPaymentService,
+    XeroAutoSyncJob,
     TransactionRepository,
     AuditLogService,
   ],
@@ -68,6 +72,7 @@ import { AuditLogService } from '../../database/services/audit-log.service';
     XeroInvoiceService,
     XeroContactService,
     XeroPaymentService,
+    XeroAutoSyncJob,
   ],
 })
 export class XeroModule {}

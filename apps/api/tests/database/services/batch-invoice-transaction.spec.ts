@@ -28,6 +28,7 @@ import { CreditBalanceService } from '../../../src/database/services/credit-bala
 import { CreditNoteService } from '../../../src/database/services/credit-note.service';
 import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConflictException } from '../../../src/shared/exceptions';
 import {
   withSerializableTransaction,
@@ -98,6 +99,10 @@ describe('Batch Invoice Transaction Isolation (TASK-BILL-002)', () => {
             deliverWelcomePack: jest.fn().mockResolvedValue(undefined),
             sendWelcomePack: jest.fn().mockResolvedValue({ success: true }),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn(), emitAsync: jest.fn() },
         },
       ],
     }).compile();

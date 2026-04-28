@@ -505,6 +505,7 @@ export class XeroController {
         lastSyncRecordsImported: null,
         currentJob: null,
         nextScheduledSyncAt: this.nextHourUtc(),
+        errorRetryState: null,
       };
     }
 
@@ -544,6 +545,16 @@ export class XeroController {
         }
       : null;
 
+    // Expose in-memory retry backoff for ERROR connections so the admin UI can
+    // display "next retry in Xh" instead of just "FAILED".
+    const retryState = this.xeroAutoSyncJob.getRetryState(tenantId);
+    const errorRetryState: XeroSyncStatusDto['errorRetryState'] = retryState
+      ? {
+          nextRetryAt: new Date(retryState.nextRetryAt).toISOString(),
+          consecutiveFailures: retryState.consecutiveFailures,
+        }
+      : null;
+
     return {
       connected: true,
       tokenExpiresAt: xeroToken.tokenExpiresAt.toISOString(),
@@ -554,6 +565,7 @@ export class XeroController {
       lastSyncRecordsImported: null, // TODO: requires XeroSyncLog table (schema-guardian)
       currentJob,
       nextScheduledSyncAt: this.nextHourUtc(),
+      errorRetryState,
     };
   }
 

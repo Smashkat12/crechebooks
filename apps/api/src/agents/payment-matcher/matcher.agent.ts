@@ -22,6 +22,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Transaction } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { formatFullName } from '../../common/utils/name-formatter';
 import { MatchDecisionLogger } from './decision-logger';
 import {
   MatchDecision,
@@ -649,7 +650,7 @@ export class PaymentMatcherAgent {
       if (transaction.payeeName) {
         const nameScore = this.calculateNameScore(
           transaction.payeeName,
-          `${invoice.parent.firstName} ${invoice.parent.lastName}`,
+          formatFullName(invoice.parent),
         );
         confidence += nameScore.score;
         if (nameScore.reason) reasons.push(nameScore.reason);
@@ -666,6 +667,7 @@ export class PaymentMatcherAgent {
             parentId: invoice.parentId,
             parent: {
               firstName: invoice.parent.firstName,
+              middleName: invoice.parent.middleName,
               lastName: invoice.parent.lastName,
             },
             child: {

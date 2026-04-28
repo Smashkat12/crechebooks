@@ -27,6 +27,7 @@ import {
   SdkAllocation,
 } from './interfaces/sdk-matcher.interface';
 import { PAYMENT_MATCHER_SYSTEM_PROMPT } from './matcher-prompt';
+import { formatFullName } from '../../common/utils/name-formatter';
 
 /** Threshold in cents above which a transaction is considered high-value (R50,000) */
 const HIGH_VALUE_ROUTE_THRESHOLD_CENTS = 5_000_000;
@@ -268,7 +269,7 @@ export class SdkPaymentMatcher extends BaseSdkAgent {
         `- Total (cents): ${String(candidate.invoice.totalCents)}`,
         `- Already Paid (cents): ${String(candidate.invoice.amountPaidCents)}`,
         `- Outstanding (cents): ${String(outstanding)}`,
-        `- Parent: ${candidate.invoice.parent.firstName} ${candidate.invoice.parent.lastName}`,
+        `- Parent: ${formatFullName(candidate.invoice.parent)}`,
         `- Child: ${candidate.invoice.child.firstName}`,
         `- Deterministic Confidence: ${String(candidate.confidence)}%`,
         `- Match Reasons: ${candidate.matchReasons.join('; ')}`,

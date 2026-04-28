@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import {
   fetchTodayAttendanceSummary,
-  fetchAttendanceByDate,
+  fetchAdminDayView,
   fetchChildAttendance,
   markAttendance,
   bulkMarkAttendance,
@@ -10,6 +10,7 @@ import {
   deleteAttendance,
   type AttendanceTodaySummary,
   type AttendanceRecord,
+  type AdminDayView,
   type MarkAttendanceDto,
   type BulkMarkAttendanceDto,
   type UpdateAttendanceDto,
@@ -38,9 +39,9 @@ export function useTodayAttendanceSummary() {
 }
 
 export function useAttendanceByDate(params: { date: string; classGroupId?: string }) {
-  return useQuery<AttendanceRecord[], AxiosError>({
+  return useQuery<AdminDayView, AxiosError>({
     queryKey: attendanceKeys.byDate(params.date, params.classGroupId),
-    queryFn: () => fetchAttendanceByDate(params.date, params.classGroupId),
+    queryFn: () => fetchAdminDayView(params.date, params.classGroupId),
     enabled: !!params.date,
     staleTime: 30 * 1000,
   });

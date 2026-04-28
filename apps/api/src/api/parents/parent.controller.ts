@@ -52,6 +52,7 @@ function toResponse(
     id: parent.id,
     tenantId: parent.tenantId,
     firstName: parent.firstName,
+    middleName: parent.middleName ?? null,
     lastName: parent.lastName,
     email: parent.email,
     phone: parent.phone,
@@ -80,7 +81,8 @@ export class ParentController {
     private readonly xeroSyncService: XeroSyncService,
     private readonly magicLinkService: MagicLinkService,
     // TASK-STUB-PARITY: Provider-agnostic contact sync
-    @Inject(ACCOUNTING_PROVIDER) @Optional()
+    @Inject(ACCOUNTING_PROVIDER)
+    @Optional()
     private readonly accountingProvider?: AccountingProvider,
   ) {}
 
@@ -173,6 +175,7 @@ export class ParentController {
       id: child.id,
       parentId: child.parentId,
       firstName: child.firstName,
+      middleName: child.middleName ?? null,
       lastName: child.lastName,
       dateOfBirth: child.dateOfBirth,
       gender: child.gender,

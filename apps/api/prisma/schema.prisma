@@ -74,6 +74,17 @@ enum VatType {
   NO_VAT
 }
 
+// SARS VAT Category (Categories A–F per VAT Act 89 of 1991).
+// Determines VAT201 filing cadence for VAT-registered vendors.
+enum VatCategory {
+  A // Bi-monthly returns due 25th of odd months  (Jan/Mar/May/Jul/Sep/Nov)
+  B // Bi-monthly returns due 25th of even months (Feb/Apr/Jun/Aug/Oct/Dec)
+  C // Monthly returns (turnover ≥ R30M or SARS-directed)
+  D // Bi-annual (farming and select industries)
+  E // Annual (small-scale specific)
+  F // 4-monthly (small business path)
+}
+
 enum CategorizationSource {
   AI_AUTO
   AI_SUGGESTED
@@ -287,6 +298,35 @@ enum InvitationStatus {
   REVOKED
 }
 
+// Backlog #7: per-staff invite + login flow.
+// Separate from parent Invitation because staff use magic-link auth (no User row)
+// and parent Invitation has @@unique([email, tenantId, status]) which would conflict
+// if a staff and parent share the email.
+enum StaffInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+// Backlog #11: parent proof-of-payment uploads.
+// Distinguishes the kind of attachment so the same table can hold receipts and
+// other future categories without schema churn.
+enum PaymentAttachmentKind {
+  PROOF_OF_PAYMENT
+  RECEIPT
+  OTHER
+}
+
+// Backlog #11: review workflow for proof-of-payment uploads.
+// Admin reviews PENDING uploads; APPROVED proofs may be linked to a Payment;
+// REJECTED proofs require the parent to re-upload.
+enum PaymentAttachmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 // TASK-STAFF-001: Staff Onboarding Document Types
 // DSD Compliance document categories for childcare workers
 enum DocumentType {
@@ -423,28 +463,6 @@ enum BillStatus {
   OVERDUE
 }
 
-// TASK-ACCT-011: Payment Gateway
-enum PaymentLinkStatus {
-  ACTIVE
-  EXPIRED
-  USED
-  CANCELLED
-}
-
-enum PaymentLinkType {
-  INVOICE
-  OUTSTANDING
-  CUSTOM
-  REGISTRATION
-}
-
-enum PaymentGatewayStatus {
-  PENDING
-  SUCCESSFUL
-  FAILED
-  REFUNDED
-}
-
 // TASK-ACCT-003: Opening Balances
 enum OpeningBalanceImportStatus {
   DRAFT
@@ -526,6 +544,7 @@ model Tenant {
   registrationNumber      String?            @map("registration_number") @db.VarChar(50)
   vatNumber               String?            @map("vat_number") @db.VarChar(20)
   taxStatus               TaxStatus          @default(NOT_REGISTERED) @map("tax_status")
+  vatCategory             VatCategory?       @map("vat_category")
   vatRegistrationDate     DateTime?          @map("vat_registration_date") @db.Date
   cumulativeTurnoverCents BigInt             @default(0) @map("cumulative_turnover_cents")
   addressLine1            String             @map("address_line1") @db.VarChar(200)
@@ -554,7 +573,7 @@ model Tenant {
   bankSwiftCode     String? @map("bank_swift_code") @db.VarChar(20)
 
   // TASK-FIX-005: Bank fee configuration for multi-bank support
-  bankFeeConfig     Json?   @map("bank_fee_config")
+  bankFeeConfig Json? @map("bank_fee_config")
 
   // TASK-ENROL-006: Parent welcome pack customization
   parentWelcomeMessage String? @map("parent_welcome_message") @db.Text
@@ -708,10 +727,6 @@ model Tenant {
   supplierBills        SupplierBill[]
   supplierBillPayments SupplierBillPayment[]
 
-  // TASK-ACCT-011: Payment Gateway
-  paymentLinks               PaymentLink[]
-  paymentGatewayTransactions PaymentGatewayTransaction[]
-
   // TASK-ACCT-014: Onboarding Wizard
   onboardingProgress OnboardingProgress?
 
@@ -720,23 +735,38 @@ model Tenant {
   correctionFeedback CorrectionFeedback[]
 
   // TASK-SDK-011: Structured Audit Trail
-  agentAuditLogs     AgentAuditLog[]
+  agentAuditLogs AgentAuditLog[]
 
   // TASK-SDK-012: Feature Flags for SDK Rollout
-  featureFlags       FeatureFlag[]
+  featureFlags FeatureFlag[]
 
   // TASK-CLI-001: API Keys for CLI/MCP Access
-  apiKeys            ApiKey[]
+  apiKeys ApiKey[]
 
   // PGVECTOR: AI Embedding Storage
-  vectorEmbeddings   VectorEmbedding[]
+  vectorEmbeddings VectorEmbedding[]
 
   // TASK-WA-011: WhatsApp Onboarding Sessions
   whatsAppOnboardingSessions WhatsAppOnboardingSession[]
 
   // In-App Notification System
-  notifications Notification[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
+
+  // Stub.africa Integration
+  stubConnection StubConnection?
+
+  // Class Groups (foundation for daily attendance, reports, parent visibility)
+  classGroups ClassGroup[]
+
+  // Daily Attendance (#6) — foundation for Today admin tile (#8), parent absence reporting (#9), daily class reports (#10)
+  attendanceRecords AttendanceRecord[]
+
+  // Backlog #7 — per-staff invite + login flow
+  staffInvitations StaffInvitation[]
+
+  // Backlog #11 — parent proof-of-payment uploads
+  paymentAttachments PaymentAttachment[]
 
   @@map("tenants")
 }
@@ -819,6 +849,19 @@ model User {
 
   // TASK-CLI-001: API Keys created by this user
   apiKeys ApiKey[] @relation("ApiKeyCreatedBy")
+
+  // Daily Attendance (#6) — back-relation for AttendanceRecord.markedBy
+  attendanceRecordsMarked AttendanceRecord[] @relation("AttendanceRecordMarkedBy")
+
+  // Backlog #7 — staff invitations sent by this user (audit trail)
+  staffInvitationsSent StaffInvitation[] @relation("StaffInvitationInvitedBy")
+
+  // Backlog #11 — payment attachments (proof-of-payment) uploaded / reviewed by this user
+  paymentAttachmentsUploaded PaymentAttachment[] @relation("PaymentAttachmentUploadedBy")
+  paymentAttachmentsReviewed PaymentAttachment[] @relation("PaymentAttachmentReviewedBy")
+
+  // Item #12 — inbound WhatsApp messages this admin has marked read (audit)
+  whatsAppMessagesReadBy WhatsAppMessage[] @relation("WhatsAppMessageReadBy")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1060,6 +1103,7 @@ model Parent {
   tenantId         String           @map("tenant_id")
   xeroContactId    String?          @unique @map("xero_contact_id")
   firstName        String           @map("first_name") @db.VarChar(100)
+  middleName       String?          @map("middle_name") @db.VarChar(100)
   lastName         String           @map("last_name") @db.VarChar(100)
   email            String?          @db.VarChar(255)
   phone            String?          @db.VarChar(20)
@@ -1092,15 +1136,14 @@ model Parent {
   // TASK-ACCT-012: Quotes for parent
   quotes Quote[]
 
-  // TASK-ACCT-011: Payment links and gateway transactions
-  paymentLinks               PaymentLink[]
-  paymentGatewayTransactions PaymentGatewayTransaction[]
-
   // TASK-ONBOARD: Parent onboarding documents
   generatedDocuments ParentGeneratedDocument[]
 
   // TASK-WA-011: WhatsApp Onboarding Sessions
   whatsAppOnboardingSessions WhatsAppOnboardingSession[]
+
+  // Backlog #11 — proof-of-payment uploads from parent portal
+  paymentAttachments PaymentAttachment[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1112,21 +1155,21 @@ model Parent {
 // TASK-ONBOARD: Parent Generated Documents
 // Stores fee agreements, consent forms, and other onboarding documents
 model ParentGeneratedDocument {
-  id           String   @id @default(uuid())
-  parentId     String   @map("parent_id")
-  tenantId     String   @map("tenant_id")
-  documentType String   @map("document_type") @db.VarChar(50) // FEE_AGREEMENT, CONSENT_FORMS, WELCOME_PACK
-  fileName     String   @map("file_name") @db.VarChar(255)
-  filePath     String   @map("file_path") @db.VarChar(500)
-  mimeType     String   @default("application/pdf") @map("mime_type") @db.VarChar(100)
-  generatedAt  DateTime @default(now()) @map("generated_at")
+  id           String    @id @default(uuid())
+  parentId     String    @map("parent_id")
+  tenantId     String    @map("tenant_id")
+  documentType String    @map("document_type") @db.VarChar(50) // FEE_AGREEMENT, CONSENT_FORMS, WELCOME_PACK
+  fileName     String    @map("file_name") @db.VarChar(255)
+  filePath     String    @map("file_path") @db.VarChar(500)
+  mimeType     String    @default("application/pdf") @map("mime_type") @db.VarChar(100)
+  generatedAt  DateTime  @default(now()) @map("generated_at")
   signedAt     DateTime? @map("signed_at")
-  signedByName String?  @map("signed_by_name") @db.VarChar(200)
-  signedByIp   String?  @map("signed_by_ip") @db.VarChar(45)
-  acknowledged Boolean  @default(false)
-  metadata     String?  // JSON for media consent, authorized collectors, etc.
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  signedByName String?   @map("signed_by_name") @db.VarChar(200)
+  signedByIp   String?   @map("signed_by_ip") @db.VarChar(45)
+  acknowledged Boolean   @default(false)
+  metadata     String? // JSON for media consent, authorized collectors, etc.
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
   parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
 
@@ -1168,34 +1211,112 @@ model CreditBalance {
 }
 
 model Child {
-  id               String    @id @default(uuid())
-  tenantId         String    @map("tenant_id")
-  parentId         String    @map("parent_id")
-  firstName        String    @map("first_name") @db.VarChar(100)
-  lastName         String    @map("last_name") @db.VarChar(100)
-  dateOfBirth      DateTime  @map("date_of_birth") @db.Date
+  id               String      @id @default(uuid())
+  tenantId         String      @map("tenant_id")
+  parentId         String      @map("parent_id")
+  firstName        String      @map("first_name") @db.VarChar(100)
+  middleName       String?     @map("middle_name") @db.VarChar(100)
+  lastName         String      @map("last_name") @db.VarChar(100)
+  dateOfBirth      DateTime    @map("date_of_birth") @db.Date
   gender           Gender?
-  medicalNotes     String?   @map("medical_notes")
-  emergencyContact String?   @map("emergency_contact") @db.VarChar(200)
-  emergencyPhone   String?      @map("emergency_phone") @db.VarChar(20)
-  status           ChildStatus  @default(REGISTERED)
-  isActive         Boolean      @default(true) @map("is_active")
+  medicalNotes     String?     @map("medical_notes")
+  emergencyContact String?     @map("emergency_contact") @db.VarChar(200)
+  emergencyPhone   String?     @map("emergency_phone") @db.VarChar(20)
+  status           ChildStatus @default(REGISTERED)
+  isActive         Boolean     @default(true) @map("is_active")
+  // Foundation for daily attendance / today admin tile / parent absence reporting
+  classGroupId     String?     @map("class_group_id")
   // TASK-DATA-003: Soft delete support
-  deletedAt        DateTime?    @map("deleted_at")
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  deletedAt        DateTime?   @map("deleted_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   parent      Parent       @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  classGroup  ClassGroup?  @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
   enrollments Enrollment[]
   invoices    Invoice[]
+
+  // Daily Attendance (#6)
+  attendanceRecords AttendanceRecord[]
 
   @@index([tenantId])
   @@index([tenantId, parentId])
   @@index([tenantId, isActive])
   @@index([tenantId, deletedAt])
   @@index([tenantId, status])
+  @@index([classGroupId])
   @@map("children")
+}
+
+// Class Groups — foundation for daily attendance (#6), Today admin tile (#8),
+// parent absence reporting (#9), and daily class reports (#10).
+// Children with classGroupId = NULL remain valid; not all tenants assign groups.
+model ClassGroup {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  name         String    @db.VarChar(120)
+  code         String?   @db.VarChar(20)
+  description  String?   @db.Text
+  ageMinMonths Int?      @map("age_min_months")
+  ageMaxMonths Int?      @map("age_max_months")
+  capacity     Int?
+  displayOrder Int       @default(0) @map("display_order")
+  isActive     Boolean   @default(true) @map("is_active")
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  children Child[]
+
+  // Daily Attendance (#6) — snapshot of class group at time of attendance
+  attendanceRecords AttendanceRecord[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([tenantId, deletedAt])
+  @@map("class_groups")
+}
+
+// Daily Attendance — backlog #6. Foundation for Today admin tile (#8),
+// parent absence reporting (#9), and daily class report (#10).
+// One row per child per day. classGroupId is a snapshot (not a live FK to
+// the child's current group) so historical reports remain accurate when a
+// child changes groups.
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  EARLY_PICKUP
+}
+
+model AttendanceRecord {
+  id           String           @id @default(uuid())
+  tenantId     String           @map("tenant_id")
+  childId      String           @map("child_id")
+  classGroupId String?          @map("class_group_id") // snapshot at time of attendance
+  date         DateTime         @db.Date // the day this record represents
+  status       AttendanceStatus
+  arrivalAt    DateTime?        @map("arrival_at") // optional drop-off time
+  departureAt  DateTime?        @map("departure_at") // optional pickup time
+  note         String?          @db.VarChar(500)
+  markedById   String           @map("marked_by_id") // user (staff) who recorded
+  markedAt     DateTime         @default(now()) @map("marked_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  child      Child       @relation(fields: [childId], references: [id], onDelete: Cascade)
+  classGroup ClassGroup? @relation(fields: [classGroupId], references: [id], onDelete: SetNull)
+  markedBy   User        @relation("AttendanceRecordMarkedBy", fields: [markedById], references: [id])
+
+  @@unique([childId, date]) // one record per child per day
+  @@index([tenantId, date])
+  @@index([tenantId, classGroupId, date])
+  @@index([tenantId, status, date])
+  @@map("attendance_records")
 }
 
 model Invoice {
@@ -1243,10 +1364,6 @@ model Invoice {
 
   // TASK-ACCT-012: Quotes converted to this invoice
   quotesConverted Quote[]
-
-  // TASK-ACCT-011: Payment gateway
-  paymentLinks               PaymentLink[]
-  paymentGatewayTransactions PaymentGatewayTransaction[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, parentId])
@@ -1358,8 +1475,10 @@ model Payment {
   // TASK-XERO-010: Xero Payment Mapping
   xeroPaymentMapping XeroPaymentMapping?
 
-  // TASK-ACCT-011: Payment gateway transactions linked to this payment
-  gatewayTransactions PaymentGatewayTransaction[]
+  // Backlog #11 — proof-of-payment uploads (one payment may have multiple attachments)
+  attachments             PaymentAttachment[]
+  // Backlog #11 part 2 — OCR matcher suggests this payment for proof attachments
+  suggestedForAttachments PaymentAttachment[] @relation("PaymentAttachmentSuggested")
 
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
@@ -1448,6 +1567,9 @@ model Staff {
 
   // TASK-STAFF-006: UI-19 Deadline Tracking
   ui19Submissions UI19Submission[]
+
+  // Backlog #7 — per-staff invite + login flow
+  invitations StaffInvitation[]
 
   @@unique([tenantId, idNumber])
   @@index([tenantId, isActive])
@@ -2048,6 +2170,96 @@ model Invitation {
   @@index([status])
   @@index([expiresAt])
   @@map("invitations")
+}
+
+// Backlog #7: per-staff invite + login flow.
+// Tracks invite state for staff who use magic-link auth (no User row created).
+// Separate from parent Invitation to avoid the @@unique([email, tenantId, status])
+// collision that would block a staff/parent sharing the same email.
+// tokenHash stores SHA-256 of a random token; the raw token is shown to the
+// invited staff once via the invite email link and never persisted.
+model StaffInvitation {
+  id          String                @id @default(uuid())
+  tenantId    String                @map("tenant_id")
+  staffId     String                @map("staff_id")
+  email       String                @db.VarChar(255)
+  tokenHash   String                @unique @map("token_hash") @db.VarChar(128)
+  status      StaffInvitationStatus @default(PENDING)
+  invitedById String                @map("invited_by_id")
+  expiresAt   DateTime              @map("expires_at")
+  acceptedAt  DateTime?             @map("accepted_at")
+  revokedAt   DateTime?             @map("revoked_at")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  staff     Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  invitedBy User   @relation("StaffInvitationInvitedBy", fields: [invitedById], references: [id])
+
+  @@index([tenantId, staffId, status])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("staff_invitations")
+}
+
+// Backlog #11: parent proof-of-payment uploads.
+// Parents upload EFT screenshots / deposit slips from the portal. Files live in
+// S3 under StorageKind.ProofOfPayment; this row stores the metadata + review state.
+//
+// Design notes:
+// - paymentId is nullable: parents often upload BEFORE the bank transaction
+//   lands in the system. Admin (or the AI matcher) attaches the proof to a
+//   Payment later. ON DELETE SET NULL preserves the upload for audit if the
+//   Payment is later removed.
+// - parentId is nullable to cover admin-side uploads on behalf of a parent.
+// - uploadedById captures the user (admin/staff) when uploaded via admin UI;
+//   null for parent-portal uploads (parents are not Users).
+// - reviewStatus drives the workflow: PENDING → APPROVED (linkable to a
+//   Payment) or REJECTED (parent re-uploads).
+// - s3Key stores the FULL key including the StorageKind.ProofOfPayment prefix
+//   (`tenants/{tenantId}/proof-of-payments/...`). Never a presigned URL — the
+//   server generates download URLs on demand.
+model PaymentAttachment {
+  id           String                  @id @default(uuid())
+  tenantId     String                  @map("tenant_id")
+  paymentId    String?                 @map("payment_id")
+  parentId     String?                 @map("parent_id")
+  uploadedById String?                 @map("uploaded_by_id")
+  kind         PaymentAttachmentKind   @default(PROOF_OF_PAYMENT)
+  s3Key        String                  @map("s3_key") @db.VarChar(500)
+  filename     String                  @db.VarChar(200)
+  contentType  String                  @map("content_type") @db.VarChar(100)
+  fileSize     Int                     @map("file_size")
+  note         String?                 @db.VarChar(500)
+  uploadedAt   DateTime                @default(now()) @map("uploaded_at")
+  reviewedAt   DateTime?               @map("reviewed_at")
+  reviewedById String?                 @map("reviewed_by_id")
+  reviewStatus PaymentAttachmentStatus @default(PENDING) @map("review_status")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+
+  // Backlog #11 part 2 — OCR extraction + match suggestion fields (populated async after APPROVED)
+  ocrText            String?   @map("ocr_text") @db.Text
+  extractedAmount    Int?      @map("extracted_amount")
+  extractedDate      DateTime? @map("extracted_date")
+  extractedReference String?   @map("extracted_reference") @db.VarChar(200)
+  matchAttemptedAt   DateTime? @map("match_attempted_at")
+  suggestedPaymentId String?   @map("suggested_payment_id")
+  matchConfidence    Decimal?  @map("match_confidence") @db.Decimal(5, 4)
+
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  payment          Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  parent           Parent?  @relation(fields: [parentId], references: [id], onDelete: SetNull)
+  uploadedBy       User?    @relation("PaymentAttachmentUploadedBy", fields: [uploadedById], references: [id])
+  reviewedBy       User?    @relation("PaymentAttachmentReviewedBy", fields: [reviewedById], references: [id])
+  suggestedPayment Payment? @relation("PaymentAttachmentSuggested", fields: [suggestedPaymentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, uploadedAt])
+  @@index([tenantId, paymentId])
+  @@index([tenantId, reviewStatus])
+  @@index([parentId, uploadedAt])
+  @@index([tenantId, suggestedPaymentId])
+  @@map("payment_attachments")
 }
 
 // TASK-STMT-001: Statement Entity and Data Model (Phase 12)
@@ -3215,6 +3427,13 @@ enum WhatsAppContextType {
   ARREARS
 }
 
+// Item #12: WhatsApp inbound persistence — distinguishes inbound parent
+// messages (from webhook) from outbound platform-initiated sends.
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
 model PendingSync {
   id          String                @id @default(cuid())
   tenantId    String                @map("tenant_id")
@@ -3248,7 +3467,10 @@ model WhatsAppMessage {
   tenantId       String  @map("tenant_id")
   parentId       String? @map("parent_id")
   recipientPhone String  @map("recipient_phone") @db.VarChar(20)
-  templateName   String  @map("template_name") @db.VarChar(100)
+  // Item #12: nullable — inbound messages have no template (raw user content).
+  // All existing rows are OUTBOUND template sends and already have a value;
+  // ALTER drops the NOT NULL constraint, doesn't touch data.
+  templateName   String? @map("template_name") @db.VarChar(100)
   templateParams Json?   @map("template_params")
 
   // Message identifiers from Meta
@@ -3261,25 +3483,61 @@ model WhatsAppMessage {
   errorMessage    String?               @map("error_message") @db.Text
 
   // Context - links to invoices, statements, etc.
-  contextType WhatsAppContextType @map("context_type")
-  contextId   String?             @map("context_id") @db.VarChar(100)
+  // Item #12: nullable — inbound messages have no platform-side context.
+  contextType WhatsAppContextType? @map("context_type")
+  contextId   String?              @map("context_id") @db.VarChar(100)
 
   // Timestamps
   sentAt      DateTime? @map("sent_at")
   deliveredAt DateTime? @map("delivered_at")
+  // readAt = WhatsApp protocol read receipt (when the customer's WhatsApp
+  // marked our outbound message read). Distinct from adminReadAt below.
   readAt      DateTime? @map("read_at")
   failedAt    DateTime? @map("failed_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  // Item #12: inbound persistence extensions
+  // direction defaults to OUTBOUND so existing 17 staging rows (all outbound
+  // template sends) are auto-backfilled by the column DEFAULT.
+  direction        MessageDirection @default(OUTBOUND)
+  // Inbound text body (or quick-reply payload echo). Outbound rows leave NULL
+  // because their content is reconstituted from templateName + templateParams.
+  body             String?          @map("body") @db.Text
+  // Snapshot of sender phone for inbound rows where parentId may be NULL
+  // (unrecognised number) — preserves who messaged us regardless of match.
+  fromPhone        String?          @map("from_phone") @db.VarChar(20)
+  // Array of { url, contentType, s3Key? } objects (JSONB).
+  mediaUrls        Json?            @map("media_urls")
+  // Admin "marked-as-read" flag for the inbox unread badge. Distinct from
+  // protocol-level readAt (which only applies to outbound deliveries).
+  isRead           Boolean          @default(false) @map("is_read")
+  readByUserId     String?          @map("read_by_user_id")
+  // Renamed from proposed `readAt` because that name was already taken by
+  // the WhatsApp protocol read receipt (existing column). adminReadAt is
+  // when an admin user clicked "mark as read" on the inbound thread view.
+  adminReadAt      DateTime?        @map("admin_read_at")
+  // Self-FK: outbound replies link back to the inbound they answer (or
+  // inbound replies to a previous outbound) — supports thread/quote views.
+  replyToMessageId String?          @map("reply_to_message_id")
+
   // Relations
   tenant Tenant  @relation(fields: [tenantId], references: [id])
   parent Parent? @relation(fields: [parentId], references: [id])
+
+  // Item #12: new relations
+  readByUser User?             @relation("WhatsAppMessageReadBy", fields: [readByUserId], references: [id])
+  replyTo    WhatsAppMessage?  @relation("WhatsAppMessageReply", fields: [replyToMessageId], references: [id])
+  replies    WhatsAppMessage[] @relation("WhatsAppMessageReply")
 
   @@index([tenantId, parentId])
   @@index([tenantId, status])
   @@index([tenantId, contextType, contextId])
   @@index([wamid])
+  // Item #12: query patterns
+  @@index([tenantId, direction, isRead]) // admin unread badge
+  @@index([tenantId, parentId, createdAt]) // conversation thread view
+  @@index([tenantId, direction, createdAt]) // inbound timeline
   @@map("whatsapp_messages")
 }
 
@@ -3797,80 +4055,6 @@ model SupplierBillPayment {
 }
 
 // ============================================
-// TASK-ACCT-011: Payment Gateway (Yoco)
-// ============================================
-model PaymentLink {
-  id          String            @id @default(uuid())
-  tenantId    String            @map("tenant_id")
-  parentId    String            @map("parent_id")
-  invoiceId   String?           @map("invoice_id")
-  type        PaymentLinkType   @default(INVOICE)
-  amountCents Int               @map("amount_cents")
-  shortCode   String            @unique @map("short_code") @db.VarChar(20)
-  description String?           @db.VarChar(200)
-  status      PaymentLinkStatus @default(ACTIVE)
-  expiresAt   DateTime?         @map("expires_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant              Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  parent              Parent                      @relation(fields: [parentId], references: [id])
-  invoice             Invoice?                    @relation(fields: [invoiceId], references: [id])
-  gatewayTransactions PaymentGatewayTransaction[]
-
-  @@index([tenantId, status])
-  @@index([shortCode])
-  @@map("payment_links")
-}
-
-model PaymentGatewayTransaction {
-  id            String  @id @default(uuid())
-  tenantId      String  @map("tenant_id")
-  paymentLinkId String? @map("payment_link_id")
-  parentId      String  @map("parent_id")
-  invoiceId     String? @map("invoice_id")
-
-  // Gateway details
-  gateway           String               @db.VarChar(30)
-  gatewayId         String               @map("gateway_id") @db.VarChar(100)
-  gatewayCheckoutId String?              @map("gateway_checkout_id") @db.VarChar(100)
-  status            PaymentGatewayStatus @default(PENDING)
-
-  // Amounts
-  amountCents    Int  @map("amount_cents")
-  feeCents       Int? @map("fee_cents")
-  netAmountCents Int? @map("net_amount_cents")
-
-  // Card details (masked)
-  cardBrand       String? @map("card_brand") @db.VarChar(20)
-  cardLastFour    String? @map("card_last_four") @db.VarChar(4)
-  cardExpiryMonth Int?    @map("card_expiry_month")
-  cardExpiryYear  Int?    @map("card_expiry_year")
-
-  // Payment record
-  paymentId String? @map("payment_id")
-
-  // Metadata
-  metadata     Json?
-  errorMessage String? @map("error_message") @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  paymentLink PaymentLink? @relation(fields: [paymentLinkId], references: [id])
-  parent      Parent       @relation(fields: [parentId], references: [id])
-  invoice     Invoice?     @relation(fields: [invoiceId], references: [id])
-  payment     Payment?     @relation(fields: [paymentId], references: [id])
-
-  @@unique([gateway, gatewayId])
-  @@index([tenantId, status])
-  @@index([paymentLinkId])
-  @@map("payment_gateway_transactions")
-}
-
-// ============================================
 // TASK-ACCT-014: Tenant Onboarding Wizard
 // ============================================
 model OnboardingProgress {
@@ -3907,19 +4091,19 @@ model OnboardingProgress {
 // ============================================
 
 model AgentDecision {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  agentType       String   @map("agent_type") @db.VarChar(30)
-  inputHash       String   @map("input_hash") @db.VarChar(64)
-  decision        Json
-  confidence      Int      // 0-100
-  source          String   @db.VarChar(20) // 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID'
-  wasCorrect      Boolean? @map("was_correct")
-  correctedTo     Json?    @map("corrected_to")
-  transactionId   String?  @map("transaction_id")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  agentType     String   @map("agent_type") @db.VarChar(30)
+  inputHash     String   @map("input_hash") @db.VarChar(64)
+  decision      Json
+  confidence    Int // 0-100
+  source        String   @db.VarChar(20) // 'LLM' | 'PATTERN' | 'HISTORICAL' | 'HYBRID'
+  wasCorrect    Boolean? @map("was_correct")
+  correctedTo   Json?    @map("corrected_to")
+  transactionId String?  @map("transaction_id")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   corrections CorrectionFeedback[]
 
   @@index([tenantId, agentType])
@@ -3930,15 +4114,15 @@ model AgentDecision {
 }
 
 model CorrectionFeedback {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  agentDecisionId String   @map("agent_decision_id")
-  originalValue   Json     @map("original_value")
-  correctedValue  Json     @map("corrected_value")
-  correctedBy     String   @map("corrected_by")
-  reason          String?
-  appliedToPattern Boolean @default(false) @map("applied_to_pattern")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  agentDecisionId  String   @map("agent_decision_id")
+  originalValue    Json     @map("original_value")
+  correctedValue   Json     @map("corrected_value")
+  correctedBy      String   @map("corrected_by")
+  reason           String?
+  appliedToPattern Boolean  @default(false) @map("applied_to_pattern")
+  createdAt        DateTime @default(now()) @map("created_at")
 
   agentDecision AgentDecision @relation(fields: [agentDecisionId], references: [id], onDelete: Cascade)
   tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -3953,22 +4137,22 @@ model CorrectionFeedback {
 // ============================================
 
 model AgentAuditLog {
-  id              String   @id @default(uuid())
-  tenantId        String   @map("tenant_id")
-  agentType       String   @map("agent_type") @db.VarChar(30)
-  eventType       String   @map("event_type") @db.VarChar(30)
-  workflowId      String?  @map("workflow_id")
-  transactionId   String?  @map("transaction_id")
-  decision        String   @db.VarChar(50)
-  confidence      Int?
-  source          String?  @db.VarChar(20)
-  autoApplied     Boolean  @default(false) @map("auto_applied")
-  details         Json
-  reasoning       String?  @db.Text
-  durationMs      Int?     @map("duration_ms")
-  createdAt       DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  agentType     String   @map("agent_type") @db.VarChar(30)
+  eventType     String   @map("event_type") @db.VarChar(30)
+  workflowId    String?  @map("workflow_id")
+  transactionId String?  @map("transaction_id")
+  decision      String   @db.VarChar(50)
+  confidence    Int?
+  source        String?  @db.VarChar(20)
+  autoApplied   Boolean  @default(false) @map("auto_applied")
+  details       Json
+  reasoning     String?  @db.Text
+  durationMs    Int?     @map("duration_ms")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, agentType])
   @@index([tenantId, eventType])
@@ -3983,16 +4167,16 @@ model AgentAuditLog {
 // ============================================
 
 model FeatureFlag {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  flag        String   @db.VarChar(50)
-  enabled     Boolean  @default(false)
-  mode        String   @default("SHADOW") @db.VarChar(20)
-  metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  flag      String   @db.VarChar(50)
+  enabled   Boolean  @default(false)
+  mode      String   @default("SHADOW") @db.VarChar(20)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, flag])
   @@index([tenantId])
@@ -4017,10 +4201,10 @@ model ShadowComparison {
   // NOTE: No foreign keys — intentional for immutability (audit data)
   // NOTE: No @updatedAt — this table is APPEND-ONLY
 
-  @@map("shadow_comparisons")
   @@index([tenantId, agentType, createdAt])
   @@index([agentType, createdAt])
   @@index([resultsMatch, agentType])
+  @@map("shadow_comparisons")
 }
 
 // ============================================
@@ -4035,9 +4219,9 @@ enum OnboardingStep {
   PARENT_SURNAME
   PARENT_EMAIL
   PARENT_ID_NUMBER
-  PARENT_ADDRESS          // TASK-WA-015: Collect physical address
+  PARENT_ADDRESS // TASK-WA-015: Collect physical address
   CHILD_NAME
-  CHILD_SURNAME           // TASK-WA-015: Per-child surname
+  CHILD_SURNAME // TASK-WA-015: Per-child surname
   CHILD_DOB
   CHILD_ALLERGIES
   CHILD_ANOTHER
@@ -4045,12 +4229,12 @@ enum OnboardingStep {
   EMERGENCY_CONTACT_PHONE
   EMERGENCY_CONTACT_RELATION
   ID_DOCUMENT
-  FEE_SELECTION           // TASK-WA-015: Select fee structure
+  FEE_SELECTION // TASK-WA-015: Select fee structure
   FEE_AGREEMENT
-  START_DATE              // When the child will start attending
-  MEDIA_CONSENT           // TASK-WA-015: Photo/video consent
-  AUTHORIZED_COLLECTORS   // TASK-WA-015: Authorized pickup persons
-  CONSENT_AGREEMENT       // TASK-WA-015: Legal consents acknowledgment
+  START_DATE // When the child will start attending
+  MEDIA_CONSENT // TASK-WA-015: Photo/video consent
+  AUTHORIZED_COLLECTORS // TASK-WA-015: Authorized pickup persons
+  CONSENT_AGREEMENT // TASK-WA-015: Legal consents acknowledgment
   COMMUNICATION_PREFS
   CONFIRMATION
   COMPLETE
@@ -4093,19 +4277,26 @@ model WhatsAppOnboardingSession {
 // Persists vector embeddings for AI agents (categorization, payment matching, semantic search)
 // Uses pgvector extension for efficient similarity search via HNSW index
 
+// INTENTIONAL SCHEMA DRIFT: The DB carries `vector_embeddings_embedding_idx`
+// (HNSW cosine index, m=16, ef_construction=64) which is NOT declared here.
+// Prisma cannot represent HNSW indexes on Unsupported() columns without
+// previewFeatures = ["postgresqlExtensions"] — out of scope for this change.
+// This index IS required for pgvector cosine-search performance and must not
+// be dropped. `prisma migrate diff` will report it as drift permanently.
+// See: migrations/20260426145222_align_vector_embeddings_to_schema/migration.sql
 model VectorEmbedding {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  collection  String   @db.VarChar(50)  // e.g., 'decisions', 'patterns', 'transactions'
-  contentId   String   @map("content_id") @db.VarChar(100)  // ID of the embedded content
-  contentType String   @map("content_type") @db.VarChar(30) // e.g., 'transaction', 'pattern', 'decision'
-  contentHash String   @map("content_hash") @db.VarChar(64) // SHA-256 of content for dedup
-  embedding   Unsupported("vector(384)")  // pgvector type - 384d MiniLM embeddings
+  id          String                     @id @default(uuid())
+  tenantId    String                     @map("tenant_id")
+  collection  String                     @db.VarChar(50) // e.g., 'decisions', 'patterns', 'transactions'
+  contentId   String                     @map("content_id") @db.VarChar(100) // ID of the embedded content
+  contentType String                     @map("content_type") @db.VarChar(30) // e.g., 'transaction', 'pattern', 'decision'
+  contentHash String                     @map("content_hash") @db.VarChar(64) // SHA-256 of content for dedup
+  embedding   Unsupported("vector(384)") // pgvector type - 384d MiniLM embeddings
   metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, collection, contentId])
   @@index([tenantId])
@@ -4135,7 +4326,7 @@ model Notification {
   expiresAt     DateTime?            @map("expires_at")
   createdAt     DateTime             @default(now()) @map("created_at")
 
-  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, recipientType, recipientId, isRead])
   @@index([tenantId, recipientId, createdAt])
@@ -4161,8 +4352,31 @@ model NotificationPreference {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, recipientType, recipientId])
   @@map("notification_preferences")
+}
+
+// ============================================
+// Stub.africa Integration — one connection per tenant
+// ============================================
+
+model StubConnection {
+  tenantId        String    @id @map("tenant_id") @db.VarChar(50)
+  stubBusinessUid String?   @map("stub_business_uid") @db.VarChar(100)
+  isActive        Boolean   @default(false) @map("is_active")
+  connectedAt     DateTime  @default(now()) @map("connected_at") @db.Timestamptz
+  lastSyncAt      DateTime? @map("last_sync_at") @db.Timestamptz
+  lastSyncStatus  String?   @map("last_sync_status") @db.VarChar(20)
+  errorMessage    String?   @map("error_message") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // onDelete/onUpdate: NoAction matches the live DB FK created by the runtime
+  // bootstrap in stub-accounting.adapter.ts. Schema describes reality, not the
+  // Prisma default of Restrict/Cascade.
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("stub_connections")
 }

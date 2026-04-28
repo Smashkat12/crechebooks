@@ -1,5 +1,9 @@
 # Tenant Guard Implementation Status
 
+> **Status:** Historical snapshot from the TenantGuard rollout.
+> Progress numbers and file lists below were point-in-time and have not been re-verified.
+> For current tenant-isolation state, run `pnpm --filter api tsc --noEmit` and inspect `apps/api/src/api/**/*.controller.ts` directly.
+
 ## What Was Completed
 
 ### ✅ Core Architecture (100%)
@@ -151,9 +155,6 @@ Request Flow:
 - `src/api/auth/utils/tenant-assertions.ts`
 - `docs/tenant-guard-implementation.md`
 - `docs/IMPLEMENTATION_STATUS.md`
-- `scripts/fix-tenant-id.sh` (helper script)
-- `scripts/fix-remaining-tenant-id.py` (helper script)
-- `scripts/add-missing-tenant-id.py` (helper script)
 
 ### Modified:
 - `src/app.module.ts` - Added TenantGuard to global guards

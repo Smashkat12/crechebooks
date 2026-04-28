@@ -27,6 +27,7 @@ export class ChildRepository {
           parentId: dto.parentId,
           firstName: dto.firstName,
           lastName: dto.lastName,
+          middleName: dto.middleName ?? null,
           dateOfBirth: dto.dateOfBirth,
           gender: dto.gender ?? null,
           medicalNotes: dto.medicalNotes ?? null,
@@ -275,6 +276,9 @@ export class ChildRepository {
       }
       if (dto.lastName !== undefined) {
         updateData.lastName = dto.lastName;
+      }
+      if (dto.middleName !== undefined) {
+        updateData.middleName = dto.middleName;
       }
       if (dto.dateOfBirth !== undefined) {
         updateData.dateOfBirth = dto.dateOfBirth;

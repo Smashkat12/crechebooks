@@ -418,7 +418,10 @@ describe('SdkSarsExplainer', () => {
   });
 
   describe('executeSdkInference()', () => {
-    it('should throw when agentic-flow is not installed', async () => {
+    it('should throw when claude client is not available', async () => {
+      // ClaudeClientService is not provided in this test module — so claudeClient
+      // is undefined, which causes executeSdkInference to throw the client-not-
+      // available error (replaces the old agentic-flow stub error).
       await expect(
         explainer.executeSdkInference(
           {
@@ -430,7 +433,7 @@ describe('SdkSarsExplainer', () => {
           'explain this',
           'tenant-1',
         ),
-      ).rejects.toThrow('SDK inference not available');
+      ).rejects.toThrow('Claude client not available');
     });
   });
 });

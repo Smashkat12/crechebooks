@@ -24,10 +24,11 @@ import { AuditLogService } from '../database/services/audit-log.service';
 import { IdempotencyService } from '../common/services/idempotency.service';
 import { IdempotencyGuard } from '../common/guards/idempotency.guard';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
-import { YocoModule } from '../integrations/yoco/yoco.module';
+import { StorageModule } from '../integrations/storage/storage.module';
+import { InboundMessagePersistenceService } from '../api/whatsapp/inbound-message-persistence.service';
 
 @Module({
-  imports: [ConfigModule, WhatsAppModule, YocoModule],
+  imports: [ConfigModule, WhatsAppModule, StorageModule],
   controllers: [WebhookController],
   providers: [
     WebhookService,
@@ -36,12 +37,14 @@ import { YocoModule } from '../integrations/yoco/yoco.module';
     AuditLogService,
     IdempotencyService,
     IdempotencyGuard,
+    InboundMessagePersistenceService,
   ],
   exports: [
     WebhookService,
     WebhookSignatureGuard,
     IdempotencyService,
     IdempotencyGuard,
+    InboundMessagePersistenceService,
   ],
 })
 export class WebhookModule {}

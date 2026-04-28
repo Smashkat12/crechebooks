@@ -149,7 +149,6 @@ export interface WhatsAppDeliveryStatus {
  */
 export type WhatsAppTemplateName =
   | 'invoice_notification'
-  | 'invoice_reminder'
   | 'payment_received'
   | 'arrears_notice'
   | 'registration_welcome'

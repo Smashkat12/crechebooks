@@ -7,7 +7,11 @@ import { SarsDeadlineProcessor } from '../sars-deadline.processor';
 import { SarsDeadlineService } from '../../../sars/sars-deadline.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
-import { DEFAULT_REMINDER_DAYS } from '../../../sars/types/deadline.types';
+import {
+  DEFAULT_REMINDER_DAYS,
+  SARS_DEADLINE_CALENDAR,
+  getVat201Frequency,
+} from '../../../sars/types/deadline.types';
 
 describe('SarsDeadlineProcessor', () => {
   let processor: SarsDeadlineProcessor;
@@ -230,9 +234,10 @@ describe('SarsDeadlineService', () => {
   });
 
   describe('SARS_DEADLINE_CALENDAR', () => {
-    it('should have VAT201 due on 25th', () => {
+    it('should have VAT201 due on 25th with BIMONTHLY default frequency (Cat A/B)', () => {
       expect(SARS_DEADLINE_CALENDAR.VAT201.dayOfMonth).toBe(25);
-      expect(SARS_DEADLINE_CALENDAR.VAT201.frequency).toBe('MONTHLY');
+      // Frequency reflects Cat A/B (most common). Per-tenant resolution: use getVat201Frequency().
+      expect(SARS_DEADLINE_CALENDAR.VAT201.frequency).toBe('BIMONTHLY');
     });
 
     it('should have EMP201 due on 7th', () => {
@@ -244,6 +249,37 @@ describe('SarsDeadlineService', () => {
       expect(SARS_DEADLINE_CALENDAR.IRP5.dayOfMonth).toBe(31);
       expect(SARS_DEADLINE_CALENDAR.IRP5.monthOfYear).toBe(4); // May
       expect(SARS_DEADLINE_CALENDAR.IRP5.frequency).toBe('ANNUAL');
+    });
+  });
+
+  describe('getVat201Frequency (VAT Act 89/1991 §27–28)', () => {
+    it('returns BIMONTHLY for Cat A', () => {
+      expect(getVat201Frequency('A')).toBe('BIMONTHLY');
+    });
+
+    it('returns BIMONTHLY for Cat B', () => {
+      expect(getVat201Frequency('B')).toBe('BIMONTHLY');
+    });
+
+    it('returns MONTHLY for Cat C', () => {
+      expect(getVat201Frequency('C')).toBe('MONTHLY');
+    });
+
+    it('returns BIANNUAL for Cat D', () => {
+      expect(getVat201Frequency('D')).toBe('BIANNUAL');
+    });
+
+    it('returns ANNUAL for Cat E', () => {
+      expect(getVat201Frequency('E')).toBe('ANNUAL');
+    });
+
+    it('returns QUADMONTHLY for Cat F', () => {
+      expect(getVat201Frequency('F')).toBe('QUADMONTHLY');
+    });
+
+    it('returns null for null/undefined (not registered)', () => {
+      expect(getVat201Frequency(null)).toBeNull();
+      expect(getVat201Frequency(undefined)).toBeNull();
     });
   });
 });

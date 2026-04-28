@@ -112,11 +112,10 @@ import { ParentOnboardingService } from './services/parent-onboarding.service';
 // TASK-REPORTS-005: Missing Report Types
 import { CashFlowReportService } from './services/cash-flow-report.service';
 import { AgedPayablesService } from './services/aged-payables.service';
-import { CurrencyConversionService } from './services/currency-conversion.service'; // TASK-FIX-004
+import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
-import { SarsModule } from '../integrations/sars/sars.module';
 import { AgentMemoryModule } from '../agents/memory/agent-memory.module';
 import { AuditTrailModule } from '../agents/audit/audit-trail.module';
 import { TransactionCategorizerModule } from '../agents/transaction-categorizer/categorizer.module';
@@ -127,15 +126,12 @@ import { ExtractionValidatorModule } from '../agents/extraction-validator/valida
 import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
 import { ConversationalModule } from '../agents/conversational/conversational.module';
 import { RolloutModule } from '../agents/rollout/rollout.module';
-// TASK-FIX-004: Exchange Rate Integration
-import { ExchangeRateModule } from '../integrations/exchange-rates';
 // TASK-STUB-PARITY: ACCOUNTING_PROVIDER is globally available via AccountingModule.forRoot()
 
 @Module({
   imports: [
     EmailModule,
     forwardRef(() => WhatsAppModule),
-    SarsModule,
     forwardRef(() => AgentMemoryModule),
     forwardRef(() => AuditTrailModule), // TASK-SDK-011: Structured Audit Trail
     TransactionCategorizerModule,
@@ -147,7 +143,6 @@ import { ExchangeRateModule } from '../integrations/exchange-rates';
     forwardRef(() => NotificationModule),
     forwardRef(() => SimplePayModule), // TASK-STAFF-006: For SimplePay offboarding integration
     forwardRef(() => RolloutModule), // TASK-SDK-012: Parallel Rollout Framework
-    ExchangeRateModule, // TASK-FIX-004: Real FX Rate Integration
   ],
   providers: [
     // TASK-QUOTE-001: QuotePdfService for quote PDF generation
@@ -266,8 +261,8 @@ import { ExchangeRateModule } from '../integrations/exchange-rates';
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
     AgedPayablesService,
-    // TASK-FIX-004: Currency Conversion with Real FX Rates
-    CurrencyConversionService,
+    // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
+    ReminderTemplateService,
   ],
   exports: [
     PrismaService,
@@ -385,8 +380,8 @@ import { ExchangeRateModule } from '../integrations/exchange-rates';
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
     AgedPayablesService,
-    // TASK-FIX-004: Currency Conversion with Real FX Rates
-    CurrencyConversionService,
+    // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
+    ReminderTemplateService,
   ],
 })
 export class DatabaseModule {}

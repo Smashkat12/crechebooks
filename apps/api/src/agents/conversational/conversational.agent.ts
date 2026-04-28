@@ -24,6 +24,7 @@ import { BaseSdkAgent } from '../sdk/base-sdk-agent';
 import { SdkAgentFactory } from '../sdk/sdk-agent.factory';
 import { SdkConfigService } from '../sdk/sdk-config';
 import { RuvectorService } from '../sdk/ruvector.service';
+import { ClaudeClientService } from '../sdk/claude-client.service';
 import type { AgentDefinition } from '../sdk/interfaces/sdk-agent.interface';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { QueryValidator } from './query-validator';
@@ -37,6 +38,12 @@ import {
   routeModel,
 } from './conversational-prompt';
 import { randomUUID } from 'crypto';
+
+/** System prompt for the CrecheBooks conversational assistant. */
+const CONVERSATIONAL_SYSTEM_PROMPT =
+  'You are CrecheBooks Assistant, helping parents and creche admins with billing questions. ' +
+  'Be brief and accurate. Refer to specific data when shown to you. ' +
+  'If unsure, say so. Do not provide tax advice — redirect tax questions to the SARS agent.';
 
 @Injectable()
 export class ConversationalAgent extends BaseSdkAgent {
@@ -52,6 +59,9 @@ export class ConversationalAgent extends BaseSdkAgent {
     @Optional()
     @Inject(QueryValidator)
     private readonly queryValidator?: QueryValidator,
+    @Optional()
+    @Inject(ClaudeClientService)
+    private readonly claudeClient?: ClaudeClientService,
   ) {
     super(factory, config, 'ConversationalAgent');
   }
@@ -99,11 +109,35 @@ export class ConversationalAgent extends BaseSdkAgent {
 
     // 3. Execute with SDK fallback
     const result = await this.executeWithFallback<string>(
-      // SDK path - would use LLM for natural language generation
-      // eslint-disable-next-line @typescript-eslint/require-await
+      // SDK path — call Claude via Requesty proxy
       async () => {
-        // SDK path not yet implemented - will be wired when SDK is available
-        throw new Error('SDK not yet wired for conversational agent');
+        if (!this.claudeClient?.isAvailable()) {
+          throw new Error(
+            'Claude client not available. Check ANTHROPIC_API_KEY configuration.',
+          );
+        }
+
+        // Fetch structured context from Prisma to ground the LLM answer
+        const contextSummary = await this.buildContextSummary(
+          queryType,
+          tenantId,
+          question,
+        );
+
+        const response = await this.claudeClient.sendMessage({
+          systemPrompt: CONVERSATIONAL_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: contextSummary }],
+          model,
+          maxTokens: 1024,
+          temperature: 0.3,
+        });
+
+        this.logger.log(
+          `Conversational LLM call: model=${response.model} ` +
+            `tokens=${String(response.usage.inputTokens)}→${String(response.usage.outputTokens)}`,
+        );
+
+        return response.content;
       },
       // Fallback path - use Prisma directly for template-based responses
       async () => {
@@ -476,6 +510,88 @@ export class ConversationalAgent extends BaseSdkAgent {
       `- Financial overviews and summaries\n\n` +
       `Try asking something like "What is my total revenue?" or "How many invoices are outstanding?"`
     );
+  }
+
+  /**
+   * Build a context summary string to ground the LLM in tenant-specific data.
+   * Queries Prisma for relevant figures and formats them as plain text for the prompt.
+   * READ-ONLY — only findMany, aggregate, count.
+   */
+  private async buildContextSummary(
+    queryType: QueryType,
+    tenantId: string,
+    question: string,
+  ): Promise<string> {
+    // For TAX queries, redirect without DB context (no tax data here)
+    if (queryType === 'TAX') {
+      return `User question: "${question}"\n\nContext: This is a tax-related question. Redirect politely.`;
+    }
+
+    if (!this.prisma) {
+      return `User question: "${question}"\n\nContext: No live data available.`;
+    }
+
+    const lines: string[] = [`User question: "${question}"`, '', 'Context:'];
+
+    try {
+      if (
+        queryType === 'REVENUE' ||
+        queryType === 'PAYMENT' ||
+        queryType === 'SUMMARY'
+      ) {
+        const rev = await this.prisma.transaction.aggregate({
+          where: { tenantId, isDeleted: false, isCredit: true },
+          _sum: { amountCents: true },
+          _count: true,
+        });
+        lines.push(
+          `- Total revenue: ${formatCents(rev._sum.amountCents ?? 0)} (${String(rev._count)} transactions)`,
+        );
+      }
+
+      if (queryType === 'EXPENSE' || queryType === 'SUMMARY') {
+        const exp = await this.prisma.transaction.aggregate({
+          where: { tenantId, isDeleted: false, isCredit: false },
+          _sum: { amountCents: true },
+          _count: true,
+        });
+        lines.push(
+          `- Total expenses: ${formatCents(exp._sum.amountCents ?? 0)} (${String(exp._count)} transactions)`,
+        );
+      }
+
+      if (
+        queryType === 'INVOICE' ||
+        queryType === 'SUMMARY' ||
+        queryType === 'GENERAL'
+      ) {
+        const invoices = await this.prisma.invoice.findMany({
+          where: { tenantId, isDeleted: false },
+          select: { status: true, totalCents: true, amountPaidCents: true },
+        });
+        const total = invoices.reduce((s, i) => s + (i.totalCents ?? 0), 0);
+        const paid = invoices.reduce((s, i) => s + (i.amountPaidCents ?? 0), 0);
+        const outstanding = invoices.filter(
+          (i) => i.status !== 'PAID' && i.status !== 'VOID',
+        ).length;
+        lines.push(
+          `- Invoices: ${String(invoices.length)} total, ${formatCents(total)} billed, ${formatCents(paid)} paid, ${String(outstanding)} outstanding`,
+        );
+      }
+
+      if (queryType === 'ENROLLMENT' || queryType === 'SUMMARY') {
+        const childCount = await this.prisma.child.count({
+          where: { tenantId, deletedAt: null },
+        });
+        lines.push(`- Children enrolled: ${String(childCount)}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Context fetch partial failure: ${msg}`);
+      lines.push('- (some data unavailable)');
+    }
+
+    return lines.join('\n');
   }
 
   /**

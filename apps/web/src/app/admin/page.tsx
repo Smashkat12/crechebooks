@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QuickStatsCards } from '@/components/admin/QuickStatsCards';
 import { RecentActivityFeed } from '@/components/admin/RecentActivityFeed';
+import { TodayAttendanceTile } from '@/components/admin/TodayAttendanceTile';
 import {
   Building2,
   Users,
@@ -55,6 +56,9 @@ export default function AdminOverviewPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Attendance Tile */}
+      <TodayAttendanceTile />
 
       {/* Quick Stats */}
       <QuickStatsCards

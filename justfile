@@ -1,5 +1,14 @@
 # CrecheBooks Justfile — Entry Points for Builder & Operator Systems
 # Usage: just <recipe>
+#
+# Multi-team PI agent recipes are namespaced under `pi`.
+# `just pi --list` shows them. Examples:
+#   just pi chat                            # interactive orchestrator
+#   just pi ask-all "<question>"            # multi-perspective answer from all teams
+#   just pi plan-engineer-validate "<task>" # serial workflow
+#   just pi last-session                    # pretty-print recent conversation log
+
+mod pi '.pi/justfile'
 
 # ── Builder Commands ──
 

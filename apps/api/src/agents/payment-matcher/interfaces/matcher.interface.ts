@@ -1,11 +1,14 @@
 /**
  * Payment Matcher Agent Interfaces
+ * Updated: source field added to MatchDecision (SDK-004 plumbing)
  * TASK-AGENT-003: Payment Matcher Agent
  *
  * @module agents/payment-matcher/interfaces
  * @description TypeScript interfaces for the Payment Matcher Agent.
  * All monetary values are in CENTS (integers).
  */
+
+import type { MatchSource } from './sdk-matcher.interface';
 
 /**
  * Match decision result
@@ -17,6 +20,8 @@ export interface MatchDecision {
   confidence: number;
   action: 'AUTO_APPLY' | 'REVIEW_REQUIRED' | 'NO_MATCH';
   reasoning: string;
+  /** Which subsystem produced the match decision */
+  source: MatchSource;
   alternatives: Array<{
     invoiceId: string;
     invoiceNumber: string;

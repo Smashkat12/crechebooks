@@ -66,10 +66,7 @@ export class DiscrepancyService {
     const discrepancies: Discrepancy[] = [];
 
     for (const m of matches) {
-      if (
-        m.status === 'MATCHED' ||
-        m.status === 'FEE_ADJUSTED_MATCH'
-      ) {
+      if (m.status === 'MATCHED' || m.status === 'FEE_ADJUSTED_MATCH') {
         continue; // Successfully matched — not a discrepancy
       }
 
@@ -90,7 +87,9 @@ export class DiscrepancyService {
           description: `Transaction in Xero but not in bank: ${m.xeroDescription ?? m.bankDescription}`,
           amountCents: m.xeroAmountCents ?? m.bankAmountCents,
           date: m.xeroDate ?? m.bankDate,
-          severity: this.calculateSeverity(m.xeroAmountCents ?? m.bankAmountCents),
+          severity: this.calculateSeverity(
+            m.xeroAmountCents ?? m.bankAmountCents,
+          ),
         });
       } else if (m.status === 'AMOUNT_MISMATCH') {
         discrepancies.push({

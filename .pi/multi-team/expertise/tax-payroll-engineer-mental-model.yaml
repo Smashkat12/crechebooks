@@ -1,0 +1,59 @@
+# Tax-payroll-engineer mental model — CrecheBooks
+
+purpose: |
+  SARS compliance (PAYE, UIF, SDL, VAT) and the payroll/staff data that feeds
+  it. Tax year: March → February. Returns: EMP201 (monthly), VAT201 (bi-monthly),
+  EMP501 (annual reconciliation).
+
+primary_paths:
+  apps/api/src/sars/:                "SARS deadline + compliance services"
+  apps/api/src/api/sars/:            "SARS REST endpoints — submissions, vat201, emp201"
+  apps/api/src/api/staff/:           "Staff lifecycle, leave, onboarding/offboarding"
+  apps/api/src/api/payroll/:         "Payroll runs"
+  apps/api/src/agents/sars-agent/:   "PAYE explainer (LLM seam in sdk-sars-explainer)"
+
+tax_rules:
+  paye_brackets: "see .claude/context/sa-tax-tables/* — read-only reference"
+  uif_rate:      "1% employer + 1% employee (capped)"
+  sdl_rate:      "1% on PAYE-leviable earnings (above R500k annual payroll)"
+  vat_rate:      "15% (since 2018)"
+  tax_year:      "March 1 → February 28/29"
+
+submission_status_realism:
+  - "SARS eFiling integration is STUBBED — sars-submission-retry.service.ts has TODO."
+  - "Don't claim 'submitted to SARS' — only 'drafted for review' or 'queued'."
+
+llm_seam_caveat: |
+  agents/sars-agent/sdk-sars-explainer.ts:142 throws 'agentic-flow not installed'
+  while it IS installed (load-bearing bug). Falls back to hand-written templates
+  in buildPayeFallback. Verify before relying on the explainer.
+
+prisma_models_in_scope:
+  - SarsSubmission
+  - SarsNotification
+  - VatAdjustment
+  - Payroll
+  - PayrollJournal
+  - PayrollJournalLine
+  - Staff
+  - StaffDocument
+  - StaffOnboarding
+  - StaffOffboarding
+  - LeaveRequest
+  - UI19Submission
+  - SimplePayEmployeeMapping
+  - SimplePayPayslipImport
+
+cross_team_handoffs:
+  platform-engineer: "SimplePay integration adapter + simplepay-sync.processor is theirs. We consume imported payslips."
+  billing-engineer: "VAT on invoices is billing's concern; we consume aggregated VAT for VAT201."
+  schema-guardian: "Schema changes via validation-lead."
+
+known_quirks:
+  - "SimplePay sync: hourly via scheduler/processors/simplepay-sync.processor."
+  - "UI19 submissions are paper-form-equivalent in the system; check format alignment with current SARS requirements before edits."
+
+session_observations: []
+open_questions:
+  - "Confirm sdk-sars-explainer issue — is agentic-flow really reachable?"
+  - "Multi-currency for tax: deferred (ZAR-only)."

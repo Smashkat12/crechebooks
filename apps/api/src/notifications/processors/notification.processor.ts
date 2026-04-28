@@ -48,7 +48,9 @@ export class NotificationProcessor {
           'PARENT_NOTIFICATIONS_ENABLED',
         );
         if (!isEnabled) {
-          this.logger.debug(`Parent notifications disabled for tenant ${notification.tenantId}`);
+          this.logger.debug(
+            `Parent notifications disabled for tenant ${notification.tenantId}`,
+          );
           return;
         }
       }
@@ -58,7 +60,9 @@ export class NotificationProcessor {
           'STAFF_NOTIFICATIONS_ENABLED',
         );
         if (!isEnabled) {
-          this.logger.debug(`Staff notifications disabled for tenant ${notification.tenantId}`);
+          this.logger.debug(
+            `Staff notifications disabled for tenant ${notification.tenantId}`,
+          );
           return;
         }
       }
@@ -78,7 +82,9 @@ export class NotificationProcessor {
         }
       } catch (prefError) {
         // If preference check fails, deliver anyway (fail-open)
-        this.logger.warn(`Preference check failed, delivering anyway: ${prefError}`);
+        this.logger.warn(
+          `Preference check failed, delivering anyway: ${prefError}`,
+        );
       }
 
       // 1. Persist to database
@@ -94,7 +100,10 @@ export class NotificationProcessor {
         recipientId: notification.recipientId,
       };
 
-      this.eventEmitterService.emitNotificationCreated(notification.tenantId, wsData);
+      this.eventEmitterService.emitNotificationCreated(
+        notification.tenantId,
+        wsData,
+      );
 
       this.logger.debug(
         `Notification ${created.id} persisted and emitted for tenant ${notification.tenantId}`,

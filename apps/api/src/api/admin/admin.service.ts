@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Readable } from 'stream';
 import { PrismaService } from '../../database/prisma';
 import {
   SubscriptionStatus,
   SubscriptionPlan,
   UserRole,
   AuditAction,
+  Prisma,
 } from '@prisma/client';
 import {
   ContactSubmissionsResponseDto,
@@ -39,8 +41,21 @@ import {
   AuditLogEntryDto,
   AuditLogStatsDto,
   AuditLogsListResponseDto,
+  AuditLogExportQueryDto,
 } from './dto/audit-logs.dto';
 import { NotFoundException } from '../../shared/exceptions';
+
+/** RFC 4180 CSV cell escaping — quote if contains comma, quote, or newline */
+function csvCell(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function csvRow(cells: string[]): string {
+  return cells.map(csvCell).join(',');
+}
 
 @Injectable()
 export class AdminService {
@@ -909,5 +924,121 @@ export class AdminService {
       select: { entityType: true },
     });
     return types.map((t) => t.entityType);
+  }
+
+  // ============================================
+  // AUDIT LOG CSV EXPORT (streaming, cursor-based)
+  // ============================================
+
+  /**
+   * Stream audit logs as RFC 4180 CSV.
+   * Pages 500 rows at a time via cursor to avoid loading all rows into memory.
+   * Both `from` and `to` are required and bounded to 366 days max — enforced
+   * at the controller layer before this method is called.
+   */
+  exportAuditLogsCsv(query: AuditLogExportQueryDto): Readable {
+    const PAGE_SIZE = 500;
+
+    const where: Prisma.AuditLogWhereInput = {
+      ...(query.tenantId && { tenantId: query.tenantId }),
+      ...(query.userId && { userId: query.userId }),
+      ...(query.action && { action: query.action }),
+      ...(query.resourceType && { entityType: query.resourceType }),
+      createdAt: {
+        gte: new Date(`${query.from}T00:00:00.000Z`),
+        lte: new Date(`${query.to}T23:59:59.999Z`),
+      },
+    };
+
+    const CSV_HEADER = csvRow([
+      'timestamp',
+      'actor_id',
+      'actor_type',
+      'action',
+      'entity_type',
+      'entity_id',
+      'change_summary',
+      'before_value',
+      'after_value',
+      'ip_address',
+      'user_agent',
+    ]);
+
+    const prisma = this.prisma;
+    const logger = this.logger;
+
+    const readable = new Readable({
+      objectMode: false,
+      read() {
+        // push() calls are driven by the async generator below — nothing to do here
+      },
+    });
+
+    // Drive the stream from an async IIFE so we can use await inside
+    (async () => {
+      try {
+        readable.push(CSV_HEADER + '\n');
+
+        let cursor: string | undefined;
+
+        for (;;) {
+          const batch = await prisma.auditLog.findMany({
+            where,
+            orderBy: { createdAt: 'asc' },
+            take: PAGE_SIZE,
+            ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+            select: {
+              id: true,
+              createdAt: true,
+              userId: true,
+              agentId: true,
+              action: true,
+              entityType: true,
+              entityId: true,
+              changeSummary: true,
+              beforeValue: true,
+              afterValue: true,
+              ipAddress: true,
+              userAgent: true,
+            },
+          });
+
+          if (batch.length === 0) break;
+
+          for (const row of batch) {
+            const actorId = row.userId ?? row.agentId ?? '';
+            const actorType = row.agentId ? 'AGENT' : 'USER';
+            const line = csvRow([
+              row.createdAt.toISOString(),
+              actorId,
+              actorType,
+              row.action,
+              row.entityType,
+              row.entityId,
+              row.changeSummary ?? '',
+              row.beforeValue != null ? JSON.stringify(row.beforeValue) : '',
+              row.afterValue != null ? JSON.stringify(row.afterValue) : '',
+              row.ipAddress ?? '',
+              row.userAgent ?? '',
+            ]);
+            readable.push(line + '\n');
+          }
+
+          cursor = batch[batch.length - 1].id;
+
+          if (batch.length < PAGE_SIZE) break;
+        }
+
+        readable.push(null); // EOF
+      } catch (err) {
+        logger.error(
+          'exportAuditLogsCsv stream error',
+          err instanceof Error ? err.stack : String(err),
+        );
+        readable.destroy(err instanceof Error ? err : new Error(String(err)));
+      }
+    })();
+
+    return readable;
   }
 }

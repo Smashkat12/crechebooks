@@ -73,6 +73,7 @@ import {
   Enrollment,
 } from '@prisma/client';
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('InvoiceGenerationService', () => {
@@ -125,6 +126,10 @@ describe('InvoiceGenerationService', () => {
           useValue: {
             deliverWelcomePack: jest.fn().mockResolvedValue(undefined),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn(), emitAsync: jest.fn() },
         },
       ],
     }).compile();

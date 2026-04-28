@@ -1,0 +1,48 @@
+# Data-ops mental model — CrecheBooks
+
+purpose: |
+  Read-only operations. Translate "what's the state of X" into the smallest
+  query. API preferred; DB when shape isn't exposed.
+
+mutation_policy:
+  rule: "READ-ONLY. No INSERT/UPDATE/DELETE/ALTER/DROP. If a question requires mutation, refuse and route to financial-ops, tax-ops, or comms-ops via the lead."
+
+tenant_scope_rule: |
+  Every business-data query MUST include:
+    WHERE tenant_id = '$TENANT' AND deleted_at IS NULL
+
+audit_trail:
+  system_audit:    "audit_logs table — CREATE/UPDATE/DELETE/CATEGORIZE/MATCH events"
+  agent_decisions: "agent_audit_logs — every payment-matcher / categorizer / SARS draft decision"
+  rule:            "When asked 'did X happen?', check audit_logs first."
+
+recurring_anomaly_checklist:
+  - id: "tenant_id_nulls"
+    query: "SELECT table_name FROM information_schema.columns WHERE column_name = 'tenant_id' AND is_nullable = 'YES'"
+    note: "Tenant-isolation retrofit debt; new tables should be tenant_id NOT NULL."
+  - id: "unmatched_payments_30d"
+    query: "SELECT count(*) FROM payments WHERE tenant_id = '$TENANT' AND status = 'UNMATCHED' AND created_at < now() - interval '30 days' AND deleted_at IS NULL"
+  - id: "uncategorized_transactions"
+    query: "SELECT count(*) FROM transactions WHERE tenant_id = '$TENANT' AND categorization_id IS NULL AND deleted_at IS NULL"
+  - id: "sars_submissions_no_status"
+    query: "SELECT id, form, period FROM sars_submissions WHERE tenant_id = '$TENANT' AND status IS NULL"
+  - id: "draft_invoices_30d"
+    query: "SELECT count(*) FROM invoices WHERE tenant_id = '$TENANT' AND status = 'DRAFT' AND created_at < now() - interval '30 days' AND deleted_at IS NULL"
+  - id: "open_reconciliations_60d"
+    query: "SELECT bank_account, period FROM reconciliations WHERE tenant_id = '$TENANT' AND status != 'RECONCILED' AND created_at < now() - interval '60 days'"
+
+useful_one_offs:
+  dashboard_summary: |
+    cb-api.sh GET /dashboard/summary
+  arrears_report: |
+    cb-api.sh GET /reports/arrears?asOf=YYYY-MM-DD
+  audit_for_tenant: |
+    cb-db.sh "SELECT id, action, entity, created_at FROM audit_logs WHERE tenant_id = '$TENANT' AND created_at >= 'YYYY-MM-DD' ORDER BY created_at DESC LIMIT 100"
+
+output_discipline:
+  rule:    "Long output → redirect to {{SESSION_DIR}}/<query>.csv and reference the path. Never paste >50 rows."
+  example: |
+    cb-db.sh "SELECT ..." > "{{SESSION_DIR}}/unmatched-payments.csv"
+
+session_observations: []
+open_questions: []

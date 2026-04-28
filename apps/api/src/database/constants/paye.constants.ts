@@ -38,20 +38,21 @@ export interface PayeTaxBracket {
 /**
  * 2025 SARS Tax Brackets
  * Effective 1 March 2024 - 28 February 2025
+ * Source: SARS Gazette No. 50236 (Budget 2024) — rates-of-tax-for-individuals
  *
  * @deprecated Use TaxTableService.getTaxYearByCode('2024/2025') instead
  */
 export const TAX_BRACKETS_2025: PayeTaxBracket[] = [
   {
     minIncomeCents: 0,
-    maxIncomeCents: 23740000, // R237,400
+    maxIncomeCents: 23710000, // R237,100 — SARS bracket 1 ceiling
     baseAmountCents: 0,
     rate: new Decimal('0.18'), // 18%
   },
   {
-    minIncomeCents: 23740100, // R237,401
+    minIncomeCents: 23710100, // R237,101 — SARS bracket 2 floor
     maxIncomeCents: 37050000, // R370,500
-    baseAmountCents: 4273200, // R42,732 (R237,400 * 18%)
+    baseAmountCents: 4267800, // R42,678 (R237,100 * 18%)
     rate: new Decimal('0.26'), // 26%
   },
   {
@@ -141,48 +142,49 @@ export const PAY_FREQUENCY_MULTIPLIERS = {
 /**
  * 2026 SARS Tax Brackets
  * Effective 1 March 2025 - 28 February 2026
- *
- * Note: These are projected values. Update when SARS publishes official rates.
+ * Source: SARS Gazette No. 51305 (Budget 2025) — rates-of-tax-for-individuals
+ * Note: 2025 Budget held bracket boundaries at 2024/2025 levels (no inflation
+ * adjustment to brackets; only rebates/thresholds adjusted slightly).
  */
 export const TAX_BRACKETS_2026: PayeTaxBracket[] = [
   {
     minIncomeCents: 0,
-    maxIncomeCents: 23740000, // R237,400
+    maxIncomeCents: 23710000, // R237,100 — SARS bracket 1 ceiling (unchanged from 2024/25)
     baseAmountCents: 0,
     rate: new Decimal('0.18'), // 18%
   },
   {
-    minIncomeCents: 23740001, // R237,400.01
+    minIncomeCents: 23710100, // R237,101 — SARS bracket 2 floor
     maxIncomeCents: 37050000, // R370,500
-    baseAmountCents: 4273200, // R42,732 (R237,400 * 18%)
+    baseAmountCents: 4267800, // R42,678 (R237,100 * 18%)
     rate: new Decimal('0.26'), // 26%
   },
   {
-    minIncomeCents: 37050001, // R370,500.01
+    minIncomeCents: 37050100, // R370,501
     maxIncomeCents: 51280000, // R512,800
     baseAmountCents: 7736200, // R77,362
     rate: new Decimal('0.31'), // 31%
   },
   {
-    minIncomeCents: 51280001, // R512,800.01
+    minIncomeCents: 51280100, // R512,801
     maxIncomeCents: 67300000, // R673,000
     baseAmountCents: 12147500, // R121,475
     rate: new Decimal('0.36'), // 36%
   },
   {
-    minIncomeCents: 67300001, // R673,000.01
+    minIncomeCents: 67300100, // R673,001
     maxIncomeCents: 85790000, // R857,900
     baseAmountCents: 17914700, // R179,147
     rate: new Decimal('0.39'), // 39%
   },
   {
-    minIncomeCents: 85790001, // R857,900.01
+    minIncomeCents: 85790100, // R857,901
     maxIncomeCents: 181700000, // R1,817,000
     baseAmountCents: 25125800, // R251,258
     rate: new Decimal('0.41'), // 41%
   },
   {
-    minIncomeCents: 181700001, // R1,817,000.01
+    minIncomeCents: 181700100, // R1,817,001
     maxIncomeCents: null, // No upper limit
     baseAmountCents: 64448900, // R644,489
     rate: new Decimal('0.45'), // 45%
@@ -226,6 +228,109 @@ export const TAX_THRESHOLDS_2026 = {
   AGE_65_TO_74: 14821700, // R148,217
   /** Age 75 and above */
   AGE_75_PLUS: 16568900, // R165,689
+};
+
+// ============================================================================
+// 2026/2027 Tax Year (1 March 2026 - 28 February 2027)
+// TASK-TAX-YEAR-2027
+// IMPORTANT: SARS 2026 Budget Speech delivered February 2026.
+// No authoritative 2026/2027 gazette was available at the time of writing.
+// These values are COPIED from 2025/2026. Verify against the official SARS
+// Gazette and update before the first EMP201 submission for March 2026.
+// ============================================================================
+
+/**
+ * 2027 SARS Tax Brackets
+ * Effective 1 March 2026 - 28 February 2027
+ *
+ * WARNING: Copied from 2025/2026 — VERIFY against SARS official gazette
+ * before first payroll run for March 2026.
+ */
+export const TAX_BRACKETS_2027: PayeTaxBracket[] = [
+  {
+    minIncomeCents: 0,
+    maxIncomeCents: 23710000, // R237,100 — VERIFY against 2026 Budget
+    baseAmountCents: 0,
+    rate: new Decimal('0.18'), // 18%
+  },
+  {
+    minIncomeCents: 23710100, // R237,101
+    maxIncomeCents: 37050000, // R370,500 — VERIFY
+    baseAmountCents: 4267800, // R42,678
+    rate: new Decimal('0.26'), // 26%
+  },
+  {
+    minIncomeCents: 37050100, // R370,501
+    maxIncomeCents: 51280000, // R512,800 — VERIFY
+    baseAmountCents: 7736200, // R77,362
+    rate: new Decimal('0.31'), // 31%
+  },
+  {
+    minIncomeCents: 51280100, // R512,801
+    maxIncomeCents: 67300000, // R673,000 — VERIFY
+    baseAmountCents: 12147500, // R121,475
+    rate: new Decimal('0.36'), // 36%
+  },
+  {
+    minIncomeCents: 67300100, // R673,001
+    maxIncomeCents: 85790000, // R857,900 — VERIFY
+    baseAmountCents: 17914700, // R179,147
+    rate: new Decimal('0.39'), // 39%
+  },
+  {
+    minIncomeCents: 85790100, // R857,901
+    maxIncomeCents: 181700000, // R1,817,000 — VERIFY
+    baseAmountCents: 25125800, // R251,258
+    rate: new Decimal('0.41'), // 41%
+  },
+  {
+    minIncomeCents: 181700100, // R1,817,001
+    maxIncomeCents: null, // No upper limit
+    baseAmountCents: 64448900, // R644,489
+    rate: new Decimal('0.45'), // 45%
+  },
+];
+
+/**
+ * 2027 Tax Rebates (annual amounts in cents)
+ * Effective 1 March 2026 - 28 February 2027
+ * WARNING: Copied from 2025/2026 — VERIFY against SARS official gazette
+ */
+export const REBATES_2027 = {
+  /** Primary rebate - all taxpayers */
+  PRIMARY: 1723500, // R17,235 — VERIFY
+  /** Secondary rebate - age 65 and older */
+  SECONDARY: 944400, // R9,444 — VERIFY
+  /** Tertiary rebate - age 75 and older */
+  TERTIARY: 314500, // R3,145 — VERIFY
+};
+
+/**
+ * 2027 Medical Aid Tax Credits (monthly amounts in cents)
+ * Effective 1 March 2026 - 28 February 2027
+ * WARNING: Copied from 2025/2026 — VERIFY against SARS official gazette
+ */
+export const MEDICAL_CREDITS_2027 = {
+  /** Main member monthly credit */
+  MAIN_MEMBER: 36400, // R364 — VERIFY
+  /** First dependent monthly credit */
+  FIRST_DEPENDENT: 36400, // R364 — VERIFY
+  /** Additional dependents monthly credit (each) */
+  ADDITIONAL_DEPENDENT: 24600, // R246 — VERIFY
+};
+
+/**
+ * 2027 Tax Thresholds (annual income below which no tax is payable)
+ * Effective 1 March 2026 - 28 February 2027
+ * WARNING: Copied from 2025/2026 — VERIFY against SARS official gazette
+ */
+export const TAX_THRESHOLDS_2027 = {
+  /** Below age 65 */
+  BELOW_65: 9575000, // R95,750 — VERIFY
+  /** Age 65 to 74 */
+  AGE_65_TO_74: 14821700, // R148,217 — VERIFY
+  /** Age 75 and above */
+  AGE_75_PLUS: 16568900, // R165,689 — VERIFY
 };
 
 // ============================================================================
@@ -275,6 +380,16 @@ export function getTaxYearTables(payPeriodDate?: Date): TaxYearTables {
   const taxYear = getTaxYear(date);
 
   switch (taxYear) {
+    case '2026/2027':
+      // WARNING: brackets/rebates/thresholds copied from 2025/2026.
+      // Verify against official SARS gazette before first March 2026 payroll.
+      return {
+        brackets: TAX_BRACKETS_2027,
+        rebates: REBATES_2027,
+        medicalCredits: MEDICAL_CREDITS_2027,
+        thresholds: TAX_THRESHOLDS_2027,
+        taxYear,
+      };
     case '2025/2026':
       return {
         brackets: TAX_BRACKETS_2026,

@@ -19,8 +19,11 @@ import {
   MaxLength,
   Matches,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { Gender } from '../../../database/entities/child.entity';
+import { normalizeName } from '../../../common/utils/name-normalizer';
+import { SanitizeName } from '../../../common/decorators';
 
 /**
  * API-layer DTO for enrolling a new child (snake_case)
@@ -30,12 +33,16 @@ export class EnrollChildDto {
   @ApiProperty({ description: 'Parent UUID' })
   parent_id!: string;
 
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   @ApiProperty({ description: 'Child first name' })
   first_name!: string;
 
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)

@@ -30,6 +30,7 @@ import { Decimal } from 'decimal.js';
 import { Tenant, User, Parent, Child, FeeStructure } from '@prisma/client';
 import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { cleanDatabase } from '../../helpers/clean-database';
 
 describe('EnrollmentService', () => {
@@ -72,6 +73,10 @@ describe('EnrollmentService', () => {
             deliverWelcomePack: jest.fn().mockResolvedValue(undefined),
             sendWelcomePack: jest.fn().mockResolvedValue({ success: true }),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn(), emitAsync: jest.fn() },
         },
       ],
     }).compile();

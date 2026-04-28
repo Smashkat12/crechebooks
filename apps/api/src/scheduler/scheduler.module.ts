@@ -9,10 +9,15 @@ import { PaymentReminderProcessor } from './processors/payment-reminder.processo
 import { StatementSchedulerProcessor } from './processors/statement-scheduler.processor';
 import { XeroSyncRecoveryProcessor } from './processors/xero-sync-recovery.processor';
 import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
+import { StaffInvitationCleanupJob } from '../jobs/staff-invitation-cleanup.job';
+import { PaymentAttachmentJanitorJob } from '../jobs/payment-attachment-janitor.job';
+import { StaffModule } from '../api/staff/staff.module';
+import { StorageModule } from '../integrations/storage/storage.module';
+import { InvoiceScheduleService } from '../billing/invoice-schedule.service';
+import { PaymentReminderService } from '../billing/payment-reminder.service';
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
-import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { CircuitBreakerModule } from '../integrations/circuit-breaker';
 import { EmailModule } from '../integrations/email/email.module';
 
@@ -103,8 +108,26 @@ const schedulerProviders = isRedisConfigured()
 
 // TASK-REL-101: XeroSyncRecoveryProcessor uses @nestjs/schedule, not Bull
 // TASK-FEAT-102: ArrearsReminderJob uses @nestjs/schedule for daily reminders
+// TASK-STAFF-INVITE-001: StaffInvitationCleanupJob — daily 03:00 SAST invite expiry
+// PaymentAttachmentJanitorJob — daily 03:00 SAST orphan PENDING attachment purge (60d)
 // Always register them as they use NestJS cron scheduling
-const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
+const cronProviders = [
+  XeroSyncRecoveryProcessor,
+  ArrearsReminderJob,
+  StaffInvitationCleanupJob,
+  PaymentAttachmentJanitorJob,
+];
+
+// TASK-BILL-016 / TASK-PAY-015: tenant-customisable scheduling services.
+// Dissolved from BillingSchedulerModule (which was never wired into the app graph)
+// to avoid a redundant module shell. DatabaseModule (already imported above) provides
+// PrismaService + AuditLogService; SchedulerService is in schedulerProviders.
+// These are not yet called by any controller; they are preserved for future wiring.
+// Guard behind isRedisConfigured() because both services inject SchedulerService,
+// which is only provided when Bull queues are available.
+const billingSchedulingProviders = isRedisConfigured()
+  ? [InvoiceScheduleService, PaymentReminderService]
+  : [];
 
 @Module({
   imports: [
@@ -112,14 +135,29 @@ const cronProviders = [XeroSyncRecoveryProcessor, ArrearsReminderJob];
     DatabaseModule,
     CircuitBreakerModule,
     EmailModule, // TASK-BILL-013: Email service for arrears reminders
+    StaffModule, // TASK-STAFF-INVITE-001: Provides StaffInvitationService for cleanup job
+    StorageModule, // PaymentAttachmentJanitorJob: provides StorageService for S3 deletes
     ScheduleModule.forRoot(), // TASK-REL-101: Enable cron scheduling
     ...bullImports,
   ],
-  providers: [...schedulerProviders, ...cronProviders, ReminderTemplateService],
+  providers: [
+    ...schedulerProviders,
+    ...cronProviders,
+    ...billingSchedulingProviders,
+  ],
   exports: [
-    ...(isRedisConfigured() ? [SchedulerService, BullModule] : []),
+    ...(isRedisConfigured()
+      ? [
+          SchedulerService,
+          BullModule,
+          InvoiceScheduleService, // TASK-BILL-016: Available for future controller wiring
+          PaymentReminderService, // TASK-PAY-015: Available for future controller wiring
+        ]
+      : []),
     XeroSyncRecoveryProcessor, // TASK-REL-101: Export for manual triggering
     ArrearsReminderJob, // TASK-FEAT-102: Export for manual triggering
+    StaffInvitationCleanupJob, // TASK-STAFF-INVITE-001: Export for manual triggering
+    PaymentAttachmentJanitorJob, // Export for manual triggering if needed
   ],
 })
 export class SchedulerModule {}

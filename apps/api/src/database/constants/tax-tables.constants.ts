@@ -316,9 +316,104 @@ export const TAX_YEAR_2025_2026: Omit<
 };
 
 /**
+ * 2026/2027 Tax Year Seed Data
+ * Effective 1 March 2026 - 28 February 2027
+ *
+ * IMPORTANT: No authoritative SARS 2026 Budget gazette was available at the
+ * time of writing (2026-04-28). These values are COPIED from 2025/2026.
+ * Verify against the official SARS gazette (expected: March 2026 Gazette) and
+ * update rebates, thresholds, medical credits, and bracket boundaries before
+ * the first EMP201 submission for the 2026/2027 tax year.
+ * Source placeholder: SARS https://www.sars.gov.za/individuals/tax-rates/
+ */
+export const TAX_YEAR_2026_2027: Omit<
+  TaxYear,
+  'id' | 'brackets' | 'createdAt' | 'updatedAt'
+> & {
+  brackets: Omit<TaxBracket, 'id' | 'taxYearId'>[];
+} = {
+  yearCode: '2026/2027',
+  effectiveFrom: new Date('2026-03-01'),
+  effectiveTo: new Date('2027-02-28'),
+  isActive: true,
+
+  // Rebates (annual, in cents) — VERIFY: copied from 2025/2026
+  primaryRebateCents: 1723500, // R17,235 — VERIFY
+  secondaryRebateCents: 944400, // R9,444 — VERIFY
+  tertiaryRebateCents: 314500, // R3,145 — VERIFY
+
+  // Tax thresholds (annual, in cents) — VERIFY: copied from 2025/2026
+  taxThresholdCents: 9575000, // R95,750 — VERIFY
+  taxThresholdOver65Cents: 14821700, // R148,217 — VERIFY
+  taxThresholdOver75Cents: 16568900, // R165,689 — VERIFY
+
+  // Medical aid credits (monthly, in cents) — VERIFY: copied from 2025/2026
+  medicalCreditsMainCents: 36400, // R364 — VERIFY
+  medicalCreditsFirstDependentCents: 36400, // R364 — VERIFY
+  medicalCreditsOtherDependentsCents: 24600, // R246 — VERIFY
+
+  // Tax brackets — VERIFY: copied from 2025/2026 (bracket boundaries per SARS 2024/25)
+  brackets: [
+    {
+      lowerBoundCents: 0,
+      upperBoundCents: 23710000, // R237,100 — VERIFY
+      baseTaxCents: 0,
+      marginalRate: new Decimal('0.18'), // 18%
+      bracketOrder: 1,
+    },
+    {
+      lowerBoundCents: 23710000, // R237,100
+      upperBoundCents: 37050000, // R370,500 — VERIFY
+      baseTaxCents: 4267800, // R42,678
+      marginalRate: new Decimal('0.26'), // 26%
+      bracketOrder: 2,
+    },
+    {
+      lowerBoundCents: 37050000, // R370,500
+      upperBoundCents: 51280000, // R512,800 — VERIFY
+      baseTaxCents: 7736200, // R77,362
+      marginalRate: new Decimal('0.31'), // 31%
+      bracketOrder: 3,
+    },
+    {
+      lowerBoundCents: 51280000, // R512,800
+      upperBoundCents: 67300000, // R673,000 — VERIFY
+      baseTaxCents: 12147500, // R121,475
+      marginalRate: new Decimal('0.36'), // 36%
+      bracketOrder: 4,
+    },
+    {
+      lowerBoundCents: 67300000, // R673,000
+      upperBoundCents: 85790000, // R857,900 — VERIFY
+      baseTaxCents: 17914700, // R179,147
+      marginalRate: new Decimal('0.39'), // 39%
+      bracketOrder: 5,
+    },
+    {
+      lowerBoundCents: 85790000, // R857,900
+      upperBoundCents: 181700000, // R1,817,000 — VERIFY
+      baseTaxCents: 25125800, // R251,258
+      marginalRate: new Decimal('0.41'), // 41%
+      bracketOrder: 6,
+    },
+    {
+      lowerBoundCents: 181700000, // R1,817,000
+      upperBoundCents: null, // No upper limit
+      baseTaxCents: 64448900, // R644,489
+      marginalRate: new Decimal('0.45'), // 45%
+      bracketOrder: 7,
+    },
+  ],
+};
+
+/**
  * All available tax years for seeding
  */
-export const TAX_YEARS_SEED = [TAX_YEAR_2024_2025, TAX_YEAR_2025_2026];
+export const TAX_YEARS_SEED = [
+  TAX_YEAR_2024_2025,
+  TAX_YEAR_2025_2026,
+  TAX_YEAR_2026_2027,
+];
 
 /**
  * Default tax year code to use when none specified

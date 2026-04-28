@@ -35,6 +35,106 @@
       "createdAt": "2026-01-18T17:36:26.041Z",
       "startedAt": null,
       "completedAt": null
+    },
+    "task-1775427490715-g23v1n": {
+      "taskId": "task-1775427490715-g23v1n",
+      "type": "feature",
+      "description": "P1-01: Add Notification model to Prisma schema with NotificationType and NotificationPriority enums. Add notifications relation to Tenant model. Run prisma generate.",
+      "priority": "critical",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [
+        "schema-agent"
+      ],
+      "tags": [
+        "phase1",
+        "schema",
+        "notification"
+      ],
+      "createdAt": "2026-04-05T22:18:10.715Z",
+      "startedAt": null,
+      "completedAt": "2026-04-05T22:51:49.320Z",
+      "result": "Schema migration complete - Notification model + NotificationType/NotificationPriority enums added to Prisma schema"
+    },
+    "task-1775427490723-3dje0r": {
+      "taskId": "task-1775427490723-3dje0r",
+      "type": "feature",
+      "description": "P1-02: Create in-app notification types (CreateNotificationDto, NotificationListQuery, NotificationListResponse) and InAppNotificationService with CRUD + cursor pagination",
+      "priority": "critical",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [
+        "service-agent"
+      ],
+      "tags": [
+        "phase1",
+        "service",
+        "notification"
+      ],
+      "createdAt": "2026-04-05T22:18:10.723Z",
+      "startedAt": null,
+      "completedAt": "2026-04-05T22:51:49.323Z",
+      "result": "InAppNotificationService, types, DTOs created with cursor pagination and CRUD. 12 unit tests passing."
+    },
+    "task-1775427490726-st6p7q": {
+      "taskId": "task-1775427490726-st6p7q",
+      "type": "feature",
+      "description": "P1-03: Create BullMQ NotificationProcessor and NotificationEmitter helper with notifyAdmins/notifyParent/notifyStaff methods",
+      "priority": "high",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [
+        "queue-agent"
+      ],
+      "tags": [
+        "phase1",
+        "queue",
+        "notification"
+      ],
+      "createdAt": "2026-04-05T22:18:10.726Z",
+      "startedAt": null,
+      "completedAt": "2026-04-05T22:51:49.325Z",
+      "result": "NotificationProcessor (BullMQ) and NotificationEmitter helper created. 13 unit tests passing."
+    },
+    "task-1775427490729-hyfl1j": {
+      "taskId": "task-1775427490729-hyfl1j",
+      "type": "feature",
+      "description": "P1-04: Create notification REST API controllers for admin (JWT), parent (parent-token), and staff (staff-token) portals with list, unread-count, mark-read, mark-all-read endpoints",
+      "priority": "high",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [
+        "api-agent"
+      ],
+      "tags": [
+        "phase1",
+        "api",
+        "notification"
+      ],
+      "createdAt": "2026-04-05T22:18:10.729Z",
+      "startedAt": null,
+      "completedAt": "2026-04-05T22:51:49.326Z",
+      "result": "Admin, Parent, Staff notification controllers created with proper auth guards. NotificationApiModule wired into ApiModule."
+    },
+    "task-1775427490731-wmmh94": {
+      "taskId": "task-1775427490731-wmmh94",
+      "type": "feature",
+      "description": "P1-05: Write unit tests for InAppNotificationService, NotificationProcessor, NotificationEmitter, and notification controllers",
+      "priority": "high",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [
+        "test-agent"
+      ],
+      "tags": [
+        "phase1",
+        "testing",
+        "notification"
+      ],
+      "createdAt": "2026-04-05T22:18:10.731Z",
+      "startedAt": null,
+      "completedAt": "2026-04-05T22:51:49.328Z",
+      "result": "25 unit tests across 3 test files all passing. Covers service CRUD, processor persistence+WebSocket, emitter fire-and-forget."
     }
   },
   "version": "3.0.0"

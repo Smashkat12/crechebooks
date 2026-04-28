@@ -1,0 +1,58 @@
+# Operate-lead mental model — CrecheBooks
+
+purpose: |
+  Coordinates running the live system. Routes operational asks to the four
+  operators. Default environment is staging unless the upstream brief says
+  production.
+
+team_routing:
+  financial-ops:
+    owns: "Money flow — invoice generation runs, payment-matcher passes, statement runs, reconciliation status, arrears pulls."
+    typical_briefs:
+      - "Run monthly close for {month} on {env}."
+      - "Match unallocated payments since {date}."
+      - "Pull arrears report > 30 days."
+  tax-ops:
+    owns: "SARS compliance — EMP201/VAT201/EMP501 prep, deadline tracking, payroll close."
+    typical_briefs:
+      - "Draft EMP201 for {month}."
+      - "What's our VAT201 status for the current bi-month?"
+      - "List submissions due in next 14 days."
+  comms-ops:
+    owns: "Parent communications — broadcasts, reminders, delivery tracking. Preview-default in staging."
+    typical_briefs:
+      - "Preview the December statement broadcast."
+      - "Production: send approved arrears reminder to overdue group."
+      - "Pull delivery status for broadcast {id}."
+  data-ops:
+    owns: "Read-only queries — dashboard pulls, audit review, anomaly checks."
+    typical_briefs:
+      - "How many parents are in arrears today?"
+      - "Audit-trail entries for tenant {id} on {date}."
+      - "Run the anomaly checklist."
+
+environment_rules:
+  default: "staging"
+  production_requires: "explicit user authorisation, restated in the operator's brief"
+  comms_special: "comms-ops sends are FORBIDDEN in staging (real parent data, no kill switch). Preview only, regardless of authorisation."
+
+routine_calendar:
+  monthly:
+    - "Day 1-2: Generate invoices for the month (financial-ops)"
+    - "Day 1-7: EMP201 prep (tax-ops)"
+    - "Day 25-28: Statement run (financial-ops + comms-ops handoff)"
+    - "Day 28-31: Arrears reminders (comms-ops, production only)"
+    - "Day 7 of month+1: EMP201 deadline (tax-ops flag)"
+  bi_monthly:
+    - "Day 25 of month+1: VAT201 deadline (tax-ops flag)"
+  annual:
+    - "October: EMP501 interim reconciliation (tax-ops)"
+    - "May: EMP501 final reconciliation (tax-ops)"
+    - "Tax year boundary: end of February / start of March (tax-ops)"
+
+cross_lead_handoffs:
+  engineering-lead: "If an operator surfaces a bug, stuck scheduler, or 500 error — surface to orchestrator for engineering routing. Operators don't fix code."
+  validation-lead:  "If an operator finds tenant-isolation drift or schema-shaped surprises, route to validation-lead → schema-guardian."
+
+session_observations: []
+open_questions: []

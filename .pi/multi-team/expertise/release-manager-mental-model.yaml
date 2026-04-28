@@ -1,0 +1,105 @@
+# Release-manager mental model — CrecheBooks
+
+purpose: |
+  Shepherds verified engineering work into PRs. Default target: staging.
+  Production releases happen via separate staging → main merge.
+
+git_layout:
+  primary_branches:
+    main:    "Production. Auto-deploys to api.elleelephant.co.za + app.elleelephant.co.za on push."
+    staging: "Integration. Auto-deploys to api-staging-5287.up.railway.app + web-staging-30e8.up.railway.app on push."
+  default_pr_target: "staging"
+  hotfix_target:     "main (only with explicit authorisation)"
+  staging_first_workflow: |
+    Normal flow: branch off staging → PR to staging → auto-deploy → manual test → staging-to-main merge for prod.
+    Hotfix flow: branch off main → PR to main → back-merge into staging.
+
+scope_taxonomy:
+  - billing
+  - payments
+  - banking
+  - tax
+  - sars
+  - payroll
+  - staff
+  - parents
+  - dashboard
+  - comms
+  - notifications
+  - platform
+  - scheduler
+  - agents
+  - integrations
+  - prisma
+  - web
+  - cli
+  - ci
+  - release
+
+verify_gate_lookup:
+  rule: "Before staging anything, scan the conversation log for the engineer's Verify: block. PASS required on lint + typecheck + tests."
+  pattern: "Look for ```Verify:\\n  - lint: PASS\\n  - typecheck: PASS\\n  - tests: PASS``` (or SKIPPED with justification)."
+
+forbidden_actions_without_explicit_auth:
+  - "git push --force / -f to any branch"
+  - "git rebase -i on shared branches (main, staging)"
+  - "git config --global"
+  - "--no-verify (skipping hooks)"
+  - "merging to main directly (always via PR)"
+  - "deleting remote branches"
+  - "GPG signing without a verified key in the brief"
+
+pr_template_minimal:
+  title_format: "<type>(<scope>): <subject ≤ 72 chars>"
+  body_template: |
+    ## Summary
+    - <1–3 bullets>
+
+    ## Changes
+    - <files / endpoints / contracts>
+
+    ## Test plan
+    - [ ] <verification step>
+
+    ## Risk
+    - <none | low | medium | high> — <one sentence>
+
+co_author_policy:
+  rule: "pi agents are tools. NEVER add Co-Authored-By: for pi agents. Attribution to the human user only."
+
+repo_quirks_to_check:
+  - "Does .github/PULL_REQUEST_TEMPLATE.md exist? gh pr create may auto-populate from it."
+  - "Branch protection on staging — if CI is required, do not assume the merge will succeed; flag CI status."
+  - "husky / lint-staged hooks — pre-commit lint + commitlint enforced. Fix root causes, never --no-verify."
+
+session_observations:
+  - date: "2026-04-26"
+    note: |
+      Shipped chore(prisma): commit notifications + stub_connection migrations applied earlier
+      Commit 63733dd pushed to origin/staging (a9cfaf5..63733dd).
+      Two migration directories (20260426120000_add_notifications_and_preferences,
+      20260426140000_add_stub_connection_model) committed — both were pre-applied to
+      staging DB and recorded in _prisma_migrations. migrate deploy will be no-op.
+      Credential-helper warning and 120 Dependabot vulns remain pre-existing non-fatal.
+  - date: "2026-04-26"
+    note: |
+      Shipped fix(prisma): align vector_embeddings with schema, preserve HNSW index
+      Commit a9cfaf5 pushed to origin/staging (9c068db..a9cfaf5).
+      schema.prisma staged change includes StubConnection model additions
+      (related to out-of-scope migration 20260426140000) — engineering-lead
+      explicitly included schema.prisma in the brief, aware of full file state.
+      GitHub Dependabot reported 120 vulnerabilities on push (3 critical, 57 high)
+      — not blocking, noted for engineering-lead awareness.
+      Credential helper warning (`git: 'credential-!aws' is not a git command`)
+      appeared on push — non-fatal, push succeeded normally.
+  - date: "2026-04-26"
+    note: |
+      Shipped chore(pi): commit multi-team agent harness + convention doc
+      Commit 2d48145 pushed to origin/staging (63733dd..2d48145).
+      61 files: 23 agents, 24 expertise (incl. .gitkeep), 9 skills, 1 config,
+      1 extensions/multi-team/index.ts, 1 justfile, 1 CONVENTION.pi.md, 1 .gitignore.
+      sessions/ and logs/ gitignored by new block appended to .gitignore.
+      Credential helper warning (non-fatal) + 120 Dependabot vulns (pre-existing).
+open_questions:
+  - "(unresolved) Does staging have branch protection requiring CI green before merge?"
+  - "(unresolved) Is there a code-owners policy for any directory?"

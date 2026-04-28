@@ -57,9 +57,7 @@ export class EnrollmentCompletedHandler {
     });
 
     if (admins.length === 0) {
-      this.logger.warn(
-        `No active admins found for tenant ${event.tenantId}`,
-      );
+      this.logger.warn(`No active admins found for tenant ${event.tenantId}`);
       return;
     }
 
@@ -80,9 +78,7 @@ export class EnrollmentCompletedHandler {
     });
 
     if (!tenant) {
-      this.logger.warn(
-        `Tenant ${event.tenantId} not found for notification`,
-      );
+      this.logger.warn(`Tenant ${event.tenantId} not found for notification`);
       return;
     }
 
@@ -120,10 +116,12 @@ export class EnrollmentCompletedHandler {
       if (!admin.email) continue;
 
       try {
-        const rendered = this.emailTemplateService.renderEnrollmentNotification({
-          ...templateData,
-          recipientName: admin.name || 'Admin',
-        });
+        const rendered = this.emailTemplateService.renderEnrollmentNotification(
+          {
+            ...templateData,
+            recipientName: admin.name || 'Admin',
+          },
+        );
 
         await this.emailService.sendEmailWithOptions({
           to: admin.email,
@@ -159,7 +157,9 @@ export class EnrollmentCompletedHandler {
     }
   }
 
-  private emitWebSocketEvent(event: EnrollmentEvents.EnrollmentCompletedEvent): void {
+  private emitWebSocketEvent(
+    event: EnrollmentEvents.EnrollmentCompletedEvent,
+  ): void {
     try {
       const wsData: EnrollmentCompletedData = {
         enrollmentId: event.enrollmentId,

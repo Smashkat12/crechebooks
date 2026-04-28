@@ -50,6 +50,8 @@ export interface CategorizationItemResult {
   accountName?: string;
   confidenceScore?: number;
   source: CategorizationSource;
+  /** Fine-grained source from the categorizer agent (not persisted to DB) */
+  agentSource?: 'PATTERN' | 'HISTORICAL' | 'FALLBACK' | 'LLM';
   error?: string;
 }
 
@@ -137,6 +139,8 @@ export interface AICategorization {
   vatType: VatType;
   isSplit: boolean;
   splits?: SplitItemDto[];
+  /** Fine-grained source from the categorizer agent */
+  agentSource?: 'PATTERN' | 'HISTORICAL' | 'FALLBACK' | 'LLM';
 }
 
 /**

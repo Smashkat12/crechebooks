@@ -141,7 +141,7 @@ export class PgVectorRepository implements OnModuleInit {
         id, tenant_id, collection, content_id, content_type,
         content_hash, embedding, metadata, created_at, updated_at
       ) VALUES (
-        gen_random_uuid(),
+        gen_random_uuid()::text,
         ${options.tenantId},
         ${options.collection},
         ${options.contentId},
@@ -188,7 +188,7 @@ export class PgVectorRepository implements OnModuleInit {
         : 'null';
 
       return `(
-        gen_random_uuid(),
+        gen_random_uuid()::text,
         '${options.tenantId}',
         '${options.collection}',
         '${item.contentId}',

@@ -29,7 +29,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { PreferredContact } from '../entities/parent.entity';
 import { IsSAIDNumber, IsSAPhoneNumber } from '../../shared/validators';
 import {
@@ -39,22 +39,32 @@ import {
   SanitizeIdNumber,
   SanitizeText,
 } from '../../common/utils/sanitize.utils';
+import { normalizeName } from '../../common/utils/name-normalizer';
 
 export class CreateParentDto {
   @IsUUID()
   tenantId?: string;
 
+  @Transform(({ value }) => normalizeName(value))
   @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   firstName!: string;
 
+  @Transform(({ value }) => normalizeName(value))
   @SanitizeName()
   @IsString()
   @MinLength(1)
   @MaxLength(100)
   lastName!: string;
+
+  @IsOptional()
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
+  @IsString()
+  @MaxLength(100)
+  middleName?: string | null;
 
   @IsOptional()
   @SanitizeEmail()

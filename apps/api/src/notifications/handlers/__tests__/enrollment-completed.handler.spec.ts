@@ -10,7 +10,10 @@ import { EnrollmentCompletedEvent } from '../../../database/events/enrollment.ev
 
 describe('EnrollmentCompletedHandler', () => {
   let handler: EnrollmentCompletedHandler;
-  let prisma: { user: { findMany: jest.Mock }; tenant: { findUnique: jest.Mock } };
+  let prisma: {
+    user: { findMany: jest.Mock };
+    tenant: { findUnique: jest.Mock };
+  };
   let emailService: { sendEmailWithOptions: jest.Mock };
   let emailTemplateService: { renderEnrollmentNotification: jest.Mock };
   let wsEventEmitter: { emitToTenant: jest.Mock };
@@ -56,7 +59,9 @@ describe('EnrollmentCompletedHandler', () => {
     emailTemplateService = { renderEnrollmentNotification: jest.fn() };
     wsEventEmitter = { emitToTenant: jest.fn() };
     configService = { get: jest.fn() };
-    notificationEmitter = { notifyAdmins: jest.fn().mockResolvedValue(undefined) };
+    notificationEmitter = {
+      notifyAdmins: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -82,8 +87,13 @@ describe('EnrollmentCompletedHandler', () => {
     configService.get.mockReturnValue('production');
     prisma.user.findMany.mockResolvedValue(admins);
     prisma.tenant.findUnique.mockResolvedValue(mockTenant);
-    emailTemplateService.renderEnrollmentNotification.mockReturnValue(mockRendered);
-    emailService.sendEmailWithOptions.mockResolvedValue({ messageId: 'msg-1', status: 'sent' });
+    emailTemplateService.renderEnrollmentNotification.mockReturnValue(
+      mockRendered,
+    );
+    emailService.sendEmailWithOptions.mockResolvedValue({
+      messageId: 'msg-1',
+      status: 'sent',
+    });
 
     await handler.handleEnrollmentCompleted(baseEvent);
 
@@ -158,7 +168,9 @@ describe('EnrollmentCompletedHandler', () => {
     configService.get.mockReturnValue('production');
     prisma.user.findMany.mockResolvedValue(admins);
     prisma.tenant.findUnique.mockResolvedValue(mockTenant);
-    emailTemplateService.renderEnrollmentNotification.mockReturnValue(mockRendered);
+    emailTemplateService.renderEnrollmentNotification.mockReturnValue(
+      mockRendered,
+    );
     emailService.sendEmailWithOptions
       .mockRejectedValueOnce(new Error('SMTP error'))
       .mockResolvedValueOnce({ messageId: 'msg-2', status: 'sent' });
@@ -175,8 +187,13 @@ describe('EnrollmentCompletedHandler', () => {
       { email: 'ok@elle.co.za', name: 'Has Email' },
     ]);
     prisma.tenant.findUnique.mockResolvedValue(mockTenant);
-    emailTemplateService.renderEnrollmentNotification.mockReturnValue(mockRendered);
-    emailService.sendEmailWithOptions.mockResolvedValue({ messageId: 'msg-1', status: 'sent' });
+    emailTemplateService.renderEnrollmentNotification.mockReturnValue(
+      mockRendered,
+    );
+    emailService.sendEmailWithOptions.mockResolvedValue({
+      messageId: 'msg-1',
+      status: 'sent',
+    });
 
     await handler.handleEnrollmentCompleted(baseEvent);
 
@@ -196,15 +213,22 @@ describe('EnrollmentCompletedHandler', () => {
       { email: 'admin@elle.co.za', name: 'Admin' },
     ]);
     prisma.tenant.findUnique.mockResolvedValue(mockTenant);
-    emailTemplateService.renderEnrollmentNotification.mockReturnValue(mockRendered);
-    emailService.sendEmailWithOptions.mockResolvedValue({ messageId: 'msg-1', status: 'sent' });
+    emailTemplateService.renderEnrollmentNotification.mockReturnValue(
+      mockRendered,
+    );
+    emailService.sendEmailWithOptions.mockResolvedValue({
+      messageId: 'msg-1',
+      status: 'sent',
+    });
 
     await handler.handleEnrollmentCompleted({
       ...baseEvent,
       source: 'admin_api',
     });
 
-    expect(emailTemplateService.renderEnrollmentNotification).toHaveBeenCalledWith(
+    expect(
+      emailTemplateService.renderEnrollmentNotification,
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         enrollmentSource: 'Admin Portal',
       }),

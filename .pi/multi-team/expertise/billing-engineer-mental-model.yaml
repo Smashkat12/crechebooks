@@ -1,0 +1,48 @@
+# Billing-engineer mental model — CrecheBooks
+
+purpose: |
+  Owns invoice generation, fee structures, statements, ad-hoc charges.
+  Pipeline: Enrollment + FeeStructure → Invoice (+lines) → Statement → InvoiceDeliveryLog.
+
+primary_paths:
+  apps/api/src/api/billing/: "REST surface — POST /invoices, /statements, etc."
+  apps/api/src/billing/:     "Core billing logic, fee resolution, invoice composition"
+
+money_rules:
+  - "ZAR. Stored as integer cents on Invoice.totalAmount, InvoiceLine.amount, etc."
+  - "Decimal.js for any sum / discount / proration. Never raw Number arithmetic."
+  - "Banker's rounding (HALF_EVEN) — Prisma uses this, billing code must match."
+
+invoice_numbering:
+  source: "InvoiceNumberCounter table — atomic increment per tenant"
+  format: "see existing tenant settings; do NOT introduce new format without product sign-off"
+
+scheduler_coupling:
+  - "invoice-scheduler.processor — owned by platform-engineer; runs invoice batches"
+  - "statement-scheduler.processor — owned by platform-engineer; monthly PDF statements"
+  - "If your change needs a new schedule, flag for platform-engineer."
+
+prisma_models_in_scope:
+  - Invoice
+  - InvoiceLine
+  - InvoiceDeliveryLog
+  - InvoiceNumberCounter
+  - FeeStructure
+  - AdHocCharge
+  - Statement
+  - StatementLine
+  - CreditBalance        # cross-cuts with people-engineer
+  - Enrollment           # cross-cuts with people-engineer
+
+cross_team_handoffs:
+  payments-engineer: "Once an invoice is paid (Payment.status), Invoice.status flips. Don't re-implement that flow."
+  people-engineer: "Parent/Child/Enrollment data is read-only here. Sibling-discount logic OWNED by billing."
+  comms-engineer: "Invoice delivery (email/WhatsApp PDF) routes through comms — return DeliveryRequest, don't call providers."
+  schema-guardian: "All schema changes route via validation-lead → schema-guardian."
+
+known_quirks:
+  - "Statement generation has TODO for pagination on large-tenant datasets."
+  - "Sibling discount edge cases: cousin/half-sibling fields exist on Child but discount logic only honors full siblings — confirm before extending."
+
+session_observations: []
+open_questions: []

@@ -206,6 +206,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         confidence: 90,
         action: 'AUTO_APPLY',
         reasoning: 'Exact reference and amount match for invoice 001',
+        source: 'deterministic',
         alternatives: [
           {
             invoiceId: mockInvoiceId2,
@@ -273,6 +274,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         confidence: 70, // Medium confidence
         action: 'REVIEW_REQUIRED',
         reasoning: 'Moderate confidence - review recommended',
+        source: 'deterministic',
         alternatives: [],
       };
 
@@ -313,6 +315,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         confidence: 45, // Low confidence
         action: 'REVIEW_REQUIRED',
         reasoning: 'Low confidence - manual review required',
+        source: 'deterministic',
         alternatives: [],
       };
 
@@ -362,6 +365,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
           confidence: 90,
           action: 'AUTO_APPLY',
           reasoning: 'Recovered after retries',
+          source: 'deterministic' as const,
           alternatives: [],
         });
 
@@ -448,6 +452,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
         confidence: 90,
         action: 'AUTO_APPLY',
         reasoning: 'Strong match based on reference and amount',
+        source: 'deterministic',
         alternatives: [
           {
             invoiceId: mockInvoiceId2,
@@ -530,9 +535,11 @@ describe('PaymentMatchingService - Agent Integration', () => {
     });
 
     it('should NOT invoke agent when no high-confidence matches exist', async () => {
-      // Arrange: Transaction that matches poorly (low confidence)
+      // Arrange: Transaction with no recognizable name or reference
       const poorMatchTransaction = {
         ...mockTransaction,
+        description: 'ATM Cash Withdrawal',
+        payeeName: 'ATM Cash Withdrawal',
         reference: 'UNKNOWN-REF',
         amountCents: 50000, // Different amount
       };

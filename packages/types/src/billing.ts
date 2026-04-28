@@ -4,6 +4,7 @@ export interface IParent {
   id: string;
   tenantId: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
   phone?: string;
@@ -20,6 +21,7 @@ export interface IChild {
   parentId: string;
   tenantId: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   dateOfBirth: Date;
   enrollmentDate: Date;

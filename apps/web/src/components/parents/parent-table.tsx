@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DataTable } from '@/components/tables';
 import type { IParent, CommunicationMethod } from '@crechebooks/types';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 interface ParentTableProps {
   parents: IParent[];
@@ -43,7 +44,7 @@ export function ParentTable({
       header: 'Name',
       cell: ({ row }) => (
         <div className="font-medium">
-          {row.original.firstName} {row.original.lastName}
+          {formatFullName(row.original)}
         </div>
       ),
     },

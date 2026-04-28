@@ -23,6 +23,7 @@ import { PrismaService } from '../../../database/prisma/prisma.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { AuditAction } from '../../../database/entities/audit-log.entity';
 import { BusinessException } from '../../../shared/exceptions';
+import { CommsGuardService } from '../../../common/services/comms-guard/comms-guard.service';
 import { WhatsAppMessageEntity } from '../entities/whatsapp-message.entity';
 import {
   WhatsAppMessageStatus,
@@ -77,6 +78,7 @@ export class TwilioWhatsAppService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
+    private readonly commsGuard: CommsGuardService,
     @Optional() private readonly messageEntity?: WhatsAppMessageEntity,
     @Optional() private readonly contentService?: TwilioContentService,
   ) {
@@ -193,6 +195,13 @@ export class TwilioWhatsAppService {
       contextId?: string;
     },
   ): Promise<TwilioMessageResult> {
+    if (this.commsGuard.isDisabled()) {
+      this.logger.warn(
+        `[COMMS_DISABLED] Skipping Twilio WhatsApp message to ${to}`,
+      );
+      return { success: true, messageId: 'comms-disabled-noop' };
+    }
+
     const config = this.ensureConfigured();
     this.checkRateLimit();
 
@@ -465,7 +474,14 @@ ${pdfUrl ? `View Statement: ${pdfUrl}` : ''}
   }
 
   /**
-   * Send welcome message after enrollment
+   * Send registration welcome message via Content API template when available.
+   * Falls back to free-form text if the content service or template is not ready.
+   *
+   * Uses REGISTRATION_WELCOME (cb_registration_welcome) — 4 variables:
+   *   {{1}} crecheName, {{2}} parentName, {{3}} childName, {{4}} portalUrl
+   *
+   * WARNING: The body text of cb_registration_welcome requires re-registration
+   * with Twilio Content API and Meta approval before it can be used in production.
    */
   async sendWelcomeMessage(
     tenantId: string,
@@ -473,20 +489,50 @@ ${pdfUrl ? `View Statement: ${pdfUrl}` : ''}
     parentName: string,
     childName: string,
     crecheName: string,
+    portalUrl: string = 'https://app.crechebooks.co.za/portal',
   ): Promise<TwilioMessageResult> {
+    const template = this.contentService?.getTemplate(
+      TEMPLATE_NAMES.REGISTRATION_WELCOME,
+    );
+
+    if (this.contentService && template) {
+      const variables: ContentVariable[] = [
+        { key: '1', value: crecheName },
+        { key: '2', value: parentName },
+        { key: '3', value: childName },
+        { key: '4', value: portalUrl },
+      ];
+
+      const result = await this.contentService.sendContentMessage(
+        parentPhone,
+        template.sid,
+        variables,
+        tenantId,
+        WhatsAppContextType.WELCOME,
+        childName,
+      );
+
+      return {
+        success: result.success,
+        messageId: result.messageSid,
+        error: result.error,
+        errorCode: result.errorCode,
+      };
+    }
+
+    // Fallback: free-form text (sandbox / template not yet approved)
     const body = `Welcome to ${crecheName}, ${parentName}!
 
-Thank you for enrolling ${childName} with us.
-
+Thank you for registering ${childName} with us.
 You will receive invoices and important updates via WhatsApp.
-
-To stop receiving messages, reply STOP at any time.
+To manage your notification preferences, visit your parent portal:
+${portalUrl}
 
 - ${crecheName}`;
 
     return this.sendMessage(parentPhone, body, {
       tenantId,
-      contextType: WhatsAppContextType.WELCOME, // Welcome message for enrollments
+      contextType: WhatsAppContextType.WELCOME,
       contextId: childName,
     });
   }

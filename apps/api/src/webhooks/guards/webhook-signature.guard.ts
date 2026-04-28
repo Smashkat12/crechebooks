@@ -7,7 +7,7 @@
  *
  * Usage:
  * @UseGuards(WebhookSignatureGuard)
- * @SetMetadata('webhookProvider', 'sendgrid')
+ * @SetMetadata('webhookProvider', 'simplepay')
  */
 
 import {
@@ -24,13 +24,7 @@ import type { Request } from 'express';
 
 export const WEBHOOK_PROVIDER_KEY = 'webhookProvider';
 
-export type WebhookProvider =
-  | 'sendgrid'
-  | 'whatsapp'
-  | 'stripe'
-  | 'xero'
-  | 'simplepay'
-  | 'mailgun';
+export type WebhookProvider = 'whatsapp' | 'xero' | 'simplepay' | 'mailgun';
 
 interface WebhookProviderConfig {
   secretEnvVar: string;
@@ -52,21 +46,10 @@ export class WebhookSignatureGuard implements CanActivate {
     WebhookProvider,
     WebhookProviderConfig
   > = {
-    sendgrid: {
-      secretEnvVar: 'SENDGRID_WEBHOOK_KEY',
-      signatureHeader: 'x-twilio-email-event-webhook-signature',
-      timestampHeader: 'x-twilio-email-event-webhook-timestamp',
-      verifyFn: this.verifySendgridSignature.bind(this),
-    },
     whatsapp: {
       secretEnvVar: 'WHATSAPP_APP_SECRET',
       signatureHeader: 'x-hub-signature-256',
       verifyFn: this.verifyWhatsAppSignature.bind(this),
-    },
-    stripe: {
-      secretEnvVar: 'STRIPE_WEBHOOK_SECRET',
-      signatureHeader: 'stripe-signature',
-      verifyFn: this.verifyStripeSignature.bind(this),
     },
     xero: {
       secretEnvVar: 'XERO_WEBHOOK_SECRET',
@@ -162,33 +145,6 @@ export class WebhookSignatureGuard implements CanActivate {
   }
 
   /**
-   * Verify SendGrid webhook signature (HMAC SHA256 with timestamp)
-   */
-  private verifySendgridSignature(
-    payload: string,
-    signature: string,
-    secret: string,
-    timestamp?: string,
-  ): boolean {
-    if (!timestamp) {
-      return false;
-    }
-
-    try {
-      const payloadToSign = timestamp + payload;
-      const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(payloadToSign)
-        .digest('base64');
-
-      return this.constantTimeCompare(signature, expectedSignature);
-    } catch (error) {
-      this.logger.error('Error verifying SendGrid signature', error);
-      return false;
-    }
-  }
-
-  /**
    * Verify WhatsApp/Meta webhook signature (HMAC SHA256 with sha256= prefix)
    */
   private verifyWhatsAppSignature(
@@ -204,41 +160,6 @@ export class WebhookSignatureGuard implements CanActivate {
       return this.constantTimeCompare(signature, expectedSignature);
     } catch (error) {
       this.logger.error('Error verifying WhatsApp signature', error);
-      return false;
-    }
-  }
-
-  /**
-   * Verify Stripe webhook signature
-   * @see https://stripe.com/docs/webhooks/signatures
-   */
-  private verifyStripeSignature(
-    payload: string,
-    signature: string,
-    secret: string,
-  ): boolean {
-    try {
-      // Stripe signature format: t=timestamp,v1=signature,...
-      const parts = signature.split(',');
-      const timestampPart = parts.find((p) => p.startsWith('t='));
-      const signaturePart = parts.find((p) => p.startsWith('v1='));
-
-      if (!timestampPart || !signaturePart) {
-        return false;
-      }
-
-      const timestamp = timestampPart.substring(2);
-      const sig = signaturePart.substring(3);
-
-      const signedPayload = `${timestamp}.${payload}`;
-      const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(signedPayload)
-        .digest('hex');
-
-      return this.constantTimeCompare(sig, expectedSignature);
-    } catch (error) {
-      this.logger.error('Error verifying Stripe signature', error);
       return false;
     }
   }

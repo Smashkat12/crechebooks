@@ -91,7 +91,8 @@ export class InvoiceGenerationService {
     private readonly creditBalanceService: CreditBalanceService,
     private readonly invoiceNumberService: InvoiceNumberService,
     // TASK-STUB-PARITY: Provider-agnostic invoice push
-    @Inject(ACCOUNTING_PROVIDER) @Optional()
+    @Inject(ACCOUNTING_PROVIDER)
+    @Optional()
     private readonly accountingProvider?: AccountingProvider,
   ) {}
 

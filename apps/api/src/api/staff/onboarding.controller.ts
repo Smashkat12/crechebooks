@@ -30,8 +30,7 @@ import {
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import * as path from 'path';
+import { memoryStorage } from 'multer';
 import * as archiver from 'archiver';
 import {
   ApiTags,
@@ -52,6 +51,8 @@ import { StaffOnboardingService } from '../../database/services/staff-onboarding
 import { StaffDocumentService } from '../../database/services/staff-document.service';
 import { WelcomePackPdfService } from '../../database/services/welcome-pack-pdf.service';
 import { EmailService } from '../../integrations/email/email.service';
+import { StorageService } from '../../integrations/storage/storage.service';
+import { StorageKind } from '../../integrations/storage/storage.types';
 import {
   InitiateOnboardingDto,
   UpdateChecklistItemDto,
@@ -84,6 +85,7 @@ export class StaffOnboardingController {
     private readonly documentService: StaffDocumentService,
     private readonly welcomePackService: WelcomePackPdfService,
     private readonly emailService: EmailService,
+    private readonly storageService: StorageService,
   ) {}
 
   // ============ Primary Staff Onboarding Endpoints (TASK-STAFF-001) ============
@@ -604,41 +606,15 @@ export class StaffOnboardingController {
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req, _file, cb) => {
-          const tenantId =
-            (req as unknown as { user?: IUser }).user?.tenantId || 'default';
-          const staffId = Array.isArray(req.params.staffId)
-            ? req.params.staffId[0]
-            : req.params.staffId;
-          const uploadPath = path.join(
-            process.cwd(),
-            'uploads',
-            'staff-documents',
-            tenantId,
-            staffId || 'unknown',
-          );
-          // Ensure directory exists
-          fs.mkdirSync(uploadPath, { recursive: true });
-          cb(null, uploadPath);
-        },
-        filename: (_req, file, cb) => {
-          const timestamp = Date.now();
-          const ext = path.extname(file.originalname);
-          const baseName = path.basename(file.originalname, ext);
-          cb(null, `${baseName}_${timestamp}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit
       },
       fileFilter: (_req, file, cb) => {
-        // Allow common document types
         const allowedMimes = [
           'application/pdf',
           'image/jpeg',
           'image/png',
-          'image/gif',
           'application/msword',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
@@ -652,7 +628,7 @@ export class StaffOnboardingController {
   )
   @ApiOperation({
     summary: 'Upload a document file for a staff member',
-    description: 'Uploads a document file and creates a document record',
+    description: 'Uploads a document file to S3 and creates a document record',
   })
   @ApiParam({ name: 'staffId', description: 'Staff member ID' })
   @ApiResponse({ status: 201, description: 'Document uploaded successfully' })
@@ -672,22 +648,42 @@ export class StaffOnboardingController {
       throw new BadRequestException('Document type is required');
     }
 
+    const tenantId = getTenantId(user);
+
     this.logger.log(
       `Uploading document file ${file.originalname} (${documentType}) for staff ${staffId}`,
     );
 
-    // Create the document record
+    // Build S3 key and upload file buffer
+    const sanitizedName = this.storageService.sanitizeFilename(
+      file.originalname,
+    );
+    const key = this.storageService.buildKey(
+      tenantId,
+      StorageKind.StaffDocument,
+      staffId,
+      sanitizedName,
+    );
+    await this.storageService.putObject(
+      tenantId,
+      StorageKind.StaffDocument,
+      key,
+      file.buffer,
+      file.mimetype,
+    );
+
+    // Create the document record — store S3 key (not a transient URL)
     const dto: CreateStaffDocumentDto = {
       staffId,
       documentType: documentType as DocumentType,
       fileName: file.originalname,
-      fileUrl: file.path,
+      fileUrl: key,
       fileSize: file.size,
       mimeType: file.mimetype,
     };
 
     const document = await this.documentService.uploadDocument(
-      getTenantId(user),
+      tenantId,
       dto,
       user.id,
     );
@@ -697,6 +693,41 @@ export class StaffOnboardingController {
       message: 'Document uploaded successfully',
       data: document,
     };
+  }
+
+  @Get('documents/:id/download')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Download a staff document',
+    description: 'Streams the document file from S3 via server proxy',
+  })
+  @ApiParam({ name: 'id', description: 'Document ID' })
+  @ApiResponse({ status: 200, description: 'Document file stream' })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  async downloadDocument(
+    @Param('id') id: string,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ) {
+    this.logger.log(`Downloading document ${id}`);
+
+    const tenantId = getTenantId(user);
+    const document = await this.documentService.getDocumentById(id, tenantId);
+
+    const stream = await this.storageService.getObjectStream(
+      tenantId,
+      StorageKind.StaffDocument,
+      document.fileUrl,
+    );
+
+    res.setHeader('Content-Type', document.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${document.fileName}"`,
+    );
+    stream.pipe(res);
+
+    this.logger.log(`Streaming document ${id} for staff ${document.staffId}`);
   }
 
   @Get('documents/staff/:staffId')

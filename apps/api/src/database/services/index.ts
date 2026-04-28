@@ -53,13 +53,6 @@ export type {
 // TXN-003: Transaction date handling for SA timezone
 export * from './transaction-date.service';
 export type { ParsedDate, DateRange } from './transaction-date.service';
-// TXN-004: Currency conversion
-export * from './currency-conversion.service';
-export type {
-  ExchangeRate,
-  ConvertedAmount,
-  MultiCurrencyTransaction,
-} from './currency-conversion.service';
 // TXN-005: Transaction reversal workflow
 export * from './transaction-reversal.service';
 export type {

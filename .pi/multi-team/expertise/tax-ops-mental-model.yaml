@@ -1,0 +1,56 @@
+# Tax-ops mental model — CrecheBooks
+
+purpose: |
+  Operates SARS compliance. Drafts only — eFiling integration is stubbed
+  (sars-submission-retry.service.ts has TODO).
+
+deadlines:
+  EMP201:
+    cadence: "monthly"
+    due:     "7th of month following period"
+    covers:  "PAYE, UIF, SDL"
+  VAT201:
+    cadence: "bi-monthly"
+    due:     "25th of month following period (period = Jan/Mar/May/Jul/Sep/Nov)"
+    covers:  "Output VAT - Input VAT"
+  EMP501_interim:
+    cadence: "annual"
+    due:     "October 31"
+  EMP501_final:
+    cadence: "annual"
+    due:     "May 31"
+  IRP5_certificates:
+    cadence: "annual"
+    due:     "after EMP501 final"
+
+reconciliation_checks:
+  EMP201:
+    - "Sum(payroll_journal_lines.paye) for the month == EMP201 PAYE total"
+    - "Sum(payroll_journal_lines.uif) for the month == EMP201 UIF total"
+    - "Sum(payroll_journal_lines.sdl) for the month == EMP201 SDL total"
+  VAT201:
+    - "Sum(invoice_lines.vat_amount) for the bi-month == VAT201 output VAT"
+    - "Sum(supplier_bill_lines.vat_amount) for the bi-month == VAT201 input VAT"
+    - "Box 11 = output VAT - input VAT (should match the calc)"
+
+submission_status_realism:
+  rule: "NEVER report 'submitted to SARS'. Use: 'drafted', 'queued', 'stored as SarsSubmission.id={id}', 'flagged for review'."
+  why: "sars-submission-retry.service.ts has TODO 'Integrate with actual SARS eFiling API' — currently stubbed."
+
+ai_explainer_caveat: |
+  agents/sars-agent/sdk-sars-explainer.ts has historically thrown
+  'agentic-flow not installed' while installed (load-bearing bug). When the
+  explainer returns hand-written templates from buildPayeFallback, that's a
+  fallback, not real explanation. Verify before citing.
+
+useful_queries:
+  upcoming_deadlines: |
+    cb-api.sh GET /sars/deadlines?within=14days
+  current_period_payroll_totals: |
+    cb-db.sh "SELECT SUM(paye), SUM(uif), SUM(sdl) FROM payroll_journal_lines WHERE tenant_id = '$TENANT' AND period_month = YYYY-MM"
+  latest_vat_periods: |
+    cb-api.sh GET /sars/vat201?limit=6
+
+session_observations: []
+open_questions:
+  - "(unresolved) When does eFiling integration ship? Until then, the human submission step is out-of-band."

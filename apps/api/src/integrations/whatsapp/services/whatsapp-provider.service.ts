@@ -277,7 +277,8 @@ export class WhatsAppProviderService implements OnModuleInit {
   }
 
   /**
-   * Send welcome message after enrollment
+   * Send registration welcome message.
+   * portalUrl defaults to https://app.crechebooks.co.za/portal when not supplied.
    */
   async sendWelcomeMessage(
     tenantId: string,
@@ -285,6 +286,7 @@ export class WhatsAppProviderService implements OnModuleInit {
     parentName: string,
     childName: string,
     crecheName: string,
+    portalUrl: string = 'https://app.crechebooks.co.za/portal',
   ): Promise<WhatsAppProviderResult> {
     this.logger.log({
       message: `Sending welcome message via ${this.provider}`,
@@ -299,6 +301,7 @@ export class WhatsAppProviderService implements OnModuleInit {
         parentName,
         childName,
         crecheName,
+        portalUrl,
       );
       return {
         success: result.success,

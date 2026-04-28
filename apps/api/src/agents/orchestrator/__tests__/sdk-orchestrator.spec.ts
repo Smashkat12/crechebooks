@@ -933,6 +933,7 @@ describe('SdkOrchestrator', () => {
           accountName: 'Salaries',
           vatType: 'EXEMPT' as any,
           isSplit: false,
+          source: 'PATTERN',
         })
         .mockRejectedValueOnce(new Error('AI timeout'))
         .mockResolvedValueOnce({
@@ -943,6 +944,7 @@ describe('SdkOrchestrator', () => {
           accountName: 'Suspense',
           vatType: 'NO_VAT' as any,
           isSplit: false,
+          source: 'FALLBACK',
         });
 
       const request = createRequest('CATEGORIZE_TRANSACTIONS');
@@ -1167,6 +1169,7 @@ describe('SdkOrchestrator', () => {
         alternatives: [
           { invoiceId: 'inv-002', invoiceNumber: 'INV-002', confidence: 50 },
         ],
+        source: 'deterministic',
       });
 
       const request = createRequest('MATCH_PAYMENTS');
@@ -1195,6 +1198,7 @@ describe('SdkOrchestrator', () => {
         confidence: 0,
         reasoning: 'No matching invoices found',
         alternatives: [],
+        source: 'deterministic',
       });
 
       const request = createRequest('MATCH_PAYMENTS');
@@ -1219,6 +1223,7 @@ describe('SdkOrchestrator', () => {
         accountName: 'Suspense',
         vatType: 'NO_VAT' as any,
         isSplit: false,
+        source: 'FALLBACK',
       });
 
       const request = createRequest('CATEGORIZE_TRANSACTIONS');

@@ -9,7 +9,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../database/prisma';
 import { DatabaseModule } from '../../database/database.module';
-import { EmailModule } from '../../common/email/email.module';
+import { EmailModule } from '../../integrations/email/email.module';
 import { AuthModule } from '../auth/auth.module';
 import { WhatsAppModule } from '../../integrations/whatsapp/whatsapp.module';
 import { ContactController } from './contact/contact.controller';

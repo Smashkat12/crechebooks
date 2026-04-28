@@ -18,12 +18,10 @@ import { TenantGuard } from './api/auth/guards/tenant.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';
 import { CustomThrottlerGuard } from './common/guards/throttle.guard';
 import { LoggerModule } from './common/logger';
-import { EmailModule } from './common/email/email.module';
 import { CircuitBreakerModule } from './integrations/circuit-breaker';
 import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
 import { BankingModule } from './integrations/banking';
-import { YocoModule } from './integrations/yoco/yoco.module';
 import { AccountingModule } from './integrations/accounting/accounting.module';
 import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
 import { ReportsModule } from './modules/reports';
@@ -35,8 +33,6 @@ import { ReportsModule } from './modules/reports';
     EventEmitterModule.forRoot(),
     // TASK-INFRA-005: Structured JSON logging with correlation ID
     LoggerModule,
-    // Email service for notifications
-    EmailModule,
     // TASK-REL-101: Circuit Breaker for Xero API
     CircuitBreakerModule,
     // TASK-INFRA-003: Global rate limiting with configurable throttlers
@@ -75,7 +71,6 @@ import { ReportsModule } from './modules/reports';
     CspModule, // TASK-SEC-103: CSP configuration and violation reporting
     WebSocketModule, // TASK-FEAT-101: Real-time Dashboard WebSocket
     BankingModule, // TASK-INT-101: Bank API Integration (Stitch Open Banking)
-    YocoModule, // TASK-ACCT-011: Yoco Payment Gateway Integration
     AccountingModule.forRoot(), // Provider-agnostic accounting abstraction (Xero, Stub.africa)
     ReportsModule, // TASK-REPORTS-002: Reports API Module
   ],

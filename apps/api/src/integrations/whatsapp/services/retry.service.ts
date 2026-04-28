@@ -185,6 +185,13 @@ export class WhatsAppRetryService {
       return null;
     }
 
+    if (!message.templateName) {
+      this.logger.warn(
+        `Cannot retry message ${messageId}: no templateName (inbound or freeform)`,
+      );
+      return null;
+    }
+
     return this.scheduleRetry(
       messageId,
       message.recipientPhone,

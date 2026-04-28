@@ -155,7 +155,6 @@ export class PaymentController {
    */
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.VIEWER, UserRole.ACCOUNTANT)
-
   @ApiOperation({
     summary: 'List payments with optional filters',
     description:
@@ -265,7 +264,6 @@ export class PaymentController {
   @Post('match')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-
   @ApiOperation({
     summary: 'Trigger AI payment matching',
     description:
@@ -313,6 +311,7 @@ export class PaymentController {
                 : 'LOW',
         confidence_score: r.appliedMatch!.confidenceScore,
         match_reasons: ['Auto-matched: ' + r.reason],
+        source: r.appliedMatch!.source,
       }));
 
     const reviewRequired: ApiReviewRequiredDto[] = result.results
@@ -354,7 +353,6 @@ export class PaymentController {
    */
   @Get('arrears')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({
     summary: 'Get arrears dashboard report',
     description:
@@ -442,7 +440,6 @@ export class PaymentController {
   @Post(':paymentId/receipt')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({
     summary: 'Generate payment receipt PDF',
     description:
@@ -509,7 +506,6 @@ export class PaymentController {
    */
   @Get(':paymentId/receipt')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-
   @ApiOperation({
     summary: 'Download payment receipt PDF',
     description:

@@ -177,13 +177,34 @@ export class XeroAutoSyncJob {
         synced++;
       } catch (err) {
         failed++;
+        const errorMessage = this.bankFeedService.extractXeroErrorMessage(err);
         this.logger.error({
           message: `XeroAutoSync: tenant ${tenantId} sync failed`,
-          error: err instanceof Error ? err.message : String(err),
+          error: errorMessage,
           file: 'xero-auto-sync.job.ts',
           function: 'runAutoSync',
           timestamp: new Date().toISOString(),
         });
+
+        // Persist the actual error to the most-recently-synced bank connection
+        // so /xero/sync-status can surface it as lastSyncError.
+        // BankFeedService.syncTransactions normally does this at the connection
+        // level, but if it throws before reaching that catch (e.g. auth error,
+        // Prisma failure), the connection record is never updated.
+        try {
+          await this.prisma.bankConnection.updateMany({
+            where: { tenantId, status: { not: 'DISCONNECTED' } },
+            data: {
+              status: 'ERROR',
+              errorMessage,
+            },
+          });
+        } catch (persistErr) {
+          this.logger.warn(
+            `XeroAutoSync: could not persist error state for tenant ${tenantId}: ` +
+              `${persistErr instanceof Error ? persistErr.message : String(persistErr)}`,
+          );
+        }
       } finally {
         this.inFlightTenants.delete(tenantId);
       }

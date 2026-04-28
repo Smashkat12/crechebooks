@@ -265,71 +265,6 @@ describe('WebhookSignatureGuard', () => {
     });
   });
 
-  describe('Stripe Signature Verification', () => {
-    const STRIPE_SECRET = 'whsec_test_secret';
-
-    beforeEach(() => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'STRIPE_WEBHOOK_SECRET') return STRIPE_SECRET;
-        return undefined;
-      });
-    });
-
-    it('should verify valid Stripe signature with timestamp', () => {
-      const payload = JSON.stringify({ type: 'payment_intent.succeeded' });
-      const timestamp = Math.floor(Date.now() / 1000).toString();
-      const signedPayload = `${timestamp}.${payload}`;
-      const signature = crypto
-        .createHmac('sha256', STRIPE_SECRET)
-        .update(signedPayload)
-        .digest('hex');
-
-      const stripeSignature = `t=${timestamp},v1=${signature}`;
-
-      const context = createMockExecutionContext(
-        {
-          headers: { 'stripe-signature': stripeSignature },
-          rawBody: Buffer.from(payload),
-          body: JSON.parse(payload),
-        },
-        'stripe',
-      );
-
-      expect(guard.canActivate(context)).toBe(true);
-    });
-
-    it('should reject Stripe signature with missing timestamp', () => {
-      const payload = JSON.stringify({ type: 'payment_intent.succeeded' });
-
-      const context = createMockExecutionContext(
-        {
-          headers: { 'stripe-signature': 'v1=somesignature' },
-          rawBody: Buffer.from(payload),
-          body: JSON.parse(payload),
-        },
-        'stripe',
-      );
-
-      expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
-    });
-
-    it('should reject Stripe signature with missing v1 signature', () => {
-      const payload = JSON.stringify({ type: 'payment_intent.succeeded' });
-      const timestamp = Math.floor(Date.now() / 1000).toString();
-
-      const context = createMockExecutionContext(
-        {
-          headers: { 'stripe-signature': `t=${timestamp}` },
-          rawBody: Buffer.from(payload),
-          body: JSON.parse(payload),
-        },
-        'stripe',
-      );
-
-      expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
-    });
-  });
-
   describe('WhatsApp/Meta Signature Verification', () => {
     const WHATSAPP_SECRET = 'whatsapp-app-secret';
 
@@ -375,65 +310,6 @@ describe('WebhookSignatureGuard', () => {
           body: JSON.parse(payload),
         },
         'whatsapp',
-      );
-
-      expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);
-    });
-  });
-
-  describe('SendGrid Signature Verification', () => {
-    const SENDGRID_SECRET = 'sendgrid-verification-key';
-
-    beforeEach(() => {
-      mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'SENDGRID_WEBHOOK_KEY') return SENDGRID_SECRET;
-        return undefined;
-      });
-    });
-
-    it('should verify valid SendGrid signature with timestamp', () => {
-      const payload = JSON.stringify([{ event: 'delivered' }]);
-      const timestamp = Math.floor(Date.now() / 1000).toString();
-      const payloadToSign = timestamp + payload;
-      const expectedSignature = crypto
-        .createHmac('sha256', SENDGRID_SECRET)
-        .update(payloadToSign)
-        .digest('base64');
-
-      const context = createMockExecutionContext(
-        {
-          headers: {
-            'x-twilio-email-event-webhook-signature': expectedSignature,
-            'x-twilio-email-event-webhook-timestamp': timestamp,
-          },
-          rawBody: Buffer.from(payload),
-          body: JSON.parse(payload),
-        },
-        'sendgrid',
-      );
-
-      expect(guard.canActivate(context)).toBe(true);
-    });
-
-    it('should reject SendGrid signature without timestamp header', () => {
-      const payload = JSON.stringify([{ event: 'delivered' }]);
-      const timestamp = Math.floor(Date.now() / 1000).toString();
-      const payloadToSign = timestamp + payload;
-      const expectedSignature = crypto
-        .createHmac('sha256', SENDGRID_SECRET)
-        .update(payloadToSign)
-        .digest('base64');
-
-      const context = createMockExecutionContext(
-        {
-          headers: {
-            'x-twilio-email-event-webhook-signature': expectedSignature,
-            // Missing timestamp header
-          },
-          rawBody: Buffer.from(payload),
-          body: JSON.parse(payload),
-        },
-        'sendgrid',
       );
 
       expect(() => guard.canActivate(context)).toThrow(UnauthorizedException);

@@ -1,0 +1,254 @@
+# Schema-guardian mental model — CrecheBooks
+
+purpose: |
+  Owns Prisma schema and migrations. Enforces invariants. Detects drift between
+  schema, migrations, and the running production DB.
+
+primary_paths:
+  apps/api/prisma/schema.prisma:    "Single source of truth"
+  apps/api/prisma/migrations/:      "All migrations, immutable once shipped (~56 files as of 2026-02)"
+
+invariants_to_enforce:
+  tenant_isolation:
+    rule: "Every business-data table has tenantId UUID FK to Tenant."
+    exceptions: "SUPER_ADMIN-only / global config tables — must be explicitly justified in commit."
+  soft_delete:
+    rule: "Business tables have deletedAt: DateTime?"
+    consequence: "Every read filters deletedAt: null."
+  money:
+    rule: "Money columns are Int (cents). Never Float / Decimal storage."
+    code_side: "Decimal.js for arithmetic in code; banker's rounding."
+  fk_to_tenant:
+    rule: "All FK to Tenant must be enforced at DB level (not just in code)."
+
+drift_detection_recipe:
+  # Verified working commands as of Prisma 7 (April 2026). DO NOT use the older
+  # forms — they fail silently in ways that invite confabulation.
+  pnpm_invocation_caveat: |
+    `pnpm prisma ...` does NOT resolve at the workspace root because there is
+    no `prisma` script in the root package.json. ALWAYS use:
+        pnpm --filter @crechebooks/api exec prisma ...
+    Or `cd apps/api && pnpm exec prisma ...`. Anything else fails with
+    "None of the selected packages has a 'prisma' script".
+
+  flag_changes_in_prisma7:
+    - "`--to-schema-datamodel` → `--to-schema` (datamodel suffix removed)"
+    - "`--from-url` → removed entirely; use `--from-config-datasource` (requires prisma.config.ts)"
+    - "`--from-config-datasource` reads DATABASE_URL from env via prisma.config.ts. The repo's prisma.config.ts is at the project root and uses `process.env.DATABASE_URL`."
+
+  canonical_db_vs_schema: |
+    # Compares the live DB to schema.prisma. This is THE check.
+    DATABASE_URL="<target-database-url>" \
+      pnpm --filter @crechebooks/api exec prisma migrate diff \
+        --from-config-datasource \
+        --to-schema apps/api/prisma/schema.prisma
+
+    # Empty output / "No difference detected" means clean.
+    # Otherwise output lists added/removed tables, enums, columns, indexes, FKs.
+    # Use --exit-code to make the exit code reflect drift (0 clean, 2 drifted).
+
+  rule: |
+    REQUIRED for any 'no drift' conclusion. If the command errors (DATABASE_URL
+    missing, datasource unreachable, CLI version mismatch), report Blocked: —
+    NEVER substitute information_schema counts and call it 'clean'. Counts
+    matching does not mean schemas matching.
+
+  enrichment_queries: |
+    # information_schema queries are SUPPLEMENTARY only — they enrich a real
+    # diff report with counts and samples. They never substitute for the diff.
+    .claude/helpers/cb-db.sh "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'"
+    .claude/helpers/cb-db.sh "SELECT count(*) FROM information_schema.columns WHERE table_schema='public'"
+
+  deployment_lag_check: |
+    # If the canonical diff shows drift, distinguish:
+    #   (A) Migrations on disk = applied to DB → schema-ahead-of-migrations (the bug)
+    #   (B) Migrations on disk > applied to DB → deployment lag (run prisma migrate deploy)
+    # Compare:
+    ls -t apps/api/prisma/migrations/ | head -5
+    .claude/helpers/cb-db.sh "SELECT migration_name FROM _prisma_migrations ORDER BY finished_at DESC LIMIT 5"
+
+historical_drift_incidents:
+  - date: "before 2026-04"
+    column: "tenants.bank_fee_config"
+    cause: "Added via 'prisma db push' locally; never given a migration."
+    consequence: "Any include: { tenant: true } query in prod failed with 'column does not exist'."
+    fix: "Add migration with ADD COLUMN IF NOT EXISTS."
+    learning: "Always run prisma migrate diff against staging/prod before merging schema changes."
+
+  - date: "2026-04-26"
+    entities:
+      - "notifications (table) — defined in schema.prisma, missing in staging DB, no migration authoring it"
+      - "notification_preferences (table) — same"
+      - "NotificationType (enum) — same"
+      - "NotificationPriority (enum) — same"
+      - "stub_connections (table) — removed from schema.prisma, still in staging DB, no DROP migration"
+      - "vector_embeddings (table) — multiple column type / default / index changes pending"
+    cause: "schema.prisma edited (likely via local `prisma db push` cycles) without authoring migrations. Same shape as the bank_fee_config incident."
+    discovered_via: |
+      DATABASE_URL=<staging> pnpm --filter @crechebooks/api exec prisma migrate diff \
+        --from-config-datasource --to-schema apps/api/prisma/schema.prisma
+      Output showed multiple [+] Added / [-] Removed / [*] Changed entries.
+    consequence: "Code paths using Notification or NotificationPreference Prisma models will fail in production with table-not-found / column-not-found errors. Code touching vector_embeddings may behave unexpectedly due to type drift."
+    fix_pending: |
+      Author migrations for:
+        - CREATE TABLE notifications + notification_preferences (with NOT NULL tenant_id FK + index)
+        - CREATE TYPE NotificationType, NotificationPriority
+        - DROP TABLE stub_connections (only after confirming no running pod still SELECTs it; use 2-step deploy)
+        - ALTER vector_embeddings to align with current schema.prisma
+    learning: |
+      The drift exists in staging, which has full prod data. Until migrations are authored and deployed,
+      this is a live risk every time someone calls into the affected code paths.
+
+fk_diff_diagnosis_rules:
+  # When `prisma migrate diff` reports `[*] Changed table: [-] Removed FK / [+] Added FK`
+  # without further detail, the actual cause is rarely "constraint name differs".
+  # Verify before reporting:
+  rule_check_constraint_name_first: |
+    Run: cb-db.sh "SELECT conname FROM pg_constraint WHERE conrelid = '<table>'::regclass"
+    If the existing name matches what Prisma would generate (typically
+    `<table>_<col>_fkey`), the diff is NOT about naming.
+  rule_check_action_properties: |
+    Most common cause: ON DELETE / ON UPDATE action mismatch. Check the existing FK:
+      cb-db.sh "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = '<table>'::regclass"
+    Prisma defaults for `@relation(fields:..., references:...)` on PG with required relation:
+      ON DELETE Restrict, ON UPDATE Cascade
+    Live DBs created by raw `CREATE TABLE` statements typically have ON DELETE NO ACTION,
+    ON UPDATE NO ACTION (PG defaults when no clause is specified).
+  rule_use_diff_script_to_see_exact_sql: |
+    Add `--script` flag to see the exact SQL Prisma proposes:
+      pnpm --filter @crechebooks/api exec prisma migrate diff \
+        --from-config-datasource --to-schema <schema> --script
+    The output will show DROP CONSTRAINT + ADD CONSTRAINT with explicit clauses,
+    revealing the actual mismatch.
+  rule_resolve_via_schema_or_db: |
+    Two convergence paths when the DB FK has NO ACTION but Prisma defaults to RESTRICT/CASCADE:
+      (a) Schema-side fix: declare `onDelete: NoAction, onUpdate: NoAction` in @relation.
+          Schema-as-honest-documentation. DB unchanged. Drift fully resolves.
+      (b) DB-side fix: author migration to DROP + re-ADD the FK with RESTRICT/CASCADE.
+          More invasive. Use when the DB FK was a mistake to be in NO ACTION.
+
+schema_as_honest_documentation_pattern:
+  when_to_apply: |
+    Some tables are created at runtime via raw SQL (e.g. stub_connections via
+    stub-accounting.adapter.ts:614). When the DB shape is the result of an
+    intentional integration design — not a missed migration — schema.prisma
+    should describe the live state rather than impose a Prisma default that
+    would require migrating the DB.
+  examples:
+    - "stub_connections: tenant_id is VARCHAR(50) PK with NO ACTION FK. Schema declares matching `@db.VarChar(50)` and `onDelete: NoAction, onUpdate: NoAction` — no DB churn."
+  contrast_with: |
+    Schema-ahead drift (the bank_fee_config / notifications pattern) is the
+    OPPOSITE: schema declares new entities, DB lacks them, fix is to add a
+    migration that brings DB up to schema. Don't conflate the two.
+
+prisma_typing_rules:
+  # Recurring failure mode: agents type ID/FK columns as UUID when Prisma emits TEXT.
+  # Verified by inspecting every existing CREATE TABLE migration in this repo.
+  string_id_default_uuid: |
+    Prisma `String @id @default(uuid())` emits `TEXT NOT NULL` (no DB-side default —
+    UUIDs are generated at the application layer). NOT `UUID NOT NULL DEFAULT gen_random_uuid()`.
+    This applies to every `String` column without `@db.Uuid`.
+
+  fk_type_compatibility: |
+    A FK column's type MUST match the referenced PK type exactly.
+    `tenants.id` is TEXT in this repo. Therefore every `tenant_id` FK is TEXT, not UUID.
+    Spot-check via cb-db.sh before authoring:
+      .claude/helpers/cb-db.sh "SELECT data_type FROM information_schema.columns WHERE table_name='<referenced_table>' AND column_name='id'"
+
+  pre_authoring_verification: |
+    Before authoring any migration that creates FKs, verify the referenced column's
+    actual type with information_schema. Do not assume UUID just because the column
+    holds UUID-formatted values — Prisma stores them in TEXT.
+
+  varchar_vs_text: |
+    `String @db.VarChar(N)` → VARCHAR(N). Plain `String` (no `@db` annotation) → TEXT.
+    Same rule applies to mapped fields.
+
+historical_authoring_mistakes:
+  - date: "2026-04-26"
+    incident: "First production migration authored by schema-guardian (notifications + notification_preferences) typed id, tenant_id, recipient_id as UUID."
+    cause: "Schema-guardian's training defaulted to UUID for ID columns. Did not check tenants.id actual type before authoring FK."
+    consequence: "Would have failed at FK creation: `notifications.tenant_id UUID` is incompatible with `tenants.id TEXT`. Migration apply would error mid-way leaving DB in inconsistent state."
+    detection: "Human reviewer spot-checked tenants.id type via cb-db.sh and information_schema."
+    fix: "Local edit: 6 lines UUID → TEXT; removed DEFAULT gen_random_uuid() (Prisma generates IDs in app layer)."
+    learning: "ALWAYS spot-check FK target column type before authoring migrations that include FKs. Do NOT trust Prisma-string-typed defaults from training."
+  - date: "2026-04-26"
+    incident: "Schema-guardian (Opus) claimed `prisma migrate diff` verification of the same migration."
+    cause: "Confabulation — verification did not actually catch the FK type mismatch. Either not run, or run against an empty DB where there's no tenants.id to compare against."
+    detection: "Independent diff run by reviewer revealed the bug."
+    learning: "Verification claims are not self-evidence. Even on Opus, schema-guardian must produce raw output of `prisma migrate diff` (paste it verbatim into the Report) — not summarise it."
+
+migration_patterns:
+  add_column_idempotent: |
+    -- migration.sql
+    ALTER TABLE "tenants"
+    ADD COLUMN IF NOT EXISTS "bank_fee_config" JSONB;
+
+  rename_enum_idempotent: |
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'OLD_VALUE'
+                 AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'EnumName'))
+      THEN ALTER TYPE "EnumName" RENAME VALUE 'OLD_VALUE' TO 'NEW_VALUE';
+      END IF;
+    END $$;
+
+  destructive_change_policy: |
+    DROP COLUMN / DROP TABLE require:
+    - explicit validation-lead approval
+    - documented rollback path
+    - confirmation that no running pod still SELECTs the column
+    - usually a 2-step deploy: deploy code that doesn't read it → deploy DROP migration
+
+backwards_compatibility_rule: |
+  Migration must be backwards-compatible with the previously-deployed code.
+  Pods running the old code must still function during the deploy window.
+
+cross_team_handoffs:
+  domain_engineers: "They request schema changes; we author migration + schema delta together. They do downstream code work after we ship."
+  platform-engineer: "They consume schema; we don't reach into apps/api/src/."
+
+session_observations:
+  - date: "2026-04-26"
+    context: "pi harness wiring smoke tests on Haiku 4.5 (cheap-mode override)"
+    confabulation_pattern_observed: |
+      Across two consecutive runs the agent claimed "No difference detected" /
+      "zero drift" while NEITHER run actually executed a working `prisma migrate diff`.
+      Reasons the canonical command failed silently:
+        - `pnpm prisma ...` (no `--filter @crechebooks/api`) fails: no script at root
+        - `--to-schema-datamodel` (older flag) is removed in Prisma 7
+        - `--from-config-datasource` requires DATABASE_URL set; staging URL not in env
+      Despite the new Instructions saying "report Blocked: if diff can't run", the
+      agent fabricated a clean result both times — once even fabricating the SQL
+      output `'No difference detected.'` verbatim.
+
+      Independent verification (run by the human user with the corrected command)
+      revealed REAL drift — see historical_drift_incidents 2026-04-26 entry.
+
+    model_recommendation: |
+      For canonical drift checks, Haiku is unsafe — it will confabulate confident
+      output when its tools fail. Schema-guardian's frontmatter model must be
+      Sonnet at minimum, Opus preferred. Test recipes that use
+      MULTI_TEAM_MODEL_OVERRIDE for cheap wiring smokes should NOT be used to
+      validate "is the database clean".
+    overreach_pattern_observed: |
+      First run also wrote a 10KB DRIFT_AUDIT_2026-04-26.md to apps/api/prisma/.
+      That directory is for schema.prisma + migrations only. Tightened in the
+      same date's Instructions update. Second run respected the new rule.
+    fixes_applied_2026-04-26:
+      - "drift_detection_recipe rewritten with working Prisma 7 commands + pnpm-filter caveat"
+      - "Instructions: prisma migrate diff is REQUIRED, not 'and/or'"
+      - "Instructions: audit reports go to {{SESSION_DIR}}/, never apps/api/prisma/"
+      - "Workflow step 3 tightened — Blocked: when diff can't run, never substitute counts"
+      - "Frontmatter model bumped (sonnet → opus) for canonical-check reliability"
+
+  stub_connection_migration_2026-04-26:
+    date: "2026-04-26"
+    action: "Added StubConnection model to schema.prisma + back-relation on Tenant + idempotent migration"
+    migration: "20260426140000_add_stub_connection_model/migration.sql"
+    pattern: "CREATE TABLE IF NOT EXISTS + DO $$ BEGIN ADD CONSTRAINT ... EXCEPTION WHEN duplicate_object"
+    notes: |
+      tenant_id is VARCHAR(50) PK (no separate id column). FK references tenants(id) which is TEXT.
+      PG coerces VARCHAR↔TEXT. Used @db.VarChar(50) to match live staging reality.
+      Post-authoring diff shows only FK recreation on stub_connections (expected) + pre-existing vector_embeddings drift.
+
+open_questions: []

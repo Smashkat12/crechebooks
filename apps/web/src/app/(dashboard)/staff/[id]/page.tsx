@@ -14,6 +14,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { OnboardingStatusBadge } from '@/components/staff/OnboardingStatusBadge';
 import { SimplepayStatusCard } from '@/components/staff/SimplepayStatusCard';
 import { LeaveBalanceCard } from '@/components/staff/LeaveBalanceCard';
+import { PortalAccessCard } from '@/components/staff/PortalAccessCard';
 import { PayslipsSection } from '@/components/staff/PayslipsSection';
 import { TaxDocumentsSection } from '@/components/staff/TaxDocumentsSection';
 import { useToast } from '@/hooks/use-toast';
@@ -181,6 +182,9 @@ export default function StaffDetailPage({ params }: StaffDetailPageProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Portal Access Card */}
+      <PortalAccessCard staffId={id} />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

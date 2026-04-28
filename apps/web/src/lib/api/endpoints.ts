@@ -51,6 +51,7 @@ export const endpoints = {
     emp201: '/sars/emp201',
     submit: (id: string) => `/sars/${id}/submit`,
     submissions: '/sars/submissions',
+    readiness: '/sars/readiness',
   },
   reconciliation: {
     list: '/reconciliation',
@@ -187,6 +188,7 @@ export const endpoints = {
     accountLedger: (accountCode: string) => `/general-ledger/account/${accountCode}`,
     trialBalance: '/general-ledger/trial-balance',
     summary: '/general-ledger/summary',
+    monthEndPack: (period: string) => `/general-ledger/month-end-pack?period=${period}`,
   },
   quotes: {
     list: '/quotes',

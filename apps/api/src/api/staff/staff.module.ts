@@ -7,15 +7,27 @@ import {
 } from './offboarding.controller';
 import { LeaveController } from './leave.controller';
 import { StaffPortalController } from './staff-portal.controller';
+import { StaffInvitationController } from './staff-invitation.controller';
+import { StaffInviteAcceptController } from './staff-invite-accept.controller';
+import { StaffInvitationService } from './staff-invitation.service';
 import { StaffRepository } from '../../database/repositories/staff.repository';
 import { LeaveRequestRepository } from '../../database/repositories/leave-request.repository';
 import { DatabaseModule } from '../../database/database.module';
 import { EmailModule } from '../../integrations/email/email.module';
 import { SimplePayModule } from '../../integrations/simplepay/simplepay.module';
 import { AuthModule } from '../auth/auth.module';
+import { StorageModule } from '../../integrations/storage/storage.module';
+import { MailgunModule } from '../../integrations/mailgun/mailgun.module';
 
 @Module({
-  imports: [DatabaseModule, EmailModule, SimplePayModule, AuthModule],
+  imports: [
+    DatabaseModule,
+    EmailModule,
+    MailgunModule,
+    SimplePayModule,
+    AuthModule,
+    StorageModule,
+  ],
   controllers: [
     StaffController,
     StaffOnboardingController,
@@ -23,8 +35,10 @@ import { AuthModule } from '../auth/auth.module';
     StaffOffboardingsController,
     LeaveController,
     StaffPortalController,
+    StaffInvitationController,
+    StaffInviteAcceptController,
   ],
-  providers: [StaffRepository, LeaveRequestRepository],
-  exports: [StaffRepository, LeaveRequestRepository],
+  providers: [StaffRepository, LeaveRequestRepository, StaffInvitationService],
+  exports: [StaffRepository, LeaveRequestRepository, StaffInvitationService],
 })
 export class StaffModule {}

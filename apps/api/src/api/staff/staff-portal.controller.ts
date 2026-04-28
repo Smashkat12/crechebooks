@@ -21,8 +21,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import * as path from 'path';
+import { memoryStorage } from 'multer';
 import * as fs from 'fs';
 import {
   ApiTags,
@@ -63,6 +62,8 @@ import {
 import { StaffOnboardingService } from '../../database/services/staff-onboarding.service';
 import { StaffDocumentService } from '../../database/services/staff-document.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { StorageService } from '../../integrations/storage/storage.service';
+import { StorageKind } from '../../integrations/storage/storage.types';
 import {
   SignDocumentDto,
   OnboardingStep,
@@ -84,6 +85,7 @@ export class StaffPortalController {
     private readonly prisma: PrismaService,
     private readonly payslipService: SimplePayPayslipService,
     private readonly simplePayRepo: SimplePayRepository,
+    private readonly storageService: StorageService,
   ) {}
 
   @Get('dashboard')
@@ -1232,30 +1234,7 @@ export class StaffPortalController {
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req, _file, cb) => {
-          const session = (
-            req as unknown as { staffSession?: StaffSessionInfo }
-          ).staffSession;
-          const staffId = session?.staffId;
-          const tenantId = session?.tenantId;
-          const uploadPath = path.join(
-            process.cwd(),
-            'uploads',
-            'staff-documents',
-            tenantId || 'default',
-            staffId || 'unknown',
-          );
-          fs.mkdirSync(uploadPath, { recursive: true });
-          cb(null, uploadPath);
-        },
-        filename: (_req, file, cb) => {
-          const timestamp = Date.now();
-          const ext = path.extname(file.originalname);
-          const baseName = path.basename(file.originalname, ext);
-          cb(null, `${baseName}_${timestamp}${ext}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit
       },
@@ -1264,7 +1243,6 @@ export class StaffPortalController {
           'application/pdf',
           'image/jpeg',
           'image/png',
-          'image/gif',
           'application/msword',
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ];
@@ -1296,21 +1274,42 @@ export class StaffPortalController {
       throw new BadRequestException('Document type is required');
     }
 
+    const tenantId = session.tenantId || '';
+    const staffId = session.staffId;
+
     this.logger.log(
-      `Uploading document ${file.originalname} (${documentType}) for staff ${session.staffId}`,
+      `Uploading document ${file.originalname} (${documentType}) for staff ${staffId}`,
+    );
+
+    // Build S3 key and upload file buffer
+    const sanitizedName = this.storageService.sanitizeFilename(
+      file.originalname,
+    );
+    const key = this.storageService.buildKey(
+      tenantId,
+      StorageKind.StaffDocument,
+      staffId,
+      sanitizedName,
+    );
+    await this.storageService.putObject(
+      tenantId,
+      StorageKind.StaffDocument,
+      key,
+      file.buffer,
+      file.mimetype,
     );
 
     const document = await this.documentService.uploadDocument(
-      session.tenantId || '',
+      tenantId,
       {
-        staffId: session.staffId,
+        staffId,
         documentType: documentType as DocumentType,
         fileName: file.originalname,
-        fileUrl: file.path,
+        fileUrl: key,
         fileSize: file.size,
         mimeType: file.mimetype,
       },
-      session.staffId,
+      staffId,
     );
 
     return {

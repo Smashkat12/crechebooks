@@ -622,7 +622,10 @@ export class BankFeeService {
       return TransactionType.ATM_DEPOSIT;
     }
     // "ATM Cash 00877436" (FNB format), "ATM Withdrawal", "ATM W/D" → withdrawal
-    if (/ATM\s*(WITHDRAWAL|W\/D|WDL)/i.test(text) || /ATM\s+CASH\b/i.test(text)) {
+    if (
+      /ATM\s*(WITHDRAWAL|W\/D|WDL)/i.test(text) ||
+      /ATM\s+CASH\b/i.test(text)
+    ) {
       return TransactionType.ATM_WITHDRAWAL;
     }
 

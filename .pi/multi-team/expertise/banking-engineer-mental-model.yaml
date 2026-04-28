@@ -1,0 +1,61 @@
+# Banking-engineer mental model — CrecheBooks
+
+purpose: |
+  Bank feed ingestion → transaction normalization → AI categorization →
+  reconciliation against books. FNB and Stitch are the live feeds.
+
+primary_paths:
+  apps/api/src/api/transaction/:                        "Transaction REST endpoints"
+  apps/api/src/api/reconciliation/:                     "Reconciliation REST endpoints"
+  apps/api/src/api/banking/:                            "Bank-account / connection endpoints"
+  apps/api/src/agents/transaction-categorizer/:         "Categorizer agent — sdk-categorizer.ts holds the LLM seam"
+  apps/api/src/database/services/categorization.*:      "DB-side categorization + DTO"
+
+bank_account_naming:
+  rule: "Use 'Business Account' (NOT 'FNB'). Matches transactions.bank_account in DB."
+
+reconciliation_strategies_ordered:
+  - "Description similarity ≥ 70%"
+  - "Keyword containment (short → long)"
+  - "Amount + date exact match (confidence 0.7)"
+  - "Fee-adjusted match (e.g. FNB ATM 2.5% fee)"
+
+fee_detection:
+  - pattern: "ATM Cash XXXXXXXX"
+    rule:    "ATM_WITHDRAWAL — fee 2.5% (NOT fixed R12)"
+  - "detectAndValidateFeeMatch() runs after matching; confidence <85% downgrades FEE_ADJUSTED_MATCH → AMOUNT_MISMATCH"
+
+boundary_dates:
+  rule: "Transactions on a period boundary appear in both periods. Always exclude IDs already matched in prior periods."
+
+llm_seam: "sdk-categorizer.ts — only fires when pattern match <80%."
+
+prisma_models_in_scope:
+  - Transaction
+  - LinkedBankAccount
+  - LinkedBankSyncEvent
+  - BankConnection
+  - BankStatementMatch
+  - Reconciliation
+  - SplitMatch
+  - SplitMatchComponent
+  - DuplicateResolution
+  - ManualMatchHistory
+  - AccruedBankCharge
+  - Categorization
+  - CategorizationMetric
+  - CategorizationJournal
+  - PayeePattern
+
+cross_team_handoffs:
+  payments-engineer: "Payment matching is theirs. We provide normalized Transactions."
+  platform-engineer: "Stitch / Stub.africa / FNB integration adapters are theirs."
+  schema-guardian: "All schema changes via validation-lead."
+
+known_quirks:
+  - "Reconciliation discrepancy service uses bank_statement_matches as source of truth (NOT re-computing from transactions)."
+  - "Rematch endpoints reuse parsed bank data, no LLMWhisperer credits."
+  - "Status as of 2026-03: 19/23 Business Account periods RECONCILED. Last 4 blocked by missing book transactions (Xero feed not synced)."
+
+session_observations: []
+open_questions: []

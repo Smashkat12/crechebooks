@@ -14,8 +14,9 @@
  * - SARS is ALWAYS L2: action='DRAFT_FOR_REVIEW', requiresReview=true
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { BaseSdkAgent, SdkAgentFactory, SdkConfigService } from '../sdk';
+import { ClaudeClientService } from '../sdk/claude-client.service';
 import type { AgentDefinition } from '../sdk';
 import type { SarsBreakdown } from './interfaces/sars.interface';
 import type {
@@ -35,7 +36,13 @@ import {
 export class SdkSarsExplainer extends BaseSdkAgent {
   protected override readonly logger = new Logger(SdkSarsExplainer.name);
 
-  constructor(factory: SdkAgentFactory, config: SdkConfigService) {
+  constructor(
+    factory: SdkAgentFactory,
+    config: SdkConfigService,
+    @Optional()
+    @Inject(ClaudeClientService)
+    private readonly claudeClient?: ClaudeClientService,
+  ) {
     super(factory, config, SdkSarsExplainer.name);
   }
 
@@ -122,29 +129,39 @@ export class SdkSarsExplainer extends BaseSdkAgent {
   }
 
   /**
-   * Execute inference via the SDK execution engine.
-   * NOTE: agentic-flow's AgenticFlow class may not be available at runtime.
-   * This method throws "SDK inference not available" when called without
-   * the real agentic-flow package. The executeWithFallback() method in
-   * BaseSdkAgent catches this and falls through to the fallback path.
+   * Execute inference via ClaudeClientService (Requesty proxy).
    *
-   * @param _agentDef - Agent definition with prompt and tools
-   * @param _userMessage - User message to send to the LLM
-   * @param _tenantId - Tenant ID for isolation
+   * @param _agentDef - Agent definition (prompt is taken from SARS_EXPLAINER_SYSTEM_PROMPT)
+   * @param userMessage - User message containing the pre-built SARS prompt
+   * @param _tenantId - Tenant ID (reserved for future isolation)
    * @returns LLM response string
-   * @throws Error when SDK inference engine is not available
+   * @throws Error when Claude client is not available or call fails
    */
-  executeSdkInference(
+  async executeSdkInference(
     _agentDef: AgentDefinition,
-    _userMessage: string,
+    userMessage: string,
     _tenantId: string,
   ): Promise<string> {
-    return Promise.reject(
-      new Error(
-        'SDK inference not available: agentic-flow execution engine not installed. ' +
-          'Install agentic-flow to enable LLM-based SARS explanations.',
-      ),
+    if (!this.claudeClient?.isAvailable()) {
+      throw new Error(
+        'Claude client not available. Check ANTHROPIC_API_KEY configuration.',
+      );
+    }
+
+    const response = await this.claudeClient.sendMessage({
+      systemPrompt: SARS_EXPLAINER_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+      model: SARS_EXPLAINER_MODEL,
+      maxTokens: SARS_EXPLAINER_MAX_TOKENS,
+      temperature: SARS_EXPLAINER_TEMPERATURE,
+    });
+
+    this.logger.log(
+      `SARS explainer LLM call: model=${response.model} ` +
+        `tokens=${String(response.usage.inputTokens)}→${String(response.usage.outputTokens)}`,
     );
+
+    return response.content;
   }
 
   /**

@@ -7,8 +7,8 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { FileSpreadsheet, TrendingUp, TrendingDown, BookOpen, AlertCircle } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { FileSpreadsheet, TrendingUp, TrendingDown, BookOpen, AlertCircle, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/tables/data-table';
@@ -25,6 +25,8 @@ import { GLDateRangePicker, type GLDateRange } from '@/components/accounting/gl-
 import { journalEntryColumns } from '@/components/accounting/journal-entry-columns';
 import { useGeneralLedger, useLedgerSummary, type SourceType } from '@/hooks/use-general-ledger';
 import { cn } from '@/lib/utils';
+import { apiClient } from '@/lib/api/client';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * Format amount in ZAR (South African Rand)
@@ -41,11 +43,48 @@ function formatZAR(cents: number): string {
 }
 
 export default function GeneralLedgerPage() {
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState<GLDateRange>(() => ({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   }));
   const [sourceFilter, setSourceFilter] = useState<SourceType | 'all'>('all');
+
+  // Month-end pack: default to last completed month (current month - 1)
+  const [packPeriod, setPackPeriod] = useState<string>(() =>
+    format(subMonths(new Date(), 1), 'yyyy-MM'),
+  );
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const currentPeriod = format(new Date(), 'yyyy-MM');
+  const isFuturePeriod = packPeriod > currentPeriod;
+
+  const handleDownloadPack = async () => {
+    if (isFuturePeriod) return;
+    setIsDownloading(true);
+    try {
+      const response = await apiClient.get(
+        `/general-ledger/month-end-pack?period=${packPeriod}`,
+        { responseType: 'blob' },
+      );
+      const blob = new Blob([response.data as BlobPart], { type: 'application/zip' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `month-end-${packPeriod}.zip`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast({ title: 'Download complete', description: `month-end-${packPeriod}.zip saved.` });
+    } catch {
+      toast({
+        title: 'Download failed',
+        description: 'Could not download the month-end pack. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const fromDate = format(dateRange.from, 'yyyy-MM-dd');
   const toDate = format(dateRange.to, 'yyyy-MM-dd');
@@ -117,6 +156,25 @@ export default function GeneralLedgerPage() {
               Trial Balance
             </Button>
           </Link>
+          <div className="flex items-center gap-2">
+            <input
+              type="month"
+              value={packPeriod}
+              max={currentPeriod}
+              onChange={(e) => setPackPeriod(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              aria-label="Month-end pack period"
+            />
+            <Button
+              variant="outline"
+              onClick={handleDownloadPack}
+              disabled={isFuturePeriod || isDownloading}
+              title={isFuturePeriod ? 'Cannot download a future period' : `Download month-end pack for ${packPeriod}`}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isDownloading ? 'Downloading...' : 'Month-End Pack'}
+            </Button>
+          </div>
         </div>
       </div>
 

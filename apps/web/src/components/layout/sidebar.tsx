@@ -18,6 +18,7 @@ import {
   type NavLink,
 } from './nav-links';
 import { useAuth } from '@/hooks/use-auth';
+import { useTotalUnread } from '@/hooks/admin/use-admin-messages';
 
 interface NavItemProps {
   link: NavLink;
@@ -105,6 +106,9 @@ export function Sidebar() {
   // UI-002: Prefetch dashboard data on hover for faster navigation
   const { onMouseEnter: prefetchDashboard } = useDashboardPrefetchOnHover();
 
+  // Inbox unread badge — driven by polling hook (5s cadence)
+  const totalUnread = useTotalUnread();
+
   // Check if user has required role for a nav link
   const hasRequiredRole = (link: NavLink): boolean => {
     if (!link.requiredRole) return true;
@@ -115,6 +119,14 @@ export function Sidebar() {
   const prefetchHandlers: Record<string, () => void> = {
     '/dashboard': prefetchDashboard,
   };
+
+  // Inject dynamic badge values into management nav links
+  const managementNavLinksWithBadges = managementNavLinks.map((link) => {
+    if (link.href === '/communications/inbox' && totalUnread > 0) {
+      return { ...link, badge: totalUnread };
+    }
+    return link;
+  });
 
   return (
     <aside
@@ -156,7 +168,7 @@ export function Sidebar() {
           <Separator />
           <NavSection
             title="Management"
-            links={managementNavLinks}
+            links={managementNavLinksWithBadges}
             collapsed={sidebarCollapsed}
             pathname={pathname}
           />

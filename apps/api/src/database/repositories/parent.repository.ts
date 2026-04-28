@@ -35,6 +35,7 @@ export class ParentRepository {
           tenantId: dto.tenantId!,
           firstName: dto.firstName,
           lastName: dto.lastName,
+          middleName: dto.middleName ?? null,
           email: dto.email ?? null,
           phone: dto.phone ?? null,
           whatsapp: dto.whatsapp ?? null,
@@ -322,6 +323,9 @@ export class ParentRepository {
       }
       if (dto.lastName !== undefined) {
         updateData.lastName = dto.lastName;
+      }
+      if (dto.middleName !== undefined) {
+        updateData.middleName = dto.middleName;
       }
       if (dto.email !== undefined) {
         updateData.email = dto.email;

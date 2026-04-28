@@ -12,6 +12,9 @@ import {
   Mail,
   ChevronLeft,
   ChevronRight,
+  BookOpen,
+  CalendarCheck,
+  FileCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -28,6 +31,9 @@ const navigation = [
     items: [
       { name: 'Tenants', href: '/admin/tenants', icon: Building2 },
       { name: 'Users', href: '/admin/users', icon: Users },
+      { name: 'Class Groups', href: '/admin/class-groups', icon: BookOpen },
+      { name: 'Attendance', href: '/admin/attendance', icon: CalendarCheck },
+      { name: 'Payment proofs', href: '/admin/payment-attachments', icon: FileCheck },
     ],
   },
   {

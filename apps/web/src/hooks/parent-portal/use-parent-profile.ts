@@ -35,6 +35,7 @@ export interface CommunicationPreferences {
 export interface ParentProfile {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
   phone?: string;
@@ -52,16 +53,45 @@ export interface UpdateParentProfileDto {
   address?: ParentAddress;
 }
 
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+
 export interface ParentChild {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
+  gender?: Gender | null;
   dateOfBirth?: string;
   enrollmentDate?: string;
   className?: string;
   attendanceType?: 'full_day' | 'half_day' | 'after_care';
   isActive: boolean;
   photoUrl?: string | null;
+  medicalNotes?: string | null;
+  emergencyContact?: string | null;
+  emergencyPhone?: string | null;
+}
+
+export interface UpdateParentChildDto {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  gender?: Gender;
+  medicalNotes?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+}
+
+export interface ParentChildUpdateResponse {
+  id: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  gender: Gender | null;
+  medicalNotes: string | null;
+  emergencyContact: string | null;
+  emergencyPhone: string | null;
+  updatedAt: string;
 }
 
 export interface DeleteAccountRequestDto {
@@ -204,6 +234,67 @@ export function useUpdateCommunicationPrefs() {
           ...old,
           communicationPreferences: data,
         };
+      });
+    },
+  });
+}
+
+/**
+ * Fetch a single child by id (derived from the children list cache)
+ */
+export function useParentChild(childId: string) {
+  return useQuery<ParentChild, Error>({
+    queryKey: [...parentProfileKeys.children(), childId],
+    queryFn: async () => {
+      const children = await parentPortalFetch<ParentChild[]>('/parent-portal/children');
+      const child = children.find((c) => c.id === childId);
+      if (!child) throw new Error('Child not found');
+      return child;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * Update editable child fields (medicalNotes, emergencyContact, emergencyPhone)
+ */
+export function useUpdateParentChild(childId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation<ParentChildUpdateResponse, Error, UpdateParentChildDto>({
+    mutationFn: async (data) => {
+      return parentPortalFetch<ParentChildUpdateResponse>(
+        `/parent-portal/children/${childId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        }
+      );
+    },
+    onSuccess: (data) => {
+      // Patch the children list cache so the detail view reflects changes immediately
+      queryClient.setQueryData(
+        parentProfileKeys.children(),
+        (old: ParentChild[] | undefined) => {
+          if (!old) return old;
+          return old.map((c) =>
+            c.id === childId
+              ? {
+                  ...c,
+                  firstName: data.firstName,
+                  lastName: data.lastName,
+                  gender: data.gender,
+                  medicalNotes: data.medicalNotes,
+                  emergencyContact: data.emergencyContact,
+                  emergencyPhone: data.emergencyPhone,
+                }
+              : c
+          );
+        }
+      );
+      // Also invalidate the per-child query key
+      queryClient.invalidateQueries({
+        queryKey: [...parentProfileKeys.children(), childId],
       });
     },
   });

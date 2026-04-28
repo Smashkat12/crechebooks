@@ -24,12 +24,11 @@ describe('WhatsAppTemplateService', () => {
       const templates = service.getAvailableTemplates();
 
       expect(templates).toContain('invoice_notification');
-      expect(templates).toContain('invoice_reminder');
       expect(templates).toContain('payment_received');
       expect(templates).toContain('arrears_notice');
       expect(templates).toContain('registration_welcome');
       expect(templates).toContain('statement_notification');
-      expect(templates.length).toBe(6);
+      expect(templates.length).toBe(5);
     });
   });
 
@@ -178,18 +177,18 @@ describe('WhatsAppTemplateService', () => {
       expect(bodyComponent?.parameters?.length).toBe(5);
     });
 
-    it('should build payment reminder template', () => {
-      const built = service.buildTemplate('invoice_reminder', {
+    it('should build payment received template', () => {
+      const built = service.buildTemplate('payment_received', {
         parentName: 'John',
-        invoiceNumber: 'INV-001',
         amount: 'R1,500.00',
-        daysOverdue: '7 days',
-        amountDue: 'R1,500.00',
-        dueDate: new Date('2026-01-15'),
+        invoiceNumber: 'INV-001',
+        reference: 'PAY-123',
+        paymentDate: new Date('2026-01-15'),
+        balance: 'R0.00',
       });
 
       expect(built).toBeDefined();
-      expect(built?.name).toBe('invoice_reminder');
+      expect(built?.name).toBe('payment_received');
     });
 
     it('should return null for unknown template', () => {
@@ -230,22 +229,6 @@ describe('WhatsAppTemplateService', () => {
     });
   });
 
-  describe('buildPaymentReminder', () => {
-    it('should build payment reminder with helper method', () => {
-      const built = service.buildPaymentReminder({
-        parentName: 'John',
-        invoiceNumber: 'INV-001',
-        amount: 'R1,500.00',
-        daysOverdue: 7,
-        amountDue: 'R1,500.00',
-        dueDate: new Date('2026-01-15'),
-      });
-
-      expect(built).toBeDefined();
-      expect(built?.name).toBe('invoice_reminder');
-    });
-  });
-
   describe('buildPaymentReceived', () => {
     it('should build payment received confirmation', () => {
       const built = service.buildPaymentReceived({
@@ -277,7 +260,25 @@ describe('WhatsAppTemplateService', () => {
   });
 
   describe('buildWelcomeMessage', () => {
-    it('should build welcome message', () => {
+    it('should build welcome message with explicit portal URL', () => {
+      const built = service.buildWelcomeMessage({
+        crecheName: 'Happy Kids Daycare',
+        parentName: 'John',
+        childName: 'Jane',
+        portalUrl: 'https://app.crechebooks.co.za/portal',
+      });
+
+      expect(built).toBeDefined();
+      expect(built?.name).toBe('registration_welcome');
+
+      const bodyComponent = built?.components.find((c) => c.type === 'body');
+      expect(bodyComponent?.parameters?.length).toBe(4);
+      expect(bodyComponent?.parameters?.[3].text).toBe(
+        'https://app.crechebooks.co.za/portal',
+      );
+    });
+
+    it('should use default portal URL when none supplied', () => {
       const built = service.buildWelcomeMessage({
         crecheName: 'Happy Kids Daycare',
         parentName: 'John',
@@ -286,6 +287,12 @@ describe('WhatsAppTemplateService', () => {
 
       expect(built).toBeDefined();
       expect(built?.name).toBe('registration_welcome');
+
+      const bodyComponent = built?.components.find((c) => c.type === 'body');
+      expect(bodyComponent?.parameters?.length).toBe(4);
+      expect(bodyComponent?.parameters?.[3].text).toBe(
+        'https://app.crechebooks.co.za/portal',
+      );
     });
   });
 

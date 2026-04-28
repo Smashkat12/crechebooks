@@ -14,6 +14,7 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { FeeStructureRepository } from '../../../src/database/repositories/fee-structure.repository';
 import { EnrollmentRepository } from '../../../src/database/repositories/enrollment.repository';
 import { EnrollmentService } from '../../../src/database/services/enrollment.service';
+import { InvoiceGenerationService } from '../../../src/database/services/invoice-generation.service';
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
 import {
   UserRole,
@@ -61,6 +62,7 @@ describe('ChildController', () => {
     tenantId: mockTenantId,
     xeroContactId: null,
     firstName: 'John',
+    middleName: null,
     lastName: 'Smith',
     email: 'john.smith@example.com',
     phone: null,
@@ -99,7 +101,9 @@ describe('ChildController', () => {
     id: 'child-001',
     tenantId: mockTenantId,
     parentId: 'parent-001',
+    classGroupId: null,
     firstName: 'Emma',
+    middleName: null,
     lastName: 'Smith',
     dateOfBirth: new Date('2020-05-15'),
     gender: PrismaGender.FEMALE,
@@ -180,6 +184,13 @@ describe('ChildController', () => {
               },
               invoice: null,
             }),
+          },
+        },
+        {
+          provide: InvoiceGenerationService,
+          useValue: {
+            generateMonthlyInvoices: jest.fn(),
+            generateInvoiceForChild: jest.fn(),
           },
         },
         {

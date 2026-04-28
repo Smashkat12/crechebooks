@@ -9,7 +9,13 @@ export interface JournalEntry {
   accountName: string;
   debitCents: number;
   creditCents: number;
-  sourceType: 'BANK_FEED' | 'CATEGORIZATION' | 'PAYROLL' | 'MANUAL' | 'INVOICE' | 'PAYMENT';
+  sourceType:
+    | 'BANK_FEED'
+    | 'CATEGORIZATION'
+    | 'PAYROLL'
+    | 'MANUAL'
+    | 'INVOICE'
+    | 'PAYMENT';
   sourceId: string;
   reference?: string;
 }

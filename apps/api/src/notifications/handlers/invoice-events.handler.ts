@@ -42,9 +42,7 @@ export class InvoiceEventsHandler {
   }
 
   @OnEvent('invoice.sent', { async: true })
-  async handleInvoiceSent(
-    event: DomainEvents.InvoiceSentEvent,
-  ): Promise<void> {
+  async handleInvoiceSent(event: DomainEvents.InvoiceSentEvent): Promise<void> {
     try {
       const amount = `R ${(event.amountCents / 100).toFixed(2)}`;
 

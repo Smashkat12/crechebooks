@@ -74,7 +74,11 @@ export class NotificationEmitter {
   /**
    * Send a notification to a specific parent.
    */
-  async notifyParent(tenantId: string, parentId: string, params: NotifyParams): Promise<void> {
+  async notifyParent(
+    tenantId: string,
+    parentId: string,
+    params: NotifyParams,
+  ): Promise<void> {
     try {
       await this.enqueue({
         tenantId,
@@ -93,7 +97,11 @@ export class NotificationEmitter {
   /**
    * Send a notification to a specific staff member.
    */
-  async notifyStaff(tenantId: string, staffId: string, params: NotifyParams): Promise<void> {
+  async notifyStaff(
+    tenantId: string,
+    staffId: string,
+    params: NotifyParams,
+  ): Promise<void> {
     try {
       await this.enqueue({
         tenantId,
@@ -112,7 +120,11 @@ export class NotificationEmitter {
   /**
    * Send a notification to a specific user.
    */
-  async notifyUser(tenantId: string, userId: string, params: NotifyParams): Promise<void> {
+  async notifyUser(
+    tenantId: string,
+    userId: string,
+    params: NotifyParams,
+  ): Promise<void> {
     try {
       await this.enqueue({
         tenantId,

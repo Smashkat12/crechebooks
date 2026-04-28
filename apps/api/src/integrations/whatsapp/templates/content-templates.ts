@@ -414,6 +414,45 @@ export const REMINDER_FINAL: ContentTemplateDefinition = {
 };
 
 /**
+ * Registration welcome message sent after a parent registers via the portal.
+ * Category: UTILITY
+ *
+ * WARNING: Body text change requires re-registration with Twilio Content API and
+ * Meta approval before this template can send. The change will not take effect in
+ * production until: (1) twilio-content.service.ts sync runs to register the new
+ * template version with Twilio, (2) Twilio approves it via Meta.
+ *
+ * Variables:
+ * - {{1}} crecheName (e.g., "Little Stars Creche")
+ * - {{2}} parentName (e.g., "Sarah")
+ * - {{3}} childName (e.g., "Emma Smith")
+ * - {{4}} portalUrl (e.g., "https://app.crechebooks.co.za/portal")
+ */
+export const REGISTRATION_WELCOME: ContentTemplateDefinition = {
+  friendlyName: 'cb_registration_welcome',
+  language: 'en',
+  category: 'UTILITY',
+  variables: {
+    '1': 'Little Stars Creche',
+    '2': 'Sarah',
+    '3': 'Emma Smith',
+    '4': 'https://app.crechebooks.co.za/portal',
+  },
+  types: {
+    'twilio/call-to-action': {
+      body: 'Welcome to {{1}}, {{2}}!\n\nThank you for registering {{3}} with us.\nYou will receive invoices and important updates via WhatsApp.\nTo manage your notification preferences, visit your parent portal:\n{{4}}',
+      actions: [
+        {
+          type: 'URL',
+          title: 'Open Parent Portal',
+          url: '{{4}}',
+        },
+      ],
+    },
+  },
+};
+
+/**
  * Onboarding re-engagement template
  * TASK-WA-011: Sent when a parent's onboarding session goes stale (>24h)
  * Category: UTILITY
@@ -453,6 +492,7 @@ export const ALL_TEMPLATES: ContentTemplateDefinition[] = [
   PAYMENT_CONFIRMATION,
   ARREARS_NOTICE,
   WELCOME_ENROLLMENT,
+  REGISTRATION_WELCOME,
   STATEMENT_NOTIFICATION,
   REMINDER_FRIENDLY,
   REMINDER_FIRM,
@@ -469,6 +509,7 @@ export const TEMPLATE_NAMES = {
   PAYMENT_CONFIRMATION: 'cb_payment_confirmation_v4',
   ARREARS_NOTICE: 'cb_arrears_notice_v3',
   WELCOME_ENROLLMENT: 'cb_welcome_enrollment_v3',
+  REGISTRATION_WELCOME: 'cb_registration_welcome',
   STATEMENT_NOTIFICATION: 'cb_statement_notification_v2',
   REMINDER_FRIENDLY: 'cb_reminder_friendly',
   REMINDER_FIRM: 'cb_reminder_firm',

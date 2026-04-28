@@ -88,7 +88,8 @@ export class CategorizationService {
     @Optional()
     private readonly xeroSyncService?: XeroSyncService,
     // TASK-STUB-PARITY: Provider-agnostic expense sync
-    @Inject(ACCOUNTING_PROVIDER) @Optional()
+    @Inject(ACCOUNTING_PROVIDER)
+    @Optional()
     private readonly accountingProvider?: AccountingProvider,
   ) {}
 
@@ -335,6 +336,7 @@ export class CategorizationService {
       accountName: categorizationDto.accountName,
       confidenceScore: finalConfidence,
       source: categorizationDto.source,
+      agentSource: aiResult.agentSource,
     };
   }
 
@@ -929,6 +931,7 @@ export class CategorizationService {
           reasoning: result.reasoning,
           vatType: result.vatType,
           isSplit: result.isSplit,
+          agentSource: result.source,
         };
       } catch (error) {
         this.logger.error(

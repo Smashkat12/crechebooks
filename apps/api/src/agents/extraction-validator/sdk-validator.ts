@@ -18,8 +18,9 @@
  * - No `any` types
  */
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional, Inject } from '@nestjs/common';
 import { BaseSdkAgent, SdkAgentFactory, SdkConfigService } from '../sdk';
+import { ClaudeClientService } from '../sdk/claude-client.service';
 import type { AgentDefinition } from '../sdk';
 import {
   ParsedBankStatement,
@@ -54,7 +55,13 @@ const SAMPLE_HEAD_TAIL = 5;
  */
 @Injectable()
 export class SdkSemanticValidator extends BaseSdkAgent {
-  constructor(factory: SdkAgentFactory, config: SdkConfigService) {
+  constructor(
+    factory: SdkAgentFactory,
+    config: SdkConfigService,
+    @Optional()
+    @Inject(ClaudeClientService)
+    private readonly claudeClient?: ClaudeClientService,
+  ) {
     super(factory, config, SdkSemanticValidator.name);
   }
 
@@ -274,19 +281,37 @@ export class SdkSemanticValidator extends BaseSdkAgent {
   // ─────────────────────────────────────────────────────────────────────
 
   /**
-   * Execute inference via the SDK execution engine.
-   * Stub: throws because agentic-flow is not installed.
+   * Execute inference via ClaudeClientService (Requesty proxy).
+   *
+   * @param _agentDef - Agent definition (system prompt taken from SEMANTIC_VALIDATOR_SYSTEM_PROMPT)
+   * @param prompt - User-facing prompt with sanitised bank statement data
+   * @returns Raw LLM response string (JSON)
+   * @throws Error when Claude client is not available or call fails
    */
-  private executeSdkInference(
+  private async executeSdkInference(
     _agentDef: AgentDefinition,
-    _prompt: string,
+    prompt: string,
   ): Promise<string> {
-    return Promise.reject(
-      new Error(
-        'SDK inference not available: agentic-flow execution engine not installed. ' +
-          'Install agentic-flow to enable LLM-based semantic validation.',
-      ),
+    if (!this.claudeClient?.isAvailable()) {
+      throw new Error(
+        'Claude client not available. Check ANTHROPIC_API_KEY configuration.',
+      );
+    }
+
+    const response = await this.claudeClient.sendMessage({
+      systemPrompt: SEMANTIC_VALIDATOR_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: prompt }],
+      model: 'haiku', // High-volume validation: use haiku for cost efficiency
+      maxTokens: 1024,
+      temperature: 0, // Deterministic for validation
+    });
+
+    this.logger.log(
+      `Extraction validator LLM call: model=${response.model} ` +
+        `tokens=${String(response.usage.inputTokens)}→${String(response.usage.outputTokens)}`,
     );
+
+    return response.content;
   }
 
   /**

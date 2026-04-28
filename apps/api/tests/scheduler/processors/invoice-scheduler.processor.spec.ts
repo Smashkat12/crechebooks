@@ -25,6 +25,7 @@ import { CreditBalanceService } from '../../../src/database/services/credit-bala
 import { CreditNoteService } from '../../../src/database/services/credit-note.service';
 import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { EnrollmentStatus } from '../../../src/database/entities/enrollment.entity';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
@@ -120,6 +121,10 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
           },
         },
         { provide: XeroSyncService, useValue: mockXeroSyncService },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn(), emitAsync: jest.fn() },
+        },
       ],
     }).compile();
 

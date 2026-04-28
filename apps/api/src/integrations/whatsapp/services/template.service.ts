@@ -441,30 +441,6 @@ export class WhatsAppTemplateService {
   }
 
   /**
-   * Build payment reminder template
-   */
-  buildPaymentReminder(data: {
-    parentName: string;
-    invoiceNumber: string;
-    amount: string;
-    daysOverdue: number;
-    amountDue: string;
-    dueDate: Date | string;
-  }): BuiltTemplate | null {
-    const params: TemplateParameterValues = {
-      parentName: data.parentName,
-      invoiceNumber: data.invoiceNumber,
-      amount: data.amount,
-      daysOverdue: `${data.daysOverdue} days`,
-      amountDue: data.amountDue,
-      dueDate:
-        data.dueDate instanceof Date ? data.dueDate : new Date(data.dueDate),
-    };
-
-    return this.buildTemplate('invoice_reminder', params);
-  }
-
-  /**
    * Build payment received confirmation template
    */
   buildPaymentReceived(data: {
@@ -516,11 +492,14 @@ export class WhatsAppTemplateService {
     crecheName: string;
     parentName: string;
     childName: string;
+    /** Parent portal URL — defaults to https://app.crechebooks.co.za/portal */
+    portalUrl?: string;
   }): BuiltTemplate | null {
     const params: TemplateParameterValues = {
       crecheName: data.crecheName,
       parentName: data.parentName,
       childName: data.childName,
+      portalUrl: data.portalUrl ?? 'https://app.crechebooks.co.za/portal',
     };
 
     return this.buildTemplate('registration_welcome', params);

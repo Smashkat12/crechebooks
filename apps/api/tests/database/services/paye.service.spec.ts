@@ -13,12 +13,16 @@ import { PayFrequency } from '@prisma/client';
 import {
   REBATES_2025,
   REBATES_2026,
+  REBATES_2027,
   MEDICAL_CREDITS_2025,
   MEDICAL_CREDITS_2026,
+  MEDICAL_CREDITS_2027,
   TAX_THRESHOLDS_2025,
   TAX_THRESHOLDS_2026,
+  TAX_THRESHOLDS_2027,
   TAX_BRACKETS_2025,
   TAX_BRACKETS_2026,
+  TAX_BRACKETS_2027,
   getTaxYear,
   getTaxYearTables,
 } from '../../../src/database/constants/paye.constants';
@@ -387,6 +391,14 @@ describe('PayeService', () => {
 
   // TASK-SARS-034: Tax Year Selection Tests
   describe('getTaxYear', () => {
+    it('should return 2026/2027 for dates in March 2026 - February 2027', () => {
+      expect(getTaxYear(new Date('2026-03-01'))).toBe('2026/2027');
+      expect(getTaxYear(new Date('2026-06-15'))).toBe('2026/2027');
+      expect(getTaxYear(new Date('2026-12-31'))).toBe('2026/2027');
+      expect(getTaxYear(new Date('2027-01-15'))).toBe('2026/2027');
+      expect(getTaxYear(new Date('2027-02-28'))).toBe('2026/2027');
+    });
+
     it('should return 2024/2025 for dates in March 2024 - February 2025', () => {
       expect(getTaxYear(new Date('2024-03-01'))).toBe('2024/2025');
       expect(getTaxYear(new Date('2024-06-15'))).toBe('2024/2025');
@@ -440,6 +452,21 @@ describe('PayeService', () => {
       expect(tables).toBeDefined();
       expect(tables.brackets).toBeDefined();
       expect(tables.rebates).toBeDefined();
+    });
+
+    it('should return 2026/2027 tables for dates in that tax year', () => {
+      const tables = getTaxYearTables(new Date('2026-06-15'));
+      expect(tables.taxYear).toBe('2026/2027');
+      expect(tables.brackets).toBe(TAX_BRACKETS_2027);
+      expect(tables.rebates).toBe(REBATES_2027);
+      expect(tables.medicalCredits).toBe(MEDICAL_CREDITS_2027);
+      expect(tables.thresholds).toBe(TAX_THRESHOLDS_2027);
+    });
+
+    it('should return 2026/2027 for today (2026-04-28) — unblocks live payroll', () => {
+      // This date drove the urgent fix: TASK-TAX-YEAR-2027
+      const tables = getTaxYearTables(new Date('2026-04-28'));
+      expect(tables.taxYear).toBe('2026/2027');
     });
   });
 
@@ -632,6 +659,12 @@ describe('PayeService', () => {
       expect(TAX_BRACKETS_2026[6].rate.toNumber()).toBe(0.45);
     });
 
+    it('should have bracket 1 ceiling at R237,100 (23710000)', () => {
+      // Verifies the bracket boundary fix — was incorrectly R237,400 (23740000)
+      expect(TAX_BRACKETS_2026[0].maxIncomeCents).toBe(23710000);
+      expect(TAX_BRACKETS_2026[1].minIncomeCents).toBe(23710100);
+    });
+
     it('should have all rebates defined for 2026', () => {
       expect(REBATES_2026.PRIMARY).toBeGreaterThan(0);
       expect(REBATES_2026.SECONDARY).toBeGreaterThan(0);
@@ -652,6 +685,71 @@ describe('PayeService', () => {
       expect(TAX_THRESHOLDS_2026.AGE_75_PLUS).toBeGreaterThan(
         TAX_THRESHOLDS_2026.AGE_65_TO_74,
       );
+    });
+  });
+
+  describe('2027 Tax Constants Validation (2026/2027 tax year)', () => {
+    it('should have 7 tax brackets for 2027', () => {
+      expect(TAX_BRACKETS_2027).toHaveLength(7);
+    });
+
+    it('should have correct bracket 1 ceiling at R237,100', () => {
+      expect(TAX_BRACKETS_2027[0].maxIncomeCents).toBe(23710000);
+      expect(TAX_BRACKETS_2027[1].minIncomeCents).toBe(23710100);
+    });
+
+    it('should have last bracket with no upper limit', () => {
+      expect(TAX_BRACKETS_2027[6].maxIncomeCents).toBeNull();
+      expect(TAX_BRACKETS_2027[6].rate.toNumber()).toBe(0.45);
+    });
+
+    it('should have all rebates defined for 2027', () => {
+      expect(REBATES_2027.PRIMARY).toBeGreaterThan(0);
+      expect(REBATES_2027.SECONDARY).toBeGreaterThan(0);
+      expect(REBATES_2027.TERTIARY).toBeGreaterThan(0);
+    });
+
+    it('should have all thresholds defined for 2027', () => {
+      expect(TAX_THRESHOLDS_2027.BELOW_65).toBeGreaterThan(0);
+      expect(TAX_THRESHOLDS_2027.AGE_65_TO_74).toBeGreaterThan(
+        TAX_THRESHOLDS_2027.BELOW_65,
+      );
+      expect(TAX_THRESHOLDS_2027.AGE_75_PLUS).toBeGreaterThan(
+        TAX_THRESHOLDS_2027.AGE_65_TO_74,
+      );
+    });
+  });
+
+  describe('Dynamic Tax Year PAYE Calculation — 2026/2027 (TASK-TAX-YEAR-2027)', () => {
+    it('should use 2026/2027 tables for payPeriodDate in March 2026', async () => {
+      const result = await service.calculatePaye({
+        grossIncomeCents: 3000000, // R30,000/month
+        payFrequency: PayFrequency.MONTHLY,
+        dateOfBirth: new Date('1990-01-01'),
+        medicalAidMembers: 0,
+        payPeriodDate: new Date('2026-04-28'), // today — the fix date
+      });
+
+      // Should use 2026/2027 rebates (same values as 2025/2026 until official gazette)
+      expect(result.primaryRebateCents).toBe(REBATES_2027.PRIMARY);
+      expect(result.grossIncomeCents).toBe(3000000);
+      expect(result.netPayeCents).toBeGreaterThan(0);
+    });
+
+    it('should calculate PAYE for R30,000/month using 2026/2027 tables', async () => {
+      // R30,000/month = R360,000/year → bracket 2 (26%)
+      // With 2026/2027 values (same as 2025/2026 — VERIFY bracket)
+      const result = await service.calculatePaye({
+        grossIncomeCents: 3000000,
+        payFrequency: PayFrequency.MONTHLY,
+        dateOfBirth: new Date('1990-01-01'),
+        medicalAidMembers: 0,
+        payPeriodDate: new Date('2026-06-15'),
+      });
+
+      expect(result.annualizedIncomeCents).toBe(36000000);
+      expect(result.bracketIndex).toBe(1); // Second bracket (26%)
+      expect(result.primaryRebateCents).toBe(REBATES_2027.PRIMARY);
     });
   });
 });

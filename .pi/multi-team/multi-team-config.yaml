@@ -1,0 +1,160 @@
+# Multi-Team Agent Configuration
+#
+# Recreated from IndyDevDan's video (https://www.youtube.com/watch?v=M30gp1315Y4)
+# Loaded at session_start by .pi/extensions/multi-team/index.ts
+#
+# Topology: orchestrator → 4 leads (Planning, Engineering, Operations, Validation) → workers
+# - Only the user talks to the orchestrator.
+# - Orchestrator can delegate to leads only.
+# - Each lead can delegate to its own team's workers only (strict tree by default).
+# - Workers cannot delegate.
+# - Build path: Engineering writes code; Validation gates ship/no-ship.
+# - Operate path: Operations drives the running system via cb-api.sh / cb-db.sh.
+
+orchestrator:
+  name: orchestrator
+  path: .pi/multi-team/agents/orchestrator.md
+  color: "#7271a8"
+
+paths:
+  agents:    .pi/multi-team/agents/
+  skills:    .pi/multi-team/skills/
+  expertise: .pi/multi-team/expertise/
+  sessions:  .pi/multi-team/sessions/
+  logs:      .pi/multi-team/logs/
+
+# Files concatenated into every agent's system prompt as shared project context.
+# Should be small; keep architecture/conventions only.
+shared_context:
+  - README.md
+  - CLAUDE.md
+
+teams:
+  - team-name: Planning
+    team-color: "#f4de5d"
+    lead:
+      name: planning-lead
+      path: .pi/multi-team/agents/planning-lead.md
+      color: "#f4de5d"
+    members:
+      - name: product-manager
+        path: .pi/multi-team/agents/product-manager.md
+        color: "#fdc678"
+        consult-when: Requirements, feature prioritization, user stories, acceptance criteria.
+      - name: ux-researcher
+        path: .pi/multi-team/agents/ux-researcher.md
+        color: "#f9b572"
+        consult-when: User research, persona modeling, journey mapping, usability heuristics.
+
+  - team-name: Engineering
+    team-color: "#7fb069"
+    lead:
+      name: engineering-lead
+      path: .pi/multi-team/agents/engineering-lead.md
+      color: "#7fb069"
+    members:
+      - name: billing-engineer
+        path: .pi/multi-team/agents/billing-engineer.md
+        color: "#a3d977"
+        consult-when: Invoice generation, fee structures, statements, ad-hoc charges, billing-cycle scheduling.
+      - name: payments-engineer
+        path: .pi/multi-team/agents/payments-engineer.md
+        color: "#9bd06b"
+        consult-when: Payment ingestion, AI matching to invoices, allocation logic, payment links.
+      - name: banking-engineer
+        path: .pi/multi-team/agents/banking-engineer.md
+        color: "#8cc560"
+        consult-when: Bank feeds, transactions, AI categorization, bank reconciliation, fee detection.
+      - name: tax-payroll-engineer
+        path: .pi/multi-team/agents/tax-payroll-engineer.md
+        color: "#7eb955"
+        consult-when: SARS (VAT201/EMP201/EMP501), payroll, staff lifecycle, leave, SimplePay sync.
+      - name: people-engineer
+        path: .pi/multi-team/agents/people-engineer.md
+        color: "#71ad4a"
+        consult-when: Parents, children, enrollments, dashboard metrics, conversational queries.
+      - name: comms-engineer
+        path: .pi/multi-team/agents/comms-engineer.md
+        color: "#65a040"
+        consult-when: Broadcasts, notifications, WhatsApp/email/SMS delivery, recipient groups.
+      - name: platform-engineer
+        path: .pi/multi-team/agents/platform-engineer.md
+        color: "#5b9c52"
+        consult-when: DB layer, scheduler/queues, integrations, auth, common infra, agent platform plumbing.
+      - name: frontend-engineer
+        path: .pi/multi-team/agents/frontend-engineer.md
+        color: "#4f8d47"
+        consult-when: Next.js 15 web app — dashboard, parent portal, staff portal, admin, public surfaces.
+      - name: release-manager
+        path: .pi/multi-team/agents/release-manager.md
+        color: "#43803c"
+        consult-when: Branch creation, conventional commits, PR opening. Final step after work is verified and (optionally) validation-lead has issued ship-it.
+
+  - team-name: Operations
+    team-color: "#5b8db8"
+    lead:
+      name: operate-lead
+      path: .pi/multi-team/agents/operate-lead.md
+      color: "#5b8db8"
+    members:
+      - name: financial-ops
+        path: .pi/multi-team/agents/financial-ops.md
+        color: "#6f9ec5"
+        consult-when: Money flow — invoice generation, payment matching, statements, reconciliation status, arrears.
+      - name: tax-ops
+        path: .pi/multi-team/agents/tax-ops.md
+        color: "#82add0"
+        consult-when: SARS compliance — EMP201/VAT201/EMP501 prep and deadline tracking, payroll close.
+      - name: comms-ops
+        path: .pi/multi-team/agents/comms-ops.md
+        color: "#95bedb"
+        consult-when: Parent communications — broadcasts, reminders, delivery tracking. Preview-default in staging.
+      - name: data-ops
+        path: .pi/multi-team/agents/data-ops.md
+        color: "#a8cee5"
+        consult-when: Read-only ad-hoc queries, dashboard pulls, audit-trail review, anomaly checks.
+
+  - team-name: Validation
+    team-color: "#e07a5f"
+    lead:
+      name: validation-lead
+      path: .pi/multi-team/agents/validation-lead.md
+      color: "#e07a5f"
+    members:
+      - name: qa-engineer
+        path: .pi/multi-team/agents/qa-engineer.md
+        color: "#f08a73"
+        consult-when: Test coverage, edge cases, regression risks, integration testing.
+      - name: security-reviewer
+        path: .pi/multi-team/agents/security-reviewer.md
+        color: "#c64c3a"
+        consult-when: Auth flows, input validation, secrets handling, threat modeling.
+      - name: schema-guardian
+        path: .pi/multi-team/agents/schema-guardian.md
+        color: "#b8442e"
+        consult-when: Prisma schema changes, migration authoring, schema/migration/prod-DB drift detection, tenant-isolation enforcement at the DB layer.
+
+# Delegation policy. Default is strict-tree.
+#   strict-tree   → orchestrator delegates only to leads; leads delegate only to own members.
+#   open-mesh     → any caller may delegate to any other agent (less safe, more flexible).
+delegation: strict-tree
+
+# Per-session shared conversation log. All agents read this before responding
+# (active-listener skill) and append their turn after responding.
+# Path is templated at runtime: {sessions}/<sid>/conversation.jsonl
+conversation_log:
+  enabled: true
+  filename: conversation.jsonl
+
+# Default model assignments (overridable per-agent via the agent's front-matter).
+defaults:
+  orchestrator_model: anthropic/claude-opus-4-6
+  lead_model:         anthropic/claude-opus-4-6
+  worker_model:       anthropic/claude-sonnet-4-6
+
+# Concurrency cap for parallel delegations (e.g., "ask all teams").
+max_parallel_delegations: 4
+
+# Per-session cost cap (USD). Circuit breaker triggers when total spend in a
+# session reaches this amount. Set this so a runaway loop can't burn budget.
+max_session_cost_usd: 5.00

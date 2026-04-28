@@ -12,10 +12,8 @@ import { WebhookService } from '../webhook.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import {
-  mapEmailEventToStatus,
   mapWhatsAppStatusToDeliveryStatus,
   shouldUpdateStatus,
-  EmailEvent,
   WhatsAppWebhookPayload,
 } from '../types/webhook.types';
 
@@ -160,17 +158,6 @@ describe('WebhookService', () => {
   }
 
   describe('Type Mapping Functions', () => {
-    it('should map email events to delivery status correctly', () => {
-      expect(mapEmailEventToStatus('delivered')).toBe('DELIVERED');
-      expect(mapEmailEventToStatus('open')).toBe('OPENED');
-      expect(mapEmailEventToStatus('click')).toBe('CLICKED');
-      expect(mapEmailEventToStatus('bounce')).toBe('BOUNCED');
-      expect(mapEmailEventToStatus('dropped')).toBe('BOUNCED');
-      expect(mapEmailEventToStatus('spam_report')).toBe('COMPLAINED');
-      expect(mapEmailEventToStatus('processed')).toBeNull();
-      expect(mapEmailEventToStatus('deferred')).toBeNull();
-    });
-
     it('should map WhatsApp statuses to delivery status correctly', () => {
       expect(mapWhatsAppStatusToDeliveryStatus('sent')).toBe('SENT');
       expect(mapWhatsAppStatusToDeliveryStatus('delivered')).toBe('DELIVERED');
@@ -209,40 +196,6 @@ describe('WebhookService', () => {
   });
 
   describe('Signature Verification', () => {
-    it('should throw when email webhook key is not configured (FAIL FAST)', () => {
-      // SECURITY: Webhooks MUST fail fast when secrets not configured
-      expect(() =>
-        service.verifyEmailSignature('test payload', 'test-sig', '12345'),
-      ).toThrow('SENDGRID_WEBHOOK_KEY not configured');
-    });
-
-    it('should return false for missing signature headers when key configured', () => {
-      // Set a temporary key to test validation
-      (service as any).sendgridWebhookKey = 'test-key';
-      const result = service.verifyEmailSignature('test payload', '', '12345');
-      expect(result).toBe(false);
-      // Reset
-      (service as any).sendgridWebhookKey = undefined;
-    });
-
-    it('should return false for missing timestamp when key configured', () => {
-      (service as any).sendgridWebhookKey = 'test-key';
-      const result = service.verifyEmailSignature('test payload', 'sig', '');
-      expect(result).toBe(false);
-      (service as any).sendgridWebhookKey = undefined;
-    });
-
-    it('should return false for invalid email signature', () => {
-      (service as any).sendgridWebhookKey = 'test-key';
-      const result = service.verifyEmailSignature(
-        'test payload',
-        'invalid-signature',
-        '12345',
-      );
-      expect(result).toBe(false);
-      (service as any).sendgridWebhookKey = undefined;
-    });
-
     it('should throw when WhatsApp app secret is not configured (FAIL FAST)', () => {
       // SECURITY: Webhooks MUST fail fast when secrets not configured
       expect(() =>
@@ -280,27 +233,6 @@ describe('WebhookService', () => {
       const result = service.verifyWhatsAppSignature(payload, expectedSig);
       expect(result).toBe(true);
       (service as any).whatsappAppSecret = undefined;
-    });
-
-    it('should verify valid email signature', () => {
-      const key = 'test-key';
-      const payload = 'test payload';
-      const timestamp = '12345';
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const crypto = require('crypto') as typeof import('crypto');
-      const expectedSig = crypto
-        .createHmac('sha256', key)
-        .update(timestamp + payload)
-        .digest('base64');
-
-      (service as any).sendgridWebhookKey = key;
-      const result = service.verifyEmailSignature(
-        payload,
-        expectedSig,
-        timestamp,
-      );
-      expect(result).toBe(true);
-      (service as any).sendgridWebhookKey = undefined;
     });
   });
 
@@ -429,72 +361,6 @@ describe('WebhookService', () => {
           {},
         ),
       ).rejects.toThrow('not found');
-    });
-  });
-
-  describe('processEmailEvent', () => {
-    it('should skip events without invoiceId', async () => {
-      const events: EmailEvent[] = [
-        {
-          event: 'delivered',
-          timestamp: Date.now(),
-          sg_message_id: 'msg-no-invoice',
-          email: 'test@test.com',
-          // No invoiceId or tenantId
-        },
-      ];
-
-      const result = await service.processEmailEvent(events);
-
-      expect(result.skipped).toBe(1);
-      expect(result.processed).toBe(0);
-    });
-
-    it('should skip non-status-change events', async () => {
-      const events: EmailEvent[] = [
-        {
-          event: 'processed', // Not a status change
-          timestamp: Date.now(),
-          sg_message_id: 'msg-processed',
-          email: 'test@test.com',
-          invoiceId: testInvoiceId,
-          tenantId: testTenantId,
-        },
-      ];
-
-      const result = await service.processEmailEvent(events);
-
-      expect(result.skipped).toBe(1);
-      expect(result.processed).toBe(0);
-    });
-
-    it('should process valid delivery events', async () => {
-      // Reset status
-      await prisma.invoice.update({
-        where: { id: testInvoiceId },
-        data: { deliveryStatus: 'SENT' },
-      });
-
-      const events: EmailEvent[] = [
-        {
-          event: 'delivered',
-          timestamp: Math.floor(Date.now() / 1000),
-          sg_message_id: 'msg-delivered-test',
-          email: 'test@test.com',
-          invoiceId: testInvoiceId,
-          tenantId: testTenantId,
-        },
-      ];
-
-      const result = await service.processEmailEvent(events);
-
-      expect(result.processed).toBe(1);
-      expect(result.skipped).toBe(0);
-
-      const invoice = await prisma.invoice.findUnique({
-        where: { id: testInvoiceId },
-      });
-      expect(invoice?.deliveryStatus).toBe('DELIVERED');
     });
   });
 

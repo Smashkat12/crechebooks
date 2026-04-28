@@ -24,12 +24,27 @@ const makePrisma = () => ({
   },
   bankConnection: {
     findFirst: jest.fn(),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
 });
 
 const makeBankFeed = () => ({
   syncTransactions: jest.fn(),
   syncFromJournals: jest.fn(),
+  /** Delegate to real implementation for error-message extraction tests. */
+  extractXeroErrorMessage: jest
+    .fn()
+    .mockImplementation((err: unknown): string => {
+      if (err instanceof Error) return err.message.slice(0, 1000);
+      if (err !== null && typeof err === 'object') {
+        try {
+          return JSON.stringify(err).slice(0, 1000);
+        } catch {
+          /* fall through */
+        }
+      }
+      return String(err).slice(0, 1000);
+    }),
 });
 
 /** Helper: get the hasValidConnection mock from the last TokenManager instance created. */
@@ -239,6 +254,95 @@ describe('XeroAutoSyncJob', () => {
       const inFlight = (job as unknown as { inFlightTenants: Set<string> })
         .inFlightTenants;
       expect(inFlight.has(tenantId)).toBe(false);
+    });
+
+    it('persists error.message (not generic "Sync failed") when syncTransactions throws an Error', async () => {
+      const tenantId = 'tenant-err-persist';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId,
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+      prisma.bankConnection.findFirst.mockResolvedValue(null);
+      bankFeed.syncTransactions.mockRejectedValue(
+        new Error('HTTP 403: Forbidden — insufficient scopes'),
+      );
+
+      await job.runAutoSync();
+
+      expect(prisma.bankConnection.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ tenantId }),
+          data: expect.objectContaining({
+            status: 'ERROR',
+            errorMessage: 'HTTP 403: Forbidden — insufficient scopes',
+          }),
+        }),
+      );
+    });
+
+    it('persists a decoded error message when xero-node rejects with a plain object (HTTP error shape)', async () => {
+      const tenantId = 'tenant-xero-sdk-err';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId,
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+      prisma.bankConnection.findFirst.mockResolvedValue(null);
+
+      // xero-node rejects with a plain object, NOT an Error instance
+      const xeroSdkRejection = {
+        response: {
+          status: 429,
+          body: {
+            Type: 'TooManyRequests',
+            Title: 'Too Many Requests',
+            Detail: 'Rate limit exceeded. Retry after 30 seconds.',
+          },
+        },
+        body: {
+          Type: 'TooManyRequests',
+          Title: 'Too Many Requests',
+          Detail: 'Rate limit exceeded. Retry after 30 seconds.',
+        },
+      };
+
+      // extractXeroErrorMessage is mocked to handle this correctly
+      bankFeed.extractXeroErrorMessage.mockReturnValue(
+        'HTTP 429: Too Many Requests: Rate limit exceeded. Retry after 30 seconds.',
+      );
+      bankFeed.syncTransactions.mockRejectedValue(xeroSdkRejection);
+
+      await job.runAutoSync();
+
+      // The persisted errorMessage must NOT be the generic "Sync failed"
+      expect(prisma.bankConnection.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            errorMessage: expect.not.stringContaining('Sync failed'),
+          }),
+        }),
+      );
+      expect(prisma.bankConnection.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            errorMessage:
+              'HTTP 429: Too Many Requests: Rate limit exceeded. Retry after 30 seconds.',
+          }),
+        }),
+      );
     });
 
     it('continues syncing remaining tenants after one fails', async () => {

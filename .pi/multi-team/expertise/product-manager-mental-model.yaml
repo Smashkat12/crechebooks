@@ -1,0 +1,39 @@
+# Product-manager mental model — CrecheBooks
+
+spec_template_lessons:
+  - "Use the BDD pattern: 'As a [persona], I want [thing], so that [outcome]'."
+  - "Acceptance criteria are observable and testable — checkboxes, not prose."
+  - "Always include 'out of scope' explicitly."
+  - "Constitution (specs/constitution.md) is the baseline — don't redefine tech stack per spec."
+
+prioritization_heuristics:
+  - "Reach × impact / effort, weighted by tenant share affected."
+  - "Compliance work (POPIA / SARS) blocks ship — always P0."
+  - "Money-correctness blocks ship — always P0."
+  - "UX polish ships in cycles, not blocking."
+
+recurring_requirements:
+  - "Every user-data write needs soft-delete (deleted_at), no hard delete."
+  - "Every endpoint needs tenant guard + audit trail entry."
+  - "Every money field is INTEGER cents — never DECIMAL or float."
+  - "Every external integration (Xero, Yoco, SARS) needs circuit breaker + retry."
+
+existing_specs_directories:
+  - specs/architecture/
+  - specs/functional/
+  - specs/technical/
+  - specs/tasks/
+  - specs/prompts/
+
+decisions_log: []
+
+product_themes_seen_so_far:
+  - "AI categorization: claim is 99%+; current implementation deterministic-first with optional LLM disambiguation."
+  - "WhatsApp parent comms: integrations/whatsapp/ wired; webhook signature verified."
+  - "Xero is the source of truth for accounting — we sync TO Xero, not from it."
+
+session_observations: []
+
+open_questions:
+  - "(unresolved) Confidence threshold for auto-apply: PRD says <80% flag; is that still right?"
+  - "(unresolved) Are sibling discounts on full-day or half-day rates? Spec is ambiguous."

@@ -399,7 +399,7 @@ export class ReportsService {
   /**
    * Composite type for all possible raw report data shapes.
    */
-  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+
   private async fetchRawData(
     type: ReportType,
     start: Date,
@@ -566,9 +566,7 @@ export class ReportsService {
   /**
    * Build expense breakdown for pie charts.
    */
-  private buildExpenseBreakdown(
-    rawData: unknown,
-  ): CategoryBreakdownDto[] {
+  private buildExpenseBreakdown(rawData: unknown): CategoryBreakdownDto[] {
     const rd = rawData as Record<string, unknown>;
     // Check if it's an income statement
     if (
@@ -940,12 +938,8 @@ export class ReportsService {
   ): ReportSummaryDto {
     const rd = rawData as Record<string, unknown>;
     // Income Statement
-    if (
-      'income' in rd &&
-      'expenses' in rd &&
-      'netProfitCents' in rd
-    ) {
-      const data = rawData as unknown as IncomeStatement;
+    if ('income' in rd && 'expenses' in rd && 'netProfitCents' in rd) {
+      const data = rawData as IncomeStatement;
       const profitMarginPercent =
         data.income.totalCents > 0
           ? new Decimal(data.netProfitCents)
@@ -968,7 +962,7 @@ export class ReportsService {
 
     // Balance Sheet — map assets/liabilities/equity to summary fields
     if ('assets' in rd && 'liabilities' in rd && 'equity' in rd) {
-      const data = rawData as unknown as BalanceSheet;
+      const data = rawData as BalanceSheet;
       const netEquity = data.assets.totalCents - data.liabilities.totalCents;
       return {
         totalIncomeCents: data.assets.totalCents,
@@ -980,26 +974,29 @@ export class ReportsService {
           .dividedBy(100)
           .toDecimalPlaces(2)
           .toNumber(),
-        profitMarginPercent: data.assets.totalCents > 0
-          ? new Decimal(netEquity)
-              .dividedBy(data.assets.totalCents)
-              .times(100)
-              .toDecimalPlaces(2)
-              .toNumber()
-          : 0,
+        profitMarginPercent:
+          data.assets.totalCents > 0
+            ? new Decimal(netEquity)
+                .dividedBy(data.assets.totalCents)
+                .times(100)
+                .toDecimalPlaces(2)
+                .toNumber()
+            : 0,
       };
     }
 
     // Cash Flow Statement
     if ('operating' in rd && 'investing' in rd && 'financing' in rd) {
-      const data = rawData as unknown as CashFlowStatement;
+      const data = rawData as CashFlowStatement;
       return {
         totalIncomeCents: data.operating.total,
         totalIncomeRands: new Decimal(data.operating.total)
           .dividedBy(100)
           .toDecimalPlaces(2)
           .toNumber(),
-        totalExpensesCents: Math.abs(data.investing.total + data.financing.total),
+        totalExpensesCents: Math.abs(
+          data.investing.total + data.financing.total,
+        ),
         totalExpensesRands: new Decimal(
           Math.abs(data.investing.total + data.financing.total),
         )
@@ -1017,7 +1014,7 @@ export class ReportsService {
 
     // Aged Receivables (ArrearsReport)
     if ('summary' in rd && 'topDebtors' in rd) {
-      const data = rawData as unknown as ArrearsReport;
+      const data = rawData as ArrearsReport;
       return {
         totalIncomeCents: data.summary.totalOutstandingCents,
         totalIncomeRands: new Decimal(data.summary.totalOutstandingCents)
@@ -1037,7 +1034,7 @@ export class ReportsService {
 
     // VAT Report
     if ('outputVat' in rd && 'inputVat' in rd) {
-      const data = rawData as unknown as VatReportData;
+      const data = rawData as VatReportData;
       return {
         totalIncomeCents: data.outputVat.vatAmountCents,
         totalIncomeRands: new Decimal(data.outputVat.vatAmountCents)
@@ -1083,12 +1080,8 @@ export class ReportsService {
       new Decimal(cents).dividedBy(100).toDecimalPlaces(2).toNumber();
 
     // Income Statement sections
-    if (
-      'income' in rd &&
-      'expenses' in rd &&
-      'netProfitCents' in rd
-    ) {
-      const d = rawData as unknown as IncomeStatement;
+    if ('income' in rd && 'expenses' in rd && 'netProfitCents' in rd) {
+      const d = rawData as IncomeStatement;
       sections.push({
         title: 'Income',
         totalCents: d.income.totalCents,
@@ -1115,7 +1108,7 @@ export class ReportsService {
 
     // Balance Sheet sections
     if ('assets' in rd && 'liabilities' in rd && 'equity' in rd) {
-      const d = rawData as unknown as BalanceSheet;
+      const d = rawData as BalanceSheet;
       sections.push({
         title: 'Assets',
         totalCents: d.assets.totalCents,
@@ -1155,7 +1148,7 @@ export class ReportsService {
 
     // Cash Flow sections
     if ('operating' in rd && 'investing' in rd && 'financing' in rd) {
-      const d = rawData as unknown as CashFlowStatement;
+      const d = rawData as CashFlowStatement;
       sections.push({
         title: 'Operating Activities',
         totalCents: d.operating.total,
@@ -1218,7 +1211,7 @@ export class ReportsService {
 
     // Aged Receivables sections
     if ('summary' in rd && 'topDebtors' in rd && 'invoices' in rd) {
-      const d = rawData as unknown as ArrearsReport;
+      const d = rawData as ArrearsReport;
       sections.push({
         title: 'Aging Summary',
         totalCents: d.summary.totalOutstandingCents,
@@ -1258,10 +1251,7 @@ export class ReportsService {
             0,
           ),
           totalRands: toRands(
-            d.topDebtors.reduce(
-              (sum, db) => sum + db.totalOutstandingCents,
-              0,
-            ),
+            d.topDebtors.reduce((sum, db) => sum + db.totalOutstandingCents, 0),
           ),
           breakdown: d.topDebtors.map((db) => ({
             accountCode: '',
@@ -1275,7 +1265,7 @@ export class ReportsService {
 
     // VAT Report sections
     if ('outputVat' in rd && 'inputVat' in rd) {
-      const d = rawData as unknown as VatReportData;
+      const d = rawData as VatReportData;
       sections.push({
         title: 'Output VAT (Collected)',
         totalCents: d.outputVat.vatAmountCents,

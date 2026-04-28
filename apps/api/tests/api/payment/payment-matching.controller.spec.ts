@@ -113,6 +113,7 @@ describe('PaymentController - matchPayments', () => {
         invoiceNumber: 'INV-2025-0001',
         amountCents: 345000, // R3450.00
         confidenceScore: 100,
+        source: 'deterministic',
       };
 
       const expectedResult: MatchingBatchResult = {
@@ -271,6 +272,7 @@ describe('PaymentController - matchPayments', () => {
         invoiceNumber: `INV-${score}`,
         amountCents: 100000,
         confidenceScore: score,
+        source: 'deterministic',
       });
 
       const results: TransactionMatchResult[] = [

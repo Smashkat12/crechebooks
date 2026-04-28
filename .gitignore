@@ -42,6 +42,11 @@ temp/
 *.tmp
 *.temp
 
+# One-off ops scripts (run locally, not part of repo)
+scripts/allocate-2026-payments.sh
+scripts/match-xero-transactions.py
+scripts/push-to-xero.py
+
 # Backup files - NEVER COMMIT
 *.bak
 *.backup
@@ -111,3 +116,7 @@ test-results/
 # Local docs
 docs/company-docs/
 docs/data
+
+# pi multi-team — ephemeral runtime state
+.pi/multi-team/sessions/
+.pi/multi-team/logs/

@@ -31,7 +31,6 @@ import type { Request } from 'express';
 import { WebhookService } from './webhook.service';
 import { Public } from '../api/auth/decorators/public.decorator';
 import type {
-  EmailEvent,
   WhatsAppWebhookPayload,
   MailgunWebhookEvent,
 } from './types/webhook.types';
@@ -46,8 +45,7 @@ import { IdempotencyService } from '../common/services/idempotency.service';
 import { OnboardingConversationHandler } from '../integrations/whatsapp/handlers/onboarding-conversation.handler';
 import { ParentMenuHandler } from '../integrations/whatsapp/handlers/parent-menu.handler';
 import { PrismaService } from '../database/prisma/prisma.service';
-import { YocoService } from '../integrations/yoco/yoco.service';
-import type { YocoWebhookPayload } from '../integrations/yoco/yoco.types';
+import { InboundMessagePersistenceService } from '../api/whatsapp/inbound-message-persistence.service';
 
 /**
  * Public webhook endpoints (no auth required, signature verified)
@@ -64,104 +62,8 @@ export class WebhookController {
     private readonly onboardingHandler: OnboardingConversationHandler,
     private readonly parentMenuHandler: ParentMenuHandler,
     private readonly prisma: PrismaService,
-    private readonly yocoService: YocoService,
+    private readonly inboundPersistence: InboundMessagePersistenceService,
   ) {}
-
-  /**
-   * Handle SendGrid email delivery webhooks
-   * Events: delivered, open, click, bounce, spam_report, dropped
-   *
-   * IDEMPOTENCY: Uses sg_message_id + event type as idempotency key.
-   * SendGrid may retry webhooks for up to 72 hours, so TTL is set accordingly.
-   *
-   * @param req - Raw request for signature verification and idempotency
-   * @param body - Parsed webhook payload
-   * @param signature - SendGrid signature header
-   * @param timestamp - SendGrid timestamp header
-   */
-  @Post('email')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(IdempotencyGuard)
-  @Idempotent({
-    keyExtractor: (req) => {
-      // Extract unique key from first event in batch
-      // Format: sendgrid:{sg_message_id}:{event}:{timestamp}
-      const events = req.body as EmailEvent[];
-      if (!events || events.length === 0) return null;
-      const firstEvent = events[0];
-      if (!firstEvent.sg_message_id) return null;
-      return IdempotencyService.generateKey(
-        'sendgrid',
-        firstEvent.sg_message_id,
-        `${firstEvent.event}:${firstEvent.timestamp}`,
-      );
-    },
-    ttl: 259200, // 72 hours for SendGrid retry window
-    keyPrefix: 'webhook:',
-    cacheResult: true,
-  })
-  @ApiOperation({ summary: 'Handle SendGrid email delivery webhooks' })
-  @ApiHeader({ name: 'x-twilio-email-event-webhook-signature', required: true })
-  @ApiHeader({ name: 'x-twilio-email-event-webhook-timestamp', required: true })
-  @ApiResponse({ status: 200, description: 'Webhook processed' })
-  @ApiResponse({ status: 401, description: 'Invalid signature' })
-  async handleEmailWebhook(
-    @Req() req: RawBodyRequest<Request> & IdempotentRequest,
-    @Body() body: EmailEvent[],
-    @Headers('x-twilio-email-event-webhook-signature') signature: string,
-    @Headers('x-twilio-email-event-webhook-timestamp') timestamp: string,
-  ): Promise<WebhookProcessingResult> {
-    this.logger.debug(`Received email webhook with ${body.length} events`);
-
-    // Check for duplicate request (already processed)
-    if (req.isDuplicate) {
-      this.logger.log(
-        `Duplicate email webhook detected: ${req.idempotencyKey}`,
-      );
-      // Return cached result or default duplicate response
-      if (req.idempotencyResult) {
-        return req.idempotencyResult as WebhookProcessingResult;
-      }
-      return {
-        processed: 0,
-        skipped: body.length,
-        errors: [],
-      };
-    }
-
-    // Get raw body for signature verification
-    const rawBody = req.rawBody?.toString() || JSON.stringify(body);
-
-    // Verify signature
-    if (
-      !this.webhookService.verifyEmailSignature(rawBody, signature, timestamp)
-    ) {
-      this.logger.warn('Invalid email webhook signature');
-      throw new BusinessException(
-        'Invalid webhook signature',
-        'INVALID_SIGNATURE',
-      );
-    }
-
-    // Process events
-    const result = await this.webhookService.processEmailEvent(body);
-
-    // Store result for future duplicate requests
-    if (req.idempotencyKey) {
-      await this.idempotencyService.markProcessed(
-        req.idempotencyKey,
-        result,
-        259200, // 72 hours
-        { provider: 'sendgrid', eventsCount: body.length },
-      );
-    }
-
-    this.logger.log(
-      `Email webhook processed: ${result.processed} processed, ${result.skipped} skipped`,
-    );
-
-    return result;
-  }
 
   /**
    * Handle Mailgun email delivery webhooks
@@ -529,6 +431,42 @@ export class WebhookController {
       return '<Response></Response>';
     }
 
+    // ------------------------------------------------------------------
+    // Persist inbound message BEFORE routing (Step 2 — Item #12)
+    // Failures here are non-fatal: we log and continue so routing still
+    // runs and Twilio gets a 200 response to prevent retries.
+    // ------------------------------------------------------------------
+    try {
+      // Collect all media items (Twilio sends MediaUrl0..N)
+      const twilioMediaItems: Array<{ url: string; contentType: string }> = [];
+      for (let i = 0; i < numMedia; i++) {
+        const u = body[`MediaUrl${i}`];
+        const ct = body[`MediaContentType${i}`];
+        if (u && ct) {
+          twilioMediaItems.push({ url: u, contentType: ct });
+        }
+      }
+
+      // Normalise fromPhone: strip "whatsapp:" prefix, keep "+" if present
+      const fromPhoneNorm = from.startsWith('whatsapp:')
+        ? from.slice('whatsapp:'.length)
+        : from;
+
+      await this.inboundPersistence.persist(
+        tenantId,
+        fromPhoneNorm,
+        messageBody,
+        messageSid,
+        twilioMediaItems,
+      );
+    } catch (persistErr) {
+      this.logger.error(
+        `[InboundPersist] Failed to persist inbound message from ${waId}: ` +
+          `${persistErr instanceof Error ? persistErr.message : String(persistErr)}`,
+        persistErr instanceof Error ? persistErr.stack : undefined,
+      );
+    }
+
     try {
       // For interactive responses, prefer ButtonPayload/ListId over Body
       // Twilio sends button ID in ButtonPayload, not in Body
@@ -570,33 +508,5 @@ export class WebhookController {
 
     // Always return empty TwiML response
     return '<Response></Response>';
-  }
-
-  /**
-   * Handle Yoco payment webhooks
-   * TASK-ACCT-011: Online Payment Gateway Integration
-   *
-   * Events: payment.succeeded, payment.failed, payment.pending
-   *
-   * @param body - Yoco webhook payload
-   * @param signature - x-yoco-signature header for HMAC verification
-   */
-  @Post('yoco')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Handle Yoco payment webhooks' })
-  @ApiHeader({ name: 'x-yoco-signature', required: true })
-  @ApiResponse({ status: 200, description: 'Webhook processed' })
-  @ApiResponse({ status: 401, description: 'Invalid signature' })
-  async handleYocoWebhook(
-    @Body() body: YocoWebhookPayload,
-    @Headers('x-yoco-signature') signature: string,
-  ): Promise<{ received: true }> {
-    this.logger.debug(`Received Yoco webhook: ${body.type} for ${body.id}`);
-
-    await this.yocoService.handleWebhook(body, signature);
-
-    this.logger.log(`Yoco webhook processed: ${body.type}`);
-
-    return { received: true };
   }
 }

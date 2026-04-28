@@ -314,7 +314,10 @@ export class BankStatementReconciliationService {
 
     // Emit reconciliation domain event (non-blocking)
     try {
-      const eventName = status === 'RECONCILED' ? 'reconciliation.completed' : 'reconciliation.discrepancy';
+      const eventName =
+        status === 'RECONCILED'
+          ? 'reconciliation.completed'
+          : 'reconciliation.discrepancy';
       this.eventEmitter.emit(eventName, {
         tenantId,
         period: `${statement.statementPeriod.start.toISOString().slice(0, 10)} to ${statement.statementPeriod.end.toISOString().slice(0, 10)}`,
@@ -511,7 +514,10 @@ export class BankStatementReconciliationService {
 
     // Emit reconciliation domain event (non-blocking)
     try {
-      const eventName = status === 'RECONCILED' ? 'reconciliation.completed' : 'reconciliation.discrepancy';
+      const eventName =
+        status === 'RECONCILED'
+          ? 'reconciliation.completed'
+          : 'reconciliation.discrepancy';
       this.eventEmitter.emit(eventName, {
         tenantId,
         period: `${reconciliation.periodStart.toISOString().slice(0, 10)} to ${reconciliation.periodEnd.toISOString().slice(0, 10)}`,
@@ -595,7 +601,8 @@ export class BankStatementReconciliationService {
           periodEnd: recon.periodEnd.toISOString().split('T')[0],
           previousStatus: 'DISCREPANCY',
           newStatus: result.status,
-          matched: result.matchSummary.matched + result.matchSummary.feeAdjusted,
+          matched:
+            result.matchSummary.matched + result.matchSummary.feeAdjusted,
           total: result.matchSummary.total,
         });
       } catch (error) {
@@ -626,7 +633,11 @@ export class BankStatementReconciliationService {
     reconciliationId: string,
     userId: string,
     notes: string,
-  ): Promise<{ reconciliationId: string; status: string; acceptedCount: number }> {
+  ): Promise<{
+    reconciliationId: string;
+    status: string;
+    acceptedCount: number;
+  }> {
     const reconciliation = await this.prisma.reconciliation.findUnique({
       where: { id: reconciliationId },
     });
@@ -683,7 +694,9 @@ export class BankStatementReconciliationService {
         select: { transactionId: true },
       })
       .then((rows) =>
-        rows.map((r) => r.transactionId).filter((id): id is string => id !== null),
+        rows
+          .map((r) => r.transactionId)
+          .filter((id): id is string => id !== null),
       );
 
     if (matchedTxIds.length > 0) {
@@ -983,9 +996,10 @@ export class BankStatementReconciliationService {
       return {
         confidence: effectiveDescConfidence,
         status: BankStatementMatchStatus.MATCHED,
-        reason: keywordMatch && descSimilarity < descriptionThreshold
-          ? `Keyword match: "${xeroDesc}" found in bank description`
-          : null,
+        reason:
+          keywordMatch && descSimilarity < descriptionThreshold
+            ? `Keyword match: "${xeroDesc}" found in bank description`
+            : null,
       };
     }
 

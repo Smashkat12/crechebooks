@@ -56,7 +56,9 @@ export class PaymentAllocationService {
     private readonly xeroSplitService: XeroTransactionSplitService,
     private readonly eventEmitter: EventEmitter2,
     // TASK-STUB-PARITY: Provider-agnostic accounting sync
-    @Inject(ACCOUNTING_PROVIDER) @Optional() private readonly accountingProvider?: AccountingProvider,
+    @Inject(ACCOUNTING_PROVIDER)
+    @Optional()
+    private readonly accountingProvider?: AccountingProvider,
     // TASK-WA-007: Optional WhatsApp service for payment confirmations
     @Optional() private readonly twilioWhatsAppService?: TwilioWhatsAppService,
   ) {}
@@ -251,8 +253,14 @@ export class PaymentAllocationService {
 
     // 11. Emit payment.allocated domain event (non-blocking)
     try {
-      const parent = await this.parentRepo.findById(invoice.parentId, dto.tenantId!);
-      const child = await this.prisma.child.findUnique({ where: { id: invoice.childId }, select: { firstName: true, lastName: true } });
+      const parent = await this.parentRepo.findById(
+        invoice.parentId,
+        dto.tenantId!,
+      );
+      const child = await this.prisma.child.findUnique({
+        where: { id: invoice.childId },
+        select: { firstName: true, lastName: true },
+      });
       this.eventEmitter.emit('payment.allocated', {
         tenantId: dto.tenantId!,
         paymentId: payment.id,
@@ -260,8 +268,12 @@ export class PaymentAllocationService {
         invoiceNumber: invoice.invoiceNumber,
         amountCents: allocation.amountCents,
         parentId: invoice.parentId,
-        parentName: parent ? `${parent.firstName} ${parent.lastName}`.trim() : 'Unknown',
-        childName: child ? `${child.firstName} ${child.lastName}`.trim() : 'Unknown',
+        parentName: parent
+          ? `${parent.firstName} ${parent.lastName}`.trim()
+          : 'Unknown',
+        childName: child
+          ? `${child.firstName} ${child.lastName}`.trim()
+          : 'Unknown',
       } satisfies PaymentAllocatedEvent);
     } catch (eventError) {
       this.logger.warn(
@@ -503,9 +515,19 @@ export class PaymentAllocationService {
 
       // Emit payment.allocated domain event (non-blocking)
       try {
-        const invoice = await this.invoiceRepo.findById(payment.invoiceId, dto.tenantId!);
-        const parent = invoice ? await this.parentRepo.findById(invoice.parentId, dto.tenantId!) : null;
-        const child = invoice ? await this.prisma.child.findUnique({ where: { id: invoice.childId }, select: { firstName: true, lastName: true } }) : null;
+        const invoice = await this.invoiceRepo.findById(
+          payment.invoiceId,
+          dto.tenantId!,
+        );
+        const parent = invoice
+          ? await this.parentRepo.findById(invoice.parentId, dto.tenantId!)
+          : null;
+        const child = invoice
+          ? await this.prisma.child.findUnique({
+              where: { id: invoice.childId },
+              select: { firstName: true, lastName: true },
+            })
+          : null;
         this.eventEmitter.emit('payment.allocated', {
           tenantId: dto.tenantId!,
           paymentId: payment.id,
@@ -513,8 +535,12 @@ export class PaymentAllocationService {
           invoiceNumber: invoice?.invoiceNumber ?? 'Unknown',
           amountCents: payment.amountCents,
           parentId: invoice?.parentId ?? 'Unknown',
-          parentName: parent ? `${parent.firstName} ${parent.lastName}`.trim() : 'Unknown',
-          childName: child ? `${child.firstName} ${child.lastName}`.trim() : 'Unknown',
+          parentName: parent
+            ? `${parent.firstName} ${parent.lastName}`.trim()
+            : 'Unknown',
+          childName: child
+            ? `${child.firstName} ${child.lastName}`.trim()
+            : 'Unknown',
         } satisfies PaymentAllocatedEvent);
       } catch (eventError) {
         this.logger.warn(

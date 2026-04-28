@@ -35,6 +35,7 @@ export interface CommunicationPreferences {
 export interface ParentProfile {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
   phone?: string;
@@ -57,6 +58,7 @@ export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 export interface ParentChild {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   gender?: Gender | null;
   dateOfBirth?: string;
@@ -72,6 +74,7 @@ export interface ParentChild {
 
 export interface UpdateParentChildDto {
   firstName?: string;
+  middleName?: string;
   lastName?: string;
   gender?: Gender;
   medicalNotes?: string;
@@ -82,6 +85,7 @@ export interface UpdateParentChildDto {
 export interface ParentChildUpdateResponse {
   id: string;
   firstName: string;
+  middleName: string | null;
   lastName: string;
   gender: Gender | null;
   medicalNotes: string | null;

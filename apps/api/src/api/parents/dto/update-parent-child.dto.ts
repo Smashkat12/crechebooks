@@ -13,8 +13,6 @@
  * NOT editable by parent (admin-only):
  *   - dateOfBirth: drives graduation-cohort flag in enrollment.service.ts:1079-1081; admin only
  *
- * TODO: middleName once 20260427172829_add_middle_name_to_children_parents lands
- *
  * Schema reality: the Child model has `emergencyContact` (VarChar 200) and
  * `emergencyPhone` (VarChar 20) as its emergency fields. The separate
  * emergencyContactName / emergencyContactPhone / emergencyContactRelation columns
@@ -50,6 +48,24 @@ export class UpdateParentChildDto {
   @Transform(({ value }) => normalizeName(value))
   @SanitizeName()
   firstName?: string;
+
+  /**
+   * Child's middle name.
+   * HTML-stripped, control-char-collapsed, and case-normalized (all-caps/all-lower corrected).
+   * Max 100 chars. Optional — pass null to clear.
+   */
+  @ApiPropertyOptional({
+    description: "Child's middle name. Max 100 chars.",
+    maxLength: 100,
+    example: 'Rose',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) => normalizeName(value))
+  @SanitizeName()
+  middleName?: string | null;
 
   /**
    * Child's last name.
@@ -151,6 +167,9 @@ export class ParentChildUpdateResponseDto {
 
   @ApiPropertyOptional({ description: "Child's first name" })
   firstName: string | null;
+
+  @ApiPropertyOptional({ description: "Child's middle name", nullable: true })
+  middleName: string | null;
 
   @ApiPropertyOptional({ description: "Child's last name" })
   lastName: string | null;

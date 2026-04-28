@@ -104,6 +104,11 @@ type PrismaMock = {
   classGroup: {
     findFirst: jest.Mock;
   };
+  // Parent absence pre-reports — added for backlog #9 integration
+  parentAbsenceReport: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+  };
   auditLog: {
     create: jest.Mock;
   };
@@ -130,6 +135,10 @@ function makePrismaMock(): PrismaMock {
     },
     classGroup: {
       findFirst: jest.fn(),
+    },
+    parentAbsenceReport: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     auditLog: {
       create: jest.fn(),
@@ -367,10 +376,13 @@ describe('AttendanceService', () => {
         classGroup: null,
       },
     ]);
+    // parentAbsenceReport.findMany returns [] by default (via makePrismaMock)
 
     const result = await service.findByDate(TENANT_A, TODAY_STR);
-    expect(result).toHaveLength(1);
-    expect(result[0].child?.firstName).toBe('Bob');
+    // findByDate now returns AdminDayViewDto: { date, records[], parentPreReports[] }
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0].child?.firstName).toBe('Bob');
+    expect(result.parentPreReports).toHaveLength(0);
   });
 
   // ----------------------------------------------------------------
@@ -555,6 +567,12 @@ describe('AttendanceService', () => {
       { status: AttendanceStatus.ABSENT, _count: { _all: 2 } },
     ]);
     mock.child.count.mockResolvedValue(10); // 10 active children
+    // attendanceRecord.findMany is used to build the markedChildIds set
+    mock.attendanceRecord.findMany.mockResolvedValue([
+      { childId: 'c1' }, { childId: 'c2' }, { childId: 'c3' },
+      { childId: 'c4' }, { childId: 'c5' }, { childId: 'c6' }, { childId: 'c7' },
+    ]);
+    // parentAbsenceReport.findMany returns [] by default (via makePrismaMock)
 
     const result = await service.todaySummary(TENANT_A);
 
@@ -564,6 +582,7 @@ describe('AttendanceService', () => {
     expect(result.excusedCount).toBe(0);
     expect(result.earlyPickupCount).toBe(0);
     expect(result.unmarkedCount).toBe(3); // 10 active - 7 marked
+    expect(result.reportedAbsentCount).toBe(0); // no pre-reports
   });
 
   // ----------------------------------------------------------------

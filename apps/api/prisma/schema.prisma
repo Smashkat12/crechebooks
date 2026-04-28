@@ -74,6 +74,17 @@ enum VatType {
   NO_VAT
 }
 
+// SARS VAT Category (Categories A–F per VAT Act 89 of 1991).
+// Determines VAT201 filing cadence for VAT-registered vendors.
+enum VatCategory {
+  A // Bi-monthly returns due 25th of odd months  (Jan/Mar/May/Jul/Sep/Nov)
+  B // Bi-monthly returns due 25th of even months (Feb/Apr/Jun/Aug/Oct/Dec)
+  C // Monthly returns (turnover ≥ R30M or SARS-directed)
+  D // Bi-annual (farming and select industries)
+  E // Annual (small-scale specific)
+  F // 4-monthly (small business path)
+}
+
 enum CategorizationSource {
   AI_AUTO
   AI_SUGGESTED
@@ -533,6 +544,7 @@ model Tenant {
   registrationNumber      String?            @map("registration_number") @db.VarChar(50)
   vatNumber               String?            @map("vat_number") @db.VarChar(20)
   taxStatus               TaxStatus          @default(NOT_REGISTERED) @map("tax_status")
+  vatCategory             VatCategory?       @map("vat_category")
   vatRegistrationDate     DateTime?          @map("vat_registration_date") @db.Date
   cumulativeTurnoverCents BigInt             @default(0) @map("cumulative_turnover_cents")
   addressLine1            String             @map("address_line1") @db.VarChar(200)

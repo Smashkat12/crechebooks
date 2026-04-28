@@ -44,6 +44,7 @@ import type {
   PaymentAttachmentResponseDto,
   AdminAttachmentListFilters,
 } from './dto/payment-attachment-response.dto';
+import type { PaymentAttachmentMatcherService } from './payment-attachment-matcher.service';
 
 /** Max rows returned by admin list */
 const ADMIN_LIST_CAP = 200;
@@ -61,6 +62,15 @@ const buildExpectedPrefix = (tenantId: string) =>
 function toResponseDto(
   row: Record<string, unknown>,
 ): PaymentAttachmentResponseDto {
+  const matchConfidenceRaw = row.matchConfidence;
+  // Prisma Decimal serialises via .toString(); plain null passes through.
+  const matchConfidenceStr: string | null =
+    matchConfidenceRaw != null &&
+    typeof (matchConfidenceRaw as { toString?: () => string }).toString ===
+      'function'
+      ? (matchConfidenceRaw as { toString: () => string }).toString()
+      : null;
+
   return {
     id: row.id as string,
     tenantId: row.tenantId as string,
@@ -80,6 +90,18 @@ function toResponseDto(
     payment: row.payment as PaymentAttachmentResponseDto['payment'],
     uploadedBy: row.uploadedBy as PaymentAttachmentResponseDto['uploadedBy'],
     reviewedBy: row.reviewedBy as PaymentAttachmentResponseDto['reviewedBy'],
+    // OCR extracted fields
+    extractedAmount: (row.extractedAmount as number | null) ?? null,
+    extractedDate: row.extractedDate
+      ? (row.extractedDate as Date).toISOString()
+      : null,
+    extractedReference: (row.extractedReference as string | null) ?? null,
+    matchAttemptedAt: row.matchAttemptedAt
+      ? (row.matchAttemptedAt as Date).toISOString()
+      : null,
+    matchConfidence: matchConfidenceStr,
+    suggestedPayment:
+      row.suggestedPayment as PaymentAttachmentResponseDto['suggestedPayment'],
   };
 }
 
@@ -91,6 +113,7 @@ export class PaymentAttachmentsService {
     private readonly prisma: PrismaService,
     private readonly auditLog: AuditLogService,
     private readonly storage: StorageService,
+    private readonly matcher: PaymentAttachmentMatcherService,
   ) {}
 
   // ---------------------------------------------------------------------------
@@ -504,6 +527,18 @@ export class PaymentAttachmentsService {
       `review: attachment=${id} tenantId=${tenantId} reviewer=${reviewerId} status=${after.reviewStatus}`,
     );
 
+    // Fire-and-forget OCR + match when attachment transitions to APPROVED.
+    // setImmediate defers past the current HTTP response cycle — caller is never blocked.
+    if (after.reviewStatus === PaymentAttachmentStatus.APPROVED) {
+      setImmediate(() => {
+        this.matcher.extractAndMatch(tenantId, id).catch((err: unknown) => {
+          this.logger.error(
+            `review: OCR/match pipeline failed for attachment=${id}: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        });
+      });
+    }
+
     return toResponseDto(after as unknown as Record<string, unknown>);
   }
 
@@ -556,6 +591,34 @@ export class PaymentAttachmentsService {
     });
 
     return toResponseDto(updated as unknown as Record<string, unknown>);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin — manually trigger OCR + match pipeline
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Manually re-run the OCR + match pipeline on an already-APPROVED attachment.
+   * Useful when auto-trigger failed or new unallocated transactions have arrived.
+   */
+  async runMatcher(tenantId: string, id: string): Promise<{ message: string }> {
+    // Verify attachment exists and is APPROVED
+    const row = await this.prisma.paymentAttachment.findFirst({
+      where: { id, tenantId },
+      select: { id: true, reviewStatus: true },
+    });
+    if (!row) {
+      throw new NotFoundException(`PaymentAttachment ${id} not found`);
+    }
+    if (row.reviewStatus !== PaymentAttachmentStatus.APPROVED) {
+      throw new BadRequestException(
+        `Only APPROVED attachments can be run through the matcher (status=${row.reviewStatus})`,
+      );
+    }
+
+    await this.matcher.extractAndMatch(tenantId, id);
+
+    return { message: 'Matcher completed' };
   }
 
   // ---------------------------------------------------------------------------

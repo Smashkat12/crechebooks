@@ -45,6 +45,25 @@ export interface PaymentAttachmentResponseDto {
     id: string;
     email: string;
   } | null;
+  /** OCR extracted fields — populated after matcher runs on APPROVED attachments */
+  extractedAmount?: number | null;
+  extractedDate?: string | null;
+  extractedReference?: string | null;
+  matchAttemptedAt?: string | null;
+  /** Normalised confidence 0.0000-1.0000 */
+  matchConfidence?: string | null;
+  /** Suggested payment context — populated on admin detail when suggestedPaymentId is set */
+  suggestedPayment?: {
+    id: string;
+    amountCents: number;
+    paymentDate: string;
+    reference: string | null;
+    parent?: {
+      id: string;
+      firstName: string;
+      lastName: string;
+    } | null;
+  } | null;
 }
 
 export interface AdminAttachmentListFilters {

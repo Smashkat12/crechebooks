@@ -12,6 +12,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException } from '../../shared/exceptions';
+import { formatFullName } from '../../common/utils';
 import {
   ParentWelcomePackOptions,
   ParentWelcomePackResult,
@@ -80,8 +81,10 @@ export class ParentWelcomePackPdfService {
     const enrollmentData: WelcomePackEnrollmentData = {
       enrollmentId: enrollment.id,
       childFirstName: enrollment.child.firstName,
+      childMiddleName: enrollment.child.middleName,
       childLastName: enrollment.child.lastName,
       parentFirstName: enrollment.child.parent.firstName,
+      parentMiddleName: enrollment.child.parent.middleName,
       parentLastName: enrollment.child.parent.lastName,
       parentEmail: enrollment.child.parent.email,
       startDate: enrollment.startDate,
@@ -149,7 +152,7 @@ export class ParentWelcomePackPdfService {
         info: {
           Title: 'Parent Welcome Pack',
           Author: tenantInfo.name,
-          Subject: `Welcome Pack for ${enrollmentData.childFirstName} ${enrollmentData.childLastName}`,
+          Subject: `Welcome Pack for ${formatFullName({ firstName: enrollmentData.childFirstName, middleName: enrollmentData.childMiddleName, lastName: enrollmentData.childLastName })}`,
         },
       });
 
@@ -283,7 +286,11 @@ export class ParentWelcomePackPdfService {
       .font('Helvetica-Bold')
       .fillColor(COLORS.primary)
       .text(
-        `${enrollmentData.childFirstName} ${enrollmentData.childLastName}`,
+        formatFullName({
+          firstName: enrollmentData.childFirstName,
+          middleName: enrollmentData.childMiddleName,
+          lastName: enrollmentData.childLastName,
+        }),
         { align: 'center' },
       );
 
@@ -419,7 +426,11 @@ export class ParentWelcomePackPdfService {
       .font('Helvetica-Bold')
       .fillColor(COLORS.text)
       .text(
-        `${enrollmentData.childFirstName} ${enrollmentData.childLastName}`,
+        formatFullName({
+          firstName: enrollmentData.childFirstName,
+          middleName: enrollmentData.childMiddleName,
+          lastName: enrollmentData.childLastName,
+        }),
         startX + cardPadding,
         cardStartY + cardPadding + 15,
         { width: colWidth - cardPadding * 2 },

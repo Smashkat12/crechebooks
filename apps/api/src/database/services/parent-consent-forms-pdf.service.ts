@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException } from '../../shared/exceptions';
+import { formatFullName } from '../../common/utils';
 
 export interface ConsentFormsData {
   parentId: string;
@@ -99,6 +100,7 @@ export class ParentConsentFormsPdfService {
     parent: {
       id: string;
       firstName: string;
+      middleName?: string | null;
       lastName: string;
       email: string | null;
       phone: string | null;
@@ -115,6 +117,7 @@ export class ParentConsentFormsPdfService {
     },
     children: Array<{
       firstName: string;
+      middleName?: string | null;
       lastName: string;
       dateOfBirth: Date | null;
     }>,
@@ -126,7 +129,7 @@ export class ParentConsentFormsPdfService {
         size: 'A4',
         bufferPages: true,
         info: {
-          Title: `Consent Forms - ${parent.firstName} ${parent.lastName}`,
+          Title: `Consent Forms - ${formatFullName(parent)}`,
           Author: tenant.name,
           Subject: 'Childcare Consent Forms',
           Creator: 'CrecheBooks',
@@ -167,9 +170,9 @@ export class ParentConsentFormsPdfService {
       // Parent and Children Info
       doc.fontSize(10).font('Helvetica').fillColor('#000000');
       doc.text(
-        `Parent/Guardian: ${parent.firstName} ${parent.lastName}\n` +
+        `Parent/Guardian: ${formatFullName(parent)}\n` +
           `ID Number: ${parent.idNumber || 'N/A'}\n` +
-          `Children: ${children.map((c) => `${c.firstName} ${c.lastName}`).join(', ') || 'To be specified'}`,
+          `Children: ${children.map((c) => formatFullName(c)).join(', ') || 'To be specified'}`,
       );
 
       doc.moveDown(1.5);
@@ -327,7 +330,7 @@ export class ParentConsentFormsPdfService {
       doc.fontSize(10).font('Helvetica');
       doc.text('Signature: _________________________', 50);
       doc.moveDown(0.5);
-      doc.text(`Full Name: ${parent.firstName} ${parent.lastName}`, 50);
+      doc.text(`Full Name: ${formatFullName(parent)}`, 50);
       doc.moveDown(0.5);
       doc.text(
         `ID Number: ${parent.idNumber || '_________________________'}`,

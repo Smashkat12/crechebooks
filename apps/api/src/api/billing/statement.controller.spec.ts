@@ -14,7 +14,10 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException as NestNotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException as NestNotFoundException,
+} from '@nestjs/common';
 import { StatementController } from './statement.controller';
 import { StatementGenerationService } from '../../database/services/statement-generation.service';
 import { StatementPdfService } from '../../database/services/statement-pdf.service';
@@ -92,10 +95,18 @@ function baseStatement(overrides = {}) {
 // ---------------------------------------------------------------------------
 function makeStatementGenerationService(stmtOverrides = {}) {
   return {
-    getStatementWithLines: jest.fn().mockResolvedValue(baseStatement(stmtOverrides)),
-    generateStatement: jest.fn().mockResolvedValue(baseStatement({ ...stmtOverrides, lines: [] })),
-    finalizeStatement: jest.fn().mockResolvedValue(baseStatement({ ...stmtOverrides, status: 'FINAL' })),
-    getStatementsForParent: jest.fn().mockResolvedValue([baseStatement(stmtOverrides)]),
+    getStatementWithLines: jest
+      .fn()
+      .mockResolvedValue(baseStatement(stmtOverrides)),
+    generateStatement: jest
+      .fn()
+      .mockResolvedValue(baseStatement({ ...stmtOverrides, lines: [] })),
+    finalizeStatement: jest
+      .fn()
+      .mockResolvedValue(baseStatement({ ...stmtOverrides, status: 'FINAL' })),
+    getStatementsForParent: jest
+      .fn()
+      .mockResolvedValue([baseStatement(stmtOverrides)]),
     bulkGenerateStatements: jest.fn().mockResolvedValue({
       generated: 0,
       skipped: 0,
@@ -118,12 +129,30 @@ async function buildController(
   const module: TestingModule = await Test.createTestingModule({
     controllers: [StatementController],
     providers: [
-      { provide: StatementGenerationService, useValue: makeStatementGenerationService(stmtOverrides) },
+      {
+        provide: StatementGenerationService,
+        useValue: makeStatementGenerationService(stmtOverrides),
+      },
       { provide: StatementPdfService, useValue: { generatePdf: jest.fn() } },
-      { provide: StatementRepository, useValue: { findByTenant: jest.fn().mockResolvedValue([]), findById: jest.fn() } },
-      { provide: ParentAccountService, useValue: { getAccountSummary: jest.fn() } },
+      {
+        provide: StatementRepository,
+        useValue: {
+          findByTenant: jest.fn().mockResolvedValue([]),
+          findById: jest.fn(),
+        },
+      },
+      {
+        provide: ParentAccountService,
+        useValue: { getAccountSummary: jest.fn() },
+      },
       { provide: ParentRepository, useValue: makeParentRepository(parent) },
-      { provide: StatementDeliveryService, useValue: { deliverStatement: jest.fn(), bulkDeliverStatements: jest.fn() } },
+      {
+        provide: StatementDeliveryService,
+        useValue: {
+          deliverStatement: jest.fn(),
+          bulkDeliverStatements: jest.fn(),
+        },
+      },
       { provide: SchedulerService, useValue: null },
     ],
   }).compile();
@@ -211,13 +240,22 @@ describe('StatementController — formatFullName serialisation (AUDIT-BILL-06)',
             provide: StatementGenerationService,
             useValue: { ...makeStatementGenerationService() },
           },
-          { provide: StatementPdfService, useValue: { generatePdf: jest.fn() } },
+          {
+            provide: StatementPdfService,
+            useValue: { generatePdf: jest.fn() },
+          },
           {
             provide: StatementRepository,
-            useValue: { findByTenant: jest.fn().mockResolvedValue([stmtSummary]), findById: jest.fn() },
+            useValue: {
+              findByTenant: jest.fn().mockResolvedValue([stmtSummary]),
+              findById: jest.fn(),
+            },
           },
           { provide: ParentAccountService, useValue: {} },
-          { provide: ParentRepository, useValue: makeParentRepository(parentWithMiddle) },
+          {
+            provide: ParentRepository,
+            useValue: makeParentRepository(parentWithMiddle),
+          },
           { provide: StatementDeliveryService, useValue: {} },
           { provide: SchedulerService, useValue: null },
         ],

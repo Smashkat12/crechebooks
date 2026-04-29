@@ -1,6 +1,7 @@
 /**
  * Notification Service Tests
  * TASK-INFRA-012: Multi-Channel Notification Service Enhancement
+ * AUDIT-COMMS-02: Migrated WhatsApp mock to WhatsAppProviderService
  *
  * Tests unified notification service with multi-channel delivery and fallback.
  */
@@ -9,7 +10,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { EmailService } from '../../integrations/email/email.service';
-import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
 import { NotificationService } from '../notification.service';
 import { EmailChannelAdapter } from '../adapters/email-channel.adapter';
 import { WhatsAppChannelAdapter } from '../adapters/whatsapp-channel.adapter';
@@ -28,13 +29,21 @@ describe('NotificationService', () => {
   let service: NotificationService;
   let prisma: PrismaService;
   let emailService: EmailService;
-  let whatsAppService: WhatsAppService;
+  let whatsAppProviderService: {
+    sendMessage: jest.Mock;
+    isConfigured: jest.Mock;
+  };
   let auditLogService: AuditLogService;
 
   const mockTenantId = 'tenant-1';
   const mockParentId = 'parent-1';
 
   beforeEach(async () => {
+    whatsAppProviderService = {
+      sendMessage: jest.fn(),
+      isConfigured: jest.fn().mockReturnValue(true),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationService,
@@ -59,11 +68,8 @@ describe('NotificationService', () => {
           },
         },
         {
-          provide: WhatsAppService,
-          useValue: {
-            sendMessage: jest.fn(),
-            isValidPhoneNumber: jest.fn(),
-          },
+          provide: WhatsAppProviderService,
+          useValue: whatsAppProviderService,
         },
         {
           provide: AuditLogService,
@@ -87,7 +93,6 @@ describe('NotificationService', () => {
     service = module.get<NotificationService>(NotificationService);
     prisma = module.get<PrismaService>(PrismaService);
     emailService = module.get<EmailService>(EmailService);
-    whatsAppService = module.get<WhatsAppService>(WhatsAppService);
     auditLogService = module.get<AuditLogService>(AuditLogService);
   });
 
@@ -142,18 +147,11 @@ describe('NotificationService', () => {
         lastName: 'Doe',
       });
 
-      (whatsAppService.isValidPhoneNumber as jest.Mock).mockReturnValue(true);
-      (whatsAppService.sendMessage as jest.Mock).mockResolvedValue({
+      whatsAppProviderService.isConfigured.mockReturnValue(true);
+      whatsAppProviderService.sendMessage.mockResolvedValue({
+        success: true,
         messageId: 'whatsapp-123',
-        status: 'sent',
-        sentAt: new Date(),
-        recipientPhone: '+27123456789',
       });
-
-      // Mock WhatsApp API configured
-      process.env.WHATSAPP_ACCESS_TOKEN = 'test-token';
-      process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-id';
-      process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = 'test-account';
 
       const notification: NotificationPayload = {
         recipientId: mockParentId,
@@ -204,10 +202,8 @@ describe('NotificationService', () => {
         lastName: 'Doe',
       });
 
-      // WhatsApp not configured (will fail availability check)
-      delete process.env.WHATSAPP_ACCESS_TOKEN;
-      delete process.env.WHATSAPP_PHONE_NUMBER_ID;
-      delete process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
+      // WhatsApp provider not configured — triggers fallback to EMAIL
+      whatsAppProviderService.isConfigured.mockReturnValue(false);
 
       (emailService.isValidEmail as jest.Mock).mockReturnValue(true);
       (emailService.sendEmail as jest.Mock).mockResolvedValue({

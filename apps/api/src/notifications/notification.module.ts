@@ -14,7 +14,7 @@ import { BullModule } from '@nestjs/bull';
 import { DatabaseModule } from '../database/database.module';
 import { EmailService } from '../integrations/email/email.service';
 import { EmailTemplateService } from '../common/services/email-template/email-template.service';
-import { WhatsAppService } from '../integrations/whatsapp/whatsapp.service';
+import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { WebSocketModule } from '../websocket';
 import { NotificationService } from './notification.service';
 import { InAppNotificationService } from './in-app-notification.service';
@@ -45,13 +45,13 @@ const logger = new Logger('NotificationModule');
     ConfigModule,
     WebSocketModule,
     RolloutModule,
+    forwardRef(() => WhatsAppModule),
     BullModule.registerQueue({ name: 'notification' }),
   ],
   providers: [
     // Services
     EmailService,
     EmailTemplateService,
-    WhatsAppService,
     NotificationService,
     NotificationPreferenceService,
 

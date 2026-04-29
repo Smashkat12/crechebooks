@@ -561,19 +561,33 @@ describe('Vat201Service deadline unit (AUDIT-TAX-01)', () => {
       },
       sarsSubmission: {
         findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockImplementation((args: { data: Record<string, unknown> }) =>
-          Promise.resolve({ ...args.data, id: 'sub-1' }),
-        ),
+        create: jest
+          .fn()
+          .mockImplementation((args: { data: Record<string, unknown> }) =>
+            Promise.resolve({ ...args.data, id: 'sub-1' }),
+          ),
       },
     };
 
     const vatStub = {
-      calculateOutputVat: jest
-        .fn()
-        .mockResolvedValue({ vatAmountCents: 0, totalExcludingVatCents: 0, totalIncludingVatCents: 0, standardRatedCents: 0, zeroRatedCents: 0, exemptCents: 0, itemCount: 0 }),
-      calculateInputVat: jest
-        .fn()
-        .mockResolvedValue({ vatAmountCents: 0, totalExcludingVatCents: 0, totalIncludingVatCents: 0, standardRatedCents: 0, zeroRatedCents: 0, exemptCents: 0, itemCount: 0 }),
+      calculateOutputVat: jest.fn().mockResolvedValue({
+        vatAmountCents: 0,
+        totalExcludingVatCents: 0,
+        totalIncludingVatCents: 0,
+        standardRatedCents: 0,
+        zeroRatedCents: 0,
+        exemptCents: 0,
+        itemCount: 0,
+      }),
+      calculateInputVat: jest.fn().mockResolvedValue({
+        vatAmountCents: 0,
+        totalExcludingVatCents: 0,
+        totalIncludingVatCents: 0,
+        standardRatedCents: 0,
+        zeroRatedCents: 0,
+        exemptCents: 0,
+        itemCount: 0,
+      }),
       getFlaggedItems: jest.fn().mockResolvedValue([]),
     };
 
@@ -605,39 +619,39 @@ describe('Vat201Service deadline unit (AUDIT-TAX-01)', () => {
   it('deadline for Apr period end is 25 May (not 31 May) — VAT Act 89/1991 §27', async () => {
     const result = await unitService.generateVat201({
       tenantId: 'unit-tenant',
-      periodStart: new Date(2026, 2, 1),   // 2026-03-01
-      periodEnd:   new Date(2026, 3, 30),  // 2026-04-30
+      periodStart: new Date(2026, 2, 1), // 2026-03-01
+      periodEnd: new Date(2026, 3, 30), // 2026-04-30
     });
 
-    const deadline = result.deadline as Date;
+    const deadline = result.deadline;
     expect(deadline.getFullYear()).toBe(2026);
-    expect(deadline.getMonth()).toBe(4);  // May = 4 (0-indexed)
+    expect(deadline.getMonth()).toBe(4); // May = 4 (0-indexed)
     expect(deadline.getDate()).toBe(25);
   });
 
   it('deadline for Dec period end is 25 Jan following year — VAT Act 89/1991 §27', async () => {
     const result = await unitService.generateVat201({
       tenantId: 'unit-tenant',
-      periodStart: new Date(2025, 10, 1),  // 2025-11-01
-      periodEnd:   new Date(2025, 11, 31), // 2025-12-31
+      periodStart: new Date(2025, 10, 1), // 2025-11-01
+      periodEnd: new Date(2025, 11, 31), // 2025-12-31
     });
 
-    const deadline = result.deadline as Date;
+    const deadline = result.deadline;
     expect(deadline.getFullYear()).toBe(2026);
-    expect(deadline.getMonth()).toBe(0);  // Jan = 0 (0-indexed)
+    expect(deadline.getMonth()).toBe(0); // Jan = 0 (0-indexed)
     expect(deadline.getDate()).toBe(25);
   });
 
   it('deadline for Feb period end is 25 Mar — VAT Act 89/1991 §27', async () => {
     const result = await unitService.generateVat201({
       tenantId: 'unit-tenant',
-      periodStart: new Date(2026, 0, 1),  // 2026-01-01
-      periodEnd:   new Date(2026, 1, 28), // 2026-02-28
+      periodStart: new Date(2026, 0, 1), // 2026-01-01
+      periodEnd: new Date(2026, 1, 28), // 2026-02-28
     });
 
-    const deadline = result.deadline as Date;
+    const deadline = result.deadline;
     expect(deadline.getFullYear()).toBe(2026);
-    expect(deadline.getMonth()).toBe(2);  // Mar = 2 (0-indexed)
+    expect(deadline.getMonth()).toBe(2); // Mar = 2 (0-indexed)
     expect(deadline.getDate()).toBe(25);
   });
 });

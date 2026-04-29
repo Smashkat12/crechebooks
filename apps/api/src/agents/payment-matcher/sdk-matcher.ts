@@ -270,7 +270,7 @@ export class SdkPaymentMatcher extends BaseSdkAgent {
         `- Already Paid (cents): ${String(candidate.invoice.amountPaidCents)}`,
         `- Outstanding (cents): ${String(outstanding)}`,
         `- Parent: ${formatFullName(candidate.invoice.parent)}`,
-        `- Child: ${candidate.invoice.child.firstName}`,
+        `- Child: ${formatFullName(candidate.invoice.child)}`,
         `- Deterministic Confidence: ${String(candidate.confidence)}%`,
         `- Match Reasons: ${candidate.matchReasons.join('; ')}`,
         '',

@@ -1371,7 +1371,12 @@ export class PaymentMatchingService {
           lastName: c.parentName.split(' ').slice(1).join(' ') || '',
         },
         child: {
+          // MatchCandidate.childName is sourced from child.firstName (single word).
+          // middleName and lastName are unavailable at this DTO boundary;
+          // use childName as firstName and leave lastName empty.
           firstName: c.childName,
+          middleName: null,
+          lastName: '',
         },
       },
       confidence: c.confidenceScore,

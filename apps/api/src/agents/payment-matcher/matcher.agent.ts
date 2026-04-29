@@ -672,6 +672,8 @@ export class PaymentMatcherAgent {
             },
             child: {
               firstName: invoice.child.firstName,
+              middleName: invoice.child.middleName,
+              lastName: invoice.child.lastName,
             },
           },
           confidence: Math.min(100, confidence),

@@ -59,7 +59,7 @@ const parentNoMiddle = {
   id: PARENT_ID,
   tenantId: TENANT_ID,
   firstName: 'Jane',
-  middleName: null,
+  middleName: '',
   lastName: 'Smith',
   email: 'jane@example.com',
   phone: '0821234567',

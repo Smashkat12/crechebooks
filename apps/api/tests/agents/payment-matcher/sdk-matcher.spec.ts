@@ -65,7 +65,7 @@ function makeCandidate(
       amountPaidCents,
       parentId: 'parent-001',
       parent: { firstName: 'John', lastName: 'Smith' },
-      child: { firstName: 'Emma' },
+      child: { firstName: 'Emma', lastName: 'Smith' },
     },
     confidence,
     matchReasons: [`Deterministic score: ${String(confidence)}%`],

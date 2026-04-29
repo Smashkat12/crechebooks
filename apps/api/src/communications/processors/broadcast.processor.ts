@@ -13,7 +13,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { BroadcastMessageEntity } from '../entities/broadcast-message.entity';
 import { MessageRecipientEntity } from '../entities/message-recipient.entity';
 import { EmailService } from '../../integrations/email/email.service';
-import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
 import {
@@ -42,7 +42,7 @@ export class BroadcastProcessor {
     private readonly broadcastEntity: BroadcastMessageEntity,
     private readonly recipientEntity: MessageRecipientEntity,
     private readonly emailService: EmailService,
-    private readonly whatsappService: WhatsAppService,
+    private readonly whatsappService: WhatsAppProviderService,
     private readonly auditLogService: AuditLogService,
   ) {}
 
@@ -229,7 +229,7 @@ export class BroadcastProcessor {
     ) {
       channelAttempted = true;
       try {
-        const result = await this.whatsappService.sendTextMessage(
+        const result = await this.whatsappService.sendMessage(
           recipient.recipientPhone,
           broadcast.body,
         );
@@ -238,7 +238,7 @@ export class BroadcastProcessor {
           broadcast.id,
           recipient.recipientId,
           DeliveryStatus.SENT,
-          result?.wamid,
+          result?.messageId,
         );
 
         anySuccess = true;
@@ -246,7 +246,7 @@ export class BroadcastProcessor {
           message: 'WhatsApp message sent successfully',
           broadcastId: broadcast.id,
           recipientId: recipient.recipientId,
-          wamid: result?.wamid,
+          wamid: result?.messageId,
         });
       } catch (error) {
         const errorMessage =

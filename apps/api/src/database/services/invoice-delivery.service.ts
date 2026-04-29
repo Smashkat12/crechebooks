@@ -17,7 +17,7 @@
  * CRITICAL: No workarounds or fallbacks - fail with BusinessException.
  */
 
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type {
   InvoiceSentEvent,
@@ -32,7 +32,6 @@ import { ChildRepository } from '../repositories/child.repository';
 import { AuditLogService } from './audit-log.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { EmailService } from '../../integrations/email/email.service';
-import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
 import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
 import {
   EmailTemplateService,
@@ -70,13 +69,11 @@ export class InvoiceDeliveryService {
     private readonly childRepo: ChildRepository,
     private readonly auditLogService: AuditLogService,
     private readonly emailService: EmailService,
-    private readonly whatsAppService: WhatsAppService,
     private readonly emailTemplateService: EmailTemplateService,
     private readonly invoicePdfService: InvoicePdfService,
     private readonly eventEmitter: EventEmitter2,
     // TASK-WA-007: WhatsApp provider service for Twilio/Meta routing
-    @Optional()
-    private readonly whatsAppProviderService?: WhatsAppProviderService,
+    private readonly whatsAppProviderService: WhatsAppProviderService,
   ) {}
 
   /**
@@ -327,36 +324,26 @@ export class InvoiceDeliveryService {
       }
 
       try {
-        // TASK-WA-007: Use provider service for structured invoice notification
-        if (this.whatsAppProviderService?.isConfigured()) {
-          const organizationName = tenant.tradingName ?? tenant.name;
-          const whatsAppResult =
-            await this.whatsAppProviderService.sendInvoiceNotification(
-              tenantId,
-              parent.whatsapp,
-              `${parent.firstName} ${parent.lastName}`.trim(),
-              invoice.invoiceNumber,
-              invoice.totalCents / 100, // Convert cents to Rands
-              invoice.dueDate,
-              organizationName, // Use tenant name for white-labeling
-            );
+        // TASK-WA-007: Use provider service (Twilio) for invoice notification
+        const organizationName = tenant.tradingName ?? tenant.name;
+        const whatsAppResult =
+          await this.whatsAppProviderService.sendInvoiceNotification(
+            tenantId,
+            parent.whatsapp,
+            `${parent.firstName} ${parent.lastName}`.trim(),
+            invoice.invoiceNumber,
+            invoice.totalCents / 100, // Convert cents to Rands
+            invoice.dueDate,
+            organizationName, // Use tenant name for white-labeling
+          );
 
-          if (whatsAppResult.success) {
-            whatsAppSucceeded = true;
-            this.logger.log(
-              `TASK-WA-007: WhatsApp invoice notification sent via provider for ${invoice.invoiceNumber} to ${parent.whatsapp}`,
-            );
-          } else {
-            throw new Error(whatsAppResult.error || 'WhatsApp delivery failed');
-          }
-        } else {
-          // Fallback to legacy WhatsApp service (Meta Cloud API)
-          const body = this.buildInvoiceMessage(invoice, lines);
-          await this.whatsAppService.sendMessage(parent.whatsapp, body);
+        if (whatsAppResult.success) {
           whatsAppSucceeded = true;
           this.logger.log(
-            `WhatsApp sent for invoice ${invoice.invoiceNumber} to ${parent.whatsapp}`,
+            `TASK-WA-007: WhatsApp invoice notification sent via provider for ${invoice.invoiceNumber} to ${parent.whatsapp}`,
           );
+        } else {
+          throw new Error(whatsAppResult.error || 'WhatsApp delivery failed');
         }
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));

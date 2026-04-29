@@ -84,11 +84,3 @@ export function useActivateUser() {
   });
 }
 
-export function useImpersonateUser() {
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { data } = await apiClient.post(`/admin/users/${id}/impersonate`);
-      return data;
-    },
-  });
-}

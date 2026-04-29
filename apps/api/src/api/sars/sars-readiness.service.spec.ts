@@ -181,7 +181,10 @@ describe('SarsReadinessService', () => {
     it('emp501Window returns EMP501 type with Oct 31 for ref in Oct', () => {
       // Verify the window shape — used as basis for blocker tests below.
       const ref = new Date(2026, 9, 15); // Oct 15 2026 — after Oct 7 EMP201 deadline
-      const svc = service as unknown as Record<string, (r: Date) => { type: string; dueDate: Date }>;
+      const svc = service as unknown as Record<
+        string,
+        (r: Date) => { type: string; dueDate: Date }
+      >;
       const w = svc['emp501Window'](ref);
       expect(w.type).toBe('EMP501');
       expect(w.dueDate).toEqual(new Date(2026, 9, 31)); // Oct 31
@@ -192,7 +195,10 @@ describe('SarsReadinessService', () => {
       mockPrisma.staff.count.mockResolvedValue(2);
 
       // Call private helper directly to verify Prisma query shape (EMP501 §4)
-      const svc = service as unknown as Record<string, (t: string) => Promise<number>>;
+      const svc = service as unknown as Record<
+        string,
+        (t: string) => Promise<number>
+      >;
       const count = await svc['countStaffNotLinkedToSimplePay'](TENANT);
       expect(count).toBe(2);
       expect(mockPrisma.staff.count).toHaveBeenCalledWith({
@@ -207,7 +213,10 @@ describe('SarsReadinessService', () => {
 
     it('returns 0 when all active staff are linked to SimplePay', async () => {
       mockPrisma.staff.count.mockResolvedValue(0);
-      const svc = service as unknown as Record<string, (t: string) => Promise<number>>;
+      const svc = service as unknown as Record<
+        string,
+        (t: string) => Promise<number>
+      >;
       const count = await svc['countStaffNotLinkedToSimplePay'](TENANT);
       expect(count).toBe(0);
     });
@@ -218,6 +227,87 @@ describe('SarsReadinessService', () => {
       expect(result.nextDeadline.type).toBe('EMP201');
       // staff.count is only used for EMP501 check; should not be called in EMP201 window
       expect(mockPrisma.staff.count).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── EMP501 blocker 6: staff with mapping but no payroll (EMP501 §4) ───────
+
+  describe('EMP501 blocker — staff with SimplePay mapping but no payroll', () => {
+    it('returns 0 when every mapped staff member has a Payroll record in the tax year', async () => {
+      // staff-1 has a mapping AND a payroll record → not flagged
+      mockPrisma.staff.findMany.mockResolvedValue([{ id: 'staff-1' }]);
+      mockPrisma.payroll.findMany.mockResolvedValue([{ staffId: 'staff-1' }]);
+
+      const svc = service as unknown as Record<
+        string,
+        (t: string, from: Date, to: Date) => Promise<number>
+      >;
+      const count = await svc['countStaffWithSimplePayMappingButNoPayroll'](
+        TENANT,
+        new Date(2025, 2, 1), // Mar 1 2025
+        new Date(2026, 1, 28), // Feb 28 2026
+      );
+      expect(count).toBe(0);
+    });
+
+    it('returns 1 when a mapped staff member has no Payroll record in the tax year', async () => {
+      // staff-1 has a mapping but no payroll → flagged
+      // staff-2 has a mapping and a payroll → not flagged
+      mockPrisma.staff.findMany.mockResolvedValue([
+        { id: 'staff-1' },
+        { id: 'staff-2' },
+      ]);
+      mockPrisma.payroll.findMany.mockResolvedValue([{ staffId: 'staff-2' }]);
+
+      const svc = service as unknown as Record<
+        string,
+        (t: string, from: Date, to: Date) => Promise<number>
+      >;
+      const count = await svc['countStaffWithSimplePayMappingButNoPayroll'](
+        TENANT,
+        new Date(2025, 2, 1),
+        new Date(2026, 1, 28),
+      );
+      expect(count).toBe(1);
+    });
+
+    it('returns 0 immediately when no staff have a SimplePay mapping', async () => {
+      mockPrisma.staff.findMany.mockResolvedValue([]); // no mapped staff
+
+      const svc = service as unknown as Record<
+        string,
+        (t: string, from: Date, to: Date) => Promise<number>
+      >;
+      const count = await svc['countStaffWithSimplePayMappingButNoPayroll'](
+        TENANT,
+        new Date(2025, 2, 1),
+        new Date(2026, 1, 28),
+      );
+      expect(count).toBe(0);
+      // payroll query should be skipped entirely
+      expect(mockPrisma.payroll.findMany).not.toHaveBeenCalled();
+    });
+
+    it('staff.findMany filter uses simplePayMapping isNot null (EMP501 §4)', async () => {
+      mockPrisma.staff.findMany.mockResolvedValue([]);
+
+      const svc = service as unknown as Record<
+        string,
+        (t: string, from: Date, to: Date) => Promise<number>
+      >;
+      const from = new Date(2025, 2, 1);
+      const to = new Date(2026, 1, 28);
+      await svc['countStaffWithSimplePayMappingButNoPayroll'](TENANT, from, to);
+
+      expect(mockPrisma.staff.findMany).toHaveBeenCalledWith({
+        where: {
+          tenantId: TENANT,
+          isActive: true,
+          deletedAt: null,
+          simplePayMapping: { isNot: null },
+        },
+        select: { id: true },
+      });
     });
   });
 

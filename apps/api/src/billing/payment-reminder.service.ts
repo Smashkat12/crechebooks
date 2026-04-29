@@ -130,6 +130,11 @@ export class PaymentReminderService {
    * @param tenantId - Tenant ID
    */
   async cancelReminders(tenantId: string): Promise<void> {
+    await this.schedulerService.removeRepeatableCronJob(
+      QUEUE_NAMES.PAYMENT_REMINDER,
+      DEFAULT_CRON,
+    );
+
     this.logger.log({
       message: 'Payment reminder schedule cancellation requested',
       tenantId,
@@ -148,8 +153,6 @@ export class PaymentReminderService {
       },
       changeSummary: 'Payment reminder schedule cancelled',
     });
-
-    // TODO: Implement actual job cancellation when job tracking is added
   }
 
   /**

@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
+import { formatFullName } from '../../common/utils/name-formatter';
 
 export interface ReceiptData {
   receiptNumber: string;
@@ -156,8 +157,17 @@ export class PaymentReceiptService {
     payment: Payment & {
       invoice: {
         invoiceNumber: string;
-        parent: { firstName: string; lastName: string; email: string | null };
-        child: { firstName: string; lastName: string };
+        parent: {
+          firstName: string;
+          middleName?: string | null;
+          lastName: string;
+          email: string | null;
+        };
+        child: {
+          firstName: string;
+          middleName?: string | null;
+          lastName: string;
+        };
       };
     },
   ): Promise<ReceiptData> {
@@ -185,9 +195,9 @@ export class PaymentReceiptService {
       paymentDate: payment.paymentDate,
       amountCents: payment.amountCents,
       reference: payment.reference,
-      parentName: `${payment.invoice.parent.firstName} ${payment.invoice.parent.lastName}`,
+      parentName: formatFullName(payment.invoice.parent),
       parentEmail: payment.invoice.parent.email,
-      childName: `${payment.invoice.child.firstName} ${payment.invoice.child.lastName}`,
+      childName: formatFullName(payment.invoice.child),
       invoiceNumber: payment.invoice.invoiceNumber,
       tenantName: tenant.tradingName || tenant.name,
       tenantAddress,

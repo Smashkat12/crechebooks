@@ -166,6 +166,28 @@ export class SarsReadinessService {
           count: unlinkedCount,
         });
       }
+
+      // ── Blocker 6 (EMP501 only): staff with SimplePay mapping but no payroll ─
+      // A staff with a mapping causes IRP5 fetch to run but the amounts will be
+      // zero/empty if no Payroll record exists in the EMP501 tax-year window
+      // (EMP501 §4 — IRP5 certificate amounts). The CSV row is generated but
+      // useless. Surface as warning before the admin downloads the file.
+      const mappedNoPayrollCount =
+        await this.countStaffWithSimplePayMappingButNoPayroll(
+          tenantId,
+          window.reportingStart,
+          window.reportingEnd,
+        );
+      if (mappedNoPayrollCount > 0) {
+        blockers.push({
+          severity: 'warning',
+          label: `${mappedNoPayrollCount} staff member${mappedNoPayrollCount === 1 ? '' : 's'} linked to SimplePay but has no payroll for the tax year`,
+          description:
+            'These employees have a SimplePay mapping so their IRP5 rows will be included, but no Payroll record exists for this tax year — amounts will be zero. Run or import payroll for them before downloading the EMP501 reconciliation file.',
+          deepLinkUrl: '/payroll',
+          count: mappedNoPayrollCount,
+        });
+      }
     }
 
     // TODO: blocker — undeclared income (transactions not linked to an invoice)
@@ -489,6 +511,48 @@ export class SarsReadinessService {
         simplePayMapping: null,
       },
     });
+  }
+
+  /**
+   * For EMP501: count active staff who have a simplePayMapping (so their IRP5
+   * row will be generated) but have NO Payroll record overlapping the EMP501
+   * tax-year window (EMP501 §4 — IRP5 certificate amounts).
+   *
+   * Overlap condition: payPeriodStart <= windowEnd AND payPeriodEnd >= windowStart
+   * (standard interval overlap — at least one day in the tax year counts).
+   * Status is not filtered — even a DRAFT payroll entry means data exists;
+   * the important thing is whether any payroll work occurred in the year.
+   */
+  private async countStaffWithSimplePayMappingButNoPayroll(
+    tenantId: string,
+    from: Date,
+    to: Date,
+  ): Promise<number> {
+    // Active staff who have a SimplePay mapping
+    const mappedStaff = await this.prisma.staff.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        deletedAt: null,
+        simplePayMapping: { isNot: null },
+      },
+      select: { id: true },
+    });
+
+    if (mappedStaff.length === 0) return 0;
+
+    // Staff who have at least one Payroll row overlapping the tax-year window
+    const staffWithPayroll = await this.prisma.payroll.findMany({
+      where: {
+        tenantId,
+        payPeriodStart: { lte: to },
+        payPeriodEnd: { gte: from },
+      },
+      select: { staffId: true },
+    });
+
+    const coveredIds = new Set(staffWithPayroll.map((r) => r.staffId));
+    return mappedStaff.filter((s) => !coveredIds.has(s.id)).length;
   }
 
   /**

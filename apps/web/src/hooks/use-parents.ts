@@ -269,6 +269,7 @@ interface ChildrenListParams extends Record<string, unknown> {
 interface ChildListItem {
   id: string;
   first_name: string;
+  middle_name?: string | null;
   last_name: string;
   date_of_birth: string;
   parent: { id: string; name: string; email: string };

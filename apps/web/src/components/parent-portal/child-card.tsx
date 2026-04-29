@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDate } from '@/lib/utils';
+import { formatFullName } from '@/lib/utils/name-formatter';
 import type { ParentChild } from '@/hooks/parent-portal/use-parent-profile';
 
 interface ChildCardProps {
@@ -95,7 +96,7 @@ export function ChildCard({ child }: ChildCardProps) {
             {child.photoUrl ? (
               <AvatarImage
                 src={child.photoUrl}
-                alt={`${child.firstName} ${child.lastName}`}
+                alt={formatFullName(child)}
               />
             ) : null}
             <AvatarFallback className="bg-primary/10 text-primary text-lg font-medium">
@@ -107,7 +108,7 @@ export function ChildCard({ child }: ChildCardProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="text-lg font-semibold truncate">
-                {child.firstName} {child.lastName}
+                {formatFullName(child)}
               </h3>
               <Badge
                 variant={child.isActive ? 'success' : 'secondary'}

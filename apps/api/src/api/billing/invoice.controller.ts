@@ -58,6 +58,7 @@ import {
   ListAdhocChargesResponseDto,
   RemoveAdhocChargeResponseDto,
 } from './dto';
+import { formatFullName } from '../../common/utils/name-formatter';
 
 @Controller('invoices')
 @ApiTags('Invoices')
@@ -158,7 +159,7 @@ export class InvoiceController {
     for (const parent of parents) {
       parentMap.set(parent.id, {
         id: parent.id,
-        name: `${parent.firstName} ${parent.lastName}`,
+        name: formatFullName(parent),
         email: parent.email,
       });
     }
@@ -166,7 +167,7 @@ export class InvoiceController {
     for (const child of children) {
       childMap.set(child.id, {
         id: child.id,
-        name: `${child.firstName} ${child.lastName}`,
+        name: formatFullName(child),
       });
     }
 
@@ -288,12 +289,12 @@ export class InvoiceController {
         invoice_number: invoice.invoiceNumber,
         parent: {
           id: parent.id,
-          name: `${parent.firstName} ${parent.lastName}`,
+          name: formatFullName(parent),
           email: parent.email,
         },
         child: {
           id: child.id,
-          name: `${child.firstName} ${child.lastName}`,
+          name: formatFullName(child),
         },
         billing_period_start: invoice.billingPeriodStart
           .toISOString()

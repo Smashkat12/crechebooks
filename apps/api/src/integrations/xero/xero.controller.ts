@@ -44,7 +44,7 @@ import { CurrentUser } from '../../api/auth/decorators/current-user.decorator';
 import { Roles } from '../../api/auth/decorators/roles.decorator';
 import { Public } from '../../api/auth/decorators/public.decorator';
 import type { IUser } from '../../database/entities/user.entity';
-import { BusinessException, NotFoundException } from '../../shared/exceptions';
+import { BusinessException } from '../../shared/exceptions';
 import {
   SyncRequestDto,
   ConnectResponseDto,
@@ -66,7 +66,6 @@ import {
   ListAccountsResponseDto,
   ValidateAccountCodeResponseDto,
 } from '../../database/dto/xero-account.dto';
-import { XeroAccountStatus } from '../../database/entities/xero-account.entity';
 import { XeroAuthService } from './xero-auth.service';
 import { XeroAutoSyncJob } from './xero-auto-sync.job';
 
@@ -76,10 +75,6 @@ import { XeroAutoSyncJob } from './xero-auto-sync.job';
 export class XeroController {
   private readonly logger = new Logger(XeroController.name);
   private readonly tokenManager: TokenManager;
-  private readonly syncJobs: Map<
-    string,
-    { status: string; startedAt: Date; tenantId: string }
-  > = new Map();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -380,13 +375,6 @@ export class XeroController {
     // Generate job ID
     const jobId = `sync-${tenantId}-${Date.now()}`;
 
-    // Store job state
-    this.syncJobs.set(jobId, {
-      status: 'queued',
-      startedAt: new Date(),
-      tenantId,
-    });
-
     // Execute sync asynchronously
     this.executeSyncAsync(jobId, tenantId, body).catch((error) => {
       this.logger.error(
@@ -505,6 +493,7 @@ export class XeroController {
         lastSyncRecordsImported: null,
         currentJob: null,
         nextScheduledSyncAt: this.nextHourUtc(),
+        errorRetryState: null,
       };
     }
 
@@ -544,6 +533,16 @@ export class XeroController {
         }
       : null;
 
+    // Expose in-memory retry backoff for ERROR connections so the admin UI can
+    // display "next retry in Xh" instead of just "FAILED".
+    const retryState = this.xeroAutoSyncJob.getRetryState(tenantId);
+    const errorRetryState: XeroSyncStatusDto['errorRetryState'] = retryState
+      ? {
+          nextRetryAt: new Date(retryState.nextRetryAt).toISOString(),
+          consecutiveFailures: retryState.consecutiveFailures,
+        }
+      : null;
+
     return {
       connected: true,
       tokenExpiresAt: xeroToken.tokenExpiresAt.toISOString(),
@@ -554,6 +553,7 @@ export class XeroController {
       lastSyncRecordsImported: null, // TODO: requires XeroSyncLog table (schema-guardian)
       currentJob,
       nextScheduledSyncAt: this.nextHourUtc(),
+      errorRetryState,
     };
   }
 
@@ -1097,11 +1097,6 @@ export class XeroController {
     tenantId: string,
     options: SyncRequestDto,
   ): Promise<void> {
-    const job = this.syncJobs.get(jobId);
-    if (!job) return;
-
-    job.status = 'in_progress';
-
     try {
       // Emit start event
       this.syncGateway.emitProgress(tenantId, {
@@ -1353,9 +1348,6 @@ export class XeroController {
         }
       }
 
-      // Mark job complete
-      job.status = 'completed';
-
       this.syncGateway.emitComplete(tenantId, {
         jobId,
         success: true,
@@ -1368,8 +1360,6 @@ export class XeroController {
         completedAt: new Date(),
       });
     } catch (error) {
-      job.status = 'failed';
-
       this.syncGateway.emitError(tenantId, {
         entity: 'sync',
         entityId: jobId,

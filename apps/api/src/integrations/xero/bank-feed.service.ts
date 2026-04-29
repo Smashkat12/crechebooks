@@ -47,6 +47,33 @@ const RATE_LIMIT_CALLS = 60;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 
 /**
+ * Sentinel error thrown when Xero responds with HTTP 429.
+ * Carries the retry-after deadline (epoch ms) so the caller can persist it
+ * without re-parsing the raw SDK rejection a second time.
+ *
+ * Distinguishing 429 from fatal errors is important: a 429 is a "soft pause"
+ * (rate-window timer), NOT a sign that the connection is broken.  The job
+ * must NOT burn an exponential-backoff slot on a 429.
+ */
+export class Xero429Error extends Error {
+  /**
+   * @param retryAfterMs  How many ms to wait before retrying (from Retry-After
+   *                      header, converted to ms). Undefined when header absent.
+   */
+  constructor(
+    public readonly retryAfterMs: number | undefined,
+    public readonly originalError: unknown,
+  ) {
+    super(
+      retryAfterMs !== undefined
+        ? `Xero rate-limited (HTTP 429). Retry after ${Math.ceil(retryAfterMs / 1000)}s.`
+        : 'Xero rate-limited (HTTP 429). No Retry-After header present.',
+    );
+    this.name = 'Xero429Error';
+  }
+}
+
+/**
  * Catch-all account codes used for auto-reconciliation in Xero.
  * Transactions with these codes should be flagged for review in CrecheBooks.
  * Common patterns: 9999, SUSPENSE, CLEARING, TO_BE_CATEGORIZED
@@ -397,7 +424,21 @@ export class BankFeedService {
           error instanceof Error ? error.stack : String(error),
         );
 
-        // Mark connection as error state
+        // Detect HTTP 429 before marking status — a rate-limit is a "soft pause",
+        // not a broken connection.  Re-throw as Xero429Error so the caller (auto-sync
+        // job) can handle it without burning an exponential-backoff slot.
+        const info429 = this.extractXero429Info(error);
+        if (info429.is429) {
+          // Do NOT set status=ERROR for a 429 — the connection is healthy, just throttled.
+          // The job will persist rateLimitUntilAt on the connection record.
+          this.logger.warn(
+            `Connection ${connection.id} hit Xero 429 rate-limit. ` +
+              `Retry-After: ${info429.retryAfterMs !== undefined ? `${Math.ceil(info429.retryAfterMs / 1000)}s` : 'not specified'}`,
+          );
+          throw new Xero429Error(info429.retryAfterMs, error);
+        }
+
+        // Non-429 error — mark connection as broken.
         const errorMessage = this.extractXeroErrorMessage(error);
         await this.prisma.bankConnection.update({
           where: { id: connection.id },
@@ -1339,6 +1380,90 @@ export class BankFeedService {
     });
 
     return 'created';
+  }
+
+  /**
+   * Detect whether a thrown error is a Xero HTTP 429 and, if so, extract
+   * the Retry-After deadline as milliseconds from now.
+   *
+   * Xero sends 429s both as xero-node SDK plain-object rejections:
+   *   { response: { status: 429, headers: { 'retry-after': '60' }, body: {...} } }
+   * and occasionally as standard Error instances wrapping the same shape.
+   *
+   * The Retry-After header value may be:
+   *   - A decimal integer string (seconds, e.g. "60")
+   *   - An HTTP date string (e.g. "Wed, 29 Apr 2026 12:00:00 GMT")
+   *
+   * Returns `{ is429: true, retryAfterMs }` when the error is a 429.
+   * Returns `{ is429: false }` for every other error type.
+   */
+  extractXero429Info(
+    error: unknown,
+  ): { is429: true; retryAfterMs: number | undefined } | { is429: false } {
+    let statusCode: number | undefined;
+    let retryAfterHeader: string | undefined;
+
+    if (error instanceof Xero429Error) {
+      // Already wrapped — avoid double-wrapping on re-throw paths.
+      return { is429: true, retryAfterMs: error.retryAfterMs };
+    }
+
+    if (error !== null && typeof error === 'object') {
+      const err = error as Record<string, unknown>;
+      const responseObj = err['response'] as
+        | Record<string, unknown>
+        | undefined;
+
+      statusCode =
+        (responseObj?.['status'] as number | undefined) ??
+        (responseObj?.['statusCode'] as number | undefined);
+
+      if (statusCode === 429) {
+        const headers = responseObj?.['headers'] as
+          | Record<string, string>
+          | undefined;
+        // Header name is case-insensitive; xero-node lowercases them.
+        retryAfterHeader =
+          headers?.['retry-after'] ??
+          headers?.['Retry-After'] ??
+          headers?.['x-rate-limit-problem']; // Xero sometimes uses this alias
+        return {
+          is429: true,
+          retryAfterMs: this.parseRetryAfterHeader(retryAfterHeader),
+        };
+      }
+    }
+
+    // Also handle Error instances whose message contains 429 (fallback).
+    if (error instanceof Error && error.message.includes('429')) {
+      return { is429: true, retryAfterMs: undefined };
+    }
+
+    return { is429: false };
+  }
+
+  /**
+   * Parse a Retry-After header value into milliseconds.
+   * Accepts both integer-seconds strings and HTTP-date strings.
+   * Returns undefined when the header is absent or unparseable.
+   */
+  private parseRetryAfterHeader(value: string | undefined): number | undefined {
+    if (!value) return undefined;
+
+    // Integer seconds (most common for Xero)
+    const seconds = parseInt(value, 10);
+    if (!isNaN(seconds) && seconds > 0) {
+      return seconds * 1000;
+    }
+
+    // HTTP-date fallback (RFC 7231)
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      const msFromNow = date.getTime() - Date.now();
+      return msFromNow > 0 ? msFromNow : 0;
+    }
+
+    return undefined;
   }
 
   /**

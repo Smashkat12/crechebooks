@@ -80,6 +80,7 @@ function formatPhoneNumber(phone: string): string {
 export function ProfileForm({ profile, onSave, isLoading = false }: ProfileFormProps) {
   // Form state
   const [firstName, setFirstName] = useState(profile.firstName);
+  const [middleName, setMiddleName] = useState(profile.middleName ?? '');
   const [lastName, setLastName] = useState(profile.lastName);
   const [phone, setPhone] = useState(profile.phone || '');
   const [alternativePhone, setAlternativePhone] = useState(profile.alternativePhone || '');
@@ -95,6 +96,10 @@ export function ProfileForm({ profile, onSave, isLoading = false }: ProfileFormP
 
     if (!firstName.trim()) {
       newErrors.firstName = 'First name is required';
+    }
+
+    if (middleName.trim().length > 100) {
+      newErrors.middleName = 'Middle name must be 100 characters or fewer';
     }
 
     if (!lastName.trim()) {
@@ -115,7 +120,7 @@ export function ProfileForm({ profile, onSave, isLoading = false }: ProfileFormP
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [firstName, lastName, phone, alternativePhone, postalCode]);
+  }, [firstName, middleName, lastName, phone, alternativePhone, postalCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +131,7 @@ export function ProfileForm({ profile, onSave, isLoading = false }: ProfileFormP
 
     await onSave({
       firstName: firstName.trim(),
+      middleName: middleName.trim() || null,
       lastName: lastName.trim(),
       phone: phone.trim() || undefined,
       alternativePhone: alternativePhone.trim() || undefined,
@@ -139,6 +145,7 @@ export function ProfileForm({ profile, onSave, isLoading = false }: ProfileFormP
 
   const hasChanges =
     firstName !== profile.firstName ||
+    middleName !== (profile.middleName ?? '') ||
     lastName !== profile.lastName ||
     phone !== (profile.phone || '') ||
     alternativePhone !== (profile.alternativePhone || '') ||
@@ -187,6 +194,20 @@ export function ProfileForm({ profile, onSave, isLoading = false }: ProfileFormP
                 <p className="text-sm text-destructive">{errors.lastName}</p>
               )}
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="middleName">Middle Name</Label>
+            <Input
+              id="middleName"
+              value={middleName}
+              onChange={(e) => setMiddleName(e.target.value)}
+              placeholder="Enter middle name (optional)"
+              maxLength={100}
+              className={errors.middleName ? 'border-destructive' : ''}
+            />
+            {errors.middleName && (
+              <p className="text-sm text-destructive">{errors.middleName}</p>
+            )}
           </div>
 
           {/* Email (Read-only) */}

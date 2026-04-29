@@ -300,11 +300,12 @@ export class WebhookController {
     const host = req.headers['x-forwarded-host'] || req.headers.host || '';
     const url = `${protocol}://${host}${req.originalUrl}`;
 
-    // Verify signature (skip in development if not configured)
-    if (
-      process.env.NODE_ENV === 'production' &&
-      !this.webhookService.verifyTwilioSignature(url, body, signature)
-    ) {
+    // SECURITY: always verify Twilio signature — not only in production.
+    // Staging holds real parent data; forged callbacks must be rejected
+    // in every environment. verifyTwilioSignature() returns false when
+    // TWILIO_AUTH_TOKEN is missing (fail-closed), surfacing
+    // misconfiguration as 401 rather than silently accepting the request.
+    if (!this.webhookService.verifyTwilioSignature(url, body, signature)) {
       this.logger.warn('Invalid Twilio webhook signature');
       throw new BusinessException(
         'Invalid webhook signature',
@@ -375,11 +376,10 @@ export class WebhookController {
     const host = req.headers['x-forwarded-host'] || req.headers.host || '';
     const url = `${protocol}://${host}${req.originalUrl}`;
 
-    // Verify signature (skip in development if not configured)
-    if (
-      process.env.NODE_ENV === 'production' &&
-      !this.webhookService.verifyTwilioSignature(url, body, signature)
-    ) {
+    // SECURITY: always verify Twilio signature — not only in production.
+    // verifyTwilioSignature() returns false when TWILIO_AUTH_TOKEN is
+    // missing (fail-closed), so missing config surfaces as 401.
+    if (!this.webhookService.verifyTwilioSignature(url, body, signature)) {
       this.logger.warn('Invalid Twilio incoming webhook signature');
       throw new BusinessException(
         'Invalid webhook signature',

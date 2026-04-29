@@ -38,6 +38,7 @@ import { PaymentReceiptService } from '../../database/services/payment-receipt.s
 import { ArrearsService } from '../../database/services/arrears.service';
 import { PaymentRepository } from '../../database/repositories/payment.repository';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -70,6 +71,7 @@ export class PaymentController {
     private readonly arrearsService: ArrearsService,
     private readonly paymentRepo: PaymentRepository,
     private readonly invoiceRepo: InvoiceRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -212,29 +214,35 @@ export class PaymentController {
     const endIndex = startIndex + limit;
     const paginatedPayments = allPayments.slice(startIndex, endIndex);
 
-    // Enrich payments with invoice details
-    const enrichedPayments: PaymentListItemDto[] = await Promise.all(
-      paginatedPayments.map(async (p) => {
-        const invoice = await this.invoiceRepo.findById(
-          p.invoiceId,
-          getTenantId(user),
-        );
-        return {
-          id: p.id,
-          invoice_id: p.invoiceId,
-          transaction_id: p.transactionId,
-          amount: p.amountCents / 100,
-          payment_date: p.paymentDate.toISOString(),
-          reference: p.reference,
-          match_type: p.matchType,
-          matched_by: p.matchedBy,
-          match_confidence: p.matchConfidence
-            ? Number(p.matchConfidence)
-            : null,
-          is_reversed: p.isReversed,
-          created_at: p.createdAt.toISOString(),
-          invoice_number: invoice?.invoiceNumber,
-        };
+    // Enrich payments with invoice details — single batch query instead of N per-row lookups.
+    // Collect the unique invoice IDs for the current page, then fetch them all at once.
+    const invoiceIds = [
+      ...new Set(paginatedPayments.map((p) => p.invoiceId).filter(Boolean)),
+    ];
+    const invoiceRows = invoiceIds.length
+      ? await this.prisma.invoice.findMany({
+          where: { id: { in: invoiceIds }, tenantId: getTenantId(user) },
+          select: { id: true, invoiceNumber: true },
+        })
+      : [];
+    const invoiceNumberById = new Map(
+      invoiceRows.map((inv) => [inv.id, inv.invoiceNumber]),
+    );
+
+    const enrichedPayments: PaymentListItemDto[] = paginatedPayments.map(
+      (p) => ({
+        id: p.id,
+        invoice_id: p.invoiceId,
+        transaction_id: p.transactionId,
+        amount: p.amountCents / 100,
+        payment_date: p.paymentDate.toISOString(),
+        reference: p.reference,
+        match_type: p.matchType,
+        matched_by: p.matchedBy,
+        match_confidence: p.matchConfidence ? Number(p.matchConfidence) : null,
+        is_reversed: p.isReversed,
+        created_at: p.createdAt.toISOString(),
+        invoice_number: invoiceNumberById.get(p.invoiceId),
       }),
     );
 

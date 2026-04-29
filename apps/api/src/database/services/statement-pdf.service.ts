@@ -26,6 +26,7 @@ import { TenantRepository } from '../repositories/tenant.repository';
 import { ParentRepository } from '../repositories/parent.repository';
 import { StatementRepository } from '../repositories/statement.repository';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
+import { formatFullName } from '../../common/utils/name-formatter';
 
 /**
  * Options for PDF generation
@@ -220,7 +221,7 @@ export class StatementPdfService {
     if (options.includePaymentInstructions) {
       const childNames =
         (parent as ParentWithChildren).children
-          ?.map((c) => `${c.firstName} ${c.lastName}`)
+          ?.map((c) => formatFullName(c))
           .join(' or ') || "your child's full name";
       yPosition = this.renderPaymentInstructions(
         doc,
@@ -395,11 +396,7 @@ export class StatementPdfService {
       .fontSize(PDF_CONSTANTS.FONT_SIZE_BODY)
       .fillColor(PDF_CONSTANTS.TEXT_PRIMARY)
       .font('Helvetica-Bold')
-      .text(
-        `${parent.firstName} ${parent.lastName}`,
-        PDF_CONSTANTS.MARGIN_LEFT,
-        y,
-      );
+      .text(formatFullName(parent), PDF_CONSTANTS.MARGIN_LEFT, y);
     y += 14;
 
     doc.font('Helvetica');

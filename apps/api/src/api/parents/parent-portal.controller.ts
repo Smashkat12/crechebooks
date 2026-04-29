@@ -1531,6 +1531,10 @@ export class ParentPortalController {
       updateData.firstName = dto.firstName;
     }
 
+    if (dto.middleName !== undefined) {
+      updateData.middleName = dto.middleName ?? null;
+    }
+
     if (dto.lastName) {
       updateData.lastName = dto.lastName;
     }

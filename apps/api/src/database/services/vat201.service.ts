@@ -138,7 +138,7 @@ export class Vat201Service {
       );
     }
 
-    // Step 9: Calculate deadline (last business day of month following period end)
+    // Step 9: Calculate deadline (25th of month following period end — VAT Act §27)
     const deadline = this.calculateDeadline(periodEnd);
 
     // Step 10: Check for existing submission and upsert
@@ -351,26 +351,24 @@ export class Vat201Service {
   }
 
   /**
-   * Calculate submission deadline
-   * Last business day of month following period end
+   * Calculate VAT201 submission deadline.
+   *
+   * Per VAT Act 89/1991 §27: the return is due on the 25th of the month
+   * following the end of the tax period.  The old implementation incorrectly
+   * used the LAST day of that following month.
+   *
+   * Source of truth: SarsReadinessService.vat201Window() in
+   *   apps/api/src/api/sars/sars-readiness.service.ts
+   * which computes `new Date(y, pem + 1, 25)` — 25th of the month after
+   * the period-end month.
    */
   private calculateDeadline(periodEnd: Date): Date {
-    // Move to next month
-    const deadline = new Date(periodEnd);
-    deadline.setMonth(deadline.getMonth() + 1);
-
-    // Set to last day of that month
-    deadline.setMonth(deadline.getMonth() + 1);
-    deadline.setDate(0);
-
-    // Adjust for weekends
-    const dayOfWeek = deadline.getDay();
-    if (dayOfWeek === 0) {
-      deadline.setDate(deadline.getDate() - 2); // Sunday -> Friday
-    } else if (dayOfWeek === 6) {
-      deadline.setDate(deadline.getDate() - 1); // Saturday -> Friday
-    }
-
+    // 25th of the month following the period-end month (VAT Act 89/1991 §27)
+    const deadline = new Date(
+      periodEnd.getFullYear(),
+      periodEnd.getMonth() + 1, // month after period end
+      25,
+    );
     return deadline;
   }
 }

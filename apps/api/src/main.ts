@@ -59,6 +59,7 @@ async function bootstrap(): Promise<void> {
     'x-whatsapp-signature',
     'x-xero-signature',
     'x-simplepay-signature',
+    'x-twilio-signature',
   ];
 
   // JSON body parser with limit and raw body preservation for webhook signature verification
@@ -82,11 +83,26 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // URL-encoded body parser with limit
+  // URL-encoded body parser with limit and raw body preservation for Twilio webhooks
+  // Twilio sends application/x-www-form-urlencoded; we must capture the raw buffer
+  // so that verifyTwilioSignature can use the original bytes when needed.
+  // NOTE: Twilio's HMAC-SHA1 algorithm uses url+sorted(params) — not raw bytes —
+  // but preserving rawBody here future-proofs against any Twilio endpoint that
+  // validates against raw payload and keeps parity with the JSON parser behaviour.
   app.use(
     urlencoded({
       limit: urlencodedLimit,
       extended: true,
+      verify: (req, _res, buf) => {
+        const request = req as {
+          headers: Record<string, string | undefined>;
+          rawBody?: Buffer;
+        };
+        // Preserve raw body for Twilio webhook routes (X-Twilio-Signature present)
+        if (request.headers['x-twilio-signature']) {
+          request.rawBody = buf;
+        }
+      },
     }),
   );
 

@@ -9,6 +9,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { Prisma, EnrollmentStatus, EmploymentType } from '@prisma/client';
+import { formatFullName } from '../../common/utils/name-formatter';
 import {
   RecipientType,
   CommunicationChannel,
@@ -133,6 +134,7 @@ export class RecipientResolverService {
       select: {
         id: true,
         firstName: true,
+        middleName: true,
         lastName: true,
         email: true,
         phone: true,
@@ -145,7 +147,7 @@ export class RecipientResolverService {
 
     return parents.map((p) => ({
       id: p.id,
-      name: `${p.firstName} ${p.lastName}`,
+      name: formatFullName(p),
       email: p.email ?? undefined,
       phone: p.whatsapp ?? p.phone ?? undefined,
       preferredContact: p.preferredContact ?? undefined,
@@ -237,6 +239,7 @@ export class RecipientResolverService {
       select: {
         id: true,
         firstName: true,
+        middleName: true,
         lastName: true,
         email: true,
         phone: true,
@@ -266,7 +269,7 @@ export class RecipientResolverService {
     const resolved = [
       ...parents.map((p) => ({
         id: p.id,
-        name: `${p.firstName} ${p.lastName}`,
+        name: formatFullName(p),
         email: p.email ?? undefined,
         phone: p.whatsapp ?? p.phone ?? undefined,
       })),

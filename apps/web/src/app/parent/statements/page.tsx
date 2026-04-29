@@ -12,58 +12,18 @@
  * - PDF download and email options
  */
 
-import { useEffect, useState, useMemo, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FileBarChart2, Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { StatementList } from '@/components/parent-portal/statement-list';
 import { StatementPreview } from '@/components/parent-portal/statement-preview';
 import { MonthPicker } from '@/components/parent-portal/month-picker';
 import {
   useParentStatements,
   useParentStatement,
-  type ParentStatementListItem,
 } from '@/hooks/parent-portal/use-parent-statements';
-
-// Mock data for development/demo when API is unavailable
-const mockStatements: ParentStatementListItem[] = [
-  {
-    year: 2024,
-    month: 1,
-    periodLabel: 'January 2024',
-    transactionCount: 5,
-    openingBalance: 0,
-    closingBalance: 1500,
-    status: 'available',
-  },
-  {
-    year: 2023,
-    month: 12,
-    periodLabel: 'December 2023',
-    transactionCount: 8,
-    openingBalance: 500,
-    closingBalance: 0,
-    status: 'available',
-  },
-  {
-    year: 2023,
-    month: 11,
-    periodLabel: 'November 2023',
-    transactionCount: 4,
-    openingBalance: 1000,
-    closingBalance: 500,
-    status: 'available',
-  },
-  {
-    year: 2023,
-    month: 10,
-    periodLabel: 'October 2023',
-    transactionCount: 6,
-    openingBalance: 0,
-    closingBalance: 1000,
-    status: 'available',
-  },
-];
 
 function StatementsPageContent() {
   const router = useRouter();
@@ -80,9 +40,6 @@ function StatementsPageContent() {
   const [selectedMonth, setSelectedMonth] = useState<number | null>(
     urlMonth ? parseInt(urlMonth, 10) : null
   );
-
-  // State for fallback to mock data
-  const [useMockData, setUseMockData] = useState(false);
 
   // Fetch statements list for the selected year
   const {
@@ -112,24 +69,27 @@ function StatementsPageContent() {
     }
   }, [router]);
 
-  // Handle API errors by falling back to mock data
-  useEffect(() => {
-    if (isStatementsError && !useMockData) {
-      console.warn('Statements API error, using mock data:', statementsError?.message);
-      setUseMockData(true);
-    }
-  }, [isStatementsError, statementsError, useMockData]);
+  if (isStatementsError) {
+    return (
+      <div className="max-w-lg mx-auto mt-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {statementsError?.message || 'Unable to load your statements. Please try again.'}
+          </AlertDescription>
+        </Alert>
+        <Button
+          className="mt-4 w-full"
+          variant="outline"
+          onClick={() => window.location.reload()}
+        >
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
-  // Apply client-side filtering to mock data
-  const filteredMockStatements = useMemo(() => {
-    return mockStatements.filter((s) => s.year === selectedYear);
-  }, [selectedYear]);
-
-  // Determine which statements to display
-  const statements = useMockData
-    ? filteredMockStatements
-    : (statementsData?.statements || []);
-  const showLoading = statementsLoading && !useMockData;
+  const statements = statementsData?.statements || [];
 
   // Handle year change
   const handleYearChange = (year: number) => {
@@ -177,22 +137,12 @@ function StatementsPageContent() {
         onMonthSelect={handleMonthSelect}
       />
 
-      {/* Error Alert (only shown if not using mock data fallback) */}
-      {isStatementsError && !useMockData && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {statementsError?.message || 'Failed to load statements. Please try again.'}
-          </AlertDescription>
-        </Alert>
-      )}
-
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Statement List */}
         <div className="lg:col-span-1">
           <StatementList
             statements={statements}
-            isLoading={showLoading}
+            isLoading={statementsLoading}
             selectedYear={selectedYear}
             selectedMonth={selectedMonth}
             onSelectStatement={handleStatementSelect}
@@ -205,8 +155,8 @@ function StatementsPageContent() {
             <StatementPreview
               year={selectedYear}
               month={selectedMonth}
-              statement={useMockData ? undefined : statementDetail}
-              isLoading={detailLoading && !useMockData}
+              statement={statementDetail}
+              isLoading={detailLoading}
               error={isDetailError ? detailError : undefined}
             />
           ) : (

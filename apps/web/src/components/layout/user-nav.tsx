@@ -29,21 +29,6 @@ export function UserNav() {
     .toUpperCase()
     .slice(0, 2) || user.email.slice(0, 2).toUpperCase();
 
-  const handleLogout = async () => {
-    // Clear NextAuth session first
-    await logout();
-
-    // Only redirect to Auth0 logout if Auth0 is configured
-    const auth0Domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN;
-    const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID;
-
-    if (auth0Domain && clientId) {
-      const returnTo = encodeURIComponent(window.location.origin + '/');
-      window.location.href = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
-    }
-    // If Auth0 is not configured, logout() already redirects to landing page
-  };
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -75,7 +60,7 @@ export function UserNav() {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
+        <DropdownMenuItem onClick={() => logout()}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>

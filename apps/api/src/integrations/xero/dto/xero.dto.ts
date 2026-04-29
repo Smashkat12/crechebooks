@@ -356,4 +356,34 @@ export class XeroSyncStatusDto {
     example: '2026-04-28T13:00:00.000Z',
   })
   nextScheduledSyncAt!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'In-memory retry backoff state for ERROR connections. ' +
+      'Non-null only when lastSyncStatus is FAILED and the self-healing cron has ' +
+      'scheduled a retry. Null when the connection is healthy (ACTIVE/RUNNING) ' +
+      'or when the process has restarted since the last failure.',
+    nullable: true,
+    type: 'object',
+    properties: {
+      nextRetryAt: {
+        type: 'string',
+        format: 'date-time',
+        nullable: true,
+        description:
+          'ISO 8601 timestamp of the next scheduled retry attempt, or null if no retry is pending.',
+        example: '2026-04-28T15:00:00.000Z',
+      },
+      consecutiveFailures: {
+        type: 'integer',
+        description:
+          'Number of consecutive sync failures recorded since the last successful sync.',
+        example: 2,
+      },
+    },
+  })
+  errorRetryState!: {
+    nextRetryAt: string | null;
+    consecutiveFailures: number;
+  } | null;
 }

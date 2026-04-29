@@ -33,6 +33,7 @@ const MAX_GROUPS = 200;
 type ChildSummary = {
   id: string;
   firstName: string;
+  middleName: string | null;
   lastName: string;
   dateOfBirth: Date;
   gender: string | null;
@@ -368,6 +369,7 @@ export class ClassGroupsService {
       select: {
         id: true,
         firstName: true,
+        middleName: true,
         lastName: true,
         dateOfBirth: true,
         gender: true,

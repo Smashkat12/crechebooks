@@ -49,73 +49,6 @@ interface DashboardData {
   email: string;
 }
 
-// Mock data for development/demo
-const mockData: DashboardData = {
-  currentBalance: 2450.0,
-  recentInvoices: [
-    {
-      id: '1',
-      invoiceNumber: 'INV-2024-001',
-      date: '2024-01-15',
-      amount: 1500.0,
-      status: 'overdue',
-    },
-    {
-      id: '2',
-      invoiceNumber: 'INV-2024-002',
-      date: '2024-01-20',
-      amount: 950.0,
-      status: 'pending',
-    },
-    {
-      id: '3',
-      invoiceNumber: 'INV-2023-012',
-      date: '2023-12-15',
-      amount: 1500.0,
-      status: 'paid',
-    },
-    {
-      id: '4',
-      invoiceNumber: 'INV-2023-011',
-      date: '2023-11-15',
-      amount: 1500.0,
-      status: 'paid',
-    },
-    {
-      id: '5',
-      invoiceNumber: 'INV-2023-010',
-      date: '2023-10-15',
-      amount: 1500.0,
-      status: 'paid',
-    },
-  ],
-  children: [
-    {
-      id: '1',
-      name: 'Emma Smith',
-      dateOfBirth: '2020-03-15',
-      enrollmentStatus: 'active',
-      className: 'Butterflies',
-    },
-    {
-      id: '2',
-      name: 'James Smith',
-      dateOfBirth: '2022-08-22',
-      enrollmentStatus: 'active',
-      className: 'Caterpillars',
-    },
-  ],
-  nextPaymentDue: {
-    date: '2024-02-15',
-    amount: 1500.0,
-  },
-  hasArrears: true,
-  daysOverdue: 15,
-  firstName: 'Sarah',
-  lastName: 'Smith',
-  email: 'sarah.smith@example.com',
-};
-
 export default function ParentDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -169,9 +102,7 @@ export default function ParentDashboardPage() {
             router.push('/parent/login');
             return;
           }
-          // If API fails, use mock data for development
-          console.warn('Dashboard API not available, using mock data');
-          setData(mockData);
+          setError('Unable to load your dashboard. Please try again.');
           setIsLoading(false);
           return;
         }
@@ -179,9 +110,8 @@ export default function ParentDashboardPage() {
         const dashboardData = await response.json();
         setData(dashboardData);
       } catch (err) {
-        // Use mock data if API is unavailable
-        console.warn('Dashboard API error, using mock data:', err);
-        setData(mockData);
+        console.error('Dashboard fetch error:', err);
+        setError('Unable to connect to the server. Please check your connection and try again.');
       } finally {
         setIsLoading(false);
       }

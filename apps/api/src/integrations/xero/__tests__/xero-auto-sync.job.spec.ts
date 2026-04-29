@@ -6,7 +6,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { XeroAutoSyncJob } from '../xero-auto-sync.job';
 import { PrismaService } from '../../../database/prisma/prisma.service';
-import { BankFeedService } from '../bank-feed.service';
+import { BankFeedService, Xero429Error } from '../bank-feed.service';
 import * as TokenManagerModule from '../../../mcp/xero-mcp/auth/token-manager';
 
 // Mock the TokenManager so it doesn't try to decrypt real tokens
@@ -23,7 +23,7 @@ const makePrisma = () => ({
     findMany: jest.fn(),
   },
   bankConnection: {
-    findFirst: jest.fn(),
+    findFirst: jest.fn().mockResolvedValue(null),
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
 });
@@ -528,7 +528,6 @@ describe('XeroAutoSyncJob', () => {
           consecutiveFailures: 20,
         });
 
-        const beforeMs = Date.now();
         await job.runAutoSync();
         const afterMs = Date.now();
 
@@ -618,6 +617,263 @@ describe('XeroAutoSyncJob', () => {
         // Backoff state must be cleared
         expect(job.getRetryState(tenantId)).toBeUndefined();
       });
+    });
+  });
+
+  describe('HTTP 429 rate-limit handling (Guard 4a)', () => {
+    const makeValidToken = (now: number) => ({
+      tenantId: 'tenant-429',
+      tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+      updatedAt: new Date(now - 5 * 60 * 1000),
+    });
+
+    it('persists rateLimitUntilAt when syncTransactions throws Xero429Error with Retry-After', async () => {
+      const tenantId = 'tenant-429';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([makeValidToken(now)]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+
+      bankFeed.syncTransactions.mockRejectedValue(
+        new Xero429Error(60_000, { response: { status: 429 } }),
+      );
+
+      const beforeMs = Date.now();
+      await job.runAutoSync();
+      const afterMs = Date.now();
+
+      // Must have called updateMany with rateLimitUntilAt
+      expect(prisma.bankConnection.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ tenantId }),
+          data: expect.objectContaining({
+            rateLimitUntilAt: expect.any(Date),
+          }),
+        }),
+      );
+
+      // The deadline should be ~60s from now
+      const callArgs = prisma.bankConnection.updateMany.mock.calls.find(
+        (call) => call[0]?.data?.rateLimitUntilAt,
+      );
+      const deadline: Date = callArgs[0].data.rateLimitUntilAt;
+      expect(deadline.getTime()).toBeGreaterThanOrEqual(beforeMs + 60_000);
+      expect(deadline.getTime()).toBeLessThanOrEqual(afterMs + 60_000 + 100);
+    });
+
+    it('uses 60s default pause when Xero429Error has no retryAfterMs', async () => {
+      const tenantId = 'tenant-429';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([makeValidToken(now)]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+
+      // Xero429Error with undefined retryAfterMs (no Retry-After header)
+      bankFeed.syncTransactions.mockRejectedValue(
+        new Xero429Error(undefined, {}),
+      );
+
+      const beforeMs = Date.now();
+      await job.runAutoSync();
+      const afterMs = Date.now();
+
+      const callArgs = prisma.bankConnection.updateMany.mock.calls.find(
+        (call) => call[0]?.data?.rateLimitUntilAt,
+      );
+      expect(callArgs).toBeDefined();
+      const deadline: Date = callArgs[0].data.rateLimitUntilAt;
+      // Default is 60s
+      expect(deadline.getTime()).toBeGreaterThanOrEqual(beforeMs + 60_000);
+      expect(deadline.getTime()).toBeLessThanOrEqual(afterMs + 60_000 + 200);
+    });
+
+    it('does NOT increment consecutiveFailures on a 429 (not a fatal error)', async () => {
+      const tenantId = 'tenant-429-no-backoff';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId,
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+
+      bankFeed.syncTransactions.mockRejectedValue(new Xero429Error(60_000, {}));
+
+      await job.runAutoSync();
+
+      // errorRetryState must NOT have been set (429 is not a fatal error)
+      expect(job.getRetryState(tenantId)).toBeUndefined();
+    });
+
+    it('does NOT set status=ERROR on the bank connection for a 429', async () => {
+      const tenantId = 'tenant-429-no-error-status';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId,
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+
+      bankFeed.syncTransactions.mockRejectedValue(new Xero429Error(60_000, {}));
+
+      await job.runAutoSync();
+
+      // updateMany must NOT have been called with status: 'ERROR'
+      const errorStatusCall = prisma.bankConnection.updateMany.mock.calls.find(
+        (call) => call[0]?.data?.status === 'ERROR',
+      );
+      expect(errorStatusCall).toBeUndefined();
+    });
+
+    it('skips the tenant when rateLimitUntilAt is in the future (Guard 4a — simulates restart persistence)', async () => {
+      const tenantId = 'tenant-429-guard4a';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId,
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+
+      // Simulate: DB has rateLimitUntilAt 30 min in the future (set before restart)
+      prisma.bankConnection.findFirst.mockImplementation((args: any) => {
+        if (args?.where && 'rateLimitUntilAt' in args.where) {
+          return Promise.resolve({
+            rateLimitUntilAt: new Date(now + 30 * 60 * 1000),
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      await job.runAutoSync();
+
+      // Sync must NOT have been attempted
+      expect(bankFeed.syncTransactions).not.toHaveBeenCalled();
+    });
+
+    it('proceeds with sync after rate-limit deadline has passed (Guard 4a expired)', async () => {
+      const tenantId = 'tenant-429-guard4a-expired';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId,
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+
+      // Guard 4a: rateLimitUntilAt is in the past → allow sync
+      prisma.bankConnection.findFirst.mockResolvedValue(null);
+
+      bankFeed.syncTransactions.mockResolvedValue({
+        transactionsCreated: 2,
+        duplicatesSkipped: 0,
+        errors: [],
+        transactionsFound: 2,
+        connectionId: 'all',
+        syncedAt: new Date(),
+      });
+      bankFeed.syncFromJournals.mockResolvedValue({
+        created: 0,
+        skipped: 0,
+        found: 0,
+      });
+
+      await job.runAutoSync();
+
+      expect(bankFeed.syncTransactions).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears rateLimitUntilAt (sets to null) after a successful sync', async () => {
+      const tenantId = 'tenant-429-clear-on-success';
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId,
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+      prisma.bankConnection.findFirst.mockResolvedValue(null);
+
+      bankFeed.syncTransactions.mockResolvedValue({
+        transactionsCreated: 1,
+        duplicatesSkipped: 0,
+        errors: [],
+        transactionsFound: 1,
+        connectionId: 'all',
+        syncedAt: new Date(),
+      });
+      bankFeed.syncFromJournals.mockResolvedValue({
+        created: 0,
+        skipped: 0,
+        found: 0,
+      });
+
+      await job.runAutoSync();
+
+      // Must have cleared rateLimitUntilAt
+      expect(prisma.bankConnection.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ tenantId }),
+          data: expect.objectContaining({ rateLimitUntilAt: null }),
+        }),
+      );
+    });
+
+    it('continues processing subsequent tenants after a 429 on the first tenant', async () => {
+      const now = Date.now();
+
+      prisma.xeroToken.findMany.mockResolvedValue([
+        {
+          tenantId: 'tenant-429-first',
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+        {
+          tenantId: 'tenant-ok-second',
+          tokenExpiresAt: new Date(now + 30 * 60 * 1000),
+          updatedAt: new Date(now - 5 * 60 * 1000),
+        },
+      ]);
+      getTokenManagerHasValidConnection().mockResolvedValue(true);
+      prisma.bankConnection.findFirst.mockResolvedValue(null);
+
+      bankFeed.syncTransactions
+        .mockRejectedValueOnce(new Xero429Error(60_000, {}))
+        .mockResolvedValueOnce({
+          transactionsCreated: 3,
+          duplicatesSkipped: 0,
+          errors: [],
+          transactionsFound: 3,
+          connectionId: 'all',
+          syncedAt: new Date(),
+        });
+
+      bankFeed.syncFromJournals.mockResolvedValue({
+        created: 0,
+        skipped: 0,
+        found: 0,
+      });
+
+      await job.runAutoSync();
+
+      // syncTransactions was called for BOTH tenants
+      expect(bankFeed.syncTransactions).toHaveBeenCalledTimes(2);
     });
   });
 

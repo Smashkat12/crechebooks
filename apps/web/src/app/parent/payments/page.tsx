@@ -29,62 +29,7 @@ import {
   useParentBankDetails,
   generatePaymentReference,
   type ParentPaymentsFilters,
-  type ParentPaymentListItem,
 } from '@/hooks/parent-portal/use-parent-payments';
-
-// Mock data for development/demo when API is unavailable
-const mockPayments: ParentPaymentListItem[] = [
-  {
-    id: '1',
-    paymentDate: '2024-01-20',
-    amount: 1500.0,
-    reference: 'ABC12345-20240120-XYZ',
-    method: 'EFT',
-    status: 'completed',
-  },
-  {
-    id: '2',
-    paymentDate: '2024-01-15',
-    amount: 950.0,
-    reference: 'ABC12345-20240115-ABC',
-    method: 'EFT',
-    status: 'completed',
-  },
-  {
-    id: '3',
-    paymentDate: '2024-01-10',
-    amount: 2000.0,
-    reference: 'ABC12345-20240110-DEF',
-    method: 'Card',
-    status: 'completed',
-  },
-  {
-    id: '4',
-    paymentDate: '2024-01-05',
-    amount: 750.0,
-    reference: 'ABC12345-20240105-GHI',
-    method: 'EFT',
-    status: 'pending',
-  },
-  {
-    id: '5',
-    paymentDate: '2023-12-20',
-    amount: 1500.0,
-    reference: 'ABC12345-20231220-JKL',
-    method: 'EFT',
-    status: 'completed',
-  },
-];
-
-// Mock bank details - will be combined with generated payment reference
-const mockBankDetailsBase = {
-  bankName: 'First National Bank',
-  accountHolderName: 'Little Stars Creche',
-  accountNumber: '62123456789',
-  branchCode: '250655',
-  accountType: 'Cheque' as const,
-  paymentInstructions: 'Please use your unique reference when making payments. Payments may take 1-2 business days to reflect.',
-};
 
 function PaymentsPageContent() {
   const router = useRouter();
@@ -120,10 +65,6 @@ function PaymentsPageContent() {
     error: bankDetailsError,
   } = useParentBankDetails();
 
-  // State for fallback to mock data
-  const [useMockData, setUseMockData] = useState(false);
-  const [useMockBankDetails, setUseMockBankDetails] = useState(false);
-
   // Check authentication on mount
   useEffect(() => {
     const token = localStorage.getItem('parent_session_token');
@@ -135,47 +76,6 @@ function PaymentsPageContent() {
     setParentId(mockParentId);
     setPaymentReference(generatePaymentReference(mockParentId));
   }, [router]);
-
-  // Handle API errors by falling back to mock data
-  useEffect(() => {
-    if (isError && !useMockData) {
-      console.warn('Payments API error, using mock data:', error?.message);
-      setUseMockData(true);
-    }
-  }, [isError, error, useMockData]);
-
-  useEffect(() => {
-    if (bankDetailsError && !useMockBankDetails) {
-      console.warn('Bank details API error, using mock data:', bankDetailsError?.message);
-      setUseMockBankDetails(true);
-    }
-  }, [bankDetailsError, useMockBankDetails]);
-
-  // Apply client-side filtering to mock data
-  const filteredMockPayments = useMemo(() => {
-    let result = [...mockPayments];
-
-    if (filters.startDate) {
-      const startDate = new Date(filters.startDate);
-      result = result.filter((p) => new Date(p.paymentDate) >= startDate);
-    }
-
-    if (filters.endDate) {
-      const endDate = new Date(filters.endDate);
-      result = result.filter((p) => new Date(p.paymentDate) <= endDate);
-    }
-
-    return result;
-  }, [filters]);
-
-  // Determine which data to display
-  const payments = useMockData ? filteredMockPayments : (data?.payments || []);
-  const totalOutstanding = useMockData ? 2450.0 : (data?.totalOutstanding || 0);
-  const showLoading = isLoading && !useMockData;
-
-  const displayBankDetails = useMockBankDetails
-    ? { ...mockBankDetailsBase, paymentReference }
-    : bankDetails;
 
   // Handle filter changes
   const applyFilters = () => {
@@ -211,9 +111,29 @@ function PaymentsPageContent() {
     setPaymentReference(ref);
   }, []);
 
-  const totalPages = useMockData
-    ? Math.ceil(filteredMockPayments.length / (filters.limit || 10))
-    : (data?.totalPages || 1);
+  if (isError) {
+    return (
+      <div className="max-w-lg mx-auto mt-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {error?.message || 'Unable to load your payments. Please try again.'}
+          </AlertDescription>
+        </Alert>
+        <Button
+          className="mt-4 w-full"
+          variant="outline"
+          onClick={() => window.location.reload()}
+        >
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  const payments = data?.payments || [];
+  const totalOutstanding = data?.totalOutstanding || 0;
+  const totalPages = data?.totalPages || 1;
   const currentPage = filters.page || 1;
 
   return (
@@ -248,9 +168,9 @@ function PaymentsPageContent() {
 
       {/* Bank Details Card */}
       <BankDetailsCard
-        bankDetails={displayBankDetails}
-        isLoading={bankDetailsLoading && !useMockBankDetails}
-        error={bankDetailsError && !useMockBankDetails ? bankDetailsError : null}
+        bankDetails={bankDetails}
+        isLoading={bankDetailsLoading}
+        error={bankDetailsError ?? null}
         paymentReference={paymentReference}
       />
 
@@ -298,28 +218,18 @@ function PaymentsPageContent() {
         </CardContent>
       </Card>
 
-      {/* Error Alert (only shown if not using mock data fallback) */}
-      {isError && !useMockData && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {error?.message || 'Failed to load payments. Please try again.'}
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Payment List */}
       <div>
         <h2 className="text-lg font-semibold mb-3">Payment History</h2>
         <PaymentList
           payments={payments}
-          isLoading={showLoading}
+          isLoading={isLoading}
           onViewPayment={handleViewPayment}
         />
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && !showLoading && payments.length > 0 && (
+      {totalPages > 1 && !isLoading && payments.length > 0 && (
         <div className="flex justify-center gap-2 pt-4">
           <Button
             variant="outline"

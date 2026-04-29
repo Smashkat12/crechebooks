@@ -27,6 +27,7 @@ import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
 import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
 import { TwilioContentService } from '../../integrations/whatsapp/services/twilio-content.service';
+import { formatFullName } from '../../common/utils/name-formatter';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
@@ -154,14 +155,12 @@ export class AdminMessagesService {
       // Parent name
       const parent = await this.prisma.parent.findUnique({
         where: { id: g.parentId },
-        select: { firstName: true, lastName: true },
+        select: { firstName: true, middleName: true, lastName: true },
       });
 
       threads.push({
         parentId: g.parentId,
-        parentName: parent
-          ? `${parent.firstName} ${parent.lastName}`.trim()
-          : g.parentId,
+        parentName: parent ? formatFullName(parent) : g.parentId,
         lastMessageAt,
         lastMessageSnippet: snippet,
         unreadCount,

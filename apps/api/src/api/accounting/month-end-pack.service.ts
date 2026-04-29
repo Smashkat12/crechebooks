@@ -16,6 +16,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as archiver from 'archiver';
 import { GeneralLedgerService } from '../../database/services/general-ledger.service';
+import { formatFullName } from '../../common/utils';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
 import { PaymentRepository } from '../../database/repositories/payment.repository';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -239,8 +240,12 @@ export class MonthEndPackService {
         issueDate: { gte: startDate, lte: endDate },
       },
       include: {
-        parent: { select: { firstName: true, lastName: true } },
-        child: { select: { firstName: true, lastName: true } },
+        parent: {
+          select: { firstName: true, middleName: true, lastName: true },
+        },
+        child: {
+          select: { firstName: true, middleName: true, lastName: true },
+        },
       },
       orderBy: { issueDate: 'asc' },
     });
@@ -264,8 +269,8 @@ export class MonthEndPackService {
         this.csvDate(inv.issueDate),
         this.csvDate(inv.dueDate),
         this.csvStr(inv.status),
-        this.csvStr(`${inv.parent.firstName} ${inv.parent.lastName}`),
-        this.csvStr(`${inv.child.firstName} ${inv.child.lastName}`),
+        this.csvStr(formatFullName(inv.parent)),
+        this.csvStr(formatFullName(inv.child)),
         this.centsToRands(inv.subtotalCents),
         this.centsToRands(inv.vatCents),
         this.centsToRands(inv.totalCents),

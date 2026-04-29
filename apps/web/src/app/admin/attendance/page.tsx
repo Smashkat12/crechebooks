@@ -29,8 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { CalendarDays, CheckCircle2, Users, Search } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Users, Search, BellOff } from 'lucide-react';
 import type { AttendanceStatus } from '@/lib/api/attendance';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 // ─── Status config ─────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ function todayIso(): string {
 interface ChildRow {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   classGroupName?: string;
 }
@@ -92,6 +94,7 @@ export default function AttendanceMarkingPage() {
       return (allChildrenResp?.data ?? []).map((c) => ({
         id: c.id,
         firstName: c.first_name,
+        middleName: c.middle_name,
         lastName: c.last_name,
       }));
     }
@@ -100,13 +103,14 @@ export default function AttendanceMarkingPage() {
     return (groupChildren ?? []).map((c) => ({
       id: c.id,
       firstName: c.first_name,
+      middleName: c.middle_name,
       lastName: c.last_name,
       classGroupName: groupName,
     }));
   }, [classGroupId, allChildrenResp, groupChildren, classGroups]);
 
-  // Attendance records for the selected date
-  const { data: records, isLoading: recordsLoading } = useAttendanceByDate({
+  // Attendance records for the selected date (AdminDayView wrapper)
+  const { data: dayView, isLoading: recordsLoading } = useAttendanceByDate({
     date,
     classGroupId: classGroupId !== 'all' ? classGroupId : undefined,
   });
@@ -114,11 +118,20 @@ export default function AttendanceMarkingPage() {
   // Build a lookup: childId → attendance record
   const attendanceMap = useMemo(() => {
     const map = new Map<string, { id: string; status: AttendanceStatus }>();
-    (records ?? []).forEach((r) => {
+    (dayView?.records ?? []).forEach((r) => {
       map.set(r.childId, { id: r.id, status: r.status });
     });
     return map;
-  }, [records]);
+  }, [dayView]);
+
+  // Build a lookup: childId → parent pre-report (for inline badge)
+  const preReportMap = useMemo(() => {
+    const map = new Map<string, { reason: string | null }>();
+    (dayView?.parentPreReports ?? []).forEach((r) => {
+      map.set(r.childId, { reason: r.reason });
+    });
+    return map;
+  }, [dayView]);
 
   const { mutate: markAttendance, isPending: isMarking } = useMarkAttendance();
   const { mutate: bulkMark, isPending: isBulking } = useBulkMarkAttendance();
@@ -127,7 +140,7 @@ export default function AttendanceMarkingPage() {
 
   const displayedChildren = useMemo(() => {
     return childRows.filter((c) => {
-      const name = `${c.firstName} ${c.lastName}`.toLowerCase();
+      const name = formatFullName(c).toLowerCase();
       if (search && !name.includes(search.toLowerCase())) return false;
       if (showUnmarkedOnly && attendanceMap.has(c.id)) return false;
       return true;
@@ -341,16 +354,28 @@ export default function AttendanceMarkingPage() {
               displayedChildren.map((child) => {
                 const rec = attendanceMap.get(child.id);
                 const currentStatus = rec?.status;
+                const preReport = preReportMap.get(child.id);
 
                 return (
                   <TableRow key={child.id}>
                     <TableCell>
-                      <Link
-                        href={`/admin/children/${child.id}/attendance`}
-                        className="font-medium hover:underline"
-                      >
-                        {child.firstName} {child.lastName}
-                      </Link>
+                      <div className="space-y-0.5">
+                        <Link
+                          href={`/admin/children/${child.id}/attendance`}
+                          className="font-medium hover:underline"
+                        >
+                          {formatFullName(child)}
+                        </Link>
+                        {preReport && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <BellOff className="h-3 w-3 shrink-0" />
+                            <span>
+                              Reported absent
+                              {preReport.reason ? ` — ${preReport.reason}` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {child.classGroupName ?? '—'}

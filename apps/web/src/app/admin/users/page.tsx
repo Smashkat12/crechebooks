@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAdminUsers, useAdminUserStats, useDeactivateUser, useActivateUser, useImpersonateUser } from '@/hooks/use-admin-users';
+import { useAdminUsers, useAdminUserStats, useDeactivateUser, useActivateUser } from '@/hooks/use-admin-users';
+import { useStartImpersonation, type ImpersonationRole } from '@/hooks/use-impersonation';
 import { useAdminTenants } from '@/hooks/use-admin-tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -53,7 +54,7 @@ export default function UsersPage() {
   const { toast } = useToast();
   const deactivateMutation = useDeactivateUser();
   const activateMutation = useActivateUser();
-  const impersonateMutation = useImpersonateUser();
+  const impersonateMutation = useStartImpersonation();
 
   const handleDeactivate = async (id: string, email: string) => {
     if (confirm(`Deactivate ${email}?`)) {
@@ -67,14 +68,13 @@ export default function UsersPage() {
     toast({ title: 'User activated' });
   };
 
-  const handleImpersonate = async (id: string, email: string) => {
+  const handleImpersonate = async (tenantId: string | undefined, role: string, email: string) => {
+    if (!tenantId) return;
     if (confirm(`Impersonate ${email}? You will be logged in as this user.`)) {
-      const result = await impersonateMutation.mutateAsync(id);
-      if (result.success) {
-        // Store the user ID for impersonation
-        localStorage.setItem('impersonation_user_id', result.userId);
-        toast({ title: 'Impersonation not yet fully implemented', description: 'This feature requires session management.' });
-      }
+      await impersonateMutation.mutateAsync({
+        tenantId,
+        role: role as ImpersonationRole,
+      });
     }
   };
 
@@ -241,7 +241,7 @@ export default function UsersPage() {
                                 <UserCheck className="mr-2 h-4 w-4" /> Activate
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => handleImpersonate(user.id, user.email)}>
+                            <DropdownMenuItem onClick={() => handleImpersonate(user.tenantId, user.role, user.email)}>
                               <LogIn className="mr-2 h-4 w-4" /> Impersonate
                             </DropdownMenuItem>
                           </>

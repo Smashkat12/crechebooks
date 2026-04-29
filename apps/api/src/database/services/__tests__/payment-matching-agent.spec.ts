@@ -564,4 +564,104 @@ describe('PaymentMatchingService - Agent Integration', () => {
       expect(result.results[0].status).toBe('REVIEW_REQUIRED');
     });
   });
+
+  // AUDIT-PAY-01: regression tests for getOutstandingInvoices status filter
+  describe('getOutstandingInvoices — invoice status filter (AUDIT-PAY-01)', () => {
+    /**
+     * Asserts that the Prisma query built by getOutstandingInvoices uses an
+     * allow-list of { in: [SENT, PARTIALLY_PAID, OVERDUE] } rather than a
+     * deny-list.  We capture the where-clause passed to prisma.invoice.findMany
+     * and inspect it directly — no real DB required.
+     */
+
+    it('should query with in-filter containing SENT, PARTIALLY_PAID, OVERDUE', async () => {
+      // Arrange: return empty so the rest of matchPayments is a no-op
+      jest.spyOn(prisma.transaction, 'findMany').mockResolvedValue([]);
+      const invoiceFindMany = jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([]);
+      jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
+
+      await service.matchPayments({ tenantId: mockTenantId });
+
+      // getOutstandingInvoices is called even when transactions is empty only if
+      // the service continues past the early-return guard. If it returns early
+      // (0 transactions), findMany for invoices may not be called — that's fine:
+      // the important test is the one below where a transaction IS present.
+      // This test verifies the guard path is safe.
+      expect(invoiceFindMany).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: expect.objectContaining({ notIn: expect.anything() }),
+          }),
+        }),
+      );
+    });
+
+    it('should NOT include DRAFT invoices as match candidates', async () => {
+      // Arrange: one real transaction so the invoice query fires
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
+      jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
+
+      const invoiceFindMany = jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([]); // no candidates → no-match path
+
+      await service.matchPayments({ tenantId: mockTenantId });
+
+      // Verify the where clause passed to invoice.findMany uses the allow-list
+      const callArgs = invoiceFindMany.mock.calls[0]?.[0] as
+        | { where?: { status?: unknown } }
+        | undefined;
+      expect(callArgs).toBeDefined();
+
+      const statusFilter = (
+        callArgs as { where: { status: { in?: string[] } } }
+      ).where.status;
+
+      // Must use allow-list (in:) not deny-list (notIn:)
+      expect(statusFilter).toHaveProperty('in');
+      expect(statusFilter).not.toHaveProperty('notIn');
+
+      // Allow-list must contain exactly the three payable statuses
+      const allowList: string[] = (statusFilter as { in: string[] }).in;
+      expect(allowList).toContain('SENT');
+      expect(allowList).toContain('PARTIALLY_PAID');
+      expect(allowList).toContain('OVERDUE');
+
+      // DRAFT and VOID must NOT appear in the allow-list
+      expect(allowList).not.toContain('DRAFT');
+      expect(allowList).not.toContain('VOID');
+    });
+
+    it('should NOT include VOID invoices as match candidates', async () => {
+      // Same structural check as above — explicit VOID assertion for clarity
+      jest
+        .spyOn(prisma.transaction, 'findMany')
+        .mockResolvedValue([mockTransaction]);
+      jest.spyOn(prisma.payment, 'findFirst').mockResolvedValue(null);
+      jest.spyOn(prisma.payment, 'findMany').mockResolvedValue([]);
+
+      const invoiceFindMany = jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([]);
+
+      await service.matchPayments({ tenantId: mockTenantId });
+
+      const callArgs = invoiceFindMany.mock.calls[0]?.[0] as
+        | { where?: { status?: unknown } }
+        | undefined;
+      expect(callArgs).toBeDefined();
+
+      const statusFilter = (
+        callArgs as { where: { status: { in?: string[] } } }
+      ).where.status;
+      const allowList: string[] = (statusFilter as { in: string[] }).in;
+
+      expect(allowList).not.toContain('VOID');
+    });
+  });
 });

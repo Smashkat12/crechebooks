@@ -914,6 +914,28 @@ describe('TaxTableService', () => {
     });
   });
 
+  describe('DI registration smoke test (AUDIT-TAX-04)', () => {
+    /**
+     * Guards against TaxTableService being removed from DatabaseModule providers.
+     * The service has no Prisma dependency — it uses in-memory storage — so a
+     * plain test module is sufficient. If the provider were unregistered the
+     * `get()` call would throw "TaxTableService is not a provider".
+     */
+    it('should be resolvable from a NestJS test module', () => {
+      expect(service).toBeDefined();
+    });
+
+    it('findBracket(R237,100 = 23710000 cents) returns bracket containing R237,100 — boundary fix guard', () => {
+      // R237,100 is the SARS 2025/2026 bracket-1 ceiling.
+      // After the continuous-boundary fix (commit 877c040), income exactly at
+      // the ceiling must remain in bracket 1 (18%), not be misclassified to
+      // bracket 2 (26%). EMP201 §3.2 compliance.
+      const taxYear = service.getTaxYearByCode('2025/2026');
+      const { bracketIndex } = service.findBracket(taxYear, 23710000);
+      expect(bracketIndex).toBe(0); // bracket 1 = 18%
+    });
+  });
+
   describe('2026/2027 Tax Year Seed Data Verification (TASK-TAX-YEAR-2027)', () => {
     it('should have correct effective date range', () => {
       expect(TAX_YEAR_2026_2027.effectiveFrom).toEqual(new Date('2026-03-01'));

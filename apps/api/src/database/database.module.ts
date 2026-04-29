@@ -126,6 +126,7 @@ import { ExtractionValidatorModule } from '../agents/extraction-validator/valida
 import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
 import { ConversationalModule } from '../agents/conversational/conversational.module';
 import { RolloutModule } from '../agents/rollout/rollout.module';
+import { TaxTableService } from './services/tax-table.service'; // TASK-STAFF-005
 // TASK-STUB-PARITY: ACCOUNTING_PROVIDER is globally available via AccountingModule.forRoot()
 
 @Module({
@@ -181,6 +182,7 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     VatService,
     VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,
+    TaxTableService, // TASK-STAFF-005: continuous-boundary PAYE brackets (wires findBracket into DI)
     UifService,
     Vat201Service,
     Emp201Service,
@@ -299,6 +301,7 @@ import { RolloutModule } from '../agents/rollout/rollout.module';
     VatService,
     VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,
+    TaxTableService, // TASK-STAFF-005: continuous-boundary PAYE brackets (wires findBracket into DI)
     UifService,
     Vat201Service,
     Emp201Service,

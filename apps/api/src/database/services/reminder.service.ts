@@ -22,7 +22,7 @@ import {
 } from '../repositories/reminder.repository';
 import { ArrearsService } from './arrears.service';
 import { EmailService } from '../../integrations/email/email.service';
-import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import {
   REMINDER_TEMPLATES,
@@ -56,7 +56,7 @@ export class ReminderService {
     private readonly reminderRepo: ReminderRepository,
     private readonly arrearsService: ArrearsService,
     private readonly emailService: EmailService,
-    private readonly whatsAppService: WhatsAppService,
+    private readonly whatsAppService: WhatsAppProviderService,
   ) {}
 
   /**
@@ -693,6 +693,9 @@ export class ReminderService {
         parentPhone,
         whatsappContent,
       );
+      if (!result.success) {
+        throw new Error(result.error ?? 'WhatsApp send failed');
+      }
       return { success: true, messageId: result.messageId };
     } catch (error) {
       const errorMessage =

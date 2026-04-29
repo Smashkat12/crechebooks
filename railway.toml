@@ -14,7 +14,7 @@ watchPatterns = ["apps/**", "packages/**", "package.json", "pnpm-lock.yaml"]
 # Number of replicas (increase for high availability)
 numReplicas = 1
 # Health check path
-healthcheckPath = "/health/ready"
+healthcheckPath = "/api/v1/health/ready"
 # Health check timeout in seconds
 healthcheckTimeout = 300
 # Restart policy

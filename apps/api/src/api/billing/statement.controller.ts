@@ -256,7 +256,7 @@ export class StatementController {
 
       const parentDto: StatementParentDto = {
         id: parent.id,
-        name: `${parent.firstName} ${parent.lastName}`,
+        name: formatFullName(parent),
         email: parent.email,
         phone: parent.phone,
       };
@@ -431,7 +431,7 @@ export class StatementController {
 
       const parentDto: StatementParentDto = {
         id: parent.id,
-        name: `${parent.firstName} ${parent.lastName}`,
+        name: formatFullName(parent),
         email: parent.email,
         phone: parent.phone,
       };
@@ -595,7 +595,7 @@ export class StatementController {
 
       const parentDto: StatementParentDto = {
         id: parent.id,
-        name: `${parent.firstName} ${parent.lastName}`,
+        name: formatFullName(parent),
         email: parent.email,
         phone: parent.phone,
       };
@@ -671,7 +671,7 @@ export class StatementController {
 
     const parentDto: StatementParentDto = {
       id: parent.id,
-      name: `${parent.firstName} ${parent.lastName}`,
+      name: formatFullName(parent),
       email: parent.email,
       phone: parent.phone,
     };

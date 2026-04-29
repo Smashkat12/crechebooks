@@ -56,6 +56,7 @@ import {
   createBankFeeTolerance,
 } from './amount-tolerance.util';
 import { TOLERANCE_DEFAULTS } from '../constants/tolerance.constants';
+import { formatFullName } from '../../common/utils/name-formatter';
 
 /** Confidence threshold for auto-apply (single high-confidence match) */
 const AUTO_APPLY_THRESHOLD = 80;
@@ -405,7 +406,7 @@ export class PaymentMatchingService {
       );
 
       if (toleranceResult.matches) {
-        const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+        const parentName = formatFullName(invoice.parent);
 
         // Adjust confidence based on deviation (100 for exact, 98-99 for tolerance match)
         const baseConfidence = toleranceResult.deviation === 0 ? 100 : 98;
@@ -461,7 +462,7 @@ export class PaymentMatchingService {
 
       // Only include if meets minimum threshold
       if (score >= CANDIDATE_THRESHOLD) {
-        const parentName = `${invoice.parent.firstName} ${invoice.parent.lastName}`;
+        const parentName = formatFullName(invoice.parent);
         const outstandingAmount = invoice.totalCents - invoice.amountPaidCents;
 
         candidates.push({
@@ -646,13 +647,17 @@ export class PaymentMatchingService {
     let bestScore = 0;
     const reasons: string[] = [];
 
-    // Names to match against
+    // Names to match against (formatFullName includes middleName when present)
     const parentFirstName = invoice.parent.firstName.toLowerCase().trim();
+    const parentMiddleName =
+      invoice.parent.middleName?.toLowerCase().trim() ?? '';
     const parentLastName = invoice.parent.lastName.toLowerCase().trim();
-    const parentFullName = `${parentFirstName} ${parentLastName}`;
+    const parentFullName = formatFullName(invoice.parent).toLowerCase();
     const childFirstName = invoice.child.firstName.toLowerCase().trim();
+    const childMiddleName =
+      invoice.child.middleName?.toLowerCase().trim() ?? '';
     const childLastName = invoice.child.lastName.toLowerCase().trim();
-    const childFullName = `${childFirstName} ${childLastName}`;
+    const childFullName = formatFullName(invoice.child).toLowerCase();
 
     // Sources to search for names (payeeName and description)
     const searchSources: string[] = [];
@@ -682,9 +687,25 @@ export class PaymentMatchingService {
       if (childScore.score > bestScore) {
         bestScore = childScore.score;
         reasons.length = 0;
-        reasons.push(
-          `${childScore.label}: ${invoice.child.firstName} ${invoice.child.lastName}`,
+        reasons.push(`${childScore.label}: ${formatFullName(invoice.child)}`);
+      }
+
+      // Child middle-name-as-first-name alternate (goes by middle name)
+      if (childMiddleName.length >= 3) {
+        const childMiddleScore = this.matchNameAgainst(
+          normalizedSource,
+          sourceLower,
+          childMiddleName,
+          childLastName,
+          `${childMiddleName} ${childLastName}`,
         );
+        if (childMiddleScore.score > bestScore) {
+          bestScore = childMiddleScore.score;
+          reasons.length = 0;
+          reasons.push(
+            `${childMiddleScore.label} (middle name): ${formatFullName(invoice.child)}`,
+          );
+        }
       }
 
       // --- PARENT NAME MATCHING ---
@@ -699,9 +720,25 @@ export class PaymentMatchingService {
       if (parentScore.score > bestScore) {
         bestScore = parentScore.score;
         reasons.length = 0;
-        reasons.push(
-          `${parentScore.label}: ${invoice.parent.firstName} ${invoice.parent.lastName}`,
+        reasons.push(`${parentScore.label}: ${formatFullName(invoice.parent)}`);
+      }
+
+      // Parent middle-name-as-first-name alternate (goes by middle name)
+      if (parentMiddleName.length >= 3) {
+        const parentMiddleScore = this.matchNameAgainst(
+          normalizedSource,
+          sourceLower,
+          parentMiddleName,
+          parentLastName,
+          `${parentMiddleName} ${parentLastName}`,
         );
+        if (parentMiddleScore.score > bestScore) {
+          bestScore = parentMiddleScore.score;
+          reasons.length = 0;
+          reasons.push(
+            `${parentMiddleScore.label} (middle name): ${formatFullName(invoice.parent)}`,
+          );
+        }
       }
     }
 

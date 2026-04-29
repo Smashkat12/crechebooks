@@ -1250,7 +1250,12 @@ export class PaymentMatchingService {
   }
 
   /**
-   * Get outstanding invoices for tenant with parent/child relations
+   * Get outstanding invoices for tenant with parent/child relations.
+   * Only returns invoices in SENT, PARTIALLY_PAID, or OVERDUE status —
+   * the same allow-list used by matcher.agent.ts:findCandidates().
+   * DRAFT and VOID invoices are intentionally excluded: DRAFT invoices
+   * have not been issued to the parent yet, so payment cannot be expected
+   * against them; matching to DRAFT would corrupt allocation accounting.
    */
   private async getOutstandingInvoices(
     tenantId: string,
@@ -1259,7 +1264,13 @@ export class PaymentMatchingService {
       where: {
         tenantId: tenantId,
         isDeleted: false,
-        status: { notIn: [InvoiceStatus.PAID, InvoiceStatus.VOID] },
+        status: {
+          in: [
+            InvoiceStatus.SENT,
+            InvoiceStatus.PARTIALLY_PAID,
+            InvoiceStatus.OVERDUE,
+          ],
+        },
       },
       include: {
         parent: true,

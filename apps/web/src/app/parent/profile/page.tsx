@@ -52,31 +52,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 
-// Mock data for development/demo
-const mockProfile: ParentProfile = {
-  id: 'p-12345678',
-  firstName: 'Sarah',
-  lastName: 'Smith',
-  email: 'sarah.smith@example.com',
-  phone: '0821234567',
-  alternativePhone: '0119876543',
-  address: {
-    street: '123 Main Road',
-    city: 'Johannesburg',
-    postalCode: '2000',
-  },
-  createdAt: '2023-01-15T00:00:00Z',
-};
-
-const mockPreferences: CommunicationPreferences = {
-  invoiceDelivery: 'email',
-  paymentReminders: true,
-  emailNotifications: true,
-  marketingOptIn: false,
-  whatsappOptIn: false,
-  whatsappConsentTimestamp: null,
-};
-
 function ProfilePageContent() {
   const router = useRouter();
   const { toast } = useToast();
@@ -91,9 +66,6 @@ function ProfilePageContent() {
   const updateProfileMutation = useUpdateParentProfile();
   const updatePrefsMutation = useUpdateCommunicationPrefs();
 
-  // State for fallback to mock data
-  const [useMockData, setUseMockData] = useState(false);
-
   // Check authentication on mount
   useEffect(() => {
     const token = localStorage.getItem('parent_session_token');
@@ -102,29 +74,7 @@ function ProfilePageContent() {
     }
   }, [router]);
 
-  // Handle API errors by falling back to mock data
-  useEffect(() => {
-    if (isProfileError && !useMockData) {
-      console.warn('Profile API error, using mock data:', profileError?.message);
-      setUseMockData(true);
-    }
-  }, [isProfileError, profileError, useMockData]);
-
-  const currentProfile = useMockData ? mockProfile : profile;
-  const currentPreferences = useMockData
-    ? mockPreferences
-    : (profile?.communicationPreferences || mockPreferences);
-  const showLoading = profileLoading && !useMockData;
-
   const handleProfileUpdate = async (data: Partial<ParentProfile>) => {
-    if (useMockData) {
-      toast({
-        title: 'Profile Updated',
-        description: 'Your profile has been updated successfully.',
-      });
-      return;
-    }
-
     try {
       await updateProfileMutation.mutateAsync(data);
       toast({
@@ -141,14 +91,6 @@ function ProfilePageContent() {
   };
 
   const handlePreferencesUpdate = async (prefs: Partial<CommunicationPreferences>) => {
-    if (useMockData) {
-      toast({
-        title: 'Preferences Updated',
-        description: 'Your communication preferences have been saved.',
-      });
-      return;
-    }
-
     try {
       await updatePrefsMutation.mutateAsync(prefs);
       toast({
@@ -190,10 +132,30 @@ function ProfilePageContent() {
     }
   };
 
-  if (showLoading) {
+  if (profileLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isProfileError) {
+    return (
+      <div className="max-w-lg mx-auto mt-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {profileError?.message || 'Unable to load your profile. Please try again.'}
+          </AlertDescription>
+        </Alert>
+        <Button
+          className="mt-4 w-full"
+          variant="outline"
+          onClick={() => window.location.reload()}
+        >
+          Try Again
+        </Button>
       </div>
     );
   }
@@ -211,20 +173,10 @@ function ProfilePageContent() {
         </p>
       </div>
 
-      {/* Error Alert */}
-      {isProfileError && !useMockData && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {profileError?.message || 'Failed to load profile. Please try again.'}
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Profile Form */}
-      {currentProfile && (
+      {profile && (
         <ProfileForm
-          profile={currentProfile}
+          profile={profile}
           onSave={handleProfileUpdate}
           isLoading={updateProfileMutation.isPending}
         />
@@ -265,27 +217,31 @@ function ProfilePageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* WhatsApp Consent (POPIA Compliant) */}
-          <WhatsAppConsent
-            isOptedIn={currentPreferences.whatsappOptIn}
-            consentTimestamp={currentPreferences.whatsappConsentTimestamp}
-            onOptInChange={(optedIn) => {
-              handlePreferencesUpdate({
-                whatsappOptIn: optedIn,
-                whatsappConsentTimestamp: optedIn ? new Date().toISOString() : null,
-              });
-            }}
-            isLoading={updatePrefsMutation.isPending}
-          />
+          {profile?.communicationPreferences && (
+            <>
+              {/* WhatsApp Consent (POPIA Compliant) */}
+              <WhatsAppConsent
+                isOptedIn={profile.communicationPreferences.whatsappOptIn}
+                consentTimestamp={profile.communicationPreferences.whatsappConsentTimestamp}
+                onOptInChange={(optedIn) => {
+                  handlePreferencesUpdate({
+                    whatsappOptIn: optedIn,
+                    whatsappConsentTimestamp: optedIn ? new Date().toISOString() : null,
+                  });
+                }}
+                isLoading={updatePrefsMutation.isPending}
+              />
 
-          <Separator />
+              <Separator />
 
-          {/* Other Communication Preferences */}
-          <CommunicationPrefs
-            preferences={currentPreferences}
-            onSave={handlePreferencesUpdate}
-            isLoading={updatePrefsMutation.isPending}
-          />
+              {/* Other Communication Preferences */}
+              <CommunicationPrefs
+                preferences={profile.communicationPreferences}
+                onSave={handlePreferencesUpdate}
+                isLoading={updatePrefsMutation.isPending}
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 

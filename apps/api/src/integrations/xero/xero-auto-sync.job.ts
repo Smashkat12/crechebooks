@@ -22,7 +22,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { BankFeedService } from './bank-feed.service';
+import { BankFeedService, Xero429Error } from './bank-feed.service';
 import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
 
 /** Minimum buffer (ms) before the access-token expiry that we still consider "usable". */
@@ -156,9 +156,35 @@ export class XeroAutoSyncJob {
         continue;
       }
 
-      // --- Guard 4: exponential backoff for ERROR connections ---
-      // If this tenant's feed previously failed, respect the computed nextRetryAt
-      // so we don't hammer Xero every hour while the feed is genuinely broken.
+      // --- Guard 4a: rate-limit soft-pause (HTTP 429) — persisted in DB ---
+      // A 429 means "Xero is throttling us right now" — not a broken connection.
+      // We store the deadline on `bank_connections.rate_limit_until_at` so the
+      // pause survives process restarts (unlike the in-memory backoff map below).
+      //
+      // NOTE: `rateLimitUntilAt` is not yet in the Prisma schema — the column
+      // exists after migration 20260429100000.  Cast to any to avoid TS errors
+      // until schema-guardian regenerates the Prisma client.
+      const rateLimitedConnection = await (
+        this.prisma.bankConnection as any
+      ).findFirst({
+        where: { tenantId, rateLimitUntilAt: { gt: new Date() } },
+        select: { rateLimitUntilAt: true },
+      });
+      if (rateLimitedConnection?.rateLimitUntilAt) {
+        const deadline = rateLimitedConnection.rateLimitUntilAt as Date;
+        const minutesLeft = Math.ceil(
+          (deadline.getTime() - Date.now()) / 60_000,
+        );
+        this.logger.log(
+          `XeroAutoSync: tenant ${tenantId} — rate-limit pause active (429), ` +
+            `next retry in ${minutesLeft} min`,
+        );
+        continue;
+      }
+
+      // --- Guard 4b: exponential backoff for ERROR connections (fatal failures) ---
+      // If this tenant's feed previously failed with a non-429 error, respect the
+      // computed nextRetryAt so we don't hammer Xero every hour indefinitely.
       const retryState = this.errorRetryState.get(tenantId);
       if (retryState && Date.now() < retryState.nextRetryAt) {
         const minutesLeft = Math.ceil(
@@ -222,10 +248,51 @@ export class XeroAutoSyncJob {
         }
 
         synced++;
-        // Successful sync — clear any prior error backoff so hourly cadence resumes.
+        // Successful sync — clear in-memory error backoff AND DB rate-limit pause.
         this.errorRetryState.delete(tenantId);
+        try {
+          await this.prisma.bankConnection.updateMany({
+            where: { tenantId, status: { not: 'DISCONNECTED' } },
+
+            data: { rateLimitUntilAt: null } as any,
+          });
+        } catch {
+          // Non-fatal: the column may not exist yet if migration hasn't run.
+          // Once the migration lands this will succeed silently.
+        }
       } catch (err) {
+        // --- HTTP 429: rate-limit soft pause ---
+        // Do NOT burn an exponential-backoff slot on a 429. Instead, set a
+        // rate-limit deadline from the Retry-After header (or default 60s) and
+        // persist it to DB so the pause survives restarts.
+        if (err instanceof Xero429Error) {
+          const pauseMs = err.retryAfterMs ?? 60_000; // default 60s when header absent
+          const retryAt = new Date(Date.now() + pauseMs);
+          this.logger.warn(
+            `XeroAutoSync: tenant ${tenantId} — 429 rate-limit, pausing until ` +
+              `${retryAt.toISOString()} (${Math.ceil(pauseMs / 1000)}s)`,
+          );
+          try {
+            await this.prisma.bankConnection.updateMany({
+              where: { tenantId, status: { not: 'DISCONNECTED' } },
+
+              data: { rateLimitUntilAt: retryAt } as any,
+            });
+          } catch (persistErr) {
+            this.logger.warn(
+              `XeroAutoSync: could not persist rate-limit state for tenant ${tenantId}: ` +
+                `${persistErr instanceof Error ? persistErr.message : String(persistErr)}`,
+            );
+          }
+          // Leave status as-is (connection is not broken, just throttled).
+          // Do not increment failed counter — 429 is not a fatal failure.
+          // The finally block (inFlightTenants cleanup) executes regardless.
+          continue; // advance to next tenant in the for-loop
+        }
+
         failed++;
+
+        // --- Fatal (non-429) error ---
         const errorMessage = this.bankFeedService.extractXeroErrorMessage(err);
         this.logger.error({
           message: `XeroAutoSync: tenant ${tenantId} sync failed`,

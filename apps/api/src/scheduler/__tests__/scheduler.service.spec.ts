@@ -24,6 +24,7 @@ describe('SchedulerService', () => {
       getCompleted: jest.fn(),
       pause: jest.fn(),
       resume: jest.fn(),
+      removeRepeatable: jest.fn(),
     });
 
     mockInvoiceQueue = createMockQueue();
@@ -312,6 +313,35 @@ describe('SchedulerService', () => {
       await service.resumeQueue(QUEUE_NAMES.INVOICE_GENERATION);
 
       expect(mockInvoiceQueue.resume).toHaveBeenCalled();
+    });
+  });
+
+  describe('removeRepeatableCronJob', () => {
+    it('should call removeRepeatable with cron expression on the correct queue', async () => {
+      mockInvoiceQueue.removeRepeatable.mockResolvedValue(undefined);
+
+      await service.removeRepeatableCronJob(
+        QUEUE_NAMES.INVOICE_GENERATION,
+        '0 6 1 * *',
+      );
+
+      expect(mockInvoiceQueue.removeRepeatable).toHaveBeenCalledWith({
+        cron: '0 6 1 * *',
+      });
+    });
+
+    it('should route payment reminder cron removal to the payment queue', async () => {
+      mockPaymentQueue.removeRepeatable.mockResolvedValue(undefined);
+
+      await service.removeRepeatableCronJob(
+        QUEUE_NAMES.PAYMENT_REMINDER,
+        '0 9 * * *',
+      );
+
+      expect(mockPaymentQueue.removeRepeatable).toHaveBeenCalledWith({
+        cron: '0 9 * * *',
+      });
+      expect(mockInvoiceQueue.removeRepeatable).not.toHaveBeenCalled();
     });
   });
 });

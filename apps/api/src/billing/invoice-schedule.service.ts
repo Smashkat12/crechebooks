@@ -139,9 +139,10 @@ export class InvoiceScheduleService {
    * @param tenantId - Tenant ID
    */
   async cancelSchedule(tenantId: string): Promise<void> {
-    // Note: BullMQ repeatable jobs are identified by their repeat options
-    // We would need to track job IDs or use a different approach
-    // For now, log the cancellation request
+    await this.schedulerService.removeRepeatableCronJob(
+      QUEUE_NAMES.INVOICE_GENERATION,
+      DEFAULT_CRON,
+    );
 
     this.logger.log({
       message: 'Invoice schedule cancellation requested',
@@ -161,8 +162,6 @@ export class InvoiceScheduleService {
       },
       changeSummary: 'Invoice generation schedule cancelled',
     });
-
-    // TODO: Implement actual job cancellation when job tracking is added
   }
 
   /**

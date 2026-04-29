@@ -461,35 +461,6 @@ export class AdminController {
     return { success: true, message: 'User activated successfully' };
   }
 
-  @Post('users/:id/impersonate')
-  @Roles(UserRole.SUPER_ADMIN)
-  @ApiOperation({
-    summary: 'Impersonate a user',
-    description:
-      'Creates an impersonation session to view the platform as a specific user.',
-  })
-  @ApiResponse({ status: 200, description: 'Impersonation session created' })
-  @ApiUnauthorizedResponse({
-    description: 'Unauthorized - valid JWT token required',
-  })
-  @ApiForbiddenResponse({
-    description: 'Forbidden - SUPER_ADMIN role required',
-  })
-  impersonateUser(@Param('id') id: string): {
-    success: boolean;
-    message: string;
-    userId: string;
-  } {
-    this.logger.debug(`Creating impersonation session for user ${id}`);
-    // Note: Full impersonation implementation would require session/token management
-    // For now, we return the user ID for the frontend to handle
-    return {
-      success: true,
-      message: 'Impersonation session available',
-      userId: id,
-    };
-  }
-
   // ============================================
   // ANALYTICS
   // ============================================

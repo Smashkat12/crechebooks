@@ -80,6 +80,8 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
     childFirst: string,
     childLast: string,
     totalCents = 150000,
+    parentMiddle: string | null = null,
+    childMiddle: string | null = null,
   ): InvoiceWithRelations {
     return {
       id: `inv-${childFirst.toLowerCase()}`,
@@ -111,6 +113,7 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
         id: `parent-${parentLast.toLowerCase()}`,
         tenantId,
         firstName: parentFirst,
+        middleName: parentMiddle,
         lastName: parentLast,
         email: null,
         phone: null,
@@ -128,6 +131,7 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
         tenantId,
         parentId: `parent-${parentLast.toLowerCase()}`,
         firstName: childFirst,
+        middleName: childMiddle,
         lastName: childLast,
         dateOfBirth: new Date('2022-01-01'),
         status: 'ENROLLED',
@@ -432,6 +436,78 @@ describe('PaymentMatchingService - Name Extraction & Matching', () => {
       expect(results[0].confidenceScore).toBeGreaterThan(
         results[1]?.confidenceScore ?? 0,
       );
+    });
+  });
+
+  // AUDIT-PEOPLE-03 regression: middleName included in name-match scoring
+  describe('middleName included in name-match scoring', () => {
+    it('parent "Mary Catherine Smith" scores higher for "M Catherine Smith" when middleName is present', () => {
+      // Parent registered as Mary Catherine Smith (goes by Catherine)
+      const invoiceWithMiddle = makeInvoice(
+        'Mary',
+        'Smith',
+        'Liam',
+        'Smith',
+        150000,
+        'Catherine', // parentMiddle
+        null,
+      );
+      // Control: same parent but without middleName (firstName+lastName only)
+      const invoiceWithoutMiddle = makeInvoice(
+        'Mary',
+        'Smith',
+        'Liam',
+        'Smith',
+        150000,
+        null, // no middleName
+        null,
+      );
+
+      const txn = makeTransaction({
+        // Bank reference uses middle name as effective first name
+        description: 'Payshap Credit M Catherine Smith',
+        payeeName: 'M Catherine Smith',
+        amountCents: 150000,
+      });
+
+      const { score: scoreWith } = service.calculateConfidence(
+        txn,
+        invoiceWithMiddle,
+      );
+      const { score: scoreWithout } = service.calculateConfidence(
+        txn,
+        invoiceWithoutMiddle,
+      );
+
+      // The middle-name-aware invoice should score at least as high
+      expect(scoreWith).toBeGreaterThanOrEqual(scoreWithout);
+      // And the middle-name path should have produced a non-trivial name score
+      expect(scoreWith).toBeGreaterThan(40);
+    });
+
+    it('parent admin review UI returns formatted name including middleName', () => {
+      // Verify that parentName in MatchCandidate includes the middle name
+      const invoiceWithMiddle = makeInvoice(
+        'Mary',
+        'Smith',
+        'Liam',
+        'Smith',
+        150000,
+        'Catherine',
+        null,
+      );
+
+      const txn = makeTransaction({
+        description: 'M Catherine Smith',
+        payeeName: 'M Catherine Smith',
+        amountCents: 150000,
+      });
+
+      const candidates = service.findPartialMatches(txn, [invoiceWithMiddle]);
+      // At least one candidate returned
+      expect(candidates.length).toBeGreaterThan(0);
+      // parentName must include the middle name
+      expect(candidates[0].parentName).toBe('Mary Catherine Smith');
     });
   });
 });

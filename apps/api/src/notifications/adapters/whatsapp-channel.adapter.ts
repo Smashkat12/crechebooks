@@ -7,7 +7,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
 import { INotificationChannel } from '../interfaces/notification-channel.interface';
 import {
   NotificationChannelType,
@@ -24,7 +24,7 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly whatsAppService: WhatsAppService,
+    private readonly whatsAppService: WhatsAppProviderService,
   ) {}
 
   /**
@@ -56,14 +56,13 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
         return false;
       }
 
-      // Validate phone number format
-      if (!this.whatsAppService.isValidPhoneNumber(phoneNumber)) {
+      // Validate phone number format (SA E.164: +27 + 9 digits)
+      if (!/^\+27\d{9}$/.test(phoneNumber.replace(/\s/g, ''))) {
         return false;
       }
 
-      // Check if WhatsApp API is configured
-      const configured = this.checkWhatsAppConfigured();
-      if (!configured) {
+      // Check if WhatsApp provider is configured
+      if (!this.whatsAppService.isConfigured()) {
         return false;
       }
 
@@ -135,11 +134,15 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
         );
       }
 
-      // Send message using WhatsAppService
+      // Send message using WhatsAppProviderService (Twilio facade)
       const result = await this.whatsAppService.sendMessage(
         phoneNumber,
         notification.body,
       );
+
+      if (!result.success) {
+        throw new Error(result.error ?? 'WhatsApp send failed');
+      }
 
       this.logger.log(
         `WhatsApp sent successfully to ${phoneNumber}: ${result.messageId}`,
@@ -150,7 +153,6 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
         channelUsed: NotificationChannelType.WHATSAPP,
         messageId: result.messageId,
         status: NotificationDeliveryStatus.SENT,
-        sentAt: result.sentAt,
       };
     } catch (error) {
       const errorMessage =
@@ -189,22 +191,5 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
     // For now, we return SENT status
     // In a production system, this would query the audit log or a message tracking table
     return Promise.resolve(NotificationDeliveryStatus.SENT);
-  }
-
-  /**
-   * Check if WhatsApp API is configured
-   */
-  private checkWhatsAppConfigured(): boolean {
-    try {
-      // Try to check opt-in for a dummy number (won't fail if API is configured)
-      // This is a lightweight check to see if WhatsApp service is initialized
-      const hasConfig =
-        process.env.WHATSAPP_ACCESS_TOKEN &&
-        process.env.WHATSAPP_PHONE_NUMBER_ID &&
-        process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-      return !!hasConfig;
-    } catch {
-      return false;
-    }
   }
 }

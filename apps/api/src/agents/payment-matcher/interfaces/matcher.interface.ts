@@ -85,6 +85,8 @@ export interface InvoiceCandidate {
     };
     child: {
       firstName: string;
+      middleName?: string | null;
+      lastName: string;
     };
   };
   confidence: number;

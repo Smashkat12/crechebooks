@@ -11,7 +11,7 @@
  * - Read-only (managed by creche)
  */
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Baby, Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,43 +19,13 @@ import { Button } from '@/components/ui/button';
 import { ChildCard } from '@/components/parent-portal';
 import {
   useParentChildren,
-  type ParentChild,
 } from '@/hooks/parent-portal/use-parent-profile';
-
-// Mock data for development/demo
-const mockChildren: ParentChild[] = [
-  {
-    id: '1',
-    firstName: 'Emma',
-    lastName: 'Smith',
-    dateOfBirth: '2020-03-15',
-    enrollmentDate: '2023-01-10',
-    className: 'Butterflies',
-    attendanceType: 'full_day',
-    isActive: true,
-    photoUrl: null,
-  },
-  {
-    id: '2',
-    firstName: 'James',
-    lastName: 'Smith',
-    dateOfBirth: '2022-08-22',
-    enrollmentDate: '2024-01-05',
-    className: 'Caterpillars',
-    attendanceType: 'half_day',
-    isActive: true,
-    photoUrl: null,
-  },
-];
 
 function ChildrenPageContent() {
   const router = useRouter();
 
   // Fetch children data
   const { data: children, isLoading, error, isError } = useParentChildren();
-
-  // State for fallback to mock data
-  const [useMockData, setUseMockData] = useState(false);
 
   // Check authentication on mount
   useEffect(() => {
@@ -65,24 +35,35 @@ function ChildrenPageContent() {
     }
   }, [router]);
 
-  // Handle API errors by falling back to mock data
-  useEffect(() => {
-    if (isError && !useMockData) {
-      console.warn('Children API error, using mock data:', error?.message);
-      setUseMockData(true);
-    }
-  }, [isError, error, useMockData]);
-
-  const displayChildren = useMockData ? mockChildren : (children || []);
-  const showLoading = isLoading && !useMockData;
-
-  if (showLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
+
+  if (isError) {
+    return (
+      <div className="max-w-lg mx-auto mt-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {error?.message || 'Unable to load your children. Please try again.'}
+          </AlertDescription>
+        </Alert>
+        <Button
+          className="mt-4 w-full"
+          variant="outline"
+          onClick={() => window.location.reload()}
+        >
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  const displayChildren = children || [];
 
   return (
     <div className="space-y-6">
@@ -107,16 +88,6 @@ function ChildrenPageContent() {
           View your enrolled children&apos;s details
         </p>
       </div>
-
-      {/* Error Alert */}
-      {isError && !useMockData && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {error?.message || 'Failed to load children. Please try again.'}
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Children List */}
       {displayChildren.length === 0 ? (

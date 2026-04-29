@@ -13,8 +13,10 @@
  *  9.  findByDate — returns records with child join
  * 10.  findByChild — defaults last 90 days
  * 11.  findByChild — tenant B cannot read tenant A child → NotFoundException
- * 12.  classGroupDailyReport — returns status counts
+ * 12.  classGroupDailyReport — returns status counts and empty parentPreReports when all children marked
  * 13.  classGroupDailyReport — unknown classGroup → NotFoundException
+ * 23.  classGroupDailyReport — surfaces pre-reports for unmarked children in the group
+ * 24.  classGroupDailyReport — does NOT surface pre-reports for children in OTHER groups
  * 14.  updateAttendance — patches status and writes audit logUpdate
  * 15.  updateAttendance — rejects departureAt < arrivalAt
  * 16.  updateAttendance — unknown record → NotFoundException
@@ -104,6 +106,11 @@ type PrismaMock = {
   classGroup: {
     findFirst: jest.Mock;
   };
+  // Parent absence pre-reports — added for backlog #9 integration
+  parentAbsenceReport: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+  };
   auditLog: {
     create: jest.Mock;
   };
@@ -130,6 +137,10 @@ function makePrismaMock(): PrismaMock {
     },
     classGroup: {
       findFirst: jest.fn(),
+    },
+    parentAbsenceReport: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     auditLog: {
       create: jest.fn(),
@@ -367,10 +378,13 @@ describe('AttendanceService', () => {
         classGroup: null,
       },
     ]);
+    // parentAbsenceReport.findMany returns [] by default (via makePrismaMock)
 
     const result = await service.findByDate(TENANT_A, TODAY_STR);
-    expect(result).toHaveLength(1);
-    expect(result[0].child?.firstName).toBe('Bob');
+    // findByDate now returns AdminDayViewDto: { date, records[], parentPreReports[] }
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0].child?.firstName).toBe('Bob');
+    expect(result.parentPreReports).toHaveLength(0);
   });
 
   // ----------------------------------------------------------------
@@ -405,28 +419,36 @@ describe('AttendanceService', () => {
   });
 
   // ----------------------------------------------------------------
-  // 12. classGroupDailyReport — returns status counts
+  // 12. classGroupDailyReport — returns status counts and empty parentPreReports when all children marked
   // ----------------------------------------------------------------
-  it('classGroupDailyReport returns summary with counts', async () => {
+  it('classGroupDailyReport returns summary with counts and empty parentPreReports when all marked', async () => {
     mock.classGroup.findFirst.mockResolvedValue({
       id: GROUP_ID,
       name: 'Butterflies',
     });
+    // Two children in the group; both are marked — no pre-reports expected
     mock.attendanceRecord.findMany.mockResolvedValue([
       {
-        ...makeRecord({ status: AttendanceStatus.PRESENT }),
+        ...makeRecord({ childId: CHILD_A, status: AttendanceStatus.PRESENT }),
         child: { firstName: 'A', lastName: 'B' },
         classGroup: { name: 'Butterflies' },
       },
       {
         ...makeRecord({
           id: 'record-002',
+          childId: 'child-a2',
           status: AttendanceStatus.ABSENT,
         }),
         child: { firstName: 'C', lastName: 'D' },
         classGroup: { name: 'Butterflies' },
       },
     ]);
+    // child.findMany returns the group's children (both already marked)
+    mock.child.findMany.mockResolvedValue([
+      { id: CHILD_A },
+      { id: 'child-a2' },
+    ]);
+    // parentAbsenceReport.findMany defaults to [] (no pre-reports)
 
     const result = await service.classGroupDailyReport(
       TENANT_A,
@@ -437,6 +459,7 @@ describe('AttendanceService', () => {
     expect(result.presentCount).toBe(1);
     expect(result.absentCount).toBe(1);
     expect(result.records).toHaveLength(2);
+    expect(result.parentPreReports).toHaveLength(0);
   });
 
   // ----------------------------------------------------------------
@@ -448,6 +471,101 @@ describe('AttendanceService', () => {
     await expect(
       service.classGroupDailyReport(TENANT_A, 'no-such-group', TODAY_STR),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  // ----------------------------------------------------------------
+  // 23. classGroupDailyReport — surfaces pre-reports for unmarked children
+  // ----------------------------------------------------------------
+  it('classGroupDailyReport surfaces parentPreReports for unmarked group children', async () => {
+    const CHILD_UNMARKED = 'child-unmarked-1';
+    const PARENT_ID = 'parent-001';
+    const REPORT_ID = 'report-001';
+    const REPORTED_AT = new Date();
+
+    mock.classGroup.findFirst.mockResolvedValue({
+      id: GROUP_ID,
+      name: 'Butterflies',
+    });
+    // Only CHILD_A has an attendance record; CHILD_UNMARKED does not
+    mock.attendanceRecord.findMany.mockResolvedValue([
+      {
+        ...makeRecord({ childId: CHILD_A, status: AttendanceStatus.PRESENT }),
+        child: { firstName: 'A', lastName: 'B' },
+        classGroup: { name: 'Butterflies' },
+      },
+    ]);
+    // group has two children
+    mock.child.findMany.mockResolvedValue([
+      { id: CHILD_A },
+      { id: CHILD_UNMARKED },
+    ]);
+    // CHILD_UNMARKED has an active pre-report
+    mock.parentAbsenceReport.findMany.mockResolvedValue([
+      {
+        id: REPORT_ID,
+        childId: CHILD_UNMARKED,
+        parentId: PARENT_ID,
+        reason: 'Sick with fever',
+        reportedAt: REPORTED_AT,
+      },
+    ]);
+
+    const result = await service.classGroupDailyReport(
+      TENANT_A,
+      GROUP_ID,
+      TODAY_STR,
+    );
+
+    expect(result.parentPreReports).toHaveLength(1);
+    expect(result.parentPreReports[0].reportId).toBe(REPORT_ID);
+    expect(result.parentPreReports[0].childId).toBe(CHILD_UNMARKED);
+    expect(result.parentPreReports[0].reason).toBe('Sick with fever');
+    expect(result.parentPreReports[0].reportedAt).toBe(
+      REPORTED_AT.toISOString(),
+    );
+    // Verify the query was scoped to ONLY the unmarked child from this group
+    expect(mock.parentAbsenceReport.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: TENANT_A,
+          childId: { in: [CHILD_UNMARKED] },
+          cancelledAt: null,
+        }),
+      }),
+    );
+  });
+
+  // ----------------------------------------------------------------
+  // 24. classGroupDailyReport — pre-reports for OTHER group children excluded
+  // ----------------------------------------------------------------
+  it('classGroupDailyReport does NOT query pre-reports for children in other groups', async () => {
+    // Group contains only CHILD_A; CHILD_B is in a different group.
+    // Even if CHILD_B has an active pre-report, it must never appear here.
+    mock.classGroup.findFirst.mockResolvedValue({
+      id: GROUP_ID,
+      name: 'Butterflies',
+    });
+    // CHILD_A is marked
+    mock.attendanceRecord.findMany.mockResolvedValue([
+      {
+        ...makeRecord({ childId: CHILD_A, status: AttendanceStatus.PRESENT }),
+        child: { firstName: 'A', lastName: 'B' },
+        classGroup: { name: 'Butterflies' },
+      },
+    ]);
+    // Group only has CHILD_A (CHILD_B belongs to another group)
+    mock.child.findMany.mockResolvedValue([{ id: CHILD_A }]);
+    // parentAbsenceReport.findMany should NOT be called (no unmarked children in group)
+
+    const result = await service.classGroupDailyReport(
+      TENANT_A,
+      GROUP_ID,
+      TODAY_STR,
+    );
+
+    expect(result.parentPreReports).toHaveLength(0);
+    // parentAbsenceReport.findMany should never be called when unmarkedGroupChildIds is empty
+    expect(mock.parentAbsenceReport.findMany).not.toHaveBeenCalled();
   });
 
   // ----------------------------------------------------------------
@@ -555,6 +673,17 @@ describe('AttendanceService', () => {
       { status: AttendanceStatus.ABSENT, _count: { _all: 2 } },
     ]);
     mock.child.count.mockResolvedValue(10); // 10 active children
+    // attendanceRecord.findMany is used to build the markedChildIds set
+    mock.attendanceRecord.findMany.mockResolvedValue([
+      { childId: 'c1' },
+      { childId: 'c2' },
+      { childId: 'c3' },
+      { childId: 'c4' },
+      { childId: 'c5' },
+      { childId: 'c6' },
+      { childId: 'c7' },
+    ]);
+    // parentAbsenceReport.findMany returns [] by default (via makePrismaMock)
 
     const result = await service.todaySummary(TENANT_A);
 
@@ -564,6 +693,7 @@ describe('AttendanceService', () => {
     expect(result.excusedCount).toBe(0);
     expect(result.earlyPickupCount).toBe(0);
     expect(result.unmarkedCount).toBe(3); // 10 active - 7 marked
+    expect(result.reportedAbsentCount).toBe(0); // no pre-reports
   });
 
   // ----------------------------------------------------------------

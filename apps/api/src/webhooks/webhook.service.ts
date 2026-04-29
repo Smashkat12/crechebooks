@@ -663,11 +663,15 @@ export class WebhookService {
     signature: string,
   ): boolean {
     if (!this.twilioAuthToken) {
-      this.logger.warn(
-        'Twilio auth token (TWILIO_AUTH_TOKEN) not configured. Skipping signature verification.',
+      // SECURITY: fail closed in ALL environments — missing token must not
+      // silently accept webhooks. The controller maps false → 401 so Twilio
+      // will retry; the operator must configure TWILIO_AUTH_TOKEN.
+      this.logger.error(
+        'SECURITY: Twilio auth token (TWILIO_AUTH_TOKEN) not configured. ' +
+          'Webhook signature verification is REQUIRED in ALL environments. ' +
+          'Configure TWILIO_AUTH_TOKEN in Railway staging and production.',
       );
-      // In development, allow without signature
-      return process.env.NODE_ENV !== 'production';
+      return false;
     }
 
     if (!signature) {

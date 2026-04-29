@@ -2,7 +2,8 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { useAdminUser, useUserActivity, useDeactivateUser, useActivateUser, useImpersonateUser } from '@/hooks/use-admin-users';
+import { useAdminUser, useUserActivity, useDeactivateUser, useActivateUser } from '@/hooks/use-admin-users';
+import { useStartImpersonation, type ImpersonationRole } from '@/hooks/use-impersonation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,7 +39,7 @@ export default function UserDetailPage({ params }: PageProps) {
   const { toast } = useToast();
   const deactivateMutation = useDeactivateUser();
   const activateMutation = useActivateUser();
-  const impersonateMutation = useImpersonateUser();
+  const impersonateMutation = useStartImpersonation();
 
   const handleDeactivate = async () => {
     if (confirm(`Deactivate user "${user?.name}"? This will prevent them from logging in.`)) {
@@ -53,12 +54,12 @@ export default function UserDetailPage({ params }: PageProps) {
   };
 
   const handleImpersonate = async () => {
+    if (!user?.tenantId) return;
     if (confirm(`Impersonate ${user?.email}? You will be logged in as this user.`)) {
-      const result = await impersonateMutation.mutateAsync(id);
-      if (result.success) {
-        localStorage.setItem('impersonation_user_id', result.userId);
-        toast({ title: 'Impersonation started', description: 'This feature requires session management.' });
-      }
+      await impersonateMutation.mutateAsync({
+        tenantId: user.tenantId,
+        role: user.role as ImpersonationRole,
+      });
     }
   };
 

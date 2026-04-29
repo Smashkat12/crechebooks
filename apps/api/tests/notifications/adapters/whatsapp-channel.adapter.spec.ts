@@ -1,17 +1,18 @@
 /**
  * WhatsApp Channel Adapter Tests
  * TASK-WA-005: WhatsApp Channel Adapter Tests
+ * AUDIT-COMMS-02: Migrated from WhatsAppService (Meta) to WhatsAppProviderService (Twilio)
  *
  * Unit tests for WhatsAppChannelAdapter covering:
  * - Availability checking (opt-in, phone validation)
- * - Message sending via WhatsAppService
+ * - Message sending via WhatsAppProviderService
  * - Error handling and edge cases
  * - Tenant isolation
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { WhatsAppChannelAdapter } from '../../../src/notifications/adapters/whatsapp-channel.adapter';
-import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../../src/integrations/whatsapp/services/whatsapp-provider.service';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import {
   NotificationChannelType,
@@ -23,7 +24,7 @@ describe('WhatsAppChannelAdapter', () => {
   let adapter: WhatsAppChannelAdapter;
   let whatsAppService: {
     sendMessage: jest.Mock;
-    isValidPhoneNumber: jest.Mock;
+    isConfigured: jest.Mock;
   };
   let prisma: {
     parent: {
@@ -43,17 +44,17 @@ describe('WhatsAppChannelAdapter', () => {
       },
     };
 
-    // Create mock WhatsAppService
+    // Create mock WhatsAppProviderService
     whatsAppService = {
       sendMessage: jest.fn(),
-      isValidPhoneNumber: jest.fn(),
+      isConfigured: jest.fn().mockReturnValue(true),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WhatsAppChannelAdapter,
         {
-          provide: WhatsAppService,
+          provide: WhatsAppProviderService,
           useValue: whatsAppService,
         },
         {
@@ -73,19 +74,6 @@ describe('WhatsAppChannelAdapter', () => {
   });
 
   describe('isAvailable', () => {
-    beforeEach(() => {
-      // Set environment variables for config check
-      process.env.WHATSAPP_ACCESS_TOKEN = 'test-token';
-      process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-id';
-      process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = 'test-account-id';
-    });
-
-    afterEach(() => {
-      delete process.env.WHATSAPP_ACCESS_TOKEN;
-      delete process.env.WHATSAPP_PHONE_NUMBER_ID;
-      delete process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-    });
-
     it('should return true when parent is opted in and has valid phone', async () => {
       prisma.parent.findUnique.mockResolvedValue({
         id: mockParentId,
@@ -93,7 +81,6 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -115,7 +102,6 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: mockPhone,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -155,7 +141,6 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber.mockReturnValue(false);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -170,8 +155,8 @@ describe('WhatsAppChannelAdapter', () => {
       expect(result).toBe(false);
     });
 
-    it('should return false when WhatsApp is not configured', async () => {
-      delete process.env.WHATSAPP_ACCESS_TOKEN;
+    it('should return false when WhatsApp provider is not configured', async () => {
+      whatsAppService.isConfigured.mockReturnValue(false);
 
       prisma.parent.findUnique.mockResolvedValue({
         id: mockParentId,
@@ -179,7 +164,6 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -206,7 +190,6 @@ describe('WhatsAppChannelAdapter', () => {
 
     it('should send notification via WhatsApp successfully', async () => {
       const mockMessageId = 'wamid_test123';
-      const mockSentAt = new Date();
 
       prisma.parent.findUnique.mockResolvedValue({
         id: mockParentId,
@@ -218,8 +201,8 @@ describe('WhatsAppChannelAdapter', () => {
       });
 
       whatsAppService.sendMessage.mockResolvedValue({
+        success: true,
         messageId: mockMessageId,
-        sentAt: mockSentAt,
       });
 
       const result = await adapter.send(mockNotification);
@@ -228,7 +211,6 @@ describe('WhatsAppChannelAdapter', () => {
       expect(result.channelUsed).toBe(NotificationChannelType.WHATSAPP);
       expect(result.messageId).toBe(mockMessageId);
       expect(result.status).toBe(NotificationDeliveryStatus.SENT);
-      expect(result.sentAt).toBe(mockSentAt);
       expect(whatsAppService.sendMessage).toHaveBeenCalledWith(
         mockPhone,
         mockNotification.body,
@@ -246,8 +228,8 @@ describe('WhatsAppChannelAdapter', () => {
       });
 
       whatsAppService.sendMessage.mockResolvedValue({
+        success: true,
         messageId: 'wamid_test456',
-        sentAt: new Date(),
       });
 
       await adapter.send(mockNotification);
@@ -324,6 +306,27 @@ describe('WhatsAppChannelAdapter', () => {
       expect(result.errorCode).toBe('WHATSAPP_SEND_FAILED');
     });
 
+    it('should return failure when provider returns success:false', async () => {
+      prisma.parent.findUnique.mockResolvedValue({
+        id: mockParentId,
+        phone: mockPhone,
+        whatsapp: null,
+        whatsappOptIn: true,
+        firstName: 'John',
+        lastName: 'Doe',
+      });
+
+      whatsAppService.sendMessage.mockResolvedValue({
+        success: false,
+        error: 'Number not registered on WhatsApp',
+      });
+
+      const result = await adapter.send(mockNotification);
+
+      expect(result.success).toBe(false);
+      expect(result.status).toBe(NotificationDeliveryStatus.FAILED);
+    });
+
     it('should handle database errors gracefully', async () => {
       prisma.parent.findUnique.mockRejectedValue(new Error('Connection lost'));
 
@@ -356,8 +359,8 @@ describe('WhatsAppChannelAdapter', () => {
       });
 
       whatsAppService.sendMessage.mockResolvedValue({
+        success: true,
         messageId: 'wamid_test789',
-        sentAt: new Date(),
       });
 
       const notification: Notification = {
@@ -387,8 +390,8 @@ describe('WhatsAppChannelAdapter', () => {
       });
 
       whatsAppService.sendMessage.mockResolvedValue({
+        success: true,
         messageId: 'wamid_empty',
-        sentAt: new Date(),
       });
 
       const notification: Notification = {
@@ -416,8 +419,8 @@ describe('WhatsAppChannelAdapter', () => {
       });
 
       whatsAppService.sendMessage.mockResolvedValue({
+        success: true,
         messageId: 'wamid_special',
-        sentAt: new Date(),
       });
 
       const notification: Notification = {
@@ -447,8 +450,8 @@ describe('WhatsAppChannelAdapter', () => {
       });
 
       whatsAppService.sendMessage.mockResolvedValue({
+        success: true,
         messageId: 'wamid_long',
-        sentAt: new Date(),
       });
 
       const longMessage = 'A'.repeat(5000); // Very long message
@@ -466,18 +469,6 @@ describe('WhatsAppChannelAdapter', () => {
   });
 
   describe('phone number validation scenarios', () => {
-    beforeEach(() => {
-      process.env.WHATSAPP_ACCESS_TOKEN = 'test-token';
-      process.env.WHATSAPP_PHONE_NUMBER_ID = 'test-phone-id';
-      process.env.WHATSAPP_BUSINESS_ACCOUNT_ID = 'test-account-id';
-    });
-
-    afterEach(() => {
-      delete process.env.WHATSAPP_ACCESS_TOKEN;
-      delete process.env.WHATSAPP_PHONE_NUMBER_ID;
-      delete process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-    });
-
     it('should accept South African mobile numbers with +27', async () => {
       prisma.parent.findUnique.mockResolvedValue({
         id: mockParentId,
@@ -485,7 +476,6 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
@@ -499,25 +489,24 @@ describe('WhatsAppChannelAdapter', () => {
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber.mockReturnValue(false);
 
       const result = await adapter.isAvailable(mockParentId);
 
       expect(result).toBe(false);
     });
 
-    it('should accept international numbers', async () => {
+    it('should reject non-South African international numbers', async () => {
+      // Adapter validates SA E.164 format only (+27 + 9 digits)
       prisma.parent.findUnique.mockResolvedValue({
         id: mockParentId,
-        phone: '+441onal234567890',
+        phone: '+441234567890',
         whatsapp: null,
         whatsappOptIn: true,
       });
-      whatsAppService.isValidPhoneNumber.mockReturnValue(true);
 
       const result = await adapter.isAvailable(mockParentId);
 
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 });

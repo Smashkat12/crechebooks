@@ -143,15 +143,20 @@ export class AttendanceController {
 
   // ------------------------------------------------------------------
   // GET /attendance/by-date/:date
+  // Returns AdminDayViewDto: records[] + parentPreReports[] for unmarked children
   // ------------------------------------------------------------------
   @Get('by-date/:date')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.VIEWER)
   @ApiOperation({
     summary:
-      'All records for a date with child name + class group (Today tile data)',
+      'All records for a date with child name + class group (Today tile data). ' +
+      'Also includes parentPreReports for unmarked children whose parent sent a pre-report.',
   })
   @ApiParam({ name: 'date', description: 'YYYY-MM-DD' })
-  @ApiResponse({ status: 200, description: 'AttendanceResponseDto[]' })
+  @ApiResponse({
+    status: 200,
+    description: 'AdminDayViewDto: { date, records[], parentPreReports[] }',
+  })
   async byDate(@CurrentUser() user: IUser, @Param('date') date: string) {
     return this.attendanceService.findByDate(getTenantId(user), date);
   }

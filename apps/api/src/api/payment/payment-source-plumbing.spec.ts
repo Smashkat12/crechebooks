@@ -16,6 +16,7 @@ import { PaymentReceiptService } from '../../database/services/payment-receipt.s
 import { ArrearsService } from '../../database/services/arrears.service';
 import { PaymentRepository } from '../../database/repositories/payment.repository';
 import { InvoiceRepository } from '../../database/repositories/invoice.repository';
+import { PrismaService } from '../../database/prisma/prisma.service';
 import type { IUser } from '../../database/entities/user.entity';
 import type { MatchingBatchResult } from '../../database/dto/payment-matching.dto';
 import type { ApiMatchPaymentsDto } from './dto';
@@ -75,6 +76,7 @@ describe('PaymentController — source field plumbing', () => {
       {} as unknown as ArrearsService,
       {} as unknown as PaymentRepository,
       {} as unknown as InvoiceRepository,
+      {} as unknown as PrismaService,
     );
   });
 

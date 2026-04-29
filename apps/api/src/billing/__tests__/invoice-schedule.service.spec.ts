@@ -22,6 +22,7 @@ describe('InvoiceScheduleService', () => {
     mockSchedulerService = {
       scheduleCronJob: jest.fn(),
       scheduleJob: jest.fn(),
+      removeRepeatableCronJob: jest.fn(),
     };
 
     mockPrisma = {
@@ -187,6 +188,8 @@ describe('InvoiceScheduleService', () => {
 
   describe('cancelSchedule', () => {
     it('should cancel schedule and log audit', async () => {
+      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
+
       await service.cancelSchedule(tenantId);
 
       expect(mockAuditLogService.logAction).toHaveBeenCalledWith(
@@ -199,6 +202,17 @@ describe('InvoiceScheduleService', () => {
         }),
       );
     });
+
+    it('should invoke removeRepeatableCronJob with INVOICE_GENERATION queue and default cron', async () => {
+      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
+
+      await service.cancelSchedule(tenantId);
+
+      expect(mockSchedulerService.removeRepeatableCronJob).toHaveBeenCalledWith(
+        QUEUE_NAMES.INVOICE_GENERATION,
+        '0 6 1 * *',
+      );
+    });
   });
 
   describe('updateSchedule', () => {
@@ -207,6 +221,7 @@ describe('InvoiceScheduleService', () => {
         id: tenantId,
         name: 'Test Creche',
       });
+      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
 
       const newCron = '0 9 5 * *';
 
@@ -228,6 +243,28 @@ describe('InvoiceScheduleService', () => {
         expect.any(Object),
         newCron,
       );
+    });
+
+    it('should call cancelSchedule before scheduleTenantInvoices', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: tenantId,
+        name: 'Test Creche',
+      });
+      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
+
+      const callOrder: string[] = [];
+      mockSchedulerService.removeRepeatableCronJob.mockImplementation(
+        async () => {
+          callOrder.push('cancel');
+        },
+      );
+      mockSchedulerService.scheduleCronJob.mockImplementation(async () => {
+        callOrder.push('schedule');
+      });
+
+      await service.updateSchedule(tenantId, '0 9 5 * *');
+
+      expect(callOrder).toEqual(['cancel', 'schedule']);
     });
   });
 

@@ -15,6 +15,7 @@ import {
   settingsNavLink,
   type NavLink,
 } from './nav-links';
+import { useTotalUnread } from '@/hooks/admin/use-admin-messages';
 
 interface MobileNavLinkProps {
   link: NavLink;
@@ -78,6 +79,14 @@ function MobileNavSection({ title, links, pathname, onLinkClick }: MobileNavSect
 export function MobileNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const totalUnread = useTotalUnread();
+
+  const managementNavLinksWithBadges = managementNavLinks.map((link) => {
+    if (link.href === '/communications/inbox' && totalUnread > 0) {
+      return { ...link, badge: totalUnread };
+    }
+    return link;
+  });
 
   const handleLinkClick = () => {
     setOpen(false);
@@ -121,7 +130,7 @@ export function MobileNav() {
           <Separator />
           <MobileNavSection
             title="Management"
-            links={managementNavLinks}
+            links={managementNavLinksWithBadges}
             pathname={pathname}
             onLinkClick={handleLinkClick}
           />

@@ -33,6 +33,7 @@ import {
 } from '@nestjs/common';
 import { PaymentAttachmentStatus, PaymentAttachmentKind } from '@prisma/client';
 import { PaymentAttachmentsService } from './payment-attachments.service';
+import { PaymentAttachmentMatcherService } from './payment-attachment-matcher.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { StorageService } from '../../integrations/storage/storage.service';
@@ -134,6 +135,10 @@ describe('PaymentAttachmentsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogService, useValue: audit },
         { provide: StorageService, useValue: storage },
+        {
+          provide: PaymentAttachmentMatcherService,
+          useValue: { extractAndMatch: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 

@@ -500,4 +500,158 @@ describe('Vat201Service', () => {
       expect(service.calculateNetVat(fields)).toBe(-100000);
     });
   });
+
+  describe('deadline calculation (VAT Act 89/1991 §27)', () => {
+    /**
+     * Regression for AUDIT-TAX-01.
+     * Old logic: last day of (period_end_month + 1) — e.g. Apr period → May 31. WRONG.
+     * Correct:   25th of the month following the period end — e.g. Apr period → May 25.
+     * These tests run against the live DB; see Vat201DeadlineUnit below for the
+     * no-DB variant that always runs.
+     */
+    it('should set deadline to 25th of month following period end (Apr period → May 25)', async () => {
+      const submission = await service.generateVat201({
+        tenantId: testTenant.id,
+        periodStart: new Date('2026-03-01'),
+        periodEnd: new Date('2026-04-30'),
+      });
+
+      const deadline = submission.deadline;
+      expect(deadline.getFullYear()).toBe(2026);
+      expect(deadline.getMonth()).toBe(4); // May = 4 (0-indexed)
+      expect(deadline.getDate()).toBe(25);
+    });
+
+    it('should set deadline to 25th of month following period end (Jan period → Feb 25)', async () => {
+      const submission = await service.generateVat201({
+        tenantId: testTenant.id,
+        periodStart: new Date('2025-12-01'),
+        periodEnd: new Date('2026-01-31'),
+      });
+
+      const deadline = submission.deadline;
+      expect(deadline.getFullYear()).toBe(2026);
+      expect(deadline.getMonth()).toBe(1); // Feb = 1 (0-indexed)
+      expect(deadline.getDate()).toBe(25);
+    });
+  });
+});
+
+/**
+ * Vat201Service — deadline unit tests (no DB required, AUDIT-TAX-01 regression guard).
+ *
+ * calculateDeadline() is private; we exercise it via generateVat201() using a
+ * stub PrismaService so no live database connection is needed.
+ * These tests pass even when Docker/Postgres is unavailable.
+ */
+describe('Vat201Service deadline unit (AUDIT-TAX-01)', () => {
+  let unitService: Vat201Service;
+
+  beforeEach(async () => {
+    // Minimal stub: only the fields generateVat201 reads before the deadline calc
+    const tenantStub = {
+      id: 'unit-tenant',
+      taxStatus: TaxStatus.VAT_REGISTERED,
+      vatNumber: '4000000001',
+    };
+
+    const prismaStub = {
+      tenant: {
+        findUnique: jest.fn().mockResolvedValue(tenantStub),
+      },
+      sarsSubmission: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest
+          .fn()
+          .mockImplementation((args: { data: Record<string, unknown> }) =>
+            Promise.resolve({ ...args.data, id: 'sub-1' }),
+          ),
+      },
+    };
+
+    const vatStub = {
+      calculateOutputVat: jest.fn().mockResolvedValue({
+        vatAmountCents: 0,
+        totalExcludingVatCents: 0,
+        totalIncludingVatCents: 0,
+        standardRatedCents: 0,
+        zeroRatedCents: 0,
+        exemptCents: 0,
+        itemCount: 0,
+      }),
+      calculateInputVat: jest.fn().mockResolvedValue({
+        vatAmountCents: 0,
+        totalExcludingVatCents: 0,
+        totalIncludingVatCents: 0,
+        standardRatedCents: 0,
+        zeroRatedCents: 0,
+        exemptCents: 0,
+        itemCount: 0,
+      }),
+      getFlaggedItems: jest.fn().mockResolvedValue([]),
+    };
+
+    const vatAdjStub = {
+      getAdjustmentsForPeriod: jest.fn().mockResolvedValue({
+        field7ChangeInUseOutputCents: 0,
+        field8ChangeInUseInputCents: 0,
+        field9OtherOutputCents: 0,
+        field10OtherInputCents: 0,
+        field11BadDebtsWrittenOffCents: 0,
+        field12BadDebtsRecoveredCents: 0,
+        field13CapitalGoodsSchemeCents: 0,
+        adjustmentCount: 0,
+      }),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        Vat201Service,
+        { provide: PrismaService, useValue: prismaStub },
+        { provide: VatService, useValue: vatStub },
+        { provide: VatAdjustmentService, useValue: vatAdjStub },
+      ],
+    }).compile();
+
+    unitService = module.get<Vat201Service>(Vat201Service);
+  });
+
+  it('deadline for Apr period end is 25 May (not 31 May) — VAT Act 89/1991 §27', async () => {
+    const result = await unitService.generateVat201({
+      tenantId: 'unit-tenant',
+      periodStart: new Date(2026, 2, 1), // 2026-03-01
+      periodEnd: new Date(2026, 3, 30), // 2026-04-30
+    });
+
+    const deadline = result.deadline;
+    expect(deadline.getFullYear()).toBe(2026);
+    expect(deadline.getMonth()).toBe(4); // May = 4 (0-indexed)
+    expect(deadline.getDate()).toBe(25);
+  });
+
+  it('deadline for Dec period end is 25 Jan following year — VAT Act 89/1991 §27', async () => {
+    const result = await unitService.generateVat201({
+      tenantId: 'unit-tenant',
+      periodStart: new Date(2025, 10, 1), // 2025-11-01
+      periodEnd: new Date(2025, 11, 31), // 2025-12-31
+    });
+
+    const deadline = result.deadline;
+    expect(deadline.getFullYear()).toBe(2026);
+    expect(deadline.getMonth()).toBe(0); // Jan = 0 (0-indexed)
+    expect(deadline.getDate()).toBe(25);
+  });
+
+  it('deadline for Feb period end is 25 Mar — VAT Act 89/1991 §27', async () => {
+    const result = await unitService.generateVat201({
+      tenantId: 'unit-tenant',
+      periodStart: new Date(2026, 0, 1), // 2026-01-01
+      periodEnd: new Date(2026, 1, 28), // 2026-02-28
+    });
+
+    const deadline = result.deadline;
+    expect(deadline.getFullYear()).toBe(2026);
+    expect(deadline.getMonth()).toBe(2); // Mar = 2 (0-indexed)
+    expect(deadline.getDate()).toBe(25);
+  });
 });

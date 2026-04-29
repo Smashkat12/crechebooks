@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useParent, useParentChildren, useCreateChild, useSendOnboardingInvite } from '@/hooks/use-parents';
+import { formatFullName } from '@/lib/utils/name-formatter';
 import { useFeeStructures } from '@/hooks/use-fee-structures';
 import { useSendInvoices } from '@/hooks/use-invoices';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -183,7 +184,7 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
           </Link>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              {parent.firstName} {parent.lastName}
+              {formatFullName(parent)}
             </h1>
             <div className="flex items-center gap-4 text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -408,7 +409,7 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
                 {children.map((child) => (
                   <div key={child.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div>
-                      <p className="font-medium">{child.firstName} {child.lastName}</p>
+                      <p className="font-medium">{formatFullName(child)}</p>
                       <p className="text-sm text-muted-foreground">
                         DOB: {new Date(child.dateOfBirth).toLocaleDateString('en-ZA')}
                       </p>
@@ -420,7 +421,7 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
                           variant="outline"
                           onClick={() => setEnrollChildTarget({
                             id: child.id,
-                            name: `${child.firstName} ${child.lastName}`,
+                            name: formatFullName(child),
                           })}
                         >
                           <UserPlus className="h-3 w-3 mr-1" />

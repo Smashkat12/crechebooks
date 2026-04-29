@@ -326,4 +326,24 @@ export class SchedulerService {
       throw error;
     }
   }
+
+  /**
+   * Remove a Bull repeatable cron job from the given queue.
+   *
+   * Bull's removeRepeatable() is a silent no-op when the repeatable is not
+   * found, so callers do not need to guard against "not registered" state.
+   */
+  async removeRepeatableCronJob(
+    queueName: QueueName,
+    cronExpression: string,
+  ): Promise<void> {
+    const queue = this.getQueue(queueName);
+    await queue.removeRepeatable({ cron: cronExpression });
+    this.logger.log({
+      message: 'Repeatable cron job removed',
+      queueName,
+      cronExpression,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }

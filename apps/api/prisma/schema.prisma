@@ -762,6 +762,9 @@ model Tenant {
   // Daily Attendance (#6) — foundation for Today admin tile (#8), parent absence reporting (#9), daily class reports (#10)
   attendanceRecords AttendanceRecord[]
 
+  // Parent absence pre-reports (#9)
+  parentAbsenceReports ParentAbsenceReport[]
+
   // Backlog #7 — per-staff invite + login flow
   staffInvitations StaffInvitation[]
 
@@ -1145,6 +1148,9 @@ model Parent {
   // Backlog #11 — proof-of-payment uploads from parent portal
   paymentAttachments PaymentAttachment[]
 
+  // Parent absence pre-reports (#9)
+  absenceReports ParentAbsenceReport[]
+
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([tenantId, lastName, firstName])
@@ -1240,6 +1246,9 @@ model Child {
   // Daily Attendance (#6)
   attendanceRecords AttendanceRecord[]
 
+  // Parent absence pre-reports (#9)
+  absenceReports ParentAbsenceReport[]
+
   @@index([tenantId])
   @@index([tenantId, parentId])
   @@index([tenantId, isActive])
@@ -1317,6 +1326,33 @@ model AttendanceRecord {
   @@index([tenantId, classGroupId, date])
   @@index([tenantId, status, date])
   @@map("attendance_records")
+}
+
+// Parent Absence Pre-Reports — backlog #9.
+// A parent signals in advance that their child will be absent on a given date.
+// Kept separate from attendance_records to distinguish admin facts from parent
+// intent. Admin's AttendanceRecord always wins; this table is informational only.
+// Cancellation soft-deletes via cancelledAt rather than row removal (preserves
+// the audit trail).
+model ParentAbsenceReport {
+  id                  String    @id @default(uuid())
+  tenantId            String    @map("tenant_id")
+  childId             String    @map("child_id")
+  parentId            String    @map("parent_id")
+  date                DateTime  @db.Date
+  reason              String?   @db.VarChar(500)
+  reportedAt          DateTime  @default(now()) @map("reported_at")
+  cancelledAt         DateTime? @map("cancelled_at")
+  cancelledByParentId String?   @map("cancelled_by_parent_id")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  child  Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, date]) // one report per child per day (app enforces uniqueness)
+  @@index([tenantId, date])
+  @@index([childId])
+  @@map("parent_absence_reports")
 }
 
 model Invoice {
@@ -1891,23 +1927,36 @@ enum BankConnectionStatus {
 }
 
 model BankConnection {
-  id            String               @id @default(uuid())
-  tenantId      String               @map("tenant_id")
-  xeroAccountId String               @map("xero_account_id")
-  accountName   String               @map("account_name")
-  accountNumber String               @map("account_number")
-  bankName      String               @map("bank_name")
-  status        BankConnectionStatus @default(ACTIVE)
-  errorMessage  String?              @map("error_message")
-  connectedAt   DateTime             @default(now()) @map("connected_at")
-  lastSyncAt    DateTime?            @map("last_sync_at")
-  createdAt     DateTime             @default(now()) @map("created_at")
-  updatedAt     DateTime             @updatedAt @map("updated_at")
+  id               String               @id @default(uuid())
+  tenantId         String               @map("tenant_id")
+  xeroAccountId    String               @map("xero_account_id")
+  accountName      String               @map("account_name")
+  accountNumber    String               @map("account_number")
+  bankName         String               @map("bank_name")
+  status           BankConnectionStatus @default(ACTIVE)
+  errorMessage     String?              @map("error_message")
+  // AUDIT-BANK-01: Xero 429 retry-after deadline. NULL = no active rate limit.
+  // Set when Xero returns 429; cleared on next successful sync. Distinct from
+  // `status` (which tracks healthy/error/disconnected) — a tenant can be
+  // rate-limited yet still ACTIVE. @db.Timestamptz(6) matches the migration
+  // 20260429100000_add_rate_limit_until_at_to_bank_connections (TIMESTAMPTZ).
+  // Other DateTime columns on this table predate the typing convention and
+  // remain TIMESTAMP(3); not changing them avoids a destructive ALTER.
+  rateLimitUntilAt DateTime?            @map("rate_limit_until_at") @db.Timestamptz(6)
+  connectedAt      DateTime             @default(now()) @map("connected_at")
+  lastSyncAt       DateTime?            @map("last_sync_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, xeroAccountId])
   @@index([tenantId, status])
+  // SQL-only artefact: partial index `bank_connections_rate_limit_until_at_idx`
+  // (CREATE INDEX ... WHERE rate_limit_until_at IS NOT NULL) is created by the
+  // 20260429100000 migration. Prisma 7 @@index cannot express the WHERE clause,
+  // so it lives as a SQL-only index. `prisma migrate diff` will surface this as
+  // an "extra index" — accepted drift, same pattern as vector_embeddings HNSW.
   @@map("bank_connections")
 }
 

@@ -18,6 +18,26 @@ export interface AttendanceTodaySummary {
   excusedCount: number;
   earlyPickupCount: number;
   unmarkedCount: number;
+  /** Number of children with an active parent-reported absence today (additive field) */
+  reportedAbsentCount?: number;
+}
+
+/** ParentPreReportDto — returned inside AdminDayViewDto */
+export interface ParentPreReport {
+  id: string;
+  childId: string;
+  childName: string;
+  parentId: string;
+  date: string; // YYYY-MM-DD
+  reason: string | null;
+  reportedAt: string; // ISO
+}
+
+/** AdminDayViewDto — new response shape for GET /attendance/by-date/:date */
+export interface AdminDayView {
+  date: string; // YYYY-MM-DD
+  records: AttendanceRecord[];
+  parentPreReports: ParentPreReport[];
 }
 
 export interface AttendanceRecord {
@@ -110,18 +130,33 @@ export async function fetchTodayAttendanceSummary(): Promise<AttendanceTodaySumm
   return data;
 }
 
-export async function fetchAttendanceByDate(
+/**
+ * Fetch the full admin day view for a given date.
+ * Returns the new AdminDayViewDto wrapper (records + parentPreReports).
+ * When classGroupId is supplied the class-group endpoint is used instead
+ * (it still returns only AttendanceRecord[] — no parent pre-reports).
+ */
+export async function fetchAdminDayView(
   date: string,
   classGroupId?: string,
-): Promise<AttendanceRecord[]> {
+): Promise<AdminDayView> {
   if (classGroupId) {
     const { data } = await apiClient.get<ClassGroupDailyReport>(
       `/attendance/class-group/${classGroupId}/by-date/${date}`,
     );
-    return data.records;
+    return { date, records: data.records, parentPreReports: [] };
   }
-  const { data } = await apiClient.get<AttendanceRecord[]>(`/attendance/by-date/${date}`);
+  const { data } = await apiClient.get<AdminDayView>(`/attendance/by-date/${date}`);
   return data;
+}
+
+/** @deprecated use fetchAdminDayView — kept for callers that only need records */
+export async function fetchAttendanceByDate(
+  date: string,
+  classGroupId?: string,
+): Promise<AttendanceRecord[]> {
+  const view = await fetchAdminDayView(date, classGroupId);
+  return view.records;
 }
 
 export async function fetchChildAttendance(
@@ -212,5 +247,98 @@ export async function fetchParentChildAttendanceSummary(
 ): Promise<ParentAttendanceSummary> {
   return parentAttendanceFetch<ParentAttendanceSummary>(
     `/parent-portal/attendance/child/${childId}/summary`,
+  );
+}
+
+// ─── Parent portal absence reporting ──────────────────────────────────────────
+
+export interface AbsenceReportResponse {
+  id: string;
+  tenantId: string;
+  childId: string;
+  parentId: string;
+  date: string; // YYYY-MM-DD
+  reason: string | null;
+  reportedAt: string; // ISO
+  cancelledAt: string | null;
+  cancelledByParentId: string | null;
+}
+
+export interface AbsenceReportsListResponse {
+  total: number;
+  reports: AbsenceReportResponse[];
+}
+
+export interface ReportAbsenceDto {
+  date: string; // YYYY-MM-DD
+  reason?: string; // max 500 chars
+}
+
+async function parentAbsenceFetch<T>(
+  endpoint: string,
+  options?: RequestInit,
+): Promise<T> {
+  const token = getParentToken();
+  if (!token) throw new Error('Not authenticated. Please log in.');
+
+  const response = await fetch(`${PARENT_API_URL}/api/v1${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options?.headers ?? {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('parent_session_token');
+      throw new Error('Session expired. Please log in again.');
+    }
+    let msg = `Request failed: ${response.status}`;
+    try {
+      const err = await response.json();
+      msg = err.message || err.error || msg;
+    } catch {
+      // use default
+    }
+    throw new Error(msg);
+  }
+
+  // 204 No Content
+  if (response.status === 204) return undefined as unknown as T;
+
+  return response.json();
+}
+
+export async function reportAbsence(
+  childId: string,
+  dto: ReportAbsenceDto,
+): Promise<AbsenceReportResponse> {
+  return parentAbsenceFetch<AbsenceReportResponse>(
+    `/parent-portal/children/${childId}/absences`,
+    { method: 'POST', body: JSON.stringify(dto) },
+  );
+}
+
+export async function fetchAbsenceReports(
+  childId: string,
+  params?: { from?: string; to?: string },
+): Promise<AbsenceReportsListResponse> {
+  const query = params
+    ? '?' + new URLSearchParams(params as Record<string, string>).toString()
+    : '';
+  return parentAbsenceFetch<AbsenceReportsListResponse>(
+    `/parent-portal/children/${childId}/absences${query}`,
+  );
+}
+
+export async function cancelAbsenceReport(
+  childId: string,
+  absenceId: string,
+): Promise<void> {
+  return parentAbsenceFetch<void>(
+    `/parent-portal/children/${childId}/absences/${absenceId}`,
+    { method: 'DELETE' },
   );
 }

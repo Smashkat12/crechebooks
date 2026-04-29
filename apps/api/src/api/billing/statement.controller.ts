@@ -25,6 +25,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
+import { formatFullName } from '../../common/utils';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -165,7 +166,7 @@ export class StatementController {
       if (parent) {
         parentMap.set(parentId, {
           id: parent.id,
-          name: `${parent.firstName} ${parent.lastName}`,
+          name: formatFullName(parent),
           email: parent.email,
           phone: parent.phone,
         });
@@ -255,7 +256,7 @@ export class StatementController {
 
       const parentDto: StatementParentDto = {
         id: parent.id,
-        name: `${parent.firstName} ${parent.lastName}`,
+        name: formatFullName(parent),
         email: parent.email,
         phone: parent.phone,
       };
@@ -430,7 +431,7 @@ export class StatementController {
 
       const parentDto: StatementParentDto = {
         id: parent.id,
-        name: `${parent.firstName} ${parent.lastName}`,
+        name: formatFullName(parent),
         email: parent.email,
         phone: parent.phone,
       };
@@ -594,7 +595,7 @@ export class StatementController {
 
       const parentDto: StatementParentDto = {
         id: parent.id,
-        name: `${parent.firstName} ${parent.lastName}`,
+        name: formatFullName(parent),
         email: parent.email,
         phone: parent.phone,
       };
@@ -670,7 +671,7 @@ export class StatementController {
 
     const parentDto: StatementParentDto = {
       id: parent.id,
-      name: `${parent.firstName} ${parent.lastName}`,
+      name: formatFullName(parent),
       email: parent.email,
       phone: parent.phone,
     };

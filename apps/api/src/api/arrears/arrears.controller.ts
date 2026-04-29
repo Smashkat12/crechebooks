@@ -11,6 +11,7 @@ import {
   Header,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
+import { formatFullName } from '../../common/utils';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -177,9 +178,9 @@ export class ArrearsController {
       arrearsItems.push({
         id: `arrears-${entry.parentId}`,
         parent_id: entry.parentId,
-        parent_name: `${parent.firstName} ${parent.lastName}`,
+        parent_name: formatFullName(parent),
         child_id: firstChildId,
-        child_name: `${child.firstName} ${child.lastName}`,
+        child_name: formatFullName(child),
         total_outstanding: entry.totalOutstandingCents / 100,
         oldest_invoice_date: entry.oldestDueDate.toISOString().split('T')[0],
         days_past_due: daysPastDue,

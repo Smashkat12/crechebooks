@@ -16,10 +16,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 interface ParentUser {
   id: string;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string;
 }
@@ -153,7 +155,7 @@ export function PortalHeader() {
                       <DropdownMenuLabel className="font-normal">
                         <div className="flex flex-col space-y-1">
                           <p className="text-sm font-medium leading-none">
-                            {user.firstName} {user.lastName}
+                            {formatFullName(user)}
                           </p>
                           <p className="text-xs leading-none text-muted-foreground">
                             {user.email}
@@ -203,7 +205,7 @@ export function PortalHeader() {
                             </Avatar>
                             <div>
                               <p className="font-medium">
-                                {user.firstName} {user.lastName}
+                                {formatFullName(user)}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {user.email}

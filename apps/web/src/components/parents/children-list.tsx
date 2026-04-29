@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EnrollmentStatus } from './enrollment-status';
 import type { IChild } from '@crechebooks/types';
+import { formatFullName } from '@/lib/utils/name-formatter';
 
 interface ChildrenListProps {
   items: IChild[];
@@ -48,7 +49,7 @@ export function ChildrenList({ items, onEdit, onViewEnrollment: _onViewEnrollmen
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h4 className="font-medium">
-                  {child.firstName} {child.lastName}
+                  {formatFullName(child)}
                 </h4>
                 <EnrollmentStatus status={child.status} />
               </div>

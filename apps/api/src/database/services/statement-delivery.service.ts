@@ -13,7 +13,7 @@
  * CRITICAL: All delivery attempts are logged. Fail fast with detailed error logging.
  */
 
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { NotificationService } from '../../notifications/notification.service';
 import {
   NotificationPayload,
@@ -31,15 +31,8 @@ import {
   EmailTemplateService,
   StatementEmailData,
 } from '../../common/services/email-template/email-template.service';
-// TASK-WA-003: WhatsApp integration imports
-import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
-import { WhatsAppTemplateService } from '../../integrations/whatsapp/services/template.service';
-import { WhatsAppMessageEntity } from '../../integrations/whatsapp/entities/whatsapp-message.entity';
+// TASK-WA-007: WhatsApp provider (Twilio facade)
 import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
-import {
-  WhatsAppContextType,
-  WhatsAppMessageStatus,
-} from '../../integrations/whatsapp/types/message-history.types';
 
 /**
  * Input for delivering a statement
@@ -98,14 +91,8 @@ export class StatementDeliveryService {
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
     private readonly emailTemplateService: EmailTemplateService,
-    // TASK-WA-003: WhatsApp integration (optional - may not be configured)
-    @Optional() private readonly whatsAppService?: WhatsAppService,
-    @Optional()
-    private readonly whatsAppTemplateService?: WhatsAppTemplateService,
-    @Optional() private readonly whatsAppMessageEntity?: WhatsAppMessageEntity,
-    // TASK-WA-007: WhatsApp provider service for Twilio/Meta routing
-    @Optional()
-    private readonly whatsAppProviderService?: WhatsAppProviderService,
+    // TASK-WA-007: WhatsApp provider service (Twilio)
+    private readonly whatsAppProviderService: WhatsAppProviderService,
   ) {
     this.appUrl =
       this.configService.get<string>('APP_URL') || 'http://localhost:3000';
@@ -314,175 +301,45 @@ export class StatementDeliveryService {
         // Format period string
         const periodString = `${statement.periodStart.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`;
 
-        // TASK-WA-007: Use provider service (Twilio) when configured
-        if (this.whatsAppProviderService?.isConfigured()) {
-          const organizationName = tenant.tradingName ?? tenant.name;
-          const whatsAppResult =
-            await this.whatsAppProviderService.sendStatementNotification(
-              tenantId,
-              parent.phone,
-              `${parent.firstName} ${parent.lastName}`.trim(),
-              periodString,
-              statement.openingBalanceCents / 100,
-              statement.closingBalanceCents / 100,
-              organizationName, // Use tenant name for white-labeling
-            );
-
-          if (whatsAppResult.success) {
-            this.logger.log(
-              `TASK-WA-007: WhatsApp statement sent via provider to ${parent.phone} with messageId ${whatsAppResult.messageId}`,
-            );
-
-            // Update statement status
-            await this.statementRepository.updateStatus(
-              statementId,
-              tenantId,
-              'DELIVERED',
-              userId,
-            );
-
-            return {
-              statementId,
-              parentId: parent.id,
-              success: true,
-              channel: NotificationChannelType.WHATSAPP,
-              messageId: whatsAppResult.messageId,
-              deliveredAt: new Date(),
-            };
-          } else {
-            throw new Error(
-              whatsAppResult.error || 'WhatsApp delivery failed via provider',
-            );
-          }
-        }
-
-        // Fallback to Meta Cloud API with templates
-        // Check if WhatsApp services are available
-        if (
-          !this.whatsAppService ||
-          !this.whatsAppTemplateService ||
-          !this.whatsAppMessageEntity
-        ) {
-          throw new BusinessException(
-            'WhatsApp delivery is not configured for this tenant',
-            'WHATSAPP_NOT_CONFIGURED',
-          );
-        }
-
-        // Check opt-in compliance (Meta requires explicit consent)
-        const compliance = this.whatsAppTemplateService.checkOptInCompliance(
-          'statement_notification',
-          parent.whatsappOptIn ?? false,
-        );
-        if (!compliance.allowed) {
-          throw new BusinessException(
-            compliance.reason || 'WhatsApp opt-in required',
-            'WHATSAPP_OPTIN_REQUIRED',
-            { parentId: parent.id },
-          );
-        }
-
-        // Generate PDF for attachment
-        const pdfBuffer = await this.statementPdfService.generatePdf(
-          tenantId,
-          statementId,
-          { includePaymentInstructions: true },
-        );
-
-        this.logger.log(
-          `TASK-WA-003: Generated PDF (${pdfBuffer.length} bytes) for WhatsApp statement ${statement.statementNumber}`,
-        );
-
-        // Upload PDF to get publicly accessible URL (required for WhatsApp media)
-        // For now, we'll use the app URL endpoint that serves the PDF
-        const documentLink = `${this.appUrl}/api/statements/${statement.id}/pdf?token=${Buffer.from(`${tenantId}:${statement.id}`).toString('base64')}`;
-        const documentFilename = `Statement_${statement.statementNumber}.pdf`;
-
-        // Build the template using the template service
-        const builtTemplate =
-          this.whatsAppTemplateService.buildStatementNotification({
-            parentName: parent.firstName,
-            periodStart: statement.periodStart,
-            periodEnd: statement.periodEnd,
-            openingBalance: formatCurrency(statement.openingBalanceCents),
-            charges: formatCurrency(statement.totalChargesCents),
-            payments: formatCurrency(statement.totalPaymentsCents),
-            closingBalance: formatCurrency(statement.closingBalanceCents),
-            documentLink,
-            documentFilename,
-            statementId: statement.id,
-          });
-
-        if (!builtTemplate) {
-          throw new BusinessException(
-            'Failed to build WhatsApp template for statement notification',
-            'TEMPLATE_BUILD_FAILED',
-          );
-        }
-
-        // Send via WhatsApp
-        const whatsAppResult = await this.whatsAppService.sendTemplate(
-          parent.phone,
-          builtTemplate.name,
-          builtTemplate.components,
-        );
-
-        // Log the message for audit trail
-        await this.whatsAppMessageEntity.create({
-          tenantId,
-          parentId: parent.id,
-          recipientPhone: parent.phone,
-          templateName: 'statement_notification',
-          templateParams: {
-            parentName: parent.firstName,
-            periodStart: statement.periodStart.toISOString(),
-            periodEnd: statement.periodEnd.toISOString(),
-            openingBalance: formatCurrency(statement.openingBalanceCents),
-            charges: formatCurrency(statement.totalChargesCents),
-            payments: formatCurrency(statement.totalPaymentsCents),
-            closingBalance: formatCurrency(statement.closingBalanceCents),
-          },
-          wamid: whatsAppResult.messageId,
-          status:
-            whatsAppResult.status === 'sent'
-              ? WhatsAppMessageStatus.SENT
-              : WhatsAppMessageStatus.PENDING,
-          contextType: WhatsAppContextType.STATEMENT,
-          contextId: statement.id,
-        });
-
-        // Log template usage for compliance audit
-        this.whatsAppTemplateService.logTemplateUsage(
-          'statement_notification',
-          {
+        // TASK-WA-007: Use provider service (Twilio) for statement notification
+        const organizationName = tenant.tradingName ?? tenant.name;
+        const whatsAppResult =
+          await this.whatsAppProviderService.sendStatementNotification(
             tenantId,
+            parent.phone,
+            `${parent.firstName} ${parent.lastName}`.trim(),
+            periodString,
+            statement.openingBalanceCents / 100,
+            statement.closingBalanceCents / 100,
+            organizationName, // Use tenant name for white-labeling
+          );
+
+        if (whatsAppResult.success) {
+          this.logger.log(
+            `TASK-WA-007: WhatsApp statement sent via provider to ${parent.phone} with messageId ${whatsAppResult.messageId}`,
+          );
+
+          // Update statement status
+          await this.statementRepository.updateStatus(
+            statementId,
+            tenantId,
+            'DELIVERED',
+            userId,
+          );
+
+          return {
+            statementId,
             parentId: parent.id,
-            contextType: 'STATEMENT',
-            contextId: statement.id,
-            recipientPhone: parent.phone,
-          },
-        );
-
-        this.logger.log(
-          `TASK-WA-003: WhatsApp statement sent to ${parent.phone} with messageId ${whatsAppResult.messageId}`,
-        );
-
-        // Update statement status
-        await this.statementRepository.updateStatus(
-          statementId,
-          tenantId,
-          'DELIVERED',
-          userId,
-        );
-
-        return {
-          statementId,
-          parentId: parent.id,
-          success: true,
-          channel: NotificationChannelType.WHATSAPP,
-          messageId: whatsAppResult.messageId,
-          deliveredAt: whatsAppResult.sentAt,
-        };
+            success: true,
+            channel: NotificationChannelType.WHATSAPP,
+            messageId: whatsAppResult.messageId,
+            deliveredAt: new Date(),
+          };
+        } else {
+          throw new Error(
+            whatsAppResult.error || 'WhatsApp delivery failed via provider',
+          );
+        }
       }
 
       // 8. SMS delivery: Use plain text via NotificationService

@@ -47,6 +47,7 @@ export interface ParentProfile {
 
 export interface UpdateParentProfileDto {
   firstName?: string;
+  middleName?: string | null;
   lastName?: string;
   phone?: string;
   alternativePhone?: string;
@@ -282,6 +283,7 @@ export function useUpdateParentChild(childId: string) {
               ? {
                   ...c,
                   firstName: data.firstName,
+                  middleName: data.middleName,
                   lastName: data.lastName,
                   gender: data.gender,
                   medicalNotes: data.medicalNotes,

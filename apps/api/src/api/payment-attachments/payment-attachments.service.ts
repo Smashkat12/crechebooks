@@ -375,7 +375,14 @@ export class PaymentAttachmentsService {
       orderBy: { uploadedAt: 'desc' },
       take: ADMIN_LIST_CAP,
       include: {
-        parent: { select: { id: true, firstName: true, lastName: true } },
+        parent: {
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+          },
+        },
         payment: {
           select: {
             id: true,
@@ -404,7 +411,14 @@ export class PaymentAttachmentsService {
       orderBy: { uploadedAt: 'asc' }, // oldest first for review queue
       take: ADMIN_PENDING_CAP,
       include: {
-        parent: { select: { id: true, firstName: true, lastName: true } },
+        parent: {
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+          },
+        },
       },
     });
 
@@ -424,7 +438,14 @@ export class PaymentAttachmentsService {
     const row = await this.prisma.paymentAttachment.findFirst({
       where: { id, tenantId },
       include: {
-        parent: { select: { id: true, firstName: true, lastName: true } },
+        parent: {
+          select: {
+            id: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+          },
+        },
         payment: {
           select: {
             id: true,

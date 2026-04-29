@@ -12,7 +12,7 @@ process.env.XERO_CLIENT_SECRET = 'test-client-secret';
 process.env.XERO_REDIRECT_URI = 'http://localhost:3000/callback';
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { BankFeedService } from '../bank-feed.service';
+import { BankFeedService, Xero429Error } from '../bank-feed.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { TransactionRepository } from '../../../database/repositories/transaction.repository';
 import { AuditLogService } from '../../../database/services/audit-log.service';
@@ -415,6 +415,82 @@ describe('BankFeedService', () => {
           'invalid-signature',
         ),
       ).rejects.toThrow(BusinessException);
+    });
+  });
+
+  describe('extractXero429Info', () => {
+    it('returns is429=false for a standard Error (non-429)', () => {
+      const result = service.extractXero429Info(new Error('something broke'));
+      expect(result.is429).toBe(false);
+    });
+
+    it('returns is429=false for a non-429 xero-node SDK rejection', () => {
+      const sdkError = {
+        response: {
+          status: 403,
+          headers: {},
+          body: { Title: 'Forbidden', Detail: 'Insufficient scope' },
+        },
+      };
+      const result = service.extractXero429Info(sdkError);
+      expect(result.is429).toBe(false);
+    });
+
+    it('returns is429=true with retryAfterMs when xero-node rejects with 429 and Retry-After header (seconds)', () => {
+      const sdkError = {
+        response: {
+          status: 429,
+          headers: { 'retry-after': '60' },
+          body: {
+            Title: 'Too Many Requests',
+            Detail: 'Rate limit exceeded.',
+          },
+        },
+      };
+      const result = service.extractXero429Info(sdkError);
+      expect(result.is429).toBe(true);
+      if (result.is429) {
+        expect(result.retryAfterMs).toBe(60_000);
+      }
+    });
+
+    it('returns is429=true with retryAfterMs=undefined when 429 has no Retry-After header', () => {
+      const sdkError = {
+        response: {
+          status: 429,
+          headers: {},
+          body: { Title: 'Too Many Requests' },
+        },
+      };
+      const result = service.extractXero429Info(sdkError);
+      expect(result.is429).toBe(true);
+      if (result.is429) {
+        expect(result.retryAfterMs).toBeUndefined();
+      }
+    });
+
+    it('returns is429=true for an already-wrapped Xero429Error (no double-wrap)', () => {
+      const wrapped = new Xero429Error(30_000, { originalRejection: true });
+      const result = service.extractXero429Info(wrapped);
+      expect(result.is429).toBe(true);
+      if (result.is429) {
+        expect(result.retryAfterMs).toBe(30_000);
+      }
+    });
+
+    it('returns is429=true with undefined retryAfterMs when Retry-After header is an unparseable string', () => {
+      const sdkError = {
+        response: {
+          status: 429,
+          headers: { 'retry-after': 'not-a-number' },
+          body: {},
+        },
+      };
+      const result = service.extractXero429Info(sdkError);
+      expect(result.is429).toBe(true);
+      if (result.is429) {
+        expect(result.retryAfterMs).toBeUndefined();
+      }
     });
   });
 });

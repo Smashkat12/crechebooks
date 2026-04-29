@@ -35,8 +35,10 @@ export interface ParentWelcomePackResult {
 export interface WelcomePackEnrollmentData {
   enrollmentId: string;
   childFirstName: string;
+  childMiddleName?: string | null;
   childLastName: string;
   parentFirstName: string;
+  parentMiddleName?: string | null;
   parentLastName: string;
   parentEmail: string | null;
   startDate: Date;

@@ -23,6 +23,9 @@ const breadcrumbMap: Record<string, string> = {
   '/admin/tenants': 'Tenants',
   '/admin/tenants/new': 'New Tenant',
   '/admin/users': 'Users',
+  '/admin/class-groups': 'Class Groups',
+  '/admin/attendance': 'Attendance',
+  '/admin/payment-attachments': 'Payment proofs',
   '/admin/analytics': 'Analytics',
   '/admin/audit-logs': 'Audit Logs',
   '/admin/submissions': 'Submissions',
@@ -48,20 +51,6 @@ export function AdminHeader() {
   };
 
   const breadcrumbs = getBreadcrumbs();
-
-  const handleLogout = async () => {
-    await logout();
-
-    // Only redirect to Auth0 logout if Auth0 is configured
-    const auth0Domain = process.env.NEXT_PUBLIC_AUTH0_DOMAIN;
-    const clientId = process.env.NEXT_PUBLIC_AUTH0_CLIENT_ID;
-
-    if (auth0Domain && clientId) {
-      const returnTo = encodeURIComponent(window.location.origin + '/');
-      window.location.href = `https://${auth0Domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`;
-    }
-    // If Auth0 is not configured, logout() already redirects to landing page
-  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card">
@@ -148,7 +137,7 @@ export function AdminHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+              <DropdownMenuItem onClick={() => logout()} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
               </DropdownMenuItem>

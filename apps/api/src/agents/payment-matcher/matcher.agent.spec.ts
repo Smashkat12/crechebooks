@@ -1,6 +1,7 @@
 /**
  * PaymentMatcherAgent unit tests
  * Asserts that MatchDecision.source is populated on all code paths.
+ * Regression: buildMatchMessage includes middleName + lastName for child (AUDIT-PEOPLE-03).
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
@@ -52,7 +53,7 @@ const makeHighConfidenceCandidate = (): InvoiceCandidate => ({
     amountPaidCents: 0,
     parentId: 'parent-001',
     parent: { firstName: 'Parent', lastName: 'Name' },
-    child: { firstName: 'Child' },
+    child: { firstName: 'Child', middleName: null, lastName: 'Smith' },
   },
   confidence: 90,
   matchReasons: ['Exact amount match', 'Reference contains invoice number'],
@@ -157,7 +158,7 @@ describe('PaymentMatcherAgent — source field with SdkPaymentMatcher', () => {
           amountPaidCents: 0,
           parentId: 'parent-002',
           parent: { firstName: 'Other', lastName: 'Parent' },
-          child: { firstName: 'Child2' },
+          child: { firstName: 'Child2', middleName: null, lastName: 'Jones' },
         },
         confidence: 85,
         matchReasons: ['Exact amount match'],
@@ -168,5 +169,91 @@ describe('PaymentMatcherAgent — source field with SdkPaymentMatcher', () => {
 
     expect(decision.source).toBe('sdk');
     expect(sdkMatcherMock.resolveAmbiguity).toHaveBeenCalled();
+  });
+});
+
+describe('SdkPaymentMatcher.buildMatchMessage — child full name (AUDIT-PEOPLE-03)', () => {
+  // buildMatchMessage is a pure string builder — instantiate with minimal stubs.
+  const sdkMatcher = new SdkPaymentMatcher(
+    {} as never, // SdkAgentFactory — not used by buildMatchMessage
+    {} as never, // SdkConfigService — not used by buildMatchMessage
+  );
+
+  const makeTxSimple = (): Transaction =>
+    ({
+      id: 'tx-reg-01',
+      tenantId: 'tenant-001',
+      bankAccount: 'acc-001',
+      xeroTransactionId: null,
+      date: new Date('2025-03-10'),
+      amountCents: 200000,
+      description: 'Mary Catherine Smith school fees',
+      reference: null,
+      payeeName: 'Mary Catherine Smith',
+      isCredit: true,
+      isDeleted: false,
+      deletedAt: null,
+      source: 'BANK_FEED',
+      importBatchId: null,
+      status: 'PENDING',
+      isReconciled: false,
+      reconciledAt: null,
+      transactionHash: null,
+      duplicateOfId: null,
+      duplicateStatus: 'NONE',
+      reversesTransactionId: null,
+      isReversal: false,
+      xeroAccountCode: null,
+      supplierId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }) as Transaction;
+
+  it('Test 4: child with middleName renders full name in LLM prompt', () => {
+    const tx = makeTxSimple();
+    const candidate: InvoiceCandidate = {
+      invoice: {
+        id: 'inv-003',
+        invoiceNumber: 'INV-2025-003',
+        totalCents: 200000,
+        amountPaidCents: 0,
+        parentId: 'parent-003',
+        parent: { firstName: 'John', middleName: null, lastName: 'Smith' },
+        child: {
+          firstName: 'Mary',
+          middleName: 'Catherine',
+          lastName: 'Smith',
+        },
+      },
+      confidence: 75,
+      matchReasons: ['Amount match'],
+    };
+
+    const message = sdkMatcher.buildMatchMessage(tx, [candidate]);
+
+    expect(message).toContain('Mary Catherine Smith');
+    expect(message).not.toMatch(/- Child: Mary\s*$/m);
+  });
+
+  it('Test 5: child without middleName renders "First Last" in LLM prompt', () => {
+    const tx = makeTxSimple();
+    const candidate: InvoiceCandidate = {
+      invoice: {
+        id: 'inv-004',
+        invoiceNumber: 'INV-2025-004',
+        totalCents: 200000,
+        amountPaidCents: 0,
+        parentId: 'parent-004',
+        parent: { firstName: 'John', middleName: null, lastName: 'Smith' },
+        child: { firstName: 'Mary', middleName: null, lastName: 'Smith' },
+      },
+      confidence: 75,
+      matchReasons: ['Amount match'],
+    };
+
+    const message = sdkMatcher.buildMatchMessage(tx, [candidate]);
+
+    expect(message).toContain('Mary Smith');
+    expect(message).not.toMatch(/- Child: Mary\s*$/m);
   });
 });

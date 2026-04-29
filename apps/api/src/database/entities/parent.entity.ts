@@ -14,6 +14,7 @@ export interface IParent {
   tenantId: string;
   xeroContactId: string | null;
   firstName: string;
+  middleName?: string | null;
   lastName: string;
   email: string | null;
   phone: string | null;

@@ -558,9 +558,19 @@ export class TaxTableService {
       (a, b) => a.bracketOrder - b.bracketOrder,
     );
 
+    // Scan from the top bracket downwards.
+    // For continuous-boundary data (lowerBound of bracket N = upperBound of bracket N-1),
+    // income exactly at a boundary belongs to the LOWER bracket per SARS gazette
+    // (e.g. R237,100 is taxed at 18%, NOT 26%).
+    // Use strict > for non-zero lower bounds so that exact boundary income stays
+    // in the bracket below. The first bracket (lowerBound = 0) uses >= to include R0.
     for (let i = sortedBrackets.length - 1; i >= 0; i--) {
       const bracket = sortedBrackets[i];
-      if (annualIncomeCents >= bracket.lowerBoundCents) {
+      const meetsLower =
+        bracket.lowerBoundCents === 0
+          ? annualIncomeCents >= 0
+          : annualIncomeCents > bracket.lowerBoundCents;
+      if (meetsLower) {
         return { bracket, bracketIndex: i };
       }
     }

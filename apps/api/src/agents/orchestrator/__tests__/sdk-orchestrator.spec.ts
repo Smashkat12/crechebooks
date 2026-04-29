@@ -974,7 +974,7 @@ describe('SdkOrchestrator', () => {
               amountPaidCents: 0,
               parentId: 'parent-001',
               parent: { firstName: 'John', lastName: 'Doe' },
-              child: { firstName: 'Jane' },
+              child: { firstName: 'Jane', lastName: 'Doe' },
             },
             confidence: 90,
             matchReasons: ['Exact amount match'],

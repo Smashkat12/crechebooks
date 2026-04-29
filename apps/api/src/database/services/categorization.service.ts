@@ -240,14 +240,17 @@ export class CategorizationService {
     // Get AI categorization
     const aiResult = await this.invokeAIAgent(transaction, tenantId);
 
-    // Calculate final confidence
-    let finalConfidence = aiResult.confidenceScore;
+    // Calculate final confidence.
+    // CANONICAL SCALE: integer 0-100.
+    // All writers (PatternMatcher, ConfidenceScorer, fallback keywords, LLM) must
+    // produce values in this range. The Math.round guard below ensures no decimal
+    // fractional values (e.g. legacy 0.95) reach the DB from this path.
+    let finalConfidence = Math.round(aiResult.confidenceScore);
     let source = CategorizationSource.AI_AUTO;
 
     if (patternMatch) {
-      finalConfidence = Math.min(
-        100,
-        aiResult.confidenceScore + patternMatch.confidenceBoost,
+      finalConfidence = Math.round(
+        Math.min(100, aiResult.confidenceScore + patternMatch.confidenceBoost),
       );
       source = CategorizationSource.RULE_BASED;
 
@@ -778,12 +781,15 @@ export class CategorizationService {
     recurringMatch: any,
     tenantId: string,
   ): Promise<CategorizationItemResult> {
+    // Canonical scale: integer 0-100. RecurringDetectionService produces integers,
+    // but Math.round guards against any future decimal drift.
+    const recurringConfidence = Math.round(Number(recurringMatch.confidence));
     const categorizationDto: CreateCategorizationDto = {
       transactionId: transaction.id,
       accountCode: recurringMatch.suggestedAccountCode,
       accountName: recurringMatch.suggestedAccountName,
-      confidenceScore: recurringMatch.confidence,
-      reasoning: `Recurring ${recurringMatch.frequency} payment to ${recurringMatch.payeeName} (${recurringMatch.confidence}% confidence)`,
+      confidenceScore: recurringConfidence,
+      reasoning: `Recurring ${recurringMatch.frequency} payment to ${recurringMatch.payeeName} (${String(recurringConfidence)}% confidence)`,
       source: CategorizationSource.RULE_BASED,
       isSplit: false,
       vatAmountCents: this.calculateVatAmount(
@@ -818,7 +824,7 @@ export class CategorizationService {
       try {
         await this.accuracyMetricsService.recordCategorization(tenantId, {
           transactionId: transaction.id,
-          confidence: recurringMatch.confidence,
+          confidence: recurringConfidence,
           isAutoApplied: true,
           accountCode: recurringMatch.suggestedAccountCode,
         });
@@ -852,7 +858,7 @@ export class CategorizationService {
       status: 'AUTO_APPLIED',
       accountCode: recurringMatch.suggestedAccountCode,
       accountName: recurringMatch.suggestedAccountName,
-      confidenceScore: recurringMatch.confidence,
+      confidenceScore: recurringConfidence,
       source: CategorizationSource.RULE_BASED,
     };
   }

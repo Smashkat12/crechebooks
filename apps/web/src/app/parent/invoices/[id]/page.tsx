@@ -36,66 +36,10 @@ import { InvoiceLineItems, type LineItem } from '@/components/parent-portal/invo
 import {
   useParentInvoice,
   useDownloadParentInvoicePdf,
-  type ParentInvoiceDetail,
   type ParentInvoiceStatus,
 } from '@/hooks/parent-portal/use-parent-invoices';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-
-// Mock invoice detail for development
-const mockInvoiceDetail: ParentInvoiceDetail = {
-  id: '1',
-  invoiceNumber: 'INV-2024-001',
-  issueDate: '2024-01-15',
-  dueDate: '2024-01-31',
-  status: 'overdue',
-  parentName: 'Sarah Smith',
-  parentEmail: 'sarah.smith@example.com',
-  crecheName: 'Little Stars Creche',
-  crecheAddress: '123 Rainbow Road, Sandton, 2196',
-  childName: 'Emma Smith',
-  subtotal: 1450.0,
-  vatAmount: 50.0,
-  total: 1500.0,
-  amountPaid: 0,
-  amountDue: 1500.0,
-  lineItems: [
-    {
-      id: '1',
-      description: 'Monthly Tuition Fee - January 2024',
-      quantity: 1,
-      unitPrice: 1200.0,
-      vatAmount: 0,
-      total: 1200.0,
-    },
-    {
-      id: '2',
-      description: 'Meals - Breakfast & Lunch',
-      quantity: 22,
-      unitPrice: 10.0,
-      vatAmount: 33.0,
-      total: 220.0,
-    },
-    {
-      id: '3',
-      description: 'Transport Fee',
-      quantity: 1,
-      unitPrice: 30.0,
-      vatAmount: 4.50,
-      total: 30.0,
-    },
-    {
-      id: '4',
-      description: 'Arts & Crafts Materials',
-      quantity: 1,
-      unitPrice: 50.0,
-      vatAmount: 7.50,
-      total: 50.0,
-    },
-  ],
-  payments: [],
-  notes: 'Thank you for choosing Little Stars Creche!',
-};
 
 const statusConfig: Record<
   ParentInvoiceStatus,
@@ -169,11 +113,10 @@ export default function InvoiceDetailPage() {
   const invoiceId = params.id as string;
 
   // State
-  const [useMockData, setUseMockData] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
   // Fetch invoice detail
-  const { data, isLoading, error, isError } = useParentInvoice(invoiceId);
+  const { data: invoice, isLoading, error, isError } = useParentInvoice(invoiceId);
   const { downloadPdf } = useDownloadParentInvoicePdf();
 
   // Check authentication
@@ -183,18 +126,6 @@ export default function InvoiceDetailPage() {
       router.push('/parent/login');
     }
   }, [router]);
-
-  // Handle API errors by falling back to mock data
-  useEffect(() => {
-    if (isError && !useMockData) {
-      console.warn('Invoice detail API error, using mock data:', error?.message);
-      setUseMockData(true);
-    }
-  }, [isError, error, useMockData]);
-
-  // Determine which data to display
-  const invoice = useMockData ? mockInvoiceDetail : data;
-  const showLoading = isLoading && !useMockData;
 
   // Handle PDF download
   const handleDownloadPdf = async () => {
@@ -223,7 +154,7 @@ export default function InvoiceDetailPage() {
     router.push('/parent/invoices');
   };
 
-  if (showLoading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
@@ -231,6 +162,32 @@ export default function InvoiceDetailPage() {
           Back to Invoices
         </Button>
         <InvoiceDetailSkeleton />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Invoices
+        </Button>
+        <div className="max-w-lg mx-auto mt-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {error?.message || 'Unable to load this invoice. Please try again.'}
+            </AlertDescription>
+          </Alert>
+          <Button
+            className="mt-4 w-full"
+            variant="outline"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }

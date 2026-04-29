@@ -160,18 +160,12 @@ export class XeroAutoSyncJob {
       // A 429 means "Xero is throttling us right now" — not a broken connection.
       // We store the deadline on `bank_connections.rate_limit_until_at` so the
       // pause survives process restarts (unlike the in-memory backoff map below).
-      //
-      // NOTE: `rateLimitUntilAt` is not yet in the Prisma schema — the column
-      // exists after migration 20260429100000.  Cast to any to avoid TS errors
-      // until schema-guardian regenerates the Prisma client.
-      const rateLimitedConnection = await (
-        this.prisma.bankConnection as any
-      ).findFirst({
+      const rateLimitedConnection = await this.prisma.bankConnection.findFirst({
         where: { tenantId, rateLimitUntilAt: { gt: new Date() } },
         select: { rateLimitUntilAt: true },
       });
       if (rateLimitedConnection?.rateLimitUntilAt) {
-        const deadline = rateLimitedConnection.rateLimitUntilAt as Date;
+        const deadline = rateLimitedConnection.rateLimitUntilAt;
         const minutesLeft = Math.ceil(
           (deadline.getTime() - Date.now()) / 60_000,
         );
@@ -254,7 +248,7 @@ export class XeroAutoSyncJob {
           await this.prisma.bankConnection.updateMany({
             where: { tenantId, status: { not: 'DISCONNECTED' } },
 
-            data: { rateLimitUntilAt: null } as any,
+            data: { rateLimitUntilAt: null },
           });
         } catch {
           // Non-fatal: the column may not exist yet if migration hasn't run.
@@ -276,7 +270,7 @@ export class XeroAutoSyncJob {
             await this.prisma.bankConnection.updateMany({
               where: { tenantId, status: { not: 'DISCONNECTED' } },
 
-              data: { rateLimitUntilAt: retryAt } as any,
+              data: { rateLimitUntilAt: retryAt },
             });
           } catch (persistErr) {
             this.logger.warn(

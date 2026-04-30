@@ -27,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 const feeStructureSchema = z.object({
   name: z.string().min(1, 'Fee structure name is required').max(100),
   description: z.string().max(500).optional(),
-  fee_type: z.enum(['FULL_DAY', 'HALF_DAY', 'HOURLY', 'CUSTOM']),
+  fee_type: z.enum(['FULL_DAY']),
   amount: z.coerce.number().min(0, 'Amount must be positive'),
   registration_fee: z.coerce.number().min(0).optional(),
   vat_inclusive: z.boolean(),
@@ -51,7 +51,6 @@ export function FeeStructureForm({ onComplete, onCancel }: FeeStructureFormProps
     register,
     handleSubmit,
     control,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<FeeStructureFormData>({
     resolver: zodResolver(feeStructureSchema),
@@ -66,8 +65,6 @@ export function FeeStructureForm({ onComplete, onCancel }: FeeStructureFormProps
       effective_from: new Date().toISOString().split('T')[0],
     },
   });
-
-  const feeType = watch('fee_type');
 
   // If there are already fee structures, show a message
   const hasFeeStructures = feeStructures && feeStructures.fee_structures.length > 0;
@@ -146,9 +143,6 @@ export function FeeStructureForm({ onComplete, onCancel }: FeeStructureFormProps
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="FULL_DAY">Full Day</SelectItem>
-                  <SelectItem value="HALF_DAY">Half Day</SelectItem>
-                  <SelectItem value="HOURLY">Hourly</SelectItem>
-                  <SelectItem value="CUSTOM">Custom</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -161,7 +155,6 @@ export function FeeStructureForm({ onComplete, onCancel }: FeeStructureFormProps
         <div className="space-y-2">
           <Label htmlFor="amount">
             Monthly Amount (ZAR) *
-            {feeType === 'HOURLY' && <span className="text-muted-foreground"> per hour</span>}
           </Label>
           <Input
             id="amount"

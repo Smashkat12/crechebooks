@@ -40,9 +40,6 @@ import {
 
 const FEE_TYPES: { value: FeeType; label: string }[] = [
   { value: 'FULL_DAY', label: 'Full Day' },
-  { value: 'HALF_DAY', label: 'Half Day' },
-  { value: 'HOURLY', label: 'Hourly' },
-  { value: 'CUSTOM', label: 'Custom' },
 ];
 
 export default function FeeStructuresSettingsPage() {

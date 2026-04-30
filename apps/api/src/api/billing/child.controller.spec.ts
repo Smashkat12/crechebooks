@@ -1,13 +1,12 @@
 /**
- * ChildController — AUDIT-BILL-08 fee-type guard tests
+ * ChildController — enrollment entry point tests
  *
- * Verifies that enrollChild and enrollExistingChild both throw
- * BadRequestException when a fee structure with an unsupported feeType
- * (HALF_DAY, HOURLY, CUSTOM) is supplied, and pass through for FULL_DAY.
+ * Verifies that enrollChild and enrollExistingChild accept FULL_DAY
+ * fee structures. HALF_DAY/HOURLY/CUSTOM guard removed — the type is
+ * narrowed at the schema level (schema-guardian follow-up).
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { ChildController } from './child.controller';
 import { ChildRepository } from '../../database/repositories/child.repository';
 import { ParentRepository } from '../../database/repositories/parent.repository';
@@ -165,43 +164,13 @@ function buildModule(feeType: FeeType): Promise<ChildController> {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-describe('ChildController — AUDIT-BILL-08 feeType guard', () => {
+describe('ChildController — enrollment entry points', () => {
   describe('enrollChild (POST /children)', () => {
     it('accepts FULL_DAY fee structure without throwing', async () => {
       const controller = await buildModule(FeeType.FULL_DAY);
       await expect(
         controller.enrollChild(enrollChildDto as any, mockUser as any),
       ).resolves.toBeDefined();
-    });
-
-    it('rejects HALF_DAY fee structure with BadRequestException', async () => {
-      const controller = await buildModule(FeeType.HALF_DAY);
-      await expect(
-        controller.enrollChild(enrollChildDto as any, mockUser as any),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('rejects HOURLY fee structure with BadRequestException', async () => {
-      const controller = await buildModule(FeeType.HOURLY);
-      await expect(
-        controller.enrollChild(enrollChildDto as any, mockUser as any),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('rejects CUSTOM fee structure with BadRequestException', async () => {
-      const controller = await buildModule(FeeType.CUSTOM);
-      await expect(
-        controller.enrollChild(enrollChildDto as any, mockUser as any),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('BadRequestException message names the unsupported feeType', async () => {
-      const controller = await buildModule(FeeType.HOURLY);
-      await expect(
-        controller.enrollChild(enrollChildDto as any, mockUser as any),
-      ).rejects.toMatchObject({
-        message: expect.stringContaining('HOURLY'),
-      });
     });
   });
 
@@ -214,48 +183,6 @@ describe('ChildController — AUDIT-BILL-08 feeType guard', () => {
           mockUser as any,
         ),
       ).resolves.toBeDefined();
-    });
-
-    it('rejects HALF_DAY fee structure with BadRequestException', async () => {
-      const controller = await buildModule(FeeType.HALF_DAY);
-      await expect(
-        controller.enrollExistingChild(
-          enrollExistingDto as any,
-          mockUser as any,
-        ),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('rejects HOURLY fee structure with BadRequestException', async () => {
-      const controller = await buildModule(FeeType.HOURLY);
-      await expect(
-        controller.enrollExistingChild(
-          enrollExistingDto as any,
-          mockUser as any,
-        ),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('rejects CUSTOM fee structure with BadRequestException', async () => {
-      const controller = await buildModule(FeeType.CUSTOM);
-      await expect(
-        controller.enrollExistingChild(
-          enrollExistingDto as any,
-          mockUser as any,
-        ),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('BadRequestException message names the unsupported feeType', async () => {
-      const controller = await buildModule(FeeType.HALF_DAY);
-      await expect(
-        controller.enrollExistingChild(
-          enrollExistingDto as any,
-          mockUser as any,
-        ),
-      ).rejects.toMatchObject({
-        message: expect.stringContaining('HALF_DAY'),
-      });
     });
   });
 });

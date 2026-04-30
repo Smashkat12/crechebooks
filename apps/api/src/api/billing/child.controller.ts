@@ -14,7 +14,6 @@
  */
 
 import {
-  BadRequestException,
   Controller,
   Get,
   Post,
@@ -37,7 +36,7 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { UserRole, ChildStatus, FeeType } from '@prisma/client';
+import { UserRole, ChildStatus } from '@prisma/client';
 import { ChildRepository } from '../../database/repositories/child.repository';
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { FeeStructureRepository } from '../../database/repositories/fee-structure.repository';
@@ -124,20 +123,6 @@ export class ChildController {
       );
       throw new NotFoundException('FeeStructure', dto.fee_structure_id);
     }
-    // AUDIT-BILL-08: HALF_DAY/HOURLY/CUSTOM feeTypes are not implemented in the
-    // billing pipeline — all invoices are generated as flat monthly amounts.
-    // Reject at enrollment entry point to prevent silent mispricing.
-    // TODO(billing-engineer): Implement rate logic for HALF_DAY/HOURLY/CUSTOM (effort M).
-    const SUPPORTED_FEE_TYPES: FeeType[] = [FeeType.FULL_DAY];
-    if (!SUPPORTED_FEE_TYPES.includes(feeStructure.feeType)) {
-      this.logger.error(
-        `Unsupported feeType '${feeStructure.feeType}' on fee structure ${feeStructure.id} — only ${SUPPORTED_FEE_TYPES.join(', ')} is supported by the billing pipeline`,
-      );
-      throw new BadRequestException(
-        `Fee structure type '${feeStructure.feeType}' is not supported by the billing pipeline. Only FULL_DAY is currently implemented.`,
-      );
-    }
-
     // 3. Create child (API snake_case -> Repository camelCase)
     const child = await this.childRepo.create({
       tenantId: getTenantId(user),
@@ -307,17 +292,6 @@ export class ChildController {
       );
       throw new NotFoundException('FeeStructure', dto.fee_structure_id);
     }
-    // AUDIT-BILL-08: Same feeType guard as enrollChild — see comment there.
-    const SUPPORTED_FEE_TYPES_EXISTING: FeeType[] = [FeeType.FULL_DAY];
-    if (!SUPPORTED_FEE_TYPES_EXISTING.includes(feeStructure.feeType)) {
-      this.logger.error(
-        `Unsupported feeType '${feeStructure.feeType}' on fee structure ${feeStructure.id} — only ${SUPPORTED_FEE_TYPES_EXISTING.join(', ')} is supported by the billing pipeline`,
-      );
-      throw new BadRequestException(
-        `Fee structure type '${feeStructure.feeType}' is not supported by the billing pipeline. Only FULL_DAY is currently implemented.`,
-      );
-    }
-
     // 3. Create enrollment (service validates no duplicate, date, etc.)
     const {
       enrollment,

@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 
-export type FeeType = 'FULL_DAY' | 'HALF_DAY' | 'HOURLY' | 'CUSTOM';
+export type FeeType = 'FULL_DAY';
 
 export interface FeeStructure {
   id: string;

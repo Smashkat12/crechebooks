@@ -278,9 +278,9 @@ describe('InvoiceGenerationService', () => {
     testFeeStructure2 = await prisma.feeStructure.create({
       data: {
         tenantId: testTenant.id,
-        name: 'Half Day Care',
-        description: 'Half day care',
-        feeType: FeeType.HALF_DAY,
+        name: 'Alternative Full Day Care',
+        description: 'Alternative full day care',
+        feeType: FeeType.FULL_DAY,
         amountCents: 300000, // R3000
         effectiveFrom: new Date('2024-01-01'),
       },

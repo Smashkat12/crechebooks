@@ -4,7 +4,6 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { EnrollmentRepository } from '../../../src/database/repositories/enrollment.repository';
 import { CreateEnrollmentDto } from '../../../src/database/dto/enrollment.dto';
 import { EnrollmentStatus } from '../../../src/database/entities/enrollment.entity';
-import { FeeType } from '../../../src/database/entities/fee-structure.entity';
 import { NotFoundException } from '../../../src/shared/exceptions';
 import { Tenant, Parent, Child, FeeStructure } from '@prisma/client';
 import { cleanDatabase } from '../../helpers/clean-database';
@@ -109,8 +108,8 @@ describe('EnrollmentRepository', () => {
     otherFeeStructure = await prisma.feeStructure.create({
       data: {
         tenantId: testTenant.id,
-        name: 'Half Day Care',
-        feeType: 'HALF_DAY',
+        name: 'Alternative Full Day Care',
+        feeType: 'FULL_DAY',
         amountCents: 275000,
         effectiveFrom: new Date('2025-01-01'),
       },

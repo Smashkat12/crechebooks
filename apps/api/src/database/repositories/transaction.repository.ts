@@ -353,12 +353,33 @@ export class TransactionRepository {
         );
       }
 
-      await this.prisma.transaction.update({
-        where: { id },
-        data: {
-          isDeleted: true,
-          deletedAt: new Date(),
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.transaction.update({
+          where: { id },
+          data: {
+            isDeleted: true,
+            deletedAt: new Date(),
+          },
+        });
+
+        // Unlink any bank_statement_matches pointing at the deleted transaction.
+        // Without this, matches referencing the deleted transaction remain as MATCHED/etc.
+        // with a dangling transactionId, causing the recon view to show phantom matches.
+        // We revert them to IN_BANK_ONLY (bank row has no corresponding book entry)
+        // which is the same sane state the matcher uses when no Xero transaction is found.
+        await tx.bankStatementMatch.updateMany({
+          where: { transactionId: id },
+          data: {
+            transactionId: null,
+            status: 'IN_BANK_ONLY',
+            xeroDate: null,
+            xeroDescription: null,
+            xeroAmountCents: null,
+            xeroIsCredit: null,
+            matchConfidence: null,
+            discrepancyReason: null,
+          },
+        });
       });
 
       this.logger.log(`Soft deleted transaction ${id}`);

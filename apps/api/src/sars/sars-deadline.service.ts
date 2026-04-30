@@ -326,13 +326,22 @@ export class SarsDeadlineService {
   }
 
   /**
-   * Check if a return has been submitted
+   * Check if a return has been submitted.
+   *
+   * DB alias note: the Prisma SubmissionType enum currently has 'IRP5', not
+   * 'EMP501'. Until schema-guardian adds EMP501, queries for EMP501 are aliased
+   * to IRP5. Both refer to the same annual May-31 reconciliation slot and no
+   * existing submission rows use either value (eFiling is stubbed). Remove the
+   * alias once the Prisma enum is updated (see SarsDeadlineType for full plan).
    */
   private async checkSubmissionStatus(
     tenantId: string,
     type: SarsDeadlineType,
     period: string,
   ): Promise<{ isSubmitted: boolean; submittedAt?: Date }> {
+    // EMP501 maps to IRP5 in the DB enum until schema-guardian adds EMP501.
+    const dbSubmissionType = type === 'EMP501' ? 'IRP5' : type;
+
     // Check SarsSubmission table if it exists
     try {
       // Parse period string (YYYY-MM) to get start of month
@@ -351,7 +360,7 @@ export class SarsDeadlineService {
       const submission = await this.prisma.sarsSubmission.findFirst({
         where: {
           tenantId,
-          submissionType: type,
+          submissionType: dbSubmissionType,
           periodStart: {
             gte: periodStartDate,
           },

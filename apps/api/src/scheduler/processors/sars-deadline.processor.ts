@@ -232,10 +232,7 @@ This is an automated reminder.
       case 'EMP201':
         return 'EMP201 is your monthly PAYE return. Verify that all employee tax deductions are correctly calculated.';
       case 'EMP501':
-        return 'EMP501 is your Employer Annual Reconciliation Declaration. All employee IRP5 records must be accurate for SARS reconciliation (EMP501 §2).';
-      case 'IRP5':
-        // Legacy alias kept until all callers are migrated to EMP501.
-        return 'EMP501 is your Employer Annual Reconciliation Declaration. All employee IRP5 records must be accurate for SARS reconciliation (EMP501 §2).';
+        return 'EMP501 is your Employer Annual Reconciliation Declaration. All employee IRP5/IT3(a) records must be accurate for SARS reconciliation (EMP501 §2).';
       default:
         return '';
     }

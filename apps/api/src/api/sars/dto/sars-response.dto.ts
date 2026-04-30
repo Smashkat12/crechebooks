@@ -11,10 +11,7 @@ export class SarsSubmissionDataDto {
   @ApiProperty({ example: 'uuid-here' })
   id!: string;
 
-  @ApiProperty({
-    example: 'VAT201',
-    enum: ['VAT201', 'EMP201', 'IRP5', 'EMP501'],
-  })
+  @ApiProperty({ example: 'VAT201', enum: ['VAT201', 'EMP201', 'EMP501'] })
   submission_type!: string;
 
   @ApiProperty({ example: '2025-01', description: 'Period in YYYY-MM format' })

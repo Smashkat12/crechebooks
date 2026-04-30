@@ -94,7 +94,7 @@ export class SarsDeadlineService {
     ref.setHours(0, 0, 0, 0);
 
     if (config.frequency === 'ANNUAL') {
-      // Annual deadline (IRP5)
+      // Annual deadline (EMP501)
       const deadline = new Date(
         ref.getFullYear(),
         config.monthOfYear,

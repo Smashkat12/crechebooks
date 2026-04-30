@@ -83,6 +83,8 @@ describe('StitchBankingService', () => {
           STITCH_REDIRECT_URI: 'https://app.test.com/banking/callback',
           STITCH_SANDBOX: 'true',
           NODE_ENV: 'test',
+          // Enable the feature gate for all tests in this suite
+          BANK_API_ENABLED: 'true',
         };
         return config[key] ?? defaultValue;
       }),
@@ -769,6 +771,92 @@ describe('StitchBankingService', () => {
         expect.stringContaining('/oauth/token'),
         expect.any(Object),
       );
+    });
+  });
+
+  describe('BANK_API_ENABLED env gate', () => {
+    let disabledService: StitchBankingService;
+
+    beforeEach(async () => {
+      const disabledConfigService = {
+        get: jest.fn((key: string, defaultValue?: unknown) => {
+          const config: Record<string, unknown> = {
+            STITCH_API_URL: 'https://api.stitch.money',
+            STITCH_CLIENT_ID: 'test-client-id',
+            STITCH_CLIENT_SECRET: 'test-client-secret',
+            STITCH_REDIRECT_URI: 'https://app.test.com/banking/callback',
+            STITCH_SANDBOX: 'true',
+            NODE_ENV: 'test',
+            // BANK_API_ENABLED intentionally absent → service is disabled
+          };
+          return config[key] ?? defaultValue;
+        }),
+      };
+
+      const mockPrismaService = {
+        linkedBankAccount: {
+          findUnique: jest.fn(),
+          findMany: jest.fn(),
+          create: jest.fn(),
+          update: jest.fn(),
+        },
+        linkedBankSyncEvent: { create: jest.fn() },
+        transaction: { findMany: jest.fn(), createMany: jest.fn() },
+      };
+
+      const mockEncryptionService = {
+        encrypt: jest.fn(),
+        decrypt: jest.fn(),
+        generateRandomString: jest.fn().mockReturnValue('random-string-123'),
+      };
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          StitchBankingService,
+          { provide: PrismaService, useValue: mockPrismaService },
+          { provide: ConfigService, useValue: disabledConfigService },
+          { provide: EncryptionService, useValue: mockEncryptionService },
+        ],
+      }).compile();
+
+      disabledService = module.get<StitchBankingService>(StitchBankingService);
+    });
+
+    it('should throw SERVICE_UNAVAILABLE from initiateAccountLink when disabled', async () => {
+      await expect(
+        disabledService.initiateAccountLink({ tenantId: 'tenant-123' }),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await disabledService.initiateAccountLink({ tenantId: 'tenant-123' });
+      } catch (err) {
+        expect((err as HttpException).getStatus()).toBe(
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+    });
+
+    it('should throw SERVICE_UNAVAILABLE from syncAccount when disabled', async () => {
+      await expect(disabledService.syncAccount('account-456')).rejects.toThrow(
+        HttpException,
+      );
+
+      try {
+        await disabledService.syncAccount('account-456');
+      } catch (err) {
+        expect((err as HttpException).getStatus()).toBe(
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      }
+    });
+
+    it('should still return linked accounts (DB-only) when disabled', async () => {
+      // getLinkedAccounts is DB-only, no Stitch call — must NOT be gated
+      (
+        disabledService['prisma'].linkedBankAccount.findMany as jest.Mock
+      ).mockResolvedValue([]);
+      const result = await disabledService.getLinkedAccounts('tenant-123');
+      expect(result).toEqual([]);
     });
   });
 

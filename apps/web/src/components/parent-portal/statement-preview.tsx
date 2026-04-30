@@ -14,7 +14,6 @@
  * - Email to self button
  */
 
-import { useState } from 'react';
 import {
   FileBarChart2,
   Download,
@@ -41,15 +40,6 @@ interface StatementPreviewProps {
   statement?: ParentStatementDetail;
   isLoading?: boolean;
   error?: Error;
-}
-
-// Get month name from month number
-function getMonthName(month: number): string {
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  return months[month - 1] || 'Unknown';
 }
 
 // Loading skeleton
@@ -81,69 +71,6 @@ function PreviewSkeleton() {
   );
 }
 
-// Mock statement for demo
-const getMockStatement = (year: number, month: number): ParentStatementDetail => ({
-  year,
-  month,
-  periodLabel: `${getMonthName(month)} ${year}`,
-  parentName: 'John Smith',
-  parentEmail: 'john.smith@example.com',
-  accountNumber: 'ACC-2024-001',
-  openingBalance: month === 1 ? 0 : 500,
-  closingBalance: 1500,
-  totalInvoiced: 3000,
-  totalPaid: 1500,
-  totalCredits: 0,
-  netMovement: 1500,
-  transactions: [
-    {
-      id: '1',
-      date: `${year}-${String(month).padStart(2, '0')}-01`,
-      description: 'INV-2024-001 - Monthly Tuition (Emma)',
-      type: 'invoice',
-      debit: 1500,
-      credit: null,
-      balance: 2000,
-    },
-    {
-      id: '2',
-      date: `${year}-${String(month).padStart(2, '0')}-05`,
-      description: 'Payment - EFT Ref: PAY123456',
-      type: 'payment',
-      debit: null,
-      credit: 1000,
-      balance: 1000,
-    },
-    {
-      id: '3',
-      date: `${year}-${String(month).padStart(2, '0')}-10`,
-      description: 'INV-2024-002 - Extra Activities (Emma)',
-      type: 'invoice',
-      debit: 500,
-      credit: null,
-      balance: 1500,
-    },
-    {
-      id: '4',
-      date: `${year}-${String(month).padStart(2, '0')}-15`,
-      description: 'INV-2024-003 - Monthly Tuition (James)',
-      type: 'invoice',
-      debit: 1000,
-      credit: null,
-      balance: 2500,
-    },
-    {
-      id: '5',
-      date: `${year}-${String(month).padStart(2, '0')}-20`,
-      description: 'Payment - Card Ref: CARD789012',
-      type: 'payment',
-      debit: null,
-      credit: 500,
-      balance: 2000,
-    },
-  ],
-});
-
 export function StatementPreview({
   year,
   month,
@@ -151,42 +78,40 @@ export function StatementPreview({
   isLoading,
   error,
 }: StatementPreviewProps) {
-  const [useMockData, setUseMockData] = useState(false);
   const { downloadPdf, isDownloading } = useDownloadStatementPdf();
   const { emailStatement, isEmailing } = useEmailStatement();
-
-  // Use mock data if no statement provided or on error
-  const displayStatement = statement || (useMockData || !isLoading ? getMockStatement(year, month) : undefined);
 
   if (isLoading) {
     return <PreviewSkeleton />;
   }
 
-  if (error && !useMockData) {
+  if (error) {
     return (
       <Card>
         <CardContent className="py-8">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between">
-              <span>{error.message || 'Failed to load statement.'}</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setUseMockData(true)}
-              >
-                View Demo
+          <div className="max-w-lg mx-auto">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {error.message || 'Failed to load statement. Please try again.'}
+              </AlertDescription>
+            </Alert>
+            <div className="mt-4 flex justify-center">
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Try Again
               </Button>
-            </AlertDescription>
-          </Alert>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  if (!displayStatement) {
+  if (!statement) {
     return <PreviewSkeleton />;
   }
+
+  const displayStatement = statement;
 
   const handleDownloadPdf = async () => {
     try {

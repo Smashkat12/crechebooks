@@ -28,6 +28,8 @@ import { FeeStructureRepository } from '../../../database/repositories/fee-struc
 import { ParentFeeAgreementPdfService } from '../../../database/services/parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from '../../../database/services/parent-consent-forms-pdf.service';
 import { MagicLinkService } from '../../../api/auth/services/magic-link.service';
+// AUDIT-WA-DELIVERY: wire invoice delivery into the WA onboarding completion path
+import { InvoiceDeliveryService } from '../../../database/services/invoice-delivery.service';
 import {
   OnboardingCollectedData,
   ONBOARDING_TRIGGERS,
@@ -98,6 +100,8 @@ export class OnboardingConversationHandler {
     private readonly feeAgreementPdfService: ParentFeeAgreementPdfService,
     private readonly consentFormsPdfService: ParentConsentFormsPdfService,
     private readonly magicLinkService: MagicLinkService,
+    // AUDIT-WA-DELIVERY: deliver invoice immediately after WA self-enrollment
+    private readonly invoiceDeliveryService: InvoiceDeliveryService,
   ) {}
 
   /**
@@ -2274,6 +2278,50 @@ export class OnboardingConversationHandler {
         // Use per-child surname, falling back to parent's surname
         const childLastName = childData.surname || data.parent?.surname || '';
 
+        // Duplicate guard: check whether a child with the same name+DOB already
+        // exists for this tenant (case-insensitive match). This prevents a second
+        // parent from creating a duplicate child record via WA self-enrollment.
+        if (childData.firstName && childLastName && childData.dateOfBirth) {
+          const existing = await this.prisma.child.findFirst({
+            where: {
+              tenantId,
+              firstName: { equals: childData.firstName, mode: 'insensitive' },
+              lastName: { equals: childLastName, mode: 'insensitive' },
+              dateOfBirth: new Date(childData.dateOfBirth),
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+
+          if (existing) {
+            this.logger.warn(
+              `Duplicate child detected during WA onboarding [session=${sessionId}] — existing child ID redacted`,
+            );
+            await this.contentService.sendSessionMessage(
+              waId,
+              `We already have a child matching that name and date of birth registered at ${tenantName}. ` +
+                `This could mean the child is enrolled under a different guardian. ` +
+                `Please contact ${tenantName} directly so a staff member can link you as an additional guardian. ` +
+                `We have flagged this for operator review.`,
+              tenantId,
+            );
+            // Mark session as requiring operator review and stop processing
+            await this.prisma.whatsAppOnboardingSession.update({
+              where: { id: sessionId },
+              data: {
+                status: WaOnboardingStatus.ABANDONED,
+                collectedData: {
+                  ...(data as unknown as Record<string, unknown>),
+                  _duplicateChildFlag: true,
+                  _duplicateChildName: `[redacted]`,
+                  _flaggedAt: new Date().toISOString(),
+                } as unknown as Prisma.InputJsonValue,
+              },
+            });
+            return;
+          }
+        }
+
         const child = await this.prisma.child.create({
           data: {
             tenantId,
@@ -2320,6 +2368,37 @@ export class OnboardingConversationHandler {
 
             if (enrollResult.invoice) {
               firstInvoiceTotal = enrollResult.invoice.totalCents;
+
+              // AUDIT-WA-DELIVERY: deliver the enrollment invoice immediately.
+              // The staging-safety gate (APP_ENV=staging + COMMS_DISABLED) lives
+              // inside InvoiceDeliveryService.sendInvoices — all callers benefit.
+              // Failure is non-fatal: log a warning, leave invoice in DRAFT for
+              // the scheduler to retry on the next auto-send cycle.
+              try {
+                await this.invoiceDeliveryService.sendInvoices({
+                  tenantId,
+                  invoiceIds: [enrollResult.invoice.id],
+                });
+                this.logger.log(
+                  `[AUDIT-WA-DELIVERY] Invoice ${enrollResult.invoice.id} delivered for WA-enrolled child ${child.id}`,
+                );
+              } catch (deliveryError) {
+                this.logger.warn(
+                  `[AUDIT-WA-DELIVERY] Invoice delivery failed for child ${child.id} ` +
+                    `(invoice ${enrollResult.invoice.id}): ${deliveryError instanceof Error ? deliveryError.message : String(deliveryError)}. ` +
+                    `Invoice remains DRAFT — scheduler will retry on next auto-send cycle.`,
+                );
+              }
+            } else {
+              // AUDIT-WA-STUCKDRAFT: enrollment that produced no invoice — keep
+              // the warn log so the operator can see when this happens.
+              this.logger.warn({
+                message: 'WA onboarding enrollment produced no invoice',
+                sessionId,
+                tenantId,
+                invoiceError:
+                  enrollResult.invoiceError ?? 'no invoiceError field',
+              });
             }
 
             // Get fee structure name for the confirmation message

@@ -162,7 +162,12 @@ export class Emp201Service {
     }
 
     // Step 6: Calculate SDL (1% of total gross payroll)
-    const sdlResult = this.calculateSdl(totalGrossCents);
+    // Uses rolling 12-month gross for SDLA §4(b) exemption test; see calculateSdl()
+    const sdlResult = await this.calculateSdl(
+      tenantId!,
+      periodMonth,
+      totalGrossCents,
+    );
     const totalSdlCents = sdlResult.sdlCents;
     const sdlApplicable = sdlResult.sdlApplicable;
 
@@ -316,7 +321,11 @@ export class Emp201Service {
       totalUifEmployerCents += payroll.uifEmployerCents;
     }
 
-    const { sdlCents } = this.calculateSdl(totalGrossCents);
+    const { sdlCents } = await this.calculateSdl(
+      tenantId,
+      periodMonth,
+      totalGrossCents,
+    );
     const totalUifCents = totalUifEmployeeCents + totalUifEmployerCents;
 
     return {
@@ -478,31 +487,70 @@ export class Emp201Service {
   }
 
   /**
-   * Calculate SDL (Skills Development Levy)
-   * 1% of total gross payroll, exempt if annual payroll < R500,000
+   * Calculate SDL (Skills Development Levy) — AUDIT-TAX-07
+   *
+   * SDLA §4(b): employers whose annual payroll does not exceed R500,000 are exempt.
+   * SDL = 0 when rollingAnnualGross <= R500,000.
+   *
+   * Annual gross is estimated using rolling 12-month actuals (option a):
+   *   SUM(grossSalaryCents) for APPROVED payrolls in the 12 calendar months ending
+   *   on the last day of periodMonth. More accurate than month × 12, which
+   *   overstates for seasonal staff and short-tenure new hires.
+   *
+   * No schema column for sdl_exempt — the exemption is derived purely from the
+   * rolling gross total per SDLA §4(b) (no employer-level flag in the Act).
+   *
+   * IMPORTANT: Does not backfill historical SARS submissions.
+   * Only affects new EMP201 generations (DRAFT records).
+   *
+   * @param tenantId - Tenant whose payrolls to aggregate
+   * @param periodMonth - Current EMP201 period in YYYY-MM format
+   * @param currentMonthGrossCents - Current month gross (for SDL levy amount)
    */
-  calculateSdl(totalGrossCents: number): {
+  async calculateSdl(
+    tenantId: string,
+    periodMonth: string,
+    currentMonthGrossCents: number,
+  ): Promise<{
     sdlCents: number;
     sdlApplicable: boolean;
-  } {
-    // Estimate annual payroll (monthly * 12)
-    const estimatedAnnualPayrollCents = totalGrossCents * 12;
+    rollingAnnualGrossCents: number;
+  }> {
+    // Rolling 12-month window: from 1st of (periodMonth - 12 months) to last day of periodMonth
+    const [year, month] = periodMonth.split('-').map(Number);
+    const windowEnd = new Date(year, month, 0); // last day of periodMonth
+    const windowStart = new Date(year, month - 13, 1); // 1st of month, 12 months prior
 
-    // Check if exempt (below R500,000 annual threshold)
+    // Sum APPROVED gross payroll for rolling 12 months (SDLA §4(b) annual payroll estimate)
+    const agg = await this.prisma.payroll.aggregate({
+      where: {
+        tenantId,
+        status: 'APPROVED',
+        payPeriodStart: {
+          gte: windowStart,
+          lte: windowEnd,
+        },
+      },
+      _sum: { grossSalaryCents: true },
+    });
+
+    const rollingAnnualGrossCents = agg._sum.grossSalaryCents ?? 0;
+
+    // SDLA §4(b): exempt when rolling annual payroll does not exceed R500,000
+    // Exempt at exactly R500,000 — SDL applies only when payroll EXCEEDS the threshold.
     if (
-      estimatedAnnualPayrollCents <
-      EMP201_CONSTANTS.SDL_EXEMPTION_THRESHOLD_CENTS
+      rollingAnnualGrossCents <= EMP201_CONSTANTS.SDL_EXEMPTION_THRESHOLD_CENTS
     ) {
-      return { sdlCents: 0, sdlApplicable: false };
+      return { sdlCents: 0, sdlApplicable: false, rollingAnnualGrossCents };
     }
 
-    // Calculate SDL as 1% of monthly gross
-    const sdlCents = new Decimal(totalGrossCents)
+    // SDL = 1% of current month gross (levy is calculated monthly; exemption test is annual)
+    const sdlCents = new Decimal(currentMonthGrossCents)
       .mul(EMP201_CONSTANTS.SDL_RATE)
       .round()
       .toNumber();
 
-    return { sdlCents, sdlApplicable: true };
+    return { sdlCents, sdlApplicable: true, rollingAnnualGrossCents };
   }
 
   /**

@@ -45,15 +45,13 @@ export async function createFeeStructure(
 }
 
 /**
- * Create standard fee structures (Full Day, Half Day, Hourly)
+ * Create standard fee structures (Full Day only — HALF_DAY/HOURLY/CUSTOM removed)
  */
 export async function createStandardFeeStructures(
   prisma: PrismaService,
   tenantId: string,
 ): Promise<{
   fullDay: FeeStructure;
-  halfDay: FeeStructure;
-  hourly: FeeStructure;
 }> {
   const fullDay = await createFeeStructure(prisma, {
     tenantId,
@@ -62,19 +60,5 @@ export async function createStandardFeeStructures(
     amountCents: 300000, // R3,000
   });
 
-  const halfDay = await createFeeStructure(prisma, {
-    tenantId,
-    name: 'Half Day Care',
-    feeType: 'HALF_DAY',
-    amountCents: 200000, // R2,000
-  });
-
-  const hourly = await createFeeStructure(prisma, {
-    tenantId,
-    name: 'Hourly Care',
-    feeType: 'HOURLY',
-    amountCents: 15000, // R150/hour
-  });
-
-  return { fullDay, halfDay, hourly };
+  return { fullDay };
 }

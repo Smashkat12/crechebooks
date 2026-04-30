@@ -114,6 +114,7 @@ import { CashFlowReportService } from './services/cash-flow-report.service';
 import { AgedPayablesService } from './services/aged-payables.service';
 import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { EmailModule } from '../integrations/email/email.module';
+import { MailgunModule } from '../integrations/mailgun/mailgun.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { AgentMemoryModule } from '../agents/memory/agent-memory.module';
@@ -127,11 +128,13 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
 import { ConversationalModule } from '../agents/conversational/conversational.module';
 import { RolloutModule } from '../agents/rollout/rollout.module';
 import { TaxTableService } from './services/tax-table.service'; // TASK-STAFF-005
+import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT-PAY-04
 // TASK-STUB-PARITY: ACCOUNTING_PROVIDER is globally available via AccountingModule.forRoot()
 
 @Module({
   imports: [
     EmailModule,
+    MailgunModule, // provides CommsGuardService for InvoiceDeliveryService staging gate
     forwardRef(() => WhatsAppModule),
     forwardRef(() => AgentMemoryModule),
     forwardRef(() => AuditTrailModule), // TASK-SDK-011: Structured Audit Trail
@@ -144,6 +147,7 @@ import { TaxTableService } from './services/tax-table.service'; // TASK-STAFF-00
     forwardRef(() => NotificationModule),
     forwardRef(() => SimplePayModule), // TASK-STAFF-006: For SimplePay offboarding integration
     forwardRef(() => RolloutModule), // TASK-SDK-012: Parallel Rollout Framework
+    StorageModule, // AUDIT-PAY-04: PaymentReceiptService needs StorageService
   ],
   providers: [
     // TASK-QUOTE-001: QuotePdfService for quote PDF generation

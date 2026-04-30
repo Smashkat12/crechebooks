@@ -231,8 +231,8 @@ This is an automated reminder.
         return 'VAT201 is your monthly VAT return. Ensure all input and output VAT is reconciled before submission.';
       case 'EMP201':
         return 'EMP201 is your monthly PAYE return. Verify that all employee tax deductions are correctly calculated.';
-      case 'IRP5':
-        return 'IRP5 is your annual employee tax certificate. All employee records must be accurate for SARS reconciliation.';
+      case 'EMP501':
+        return 'EMP501 is your Employer Annual Reconciliation Declaration. All employee IRP5/IT3(a) records must be accurate for SARS reconciliation (EMP501 §2).';
       default:
         return '';
     }

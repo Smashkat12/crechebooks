@@ -42,7 +42,7 @@ export class SarsDeadlineService {
     const deadlines: UpcomingDeadline[] = [];
 
     // Check each deadline type
-    const types: SarsDeadlineType[] = ['VAT201', 'EMP201', 'IRP5'];
+    const types: SarsDeadlineType[] = ['VAT201', 'EMP201', 'EMP501'];
 
     for (const type of types) {
       // Get next deadline date
@@ -94,7 +94,7 @@ export class SarsDeadlineService {
     ref.setHours(0, 0, 0, 0);
 
     if (config.frequency === 'ANNUAL') {
-      // Annual deadline (IRP5)
+      // Annual deadline (EMP501)
       const deadline = new Date(
         ref.getFullYear(),
         config.monthOfYear,
@@ -326,7 +326,11 @@ export class SarsDeadlineService {
   }
 
   /**
-   * Check if a return has been submitted
+   * Check if a return has been submitted.
+   *
+   * Queries the SarsSubmission table using the canonical type value.
+   * EMP501 is now a valid Prisma SubmissionType enum value (migration
+   * 20260430120000_add_emp501_to_submission_type).
    */
   private async checkSubmissionStatus(
     tenantId: string,
@@ -338,7 +342,7 @@ export class SarsDeadlineService {
       // Parse period string (YYYY-MM) to get start of month
       const [year, month] = period.split('-').map(Number);
 
-      // If period is just a year (for annual like IRP5), use Jan 1
+      // If period is just a year (for annual like EMP501), use Jan 1
       const periodStartDate = month
         ? new Date(year, month - 1, 1)
         : new Date(year, 0, 1);

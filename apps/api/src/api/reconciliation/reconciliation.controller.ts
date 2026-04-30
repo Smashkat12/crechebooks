@@ -1392,6 +1392,141 @@ export class ReconciliationController {
     };
   }
 
+  /**
+   * AUDIT-BANK-03: IN_BANK_ONLY rows in RECONCILED periods.
+   * Returns per-period counts and line items so the admin can investigate
+   * bank entries that have no matching book transaction in closed periods.
+   */
+  @Get('bank-statement/unmatched-closed')
+  @HttpCode(200)
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({
+    summary:
+      'List IN_BANK_ONLY entries that remain inside RECONCILED periods. Indicates bank transactions with no matching book entry in a closed period.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Per-period list of unmatched bank-only entries in closed (RECONCILED) periods',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'object',
+          properties: {
+            total_count: { type: 'number' },
+            total_amount: {
+              type: 'number',
+              description: 'ZAR (sum of abs values)',
+            },
+            oldest_period_start: { type: 'string', nullable: true },
+            periods: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  reconciliation_id: { type: 'string' },
+                  period_start: { type: 'string' },
+                  period_end: { type: 'string' },
+                  bank_account: { type: 'string' },
+                  count: { type: 'number' },
+                  total_amount: { type: 'number' },
+                  items: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        bank_date: { type: 'string' },
+                        bank_description: { type: 'string' },
+                        bank_amount: { type: 'number' },
+                        bank_is_credit: { type: 'boolean' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getUnmatchedInClosedPeriods(@CurrentUser() user: IUser): Promise<{
+    success: boolean;
+    data: {
+      total_count: number;
+      total_amount: number;
+      oldest_period_start: string | null;
+      periods: Array<{
+        reconciliation_id: string;
+        period_start: string;
+        period_end: string;
+        bank_account: string;
+        count: number;
+        total_amount: number;
+        items: Array<{
+          id: string;
+          bank_date: string;
+          bank_description: string;
+          bank_amount: number;
+          bank_is_credit: boolean;
+        }>;
+      }>;
+    };
+  }> {
+    this.logger.log(`Unmatched in closed periods: tenant=${getTenantId(user)}`);
+
+    const periods =
+      await this.bankStatementReconciliationService.getUnmatchedInClosedPeriods(
+        getTenantId(user),
+      );
+
+    const totalCount = periods.reduce((sum, p) => sum + p.count, 0);
+    const totalAmountCents = periods.reduce(
+      (sum, p) => sum + p.totalAmountCents,
+      0,
+    );
+    const oldestPeriodStart =
+      periods.length > 0
+        ? periods.reduce((oldest, p) =>
+            p.periodStart < oldest.periodStart ? p : oldest,
+          ).periodStart
+        : null;
+
+    return {
+      success: true,
+      data: {
+        total_count: totalCount,
+        total_amount: totalAmountCents / 100,
+        oldest_period_start: oldestPeriodStart
+          ? oldestPeriodStart.toISOString().split('T')[0]
+          : null,
+        periods: periods.map((p) => ({
+          reconciliation_id: p.reconciliationId,
+          period_start: p.periodStart.toISOString().split('T')[0],
+          period_end: p.periodEnd.toISOString().split('T')[0],
+          bank_account: p.bankAccount,
+          count: p.count,
+          total_amount: p.totalAmountCents / 100,
+          items: p.items.map((item) => ({
+            id: item.id,
+            bank_date: item.bankDate.toISOString().split('T')[0],
+            bank_description: item.bankDescription,
+            bank_amount: item.bankAmountCents / 100,
+            bank_is_credit: item.bankIsCredit,
+          })),
+        })),
+      },
+    };
+  }
+
   @Post(':id/accept-discrepancies')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)

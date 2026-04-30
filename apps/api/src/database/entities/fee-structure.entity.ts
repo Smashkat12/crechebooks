@@ -5,9 +5,6 @@
 
 export enum FeeType {
   FULL_DAY = 'FULL_DAY',
-  HALF_DAY = 'HALF_DAY',
-  HOURLY = 'HOURLY',
-  CUSTOM = 'CUSTOM',
 }
 
 export interface IFeeStructure {

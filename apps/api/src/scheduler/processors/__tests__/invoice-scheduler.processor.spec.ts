@@ -9,13 +9,9 @@ import { InvoiceGenerationService } from '../../../database/services/invoice-gen
 import { InvoiceDeliveryService } from '../../../database/services/invoice-delivery.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
-import { CommsGuardService } from '../../../common/services/comms-guard/comms-guard.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EnrollmentStatus } from '../../../database/entities/enrollment.entity';
-import {
-  InvoiceStatus,
-  DeliveryStatus,
-} from '../../../database/entities/invoice.entity';
+import { InvoiceStatus } from '../../../database/entities/invoice.entity';
 import type { InvoiceGenerationResult } from '../../../database/dto/invoice-generation.dto';
 
 describe('InvoiceSchedulerProcessor', () => {
@@ -24,13 +20,14 @@ describe('InvoiceSchedulerProcessor', () => {
   let mockInvoiceDeliveryService: any;
   let mockAuditLogService: any;
   let mockPrisma: any;
-  let mockCommsGuard: any;
   let mockEventEmitter: any;
 
   const tenantId = 'tenant-123';
   const billingMonth = '2025-01';
 
-  const buildModule = async (commsDisabled = false): Promise<TestingModule> => {
+  // Staging-safety gate is now enforced inside InvoiceDeliveryService.sendInvoices;
+  // InvoiceSchedulerProcessor no longer needs CommsGuardService.
+  const buildModule = async (): Promise<TestingModule> => {
     mockInvoiceGenerationService = {
       generateMonthlyInvoices: jest.fn(),
     };
@@ -48,11 +45,6 @@ describe('InvoiceSchedulerProcessor', () => {
     mockPrisma = {
       enrollment: { findMany: jest.fn() },
       tenant: { findUnique: jest.fn() },
-      invoice: { updateMany: jest.fn() },
-    };
-
-    mockCommsGuard = {
-      isDisabled: jest.fn().mockReturnValue(commsDisabled),
     };
 
     mockEventEmitter = {
@@ -72,16 +64,15 @@ describe('InvoiceSchedulerProcessor', () => {
         },
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: CommsGuardService, useValue: mockCommsGuard },
         { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
   };
 
   beforeEach(async () => {
-    // Default: COMMS_DISABLED=false, APP_ENV not set (production-like)
+    // Default: APP_ENV not set (production-like)
     delete process.env.APP_ENV;
-    const module = await buildModule(false);
+    const module = await buildModule();
     processor = module.get<InvoiceSchedulerProcessor>(
       InvoiceSchedulerProcessor,
     );
@@ -618,10 +609,12 @@ describe('InvoiceSchedulerProcessor', () => {
       expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
     });
 
-    it('when APP_ENV=staging and COMMS_DISABLED=false: marks invoices SENT in DB without calling sendInvoices', async () => {
-      // Rebuild processor with COMMS_DISABLED=false
+    it('when APP_ENV=staging: delegates to sendInvoices (staging gate now lives inside InvoiceDeliveryService)', async () => {
+      // The processor no longer hard-suppresses in staging — it always calls sendInvoices.
+      // The two-layer gate (APP_ENV=staging + COMMS_DISABLED) is enforced inside
+      // InvoiceDeliveryService.sendInvoices, tested in invoice-delivery.service.spec.ts.
       delete process.env.APP_ENV;
-      const module = await buildModule(false);
+      const module = await buildModule();
       const stagingProcessor = module.get<InvoiceSchedulerProcessor>(
         InvoiceSchedulerProcessor,
       );
@@ -639,44 +632,22 @@ describe('InvoiceSchedulerProcessor', () => {
       mockInvoiceGenerationService.generateMonthlyInvoices.mockResolvedValue(
         batchResult,
       );
+      mockInvoiceDeliveryService.sendInvoices.mockResolvedValue({
+        sent: 2,
+        failed: 0,
+        failures: [],
+      });
 
       await stagingProcessor.processJob(mockJob as any);
 
-      // Must NOT call the delivery service
-      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
-
-      // Must mark invoices SENT directly in DB
-      expect(mockPrisma.invoice.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: { in: generatedInvoiceIds },
-          tenantId,
-          status: InvoiceStatus.DRAFT,
-        },
-        data: expect.objectContaining({
-          status: InvoiceStatus.SENT,
-          deliveryStatus: DeliveryStatus.SENT,
-          deliveredAt: expect.any(Date),
-        }),
+      // Processor always delegates — gate is inside the service
+      expect(mockInvoiceDeliveryService.sendInvoices).toHaveBeenCalledWith({
+        tenantId,
+        invoiceIds: generatedInvoiceIds,
       });
-
-      // Must audit-log the suppression
-      expect(mockAuditLogService.logAction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          entityId: `batch-${billingMonth}-send`,
-          afterValue: expect.objectContaining({
-            suppressedReason: 'staging env / COMMS_DISABLED not set',
-          }),
-        }),
-      );
     });
 
-    it('when COMMS_DISABLED=true: calls sendInvoices (adapters mock internally) and does NOT updateMany', async () => {
-      // Rebuild processor with COMMS_DISABLED=true
-      const module = await buildModule(true);
-      const commsDisabledProcessor = module.get<InvoiceSchedulerProcessor>(
-        InvoiceSchedulerProcessor,
-      );
-      // No APP_ENV=staging — production-like
+    it('normal path: calls sendInvoices with generated invoice IDs', async () => {
       delete process.env.APP_ENV;
 
       const mockJob = createJobWithInvoices();
@@ -697,16 +668,12 @@ describe('InvoiceSchedulerProcessor', () => {
         failures: [],
       });
 
-      await commsDisabledProcessor.processJob(mockJob as any);
+      await processor.processJob(mockJob as any);
 
-      // Delivery service IS called — adapters handle suppression internally
       expect(mockInvoiceDeliveryService.sendInvoices).toHaveBeenCalledWith({
         tenantId,
         invoiceIds: generatedInvoiceIds,
       });
-
-      // Direct DB updateMany must NOT be called (adapters handle DB updates via delivery service)
-      expect(mockPrisma.invoice.updateMany).not.toHaveBeenCalled();
     });
   });
 });

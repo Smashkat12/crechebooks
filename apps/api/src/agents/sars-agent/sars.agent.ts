@@ -105,12 +105,21 @@ export class SarsAgent {
     // Map string pay frequency to enum
     const payFrequencyEnum = this.mapPayFrequency(payFrequency);
 
+    // Derive pay period date from "YYYY-MM" period string so the correct SARS
+    // tax tables are used (March-February fiscal year boundary).
+    const [periodYear, periodMonth] = period.split('-').map(Number);
+    const payPeriodDate =
+      periodYear && periodMonth
+        ? new Date(periodYear, periodMonth - 1, 1)
+        : new Date();
+
     // Calculate PAYE using underlying service
     const result = await this.payeService.calculatePaye({
       grossIncomeCents,
       payFrequency: payFrequencyEnum,
       dateOfBirth,
       medicalAidMembers,
+      payPeriodDate,
     });
 
     const reasoning = this.buildPayeReasoning(

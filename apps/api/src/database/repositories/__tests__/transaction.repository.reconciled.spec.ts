@@ -17,14 +17,34 @@ describe('TransactionRepository - Reconciled Delete Protection', () => {
   let mockAuditLogService: any;
 
   beforeEach(async () => {
+    // Inner tx client used inside $transaction callback
+    const mockTxClient = {
+      transaction: {
+        update: jest.fn().mockResolvedValue({}),
+      },
+      bankStatementMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+
     mockPrisma = {
       transaction: {
         findFirst: jest.fn(),
         update: jest.fn(),
       },
+      bankStatementMatch: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       auditLog: {
         create: jest.fn(),
       },
+      // $transaction executes the callback with the inner tx client
+      $transaction: jest
+        .fn()
+        .mockImplementation((cb: (tx: typeof mockTxClient) => Promise<void>) =>
+          cb(mockTxClient),
+        ),
+      _mockTxClient: mockTxClient,
     };
 
     mockAuditLogService = {
@@ -171,8 +191,8 @@ describe('TransactionRepository - Reconciled Delete Protection', () => {
         // Expected to throw
       }
 
-      // Assert: update was NOT called
-      expect(mockPrisma.transaction.update).not.toHaveBeenCalled();
+      // Assert: $transaction was NOT entered (update was NOT called on tx client)
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('should allow deletion of non-reconciled transaction', async () => {
@@ -188,11 +208,6 @@ describe('TransactionRepository - Reconciled Delete Protection', () => {
       mockPrisma.transaction.findFirst.mockResolvedValue(
         nonReconciledTransaction,
       );
-      mockPrisma.transaction.update.mockResolvedValue({
-        ...nonReconciledTransaction,
-        isDeleted: true,
-        deletedAt: new Date(),
-      });
 
       // Act & Assert: Should NOT throw
       await expect(
@@ -213,17 +228,52 @@ describe('TransactionRepository - Reconciled Delete Protection', () => {
       mockPrisma.transaction.findFirst.mockResolvedValue(
         nonReconciledTransaction,
       );
-      mockPrisma.transaction.update.mockResolvedValue({});
 
       // Act
       await repository.softDelete(tenantId, transactionId, userId);
 
-      // Assert: update was called with correct data
-      expect(mockPrisma.transaction.update).toHaveBeenCalledWith({
+      // Assert: tx client update was called with correct data
+      expect(mockPrisma._mockTxClient.transaction.update).toHaveBeenCalledWith({
         where: { id: transactionId },
         data: {
           isDeleted: true,
           deletedAt: expect.any(Date),
+        },
+      });
+    });
+
+    it('should unlink bank_statement_matches when soft-deleting a non-reconciled transaction', async () => {
+      // Arrange
+      const nonReconciledTransaction = {
+        id: transactionId,
+        tenantId,
+        isReconciled: false,
+        reconciledAt: null,
+        isDeleted: false,
+      };
+
+      mockPrisma.transaction.findFirst.mockResolvedValue(
+        nonReconciledTransaction,
+      );
+
+      // Act
+      await repository.softDelete(tenantId, transactionId, userId);
+
+      // Assert: bankStatementMatch rows pointing at the deleted transaction
+      // are reverted to IN_BANK_ONLY with all Xero-side fields cleared.
+      expect(
+        mockPrisma._mockTxClient.bankStatementMatch.updateMany,
+      ).toHaveBeenCalledWith({
+        where: { transactionId },
+        data: {
+          transactionId: null,
+          status: 'IN_BANK_ONLY',
+          xeroDate: null,
+          xeroDescription: null,
+          xeroAmountCents: null,
+          xeroIsCredit: null,
+          matchConfidence: null,
+          discrepancyReason: null,
         },
       });
     });

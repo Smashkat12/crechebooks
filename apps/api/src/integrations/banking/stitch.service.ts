@@ -1,4 +1,20 @@
 /**
+ * STITCH.AFRICA INTEGRATION — DISABLED IN PRODUCTION (as of 2026-04-30)
+ *
+ * Status: code-complete but inactive.
+ * - `BANK_API_ENABLED` env var is NOT set in Railway prod.
+ * - 0 rows in `linked_bank_accounts` (verified iter 23, staging + prod).
+ * - All public methods that hit Stitch short-circuit when `BANK_API_ENABLED !== 'true'`.
+ *
+ * The team must decide between:
+ *   (a) Activate: set `BANK_API_ENABLED=true`, configure Stitch credentials,
+ *       run smoke test against the staging Stitch sandbox, then enable in prod.
+ *   (b) Remove: ~900 LOC of inert code; delete if Stitch isn't on the roadmap.
+ *
+ * Do NOT remove this file or its consumers without making decision (a)/(b) explicit.
+ */
+
+/**
  * Stitch Banking Service
  * TASK-INT-101: Bank API Integration (Open Banking)
  *
@@ -121,8 +137,36 @@ export class StitchBankingService {
     }
 
     this.logger.log(
-      `StitchBankingService initialized (sandbox: ${this.config.sandbox})`,
+      `StitchBankingService initialized (sandbox: ${this.config.sandbox}, enabled: ${this.isApiEnabled()})`,
     );
+  }
+
+  // ===========================================================================
+  // Feature Gate
+  // ===========================================================================
+
+  /**
+   * Returns true when BANK_API_ENABLED=true.
+   * All public methods that make external Stitch calls MUST check this first.
+   */
+  private isApiEnabled(): boolean {
+    return this.configService.get<string>('BANK_API_ENABLED') === 'true';
+  }
+
+  /**
+   * Throws SERVICE_UNAVAILABLE when the Stitch integration is disabled.
+   * Call at the top of every public method that reaches Stitch.
+   */
+  private requireApiEnabled(methodName: string): void {
+    if (!this.isApiEnabled()) {
+      this.logger.warn(
+        `StitchBankingService.${methodName} called but BANK_API_ENABLED is not set — request rejected.`,
+      );
+      throw new HttpException(
+        'Bank API integration is not enabled. Set BANK_API_ENABLED=true to activate.',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
   }
 
   // ===========================================================================
@@ -139,6 +183,7 @@ export class StitchBankingService {
   async initiateAccountLink(
     request: LinkInitRequest,
   ): Promise<LinkInitResponse> {
+    this.requireApiEnabled('initiateAccountLink');
     this.logger.log(`Initiating account link for tenant: ${request.tenantId}`);
 
     // Generate state for CSRF protection
@@ -201,6 +246,7 @@ export class StitchBankingService {
     authCode: string,
     _state?: string,
   ): Promise<LinkedAccount> {
+    this.requireApiEnabled('completeAccountLink');
     this.logger.log(`Completing account link for tenant: ${tenantId}`);
 
     try {
@@ -318,6 +364,7 @@ export class StitchBankingService {
     from: Date,
     to: Date,
   ): Promise<BankTransaction[]> {
+    this.requireApiEnabled('getTransactions');
     this.logger.log(
       `Fetching transactions for account ${accountId} from ${from.toISOString()} to ${to.toISOString()}`,
     );
@@ -365,6 +412,7 @@ export class StitchBankingService {
    * @returns Account balance information
    */
   async getBalance(accountId: string): Promise<AccountBalance> {
+    this.requireApiEnabled('getBalance');
     this.logger.log(`Fetching balance for account ${accountId}`);
 
     const linkedAccount = await this.getLinkedAccountOrThrow(accountId);
@@ -383,6 +431,7 @@ export class StitchBankingService {
    * @param accountId - Linked bank account ID
    */
   async refreshAccountLink(accountId: string): Promise<void> {
+    this.requireApiEnabled('refreshAccountLink');
     this.logger.log(`Refreshing tokens for account ${accountId}`);
 
     const linkedAccount = await this.getLinkedAccountOrThrow(accountId);
@@ -474,6 +523,7 @@ export class StitchBankingService {
    * @param accountId - Linked bank account ID
    */
   async unlinkAccount(accountId: string): Promise<void> {
+    this.requireApiEnabled('unlinkAccount');
     this.logger.log(`Unlinking account ${accountId}`);
 
     const linkedAccount = await this.getLinkedAccountOrThrow(accountId);
@@ -525,6 +575,7 @@ export class StitchBankingService {
    * @returns Sync result
    */
   async syncAccount(accountId: string): Promise<AccountSyncResult> {
+    this.requireApiEnabled('syncAccount');
     const startedAt = new Date();
     this.logger.log(`Starting sync for account ${accountId}`);
 

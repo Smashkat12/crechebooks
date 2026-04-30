@@ -106,6 +106,9 @@ enum PreferredContact {
 
 enum FeeType {
   FULL_DAY
+  HALF_DAY
+  HOURLY
+  CUSTOM
 }
 
 enum EnrollmentStatus {

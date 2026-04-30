@@ -34,7 +34,10 @@ describe('PaymentReminderService', () => {
     };
 
     mockPrisma = {
-      tenant: { findUnique: jest.fn() },
+      tenant: {
+        findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       invoice: { findMany: jest.fn() },
       reminder: { findMany: jest.fn() },
     };
@@ -147,6 +150,61 @@ describe('PaymentReminderService', () => {
       await expect(service.triggerManualReminders(tenantId)).rejects.toThrow(
         BusinessException,
       );
+    });
+  });
+
+  describe('onApplicationBootstrap', () => {
+    it('calls scheduleReminders once per ACTIVE tenant', async () => {
+      mockPrisma.tenant.findMany.mockResolvedValue([
+        { id: 'tenant-a', name: 'Creche A' },
+        { id: 'tenant-b', name: 'Creche B' },
+      ]);
+      mockPrisma.tenant.findUnique
+        .mockResolvedValueOnce({ id: 'tenant-a', name: 'Creche A' })
+        .mockResolvedValueOnce({ id: 'tenant-b', name: 'Creche B' });
+
+      await service.onApplicationBootstrap();
+
+      expect(
+        mockSchedulerService.removeRepeatableCronJob,
+      ).toHaveBeenCalledTimes(2);
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
+        QUEUE_NAMES.PAYMENT_REMINDER,
+        expect.objectContaining({ tenantId: 'tenant-a' }),
+        '0 9 * * *',
+      );
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
+        QUEUE_NAMES.PAYMENT_REMINDER,
+        expect.objectContaining({ tenantId: 'tenant-b' }),
+        '0 9 * * *',
+      );
+    });
+
+    it('is idempotent: calling twice does remove-then-schedule each time', async () => {
+      mockPrisma.tenant.findMany.mockResolvedValue([
+        { id: 'tenant-a', name: 'Creche A' },
+      ]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-a',
+        name: 'Creche A',
+      });
+
+      await service.onApplicationBootstrap();
+      await service.onApplicationBootstrap();
+
+      expect(
+        mockSchedulerService.removeRepeatableCronJob,
+      ).toHaveBeenCalledTimes(2);
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips registration when no ACTIVE tenants exist', async () => {
+      mockPrisma.tenant.findMany.mockResolvedValue([]);
+
+      await service.onApplicationBootstrap();
+
+      expect(mockSchedulerService.scheduleCronJob).not.toHaveBeenCalled();
     });
   });
 });

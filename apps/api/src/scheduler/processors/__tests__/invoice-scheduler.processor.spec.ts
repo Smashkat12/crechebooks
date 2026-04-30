@@ -1,28 +1,44 @@
 /**
  * Invoice Scheduler Processor Tests
  * TASK-BILL-016: Invoice Generation Scheduling Cron Job
+ * FEAT-BILLING-AUTOSEND: Post-generation auto-send + staging-safety gate
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { InvoiceSchedulerProcessor } from '../invoice-scheduler.processor';
 import { InvoiceGenerationService } from '../../../database/services/invoice-generation.service';
+import { InvoiceDeliveryService } from '../../../database/services/invoice-delivery.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+import { CommsGuardService } from '../../../common/services/comms-guard/comms-guard.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EnrollmentStatus } from '../../../database/entities/enrollment.entity';
-import { InvoiceStatus } from '../../../database/entities/invoice.entity';
+import {
+  InvoiceStatus,
+  DeliveryStatus,
+} from '../../../database/entities/invoice.entity';
 import type { InvoiceGenerationResult } from '../../../database/dto/invoice-generation.dto';
 
 describe('InvoiceSchedulerProcessor', () => {
   let processor: InvoiceSchedulerProcessor;
   let mockInvoiceGenerationService: any;
+  let mockInvoiceDeliveryService: any;
   let mockAuditLogService: any;
   let mockPrisma: any;
+  let mockCommsGuard: any;
+  let mockEventEmitter: any;
 
   const tenantId = 'tenant-123';
   const billingMonth = '2025-01';
 
-  beforeEach(async () => {
+  const buildModule = async (commsDisabled = false): Promise<TestingModule> => {
     mockInvoiceGenerationService = {
       generateMonthlyInvoices: jest.fn(),
+    };
+
+    mockInvoiceDeliveryService = {
+      sendInvoices: jest
+        .fn()
+        .mockResolvedValue({ sent: 0, failed: 0, failures: [] }),
     };
 
     mockAuditLogService = {
@@ -30,29 +46,49 @@ describe('InvoiceSchedulerProcessor', () => {
     };
 
     mockPrisma = {
-      enrollment: {
-        findMany: jest.fn(),
-      },
-      tenant: {
-        findUnique: jest.fn(),
-      },
+      enrollment: { findMany: jest.fn() },
+      tenant: { findUnique: jest.fn() },
+      invoice: { updateMany: jest.fn() },
     };
 
-    const module: TestingModule = await Test.createTestingModule({
+    mockCommsGuard = {
+      isDisabled: jest.fn().mockReturnValue(commsDisabled),
+    };
+
+    mockEventEmitter = {
+      emit: jest.fn(),
+    };
+
+    return Test.createTestingModule({
       providers: [
         InvoiceSchedulerProcessor,
         {
           provide: InvoiceGenerationService,
           useValue: mockInvoiceGenerationService,
         },
+        {
+          provide: InvoiceDeliveryService,
+          useValue: mockInvoiceDeliveryService,
+        },
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: CommsGuardService, useValue: mockCommsGuard },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
+  };
 
+  beforeEach(async () => {
+    // Default: COMMS_DISABLED=false, APP_ENV not set (production-like)
+    delete process.env.APP_ENV;
+    const module = await buildModule(false);
     processor = module.get<InvoiceSchedulerProcessor>(
       InvoiceSchedulerProcessor,
     );
+  });
+
+  afterEach(() => {
+    delete process.env.APP_ENV;
   });
 
   describe('processJob', () => {
@@ -471,6 +507,206 @@ describe('InvoiceSchedulerProcessor', () => {
 
       // Should not throw, just log warning
       expect(mockJob.progress).toHaveBeenCalledWith(100);
+    });
+  });
+
+  describe('auto-send: post-generation delivery', () => {
+    const generatedInvoiceIds = ['inv-1', 'inv-2'];
+
+    const createJobWithInvoices = () => ({
+      id: 'job-auto-send',
+      data: {
+        tenantId,
+        billingMonth,
+        triggeredBy: 'cron' as const,
+        scheduledAt: new Date(),
+        dryRun: false,
+      },
+      progress: jest.fn(),
+    });
+
+    const batchResult: InvoiceGenerationResult = {
+      invoicesCreated: 2,
+      totalAmountCents: 300000,
+      invoices: [
+        {
+          id: 'inv-1',
+          invoiceNumber: 'INV-2025-001',
+          childId: 'child-1',
+          childName: 'John Doe',
+          parentId: 'parent-1',
+          totalCents: 150000,
+          status: InvoiceStatus.DRAFT,
+          xeroInvoiceId: null,
+        },
+        {
+          id: 'inv-2',
+          invoiceNumber: 'INV-2025-002',
+          childId: 'child-2',
+          childName: 'Jane Doe',
+          parentId: 'parent-1',
+          totalCents: 150000,
+          status: InvoiceStatus.DRAFT,
+          xeroInvoiceId: null,
+        },
+      ],
+      errors: [],
+    };
+
+    it('calls sendInvoices with generated invoice IDs on non-dry-run', async () => {
+      const mockJob = createJobWithInvoices();
+      mockPrisma.enrollment.findMany.mockResolvedValue([
+        { id: 'enr-1', childId: 'child-1' },
+        { id: 'enr-2', childId: 'child-2' },
+      ]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@test.co.za',
+      });
+      mockInvoiceGenerationService.generateMonthlyInvoices.mockResolvedValue(
+        batchResult,
+      );
+      mockInvoiceDeliveryService.sendInvoices.mockResolvedValue({
+        sent: 2,
+        failed: 0,
+        failures: [],
+      });
+
+      await processor.processJob(mockJob as any);
+
+      expect(mockInvoiceDeliveryService.sendInvoices).toHaveBeenCalledWith({
+        tenantId,
+        invoiceIds: generatedInvoiceIds,
+      });
+    });
+
+    it('does NOT call sendInvoices in dry-run mode', async () => {
+      const mockJob = {
+        id: 'job-dry-run',
+        data: {
+          tenantId,
+          billingMonth,
+          triggeredBy: 'cron' as const,
+          scheduledAt: new Date(),
+          dryRun: true,
+        },
+        progress: jest.fn(),
+      };
+      mockPrisma.enrollment.findMany.mockResolvedValue([
+        { id: 'enr-1', childId: 'child-1' },
+      ]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@test.co.za',
+      });
+
+      await processor.processJob(mockJob as any);
+
+      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call sendInvoices when no invoices were generated', async () => {
+      const mockJob = createJobWithInvoices();
+      mockPrisma.enrollment.findMany.mockResolvedValue([]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@test.co.za',
+      });
+
+      await processor.processJob(mockJob as any);
+
+      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
+    });
+
+    it('when APP_ENV=staging and COMMS_DISABLED=false: marks invoices SENT in DB without calling sendInvoices', async () => {
+      // Rebuild processor with COMMS_DISABLED=false
+      delete process.env.APP_ENV;
+      const module = await buildModule(false);
+      const stagingProcessor = module.get<InvoiceSchedulerProcessor>(
+        InvoiceSchedulerProcessor,
+      );
+      process.env.APP_ENV = 'staging';
+
+      const mockJob = createJobWithInvoices();
+      mockPrisma.enrollment.findMany.mockResolvedValue([
+        { id: 'enr-1', childId: 'child-1' },
+        { id: 'enr-2', childId: 'child-2' },
+      ]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@test.co.za',
+      });
+      mockInvoiceGenerationService.generateMonthlyInvoices.mockResolvedValue(
+        batchResult,
+      );
+
+      await stagingProcessor.processJob(mockJob as any);
+
+      // Must NOT call the delivery service
+      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
+
+      // Must mark invoices SENT directly in DB
+      expect(mockPrisma.invoice.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: generatedInvoiceIds },
+          tenantId,
+          status: InvoiceStatus.DRAFT,
+        },
+        data: expect.objectContaining({
+          status: InvoiceStatus.SENT,
+          deliveryStatus: DeliveryStatus.SENT,
+          deliveredAt: expect.any(Date),
+        }),
+      });
+
+      // Must audit-log the suppression
+      expect(mockAuditLogService.logAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityId: `batch-${billingMonth}-send`,
+          afterValue: expect.objectContaining({
+            suppressedReason: 'staging env / COMMS_DISABLED not set',
+          }),
+        }),
+      );
+    });
+
+    it('when COMMS_DISABLED=true: calls sendInvoices (adapters mock internally) and does NOT updateMany', async () => {
+      // Rebuild processor with COMMS_DISABLED=true
+      const module = await buildModule(true);
+      const commsDisabledProcessor = module.get<InvoiceSchedulerProcessor>(
+        InvoiceSchedulerProcessor,
+      );
+      // No APP_ENV=staging — production-like
+      delete process.env.APP_ENV;
+
+      const mockJob = createJobWithInvoices();
+      mockPrisma.enrollment.findMany.mockResolvedValue([
+        { id: 'enr-1', childId: 'child-1' },
+        { id: 'enr-2', childId: 'child-2' },
+      ]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@test.co.za',
+      });
+      mockInvoiceGenerationService.generateMonthlyInvoices.mockResolvedValue(
+        batchResult,
+      );
+      mockInvoiceDeliveryService.sendInvoices.mockResolvedValue({
+        sent: 2,
+        failed: 0,
+        failures: [],
+      });
+
+      await commsDisabledProcessor.processJob(mockJob as any);
+
+      // Delivery service IS called — adapters handle suppression internally
+      expect(mockInvoiceDeliveryService.sendInvoices).toHaveBeenCalledWith({
+        tenantId,
+        invoiceIds: generatedInvoiceIds,
+      });
+
+      // Direct DB updateMany must NOT be called (adapters handle DB updates via delivery service)
+      expect(mockPrisma.invoice.updateMany).not.toHaveBeenCalled();
     });
   });
 });

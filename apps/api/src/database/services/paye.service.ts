@@ -155,21 +155,21 @@ export class PayeService {
    * Get the applicable tax bracket for an annual income
    *
    * @param annualIncomeCents - Annual income in cents
+   * @param payPeriodDate - Date for tax year selection (defaults to current date)
    * @returns Tax bracket and index
+   *
+   * @deprecated Prefer getTaxBracketFromTables() with explicit brackets from getTaxYearTables().
+   * This wrapper now delegates to year-aware tables — callers should pass payPeriodDate.
    */
-  getTaxBracket(annualIncomeCents: number): {
+  getTaxBracket(
+    annualIncomeCents: number,
+    payPeriodDate?: Date,
+  ): {
     bracket: PayeTaxBracket;
     bracketIndex: number;
   } {
-    for (let i = TAX_BRACKETS_2025.length - 1; i >= 0; i--) {
-      const bracket = TAX_BRACKETS_2025[i];
-      if (annualIncomeCents >= bracket.minIncomeCents) {
-        return { bracket, bracketIndex: i };
-      }
-    }
-
-    // Default to first bracket
-    return { bracket: TAX_BRACKETS_2025[0], bracketIndex: 0 };
+    const taxTables = getTaxYearTables(payPeriodDate);
+    return this.getTaxBracketFromTables(annualIncomeCents, taxTables.brackets);
   }
 
   /**
@@ -177,21 +177,31 @@ export class PayeService {
    *
    * @param dateOfBirth - Employee's date of birth
    * @param rebateType - Optional specific rebate type to calculate
+   * @param payPeriodDate - Date for tax year selection (defaults to current date)
    * @returns Rebate amount in cents (annual)
+   *
+   * @deprecated Prefer reading rebates directly from getTaxYearTables().rebates.
+   * This wrapper now delegates to year-aware tables — callers should pass payPeriodDate.
    */
-  calculateRebate(dateOfBirth: Date, rebateType?: RebateType): number {
+  calculateRebate(
+    dateOfBirth: Date,
+    rebateType?: RebateType,
+    payPeriodDate?: Date,
+  ): number {
+    const taxTables = getTaxYearTables(payPeriodDate);
+
     if (rebateType) {
-      return REBATES_2025[rebateType];
+      return taxTables.rebates[rebateType];
     }
 
     const age = this.calculateAge(dateOfBirth);
-    let total = REBATES_2025.PRIMARY;
+    let total = taxTables.rebates.PRIMARY;
 
     if (age >= 65) {
-      total += REBATES_2025.SECONDARY;
+      total += taxTables.rebates.SECONDARY;
     }
     if (age >= 75) {
-      total += REBATES_2025.TERTIARY;
+      total += taxTables.rebates.TERTIARY;
     }
 
     return total;
@@ -201,31 +211,20 @@ export class PayeService {
    * Calculate medical aid tax credits
    *
    * @param medicalAidMembers - Number of members on medical aid
+   * @param payPeriodDate - Date for tax year selection (defaults to current date)
    * @returns Monthly credit amount in cents
+   *
+   * @deprecated Prefer calculateMedicalCreditsFromTables() with explicit tables.
+   * This wrapper now delegates to year-aware tables — callers should pass payPeriodDate.
    */
-  calculateMedicalCredits(medicalAidMembers: number): number {
-    if (medicalAidMembers <= 0) {
-      return 0;
-    }
-
-    if (medicalAidMembers === 1) {
-      // Main member only
-      return MEDICAL_CREDITS_2025.MAIN_MEMBER;
-    }
-
-    if (medicalAidMembers === 2) {
-      // Main + first dependent
-      return (
-        MEDICAL_CREDITS_2025.MAIN_MEMBER + MEDICAL_CREDITS_2025.FIRST_DEPENDENT
-      );
-    }
-
-    // Main + first dependent + additional dependents
-    const additionalDependents = medicalAidMembers - 2;
-    return (
-      MEDICAL_CREDITS_2025.MAIN_MEMBER +
-      MEDICAL_CREDITS_2025.FIRST_DEPENDENT +
-      MEDICAL_CREDITS_2025.ADDITIONAL_DEPENDENT * additionalDependents
+  calculateMedicalCredits(
+    medicalAidMembers: number,
+    payPeriodDate?: Date,
+  ): number {
+    const taxTables = getTaxYearTables(payPeriodDate);
+    return this.calculateMedicalCreditsFromTables(
+      medicalAidMembers,
+      taxTables.medicalCredits,
     );
   }
 
@@ -356,16 +355,15 @@ export class PayeService {
    * Get tax threshold based on age
    *
    * @param age - Employee's age
+   * @param payPeriodDate - Date for tax year selection (defaults to current date)
    * @returns Annual tax threshold in cents
+   *
+   * @deprecated Prefer getTaxThresholdFromTables() with explicit thresholds from getTaxYearTables().
+   * This wrapper now delegates to year-aware tables — callers should pass payPeriodDate.
    */
-  getTaxThreshold(age: number): number {
-    if (age >= 75) {
-      return TAX_THRESHOLDS_2025.AGE_75_PLUS;
-    }
-    if (age >= 65) {
-      return TAX_THRESHOLDS_2025.AGE_65_TO_74;
-    }
-    return TAX_THRESHOLDS_2025.BELOW_65;
+  getTaxThreshold(age: number, payPeriodDate?: Date): number {
+    const taxTables = getTaxYearTables(payPeriodDate);
+    return this.getTaxThresholdFromTables(age, taxTables.thresholds);
   }
 
   /**
@@ -373,10 +371,18 @@ export class PayeService {
    *
    * @param annualIncomeCents - Annual income in cents
    * @param age - Employee's age
+   * @param payPeriodDate - Date for tax year selection (defaults to current date)
    * @returns True if below threshold
+   *
+   * @deprecated Prefer isBelowThresholdForDate() which makes the payPeriodDate intent explicit.
+   * This wrapper now delegates to year-aware tables — callers should pass payPeriodDate.
    */
-  isBelowThreshold(annualIncomeCents: number, age: number): boolean {
-    return annualIncomeCents < this.getTaxThreshold(age);
+  isBelowThreshold(
+    annualIncomeCents: number,
+    age: number,
+    payPeriodDate?: Date,
+  ): boolean {
+    return annualIncomeCents < this.getTaxThreshold(age, payPeriodDate);
   }
 
   /**

@@ -209,12 +209,14 @@ export class StaffOffboardingService {
     const grossEarningsCents =
       outstandingSalaryCents + leavePayoutCents + noticePayCents;
 
-    // Calculate PAYE on final pay
+    // Calculate PAYE on final pay — use lastWorkingDay so SARS tables match the
+    // correct tax year (March-February) for the termination payroll period.
     const payeResult = await this.payeService.calculatePaye({
       grossIncomeCents: grossEarningsCents,
       payFrequency: staff.payFrequency,
       dateOfBirth: staff.dateOfBirth,
       medicalAidMembers: staff.medicalAidMembers,
+      payPeriodDate: lastWorkingDay,
     });
     const payeCents = payeResult.netPayeCents;
 

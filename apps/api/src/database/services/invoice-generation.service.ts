@@ -219,9 +219,26 @@ export class InvoiceGenerationService {
 
       // Process each parent's enrollments
       for (const [parentId, parentEnrollments] of enrollmentsByParent) {
+        // AUDIT-BILL-09: Resolve fee-structure override for sibling discount.
+        // Take the first non-null siblingDiscountPercent from this parent's
+        // enrollments. All siblings in a creche typically share one fee structure,
+        // so the first non-null value is the operator intent for this group.
+        // Prisma returns Decimal objects for @db.Decimal fields; convert to number first.
+        const feeStructureOverrideRaw = parentEnrollments
+          .map((e) => e.feeStructure.siblingDiscountPercent)
+          .find((pct) => pct != null);
+        const siblingDiscountOverride =
+          feeStructureOverrideRaw != null
+            ? new Decimal(feeStructureOverrideRaw.toNumber())
+            : null;
+
         // Get sibling discounts for this parent
         const siblingDiscounts =
-          await this.enrollmentService.applySiblingDiscount(tenantId, parentId);
+          await this.enrollmentService.applySiblingDiscount(
+            tenantId,
+            parentId,
+            siblingDiscountOverride,
+          );
 
         // Create invoice for each child
         for (const enrollment of parentEnrollments) {
@@ -1274,6 +1291,7 @@ export class InvoiceGenerationService {
             amountCents: true,
             vatInclusive: true,
             reRegistrationFeeCents: true, // TASK-BILL-037: For January re-registration
+            siblingDiscountPercent: true, // AUDIT-BILL-09: Operator override
           },
         },
       },

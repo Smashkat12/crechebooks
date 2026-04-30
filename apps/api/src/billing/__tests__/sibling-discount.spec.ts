@@ -182,3 +182,139 @@ describe('EnrollmentService.applySiblingDiscount — full-siblings-only rule', (
     expect(discounts.get('child-newer')).toEqual(new Decimal(10));
   });
 });
+
+// ---------------------------------------------------------------------------
+// AUDIT-BILL-09: feeStructureOverride tests
+// ---------------------------------------------------------------------------
+describe('EnrollmentService.applySiblingDiscount — fee-structure override (AUDIT-BILL-09)', () => {
+  let service: EnrollmentService;
+  let mockEnrollmentRepo: jest.Mocked<
+    Pick<EnrollmentRepository, 'findActiveByParentId' | 'findByStatus'>
+  >;
+
+  beforeEach(async () => {
+    mockEnrollmentRepo = {
+      findActiveByParentId: jest.fn(),
+      findByStatus: jest.fn(),
+    };
+
+    const noop = () => jest.fn();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        EnrollmentService,
+        { provide: EnrollmentRepository, useValue: mockEnrollmentRepo },
+        { provide: ChildRepository, useValue: { findById: noop() } },
+        { provide: ParentRepository, useValue: { findById: noop() } },
+        { provide: FeeStructureRepository, useValue: { findById: noop() } },
+        {
+          provide: InvoiceRepository,
+          useValue: { findByBillingPeriod: noop(), create: noop() },
+        },
+        { provide: InvoiceLineRepository, useValue: { createMany: noop() } },
+        { provide: TenantRepository, useValue: { findById: noop() } },
+        { provide: AuditLogService, useValue: { logAction: jest.fn() } },
+        { provide: ProRataService, useValue: {} },
+        { provide: CreditNoteService, useValue: {} },
+        { provide: InvoiceNumberService, useValue: {} },
+        { provide: WelcomePackDeliveryService, useValue: {} },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+      ],
+    }).compile();
+
+    service = module.get(EnrollmentService);
+  });
+
+  it('1st sibling with no override receives 0%', async () => {
+    mockEnrollmentRepo.findActiveByParentId.mockResolvedValue([
+      enrollment('e1', 'child-1', PARENT_A, '2025-01-01'),
+    ]);
+
+    const discounts = await service.applySiblingDiscount(TENANT_ID, PARENT_A);
+
+    expect(discounts.get('child-1')).toEqual(new Decimal(0));
+  });
+
+  it('2nd sibling with override=20 receives 20%', async () => {
+    mockEnrollmentRepo.findActiveByParentId.mockResolvedValue([
+      enrollment('e1', 'child-1', PARENT_A, '2024-01-01'),
+      enrollment('e2', 'child-2', PARENT_A, '2025-01-01'),
+    ]);
+
+    const discounts = await service.applySiblingDiscount(
+      TENANT_ID,
+      PARENT_A,
+      new Decimal(20),
+    );
+
+    expect(discounts.get('child-1')).toEqual(new Decimal(0)); // 1st always 0%
+    expect(discounts.get('child-2')).toEqual(new Decimal(20));
+  });
+
+  it('2nd sibling with override=null falls back to default 10%', async () => {
+    mockEnrollmentRepo.findActiveByParentId.mockResolvedValue([
+      enrollment('e1', 'child-1', PARENT_A, '2024-01-01'),
+      enrollment('e2', 'child-2', PARENT_A, '2025-01-01'),
+    ]);
+
+    const discounts = await service.applySiblingDiscount(
+      TENANT_ID,
+      PARENT_A,
+      null,
+    );
+
+    expect(discounts.get('child-1')).toEqual(new Decimal(0));
+    expect(discounts.get('child-2')).toEqual(new Decimal(10));
+  });
+
+  it('override out-of-range (>100) falls back to default scale', async () => {
+    mockEnrollmentRepo.findActiveByParentId.mockResolvedValue([
+      enrollment('e1', 'child-1', PARENT_A, '2024-01-01'),
+      enrollment('e2', 'child-2', PARENT_A, '2025-01-01'),
+    ]);
+
+    const discounts = await service.applySiblingDiscount(
+      TENANT_ID,
+      PARENT_A,
+      new Decimal(150), // invalid — clamped to default
+    );
+
+    expect(discounts.get('child-1')).toEqual(new Decimal(0));
+    expect(discounts.get('child-2')).toEqual(new Decimal(10)); // default scale
+  });
+
+  it('override=0 is valid (operator explicitly wants 0% for siblings)', async () => {
+    mockEnrollmentRepo.findActiveByParentId.mockResolvedValue([
+      enrollment('e1', 'child-1', PARENT_A, '2024-01-01'),
+      enrollment('e2', 'child-2', PARENT_A, '2025-01-01'),
+    ]);
+
+    const discounts = await service.applySiblingDiscount(
+      TENANT_ID,
+      PARENT_A,
+      new Decimal(0),
+    );
+
+    // 0 is a valid override — both children get 0%
+    expect(discounts.get('child-1')).toEqual(new Decimal(0));
+    expect(discounts.get('child-2')).toEqual(new Decimal(0));
+  });
+
+  it('override applies uniformly to 3rd+ children (not just 2nd)', async () => {
+    mockEnrollmentRepo.findActiveByParentId.mockResolvedValue([
+      enrollment('e1', 'child-1', PARENT_A, '2023-01-01'),
+      enrollment('e2', 'child-2', PARENT_A, '2024-01-01'),
+      enrollment('e3', 'child-3', PARENT_A, '2025-01-01'),
+    ]);
+
+    const discounts = await service.applySiblingDiscount(
+      TENANT_ID,
+      PARENT_A,
+      new Decimal(25),
+    );
+
+    expect(discounts.get('child-1')).toEqual(new Decimal(0));
+    expect(discounts.get('child-2')).toEqual(new Decimal(25));
+    expect(discounts.get('child-3')).toEqual(new Decimal(25));
+  });
+});

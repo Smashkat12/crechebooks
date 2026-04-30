@@ -509,22 +509,42 @@ export class EnrollmentService {
   }
 
   /**
-   * Calculate sibling discount percentages for all children of a parent
-   * Discount policy:
-   * - 1 child: 0% discount
-   * - 2 children: second child gets 10% discount
-   * - 3+ children: second child gets 15%, third+ get 20%
+   * Calculate sibling discount percentages for all children of a parent.
    *
-   * Children are ordered by enrollment startDate (oldest enrollment = first child)
+   * Discount policy (default scale — TASK-INT-002):
+   * - 1st child: 0%
+   * - 2nd child: 10%
+   * - 3rd+ child: 15%
+   *
+   * AUDIT-BILL-09 — operator override:
+   * If `feeStructureOverride` is provided (a valid Decimal in [0, 100]), it
+   * replaces the per-position rates for ALL non-first siblings.  The 1st child
+   * always receives 0%.  If the override is outside [0, 100] it is silently
+   * ignored and the default scale is used.
+   *
+   * Children are ordered by enrollment startDate (oldest = first child).
    *
    * @param tenantId - Tenant ID for multi-tenant isolation
    * @param parentId - Parent ID to calculate discounts for
+   * @param feeStructureOverride - Optional operator-configured percent (Decimal, 0-100).
+   *   Null / undefined = use default scale.
    * @returns Map of childId -> discount percentage (as Decimal)
    */
   async applySiblingDiscount(
     tenantId: string,
     parentId: string,
+    feeStructureOverride?: Decimal | null,
   ): Promise<Map<string, Decimal>> {
+    // Validate the override: must be in [0, 100] to be used; otherwise fall back.
+    const useOverride =
+      feeStructureOverride != null &&
+      feeStructureOverride.gte(0) &&
+      feeStructureOverride.lte(100);
+
+    const overrideSource = useOverride
+      ? 'fee_structure_override'
+      : 'default_scale';
+
     const enrollments = await this.getActiveEnrollments(tenantId, parentId);
     const discountMap = new Map<string, Decimal>();
 
@@ -545,26 +565,27 @@ export class EnrollmentService {
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
     );
 
-    // Sibling discount per TASK-INT-002 specification:
-    // - 1st child: 0% discount
-    // - 2nd child: 10% discount
-    // - 3rd+ child: 15% discount
+    // Apply discount per position, respecting operator override when valid.
     for (let i = 0; i < enrollments.length; i++) {
       const childId = enrollments[i].childId;
       if (i === 0) {
-        // First child: 0%
+        // First child: always 0% regardless of override
         discountMap.set(childId, new Decimal(0));
+      } else if (useOverride) {
+        // AUDIT-BILL-09: operator override applies to all non-first siblings
+        discountMap.set(childId, feeStructureOverride);
       } else if (i === 1) {
-        // Second child: 10%
+        // Default scale: 2nd child 10%
         discountMap.set(childId, new Decimal(10));
       } else {
-        // Third+ child: 15%
+        // Default scale: 3rd+ child 15%
         discountMap.set(childId, new Decimal(15));
       }
     }
 
     this.logger.log(
-      `Calculated sibling discounts for parent ${parentId}: ${enrollments.length} children`,
+      `Calculated sibling discounts for parent ${parentId}: ${enrollments.length} children` +
+        ` [source: ${overrideSource}${useOverride ? `, override: ${feeStructureOverride.toString()}%` : ''}]`,
     );
 
     return discountMap;

@@ -1454,6 +1454,108 @@ describe('OnboardingConversationHandler', () => {
     });
 
     // -----------------------------------------------------------------------
+    // AUDIT-WA-STUCKDRAFT instrumentation
+    // -----------------------------------------------------------------------
+
+    it('should warn when enrollment invoice is created but left in DRAFT (not sent)', async () => {
+      // Simulate enrollChild returning a DRAFT invoice — the stuck-invoice path
+      const mockInvoice = {
+        id: 'inv-draft-1',
+        invoiceNumber: 'INV-2026-196',
+        totalCents: 97619,
+        status: 'DRAFT',
+      };
+      mockEnrollmentService.enrollChild.mockResolvedValueOnce({
+        enrollment: { id: 'enr-1' },
+        invoice: mockInvoice,
+        invoiceError: undefined,
+        welcomePackSent: false,
+      });
+
+      const dataWithFee = {
+        ...fullData,
+        selectedFeeStructureId: 'fee-1',
+        startDate: '2026-04-09',
+      };
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({
+        id: 'child-1',
+        status: 'ENROLLED',
+      });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+
+      const warnSpy = jest.spyOn(handler['logger'], 'warn');
+
+      await handler.completeOnboarding(
+        SESSION_ID,
+        dataWithFee,
+        TENANT_ID,
+        WA_ID,
+        'Little Stars Creche',
+      );
+
+      // Must emit a warn with invoiceId and sessionId so operators can triage stuck DRAFTs
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'WA onboarding enrollment invoice left in DRAFT — not sent',
+          invoiceId: 'inv-draft-1',
+          invoiceNumber: 'INV-2026-196',
+          sessionId: SESSION_ID,
+          tenantId: TENANT_ID,
+        }),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('should warn when enrollment produces no invoice at all', async () => {
+      mockEnrollmentService.enrollChild.mockResolvedValueOnce({
+        enrollment: { id: 'enr-1' },
+        invoice: null,
+        invoiceError: 'Invoice creation failed: DB timeout',
+        welcomePackSent: false,
+      });
+
+      const dataWithFee = {
+        ...fullData,
+        selectedFeeStructureId: 'fee-1',
+        startDate: '2026-04-09',
+      };
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({
+        id: 'child-1',
+        status: 'ENROLLED',
+      });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+
+      const warnSpy = jest.spyOn(handler['logger'], 'warn');
+
+      await handler.completeOnboarding(
+        SESSION_ID,
+        dataWithFee,
+        TENANT_ID,
+        WA_ID,
+        'Little Stars Creche',
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'WA onboarding enrollment produced no invoice',
+          sessionId: SESSION_ID,
+          tenantId: TENANT_ID,
+        }),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    // -----------------------------------------------------------------------
     // Duplicate child guard tests
     // -----------------------------------------------------------------------
 

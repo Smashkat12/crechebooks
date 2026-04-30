@@ -194,6 +194,7 @@ enum EmploymentType {
   CONTRACT
   PART_TIME
   CASUAL
+  INDEPENDENT_CONTRACTOR
 }
 
 enum PayFrequency {
@@ -1567,8 +1568,9 @@ model Staff {
   reportingTo  String? @map("reporting_to") @db.VarChar(200)
 
   // Tax details
-  taxStatus     String? @map("tax_status") @db.VarChar(50)
-  paymentMethod String? @map("payment_method") @db.VarChar(50)
+  taxStatus      String? @map("tax_status") @db.VarChar(50)
+  paymentMethod  String? @map("payment_method") @db.VarChar(50)
+  it3aReasonCode Int?    @map("it3a_reason_code")
 
   // TASK-DATA-003: Soft delete support
   deletedAt DateTime? @map("deleted_at")

@@ -12,6 +12,7 @@ export enum StorageKind {
   Invoice = 'invoices',
   ClassReport = 'class-reports',
   WhatsAppMedia = 'whatsapp-media',
+  PaymentReceipt = 'payment-receipts',
 }
 
 export interface PresignUploadOptions {

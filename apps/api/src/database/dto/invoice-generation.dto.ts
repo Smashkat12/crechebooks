@@ -159,6 +159,9 @@ export interface EnrollmentWithRelations {
     vatInclusive: boolean;
     /** TASK-BILL-037: Re-registration fee for continuing students */
     reRegistrationFeeCents?: number;
+    /** AUDIT-BILL-09: Operator-configured sibling discount override (percent, 0-100). Null = use default scale.
+     *  Prisma returns Decimal objects for @db.Decimal fields; accept the widened shape. */
+    siblingDiscountPercent?: { toNumber(): number } | null;
   };
 }
 

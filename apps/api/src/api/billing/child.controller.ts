@@ -123,7 +123,6 @@ export class ChildController {
       );
       throw new NotFoundException('FeeStructure', dto.fee_structure_id);
     }
-
     // 3. Create child (API snake_case -> Repository camelCase)
     const child = await this.childRepo.create({
       tenantId: getTenantId(user),
@@ -293,7 +292,6 @@ export class ChildController {
       );
       throw new NotFoundException('FeeStructure', dto.fee_structure_id);
     }
-
     // 3. Create enrollment (service validates no duplicate, date, etc.)
     const {
       enrollment,

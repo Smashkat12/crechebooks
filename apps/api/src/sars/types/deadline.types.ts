@@ -8,7 +8,7 @@
 /**
  * SARS deadline submission types
  */
-export type SarsDeadlineType = 'VAT201' | 'EMP201' | 'IRP5';
+export type SarsDeadlineType = 'VAT201' | 'EMP201' | 'EMP501';
 
 /**
  * Upcoming deadline information
@@ -117,12 +117,13 @@ export const SARS_DEADLINE_CALENDAR = {
     frequency: 'MONTHLY' as const,
   },
   /**
-   * IRP5: Due end of May annually
-   * Annual employee tax certificates
+   * EMP501: Employer Annual Reconciliation Declaration (EMP501 §2).
+   * Annual reconciliation due May 31; interim reconciliation Oct 31.
+   * SarsReadinessService.emp501Window() handles both dates.
    */
-  IRP5: {
+  EMP501: {
     dayOfMonth: 31,
-    monthOfYear: 4, // May (0-indexed)
+    monthOfYear: 4, // May (0-indexed) — annual reconciliation deadline
     frequency: 'ANNUAL' as const,
   },
 } as const;

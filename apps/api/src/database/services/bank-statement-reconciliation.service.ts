@@ -947,8 +947,15 @@ export class BankStatementReconciliationService {
     reason: string | null;
   } {
     // TASK-RECON-003: Use centralized tolerance configuration
-    const amountDiff = Math.abs(bankTx.amountCents - xeroTx.amountCents);
-    const maxAmount = Math.max(bankTx.amountCents, xeroTx.amountCents);
+    // AUDIT-RECON-SIGN: Normalize to absolute values before comparison.
+    // Bank-statement parser stores fees as POSITIVE with isCredit=false.
+    // Transactions table stores fees as NEGATIVE with isCredit=false (Xero/bank-feed correction).
+    // isCredit is the authoritative polarity signal; magnitude must be compared sign-free.
+    const bankAbsAmount = Math.abs(bankTx.amountCents);
+    const xeroAbsAmount = Math.abs(xeroTx.amountCents);
+
+    const amountDiff = Math.abs(bankAbsAmount - xeroAbsAmount);
+    const maxAmount = Math.max(bankAbsAmount, xeroAbsAmount);
     const effectiveTolerance =
       this.toleranceConfig.getEffectiveTolerance(maxAmount);
 
@@ -956,8 +963,7 @@ export class BankStatementReconciliationService {
       this.toleranceConfig.isWithinTolerance(amountDiff, maxAmount) &&
       bankTx.isCredit === xeroTx.isCredit;
     const exactAmountMatch =
-      bankTx.amountCents === xeroTx.amountCents &&
-      bankTx.isCredit === xeroTx.isCredit;
+      bankAbsAmount === xeroAbsAmount && bankTx.isCredit === xeroTx.isCredit;
 
     // Check date match (within tolerance)
     const daysDiff = Math.abs(
@@ -1013,26 +1019,27 @@ export class BankStatementReconciliationService {
       return {
         confidence: effectiveDescConfidence * 0.95,
         status: BankStatementMatchStatus.MATCHED,
-        reason: `Amount within tolerance: bank ${bankTx.amountCents}c vs Xero ${xeroTx.amountCents}c (diff: ${amountDiff}c)`,
+        reason: `Amount within tolerance: bank ${bankAbsAmount}c vs Xero ${xeroAbsAmount}c (diff: ${amountDiff}c)`,
       };
     }
 
     if (!amountMatches && dateMatches && descriptionMatches) {
       // Amount difference exceeds tolerance - check if this could be a fee-adjusted match
       // Fee-adjusted match: Bank shows NET, Xero shows GROSS (Bank + Fee = Xero)
-      const feeDifference = xeroTx.amountCents - bankTx.amountCents;
+      // Use normalized absolute amounts; isCredit is the polarity authority.
+      const feeDifference = xeroAbsAmount - bankAbsAmount;
 
       // If Xero amount is higher and the difference is within 10% (matches MAX_FEE_PERCENTAGE)
       if (
         feeDifference > 0 &&
-        feeDifference <= xeroTx.amountCents * 0.1 &&
+        feeDifference <= xeroAbsAmount * 0.1 &&
         bankTx.isCredit === xeroTx.isCredit
       ) {
         // This could be a fee-adjusted match - flag it as such
         return {
           confidence: effectiveDescConfidence * 0.9,
           status: BankStatementMatchStatus.FEE_ADJUSTED_MATCH,
-          reason: `Possible fee-adjusted match: bank ${bankTx.amountCents}c (NET) + fee ${feeDifference}c = Xero ${xeroTx.amountCents}c (GROSS)`,
+          reason: `Possible fee-adjusted match: bank ${bankAbsAmount}c (NET) + fee ${feeDifference}c = Xero ${xeroAbsAmount}c (GROSS)`,
         };
       }
 
@@ -1040,7 +1047,7 @@ export class BankStatementReconciliationService {
       return {
         confidence: effectiveDescConfidence * 0.8,
         status: BankStatementMatchStatus.AMOUNT_MISMATCH,
-        reason: `Amount differs: bank ${bankTx.amountCents}c vs Xero ${xeroTx.amountCents}c (exceeds tolerance of ${effectiveTolerance.toFixed(0)}c)`,
+        reason: `Amount differs: bank ${bankAbsAmount}c vs Xero ${xeroAbsAmount}c (exceeds tolerance of ${effectiveTolerance.toFixed(0)}c)`,
       };
     }
 
@@ -1267,6 +1274,99 @@ export class BankStatementReconciliationService {
       }));
 
     return { inBankOnly, inXeroOnly };
+  }
+
+  /**
+   * AUDIT-BANK-03: Surface IN_BANK_ONLY rows that survive inside RECONCILED periods.
+   *
+   * Groups by reconciliation period so the admin can see which closed periods still
+   * carry unmatched bank-only entries. Read-only — no mutations.
+   */
+  async getUnmatchedInClosedPeriods(tenantId: string): Promise<
+    Array<{
+      reconciliationId: string;
+      periodStart: Date;
+      periodEnd: Date;
+      bankAccount: string;
+      count: number;
+      totalAmountCents: number;
+      items: Array<{
+        id: string;
+        bankDate: Date;
+        bankDescription: string;
+        bankAmountCents: number;
+        bankIsCredit: boolean;
+      }>;
+    }>
+  > {
+    const matches = await this.prisma.bankStatementMatch.findMany({
+      where: {
+        tenantId,
+        status: BankStatementMatchStatus.IN_BANK_ONLY,
+        reconciliation: { status: ReconciliationStatus.RECONCILED },
+      },
+      include: {
+        reconciliation: {
+          select: {
+            id: true,
+            periodStart: true,
+            periodEnd: true,
+            bankAccount: true,
+          },
+        },
+      },
+      orderBy: [
+        { reconciliation: { periodStart: 'asc' } },
+        { bankDate: 'asc' },
+      ],
+    });
+
+    // Group by reconciliation ID
+    const grouped = new Map<
+      string,
+      {
+        reconciliationId: string;
+        periodStart: Date;
+        periodEnd: Date;
+        bankAccount: string;
+        totalAmountCents: number;
+        items: Array<{
+          id: string;
+          bankDate: Date;
+          bankDescription: string;
+          bankAmountCents: number;
+          bankIsCredit: boolean;
+        }>;
+      }
+    >();
+
+    for (const match of matches) {
+      const r = match.reconciliation;
+      if (!grouped.has(r.id)) {
+        grouped.set(r.id, {
+          reconciliationId: r.id,
+          periodStart: r.periodStart,
+          periodEnd: r.periodEnd,
+          bankAccount: r.bankAccount,
+          totalAmountCents: 0,
+          items: [],
+        });
+      }
+      const group = grouped.get(r.id)!;
+      group.totalAmountCents += Math.abs(match.bankAmountCents);
+      group.items.push({
+        id: match.id,
+        bankDate: match.bankDate,
+        bankDescription: match.bankDescription,
+        bankAmountCents: match.bankAmountCents,
+        bankIsCredit: match.bankIsCredit,
+      });
+    }
+
+    return Array.from(grouped.values()).map((g) => ({
+      ...g,
+      count: g.items.length,
+    }));
   }
 
   /**

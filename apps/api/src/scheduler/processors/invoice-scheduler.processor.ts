@@ -11,12 +11,10 @@
  * - Post-generation auto-send (with staging-safety gate)
  * - Admin notifications
  *
- * Staging-safety contract (two-layer guard):
- *   1. CommsGuardService.isDisabled() — COMMS_DISABLED env var.
- *      When true, email/WA adapters return mocked success; no external call.
- *   2. APP_ENV === 'staging' belt-and-suspenders — if COMMS_DISABLED is not
- *      set AND we are in the staging environment, delivery is suppressed and
- *      invoices are marked SENT in DB without calling InvoiceDeliveryService.
+ * Staging-safety contract (two-layer guard, now enforced inside InvoiceDeliveryService):
+ *   1. APP_ENV === 'staging' AND COMMS_DISABLED not set: DeliveryService marks invoices
+ *      SENT in DB without contacting any adapter. Audit note records suppression reason.
+ *   2. COMMS_DISABLED=true: email/WA adapters return mocked success; no external call.
  * In either suppressed case the audit log records the reason explicitly.
  */
 
@@ -34,11 +32,6 @@ import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { EnrollmentStatus } from '../../database/entities/enrollment.entity';
-import {
-  DeliveryStatus,
-  InvoiceStatus,
-} from '../../database/entities/invoice.entity';
-import { CommsGuardService } from '../../common/services/comms-guard/comms-guard.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { InvoiceBatchCompletedEvent } from '../../database/events/domain-events';
 
@@ -66,7 +59,6 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
     private readonly invoiceDeliveryService: InvoiceDeliveryService,
     private readonly auditLogService: AuditLogService,
     private readonly prisma: PrismaService,
-    private readonly commsGuard: CommsGuardService,
     private readonly eventEmitter: EventEmitter2,
   ) {
     super(QUEUE_NAMES.INVOICE_GENERATION);
@@ -178,15 +170,9 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
   /**
    * Send all generated DRAFT invoices to parents.
    *
-   * Two-layer staging-safety gate (evaluated in order):
-   *   1. APP_ENV === 'staging' AND COMMS_DISABLED is not explicitly true:
-   *      Delivery is suppressed — invoices are marked SENT in DB (matching
-   *      what DATA-01 did manually) without calling any delivery adapter.
-   *      Audit note: "delivery suppressed (staging env / COMMS_DISABLED not set)".
-   *   2. COMMS_DISABLED=true: The email/WA adapters will return mocked success
-   *      without hitting external APIs. InvoiceDeliveryService handles the DB
-   *      update normally. Audit note: "delivery suppressed via COMMS_DISABLED".
-   *   3. Neither suppression is active: Normal delivery via InvoiceDeliveryService.
+   * Staging-safety is enforced inside InvoiceDeliveryService.sendInvoices (two layers):
+   *   1. APP_ENV === 'staging' AND COMMS_DISABLED not set → marks SENT in DB, no adapter.
+   *   2. COMMS_DISABLED=true → adapters mock the send without external API calls.
    *
    * Failed individual deliveries are logged but do NOT fail the whole job;
    * those invoices remain in DRAFT for operator retry.
@@ -196,59 +182,7 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
     billingMonth: string,
     invoiceIds: string[],
   ): Promise<void> {
-    const isCommsDisabled = this.commsGuard.isDisabled();
-    const isStagingEnv = process.env.APP_ENV === 'staging';
-
-    // Layer 1: staging env without COMMS_DISABLED set — hard suppress
-    if (isStagingEnv && !isCommsDisabled) {
-      this.logger.warn(
-        `[STAGING-SAFETY] Delivery suppressed for ${invoiceIds.length} invoices ` +
-          `(APP_ENV=staging, COMMS_DISABLED not set). ` +
-          `Marking invoices SENT in DB without contacting any delivery adapter. ` +
-          `Set COMMS_DISABLED=true in Railway staging to route through the comms guard instead.`,
-      );
-
-      // Mark all as SENT in DB (matches DATA-01 manual fix pattern)
-      const now = new Date();
-      await this.prisma.invoice.updateMany({
-        where: {
-          id: { in: invoiceIds },
-          tenantId,
-          status: InvoiceStatus.DRAFT,
-        },
-        data: {
-          status: InvoiceStatus.SENT,
-          deliveryStatus: DeliveryStatus.SENT,
-          deliveredAt: now,
-        },
-      });
-
-      await this.auditLogService.logAction({
-        tenantId,
-        entityType: 'InvoiceGeneration',
-        entityId: `batch-${billingMonth}-send`,
-        action: AuditAction.UPDATE,
-        afterValue: {
-          billingMonth,
-          invoiceIds,
-          suppressedReason: 'staging env / COMMS_DISABLED not set',
-          markedSentAt: now.toISOString(),
-        },
-        changeSummary: `Auto-send suppressed (staging env): ${invoiceIds.length} invoices marked SENT in DB without delivery`,
-      });
-
-      return;
-    }
-
-    // Layer 2: COMMS_DISABLED=true — adapters mock the send, log the note
-    if (isCommsDisabled) {
-      this.logger.warn(
-        `[COMMS_DISABLED] Auto-send for ${invoiceIds.length} invoices will be mocked ` +
-          `by the comms adapters — no emails or WhatsApp messages will be sent.`,
-      );
-    }
-
-    // Normal path (or COMMS_DISABLED path — adapters handle suppression internally)
+    // Normal path — staging gate is enforced inside sendInvoices
     this.logger.log(
       `Auto-send: delivering ${invoiceIds.length} invoices for tenant ${tenantId} (${billingMonth})`,
     );
@@ -289,7 +223,7 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
           reason: f.reason,
           code: f.code,
         })),
-        commsDisabled: isCommsDisabled,
+        // staging-safety gate now enforced inside InvoiceDeliveryService.sendInvoices
       },
       changeSummary: `Auto-send: ${deliveryResult.sent} delivered, ${deliveryResult.failed} failed for ${billingMonth}`,
     });

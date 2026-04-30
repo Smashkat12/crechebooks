@@ -196,24 +196,24 @@ describe('SarsDeadlineService', () => {
       expect(deadline.getDate()).toBe(7);
     });
 
-    it('should calculate IRP5 deadline correctly', () => {
+    it('should calculate EMP501 deadline correctly (EMP501 §2 — annual reconciliation May 31)', () => {
       const service = new SarsDeadlineService({} as any);
 
       // Reference: January 15, 2024
       const ref = new Date(2024, 0, 15);
-      const deadline = service.getNextDeadline('IRP5', ref);
+      const deadline = service.getNextDeadline('EMP501', ref);
 
-      // IRP5 is due end of May annually
+      // EMP501 annual reconciliation is due end of May
       expect(deadline.getMonth()).toBe(4); // May
       expect(deadline.getDate()).toBe(31);
     });
 
-    it('should roll over IRP5 to next year if past deadline', () => {
+    it('should roll over EMP501 to next year if past May 31 deadline', () => {
       const service = new SarsDeadlineService({} as any);
 
-      // Reference: June 15, 2024 (after May deadline)
+      // Reference: June 15, 2024 (after May 31 interim deadline)
       const ref = new Date(2024, 5, 15);
-      const deadline = service.getNextDeadline('IRP5', ref);
+      const deadline = service.getNextDeadline('EMP501', ref);
 
       // Should be May 31, 2025
       expect(deadline.getFullYear()).toBe(2025);
@@ -245,10 +245,10 @@ describe('SarsDeadlineService', () => {
       expect(SARS_DEADLINE_CALENDAR.EMP201.frequency).toBe('MONTHLY');
     });
 
-    it('should have IRP5 due on May 31', () => {
-      expect(SARS_DEADLINE_CALENDAR.IRP5.dayOfMonth).toBe(31);
-      expect(SARS_DEADLINE_CALENDAR.IRP5.monthOfYear).toBe(4); // May
-      expect(SARS_DEADLINE_CALENDAR.IRP5.frequency).toBe('ANNUAL');
+    it('should have EMP501 due on May 31 (annual reconciliation — EMP501 §2)', () => {
+      expect(SARS_DEADLINE_CALENDAR.EMP501.dayOfMonth).toBe(31);
+      expect(SARS_DEADLINE_CALENDAR.EMP501.monthOfYear).toBe(4); // May
+      expect(SARS_DEADLINE_CALENDAR.EMP501.frequency).toBe('ANNUAL');
     });
   });
 

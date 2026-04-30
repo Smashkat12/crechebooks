@@ -219,9 +219,26 @@ export class InvoiceGenerationService {
 
       // Process each parent's enrollments
       for (const [parentId, parentEnrollments] of enrollmentsByParent) {
+        // AUDIT-BILL-09: Resolve fee-structure override for sibling discount.
+        // Take the first non-null siblingDiscountPercent from this parent's
+        // enrollments. All siblings in a creche typically share one fee structure,
+        // so the first non-null value is the operator intent for this group.
+        // Prisma returns Decimal objects for @db.Decimal fields; convert to number first.
+        const feeStructureOverrideRaw = parentEnrollments
+          .map((e) => e.feeStructure.siblingDiscountPercent)
+          .find((pct) => pct != null);
+        const siblingDiscountOverride =
+          feeStructureOverrideRaw != null
+            ? new Decimal(feeStructureOverrideRaw.toNumber())
+            : null;
+
         // Get sibling discounts for this parent
         const siblingDiscounts =
-          await this.enrollmentService.applySiblingDiscount(tenantId, parentId);
+          await this.enrollmentService.applySiblingDiscount(
+            tenantId,
+            parentId,
+            siblingDiscountOverride,
+          );
 
         // Create invoice for each child
         for (const enrollment of parentEnrollments) {
@@ -351,11 +368,10 @@ export class InvoiceGenerationService {
             // Get tenant due days
             const dueDays = tenant?.invoiceDueDays ?? this.DEFAULT_DUE_DAYS;
 
-            // TASK-BILL-041: Generate invoice number atomically to prevent race conditions
-            const invoiceNumber = await this.generateInvoiceNumber(
-              tenantId,
-              batchYear,
-            );
+            // AUDIT-BILL-07: invoiceNumber is generated inside createInvoiceAtomic's
+            // transaction so that a failed insert rolls back the counter increment too.
+            // Do NOT generate the number here (outside the transaction) — that was the
+            // root cause of the INV-2026 gap of 46 numbers.
 
             // TASK-BILL-040: Create invoice atomically with all line items and ad-hoc marking
             // This ensures either all operations succeed or all are rolled back - no partial invoices
@@ -364,7 +380,7 @@ export class InvoiceGenerationService {
               enrollment,
               billingPeriodStart,
               billingPeriodEnd,
-              invoiceNumber,
+              batchYear,
               lineItems,
               isVatRegistered,
               adHocChargeIds,
@@ -615,7 +631,11 @@ export class InvoiceGenerationService {
   }
 
   /**
-   * Create a single invoice for an enrollment
+   * Create a single invoice for an enrollment (ad-hoc / single-invoice path).
+   *
+   * AUDIT-BILL-07 follow-up: invoice number generation and row insert share one
+   * prisma.$transaction so a failed insert rolls back the counter increment,
+   * preventing number gaps. This mirrors the fix applied to createInvoiceAtomic.
    *
    * @param tenantId - Tenant ID
    * @param enrollment - Enrollment with relations
@@ -630,17 +650,8 @@ export class InvoiceGenerationService {
     billingPeriodStart: Date,
     billingPeriodEnd: Date,
     userId: string,
-    precomputedInvoiceNumber?: string,
   ): Promise<Invoice> {
-    // Use precomputed number or generate one (for backward compatibility)
     const year = billingPeriodStart.getFullYear();
-    const invoiceNumber =
-      precomputedInvoiceNumber ??
-      (await this.generateInvoiceNumber(tenantId, year));
-
-    // Get tenant for due days setting
-    const tenant = await this.tenantRepo.findById(tenantId);
-    const dueDays = tenant?.invoiceDueDays ?? this.DEFAULT_DUE_DAYS;
 
     // Issue date = 1st of billing month, due date = last day of billing month
     // Use UTC noon to avoid timezone drift with @db.Date columns
@@ -661,29 +672,48 @@ export class InvoiceGenerationService {
       ),
     );
 
-    // Create invoice
-    const invoice = await this.invoiceRepo.create({
-      tenantId,
-      invoiceNumber,
-      parentId: enrollment.child.parentId,
-      childId: enrollment.childId,
-      billingPeriodStart,
-      billingPeriodEnd,
-      issueDate,
-      dueDate,
-      subtotalCents: 0, // Will be updated when adding lines
-      vatCents: 0,
-      totalCents: 0,
-    });
+    // AUDIT-BILL-07: Generate invoice number INSIDE the transaction so that a
+    // failed INSERT rolls back the counter UPDATE together — no number is burned.
+    const invoice = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const invoiceNumber =
+          await this.invoiceNumberService.generateNextNumber(
+            tenantId,
+            year,
+            tx,
+          );
 
-    // Audit log
+        this.logger.debug(
+          `createInvoice: creating ${invoiceNumber} for child ${enrollment.childId}`,
+        );
+
+        return tx.invoice.create({
+          data: {
+            tenantId,
+            invoiceNumber,
+            parentId: enrollment.child.parentId,
+            childId: enrollment.childId,
+            billingPeriodStart,
+            billingPeriodEnd,
+            issueDate,
+            dueDate,
+            subtotalCents: 0, // Will be updated when adding lines
+            vatCents: 0,
+            totalCents: 0,
+            status: 'DRAFT',
+          },
+        });
+      },
+    );
+
+    // Audit log (outside transaction — non-critical, same as createInvoiceAtomic)
     await this.auditLogService.logCreate({
       tenantId,
       userId,
       entityType: 'Invoice',
       entityId: invoice.id,
       afterValue: {
-        invoiceNumber,
+        invoiceNumber: invoice.invoiceNumber,
         childId: enrollment.childId,
         billingPeriod: `${billingPeriodStart.toISOString().split('T')[0]} to ${billingPeriodEnd.toISOString().split('T')[0]}`,
       },
@@ -826,7 +856,7 @@ export class InvoiceGenerationService {
     enrollment: EnrollmentWithRelations,
     billingPeriodStart: Date,
     billingPeriodEnd: Date,
-    invoiceNumber: string,
+    year: number,
     lineItems: LineItemInput[],
     isVatRegistered: boolean,
     adHocChargeIds: string[],
@@ -834,7 +864,7 @@ export class InvoiceGenerationService {
     dueDays: number,
   ): Promise<Invoice> {
     this.logger.debug(
-      `TASK-BILL-040: Creating invoice ${invoiceNumber} with transaction isolation`,
+      `TASK-BILL-040: Creating invoice for tenant ${tenantId} with transaction isolation`,
     );
 
     // Issue date = 1st of billing month, due date = last day of billing month
@@ -859,6 +889,21 @@ export class InvoiceGenerationService {
     // Execute all database operations atomically
     const invoice = await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
+        // AUDIT-BILL-07: Generate invoice number inside the transaction so that
+        // any failure rolls back both the counter increment AND the insert together.
+        // Previously the counter was incremented before the transaction started,
+        // which burned a sequence number on every failed insert.
+        const invoiceNumber =
+          await this.invoiceNumberService.generateNextNumber(
+            tenantId,
+            year,
+            tx,
+          );
+
+        this.logger.debug(
+          `TASK-BILL-040: Creating invoice ${invoiceNumber} with transaction isolation`,
+        );
+
         // 1. Create invoice header
         const createdInvoice = await tx.invoice.create({
           data: {
@@ -976,7 +1021,7 @@ export class InvoiceGenerationService {
     );
 
     this.logger.log(
-      `TASK-BILL-040: Invoice ${invoiceNumber} created atomically with ${lineItems.length} line items`,
+      `TASK-BILL-040: Invoice ${invoice.invoiceNumber} created atomically with ${lineItems.length} line items`,
     );
 
     // Audit log (outside transaction - non-critical)
@@ -986,7 +1031,7 @@ export class InvoiceGenerationService {
       entityType: 'Invoice',
       entityId: invoice.id,
       afterValue: {
-        invoiceNumber,
+        invoiceNumber: invoice.invoiceNumber,
         childId: enrollment.childId,
         billingPeriod: `${billingPeriodStart.toISOString().split('T')[0]} to ${billingPeriodEnd.toISOString().split('T')[0]}`,
         transactionIsolated: true,
@@ -1246,6 +1291,7 @@ export class InvoiceGenerationService {
             amountCents: true,
             vatInclusive: true,
             reRegistrationFeeCents: true, // TASK-BILL-037: For January re-registration
+            siblingDiscountPercent: true, // AUDIT-BILL-09: Operator override
           },
         },
       },

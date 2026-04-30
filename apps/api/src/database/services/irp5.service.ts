@@ -12,7 +12,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import Decimal from 'decimal.js';
 import { PayrollStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { PayeService } from './paye.service';
 import {
   Irp5Certificate,
   Irp5Fields,
@@ -35,10 +34,7 @@ Decimal.set({
 export class Irp5Service {
   private readonly logger = new Logger(Irp5Service.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly payeService: PayeService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Generate an IRP5 certificate for an employee

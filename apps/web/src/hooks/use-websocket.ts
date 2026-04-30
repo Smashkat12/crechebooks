@@ -16,7 +16,11 @@ export function useWebSocket() {
 
     const socket = io(`${API_URL}/dashboard`, {
       auth: { token: session.accessToken },
-      transports: ['websocket', 'polling'],
+      // Railway's HTTP/2 edge proxy returns 400 on WebSocket upgrades, so the
+      // ['websocket', 'polling'] default kept the page in a perpetual upgrade-
+      // fail-then-fallback loop and stopped document_idle from ever firing.
+      // Polling alone keeps notifications real-time without the wedge.
+      transports: ['polling'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,

@@ -351,11 +351,10 @@ export class InvoiceGenerationService {
             // Get tenant due days
             const dueDays = tenant?.invoiceDueDays ?? this.DEFAULT_DUE_DAYS;
 
-            // TASK-BILL-041: Generate invoice number atomically to prevent race conditions
-            const invoiceNumber = await this.generateInvoiceNumber(
-              tenantId,
-              batchYear,
-            );
+            // AUDIT-BILL-07: invoiceNumber is generated inside createInvoiceAtomic's
+            // transaction so that a failed insert rolls back the counter increment too.
+            // Do NOT generate the number here (outside the transaction) — that was the
+            // root cause of the INV-2026 gap of 46 numbers.
 
             // TASK-BILL-040: Create invoice atomically with all line items and ad-hoc marking
             // This ensures either all operations succeed or all are rolled back - no partial invoices
@@ -364,7 +363,7 @@ export class InvoiceGenerationService {
               enrollment,
               billingPeriodStart,
               billingPeriodEnd,
-              invoiceNumber,
+              batchYear,
               lineItems,
               isVatRegistered,
               adHocChargeIds,
@@ -826,7 +825,7 @@ export class InvoiceGenerationService {
     enrollment: EnrollmentWithRelations,
     billingPeriodStart: Date,
     billingPeriodEnd: Date,
-    invoiceNumber: string,
+    year: number,
     lineItems: LineItemInput[],
     isVatRegistered: boolean,
     adHocChargeIds: string[],
@@ -834,7 +833,7 @@ export class InvoiceGenerationService {
     dueDays: number,
   ): Promise<Invoice> {
     this.logger.debug(
-      `TASK-BILL-040: Creating invoice ${invoiceNumber} with transaction isolation`,
+      `TASK-BILL-040: Creating invoice for tenant ${tenantId} with transaction isolation`,
     );
 
     // Issue date = 1st of billing month, due date = last day of billing month
@@ -859,6 +858,21 @@ export class InvoiceGenerationService {
     // Execute all database operations atomically
     const invoice = await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
+        // AUDIT-BILL-07: Generate invoice number inside the transaction so that
+        // any failure rolls back both the counter increment AND the insert together.
+        // Previously the counter was incremented before the transaction started,
+        // which burned a sequence number on every failed insert.
+        const invoiceNumber =
+          await this.invoiceNumberService.generateNextNumber(
+            tenantId,
+            year,
+            tx,
+          );
+
+        this.logger.debug(
+          `TASK-BILL-040: Creating invoice ${invoiceNumber} with transaction isolation`,
+        );
+
         // 1. Create invoice header
         const createdInvoice = await tx.invoice.create({
           data: {
@@ -976,7 +990,7 @@ export class InvoiceGenerationService {
     );
 
     this.logger.log(
-      `TASK-BILL-040: Invoice ${invoiceNumber} created atomically with ${lineItems.length} line items`,
+      `TASK-BILL-040: Invoice ${invoice.invoiceNumber} created atomically with ${lineItems.length} line items`,
     );
 
     // Audit log (outside transaction - non-critical)
@@ -986,7 +1000,7 @@ export class InvoiceGenerationService {
       entityType: 'Invoice',
       entityId: invoice.id,
       afterValue: {
-        invoiceNumber,
+        invoiceNumber: invoice.invoiceNumber,
         childId: enrollment.childId,
         billingPeriod: `${billingPeriodStart.toISOString().split('T')[0]} to ${billingPeriodEnd.toISOString().split('T')[0]}`,
         transactionIsolated: true,

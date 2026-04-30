@@ -66,6 +66,7 @@ export const queryKeys = {
     list: (params?: Record<string, unknown>) => [...queryKeys.reconciliation.lists(), params] as const,
     summary: (params?: Record<string, unknown>) => [...queryKeys.reconciliation.all, 'summary', params] as const,
     discrepancies: () => [...queryKeys.reconciliation.all, 'discrepancies'] as const,
+    unmatchedClosed: () => [...queryKeys.reconciliation.all, 'unmatched-closed'] as const,
   },
   // Staff & Payroll
   staff: {

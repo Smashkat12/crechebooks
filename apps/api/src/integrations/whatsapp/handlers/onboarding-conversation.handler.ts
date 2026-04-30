@@ -2274,6 +2274,50 @@ export class OnboardingConversationHandler {
         // Use per-child surname, falling back to parent's surname
         const childLastName = childData.surname || data.parent?.surname || '';
 
+        // Duplicate guard: check whether a child with the same name+DOB already
+        // exists for this tenant (case-insensitive match). This prevents a second
+        // parent from creating a duplicate child record via WA self-enrollment.
+        if (childData.firstName && childLastName && childData.dateOfBirth) {
+          const existing = await this.prisma.child.findFirst({
+            where: {
+              tenantId,
+              firstName: { equals: childData.firstName, mode: 'insensitive' },
+              lastName: { equals: childLastName, mode: 'insensitive' },
+              dateOfBirth: new Date(childData.dateOfBirth),
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+
+          if (existing) {
+            this.logger.warn(
+              `Duplicate child detected during WA onboarding [session=${sessionId}] — existing child ID redacted`,
+            );
+            await this.contentService.sendSessionMessage(
+              waId,
+              `We already have a child matching that name and date of birth registered at ${tenantName}. ` +
+                `This could mean the child is enrolled under a different guardian. ` +
+                `Please contact ${tenantName} directly so a staff member can link you as an additional guardian. ` +
+                `We have flagged this for operator review.`,
+              tenantId,
+            );
+            // Mark session as requiring operator review and stop processing
+            await this.prisma.whatsAppOnboardingSession.update({
+              where: { id: sessionId },
+              data: {
+                status: WaOnboardingStatus.ABANDONED,
+                collectedData: {
+                  ...(data as unknown as Record<string, unknown>),
+                  _duplicateChildFlag: true,
+                  _duplicateChildName: `[redacted]`,
+                  _flaggedAt: new Date().toISOString(),
+                } as unknown as Prisma.InputJsonValue,
+              },
+            });
+            return;
+          }
+        }
+
         const child = await this.prisma.child.create({
           data: {
             tenantId,

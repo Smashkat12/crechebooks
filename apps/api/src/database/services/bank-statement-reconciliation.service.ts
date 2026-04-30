@@ -1277,6 +1277,99 @@ export class BankStatementReconciliationService {
   }
 
   /**
+   * AUDIT-BANK-03: Surface IN_BANK_ONLY rows that survive inside RECONCILED periods.
+   *
+   * Groups by reconciliation period so the admin can see which closed periods still
+   * carry unmatched bank-only entries. Read-only — no mutations.
+   */
+  async getUnmatchedInClosedPeriods(tenantId: string): Promise<
+    Array<{
+      reconciliationId: string;
+      periodStart: Date;
+      periodEnd: Date;
+      bankAccount: string;
+      count: number;
+      totalAmountCents: number;
+      items: Array<{
+        id: string;
+        bankDate: Date;
+        bankDescription: string;
+        bankAmountCents: number;
+        bankIsCredit: boolean;
+      }>;
+    }>
+  > {
+    const matches = await this.prisma.bankStatementMatch.findMany({
+      where: {
+        tenantId,
+        status: BankStatementMatchStatus.IN_BANK_ONLY,
+        reconciliation: { status: ReconciliationStatus.RECONCILED },
+      },
+      include: {
+        reconciliation: {
+          select: {
+            id: true,
+            periodStart: true,
+            periodEnd: true,
+            bankAccount: true,
+          },
+        },
+      },
+      orderBy: [
+        { reconciliation: { periodStart: 'asc' } },
+        { bankDate: 'asc' },
+      ],
+    });
+
+    // Group by reconciliation ID
+    const grouped = new Map<
+      string,
+      {
+        reconciliationId: string;
+        periodStart: Date;
+        periodEnd: Date;
+        bankAccount: string;
+        totalAmountCents: number;
+        items: Array<{
+          id: string;
+          bankDate: Date;
+          bankDescription: string;
+          bankAmountCents: number;
+          bankIsCredit: boolean;
+        }>;
+      }
+    >();
+
+    for (const match of matches) {
+      const r = match.reconciliation;
+      if (!grouped.has(r.id)) {
+        grouped.set(r.id, {
+          reconciliationId: r.id,
+          periodStart: r.periodStart,
+          periodEnd: r.periodEnd,
+          bankAccount: r.bankAccount,
+          totalAmountCents: 0,
+          items: [],
+        });
+      }
+      const group = grouped.get(r.id)!;
+      group.totalAmountCents += Math.abs(match.bankAmountCents);
+      group.items.push({
+        id: match.id,
+        bankDate: match.bankDate,
+        bankDescription: match.bankDescription,
+        bankAmountCents: match.bankAmountCents,
+        bankIsCredit: match.bankIsCredit,
+      });
+    }
+
+    return Array.from(grouped.values()).map((g) => ({
+      ...g,
+      count: g.items.length,
+    }));
+  }
+
+  /**
    * Manually match a bank statement record with a transaction
    * @throws NotFoundException if match or transaction not found
    */

@@ -18,11 +18,9 @@ import {
   Logger,
   HttpCode,
   StreamableFile,
-  NotFoundException,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { Response } from 'express';
-import * as fs from 'fs';
 import {
   ApiTags,
   ApiOperation,
@@ -493,6 +491,7 @@ export class PaymentController {
     const result = await this.paymentReceiptService.generateReceipt(
       getTenantId(user),
       paymentId,
+      user.id,
     );
 
     this.logger.log(
@@ -542,37 +541,28 @@ export class PaymentController {
       `Download receipt: tenant=${getTenantId(user)}, payment=${paymentId}`,
     );
 
-    // Check if receipt exists, generate if not
-    let receipt = this.paymentReceiptService.findReceiptByPaymentId(
+    // Cache-or-generate: returns signed URL + S3 key
+    const receipt = await this.paymentReceiptService.getOrGenerateReceipt(
       getTenantId(user),
       paymentId,
+      user.id,
     );
 
-    if (!receipt) {
-      // Generate receipt on-the-fly if it doesn't exist
-      receipt = await this.paymentReceiptService.generateReceipt(
-        getTenantId(user),
-        paymentId,
-      );
-    }
-
-    // Verify file exists
-    if (!fs.existsSync(receipt.filePath)) {
-      throw new NotFoundException(
-        `Receipt file not found for payment ${paymentId}`,
-      );
-    }
-
-    // Stream the PDF file
-    const file = fs.createReadStream(receipt.filePath);
+    // Stream directly from S3
+    const stream = await this.paymentReceiptService.streamReceipt(
+      getTenantId(user),
+      receipt.s3Key,
+    );
 
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${receipt.receiptNumber}.pdf"`,
     });
 
-    this.logger.log(`Streaming receipt ${receipt.receiptNumber} for download`);
+    this.logger.log(
+      `Streaming receipt ${receipt.receiptNumber} from S3 key=${receipt.s3Key} (cached=${receipt.cached})`,
+    );
 
-    return new StreamableFile(file);
+    return new StreamableFile(stream);
   }
 }

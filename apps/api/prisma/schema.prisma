@@ -772,6 +772,8 @@ model Tenant {
 
   // Backlog #11 — parent proof-of-payment uploads
   paymentAttachments PaymentAttachment[]
+  // AUDIT-PAY-04: persisted receipt S3 pointers
+  paymentReceipts    PaymentReceipt[]
 
   @@map("tenants")
 }
@@ -1517,12 +1519,31 @@ model Payment {
   attachments             PaymentAttachment[]
   // Backlog #11 part 2 — OCR matcher suggests this payment for proof attachments
   suggestedForAttachments PaymentAttachment[] @relation("PaymentAttachmentSuggested")
+  // AUDIT-PAY-04: persisted receipt S3 pointer
+  receipt                 PaymentReceipt?
 
   @@index([tenantId, transactionId])
   @@index([tenantId, invoiceId])
   @@index([xeroPaymentId])
   @@index([tenantId, deletedAt])
   @@map("payments")
+}
+
+/// AUDIT-PAY-04: Persisted payment receipt S3 pointer.
+/// One row per payment — regenerated receipts update the existing row.
+model PaymentReceipt {
+  id          String   @id @default(uuid())
+  paymentId   String   @unique @map("payment_id")
+  tenantId    String   @map("tenant_id")
+  s3Key       String   @map("s3_key") @db.VarChar(500)
+  contentHash String?  @map("content_hash") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("payment_receipts")
 }
 
 model Staff {

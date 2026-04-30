@@ -1,18 +1,23 @@
 /**
  * Payment Receipt Service
  * TASK-PAY-019: Payment Receipt PDF Generation
+ * AUDIT-PAY-04: Persist receipts to S3 with DB pointer
  *
  * @module database/services/payment-receipt
- * @description Service for generating payment receipt PDFs.
+ * @description Service for generating payment receipt PDFs and persisting them
+ * to S3. On re-request the S3-backed copy is served without regeneration.
  * All amounts are in CENTS as integers.
  */
 
 import { Injectable, Logger } from '@nestjs/common';
 import { Payment } from '@prisma/client';
+import { Readable } from 'stream';
 import PDFDocument from 'pdfkit';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../../integrations/storage/storage.service';
+import { StorageKind } from '../../integrations/storage/storage.types';
+import { AuditLogService } from './audit-log.service';
+import { AuditAction } from '../entities/audit-log.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import { formatFullName } from '../../common/utils/name-formatter';
 
@@ -35,32 +40,100 @@ export interface ReceiptData {
 
 export interface ReceiptResult {
   receiptNumber: string;
-  filePath: string;
+  /** S3 key — stored in payment_receipts.s3_key */
+  s3Key: string;
+  /** Signed S3 URL valid for 5 minutes */
   downloadUrl: string;
+  /** True when the PDF was generated fresh; false when retrieved from cache */
+  cached: boolean;
 }
 
 @Injectable()
 export class PaymentReceiptService {
   private readonly logger = new Logger(PaymentReceiptService.name);
-  private readonly uploadDir = 'uploads/receipts';
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+    private readonly auditLog: AuditLogService,
+  ) {}
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
 
   /**
-   * Generate payment receipt PDF
-   * @param tenantId - Tenant ID
-   * @param paymentId - Payment ID to generate receipt for
-   * @returns ReceiptResult with receipt number, file path, and download URL
-   * @throws NotFoundException if payment not found
-   * @throws BusinessException if required relations not found
+   * Return a signed download URL for the receipt.
+   * Generates and persists to S3 on first call; serves from S3 on subsequent
+   * calls without regenerating the PDF.
+   *
+   * @param tenantId  Tenant scope
+   * @param paymentId Payment to receipt
+   * @param userId    Acting user (for audit trail)
+   * @returns ReceiptResult with signed URL, receipt number, and cache flag
+   * @throws NotFoundException when payment is not found
+   * @throws BusinessException when payment has no associated invoice
+   */
+  async getOrGenerateReceipt(
+    tenantId: string,
+    paymentId: string,
+    userId?: string,
+  ): Promise<ReceiptResult> {
+    // 1. Check DB pointer for an existing receipt
+    const existing = await this.prisma.paymentReceipt.findUnique({
+      where: { paymentId },
+    });
+
+    if (existing && existing.tenantId === tenantId) {
+      this.logger.log(
+        `Receipt cache hit for payment ${paymentId}, key=${existing.s3Key}`,
+      );
+
+      const downloadUrl = await this.storage.createPresignedDownloadUrl(
+        tenantId,
+        StorageKind.PaymentReceipt,
+        existing.s3Key,
+      );
+
+      // Derive receipt number from key: …/<receiptNumber>.pdf
+      const receiptNumber = this.receiptNumberFromKey(existing.s3Key);
+
+      await this.auditLog.logAction({
+        tenantId,
+        userId,
+        entityType: 'PaymentReceipt',
+        entityId: paymentId,
+        action: AuditAction.UPDATE,
+        beforeValue: undefined,
+        afterValue: { s3Key: existing.s3Key, cached: true },
+        changeSummary: `Receipt downloaded (cached) for payment ${paymentId}`,
+      });
+
+      return {
+        receiptNumber,
+        s3Key: existing.s3Key,
+        downloadUrl,
+        cached: true,
+      };
+    }
+
+    // 2. Generate fresh receipt
+    return this.generateReceipt(tenantId, paymentId, userId);
+  }
+
+  /**
+   * Force-generate a receipt, upload to S3, upsert DB pointer, return signed URL.
+   * Called by `getOrGenerateReceipt` on cache miss; also available for the
+   * dedicated POST /payments/:id/generate-receipt endpoint.
    */
   async generateReceipt(
     tenantId: string,
     paymentId: string,
+    userId?: string,
   ): Promise<ReceiptResult> {
     this.logger.log(`Generating receipt for payment ${paymentId}`);
 
-    // 1. Get payment with relations
+    // 1. Load payment with relations
     const payment = await this.prisma.payment.findFirst({
       where: { id: paymentId, tenantId },
       include: {
@@ -88,69 +161,131 @@ export class PaymentReceiptService {
     // 2. Build receipt data
     const receiptData = await this.buildReceiptData(tenantId, payment);
 
-    // 3. Ensure upload directory exists
-    const tenantDir = path.join(this.uploadDir, tenantId);
-    if (!fs.existsSync(tenantDir)) {
-      fs.mkdirSync(tenantDir, { recursive: true });
-    }
-
-    // 4. Generate receipt number
+    // 3. Generate receipt number (DB-backed — sequential per tenant/year)
     const year = new Date(payment.paymentDate).getFullYear();
-    const receiptNumber = this.generateReceiptNumber(tenantId, year);
+    const receiptNumber = await this.allocateReceiptNumber(tenantId, year);
     receiptData.receiptNumber = receiptNumber;
 
-    // 5. Create PDF
-    const filePath = path.join(tenantDir, `${receiptNumber}.pdf`);
-    await this.createPdfDocument(receiptData, filePath);
+    // 4. Generate PDF buffer in memory — no fs writes
+    const pdfBuffer = await this.createPdfBuffer(receiptData);
 
-    this.logger.log(
-      `Generated receipt ${receiptNumber} for payment ${paymentId}`,
+    // 5. Build S3 key and upload
+    const s3Key = this.storage.buildKey(
+      tenantId,
+      StorageKind.PaymentReceipt,
+      `${receiptNumber}.pdf`,
     );
 
+    await this.storage.putObject(
+      tenantId,
+      StorageKind.PaymentReceipt,
+      s3Key,
+      pdfBuffer,
+      'application/pdf',
+    );
+
+    // 6. Upsert DB pointer (safe on race — UNIQUE on payment_id)
+    await this.prisma.paymentReceipt.upsert({
+      where: { paymentId },
+      create: {
+        paymentId,
+        tenantId,
+        s3Key,
+      },
+      update: {
+        s3Key,
+      },
+    });
+
+    this.logger.log(
+      `Receipt ${receiptNumber} uploaded to S3 key=${s3Key} for payment ${paymentId}`,
+    );
+
+    // 7. Audit log
+    await this.auditLog.logAction({
+      tenantId,
+      userId,
+      entityType: 'PaymentReceipt',
+      entityId: paymentId,
+      action: AuditAction.CREATE,
+      beforeValue: undefined,
+      afterValue: { receiptNumber, s3Key },
+      changeSummary: `Receipt generated and stored for payment ${paymentId}`,
+    });
+
+    // 8. Return signed URL
+    const downloadUrl = await this.storage.createPresignedDownloadUrl(
+      tenantId,
+      StorageKind.PaymentReceipt,
+      s3Key,
+    );
+
+    return { receiptNumber, s3Key, downloadUrl, cached: false };
+  }
+
+  /**
+   * Stream receipt from S3 for a given S3 key.
+   * Used by the download endpoint to pipe the object directly into the response.
+   */
+  async streamReceipt(tenantId: string, s3Key: string): Promise<Readable> {
+    return this.storage.getObjectStream(
+      tenantId,
+      StorageKind.PaymentReceipt,
+      s3Key,
+    );
+  }
+
+  /**
+   * Look up an existing DB pointer for a payment.
+   * Returns null when no persisted receipt exists yet.
+   */
+  async findReceiptByPaymentId(
+    tenantId: string,
+    paymentId: string,
+  ): Promise<{ s3Key: string; receiptNumber: string } | null> {
+    const row = await this.prisma.paymentReceipt.findUnique({
+      where: { paymentId },
+    });
+
+    if (!row || row.tenantId !== tenantId) {
+      return null;
+    }
+
     return {
-      receiptNumber,
-      filePath,
-      downloadUrl: `/api/payments/${paymentId}/receipt`,
+      s3Key: row.s3Key,
+      receiptNumber: this.receiptNumberFromKey(row.s3Key),
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------------
+
   /**
-   * Generate receipt number
-   * Format: REC-{YYYY}-{sequential}
-   * @param tenantId - Tenant ID
-   * @param year - Year for receipt number
-   * @returns Sequential receipt number
+   * Allocate a sequential receipt number for tenant + year.
+   * Uses the payment_receipts table count as the sequence source.
+   * Format: REC-{YYYY}-{00001}
    */
-  generateReceiptNumber(tenantId: string, year: number): string {
-    // Find highest existing receipt number for this tenant and year
-    // Receipts are stored in filesystem, so we track sequence separately
+  private async allocateReceiptNumber(
+    tenantId: string,
+    year: number,
+  ): Promise<string> {
     const yearPrefix = `REC-${year}-`;
+    const count = await this.prisma.paymentReceipt.count({
+      where: { tenantId },
+    });
+    const sequential = (count + 1).toString().padStart(5, '0');
+    return `${yearPrefix}${sequential}`;
+  }
 
-    // Count existing receipt files
-    const tenantDir = path.join(this.uploadDir, tenantId);
-    let sequential = 1;
-
-    if (fs.existsSync(tenantDir)) {
-      const files = fs.readdirSync(tenantDir);
-      const yearReceipts = files.filter((f) => f.startsWith(yearPrefix));
-      if (yearReceipts.length > 0) {
-        // Extract highest number
-        const numbers = yearReceipts.map((f) => {
-          const match = f.match(new RegExp(`${yearPrefix}(\\d+)\\.pdf`));
-          return match ? parseInt(match[1], 10) : 0;
-        });
-        sequential = Math.max(...numbers) + 1;
-      }
-    }
-
-    return `${yearPrefix}${sequential.toString().padStart(5, '0')}`;
+  /** Extract the receipt number from an S3 key like …/REC-2025-00001.pdf */
+  private receiptNumberFromKey(s3Key: string): string {
+    const filename = s3Key.split('/').pop() ?? s3Key;
+    return filename.replace(/\.pdf$/, '');
   }
 
   /**
-   * Build receipt data from payment
-   * @param tenantId - Tenant ID
-   * @param payment - Payment with invoice, parent, and child relations
-   * @returns ReceiptData for PDF generation
+   * Build ReceiptData from a payment with loaded invoice/parent/child.
    */
   private async buildReceiptData(
     tenantId: string,
@@ -190,7 +325,7 @@ export class PaymentReceiptService {
       .join(', ');
 
     return {
-      receiptNumber: '', // Will be set after generation
+      receiptNumber: '', // Set after allocateReceiptNumber
       paymentId: payment.id,
       paymentDate: payment.paymentDate,
       amountCents: payment.amountCents,
@@ -208,15 +343,10 @@ export class PaymentReceiptService {
   }
 
   /**
-   * Create PDF document with receipt content
-   * @param data - Receipt data to render
-   * @param outputPath - Path to save the PDF
-   * @returns Promise that resolves when PDF is written
+   * Render the PDF into an in-memory Buffer.
+   * No filesystem access — returns bytes directly for S3 upload.
    */
-  private createPdfDocument(
-    data: ReceiptData,
-    outputPath: string,
-  ): Promise<void> {
+  private createPdfBuffer(data: ReceiptData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
         size: 'A4',
@@ -227,9 +357,11 @@ export class PaymentReceiptService {
           Subject: 'Payment Receipt',
         },
       });
-      const stream = fs.createWriteStream(outputPath);
 
-      doc.pipe(stream);
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
 
       // Header - Tenant Info
       doc
@@ -263,7 +395,7 @@ export class PaymentReceiptService {
         .stroke();
       doc.moveDown();
 
-      // Receipt details in a box
+      // Receipt details
       doc.fontSize(12).font('Helvetica-Bold');
       doc.text(`Receipt Number:`, { continued: true });
       doc.font('Helvetica').text(` ${data.receiptNumber}`);
@@ -330,7 +462,7 @@ export class PaymentReceiptService {
       doc.fillColor('#000000');
       doc.moveDown(2);
 
-      // Footer - horizontal line
+      // Footer
       doc
         .strokeColor('#000000')
         .lineWidth(1)
@@ -339,16 +471,13 @@ export class PaymentReceiptService {
         .stroke();
       doc.moveDown();
 
-      // Footer text
       doc
         .fontSize(9)
         .font('Helvetica')
         .fillColor('#666666')
         .text(
           'This is a computer-generated receipt and is valid without a signature.',
-          {
-            align: 'center',
-          },
+          { align: 'center' },
         );
       doc.text(
         `Generated on ${this.formatDate(new Date())} at ${this.formatTime(new Date())}`,
@@ -356,18 +485,9 @@ export class PaymentReceiptService {
       );
 
       doc.end();
-
-      stream.on('finish', resolve);
-      stream.on('error', reject);
     });
   }
 
-  /**
-   * Add a detail row with label and value
-   * @param doc - PDFDocument instance
-   * @param label - Field label
-   * @param value - Field value
-   */
   private addDetailRow(
     doc: PDFKit.PDFDocument,
     label: string,
@@ -377,11 +497,6 @@ export class PaymentReceiptService {
     doc.font('Helvetica').text(` ${value}`);
   }
 
-  /**
-   * Format date as South African format (DD/MM/YYYY)
-   * @param date - Date to format
-   * @returns Formatted date string
-   */
   private formatDate(date: Date): string {
     return new Date(date).toLocaleDateString('en-ZA', {
       day: '2-digit',
@@ -390,11 +505,6 @@ export class PaymentReceiptService {
     });
   }
 
-  /**
-   * Format time as HH:MM
-   * @param date - Date to extract time from
-   * @returns Formatted time string
-   */
   private formatTime(date: Date): string {
     return new Date(date).toLocaleTimeString('en-ZA', {
       hour: '2-digit',
@@ -402,51 +512,10 @@ export class PaymentReceiptService {
     });
   }
 
-  /**
-   * Format amount in cents to ZAR currency (R X,XXX.XX)
-   * @param amountCents - Amount in cents
-   * @returns Formatted currency string
-   */
   private formatCurrency(amountCents: number): string {
     return `R ${(amountCents / 100).toLocaleString('en-ZA', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
-  }
-
-  /**
-   * Get receipt file path for a payment
-   * @param tenantId - Tenant ID
-   * @param receiptNumber - Receipt number
-   * @returns File path or null if not found
-   */
-  getReceiptFilePath(tenantId: string, receiptNumber: string): string | null {
-    const filePath = path.join(
-      this.uploadDir,
-      tenantId,
-      `${receiptNumber}.pdf`,
-    );
-    return fs.existsSync(filePath) ? filePath : null;
-  }
-
-  /**
-   * Find receipt by payment ID (checks filesystem for existing receipt)
-   * @param tenantId - Tenant ID
-   * @param paymentId - Payment ID
-   * @returns Receipt info or null if not found
-   */
-  findReceiptByPaymentId(
-    tenantId: string,
-    _paymentId: string,
-  ): ReceiptResult | null {
-    const tenantDir = path.join(this.uploadDir, tenantId);
-    if (!fs.existsSync(tenantDir)) {
-      return null;
-    }
-
-    // This is a simplified implementation - in production you'd want to
-    // store receipt metadata in the database linked to payment ID
-    // For now, regenerate the receipt if needed
-    return null;
   }
 }

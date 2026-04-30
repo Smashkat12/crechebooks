@@ -2364,6 +2364,32 @@ export class OnboardingConversationHandler {
 
             if (enrollResult.invoice) {
               firstInvoiceTotal = enrollResult.invoice.totalCents;
+              // AUDIT-WA-STUCKDRAFT: Enrollment invoice is created as DRAFT by
+              // enrollChild(). It is NOT fed into the delivery pipeline here — the
+              // monthly invoice-scheduler is the only path that sends invoices.
+              // That scheduler only processes invoices it generates in its own batch
+              // run; it skips this enrollment invoice as DUPLICATE_INVOICE on the
+              // next run. Result: enrollment invoices from WA onboarding sit DRAFT
+              // indefinitely unless manually sent or corrected (DATA-01 pattern).
+              // The invoice must be manually sent by an operator, or a separate
+              // delivery step must be added here (comms-engineer scope).
+              this.logger.warn({
+                message:
+                  'WA onboarding enrollment invoice left in DRAFT — not sent',
+                invoiceId: enrollResult.invoice.id,
+                invoiceNumber: enrollResult.invoice.invoiceNumber,
+                sessionId,
+                tenantId,
+                note: 'Enrollment invoices created via WA onboarding are not automatically delivered. Operator action required to send.',
+              });
+            } else {
+              this.logger.warn({
+                message: 'WA onboarding enrollment produced no invoice',
+                sessionId,
+                tenantId,
+                invoiceError:
+                  enrollResult.invoiceError ?? 'no invoiceError field',
+              });
             }
 
             // Get fee structure name for the confirmation message

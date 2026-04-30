@@ -1,16 +1,22 @@
 /**
  * Invoice Schedule Service
  * TASK-BILL-016: Invoice Generation Scheduling Cron Job
+ * FEAT-BILLING-AUTOSEND: Bootstrap cron registration on app start
  *
  * Manages invoice generation scheduling for tenants.
  * Features:
  * - Tenant-configurable schedule
- * - Default: 6AM on 1st of month (SAST)
+ * - Default: 6AM on 1st of month (SAST) — cron '0 6 1 * *'
+ * - Idempotent bootstrap: remove-then-schedule prevents stacked repeatables
  * - Manual trigger support
  * - Schedule cancellation
+ *
+ * Staging-safety contract: delivery suppression is enforced inside
+ * InvoiceSchedulerProcessor (COMMS_DISABLED flag + APP_ENV guard). This
+ * service only registers/removes Bull repeatable jobs; it does NOT send.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import type { Job } from 'bull';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { PrismaService } from '../database/prisma/prisma.service';
@@ -21,6 +27,7 @@ import {
   InvoiceGenerationJobData,
 } from '../scheduler/types/scheduler.types';
 import { BusinessException } from '../shared/exceptions';
+import { SubscriptionStatus } from '../database/entities/tenant.entity';
 
 /** Default cron: 6AM on 1st of month (0 6 1 * *) */
 const DEFAULT_CRON = '0 6 1 * *';
@@ -39,7 +46,7 @@ interface TenantScheduleConfig {
 }
 
 @Injectable()
-export class InvoiceScheduleService {
+export class InvoiceScheduleService implements OnApplicationBootstrap {
   private readonly logger = new Logger(InvoiceScheduleService.name);
 
   constructor(
@@ -47,6 +54,63 @@ export class InvoiceScheduleService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  /**
+   * Bootstrap hook: register the monthly invoice-generation cron for every
+   * ACTIVE tenant once the application is ready.
+   *
+   * Cron schedule: '0 6 1 * *' = 06:00 SAST on the 1st of each month.
+   *
+   * Idempotency: removeRepeatableCronJob() is called before scheduleCronJob()
+   * for each tenant. Bull's removeRepeatable() is a no-op when the repeatable
+   * does not exist, so repeated cold-starts are safe.
+   *
+   * Staging-safety: this method only enqueues the *generation* job. Delivery
+   * suppression is enforced inside InvoiceSchedulerProcessor via the
+   * COMMS_DISABLED env flag and the APP_ENV guard — not here.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    const activeTenants = await this.prisma.tenant.findMany({
+      where: {
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (activeTenants.length === 0) {
+      this.logger.log(
+        'onApplicationBootstrap: no ACTIVE tenants — skipping cron registration',
+      );
+      return;
+    }
+
+    this.logger.log(
+      `onApplicationBootstrap: registering invoice cron for ${activeTenants.length} ACTIVE tenant(s)`,
+    );
+
+    for (const tenant of activeTenants) {
+      try {
+        // Remove-then-schedule ensures no stacked repeatables on restart
+        await this.schedulerService.removeRepeatableCronJob(
+          QUEUE_NAMES.INVOICE_GENERATION,
+          DEFAULT_CRON,
+        );
+        await this.scheduleTenantInvoices(
+          tenant.id,
+          DEFAULT_CRON,
+          DEFAULT_TIMEZONE,
+        );
+        this.logger.log(
+          `Registered invoice cron for tenant ${tenant.id} (${tenant.name})`,
+        );
+      } catch (err) {
+        // Log and continue — a single tenant failure must not block the rest
+        this.logger.error(
+          `Failed to register invoice cron for tenant ${tenant.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
 
   /**
    * Schedule invoice generation for a tenant

@@ -28,6 +28,7 @@ describe('InvoiceScheduleService', () => {
     mockPrisma = {
       tenant: {
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
 
@@ -345,6 +346,87 @@ describe('InvoiceScheduleService', () => {
       const jobData = call[1];
 
       expect(jobData.billingMonth).toMatch(/^\d{4}-\d{2}$/);
+    });
+  });
+
+  describe('onApplicationBootstrap', () => {
+    it('calls scheduleCronJob once per ACTIVE tenant', async () => {
+      mockPrisma.tenant.findMany = jest.fn().mockResolvedValue([
+        { id: 'tenant-a', name: 'Creche A' },
+        { id: 'tenant-b', name: 'Creche B' },
+      ]);
+      // findUnique is called inside scheduleTenantInvoices for each tenant
+      mockPrisma.tenant.findUnique
+        .mockResolvedValueOnce({ id: 'tenant-a', name: 'Creche A' })
+        .mockResolvedValueOnce({ id: 'tenant-b', name: 'Creche B' });
+
+      await service.onApplicationBootstrap();
+
+      // removeRepeatableCronJob called once per tenant before scheduling
+      expect(
+        mockSchedulerService.removeRepeatableCronJob,
+      ).toHaveBeenCalledTimes(2);
+      // scheduleCronJob called once per tenant
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
+        QUEUE_NAMES.INVOICE_GENERATION,
+        expect.objectContaining({ tenantId: 'tenant-a' }),
+        '0 6 1 * *',
+      );
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
+        QUEUE_NAMES.INVOICE_GENERATION,
+        expect.objectContaining({ tenantId: 'tenant-b' }),
+        '0 6 1 * *',
+      );
+    });
+
+    it('is idempotent: calling twice results in remove-then-schedule for each call', async () => {
+      mockPrisma.tenant.findMany = jest
+        .fn()
+        .mockResolvedValue([{ id: 'tenant-a', name: 'Creche A' }]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-a',
+        name: 'Creche A',
+      });
+
+      await service.onApplicationBootstrap();
+      await service.onApplicationBootstrap();
+
+      // removeRepeatableCronJob called before each scheduleCronJob on each bootstrap
+      // 2 bootstraps × 1 tenant = 2 remove calls, 2 schedule calls
+      expect(
+        mockSchedulerService.removeRepeatableCronJob,
+      ).toHaveBeenCalledTimes(2);
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips registration when no ACTIVE tenants exist', async () => {
+      mockPrisma.tenant.findMany = jest.fn().mockResolvedValue([]);
+
+      await service.onApplicationBootstrap();
+
+      expect(mockSchedulerService.scheduleCronJob).not.toHaveBeenCalled();
+    });
+
+    it('continues registering remaining tenants if one fails', async () => {
+      mockPrisma.tenant.findMany = jest.fn().mockResolvedValue([
+        { id: 'tenant-a', name: 'Creche A' },
+        { id: 'tenant-b', name: 'Creche B' },
+      ]);
+      // tenant-a: removeRepeatable succeeds, scheduleTenantInvoices findUnique returns null → throws
+      mockPrisma.tenant.findUnique
+        .mockResolvedValueOnce(null) // tenant-a fails
+        .mockResolvedValueOnce({ id: 'tenant-b', name: 'Creche B' }); // tenant-b succeeds
+
+      await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
+
+      // tenant-b was still scheduled despite tenant-a failing
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(1);
+      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
+        QUEUE_NAMES.INVOICE_GENERATION,
+        expect.objectContaining({ tenantId: 'tenant-b' }),
+        '0 6 1 * *',
+      );
     });
   });
 });

@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { RefreshCw, CheckCircle, AlertTriangle, Plus, FileText, PenLine } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertTriangle, Plus, FileText, PenLine, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -13,7 +14,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { useReconciliationSummary, useReconciliationHistory, useReconciliationDiscrepancies, useRefreshMatchResults, useIncomeStatement, type BankStatementReconciliationResult, type BankStatementMatch } from '@/hooks/use-reconciliation';
+import { useReconciliationSummary, useReconciliationHistory, useReconciliationDiscrepancies, useRefreshMatchResults, useIncomeStatement, useUnmatchedClosed, type BankStatementReconciliationResult, type BankStatementMatch } from '@/hooks/use-reconciliation';
 import { apiClient } from '@/lib/api';
 import type { IReconciliation } from '@crechebooks/types';
 import {
@@ -28,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ReconciliationPage() {
   const { data: summary, isLoading, error, refetch } = useReconciliationSummary();
+  const { data: unmatchedClosed } = useUnmatchedClosed();
   const { data: incomeStatement, isLoading: incomeLoading, error: incomeError } = useIncomeStatement();
   const { data: history, isLoading: historyLoading, error: historyError } = useReconciliationHistory();
   const { data: discrepancies, isLoading: discrepanciesLoading, error: discrepanciesError } = useReconciliationDiscrepancies();
@@ -208,6 +210,31 @@ export default function ReconciliationPage() {
           </Button>
         </div>
       </div>
+
+      {unmatchedClosed && unmatchedClosed.totalCount > 0 && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <Info className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="flex flex-col gap-1">
+            <span className="font-medium">
+              {unmatchedClosed.totalCount} unmatched bank-only{' '}
+              {unmatchedClosed.totalCount === 1 ? 'row' : 'rows'} in closed periods
+              {' '}({formatCurrency(unmatchedClosed.totalAmountCents / 100)} total)
+            </span>
+            <span className="text-sm text-amber-700">
+              {unmatchedClosed.periods.map((p) => (
+                <span key={p.periodId} className="mr-3">
+                  {p.periodLabel}: {p.count} {p.count === 1 ? 'row' : 'rows'}{' '}
+                  ({formatCurrency(p.amountCents / 100)})
+                </span>
+              ))}
+            </span>
+            <span className="text-xs text-amber-600 mt-0.5">
+              These rows were unmatched (bank-only) when the period was closed. Review
+              the period&apos;s match results to investigate.
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[600px]">

@@ -716,6 +716,60 @@ export function useApplyFeeCorrections() {
   });
 }
 
+// ============================================
+// Unmatched bank-only rows in closed (RECONCILED) periods
+// ============================================
+
+interface ApiUnmatchedClosedPeriod {
+  periodId: string;
+  periodLabel: string;
+  count: number;
+  amount: number; // cents
+}
+
+interface ApiUnmatchedClosedResponse {
+  total_count: number;
+  total_amount: number; // cents
+  oldest_period_start: string | null;
+  periods: ApiUnmatchedClosedPeriod[];
+}
+
+export interface UnmatchedClosedSummary {
+  totalCount: number;
+  totalAmountCents: number;
+  oldestPeriodStart: string | null;
+  periods: Array<{
+    periodId: string;
+    periodLabel: string;
+    count: number;
+    amountCents: number;
+  }>;
+}
+
+export function useUnmatchedClosed() {
+  return useQuery<UnmatchedClosedSummary, AxiosError>({
+    queryKey: queryKeys.reconciliation.unmatchedClosed(),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ApiUnmatchedClosedResponse>(
+        endpoints.reconciliation.unmatchedClosed
+      );
+      return {
+        totalCount: data.total_count,
+        totalAmountCents: data.total_amount,
+        oldestPeriodStart: data.oldest_period_start,
+        periods: data.periods.map((p) => ({
+          periodId: p.periodId,
+          periodLabel: p.periodLabel,
+          count: p.count,
+          amountCents: p.amount,
+        })),
+      };
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+  });
+}
+
 // Match monthly fee aggregates
 interface MonthlyFeeMatchParams {
   startDate: string;

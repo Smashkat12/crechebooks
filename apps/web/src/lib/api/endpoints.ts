@@ -59,6 +59,7 @@ export const endpoints = {
     summary: '/reconciliation/summary',
     incomeStatement: '/reconciliation/income-statement',
     discrepancies: '/reconciliation/discrepancies',
+    unmatchedClosed: '/reconciliation/bank-statement/unmatched-closed',
   },
   staff: {
     list: '/staff',

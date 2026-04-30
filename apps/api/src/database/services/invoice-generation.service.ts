@@ -614,7 +614,11 @@ export class InvoiceGenerationService {
   }
 
   /**
-   * Create a single invoice for an enrollment
+   * Create a single invoice for an enrollment (ad-hoc / single-invoice path).
+   *
+   * AUDIT-BILL-07 follow-up: invoice number generation and row insert share one
+   * prisma.$transaction so a failed insert rolls back the counter increment,
+   * preventing number gaps. This mirrors the fix applied to createInvoiceAtomic.
    *
    * @param tenantId - Tenant ID
    * @param enrollment - Enrollment with relations
@@ -629,17 +633,8 @@ export class InvoiceGenerationService {
     billingPeriodStart: Date,
     billingPeriodEnd: Date,
     userId: string,
-    precomputedInvoiceNumber?: string,
   ): Promise<Invoice> {
-    // Use precomputed number or generate one (for backward compatibility)
     const year = billingPeriodStart.getFullYear();
-    const invoiceNumber =
-      precomputedInvoiceNumber ??
-      (await this.generateInvoiceNumber(tenantId, year));
-
-    // Get tenant for due days setting
-    const tenant = await this.tenantRepo.findById(tenantId);
-    const dueDays = tenant?.invoiceDueDays ?? this.DEFAULT_DUE_DAYS;
 
     // Issue date = 1st of billing month, due date = last day of billing month
     // Use UTC noon to avoid timezone drift with @db.Date columns
@@ -660,29 +655,48 @@ export class InvoiceGenerationService {
       ),
     );
 
-    // Create invoice
-    const invoice = await this.invoiceRepo.create({
-      tenantId,
-      invoiceNumber,
-      parentId: enrollment.child.parentId,
-      childId: enrollment.childId,
-      billingPeriodStart,
-      billingPeriodEnd,
-      issueDate,
-      dueDate,
-      subtotalCents: 0, // Will be updated when adding lines
-      vatCents: 0,
-      totalCents: 0,
-    });
+    // AUDIT-BILL-07: Generate invoice number INSIDE the transaction so that a
+    // failed INSERT rolls back the counter UPDATE together — no number is burned.
+    const invoice = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        const invoiceNumber =
+          await this.invoiceNumberService.generateNextNumber(
+            tenantId,
+            year,
+            tx,
+          );
 
-    // Audit log
+        this.logger.debug(
+          `createInvoice: creating ${invoiceNumber} for child ${enrollment.childId}`,
+        );
+
+        return tx.invoice.create({
+          data: {
+            tenantId,
+            invoiceNumber,
+            parentId: enrollment.child.parentId,
+            childId: enrollment.childId,
+            billingPeriodStart,
+            billingPeriodEnd,
+            issueDate,
+            dueDate,
+            subtotalCents: 0, // Will be updated when adding lines
+            vatCents: 0,
+            totalCents: 0,
+            status: 'DRAFT',
+          },
+        });
+      },
+    );
+
+    // Audit log (outside transaction — non-critical, same as createInvoiceAtomic)
     await this.auditLogService.logCreate({
       tenantId,
       userId,
       entityType: 'Invoice',
       entityId: invoice.id,
       afterValue: {
-        invoiceNumber,
+        invoiceNumber: invoice.invoiceNumber,
         childId: enrollment.childId,
         billingPeriod: `${billingPeriodStart.toISOString().split('T')[0]} to ${billingPeriodEnd.toISOString().split('T')[0]}`,
       },

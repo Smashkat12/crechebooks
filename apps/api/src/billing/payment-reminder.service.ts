@@ -1,16 +1,18 @@
 /**
  * Payment Reminder Service
  * TASK-PAY-015: Payment Reminder Scheduler Service
+ * FEAT-BILLING-AUTOSEND: Bootstrap cron registration on app start
  *
  * Manages payment reminder scheduling for tenants.
  * Features:
  * - Tenant-configurable schedule
- * - Default: 09:00 SAST daily
+ * - Default: 09:00 SAST daily — cron '0 9 * * *'
+ * - Idempotent bootstrap: remove-then-schedule prevents stacked repeatables
  * - Manual trigger support
  * - Schedule cancellation
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import type { Job } from 'bull';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { PrismaService } from '../database/prisma/prisma.service';
@@ -29,6 +31,7 @@ import {
   ReminderHistory,
   getStageForDaysOverdue,
 } from './types/reminder.types';
+import { SubscriptionStatus } from '../database/entities/tenant.entity';
 
 /** Default cron: 09:00 SAST daily */
 const DEFAULT_CRON = '0 9 * * *';
@@ -37,7 +40,7 @@ const DEFAULT_CRON = '0 9 * * *';
 const DEFAULT_TIMEZONE = 'Africa/Johannesburg';
 
 @Injectable()
-export class PaymentReminderService {
+export class PaymentReminderService implements OnApplicationBootstrap {
   private readonly logger = new Logger(PaymentReminderService.name);
 
   constructor(
@@ -45,6 +48,52 @@ export class PaymentReminderService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  /**
+   * Bootstrap hook: register the daily payment-reminder cron for every
+   * ACTIVE tenant once the application is ready.
+   *
+   * Cron schedule: '0 9 * * *' = 09:00 SAST daily.
+   *
+   * Idempotency: removeRepeatableCronJob() is called before scheduleReminders()
+   * for each tenant. Repeated cold-starts are safe.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    const activeTenants = await this.prisma.tenant.findMany({
+      where: {
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (activeTenants.length === 0) {
+      this.logger.log(
+        'onApplicationBootstrap: no ACTIVE tenants — skipping reminder cron registration',
+      );
+      return;
+    }
+
+    this.logger.log(
+      `onApplicationBootstrap: registering reminder cron for ${activeTenants.length} ACTIVE tenant(s)`,
+    );
+
+    for (const tenant of activeTenants) {
+      try {
+        await this.schedulerService.removeRepeatableCronJob(
+          QUEUE_NAMES.PAYMENT_REMINDER,
+          DEFAULT_CRON,
+        );
+        await this.scheduleReminders(tenant.id, DEFAULT_CRON);
+        this.logger.log(
+          `Registered reminder cron for tenant ${tenant.id} (${tenant.name})`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to register reminder cron for tenant ${tenant.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+  }
 
   /**
    * Schedule payment reminders for a tenant

@@ -17,12 +17,15 @@ import { TenantRepository } from '../../../src/database/repositories/tenant.repo
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { EmailService } from '../../../src/integrations/email/email.service';
 import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../../src/integrations/whatsapp/services/whatsapp-provider.service';
 import { EmailTemplateService } from '../../../src/common/services/email-template/email-template.service';
 import { InvoicePdfService } from '../../../src/database/services/invoice-pdf.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   NotFoundException,
   BusinessException,
 } from '../../../src/shared/exceptions';
+import { CommsGuardService } from '../../../src/common/services/comms-guard/comms-guard.service';
 import {
   DeliveryStatus,
   DeliveryMethod,
@@ -139,6 +142,18 @@ describe('InvoiceDeliveryService', () => {
         { provide: EmailService, useValue: mockEmailService },
         { provide: WhatsAppService, useValue: mockWhatsAppService },
         {
+          provide: WhatsAppProviderService,
+          useValue: {
+            sendInvoiceNotification: jest
+              .fn()
+              .mockResolvedValue({ success: true, messageId: 'wa-123' }),
+          },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
+        {
           provide: InvoicePdfService,
           useValue: {
             generatePdf: jest.fn().mockResolvedValue(Buffer.from('mock-pdf')),
@@ -146,6 +161,11 @@ describe('InvoiceDeliveryService', () => {
               .fn()
               .mockResolvedValue(Buffer.from('mock-pdf')),
           },
+        },
+        // AUDIT-WA-DELIVERY: CommsGuardService now required by InvoiceDeliveryService
+        {
+          provide: CommsGuardService,
+          useValue: { isDisabled: jest.fn().mockReturnValue(false) },
         },
       ],
     }).compile();

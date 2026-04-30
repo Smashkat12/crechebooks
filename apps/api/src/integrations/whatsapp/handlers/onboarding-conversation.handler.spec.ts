@@ -1,6 +1,7 @@
 /**
  * Onboarding Conversation Handler Tests
  * TASK-WA-012: WhatsApp Conversational Onboarding
+ * AUDIT-WA-DELIVERY: Invoice delivery wired into onboarding completion
  *
  * London-school TDD with full mocking of dependencies.
  */
@@ -14,6 +15,7 @@ import { FeeStructureRepository } from '../../../database/repositories/fee-struc
 import { ParentFeeAgreementPdfService } from '../../../database/services/parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from '../../../database/services/parent-consent-forms-pdf.service';
 import { MagicLinkService } from '../../../api/auth/services/magic-link.service';
+import { InvoiceDeliveryService } from '../../../database/services/invoice-delivery.service';
 import {
   validateSAID,
   validateEmail,
@@ -79,6 +81,12 @@ const createMockMagicLinkService = () => ({
   generateMagicLinkUrl: jest
     .fn()
     .mockResolvedValue('https://app.example.com/magic?token=abc'),
+});
+
+const createMockInvoiceDeliveryService = () => ({
+  sendInvoices: jest
+    .fn()
+    .mockResolvedValue({ sent: 1, failed: 0, failures: [] }),
 });
 
 const TENANT_ID = 'tenant-123';
@@ -361,6 +369,9 @@ describe('OnboardingConversationHandler', () => {
     typeof createMockConsentFormsPdfService
   >;
   let mockMagicLinkService: ReturnType<typeof createMockMagicLinkService>;
+  let mockInvoiceDeliveryService: ReturnType<
+    typeof createMockInvoiceDeliveryService
+  >;
 
   beforeEach(async () => {
     mockPrisma = createMockPrisma();
@@ -370,6 +381,7 @@ describe('OnboardingConversationHandler', () => {
     mockFeeAgreementPdfService = createMockFeeAgreementPdfService();
     mockConsentFormsPdfService = createMockConsentFormsPdfService();
     mockMagicLinkService = createMockMagicLinkService();
+    mockInvoiceDeliveryService = createMockInvoiceDeliveryService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -387,6 +399,10 @@ describe('OnboardingConversationHandler', () => {
           useValue: mockConsentFormsPdfService,
         },
         { provide: MagicLinkService, useValue: mockMagicLinkService },
+        {
+          provide: InvoiceDeliveryService,
+          useValue: mockInvoiceDeliveryService,
+        },
       ],
     }).compile();
 
@@ -1448,6 +1464,135 @@ describe('OnboardingConversationHandler', () => {
           preferredContact: 'EMAIL',
         }),
       });
+    });
+
+    // ==========================================
+    // AUDIT-WA-DELIVERY: invoice delivery tests
+    // ==========================================
+
+    it('AUDIT-WA-DELIVERY: happy path — sends invoice and marks SENT when fee structure selected', async () => {
+      const dataWithFee = {
+        ...fullData,
+        selectedFeeStructureId: 'fee-structure-1',
+      };
+      mockPrisma.parent.create.mockResolvedValue({
+        id: 'parent-1',
+        email: 'jane@example.com',
+      });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+      mockEnrollmentService.enrollChild.mockResolvedValue({
+        enrollment: { id: 'enr-1' },
+        invoice: { id: 'inv-1', totalCents: 150000 },
+      });
+      mockFeeStructureRepo.findById.mockResolvedValue({ name: 'Full Day' });
+      mockInvoiceDeliveryService.sendInvoices.mockResolvedValue({
+        sent: 1,
+        failed: 0,
+        failures: [],
+      });
+
+      await handler.completeOnboarding(
+        SESSION_ID,
+        dataWithFee,
+        TENANT_ID,
+        WA_ID,
+        'Little Stars Creche',
+      );
+
+      expect(mockInvoiceDeliveryService.sendInvoices).toHaveBeenCalledWith({
+        tenantId: TENANT_ID,
+        invoiceIds: ['inv-1'],
+      });
+    });
+
+    it('AUDIT-WA-DELIVERY: no invoice — skips delivery when enrollChild returns no invoice', async () => {
+      const dataWithFee = {
+        ...fullData,
+        selectedFeeStructureId: 'fee-structure-1',
+      };
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+      mockEnrollmentService.enrollChild.mockResolvedValue({
+        enrollment: { id: 'enr-1' },
+        invoice: null,
+      });
+      mockFeeStructureRepo.findById.mockResolvedValue({ name: 'Full Day' });
+
+      await handler.completeOnboarding(
+        SESSION_ID,
+        dataWithFee,
+        TENANT_ID,
+        WA_ID,
+        'Little Stars Creche',
+      );
+
+      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
+    });
+
+    it('AUDIT-WA-DELIVERY: failure path — delivery throws but handler does not crash; invoice remains DRAFT', async () => {
+      const dataWithFee = {
+        ...fullData,
+        selectedFeeStructureId: 'fee-structure-1',
+      };
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+      mockEnrollmentService.enrollChild.mockResolvedValue({
+        enrollment: { id: 'enr-1' },
+        invoice: { id: 'inv-1', totalCents: 150000 },
+      });
+      mockFeeStructureRepo.findById.mockResolvedValue({ name: 'Full Day' });
+      mockInvoiceDeliveryService.sendInvoices.mockRejectedValue(
+        new Error('SMTP timeout'),
+      );
+
+      // Should not throw — delivery failure is non-fatal
+      await expect(
+        handler.completeOnboarding(
+          SESSION_ID,
+          dataWithFee,
+          TENANT_ID,
+          WA_ID,
+          'Little Stars Creche',
+        ),
+      ).resolves.not.toThrow();
+
+      // Confirmation message should still be sent to the parent
+      expect(mockContentService.sendSessionMessage).toHaveBeenCalledWith(
+        WA_ID,
+        expect.stringContaining('Little Stars Creche'),
+        TENANT_ID,
+      );
+    });
+
+    it('AUDIT-WA-DELIVERY: no fee structure selected — delivery skipped (no invoice generated)', async () => {
+      // No selectedFeeStructureId → enrollChild never called → no invoice
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+
+      await handler.completeOnboarding(
+        SESSION_ID,
+        fullData, // no selectedFeeStructureId
+        TENANT_ID,
+        WA_ID,
+        'Little Stars Creche',
+      );
+
+      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
     });
   });
 });

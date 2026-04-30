@@ -50,6 +50,7 @@ import {
 import { PreferredContact } from '../entities/parent.entity';
 import { AuditAction } from '../entities/audit-log.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
+import { CommsGuardService } from '../../common/services/comms-guard/comms-guard.service';
 
 /** Maximum delivery retry attempts */
 const MAX_RETRY_COUNT = 3;
@@ -74,10 +75,21 @@ export class InvoiceDeliveryService {
     private readonly eventEmitter: EventEmitter2,
     // TASK-WA-007: WhatsApp provider service for Twilio/Meta routing
     private readonly whatsAppProviderService: WhatsAppProviderService,
+    // AUDIT-WA-DELIVERY: comms guard for staging-safety gate
+    private readonly commsGuard: CommsGuardService,
   ) {}
 
   /**
-   * Send invoices to parents via their preferred contact method
+   * Send invoices to parents via their preferred contact method.
+   *
+   * Two-layer staging-safety gate (evaluated before any delivery attempt):
+   *   1. APP_ENV === 'staging' AND COMMS_DISABLED is not explicitly true:
+   *      Delivery is suppressed — invoices are marked SENT in DB without
+   *      calling any delivery adapter. Audit note records the suppression.
+   *   2. COMMS_DISABLED=true: The email/WA adapters mock the send without
+   *      hitting external APIs. InvoiceDeliveryService proceeds normally;
+   *      adapters handle suppression internally.
+   *   3. Neither: Normal delivery.
    *
    * @param dto - Contains tenantId, invoiceIds, optional method override
    * @returns Summary of sent/failed deliveries
@@ -95,6 +107,69 @@ export class InvoiceDeliveryService {
 
     if (dto.invoiceIds.length === 0) {
       return result;
+    }
+
+    // Layer 1: staging env without COMMS_DISABLED — hard suppress all delivery
+    const isStagingEnv = process.env.APP_ENV === 'staging';
+    const isCommsDisabled = this.commsGuard.isDisabled();
+
+    if (isStagingEnv && !isCommsDisabled) {
+      this.logger.warn(
+        `[STAGING-SAFETY] Delivery suppressed for ${dto.invoiceIds.length} invoices ` +
+          `(APP_ENV=staging, COMMS_DISABLED not set). ` +
+          `Marking invoices SENT in DB without contacting any delivery adapter. ` +
+          `Set COMMS_DISABLED=true in Railway staging to route through the comms guard instead.`,
+      );
+
+      const now = new Date();
+      // Mark each DRAFT invoice SENT in DB (mirrors DATA-01 manual correction pattern)
+      for (const invoiceId of dto.invoiceIds) {
+        try {
+          await this.invoiceRepo.update(invoiceId, dto.tenantId!, {
+            status: InvoiceStatus.SENT,
+            deliveryStatus: DeliveryStatus.SENT,
+            deliveredAt: now,
+          });
+          result.sent++;
+        } catch (updateErr) {
+          const msg =
+            updateErr instanceof Error ? updateErr.message : String(updateErr);
+          this.logger.error(
+            `[STAGING-SAFETY] Failed to mark invoice ${invoiceId} SENT: ${msg}`,
+          );
+          result.failed++;
+          result.failures.push({
+            invoiceId,
+            reason: msg,
+            code: 'STAGING_SUPPRESS_UPDATE_FAILED',
+          });
+        }
+      }
+
+      await this.auditLogService.logAction({
+        tenantId: dto.tenantId!,
+        entityType: 'InvoiceDelivery',
+        entityId: `staging-suppress-${Date.now()}`,
+        action: AuditAction.UPDATE,
+        afterValue: {
+          invoiceIds: dto.invoiceIds,
+          suppressedReason: 'staging env / COMMS_DISABLED not set',
+          markedSentAt: now.toISOString(),
+          sent: result.sent,
+          failed: result.failed,
+        },
+        changeSummary: `Delivery suppressed (staging env): ${result.sent} invoices marked SENT in DB without delivery`,
+      });
+
+      return result;
+    }
+
+    // Layer 2: COMMS_DISABLED=true — adapters will mock without external call
+    if (isCommsDisabled) {
+      this.logger.warn(
+        `[COMMS_DISABLED] Delivery for ${dto.invoiceIds.length} invoices will be mocked ` +
+          `by the comms adapters — no emails or WhatsApp messages will be sent.`,
+      );
     }
 
     for (const invoiceId of dto.invoiceIds) {

@@ -28,6 +28,8 @@ import { FeeStructureRepository } from '../../../database/repositories/fee-struc
 import { ParentFeeAgreementPdfService } from '../../../database/services/parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from '../../../database/services/parent-consent-forms-pdf.service';
 import { MagicLinkService } from '../../../api/auth/services/magic-link.service';
+// AUDIT-WA-DELIVERY: wire invoice delivery into the WA onboarding completion path
+import { InvoiceDeliveryService } from '../../../database/services/invoice-delivery.service';
 import {
   OnboardingCollectedData,
   ONBOARDING_TRIGGERS,
@@ -98,6 +100,8 @@ export class OnboardingConversationHandler {
     private readonly feeAgreementPdfService: ParentFeeAgreementPdfService,
     private readonly consentFormsPdfService: ParentConsentFormsPdfService,
     private readonly magicLinkService: MagicLinkService,
+    // AUDIT-WA-DELIVERY: deliver invoice immediately after WA self-enrollment
+    private readonly invoiceDeliveryService: InvoiceDeliveryService,
   ) {}
 
   /**
@@ -2320,6 +2324,27 @@ export class OnboardingConversationHandler {
 
             if (enrollResult.invoice) {
               firstInvoiceTotal = enrollResult.invoice.totalCents;
+
+              // AUDIT-WA-DELIVERY: deliver the enrollment invoice immediately.
+              // The staging-safety gate (APP_ENV=staging + COMMS_DISABLED) lives
+              // inside InvoiceDeliveryService.sendInvoices — all callers benefit.
+              // Failure is non-fatal: log a warning, leave invoice in DRAFT for
+              // the scheduler to retry on the next auto-send cycle.
+              try {
+                await this.invoiceDeliveryService.sendInvoices({
+                  tenantId,
+                  invoiceIds: [enrollResult.invoice.id],
+                });
+                this.logger.log(
+                  `[AUDIT-WA-DELIVERY] Invoice ${enrollResult.invoice.id} delivered for WA-enrolled child ${child.id}`,
+                );
+              } catch (deliveryError) {
+                this.logger.warn(
+                  `[AUDIT-WA-DELIVERY] Invoice delivery failed for child ${child.id} ` +
+                    `(invoice ${enrollResult.invoice.id}): ${deliveryError instanceof Error ? deliveryError.message : String(deliveryError)}. ` +
+                    `Invoice remains DRAFT — scheduler will retry on next auto-send cycle.`,
+                );
+              }
             }
 
             // Get fee structure name for the confirmation message

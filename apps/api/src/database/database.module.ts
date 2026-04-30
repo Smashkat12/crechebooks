@@ -114,6 +114,7 @@ import { CashFlowReportService } from './services/cash-flow-report.service';
 import { AgedPayablesService } from './services/aged-payables.service';
 import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { EmailModule } from '../integrations/email/email.module';
+import { MailgunModule } from '../integrations/mailgun/mailgun.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { AgentMemoryModule } from '../agents/memory/agent-memory.module';
@@ -132,6 +133,7 @@ import { TaxTableService } from './services/tax-table.service'; // TASK-STAFF-00
 @Module({
   imports: [
     EmailModule,
+    MailgunModule, // provides CommsGuardService for InvoiceDeliveryService staging gate
     forwardRef(() => WhatsAppModule),
     forwardRef(() => AgentMemoryModule),
     forwardRef(() => AuditTrailModule), // TASK-SDK-011: Structured Audit Trail

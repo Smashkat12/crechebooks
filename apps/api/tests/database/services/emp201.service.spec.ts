@@ -338,29 +338,91 @@ describe('Emp201Service', () => {
     });
   });
 
+  // calculateSdl DB integration tests — AUDIT-TAX-07
+  // These require a running DB; pure unit tests are in src/database/services/__tests__/emp201-sdl.service.spec.ts
   describe('calculateSdl', () => {
-    it('should calculate SDL as 1% of gross payroll', () => {
-      // R100,000 monthly = R1.2M annual (above threshold)
-      const result = service.calculateSdl(10000000);
+    it('should calculate SDL as 1% of gross payroll for above-threshold employer', async () => {
+      // Seed 12 months of R100,000 payroll = R1.2M rolling annual (above R500k)
+      for (let i = 0; i < 12; i++) {
+        await prisma.payroll.create({
+          data: {
+            tenantId: testTenant.id,
+            staffId: testStaff1.id,
+            payPeriodStart: new Date(2024, i, 1),
+            payPeriodEnd: new Date(2024, i + 1, 0),
+            basicSalaryCents: 10000000,
+            grossSalaryCents: 10000000, // R100,000/month
+            payeCents: 0,
+            uifEmployeeCents: 0,
+            uifEmployerCents: 0,
+            netSalaryCents: 10000000,
+            status: PayrollStatus.APPROVED,
+          },
+        });
+      }
 
+      const result = await service.calculateSdl(
+        testTenant.id,
+        '2024-12',
+        10000000,
+      );
       expect(result.sdlApplicable).toBe(true);
       expect(result.sdlCents).toBe(100000); // 1% of R100,000
     });
 
-    it('should exempt SDL for small employers', () => {
-      // R3,000 monthly = R36,000 annual (below R500k threshold)
-      const result = service.calculateSdl(300000);
+    it('should exempt SDL for small employers (SDLA §4(b))', async () => {
+      // Only R3,000 payroll in period — rolling 12m well below R500k
+      await prisma.payroll.create({
+        data: {
+          tenantId: testTenant.id,
+          staffId: testStaff1.id,
+          payPeriodStart: new Date(2025, 0, 1),
+          payPeriodEnd: new Date(2025, 0, 31),
+          basicSalaryCents: 300000,
+          grossSalaryCents: 300000, // R3,000
+          payeCents: 0,
+          uifEmployeeCents: 0,
+          uifEmployerCents: 0,
+          netSalaryCents: 300000,
+          status: PayrollStatus.APPROVED,
+        },
+      });
 
+      const result = await service.calculateSdl(
+        testTenant.id,
+        '2025-01',
+        300000,
+      );
       expect(result.sdlApplicable).toBe(false);
       expect(result.sdlCents).toBe(0);
     });
 
-    it('should handle boundary case at threshold', () => {
-      // R41,666 monthly * 12 = ~R500k annual (at threshold)
-      const result = service.calculateSdl(4166700);
+    it('should exempt at exactly R500k annual boundary (SDLA §4(b))', async () => {
+      // Exactly R500,000 rolling annual — exempt (<=, not strictly <)
+      await prisma.payroll.create({
+        data: {
+          tenantId: testTenant.id,
+          staffId: testStaff1.id,
+          payPeriodStart: new Date(2025, 0, 1),
+          payPeriodEnd: new Date(2025, 0, 31),
+          basicSalaryCents: 50000000,
+          grossSalaryCents: 50000000, // exactly R500,000
+          payeCents: 0,
+          uifEmployeeCents: 0,
+          uifEmployerCents: 0,
+          netSalaryCents: 50000000,
+          status: PayrollStatus.APPROVED,
+        },
+      });
 
-      expect(result.sdlApplicable).toBe(true);
-      expect(result.sdlCents).toBe(41667); // 1%
+      const result = await service.calculateSdl(
+        testTenant.id,
+        '2025-01',
+        50000000,
+      );
+      expect(result.sdlApplicable).toBe(false);
+      expect(result.sdlCents).toBe(0);
+      expect(result.rollingAnnualGrossCents).toBe(50000000);
     });
   });
 

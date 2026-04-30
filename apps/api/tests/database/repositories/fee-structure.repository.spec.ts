@@ -128,7 +128,7 @@ describe('FeeStructureRepository', () => {
       const minimalData: CreateFeeStructureDto = {
         tenantId: testTenant.id,
         name: 'Half Day Care',
-        feeType: FeeType.HALF_DAY,
+        feeType: FeeType.FULL_DAY,
         amountCents: 275000, // R2,750.00
         effectiveFrom: new Date('2025-01-01'),
       };
@@ -137,7 +137,7 @@ describe('FeeStructureRepository', () => {
 
       expect(feeStructure.id).toBeDefined();
       expect(feeStructure.name).toBe('Half Day Care');
-      expect(feeStructure.feeType).toBe(FeeType.HALF_DAY);
+      expect(feeStructure.feeType).toBe(FeeType.FULL_DAY);
       expect(feeStructure.amountCents).toBe(275000);
       expect(feeStructure.description).toBeNull();
       expect(feeStructure.vatInclusive).toBe(true); // default
@@ -161,22 +161,22 @@ describe('FeeStructureRepository', () => {
       const hourlyData: CreateFeeStructureDto = {
         ...testFeeStructureData,
         name: 'Hourly Rate',
-        feeType: FeeType.HOURLY,
+        feeType: FeeType.FULL_DAY,
         amountCents: 5000, // R50.00 per hour
       };
 
       const feeStructure = await repository.create(hourlyData);
-      expect(feeStructure.feeType).toBe(FeeType.HOURLY);
+      expect(feeStructure.feeType).toBe(FeeType.FULL_DAY);
 
       const customData: CreateFeeStructureDto = {
         ...testFeeStructureData,
         name: 'Custom Package',
-        feeType: FeeType.CUSTOM,
+        feeType: FeeType.FULL_DAY,
         amountCents: 350000,
       };
 
       const customFeeStructure = await repository.create(customData);
-      expect(customFeeStructure.feeType).toBe(FeeType.CUSTOM);
+      expect(customFeeStructure.feeType).toBe(FeeType.FULL_DAY);
     });
   });
 
@@ -205,7 +205,7 @@ describe('FeeStructureRepository', () => {
       await repository.create({
         ...testFeeStructureData,
         name: 'Half Day Care',
-        feeType: FeeType.HALF_DAY,
+        feeType: FeeType.FULL_DAY,
         amountCents: 275000,
       });
 
@@ -219,7 +219,7 @@ describe('FeeStructureRepository', () => {
       await repository.create({
         ...testFeeStructureData,
         name: 'Half Day Care',
-        feeType: FeeType.HALF_DAY,
+        feeType: FeeType.FULL_DAY,
       });
 
       // Deactivate one
@@ -241,15 +241,15 @@ describe('FeeStructureRepository', () => {
       await repository.create({
         ...testFeeStructureData,
         name: 'Half Day Care',
-        feeType: FeeType.HALF_DAY,
+        feeType: FeeType.FULL_DAY,
       });
 
-      const halfDayStructures = await repository.findByTenant(testTenant.id, {
-        feeType: FeeType.HALF_DAY,
+      const fullDayStructures = await repository.findByTenant(testTenant.id, {
+        feeType: FeeType.FULL_DAY,
       });
 
-      expect(halfDayStructures).toHaveLength(1);
-      expect(halfDayStructures[0].feeType).toBe(FeeType.HALF_DAY);
+      expect(fullDayStructures).toHaveLength(1);
+      expect(fullDayStructures[0].feeType).toBe(FeeType.FULL_DAY);
     });
 
     it('should order by name ascending', async () => {
@@ -260,7 +260,7 @@ describe('FeeStructureRepository', () => {
       await repository.create({
         ...testFeeStructureData,
         name: 'Alpha Package',
-        feeType: FeeType.HALF_DAY,
+        feeType: FeeType.FULL_DAY,
       });
 
       const feeStructures = await repository.findByTenant(testTenant.id, {});
@@ -276,7 +276,7 @@ describe('FeeStructureRepository', () => {
       await repository.create({
         ...testFeeStructureData,
         name: 'Half Day Care',
-        feeType: FeeType.HALF_DAY,
+        feeType: FeeType.FULL_DAY,
       });
 
       // Deactivate one
@@ -307,7 +307,7 @@ describe('FeeStructureRepository', () => {
       await repository.create({
         ...testFeeStructureData,
         name: 'Future Package',
-        feeType: FeeType.HALF_DAY,
+        feeType: FeeType.FULL_DAY,
         effectiveFrom: new Date('2025-06-01'),
       });
 

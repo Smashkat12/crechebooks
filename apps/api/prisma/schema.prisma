@@ -1342,17 +1342,17 @@ model ParentAbsenceReport {
   parentId            String    @map("parent_id")
   date                DateTime  @db.Date
   reason              String?   @db.VarChar(500)
-  reportedAt          DateTime  @default(now()) @map("reported_at")
-  cancelledAt         DateTime? @map("cancelled_at")
+  reportedAt          DateTime  @default(now()) @map("reported_at") @db.Timestamptz(6)
+  cancelledAt         DateTime? @map("cancelled_at") @db.Timestamptz(6)
   cancelledByParentId String?   @map("cancelled_by_parent_id")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  child  Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
-  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  child  Child  @relation(fields: [childId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([childId, date]) // one report per child per day (app enforces uniqueness)
-  @@index([tenantId, date])
-  @@index([childId])
+  @@unique([childId, date], map: "parent_absence_reports_child_date_key") // one report per child per day (app enforces uniqueness)
+  @@index([tenantId, date], map: "parent_absence_reports_tenant_date_idx")
+  @@index([childId], map: "parent_absence_reports_child_idx")
   @@map("parent_absence_reports")
 }
 
@@ -1534,12 +1534,12 @@ model PaymentReceipt {
   tenantId    String   @map("tenant_id")
   s3Key       String   @map("s3_key") @db.VarChar(500)
   contentHash String?  @map("content_hash") @db.VarChar(64)
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   tenant  Tenant  @relation(fields: [tenantId], references: [id])
 
-  @@index([tenantId])
+  @@index([tenantId], map: "idx_payment_receipts_tenant")
   @@map("payment_receipts")
 }
 

@@ -326,12 +326,14 @@ export class StaffTerminationService {
       bonusPayoutCents +
       otherEarningsCents;
 
-    // Calculate deductions
+    // Calculate deductions — use lastWorkingDay so SARS tables match the correct
+    // tax year (March-February) for the termination payroll period.
     const payeResult = await this.payeService.calculatePaye({
       grossIncomeCents: grossEarningsCents,
       payFrequency: staff.payFrequency as any,
       dateOfBirth: staff.dateOfBirth,
       medicalAidMembers: staff.medicalAidMembers,
+      payPeriodDate: lastWorkingDay,
     });
 
     const uifResult = await this.uifService.calculateUif(grossEarningsCents);

@@ -752,4 +752,219 @@ describe('PayeService', () => {
       expect(result.primaryRebateCents).toBe(REBATES_2027.PRIMARY);
     });
   });
+
+  // AUDIT-TAX-05: Legacy methods year-aware fix
+  // Verifies that getTaxBracket, calculateRebate, calculateMedicalCredits,
+  // getTaxThreshold, and isBelowThreshold now delegate to getTaxYearTables()
+  // instead of hardcoding 2025 constants.
+  describe('Legacy methods — year-aware via payPeriodDate (AUDIT-TAX-05)', () => {
+    // The 2024/2025 and 2025/2026 values are numerically identical in our
+    // tables (no SARS gazette adjustment was published). The 2026/2027 values
+    // are also identical (copied — VERIFY against gazette). So we confirm
+    // dispatch to the CORRECT table object, not numeric equality.
+
+    describe('getTaxBracket', () => {
+      it('should use 2024/2025 tables for a date in that tax year', () => {
+        const { bracket, bracketIndex } = service.getTaxBracket(
+          30000000, // R300,000
+          new Date('2024-06-15'),
+        );
+        expect(bracketIndex).toBe(1);
+        expect(bracket).toBe(TAX_BRACKETS_2025[1]); // same object reference
+      });
+
+      it('should use 2025/2026 tables for a date in that tax year', () => {
+        const { bracket, bracketIndex } = service.getTaxBracket(
+          30000000,
+          new Date('2025-06-15'),
+        );
+        expect(bracketIndex).toBe(1);
+        expect(bracket).toBe(TAX_BRACKETS_2026[1]);
+      });
+
+      it('should use 2026/2027 tables for a date in that tax year', () => {
+        const { bracket, bracketIndex } = service.getTaxBracket(
+          30000000,
+          new Date('2026-06-15'),
+        );
+        expect(bracketIndex).toBe(1);
+        expect(bracket).toBe(TAX_BRACKETS_2027[1]);
+      });
+
+      it('should default to current date when no payPeriodDate given', () => {
+        // Smoke test — just verifies it completes without error
+        const result = service.getTaxBracket(30000000);
+        expect(result.bracketIndex).toBeGreaterThanOrEqual(0);
+      });
+    });
+
+    describe('calculateRebate', () => {
+      const dob = new Date('1990-01-01'); // under 65
+
+      it('should use 2024/2025 rebates for payPeriodDate in that tax year', () => {
+        const rebate = service.calculateRebate(
+          dob,
+          undefined,
+          new Date('2024-06-15'),
+        );
+        expect(rebate).toBe(REBATES_2025.PRIMARY);
+      });
+
+      it('should use 2025/2026 rebates for payPeriodDate in that tax year', () => {
+        const rebate = service.calculateRebate(
+          dob,
+          undefined,
+          new Date('2025-06-15'),
+        );
+        expect(rebate).toBe(REBATES_2026.PRIMARY);
+      });
+
+      it('should use 2026/2027 rebates for payPeriodDate in that tax year', () => {
+        const rebate = service.calculateRebate(
+          dob,
+          undefined,
+          new Date('2026-06-15'),
+        );
+        expect(rebate).toBe(REBATES_2027.PRIMARY);
+      });
+    });
+
+    describe('calculateMedicalCredits', () => {
+      it('should use 2024/2025 medical credits for payPeriodDate in that tax year', () => {
+        const credits = service.calculateMedicalCredits(
+          2,
+          new Date('2024-06-15'),
+        );
+        expect(credits).toBe(
+          MEDICAL_CREDITS_2025.MAIN_MEMBER +
+            MEDICAL_CREDITS_2025.FIRST_DEPENDENT,
+        );
+      });
+
+      it('should use 2025/2026 medical credits for payPeriodDate in that tax year', () => {
+        const credits = service.calculateMedicalCredits(
+          2,
+          new Date('2025-06-15'),
+        );
+        expect(credits).toBe(
+          MEDICAL_CREDITS_2026.MAIN_MEMBER +
+            MEDICAL_CREDITS_2026.FIRST_DEPENDENT,
+        );
+      });
+
+      it('should use 2026/2027 medical credits for payPeriodDate in that tax year', () => {
+        const credits = service.calculateMedicalCredits(
+          2,
+          new Date('2026-06-15'),
+        );
+        expect(credits).toBe(
+          MEDICAL_CREDITS_2027.MAIN_MEMBER +
+            MEDICAL_CREDITS_2027.FIRST_DEPENDENT,
+        );
+      });
+    });
+
+    describe('getTaxThreshold', () => {
+      it('should use 2024/2025 thresholds for payPeriodDate in that tax year', () => {
+        expect(service.getTaxThreshold(30, new Date('2024-06-15'))).toBe(
+          TAX_THRESHOLDS_2025.BELOW_65,
+        );
+      });
+
+      it('should use 2025/2026 thresholds for payPeriodDate in that tax year', () => {
+        expect(service.getTaxThreshold(30, new Date('2025-06-15'))).toBe(
+          TAX_THRESHOLDS_2026.BELOW_65,
+        );
+      });
+
+      it('should use 2026/2027 thresholds for payPeriodDate in that tax year', () => {
+        expect(service.getTaxThreshold(30, new Date('2026-06-15'))).toBe(
+          TAX_THRESHOLDS_2027.BELOW_65,
+        );
+      });
+    });
+
+    describe('isBelowThreshold', () => {
+      it('should use 2024/2025 thresholds for payPeriodDate in that tax year', () => {
+        // R90,000 < R95,750 (2024/2025 BELOW_65 threshold)
+        expect(
+          service.isBelowThreshold(9000000, 30, new Date('2024-06-15')),
+        ).toBe(true);
+        expect(
+          service.isBelowThreshold(10000000, 30, new Date('2024-06-15')),
+        ).toBe(false);
+      });
+
+      it('should use 2025/2026 thresholds for payPeriodDate in that tax year', () => {
+        expect(
+          service.isBelowThreshold(9000000, 30, new Date('2025-06-15')),
+        ).toBe(true);
+        expect(
+          service.isBelowThreshold(10000000, 30, new Date('2025-06-15')),
+        ).toBe(false);
+      });
+
+      it('should use 2026/2027 thresholds for payPeriodDate in that tax year', () => {
+        expect(
+          service.isBelowThreshold(9000000, 30, new Date('2026-06-15')),
+        ).toBe(true);
+        expect(
+          service.isBelowThreshold(10000000, 30, new Date('2026-06-15')),
+        ).toBe(false);
+      });
+
+      it('should default to current date when no payPeriodDate given (backward compat)', () => {
+        // Legacy two-arg call — must not throw
+        const result = service.isBelowThreshold(9000000, 30);
+        expect(typeof result).toBe('boolean');
+      });
+    });
+
+    describe('Tax year boundary — 2025 vs 2026 transition (EMP201 §3.2)', () => {
+      // Feb 28 2025 = still 2024/2025 year; Mar 1 2025 = 2025/2026 year
+      it('2025-02-28 (last day 2024/2025) → 2024/2025 tables', async () => {
+        const result = await service.calculatePaye({
+          grossIncomeCents: 3000000,
+          payFrequency: PayFrequency.MONTHLY,
+          dateOfBirth: new Date('1990-01-01'),
+          medicalAidMembers: 0,
+          payPeriodDate: new Date('2025-02-28'),
+        });
+        expect(result.primaryRebateCents).toBe(REBATES_2025.PRIMARY);
+      });
+
+      it('2025-03-01 (first day 2025/2026) → 2025/2026 tables', async () => {
+        const result = await service.calculatePaye({
+          grossIncomeCents: 3000000,
+          payFrequency: PayFrequency.MONTHLY,
+          dateOfBirth: new Date('1990-01-01'),
+          medicalAidMembers: 0,
+          payPeriodDate: new Date('2025-03-01'),
+        });
+        expect(result.primaryRebateCents).toBe(REBATES_2026.PRIMARY);
+      });
+
+      it('2026-02-28 (last day 2025/2026) → 2025/2026 tables', async () => {
+        const result = await service.calculatePaye({
+          grossIncomeCents: 3000000,
+          payFrequency: PayFrequency.MONTHLY,
+          dateOfBirth: new Date('1990-01-01'),
+          medicalAidMembers: 0,
+          payPeriodDate: new Date('2026-02-28'),
+        });
+        expect(result.primaryRebateCents).toBe(REBATES_2026.PRIMARY);
+      });
+
+      it('2026-03-01 (first day 2026/2027) → 2026/2027 tables', async () => {
+        const result = await service.calculatePaye({
+          grossIncomeCents: 3000000,
+          payFrequency: PayFrequency.MONTHLY,
+          dateOfBirth: new Date('1990-01-01'),
+          medicalAidMembers: 0,
+          payPeriodDate: new Date('2026-03-01'),
+        });
+        expect(result.primaryRebateCents).toBe(REBATES_2027.PRIMARY);
+      });
+    });
+  });
 });

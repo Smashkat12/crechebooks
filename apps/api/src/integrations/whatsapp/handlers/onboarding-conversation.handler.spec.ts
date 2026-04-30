@@ -41,6 +41,7 @@ const createMockPrisma = () => ({
   child: {
     create: jest.fn(),
     update: jest.fn(),
+    findFirst: jest.fn(),
   },
   tenant: {
     findUnique: jest.fn(),
@@ -1266,6 +1267,8 @@ describe('OnboardingConversationHandler', () => {
 
     beforeEach(() => {
       mockPrisma.tenant.findUnique.mockResolvedValue(mockTenant);
+      // Default: no duplicate child found — guard passes through
+      mockPrisma.child.findFirst.mockResolvedValue(null);
     });
 
     it('should create Parent record with correct fields', async () => {
@@ -1447,6 +1450,118 @@ describe('OnboardingConversationHandler', () => {
         data: expect.objectContaining({
           preferredContact: 'EMAIL',
         }),
+      });
+    });
+
+    // -----------------------------------------------------------------------
+    // Duplicate child guard tests
+    // -----------------------------------------------------------------------
+
+    describe('duplicate child guard', () => {
+      it('should block creation and send holding message when same name+DOB+tenant already exists', async () => {
+        // Simulate a child already on record for this tenant
+        mockPrisma.child.findFirst.mockResolvedValue({
+          id: 'existing-child-1',
+        });
+        mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+        mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+          createSession({ status: 'ABANDONED' }),
+        );
+
+        const dataWithDob = {
+          ...fullData,
+          children: [
+            { firstName: 'Lily', surname: 'Smith', dateOfBirth: '2023-06-15' },
+          ],
+        };
+
+        await handler.completeOnboarding(
+          SESSION_ID,
+          dataWithDob,
+          TENANT_ID,
+          WA_ID,
+          'Little Stars Creche',
+        );
+
+        // Guard fires: child.create must NOT be called
+        expect(mockPrisma.child.create).not.toHaveBeenCalled();
+
+        // Operator-review holding message sent to parent
+        expect(mockContentService.sendSessionMessage).toHaveBeenCalledWith(
+          WA_ID,
+          expect.stringContaining('already have a child matching'),
+          TENANT_ID,
+        );
+
+        // Session marked ABANDONED with duplicate flag
+        expect(
+          mockPrisma.whatsAppOnboardingSession.update,
+        ).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              status: 'ABANDONED',
+              collectedData: expect.objectContaining({
+                _duplicateChildFlag: true,
+              }),
+            }),
+          }),
+        );
+      });
+
+      it('should allow creation when same name but different DOB exists in same tenant', async () => {
+        // findFirst returns null — different DOB means no match
+        mockPrisma.child.findFirst.mockResolvedValue(null);
+        mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+        mockPrisma.child.create.mockResolvedValue({ id: 'child-new' });
+        mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+          createSession({ status: 'COMPLETED' }),
+        );
+
+        const dataWithDifferentDob = {
+          ...fullData,
+          children: [
+            { firstName: 'Lily', surname: 'Smith', dateOfBirth: '2021-03-10' },
+          ],
+        };
+
+        await handler.completeOnboarding(
+          SESSION_ID,
+          dataWithDifferentDob,
+          TENANT_ID,
+          WA_ID,
+          'Little Stars Creche',
+        );
+
+        // Guard passes — child.create must be called
+        expect(mockPrisma.child.create).toHaveBeenCalledTimes(1);
+      });
+
+      it('should allow creation when same name+DOB exists under a different tenant', async () => {
+        // findFirst is tenant-scoped, returns null for this tenant
+        mockPrisma.child.findFirst.mockResolvedValue(null);
+        mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+        mockPrisma.child.create.mockResolvedValue({ id: 'child-new' });
+        mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+          createSession({ status: 'COMPLETED' }),
+        );
+
+        await handler.completeOnboarding(
+          SESSION_ID,
+          fullData,
+          'other-tenant-id',
+          WA_ID,
+          'Other Creche',
+        );
+
+        // Guard passes — cross-tenant match is invisible
+        expect(mockPrisma.child.create).toHaveBeenCalledTimes(1);
+
+        // Verify the findFirst was called with the correct (different) tenantId
+        expect(mockPrisma.child.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ tenantId: 'other-tenant-id' }),
+          }),
+        );
       });
     });
   });

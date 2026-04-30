@@ -128,6 +128,7 @@ import { SimplePayModule } from '../integrations/simplepay/simplepay.module';
 import { ConversationalModule } from '../agents/conversational/conversational.module';
 import { RolloutModule } from '../agents/rollout/rollout.module';
 import { TaxTableService } from './services/tax-table.service'; // TASK-STAFF-005
+import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT-PAY-04
 // TASK-STUB-PARITY: ACCOUNTING_PROVIDER is globally available via AccountingModule.forRoot()
 
 @Module({
@@ -146,6 +147,7 @@ import { TaxTableService } from './services/tax-table.service'; // TASK-STAFF-00
     forwardRef(() => NotificationModule),
     forwardRef(() => SimplePayModule), // TASK-STAFF-006: For SimplePay offboarding integration
     forwardRef(() => RolloutModule), // TASK-SDK-012: Parallel Rollout Framework
+    StorageModule, // AUDIT-PAY-04: PaymentReceiptService needs StorageService
   ],
   providers: [
     // TASK-QUOTE-001: QuotePdfService for quote PDF generation

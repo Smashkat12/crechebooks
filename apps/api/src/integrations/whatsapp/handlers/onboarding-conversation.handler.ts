@@ -28,6 +28,8 @@ import { FeeStructureRepository } from '../../../database/repositories/fee-struc
 import { ParentFeeAgreementPdfService } from '../../../database/services/parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from '../../../database/services/parent-consent-forms-pdf.service';
 import { MagicLinkService } from '../../../api/auth/services/magic-link.service';
+// AUDIT-WA-DELIVERY: wire invoice delivery into the WA onboarding completion path
+import { InvoiceDeliveryService } from '../../../database/services/invoice-delivery.service';
 import {
   OnboardingCollectedData,
   ONBOARDING_TRIGGERS,
@@ -98,6 +100,8 @@ export class OnboardingConversationHandler {
     private readonly feeAgreementPdfService: ParentFeeAgreementPdfService,
     private readonly consentFormsPdfService: ParentConsentFormsPdfService,
     private readonly magicLinkService: MagicLinkService,
+    // AUDIT-WA-DELIVERY: deliver invoice immediately after WA self-enrollment
+    private readonly invoiceDeliveryService: InvoiceDeliveryService,
   ) {}
 
   /**
@@ -2364,25 +2368,30 @@ export class OnboardingConversationHandler {
 
             if (enrollResult.invoice) {
               firstInvoiceTotal = enrollResult.invoice.totalCents;
-              // AUDIT-WA-STUCKDRAFT: Enrollment invoice is created as DRAFT by
-              // enrollChild(). It is NOT fed into the delivery pipeline here — the
-              // monthly invoice-scheduler is the only path that sends invoices.
-              // That scheduler only processes invoices it generates in its own batch
-              // run; it skips this enrollment invoice as DUPLICATE_INVOICE on the
-              // next run. Result: enrollment invoices from WA onboarding sit DRAFT
-              // indefinitely unless manually sent or corrected (DATA-01 pattern).
-              // The invoice must be manually sent by an operator, or a separate
-              // delivery step must be added here (comms-engineer scope).
-              this.logger.warn({
-                message:
-                  'WA onboarding enrollment invoice left in DRAFT — not sent',
-                invoiceId: enrollResult.invoice.id,
-                invoiceNumber: enrollResult.invoice.invoiceNumber,
-                sessionId,
-                tenantId,
-                note: 'Enrollment invoices created via WA onboarding are not automatically delivered. Operator action required to send.',
-              });
+
+              // AUDIT-WA-DELIVERY: deliver the enrollment invoice immediately.
+              // The staging-safety gate (APP_ENV=staging + COMMS_DISABLED) lives
+              // inside InvoiceDeliveryService.sendInvoices — all callers benefit.
+              // Failure is non-fatal: log a warning, leave invoice in DRAFT for
+              // the scheduler to retry on the next auto-send cycle.
+              try {
+                await this.invoiceDeliveryService.sendInvoices({
+                  tenantId,
+                  invoiceIds: [enrollResult.invoice.id],
+                });
+                this.logger.log(
+                  `[AUDIT-WA-DELIVERY] Invoice ${enrollResult.invoice.id} delivered for WA-enrolled child ${child.id}`,
+                );
+              } catch (deliveryError) {
+                this.logger.warn(
+                  `[AUDIT-WA-DELIVERY] Invoice delivery failed for child ${child.id} ` +
+                    `(invoice ${enrollResult.invoice.id}): ${deliveryError instanceof Error ? deliveryError.message : String(deliveryError)}. ` +
+                    `Invoice remains DRAFT — scheduler will retry on next auto-send cycle.`,
+                );
+              }
             } else {
+              // AUDIT-WA-STUCKDRAFT: enrollment that produced no invoice — keep
+              // the warn log so the operator can see when this happens.
               this.logger.warn({
                 message: 'WA onboarding enrollment produced no invoice',
                 sessionId,

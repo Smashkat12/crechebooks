@@ -1,6 +1,7 @@
 /**
  * Onboarding Conversation Handler Tests
  * TASK-WA-012: WhatsApp Conversational Onboarding
+ * AUDIT-WA-DELIVERY: Invoice delivery wired into onboarding completion
  *
  * London-school TDD with full mocking of dependencies.
  */
@@ -14,6 +15,7 @@ import { FeeStructureRepository } from '../../../database/repositories/fee-struc
 import { ParentFeeAgreementPdfService } from '../../../database/services/parent-fee-agreement-pdf.service';
 import { ParentConsentFormsPdfService } from '../../../database/services/parent-consent-forms-pdf.service';
 import { MagicLinkService } from '../../../api/auth/services/magic-link.service';
+import { InvoiceDeliveryService } from '../../../database/services/invoice-delivery.service';
 import {
   validateSAID,
   validateEmail,
@@ -80,6 +82,12 @@ const createMockMagicLinkService = () => ({
   generateMagicLinkUrl: jest
     .fn()
     .mockResolvedValue('https://app.example.com/magic?token=abc'),
+});
+
+const createMockInvoiceDeliveryService = () => ({
+  sendInvoices: jest
+    .fn()
+    .mockResolvedValue({ sent: 1, failed: 0, failures: [] }),
 });
 
 const TENANT_ID = 'tenant-123';
@@ -362,6 +370,9 @@ describe('OnboardingConversationHandler', () => {
     typeof createMockConsentFormsPdfService
   >;
   let mockMagicLinkService: ReturnType<typeof createMockMagicLinkService>;
+  let mockInvoiceDeliveryService: ReturnType<
+    typeof createMockInvoiceDeliveryService
+  >;
 
   beforeEach(async () => {
     mockPrisma = createMockPrisma();
@@ -371,6 +382,7 @@ describe('OnboardingConversationHandler', () => {
     mockFeeAgreementPdfService = createMockFeeAgreementPdfService();
     mockConsentFormsPdfService = createMockConsentFormsPdfService();
     mockMagicLinkService = createMockMagicLinkService();
+    mockInvoiceDeliveryService = createMockInvoiceDeliveryService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -388,6 +400,10 @@ describe('OnboardingConversationHandler', () => {
           useValue: mockConsentFormsPdfService,
         },
         { provide: MagicLinkService, useValue: mockMagicLinkService },
+        {
+          provide: InvoiceDeliveryService,
+          useValue: mockInvoiceDeliveryService,
+        },
       ],
     }).compile();
 
@@ -1453,41 +1469,34 @@ describe('OnboardingConversationHandler', () => {
       });
     });
 
-    // -----------------------------------------------------------------------
-    // AUDIT-WA-STUCKDRAFT instrumentation
-    // -----------------------------------------------------------------------
+    // ==========================================
+    // AUDIT-WA-DELIVERY: invoice delivery tests
+    // ==========================================
 
-    it('should warn when enrollment invoice is created but left in DRAFT (not sent)', async () => {
-      // Simulate enrollChild returning a DRAFT invoice — the stuck-invoice path
-      const mockInvoice = {
-        id: 'inv-draft-1',
-        invoiceNumber: 'INV-2026-196',
-        totalCents: 97619,
-        status: 'DRAFT',
-      };
-      mockEnrollmentService.enrollChild.mockResolvedValueOnce({
-        enrollment: { id: 'enr-1' },
-        invoice: mockInvoice,
-        invoiceError: undefined,
-        welcomePackSent: false,
-      });
-
+    it('AUDIT-WA-DELIVERY: happy path — sends invoice and marks SENT when fee structure selected', async () => {
       const dataWithFee = {
         ...fullData,
-        selectedFeeStructureId: 'fee-1',
-        startDate: '2026-04-09',
+        selectedFeeStructureId: 'fee-structure-1',
       };
-      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
-      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
-      mockPrisma.child.update.mockResolvedValue({
-        id: 'child-1',
-        status: 'ENROLLED',
+      mockPrisma.parent.create.mockResolvedValue({
+        id: 'parent-1',
+        email: 'jane@example.com',
       });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({ id: 'child-1' });
       mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
         createSession({ status: 'COMPLETED' }),
       );
-
-      const warnSpy = jest.spyOn(handler['logger'], 'warn');
+      mockEnrollmentService.enrollChild.mockResolvedValue({
+        enrollment: { id: 'enr-1' },
+        invoice: { id: 'inv-1', totalCents: 150000 },
+      });
+      mockFeeStructureRepo.findById.mockResolvedValue({ name: 'Full Day' });
+      mockInvoiceDeliveryService.sendInvoices.mockResolvedValue({
+        sent: 1,
+        failed: 0,
+        failures: [],
+      });
 
       await handler.completeOnboarding(
         SESSION_ID,
@@ -1497,42 +1506,29 @@ describe('OnboardingConversationHandler', () => {
         'Little Stars Creche',
       );
 
-      // Must emit a warn with invoiceId and sessionId so operators can triage stuck DRAFTs
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'WA onboarding enrollment invoice left in DRAFT — not sent',
-          invoiceId: 'inv-draft-1',
-          invoiceNumber: 'INV-2026-196',
-          sessionId: SESSION_ID,
-          tenantId: TENANT_ID,
-        }),
-      );
-
-      warnSpy.mockRestore();
+      expect(mockInvoiceDeliveryService.sendInvoices).toHaveBeenCalledWith({
+        tenantId: TENANT_ID,
+        invoiceIds: ['inv-1'],
+      });
     });
 
-    it('should warn when enrollment produces no invoice at all', async () => {
-      mockEnrollmentService.enrollChild.mockResolvedValueOnce({
+    it('AUDIT-WA-DELIVERY: no invoice — skips delivery and warns when enrollChild returns no invoice', async () => {
+      const dataWithFee = {
+        ...fullData,
+        selectedFeeStructureId: 'fee-structure-1',
+      };
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+      mockEnrollmentService.enrollChild.mockResolvedValue({
         enrollment: { id: 'enr-1' },
         invoice: null,
         invoiceError: 'Invoice creation failed: DB timeout',
-        welcomePackSent: false,
       });
-
-      const dataWithFee = {
-        ...fullData,
-        selectedFeeStructureId: 'fee-1',
-        startDate: '2026-04-09',
-      };
-      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
-      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
-      mockPrisma.child.update.mockResolvedValue({
-        id: 'child-1',
-        status: 'ENROLLED',
-      });
-      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
-        createSession({ status: 'COMPLETED' }),
-      );
+      mockFeeStructureRepo.findById.mockResolvedValue({ name: 'Full Day' });
 
       const warnSpy = jest.spyOn(handler['logger'], 'warn');
 
@@ -1544,6 +1540,7 @@ describe('OnboardingConversationHandler', () => {
         'Little Stars Creche',
       );
 
+      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'WA onboarding enrollment produced no invoice',
@@ -1555,8 +1552,66 @@ describe('OnboardingConversationHandler', () => {
       warnSpy.mockRestore();
     });
 
+    it('AUDIT-WA-DELIVERY: failure path — delivery throws but handler does not crash; invoice remains DRAFT', async () => {
+      const dataWithFee = {
+        ...fullData,
+        selectedFeeStructureId: 'fee-structure-1',
+      };
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.child.update.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+      mockEnrollmentService.enrollChild.mockResolvedValue({
+        enrollment: { id: 'enr-1' },
+        invoice: { id: 'inv-1', totalCents: 150000 },
+      });
+      mockFeeStructureRepo.findById.mockResolvedValue({ name: 'Full Day' });
+      mockInvoiceDeliveryService.sendInvoices.mockRejectedValue(
+        new Error('SMTP timeout'),
+      );
+
+      // Should not throw — delivery failure is non-fatal
+      await expect(
+        handler.completeOnboarding(
+          SESSION_ID,
+          dataWithFee,
+          TENANT_ID,
+          WA_ID,
+          'Little Stars Creche',
+        ),
+      ).resolves.not.toThrow();
+
+      // Confirmation message should still be sent to the parent
+      expect(mockContentService.sendSessionMessage).toHaveBeenCalledWith(
+        WA_ID,
+        expect.stringContaining('Little Stars Creche'),
+        TENANT_ID,
+      );
+    });
+
+    it('AUDIT-WA-DELIVERY: no fee structure selected — delivery skipped (no invoice generated)', async () => {
+      // No selectedFeeStructureId → enrollChild never called → no invoice
+      mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
+      mockPrisma.child.create.mockResolvedValue({ id: 'child-1' });
+      mockPrisma.whatsAppOnboardingSession.update.mockResolvedValue(
+        createSession({ status: 'COMPLETED' }),
+      );
+
+      await handler.completeOnboarding(
+        SESSION_ID,
+        fullData, // no selectedFeeStructureId
+        TENANT_ID,
+        WA_ID,
+        'Little Stars Creche',
+      );
+
+      expect(mockInvoiceDeliveryService.sendInvoices).not.toHaveBeenCalled();
+    });
+
     // -----------------------------------------------------------------------
-    // Duplicate child guard tests
+    // Duplicate child guard tests (AUDIT-WA-DUPCHILD)
     // -----------------------------------------------------------------------
 
     describe('duplicate child guard', () => {
@@ -1611,7 +1666,6 @@ describe('OnboardingConversationHandler', () => {
       });
 
       it('should allow creation when same name but different DOB exists in same tenant', async () => {
-        // findFirst returns null — different DOB means no match
         mockPrisma.child.findFirst.mockResolvedValue(null);
         mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
         mockPrisma.child.create.mockResolvedValue({ id: 'child-new' });
@@ -1634,12 +1688,10 @@ describe('OnboardingConversationHandler', () => {
           'Little Stars Creche',
         );
 
-        // Guard passes — child.create must be called
         expect(mockPrisma.child.create).toHaveBeenCalledTimes(1);
       });
 
       it('should allow creation when same name+DOB exists under a different tenant', async () => {
-        // findFirst is tenant-scoped, returns null for this tenant
         mockPrisma.child.findFirst.mockResolvedValue(null);
         mockPrisma.parent.create.mockResolvedValue({ id: 'parent-1' });
         mockPrisma.child.create.mockResolvedValue({ id: 'child-new' });
@@ -1655,10 +1707,7 @@ describe('OnboardingConversationHandler', () => {
           'Other Creche',
         );
 
-        // Guard passes — cross-tenant match is invisible
         expect(mockPrisma.child.create).toHaveBeenCalledTimes(1);
-
-        // Verify the findFirst was called with the correct (different) tenantId
         expect(mockPrisma.child.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({ tenantId: 'other-tenant-id' }),

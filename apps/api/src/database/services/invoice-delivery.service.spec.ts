@@ -175,7 +175,7 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(false);
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    const mockInvoiceRepo = module.get(InvoiceRepository) as any;
+    const mockInvoiceRepo = module.get(InvoiceRepository) as unknown as Record<string, jest.Mock>;
     mockInvoiceRepo.findById.mockResolvedValue(buildDraftInvoice());
 
     const result = await service.sendInvoices({
@@ -198,10 +198,10 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(false); // COMMS_DISABLED=false
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    const mockInvoiceRepo = module.get(InvoiceRepository) as any;
-    const mockEmailService = module.get(EmailService) as any;
-    const mockWAProviderService = module.get(WhatsAppProviderService) as any;
-    const mockAuditLogService = module.get(AuditLogService) as any;
+    const mockInvoiceRepo = module.get(InvoiceRepository) as unknown as Record<string, jest.Mock>;
+    const mockEmailService = module.get(EmailService) as unknown as Record<string, jest.Mock>;
+    const mockWAProviderService = module.get(WhatsAppProviderService) as unknown as Record<string, jest.Mock>;
+    const mockAuditLogService = module.get(AuditLogService) as unknown as Record<string, jest.Mock>;
 
     mockInvoiceRepo.update.mockResolvedValue(undefined);
 
@@ -245,8 +245,8 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(true); // COMMS_DISABLED=true
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    const mockInvoiceRepo = module.get(InvoiceRepository) as any;
-    const mockEmailService = module.get(EmailService) as any;
+    const mockInvoiceRepo = module.get(InvoiceRepository) as unknown as Record<string, jest.Mock>;
+    const mockEmailService = module.get(EmailService) as unknown as Record<string, jest.Mock>;
 
     mockInvoiceRepo.findById.mockResolvedValue(buildDraftInvoice());
 

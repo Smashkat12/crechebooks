@@ -6,25 +6,9 @@
  */
 
 /**
- * SARS deadline submission types.
- *
- * Naming note — two systems, two names for the same annual reconciliation:
- *
- *   'EMP501' — canonical SARS form name (EMP501 §2 — Employer Annual Reconciliation
- *               Declaration). Used by SarsDeadlineService, SarsReadinessService, and
- *               the Prisma SubmissionType enum. This is the correct name everywhere.
- *
- *   'IRP5'   — legacy alias kept in this union and in SarsDeadlineProcessor's
- *               getDeadlineDescription() for backward compatibility only.
- *               The iteration list in SarsDeadlineService.getUpcomingDeadlines()
- *               now uses 'EMP501'. 'IRP5' may be removed once all remaining
- *               switch arms that dispatch on it are cleaned up.
- *
- * Remaining cleanup:
- *   - Remove 'IRP5' from this union once SarsDeadlineProcessor's legacy case arm
- *     is confirmed unreachable (both case labels now log the same message).
+ * SARS deadline submission types
  */
-export type SarsDeadlineType = 'VAT201' | 'EMP201' | 'IRP5' | 'EMP501';
+export type SarsDeadlineType = 'VAT201' | 'EMP201' | 'EMP501';
 
 /**
  * Upcoming deadline information
@@ -133,24 +117,13 @@ export const SARS_DEADLINE_CALENDAR = {
     frequency: 'MONTHLY' as const,
   },
   /**
-   * IRP5: Legacy calendar entry — SarsDeadlineService now iterates EMP501 instead.
-   * Kept in the calendar so getNextDeadline('IRP5') still works for any historical
-   * callers. Remove once 'IRP5' is dropped from SarsDeadlineType.
-   * @deprecated Use EMP501.
-   */
-  IRP5: {
-    dayOfMonth: 31,
-    monthOfYear: 4, // May (0-indexed)
-    frequency: 'ANNUAL' as const,
-  },
-  /**
    * EMP501: Employer Annual Reconciliation Declaration (EMP501 §2).
-   * Canonical SARS form name. Same deadline slot as IRP5: May 31 (interim),
-   * Oct 31 (annual) — SarsReadinessService.emp501Window() handles both dates.
+   * Annual reconciliation due May 31; interim reconciliation Oct 31.
+   * SarsReadinessService.emp501Window() handles both dates.
    */
   EMP501: {
     dayOfMonth: 31,
-    monthOfYear: 4, // May 31 interim; Oct 31 handled by SarsReadinessService
+    monthOfYear: 4, // May (0-indexed) — annual reconciliation deadline
     frequency: 'ANNUAL' as const,
   },
 } as const;

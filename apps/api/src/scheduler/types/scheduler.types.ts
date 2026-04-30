@@ -32,7 +32,7 @@ export interface PaymentReminderJobData extends ScheduledJobData {
 }
 
 export interface SarsDeadlineJobData extends ScheduledJobData {
-  submissionType: 'VAT201' | 'EMP201' | 'IRP5' | 'EMP501';
+  submissionType: 'VAT201' | 'EMP201' | 'EMP501';
   daysUntilDeadline: number;
 }
 

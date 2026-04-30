@@ -10,21 +10,19 @@
  *
  * Naming note — two systems, two names for the same annual reconciliation:
  *
- *   'IRP5'   — legacy name used by SarsDeadlineService (and the Prisma
- *               SubmissionType DB enum). Kept for backward compatibility with
- *               SarsDeadlineProcessor which has case 'IRP5' switch arms.
- *               Maps to the annual May-31 reconciliation deadline.
+ *   'EMP501' — canonical SARS form name (EMP501 §2 — Employer Annual Reconciliation
+ *               Declaration). Used by SarsDeadlineService, SarsReadinessService, and
+ *               the Prisma SubmissionType enum. This is the correct name everywhere.
  *
- *   'EMP501' — canonical SARS form name used by SarsReadinessService and the
- *               SARS eFiling portal. This is the EMP501 Employer Annual
- *               Reconciliation Declaration (EMP501 §2).
+ *   'IRP5'   — legacy alias kept in this union and in SarsDeadlineProcessor's
+ *               getDeadlineDescription() for backward compatibility only.
+ *               The iteration list in SarsDeadlineService.getUpcomingDeadlines()
+ *               now uses 'EMP501'. 'IRP5' may be removed once all remaining
+ *               switch arms that dispatch on it are cleaned up.
  *
- * Resolution path (owner in parens):
- *   1. schema-guardian: add EMP501 to the Prisma SubmissionType enum.
- *   2. platform-engineer: update SarsDeadlineProcessor case arms ('IRP5' -> 'EMP501').
- *   3. After (2): update SarsDeadlineService iteration list to 'EMP501';
- *      remove the checkSubmissionStatus EMP501->IRP5 alias.
- *   4. Deprecate 'IRP5' from this union.
+ * Remaining cleanup:
+ *   - Remove 'IRP5' from this union once SarsDeadlineProcessor's legacy case arm
+ *     is confirmed unreachable (both case labels now log the same message).
  */
 export type SarsDeadlineType = 'VAT201' | 'EMP201' | 'IRP5' | 'EMP501';
 
@@ -135,9 +133,10 @@ export const SARS_DEADLINE_CALENDAR = {
     frequency: 'MONTHLY' as const,
   },
   /**
-   * IRP5: Due end of May annually (legacy name — see SarsDeadlineType comment).
-   * Kept while SarsDeadlineProcessor still dispatches on case 'IRP5'.
-   * @deprecated Prefer EMP501. Remove after processor switch arms are updated.
+   * IRP5: Legacy calendar entry — SarsDeadlineService now iterates EMP501 instead.
+   * Kept in the calendar so getNextDeadline('IRP5') still works for any historical
+   * callers. Remove once 'IRP5' is dropped from SarsDeadlineType.
+   * @deprecated Use EMP501.
    */
   IRP5: {
     dayOfMonth: 31,

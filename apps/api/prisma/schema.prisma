@@ -215,6 +215,7 @@ enum SubmissionType {
   VAT201
   EMP201
   IRP5
+  EMP501
 }
 
 // TASK-SARS-005: Enhanced submission status tracking

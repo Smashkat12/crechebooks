@@ -42,7 +42,7 @@ export class SarsDeadlineService {
     const deadlines: UpcomingDeadline[] = [];
 
     // Check each deadline type
-    const types: SarsDeadlineType[] = ['VAT201', 'EMP201', 'IRP5'];
+    const types: SarsDeadlineType[] = ['VAT201', 'EMP201', 'EMP501'];
 
     for (const type of types) {
       // Get next deadline date
@@ -328,26 +328,21 @@ export class SarsDeadlineService {
   /**
    * Check if a return has been submitted.
    *
-   * DB alias note: the Prisma SubmissionType enum currently has 'IRP5', not
-   * 'EMP501'. Until schema-guardian adds EMP501, queries for EMP501 are aliased
-   * to IRP5. Both refer to the same annual May-31 reconciliation slot and no
-   * existing submission rows use either value (eFiling is stubbed). Remove the
-   * alias once the Prisma enum is updated (see SarsDeadlineType for full plan).
+   * Queries the SarsSubmission table using the canonical type value.
+   * EMP501 is now a valid Prisma SubmissionType enum value (migration
+   * 20260430120000_add_emp501_to_submission_type).
    */
   private async checkSubmissionStatus(
     tenantId: string,
     type: SarsDeadlineType,
     period: string,
   ): Promise<{ isSubmitted: boolean; submittedAt?: Date }> {
-    // EMP501 maps to IRP5 in the DB enum until schema-guardian adds EMP501.
-    const dbSubmissionType = type === 'EMP501' ? 'IRP5' : type;
-
     // Check SarsSubmission table if it exists
     try {
       // Parse period string (YYYY-MM) to get start of month
       const [year, month] = period.split('-').map(Number);
 
-      // If period is just a year (for annual like IRP5), use Jan 1
+      // If period is just a year (for annual like EMP501), use Jan 1
       const periodStartDate = month
         ? new Date(year, month - 1, 1)
         : new Date(year, 0, 1);
@@ -360,7 +355,7 @@ export class SarsDeadlineService {
       const submission = await this.prisma.sarsSubmission.findFirst({
         where: {
           tenantId,
-          submissionType: dbSubmissionType,
+          submissionType: type,
           periodStart: {
             gte: periodStartDate,
           },

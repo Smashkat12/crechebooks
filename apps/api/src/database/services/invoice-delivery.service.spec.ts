@@ -175,7 +175,8 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(false);
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    const mockInvoiceRepo = module.get(InvoiceRepository) as unknown as Record<string, jest.Mock>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockInvoiceRepo: any = module.get(InvoiceRepository);
     mockInvoiceRepo.findById.mockResolvedValue(buildDraftInvoice());
 
     const result = await service.sendInvoices({
@@ -198,10 +199,14 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(false); // COMMS_DISABLED=false
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    const mockInvoiceRepo = module.get(InvoiceRepository) as unknown as Record<string, jest.Mock>;
-    const mockEmailService = module.get(EmailService) as unknown as Record<string, jest.Mock>;
-    const mockWAProviderService = module.get(WhatsAppProviderService) as unknown as Record<string, jest.Mock>;
-    const mockAuditLogService = module.get(AuditLogService) as unknown as Record<string, jest.Mock>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockInvoiceRepo: any = module.get(InvoiceRepository);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockEmailService: any = module.get(EmailService);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockWAProviderService: any = module.get(WhatsAppProviderService);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockAuditLogService: any = module.get(AuditLogService);
 
     mockInvoiceRepo.update.mockResolvedValue(undefined);
 
@@ -245,8 +250,10 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(true); // COMMS_DISABLED=true
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    const mockInvoiceRepo = module.get(InvoiceRepository) as unknown as Record<string, jest.Mock>;
-    const mockEmailService = module.get(EmailService) as unknown as Record<string, jest.Mock>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockInvoiceRepo: any = module.get(InvoiceRepository);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockEmailService: any = module.get(EmailService);
 
     mockInvoiceRepo.findById.mockResolvedValue(buildDraftInvoice());
 

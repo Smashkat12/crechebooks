@@ -25,6 +25,8 @@ import { CreditBalanceService } from '../../../src/database/services/credit-bala
 import { CreditNoteService } from '../../../src/database/services/credit-note.service';
 import { InvoiceNumberService } from '../../../src/database/services/invoice-number.service';
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
+import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
+import { CommsGuardService } from '../../../src/common/services/comms-guard/comms-guard.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { EnrollmentStatus } from '../../../src/database/entities/enrollment.entity';
@@ -124,6 +126,20 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn(), emitAsync: jest.fn() },
+        },
+        {
+          // FEAT-BILLING-AUTOSEND: InvoiceDeliveryService stub — suppress actual delivery in integration test
+          provide: InvoiceDeliveryService,
+          useValue: {
+            sendInvoices: jest
+              .fn()
+              .mockResolvedValue({ sent: 0, failed: 0, failures: [] }),
+          },
+        },
+        {
+          // FEAT-BILLING-AUTOSEND: CommsGuardService stub — isDisabled=false lets sendInvoices path run
+          provide: CommsGuardService,
+          useValue: { isDisabled: jest.fn().mockReturnValue(false) },
         },
       ],
     }).compile();

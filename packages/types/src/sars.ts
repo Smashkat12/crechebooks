@@ -103,6 +103,7 @@ export enum SarsSubmissionType {
   VAT201 = 'VAT201',
   EMP201 = 'EMP201',
   IRP5 = 'IRP5',
+  EMP501 = 'EMP501',
 }
 
 export enum SarsSubmissionStatus {

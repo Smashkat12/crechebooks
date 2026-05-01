@@ -224,7 +224,6 @@ export const endpoints = {
     unreadCount: '/notifications/unread-count',
     markRead: (id: string) => `/notifications/${id}/read`,
     markAllRead: '/notifications/read-all',
-    delete: (id: string) => `/notifications/${id}`,
     // Parent portal
     parentList: '/parent-portal/notifications',
     parentUnreadCount: '/parent-portal/notifications/unread-count',

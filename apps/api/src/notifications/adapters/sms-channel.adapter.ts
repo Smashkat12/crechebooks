@@ -216,18 +216,6 @@ export class SmsChannelAdapter implements INotificationChannel {
   }
 
   /**
-   * Get delivery status for SMS message
-   * Note: Status is typically updated via gateway webhooks
-   */
-  getDeliveryStatus(messageId: string): Promise<NotificationDeliveryStatus> {
-    // For now, we return SENT status
-    // In production, this would query a message tracking table
-    // updated by gateway webhook callbacks
-    this.logger.debug(`Getting delivery status for message: ${messageId}`);
-    return Promise.resolve(NotificationDeliveryStatus.SENT);
-  }
-
-  /**
    * Send SMS with retry logic for transient failures
    */
   private async sendWithRetry(

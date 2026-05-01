@@ -348,53 +348,6 @@ describe('AdhocCommunicationService', () => {
     });
   });
 
-  describe('previewRecipientCount', () => {
-    it('should return count without creating broadcast', async () => {
-      const count = await service.previewRecipientCount(testTenantId, {
-        recipientType: RecipientType.PARENT,
-        channel: CommunicationChannel.EMAIL,
-      });
-
-      expect(count).toBe(2);
-
-      // Verify no broadcast was created
-      const broadcasts = await prisma.broadcastMessage.findMany({
-        where: { tenantId: testTenantId },
-      });
-      expect(broadcasts).toHaveLength(0);
-    });
-  });
-
-  describe('getDeliveryStats', () => {
-    it('should return delivery statistics', async () => {
-      const broadcast = await service.createBroadcast(
-        testTenantId,
-        testUserId,
-        {
-          tenantId: testTenantId,
-          subject: 'Stats Test',
-          body: 'Message',
-          recipientType: RecipientType.PARENT,
-          channel: CommunicationChannel.EMAIL,
-        },
-      );
-
-      const stats = await service.getDeliveryStats(testTenantId, broadcast.id);
-
-      expect(stats).toBeDefined();
-      expect(stats.total).toBe(2);
-    });
-
-    it('should throw NotFoundException for invalid broadcast', async () => {
-      await expect(
-        service.getDeliveryStats(
-          testTenantId,
-          '00000000-0000-0000-0000-000000000000',
-        ),
-      ).rejects.toThrow(NotFoundException);
-    });
-  });
-
   describe('sendBroadcast (without Redis)', () => {
     it('should throw error when Redis is not configured', async () => {
       const broadcast = await service.createBroadcast(

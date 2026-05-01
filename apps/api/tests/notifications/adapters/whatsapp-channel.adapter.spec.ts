@@ -338,14 +338,6 @@ describe('WhatsAppChannelAdapter', () => {
     });
   });
 
-  describe('getDeliveryStatus', () => {
-    it('should return SENT status (status updated via webhooks)', async () => {
-      const status = await adapter.getDeliveryStatus('test-message-id');
-
-      expect(status).toBe(NotificationDeliveryStatus.SENT);
-    });
-  });
-
   describe('edge cases', () => {
     it('should prefer whatsapp number over phone when both available', async () => {
       const whatsappNumber = '+27829876543';

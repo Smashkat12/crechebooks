@@ -106,7 +106,6 @@ export class FilterCriteriaResponseDto {
     has_outstanding_balance?: boolean;
     days_overdue?: number;
     whatsapp_opt_in?: boolean;
-    sms_opt_in?: boolean;
   };
 
   @ApiPropertyOptional({ description: 'Staff filter criteria' })
@@ -172,7 +171,6 @@ export class RecipientGroupResponseDto {
         has_outstanding_balance: fc.parentFilter.hasOutstandingBalance,
         days_overdue: fc.parentFilter.daysOverdue,
         whatsapp_opt_in: fc.parentFilter.whatsappOptIn,
-        sms_opt_in: fc.parentFilter.smsOptIn,
       };
     }
 

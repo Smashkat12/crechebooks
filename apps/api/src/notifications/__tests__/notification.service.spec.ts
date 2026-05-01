@@ -14,9 +14,7 @@ import { WhatsAppProviderService } from '../../integrations/whatsapp/services/wh
 import { NotificationService } from '../notification.service';
 import { EmailChannelAdapter } from '../adapters/email-channel.adapter';
 import { WhatsAppChannelAdapter } from '../adapters/whatsapp-channel.adapter';
-import { SmsChannelAdapter } from '../adapters/sms-channel.adapter';
 import { NotificationPreferenceService } from '../notification-preference.service';
-import { SMS_GATEWAY_TOKEN } from '../interfaces/sms-gateway.interface';
 import {
   NotificationChannelType,
   NotificationDeliveryStatus,
@@ -50,7 +48,6 @@ describe('NotificationService', () => {
         NotificationPreferenceService,
         EmailChannelAdapter,
         WhatsAppChannelAdapter,
-        SmsChannelAdapter,
         {
           provide: PrismaService,
           useValue: {
@@ -75,16 +72,6 @@ describe('NotificationService', () => {
           provide: AuditLogService,
           useValue: {
             logAction: jest.fn(),
-          },
-        },
-        {
-          provide: SMS_GATEWAY_TOKEN,
-          useValue: {
-            send: jest.fn().mockResolvedValue({
-              messageId: 'sms-123',
-              status: 'sent',
-            }),
-            isConfigured: jest.fn().mockReturnValue(true),
           },
         },
       ],

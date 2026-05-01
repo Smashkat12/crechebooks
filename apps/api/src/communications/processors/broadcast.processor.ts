@@ -268,9 +268,6 @@ export class BroadcastProcessor {
       }
     }
 
-    // Note: SMS channel not implemented yet (TASK-COMM-002 scope)
-    // When implementing, add similar pattern for SMS
-
     // Return success only if at least one channel succeeded
     // (or if no channels were applicable/attempted)
     return anySuccess || !channelAttempted;

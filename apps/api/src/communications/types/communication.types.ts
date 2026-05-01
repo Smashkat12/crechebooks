@@ -89,8 +89,6 @@ export interface ParentFilter {
   daysOverdue?: number;
   /** Filter by WhatsApp opt-in status (for WhatsApp channel) */
   whatsappOptIn?: boolean;
-  /** Filter by SMS opt-in status (for SMS channel) */
-  smsOptIn?: boolean;
 }
 
 /**

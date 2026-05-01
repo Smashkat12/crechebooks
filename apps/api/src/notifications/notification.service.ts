@@ -18,7 +18,6 @@ import { AuditAction } from '../database/entities/audit-log.entity';
 import { INotificationChannel } from './interfaces/notification-channel.interface';
 import { EmailChannelAdapter } from './adapters/email-channel.adapter';
 import { WhatsAppChannelAdapter } from './adapters/whatsapp-channel.adapter';
-import { SmsChannelAdapter } from './adapters/sms-channel.adapter';
 import { NotificationPreferenceService } from './notification-preference.service';
 import {
   NotificationPayload,
@@ -37,7 +36,6 @@ export class NotificationService {
   constructor(
     private readonly emailAdapter: EmailChannelAdapter,
     private readonly whatsAppAdapter: WhatsAppChannelAdapter,
-    private readonly smsAdapter: SmsChannelAdapter,
     private readonly preferenceService: NotificationPreferenceService,
     private readonly auditLogService: AuditLogService,
   ) {
@@ -45,7 +43,6 @@ export class NotificationService {
     this.channels = new Map<NotificationChannelType, INotificationChannel>();
     this.channels.set(NotificationChannelType.EMAIL, this.emailAdapter);
     this.channels.set(NotificationChannelType.WHATSAPP, this.whatsAppAdapter);
-    this.channels.set(NotificationChannelType.SMS, this.smsAdapter);
   }
 
   /**

@@ -294,5 +294,4 @@ export class AdhocCommunicationService {
   ): Promise<BroadcastMessage[]> {
     return this.broadcastEntity.findByTenant(tenantId, options);
   }
-
 }

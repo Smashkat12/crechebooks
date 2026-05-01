@@ -4,17 +4,6 @@ import { Logger } from '@nestjs/common';
 const logger = new Logger('CorsConfig');
 
 /**
- * CORS configuration interface
- */
-export interface CorsConfiguration {
-  allowedOrigins: string[];
-  allowedMethods: string[];
-  allowedHeaders: string[];
-  credentials: boolean;
-  maxAge: number;
-}
-
-/**
  * Validates that a string is a valid origin URL
  * @param origin - The origin string to validate
  * @returns true if valid origin format
@@ -253,24 +242,6 @@ export function createCorsConfig(): CorsOptions {
     exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'], // Common pagination headers
     preflightContinue: false,
     optionsSuccessStatus: 204,
-  };
-}
-
-/**
- * Get CORS configuration object (for testing/inspection)
- */
-export function getCorsConfiguration(): CorsConfiguration {
-  const nodeEnv = process.env.NODE_ENV || 'development';
-
-  return {
-    allowedOrigins: parseAllowedOrigins(
-      process.env.CORS_ALLOWED_ORIGINS,
-      nodeEnv,
-    ),
-    allowedMethods: parseAllowedMethods(process.env.CORS_ALLOWED_METHODS),
-    allowedHeaders: parseAllowedHeaders(process.env.CORS_ALLOWED_HEADERS),
-    credentials: process.env.CORS_CREDENTIALS !== 'false',
-    maxAge: parseInt(process.env.CORS_MAX_AGE || '86400', 10),
   };
 }
 

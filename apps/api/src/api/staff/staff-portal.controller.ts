@@ -37,7 +37,9 @@ import { StaffAuthGuard } from '../auth/guards/staff-auth.guard';
 import { CurrentStaff } from '../auth/decorators/current-staff.decorator';
 import type { StaffSessionInfo } from '../auth/decorators/current-staff.decorator';
 import { SimplePayPayslipService } from '../../integrations/simplepay/simplepay-payslip.service';
+import { SimplePayLeaveService } from '../../integrations/simplepay/simplepay-leave.service';
 import { SimplePayRepository } from '../../database/repositories/simplepay.repository';
+import { LeaveRequestRepository } from '../../database/repositories/leave-request.repository';
 import { StaffDashboardResponseDto } from './dto/staff-dashboard.dto';
 import {
   PayslipsResponseDto,
@@ -70,14 +72,61 @@ import {
 } from '../../database/dto/staff-onboarding.dto';
 import { DocumentType } from '../../database/entities/staff-onboarding.entity';
 
+// Static fallback mapping from staff-portal LeaveType enum to SimplePay-style names.
+// Used when SimplePay is not connected so leave requests can still be persisted locally.
+const LEAVE_TYPE_FALLBACK: Record<
+  LeaveType,
+  { leaveTypeId: number; leaveTypeName: string }
+> = {
+  [LeaveType.ANNUAL]: { leaveTypeId: 0, leaveTypeName: 'Annual Leave' },
+  [LeaveType.SICK]: { leaveTypeId: 0, leaveTypeName: 'Sick Leave' },
+  [LeaveType.FAMILY]: {
+    leaveTypeId: 0,
+    leaveTypeName: 'Family Responsibility Leave',
+  },
+  [LeaveType.UNPAID]: { leaveTypeId: 0, leaveTypeName: 'Unpaid Leave' },
+  [LeaveType.STUDY]: { leaveTypeId: 0, leaveTypeName: 'Study Leave' },
+  [LeaveType.MATERNITY]: { leaveTypeId: 0, leaveTypeName: 'Maternity Leave' },
+  [LeaveType.PATERNITY]: { leaveTypeId: 0, leaveTypeName: 'Paternity Leave' },
+};
+
+// BCEA statutory leave entitlements (Section 20, 22, 27) used as fallback
+// when SimplePay balances are unavailable.
+const BCEA_FALLBACK_BALANCES = [
+  {
+    type: LeaveType.ANNUAL,
+    name: 'Annual Leave',
+    entitled: 15,
+    used: 0,
+    pending: 0,
+    available: 15,
+    bceoInfo: '15 working days per year as per BCEA Section 20',
+  },
+  {
+    type: LeaveType.SICK,
+    name: 'Sick Leave',
+    entitled: 30,
+    used: 0,
+    pending: 0,
+    available: 30,
+    bceoInfo: '30 days per 3-year cycle as per BCEA Section 22',
+  },
+  {
+    type: LeaveType.FAMILY,
+    name: 'Family Responsibility Leave',
+    entitled: 3,
+    used: 0,
+    pending: 0,
+    available: 3,
+    bceoInfo: '3 days per year for family emergencies as per BCEA Section 27',
+  },
+];
+
 @ApiTags('Staff Portal')
 @UseGuards(StaffAuthGuard)
 @Controller('staff-portal')
 export class StaffPortalController {
   private readonly logger = new Logger(StaffPortalController.name);
-
-  // In-memory store for mock leave requests (will be replaced with DB)
-  private mockLeaveRequests: Map<string, LeaveRequestDto[]> = new Map();
 
   constructor(
     private readonly onboardingService: StaffOnboardingService,
@@ -86,6 +135,8 @@ export class StaffPortalController {
     private readonly payslipService: SimplePayPayslipService,
     private readonly simplePayRepo: SimplePayRepository,
     private readonly storageService: StorageService,
+    private readonly simplePayLeaveService: SimplePayLeaveService,
+    private readonly leaveRequestRepo: LeaveRequestRepository,
   ) {}
 
   @Get('dashboard')
@@ -171,6 +222,45 @@ export class StaffPortalController {
     const today = new Date();
     const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 25);
 
+    // Attempt to fetch live leave balances from SimplePay.
+    // Falls back to BCEA statutory minimums when SimplePay is not connected
+    // or the staff member is not yet mapped to a SimplePay employee.
+    const leaveBalance = {
+      annual: 15,
+      annualUsed: 0,
+      sick: 30,
+      sickUsed: 0,
+      family: 3,
+      familyUsed: 0,
+    };
+
+    try {
+      const spBalances =
+        await this.simplePayLeaveService.getLeaveBalancesByStaff(
+          session.tenantId,
+          session.staffId,
+        );
+
+      // Map SimplePay balance names to dashboard summary keys
+      for (const b of spBalances) {
+        const nameLower = b.leave_type_name.toLowerCase();
+        if (nameLower.includes('annual')) {
+          leaveBalance.annual = b.current_balance;
+          leaveBalance.annualUsed = b.taken;
+        } else if (nameLower.includes('sick')) {
+          leaveBalance.sick = b.current_balance;
+          leaveBalance.sickUsed = b.taken;
+        } else if (nameLower.includes('family')) {
+          leaveBalance.family = b.current_balance;
+          leaveBalance.familyUsed = b.taken;
+        }
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Dashboard leave balance: using BCEA fallback for staff ${session.staffId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
     return {
       employmentStatus: {
         position: staff.position || 'Staff Member',
@@ -180,14 +270,7 @@ export class StaffPortalController {
         employeeNumber: staff.employeeNumber || undefined,
       },
       recentPayslips,
-      leaveBalance: {
-        annual: 15,
-        annualUsed: 0,
-        sick: 10,
-        sickUsed: 0,
-        family: 3,
-        familyUsed: 0,
-      },
+      leaveBalance,
       nextPayDate: nextMonth,
       ytdEarnings,
       announcements: [],
@@ -410,65 +493,103 @@ export class StaffPortalController {
     type: LeaveBalancesResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getLeaveBalances(
+  async getLeaveBalances(
     @CurrentStaff() session: StaffSessionInfo,
-  ): LeaveBalancesResponseDto {
+  ): Promise<LeaveBalancesResponseDto> {
     this.logger.log(
       `Fetching leave balances for staff: ${session.staff.email}`,
     );
 
     const year = new Date().getFullYear();
+    const staff = await this.prisma.staff.findUnique({
+      where: { id: session.staffId },
+      select: { startDate: true },
+    });
 
-    // Calculate pending days from mock requests
-    const userRequests = this.mockLeaveRequests.get(session.staffId) || [];
-    const pendingByType = userRequests
-      .filter((r) => r.status === LeaveStatus.PENDING)
-      .reduce(
-        (acc, r) => {
-          acc[r.type] = (acc[r.type] || 0) + r.days;
-          return acc;
-        },
-        {} as Record<string, number>,
+    // Try to fetch real balances from SimplePay.
+    // Gracefully degrades to BCEA statutory minimums when:
+    //   - SimplePay connection is not configured for this tenant
+    //   - Staff member is not yet linked to a SimplePay employee
+    try {
+      const spBalances =
+        await this.simplePayLeaveService.getLeaveBalancesByStaff(
+          session.tenantId,
+          session.staffId,
+        );
+
+      // Map SimplePay balance entries to portal DTO format.
+      // SimplePay names are not standardised; use accrual_type inference from name.
+      const balanceItems = spBalances.map((b) => {
+        const nameLower = b.leave_type_name.toLowerCase();
+        let type = LeaveType.ANNUAL;
+        let cyclePeriod = `Jan - Dec ${year}`;
+        let bceoInfo = '';
+
+        if (nameLower.includes('sick')) {
+          type = LeaveType.SICK;
+          cyclePeriod = `${year - 2} - ${year}`;
+          bceoInfo = '30 days per 3-year cycle as per BCEA Section 22';
+        } else if (
+          nameLower.includes('family') ||
+          nameLower.includes('responsibility')
+        ) {
+          type = LeaveType.FAMILY;
+          bceoInfo =
+            '3 days per year for family emergencies as per BCEA Section 27';
+        } else if (nameLower.includes('unpaid')) {
+          type = LeaveType.UNPAID;
+        } else if (nameLower.includes('study')) {
+          type = LeaveType.STUDY;
+        } else if (nameLower.includes('maternity')) {
+          type = LeaveType.MATERNITY;
+        } else if (
+          nameLower.includes('paternity') ||
+          nameLower.includes('parental')
+        ) {
+          type = LeaveType.PATERNITY;
+        } else {
+          // Default annual leave
+          bceoInfo = '15 working days per year as per BCEA Section 20';
+        }
+
+        const entitled = b.current_balance + b.taken;
+        return {
+          type,
+          name: b.leave_type_name,
+          entitled: Math.max(entitled, b.current_balance),
+          used: b.taken,
+          pending: b.pending,
+          available: b.current_balance,
+          cyclePeriod,
+          ...(bceoInfo ? { bceoInfo } : {}),
+        };
+      });
+
+      return {
+        balances: balanceItems,
+        cycleStartDate: new Date(year, 0, 1),
+        cycleEndDate: new Date(year, 11, 31),
+        employmentStartDate: staff?.startDate ?? undefined,
+      };
+    } catch (err) {
+      this.logger.warn(
+        `Leave balances: SimplePay unavailable for staff ${session.staffId}, returning BCEA statutory minimums. Reason: ${err instanceof Error ? err.message : String(err)}`,
       );
 
-    return {
-      balances: [
-        {
-          type: LeaveType.ANNUAL,
-          name: 'Annual Leave',
-          entitled: 15,
-          used: 5,
-          pending: pendingByType[LeaveType.ANNUAL] || 0,
-          available: 15 - 5 - (pendingByType[LeaveType.ANNUAL] || 0),
-          cyclePeriod: `Jan - Dec ${year}`,
-          bceoInfo: '15 working days per year as per BCEA Section 20',
-        },
-        {
-          type: LeaveType.SICK,
-          name: 'Sick Leave',
-          entitled: 30,
-          used: 3,
-          pending: pendingByType[LeaveType.SICK] || 0,
-          available: 30 - 3 - (pendingByType[LeaveType.SICK] || 0),
-          cyclePeriod: `${year - 2} - ${year}`,
-          bceoInfo: '30 days per 3-year cycle as per BCEA Section 22',
-        },
-        {
-          type: LeaveType.FAMILY,
-          name: 'Family Responsibility Leave',
-          entitled: 3,
-          used: 1,
-          pending: pendingByType[LeaveType.FAMILY] || 0,
-          available: 3 - 1 - (pendingByType[LeaveType.FAMILY] || 0),
-          cyclePeriod: `Jan - Dec ${year}`,
-          bceoInfo:
-            '3 days per year for family emergencies as per BCEA Section 27',
-        },
-      ],
-      cycleStartDate: new Date(year, 0, 1),
-      cycleEndDate: new Date(year, 11, 31),
-      employmentStartDate: new Date('2023-03-15'),
-    };
+      // Return BCEA statutory minimums so the frontend shows honest placeholder data.
+      return {
+        balances: BCEA_FALLBACK_BALANCES.map((b) => ({
+          ...b,
+          cyclePeriod:
+            b.type === LeaveType.SICK
+              ? `${year - 2} - ${year}`
+              : `Jan - Dec ${year}`,
+        })),
+        cycleStartDate: new Date(year, 0, 1),
+        cycleEndDate: new Date(year, 11, 31),
+        employmentStartDate: staff?.startDate ?? undefined,
+      };
+    }
   }
 
   @Get('leave/requests')
@@ -487,42 +608,57 @@ export class StaffPortalController {
     type: LeaveRequestsResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getLeaveRequests(
+  async getLeaveRequests(
     @CurrentStaff() session: StaffSessionInfo,
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-  ): LeaveRequestsResponseDto {
+  ): Promise<LeaveRequestsResponseDto> {
     this.logger.log(
       `Fetching leave requests for staff: ${session.staff.email}`,
     );
 
-    // Get or initialize user's leave requests
-    let requests = this.mockLeaveRequests.get(session.staffId);
-    if (!requests) {
-      requests = this.generateMockLeaveRequests();
-      this.mockLeaveRequests.set(session.staffId, requests);
-    }
+    const pageNum = parseInt(page || '1', 10);
+    const limitNum = parseInt(limit || '20', 10);
 
-    // Filter by status if provided
-    let filteredRequests = requests;
-    if (status && status !== 'all') {
-      filteredRequests = requests.filter(
-        (r) => r.status === (status as LeaveStatus),
-      );
-    }
+    // Map portal status filter (lowercase) to DB status (uppercase)
+    const dbStatus =
+      status && status !== 'all'
+        ? (status.toUpperCase() as
+            | 'PENDING'
+            | 'APPROVED'
+            | 'REJECTED'
+            | 'CANCELLED')
+        : undefined;
 
-    // Sort by createdAt descending
-    filteredRequests.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    const dbRequests = await this.leaveRequestRepo.findByStaff(
+      session.staffId,
+      {
+        status: dbStatus,
+        page: pageNum,
+        limit: limitNum,
+      },
     );
 
+    // Map DB LeaveRequest records to portal DTO shape
+    const dtoRequests: LeaveRequestDto[] = dbRequests.map((lr) => ({
+      id: lr.id,
+      type: this.mapLeaveTypeName(lr.leaveTypeName),
+      typeName: lr.leaveTypeName,
+      startDate: lr.startDate,
+      endDate: lr.endDate,
+      days: Number(lr.totalDays),
+      status: lr.status.toLowerCase() as LeaveStatus,
+      reason: lr.reason ?? undefined,
+      createdAt: lr.createdAt,
+      updatedAt: lr.updatedAt,
+    }));
+
     return {
-      data: filteredRequests,
-      total: filteredRequests.length,
-      page: parseInt(page || '1'),
-      limit: parseInt(limit || '20'),
+      data: dtoRequests,
+      total: dtoRequests.length,
+      page: pageNum,
+      limit: limitNum,
     };
   }
 
@@ -538,54 +674,72 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 400, description: 'Invalid request data' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  createLeaveRequest(
+  async createLeaveRequest(
     @CurrentStaff() session: StaffSessionInfo,
     @Body() createDto: CreateLeaveRequestDto,
-  ): LeaveRequestSuccessDto {
+  ): Promise<LeaveRequestSuccessDto> {
     this.logger.log(`Creating leave request for staff: ${session.staff.email}`);
 
     const startDate = new Date(createDto.startDate);
     const endDate = new Date(createDto.endDate);
 
-    // Validate dates
     if (startDate > endDate) {
       throw new BadRequestException('End date must be after start date');
     }
 
-    if (startDate < new Date()) {
-      throw new BadRequestException('Start date cannot be in the past');
+    // Calculate working days (weekends excluded; public holidays not accounted for)
+    const days = this.calculateWorkingDays(startDate, endDate);
+    const hoursPerDay = 8;
+    const totalHours = days * hoursPerDay;
+
+    // Resolve SimplePay leave type ID + name.
+    // Attempts a live lookup from SimplePay. Falls back to static BCEA names with
+    // leaveTypeId=0 when SimplePay is not connected — the ID can be reconciled
+    // when the admin-side sync runs after approval.
+    let leaveTypeId: number =
+      LEAVE_TYPE_FALLBACK[createDto.type]?.leaveTypeId ?? 0;
+    let leaveTypeName: string =
+      LEAVE_TYPE_FALLBACK[createDto.type]?.leaveTypeName ??
+      String(createDto.type);
+
+    try {
+      const spTypes = await this.simplePayLeaveService.getLeaveTypes(
+        session.tenantId,
+      );
+      const matched = this.matchSimplePayLeaveType(createDto.type, spTypes);
+      if (matched) {
+        leaveTypeId = matched.id;
+        leaveTypeName = matched.name;
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Leave type lookup failed for tenant ${session.tenantId}, using fallback name. Reason: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
-    // Calculate working days (simple calculation - doesn't account for holidays)
-    const days = this.calculateWorkingDays(startDate, endDate);
-
-    // Get leave type display name
-    const typeNames: Record<LeaveType, string> = {
-      [LeaveType.ANNUAL]: 'Annual Leave',
-      [LeaveType.SICK]: 'Sick Leave',
-      [LeaveType.FAMILY]: 'Family Responsibility Leave',
-      [LeaveType.UNPAID]: 'Unpaid Leave',
-      [LeaveType.STUDY]: 'Study Leave',
-      [LeaveType.MATERNITY]: 'Maternity Leave',
-      [LeaveType.PATERNITY]: 'Paternity Leave',
-    };
-
-    const newRequest: LeaveRequestDto = {
-      id: `lr-${Date.now()}`,
-      type: createDto.type,
-      typeName: typeNames[createDto.type] || createDto.type,
+    const dbRequest = await this.leaveRequestRepo.create({
+      tenantId: session.tenantId,
+      staffId: session.staffId,
+      leaveTypeId,
+      leaveTypeName,
       startDate,
       endDate,
-      days,
-      status: LeaveStatus.PENDING,
+      totalDays: days,
+      totalHours,
       reason: createDto.reason,
-      createdAt: new Date(),
-    };
+    });
 
-    // Store the request
-    const userRequests = this.mockLeaveRequests.get(session.staffId) || [];
-    userRequests.unshift(newRequest);
-    this.mockLeaveRequests.set(session.staffId, userRequests);
+    const newRequest: LeaveRequestDto = {
+      id: dbRequest.id,
+      type: createDto.type,
+      typeName: leaveTypeName,
+      startDate: dbRequest.startDate,
+      endDate: dbRequest.endDate,
+      days: Number(dbRequest.totalDays),
+      status: LeaveStatus.PENDING,
+      reason: dbRequest.reason ?? undefined,
+      createdAt: dbRequest.createdAt,
+    };
 
     return {
       message: 'Leave request submitted successfully',
@@ -606,39 +760,56 @@ export class StaffPortalController {
   @ApiResponse({ status: 400, description: 'Request cannot be cancelled' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Leave request not found' })
-  cancelLeaveRequest(
+  async cancelLeaveRequest(
     @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
-  ): LeaveRequestSuccessDto {
+  ): Promise<LeaveRequestSuccessDto> {
     this.logger.log(
       `Cancelling leave request ${id} for staff: ${session.staff.email}`,
     );
 
-    const userRequests = this.mockLeaveRequests.get(session.staffId) || [];
-    const requestIndex = userRequests.findIndex((r) => r.id === id);
+    // Verify the leave request belongs to this staff member before cancelling.
+    // LeaveRequestRepository.cancel() uses tenant scoping via findByIdOrThrow
+    // which checks tenantId. We additionally verify staffId to prevent
+    // one staff member cancelling another's request via the portal.
+    const existing = await this.leaveRequestRepo.findById(id, session.tenantId);
 
-    if (requestIndex === -1) {
+    if (!existing) {
       throw new NotFoundException('Leave request not found');
     }
 
-    const request = userRequests[requestIndex];
-
-    if (request.status !== LeaveStatus.PENDING) {
-      throw new BadRequestException(
-        `Cannot cancel a leave request with status: ${request.status}`,
-      );
+    if (existing.staffId !== session.staffId) {
+      throw new NotFoundException('Leave request not found');
     }
 
-    // Update status to cancelled
-    request.status = LeaveStatus.CANCELLED;
-    request.updatedAt = new Date();
+    // Repository enforces REJECTED/CANCELLED guard; maps ConflictException → BadRequestException
+    try {
+      const cancelled = await this.leaveRequestRepo.cancel(
+        id,
+        session.tenantId,
+      );
 
-    this.mockLeaveRequests.set(session.staffId, userRequests);
+      const request: LeaveRequestDto = {
+        id: cancelled.id,
+        type: this.mapLeaveTypeName(cancelled.leaveTypeName),
+        typeName: cancelled.leaveTypeName,
+        startDate: cancelled.startDate,
+        endDate: cancelled.endDate,
+        days: Number(cancelled.totalDays),
+        status: LeaveStatus.CANCELLED,
+        reason: cancelled.reason ?? undefined,
+        createdAt: cancelled.createdAt,
+        updatedAt: cancelled.updatedAt,
+      };
 
-    return {
-      message: 'Leave request cancelled successfully',
-      request,
-    };
+      return {
+        message: 'Leave request cancelled successfully',
+        request,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(msg);
+    }
   }
 
   // ============================================================================
@@ -660,77 +831,48 @@ export class StaffPortalController {
     return count;
   }
 
-  private generateMockLeaveRequests(): LeaveRequestDto[] {
-    const today = new Date();
+  /**
+   * Map a SimplePay leave type name back to the staff-portal LeaveType enum.
+   * Used when converting DB LeaveRequest rows (which store leave type names
+   * from SimplePay) to the portal DTO.
+   */
+  private mapLeaveTypeName(leaveTypeName: string): LeaveType {
+    const lower = leaveTypeName.toLowerCase();
+    if (lower.includes('sick')) return LeaveType.SICK;
+    if (lower.includes('family') || lower.includes('responsibility'))
+      return LeaveType.FAMILY;
+    if (lower.includes('unpaid')) return LeaveType.UNPAID;
+    if (lower.includes('study')) return LeaveType.STUDY;
+    if (lower.includes('maternity')) return LeaveType.MATERNITY;
+    if (lower.includes('paternity') || lower.includes('parental'))
+      return LeaveType.PATERNITY;
+    return LeaveType.ANNUAL;
+  }
 
-    return [
-      {
-        id: 'lr-001',
-        type: LeaveType.ANNUAL,
-        typeName: 'Annual Leave',
-        startDate: new Date(today.getFullYear(), today.getMonth() + 1, 10),
-        endDate: new Date(today.getFullYear(), today.getMonth() + 1, 12),
-        days: 3,
-        status: LeaveStatus.PENDING,
-        reason: 'Family vacation',
-        createdAt: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000),
-      },
-      {
-        id: 'lr-002',
-        type: LeaveType.ANNUAL,
-        typeName: 'Annual Leave',
-        startDate: new Date(today.getFullYear(), today.getMonth() - 1, 15),
-        endDate: new Date(today.getFullYear(), today.getMonth() - 1, 19),
-        days: 5,
-        status: LeaveStatus.APPROVED,
-        reason: 'Personal time off',
-        createdAt: new Date(today.getFullYear(), today.getMonth() - 1, 5),
-        reviewerName: 'Sarah Manager',
-        reviewerComments: 'Approved. Enjoy your break!',
-        reviewedAt: new Date(today.getFullYear(), today.getMonth() - 1, 6),
-      },
-      {
-        id: 'lr-003',
-        type: LeaveType.SICK,
-        typeName: 'Sick Leave',
-        startDate: new Date(today.getFullYear(), today.getMonth() - 2, 8),
-        endDate: new Date(today.getFullYear(), today.getMonth() - 2, 10),
-        days: 3,
-        status: LeaveStatus.APPROVED,
-        reason: 'Flu',
-        createdAt: new Date(today.getFullYear(), today.getMonth() - 2, 8),
-        reviewerName: 'Sarah Manager',
-        reviewedAt: new Date(today.getFullYear(), today.getMonth() - 2, 8),
-      },
-      {
-        id: 'lr-004',
-        type: LeaveType.FAMILY,
-        typeName: 'Family Responsibility Leave',
-        startDate: new Date(today.getFullYear(), today.getMonth() - 3, 20),
-        endDate: new Date(today.getFullYear(), today.getMonth() - 3, 20),
-        days: 1,
-        status: LeaveStatus.APPROVED,
-        reason: "Child's school event",
-        createdAt: new Date(today.getFullYear(), today.getMonth() - 3, 18),
-        reviewerName: 'Sarah Manager',
-        reviewedAt: new Date(today.getFullYear(), today.getMonth() - 3, 18),
-      },
-      {
-        id: 'lr-005',
-        type: LeaveType.ANNUAL,
-        typeName: 'Annual Leave',
-        startDate: new Date(today.getFullYear(), today.getMonth() - 4, 1),
-        endDate: new Date(today.getFullYear(), today.getMonth() - 4, 3),
-        days: 3,
-        status: LeaveStatus.REJECTED,
-        reason: 'Weekend trip',
-        createdAt: new Date(today.getFullYear(), today.getMonth() - 4, -10),
-        reviewerName: 'Sarah Manager',
-        reviewerComments:
-          'Unfortunately this period is during our busiest time. Please consider alternative dates.',
-        reviewedAt: new Date(today.getFullYear(), today.getMonth() - 4, -9),
-      },
-    ];
+  /**
+   * Match a portal LeaveType enum value to a SimplePay leave type entry.
+   * Returns the best-matching SimplePay leave type, or null if none matched.
+   */
+  private matchSimplePayLeaveType(
+    leaveType: LeaveType,
+    spTypes: Array<{ id: number; name: string; accrual_type: string }>,
+  ): { id: number; name: string } | null {
+    const keywords: Record<LeaveType, string[]> = {
+      [LeaveType.ANNUAL]: ['annual'],
+      [LeaveType.SICK]: ['sick'],
+      [LeaveType.FAMILY]: ['family', 'responsibility'],
+      [LeaveType.UNPAID]: ['unpaid'],
+      [LeaveType.STUDY]: ['study'],
+      [LeaveType.MATERNITY]: ['maternity'],
+      [LeaveType.PATERNITY]: ['paternity', 'parental'],
+    };
+
+    const words = keywords[leaveType] ?? [];
+    for (const word of words) {
+      const match = spTypes.find((t) => t.name.toLowerCase().includes(word));
+      if (match) return { id: match.id, name: match.name };
+    }
+    return null;
   }
 
   // ============================================================================
@@ -759,8 +901,23 @@ export class StaffPortalController {
       `Fetching IRP5 documents for staff: ${session.staff.email}, taxYear: ${taxYear || 'all'}`,
     );
 
-    // IRP5 documents are not yet available via SimplePay integration.
-    // They will be populated once SARS tax year processing is implemented.
+    // IRP5 documents are intentionally empty.
+    //
+    // DEFERRED — FOLLOW-UP REQUIRED:
+    // The SimplePay API (as audited 2026-05-01) exposes no IRP5/tax-certificate
+    // endpoint (no /employees/:id/irp5 or /clients/:id/irp5_certificates route
+    // exists in simplepay-api.client.ts or simplepay-reports.service.ts).
+    // IRP5 generation in SA is driven by the EMP501 reconciliation process and
+    // SARS e@syFile — not by the payroll system directly.
+    //
+    // Options when this becomes a priority:
+    //   A) Wait for SimplePay to expose an IRP5 download API.
+    //   B) Generate IRP5 PDFs internally from SimplePayPayslipImport rows
+    //      aggregated per tax year (March–February) using PayeService.
+    //      That requires a new service + schema work — scope for a future task.
+    //
+    // The web page (apps/web/src/app/staff/tax-documents/page.tsx) handles
+    // empty data gracefully (falls back to mock data with a warning banner).
     const currentYear = new Date().getFullYear();
 
     return {
@@ -789,7 +946,8 @@ export class StaffPortalController {
       `Downloading IRP5 PDF for staff: ${session.staff.email}, id: ${id}`,
     );
 
-    // IRP5 PDFs are not yet available via SimplePay integration
+    // IRP5 PDFs are not yet available — see getIRP5Documents() for full rationale.
+    // SimplePay has no IRP5 download endpoint as of 2026-05-01.
     throw new NotFoundException(
       'IRP5 documents are not yet available. They will be available after tax year processing.',
     );

@@ -18,12 +18,14 @@ import {
   Logger,
   HttpCode,
   StreamableFile,
+  NotFoundException as NestNotFoundException,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
 import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiBearerAuth,
   ApiUnauthorizedResponse,
@@ -41,6 +43,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import type { PaymentFilterDto } from '../../database/dto/payment.dto';
+import type { MatchCandidate } from '../../database/dto/payment-matching.dto';
 import {
   ApiAllocatePaymentDto,
   AllocatePaymentResponseDto,
@@ -55,6 +58,21 @@ import {
   ApiArrearsQueryDto,
   ApiArrearsReportResponseDto,
 } from './dto';
+
+/**
+ * Shape returned by GET /payments/:paymentId/suggestions.
+ * Mirrors the PaymentSuggestion interface in apps/web/src/hooks/use-payments.ts.
+ */
+interface PaymentSuggestionDto {
+  invoiceId: string;
+  parentName: string;
+  childName: string;
+  /** Outstanding invoice amount in ZAR decimal (cents / 100) */
+  amount: number;
+  /** Normalised confidence 0-1 (service score 0-100 divided by 100) */
+  confidence: number;
+  reason: string;
+}
 
 @Controller('payments')
 @ApiTags('Payments')
@@ -261,6 +279,101 @@ export class PaymentController {
         totalPages,
       },
     };
+  }
+
+  /**
+   * Get invoice match suggestions for an existing Payment record.
+   *
+   * Looks up the Payment row (tenant-scoped), resolves its bank transaction,
+   * and runs the same scoring pipeline as matchPayments — but read-only:
+   * no Payment rows are created and no Invoice statuses are updated.
+   *
+   * Used by the match-payment-dialog frontend to populate AI suggestions.
+   */
+  @Get(':paymentId/suggestions')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
+  @ApiOperation({
+    summary: 'Get invoice match suggestions for a payment',
+    description:
+      'Returns scored invoice candidates for the bank transaction linked to this payment. ' +
+      'Read-only — does not apply any matches. Candidates are sorted by confidence DESC.',
+  })
+  @ApiParam({ name: 'paymentId', description: 'Payment UUID', type: String })
+  @ApiResponse({
+    status: 200,
+    description: 'Suggestions returned successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          invoiceId: { type: 'string' },
+          parentName: { type: 'string' },
+          childName: { type: 'string' },
+          amount: {
+            type: 'number',
+            description: 'Outstanding invoice amount in ZAR decimal',
+          },
+          confidence: { type: 'number', description: 'Confidence score 0-1' },
+          reason: { type: 'string' },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Payment or linked transaction not found',
+  })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, ACCOUNTANT, or VIEWER role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getPaymentSuggestions(
+    @Param('paymentId') paymentId: string,
+    @CurrentUser() user: IUser,
+  ): Promise<PaymentSuggestionDto[]> {
+    const tenantId = getTenantId(user);
+    this.logger.log(
+      `Get payment suggestions: tenant=${tenantId}, payment=${paymentId}`,
+    );
+
+    // Look up the Payment row, tenant-scoped
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId, isReversed: false },
+      select: { transactionId: true },
+    });
+
+    if (!payment) {
+      throw new NestNotFoundException(`Payment ${paymentId} not found`);
+    }
+
+    if (!payment.transactionId) {
+      // Payment exists but has no linked bank transaction (e.g. manually posted)
+      return [];
+    }
+
+    const candidates: MatchCandidate[] =
+      await this.paymentMatchingService.getSuggestionsForTransaction(
+        tenantId,
+        payment.transactionId,
+      );
+
+    const suggestions: PaymentSuggestionDto[] = candidates.map((c) => ({
+      invoiceId: c.invoiceId,
+      parentName: c.parentName,
+      childName: c.childName,
+      // Frontend expects decimal ZAR, not cents
+      amount: c.invoiceOutstandingCents / 100,
+      // Frontend expects 0-1 range; service scores are 0-100
+      confidence: c.confidenceScore / 100,
+      reason: c.matchReasons.join('; '),
+    }));
+
+    this.logger.log(
+      `Suggestions: ${suggestions.length} candidates for payment=${paymentId}`,
+    );
+
+    return suggestions;
   }
 
   /**

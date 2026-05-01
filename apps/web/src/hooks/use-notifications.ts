@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { apiClient } from '@/lib/api/client';
 import { useNotificationStore } from '@/stores/notification-store';
 import type { NotificationListResponse } from '@/types/notification.types';
@@ -32,7 +33,7 @@ export function useNotifications() {
 export function useUnreadCount() {
   const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
 
-  return useQuery<{ count: number }>({
+  const query = useQuery<{ count: number }>({
     queryKey: NOTIFICATION_KEYS.unreadCount(),
     queryFn: async () => {
       const { data } = await apiClient.get('/notifications/unread-count');
@@ -40,11 +41,15 @@ export function useUnreadCount() {
     },
     refetchInterval: 60_000,
     staleTime: 15_000,
-    select: (data) => {
-      setUnreadCount(data.count);
-      return data;
-    },
   });
+
+  useEffect(() => {
+    if (query.data) {
+      setUnreadCount(query.data.count);
+    }
+  }, [query.data?.count, setUnreadCount]);
+
+  return query;
 }
 
 export function useMarkAsRead() {

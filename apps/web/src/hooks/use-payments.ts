@@ -29,10 +29,6 @@ interface PaymentSuggestion {
   reason: string;
 }
 
-interface MatchPaymentsParams {
-  paymentIds: string[];
-}
-
 interface AllocatePaymentParams {
   paymentId: string;
   /**
@@ -63,31 +59,6 @@ export function usePaymentsList(params?: PaymentListParams) {
   });
 }
 
-// Get unmatched payments
-export function useUnmatchedPayments() {
-  return useQuery<IPayment[], AxiosError>({
-    queryKey: queryKeys.payments.unmatched(),
-    queryFn: async () => {
-      const { data } = await apiClient.get<PaymentsListResponse>(endpoints.payments.list, {
-        params: { status: 'unmatched', limit: 100 },
-      });
-      return data.payments;
-    },
-  });
-}
-
-// Get single payment detail
-export function usePayment(id: string, enabled = true) {
-  return useQuery<IPayment, AxiosError>({
-    queryKey: queryKeys.payments.detail(id),
-    queryFn: async () => {
-      const { data } = await apiClient.get<IPayment>(endpoints.payments.detail(id));
-      return data;
-    },
-    enabled: enabled && !!id,
-  });
-}
-
 // Get matching suggestions for a payment
 export function usePaymentSuggestions(id: string, enabled = true) {
   return useQuery<PaymentSuggestion[], AxiosError>({
@@ -99,34 +70,6 @@ export function usePaymentSuggestions(id: string, enabled = true) {
       return data;
     },
     enabled: enabled && !!id,
-  });
-}
-
-// Match payments automatically
-export function useMatchPayments() {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    { success: boolean; matched: number; unmatched: number },
-    AxiosError,
-    MatchPaymentsParams
-  >({
-    mutationFn: async ({ paymentIds }) => {
-      const { data } = await apiClient.post<{
-        success: boolean;
-        matched: number;
-        unmatched: number;
-      }>(endpoints.payments.match, {
-        paymentIds,
-      });
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.arrears.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
-    },
   });
 }
 

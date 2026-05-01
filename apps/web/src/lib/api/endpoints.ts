@@ -24,7 +24,6 @@ export const endpoints = {
   },
   payments: {
     list: '/payments',
-    detail: (id: string) => `/payments/${id}`,
     match: '/payments/match',
     allocate: (id: string) => `/payments/${id}/allocate`,
     suggestions: (id: string) => `/payments/${id}/suggestions`,

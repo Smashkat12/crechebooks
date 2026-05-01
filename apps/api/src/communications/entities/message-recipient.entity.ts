@@ -3,7 +3,7 @@
  * TASK-COMM-001: Ad-hoc Communication Database Schema
  *
  * Handles CRUD operations for message recipients within a broadcast.
- * Tracks delivery status across all channels (email, WhatsApp, SMS).
+ * Tracks delivery status across all channels (email, WhatsApp).
  */
 
 import { Injectable, Logger } from '@nestjs/common';

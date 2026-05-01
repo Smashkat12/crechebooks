@@ -71,11 +71,6 @@ export class ParentFilterDto {
   @IsOptional()
   @IsBoolean()
   whatsapp_opt_in?: boolean;
-
-  @ApiPropertyOptional({ description: 'Filter by SMS opt-in status' })
-  @IsOptional()
-  @IsBoolean()
-  sms_opt_in?: boolean;
 }
 
 /**

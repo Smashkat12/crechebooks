@@ -55,10 +55,6 @@ export class ParentFilterDto {
   @IsOptional()
   @IsBoolean()
   whatsappOptIn?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  smsOptIn?: boolean;
 }
 
 /**

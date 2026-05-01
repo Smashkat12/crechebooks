@@ -56,6 +56,8 @@ import {
   ParentChildUpdateResponseDto,
 } from './dto/update-parent-child.dto';
 import { InvoicePdfService } from '../../database/services/invoice-pdf.service';
+import { StatementPdfService } from '../../database/services/statement-pdf.service';
+import { PaymentReceiptService } from '../../database/services/payment-receipt.service';
 
 @ApiTags('Parent Portal')
 @ApiBearerAuth()
@@ -70,6 +72,8 @@ export class ParentPortalController {
     private readonly parentOnboarding: ParentOnboardingService,
     private readonly parentPortalChild: ParentPortalChildService,
     private readonly invoicePdfService: InvoicePdfService,
+    private readonly statementPdfService: StatementPdfService,
+    private readonly paymentReceiptService: PaymentReceiptService,
   ) {}
 
   // ============================================================================
@@ -1082,13 +1086,14 @@ export class ParentPortalController {
   @ApiParam({ name: 'month', description: 'Statement month (1-12)' })
   @ApiResponse({ status: 200, description: 'PDF file' })
   @ApiResponse({ status: 404, description: 'Statement not found' })
-  downloadStatementPdf(
+  async downloadStatementPdf(
     @CurrentParent() session: ParentSession,
     @Param('year') yearParam: string,
     @Param('month') monthParam: string,
     @Res() res: Response,
-  ): void {
+  ): Promise<void> {
     const parentId = session.parentId;
+    const tenantId = session.tenantId;
     const year = parseInt(yearParam, 10);
     const month = parseInt(monthParam, 10);
 
@@ -1100,14 +1105,54 @@ export class ParentPortalController {
       `Downloading PDF for statement ${year}/${month}, parent ${parentId}`,
     );
 
-    // TODO: Integrate with actual PDF generation service
-    // For now, return a placeholder response
-    res.setHeader('Content-Type', 'application/json');
-    res.status(501).json({
-      message: 'Statement PDF generation not yet implemented',
-      period: `${this.getMonthName(month)} ${year}`,
-      hint: 'Integration with PDF service pending',
+    // Derive period boundaries for the requested month
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Look up the Statement DB record scoped to this parent + tenant + period.
+    // Ownership is enforced by including parentId in the WHERE clause — a
+    // statement belonging to another parent returns null and we respond 404
+    // without leaking existence.
+    const statement = await this.prisma.statement.findFirst({
+      where: {
+        tenantId,
+        parentId,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
+      },
+      orderBy: { createdAt: 'desc' },
     });
+
+    if (!statement) {
+      res.status(404).json({ message: 'Statement not found' });
+      return;
+    }
+
+    try {
+      const pdfBuffer = await this.statementPdfService.generatePdf(
+        tenantId,
+        statement.id,
+      );
+
+      const filename = `${statement.statementNumber}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+
+      this.logger.log(
+        `Statement PDF downloaded for statement ${statement.statementNumber}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate PDF for statement ${statement.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      res.status(500).json({ message: 'Failed to generate PDF' });
+    }
   }
 
   @Post('statements/:year/:month/email')
@@ -1317,6 +1362,7 @@ export class ParentPortalController {
             },
           },
         },
+        receipt: { select: { paymentId: true } },
       },
     });
 
@@ -1348,7 +1394,9 @@ export class ParentPortalController {
       method: payment.matchType || 'EFT',
       status: this.mapPaymentStatus(payment.deletedAt, payment.paymentDate),
       allocations,
-      hasReceipt: false, // TODO: Implement receipt generation
+      // True when a persisted receipt already exists in S3; false means one
+      // can still be generated on demand via GET payments/:id/receipt
+      hasReceipt: !!payment.receipt,
       notes: undefined,
     };
   }
@@ -1361,8 +1409,8 @@ export class ParentPortalController {
   async downloadPaymentReceipt(
     @CurrentParent() session: ParentSession,
     @Param('id') paymentId: string,
-    @Res() res: Response,
-  ): Promise<void> {
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
     const parentId = session.parentId;
     const tenantId = session.tenantId;
 
@@ -1370,7 +1418,8 @@ export class ParentPortalController {
       `Downloading receipt for payment ${paymentId}, parent ${parentId}`,
     );
 
-    // Verify payment belongs to this parent
+    // Verify payment belongs to this parent (parent → invoice → payment chain).
+    // Returns null for not-found OR ownership/tenant mismatch — no existence leak.
     const payment = await this.prisma.payment.findFirst({
       where: {
         id: paymentId,
@@ -1383,13 +1432,28 @@ export class ParentPortalController {
       throw new NotFoundException('Payment not found');
     }
 
-    // TODO: Integrate with actual PDF generation service
-    res.setHeader('Content-Type', 'application/json');
-    res.status(501).json({
-      message: 'Receipt generation not yet implemented',
-      paymentId: payment.id,
-      hint: 'Integration with PDF service pending',
+    // Cache-or-generate receipt, then stream from S3 — mirrors the admin
+    // GET /payments/:paymentId/receipt pattern in payment.controller.ts
+    const receipt = await this.paymentReceiptService.getOrGenerateReceipt(
+      tenantId,
+      paymentId,
+    );
+
+    const stream = await this.paymentReceiptService.streamReceipt(
+      tenantId,
+      receipt.s3Key,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${receipt.receiptNumber}.pdf"`,
     });
+
+    this.logger.log(
+      `Streaming receipt ${receipt.receiptNumber} for payment ${paymentId} (cached=${receipt.cached})`,
+    );
+
+    return new StreamableFile(stream);
   }
 
   @Get('bank-details')

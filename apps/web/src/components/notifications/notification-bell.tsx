@@ -11,7 +11,9 @@ import { NotificationPanel } from './notification-panel';
 import { useMobile } from '@/hooks/use-mobile';
 
 export function NotificationBell() {
-  const { unreadCount, isOpen, setOpen } = useNotificationStore();
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const isOpen = useNotificationStore((s) => s.isOpen);
+  const setOpen = useNotificationStore((s) => s.setOpen);
   useUnreadCount();
   // Live notifications via WebSocket are temporarily disabled. The dashboard
   // socket entered a tight reconnect loop on Railway that drove React into a

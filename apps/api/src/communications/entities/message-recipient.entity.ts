@@ -39,7 +39,6 @@ export class MessageRecipientEntity {
         recipientPhone: r.recipientPhone,
         emailStatus: r.recipientEmail ? DeliveryStatus.PENDING : null,
         whatsappStatus: r.recipientPhone ? DeliveryStatus.PENDING : null,
-        smsStatus: r.recipientPhone ? DeliveryStatus.PENDING : null,
       })),
       skipDuplicates: true,
     });
@@ -166,47 +165,6 @@ export class MessageRecipientEntity {
   }
 
   /**
-   * Update SMS delivery status
-   */
-  async updateSmsStatus(
-    broadcastId: string,
-    recipientId: string,
-    status: DeliveryStatus,
-    messageId?: string,
-    error?: string,
-  ): Promise<MessageRecipient> {
-    this.logger.debug(
-      `Updating SMS status for recipient ${recipientId}: ${status}`,
-    );
-
-    const updateData: Prisma.MessageRecipientUpdateInput = {
-      smsStatus: status,
-    };
-
-    if (messageId) {
-      updateData.smsMessageId = messageId;
-    }
-
-    if (status === DeliveryStatus.SENT) {
-      updateData.smsSentAt = new Date();
-    }
-
-    if (status === DeliveryStatus.FAILED) {
-      updateData.lastError = error;
-    }
-
-    return this.prisma.messageRecipient.update({
-      where: {
-        broadcastId_recipientId: {
-          broadcastId,
-          recipientId,
-        },
-      },
-      data: updateData,
-    });
-  }
-
-  /**
    * Mark recipient as failed on all channels
    */
   async markFailed(id: string, error: string): Promise<MessageRecipient> {
@@ -230,9 +188,6 @@ export class MessageRecipientEntity {
     }
     if (recipient.whatsappStatus === DeliveryStatus.PENDING) {
       updateData.whatsappStatus = DeliveryStatus.FAILED;
-    }
-    if (recipient.smsStatus === DeliveryStatus.PENDING) {
-      updateData.smsStatus = DeliveryStatus.FAILED;
     }
 
     return this.prisma.messageRecipient.update({
@@ -264,7 +219,6 @@ export class MessageRecipientEntity {
       select: {
         emailStatus: true,
         whatsappStatus: true,
-        smsStatus: true,
       },
     });
 
@@ -278,9 +232,6 @@ export class MessageRecipientEntity {
       whatsappDelivered: 0,
       whatsappRead: 0,
       whatsappFailed: 0,
-      smsSent: 0,
-      smsDelivered: 0,
-      smsFailed: 0,
     };
 
     for (const recipient of recipients) {
@@ -328,23 +279,6 @@ export class MessageRecipientEntity {
             break;
         }
       }
-
-      // SMS stats
-      if (recipient.smsStatus) {
-        const smsStatus = recipient.smsStatus as DeliveryStatus;
-        switch (smsStatus) {
-          case DeliveryStatus.SENT:
-            stats.smsSent++;
-            break;
-          case DeliveryStatus.DELIVERED:
-            stats.smsSent++;
-            stats.smsDelivered++;
-            break;
-          case DeliveryStatus.FAILED:
-            stats.smsFailed++;
-            break;
-        }
-      }
     }
 
     return stats;
@@ -366,7 +300,6 @@ export class MessageRecipientEntity {
         OR: [
           { emailStatus: DeliveryStatus.FAILED },
           { whatsappStatus: DeliveryStatus.FAILED },
-          { smsStatus: DeliveryStatus.FAILED },
         ],
       },
     });
@@ -382,7 +315,6 @@ export class MessageRecipientEntity {
         OR: [
           { emailStatus: DeliveryStatus.PENDING },
           { whatsappStatus: DeliveryStatus.PENDING },
-          { smsStatus: DeliveryStatus.PENDING },
         ],
       },
     });

@@ -186,10 +186,7 @@ export class RecipientResolverService {
     // Channel-specific filtering
     if (channel === CommunicationChannel.EMAIL) {
       where.email = { not: null };
-    } else if (
-      channel === CommunicationChannel.WHATSAPP ||
-      channel === CommunicationChannel.SMS
-    ) {
+    } else if (channel === CommunicationChannel.WHATSAPP) {
       where.phone = { not: null };
     }
 

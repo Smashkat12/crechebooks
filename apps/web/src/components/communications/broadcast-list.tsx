@@ -7,7 +7,7 @@
 
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
-import { Mail, MessageSquare, Phone, Users, Clock, CheckCircle, XCircle, AlertCircle, Send } from 'lucide-react';
+import { Mail, MessageSquare, Users, Clock, CheckCircle, XCircle, AlertCircle, Send } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -47,8 +47,6 @@ function ChannelIcon({ channel }: { channel: string }) {
       return <Mail className="h-4 w-4 text-blue-500" />;
     case 'whatsapp':
       return <MessageSquare className="h-4 w-4 text-green-500" />;
-    case 'sms':
-      return <Phone className="h-4 w-4 text-purple-500" />;
     case 'all':
       return <Users className="h-4 w-4 text-orange-500" />;
     default:

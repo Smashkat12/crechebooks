@@ -134,7 +134,7 @@ export class RecipientFilterDto {
  */
 export class CreateBroadcastDto {
   @ApiPropertyOptional({
-    description: 'Email subject line (optional for WhatsApp/SMS)',
+    description: 'Email subject line (optional for WhatsApp)',
     maxLength: 200,
   })
   @IsOptional()

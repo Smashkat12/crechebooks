@@ -2,7 +2,7 @@
 
 import { type LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 interface MetricCardProps {
   title: string;

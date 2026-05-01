@@ -25,7 +25,7 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { useSupplier, useSupplierStatement, type SupplierBill } from '@/hooks/use-suppliers';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 
 function getBillStatusBadge(status: SupplierBill['status']) {
   switch (status) {

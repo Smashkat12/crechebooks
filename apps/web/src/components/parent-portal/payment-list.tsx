@@ -25,7 +25,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
-import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { cn } from '@/lib/utils';
 import type { ParentPaymentListItem, ParentPaymentStatus } from '@/hooks/parent-portal/use-parent-payments';
 
 interface PaymentListProps {

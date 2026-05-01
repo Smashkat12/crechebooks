@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import type { SupplierBill } from '@/hooks/use-suppliers';
 
 interface BillTableProps {

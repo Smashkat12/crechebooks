@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DataTableColumnHeader } from '@/components/tables/data-table-column-header';
 import { QuoteStatusBadge } from './quote-status-badge';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import type { Quote } from '@/hooks/use-quotes';
 
 interface QuoteColumnsOptions {

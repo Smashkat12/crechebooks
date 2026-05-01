@@ -10,7 +10,7 @@
  */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
 import {
   calculateInvoiceVAT,
   DEFAULT_VAT_RATE,

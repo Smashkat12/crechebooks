@@ -36,7 +36,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils/format';
 import { useParentChild } from '@/hooks/parent-portal/use-parent-profile';
 import { formatFullName } from '@/lib/utils/name-formatter';
 

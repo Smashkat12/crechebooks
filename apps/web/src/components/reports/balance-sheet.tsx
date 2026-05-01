@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { formatCurrency } from '@/lib/utils/format';
-import { cn } from '@/lib/utils';
 import { ReportHeader } from './report-header';
 import { ExportButtons, ExportFormat } from './export-buttons';
 

@@ -32,7 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { formatCurrency, formatDate, cn } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { useParentPayment, useDownloadPaymentReceipt } from '@/hooks/parent-portal/use-parent-payments';
 import type { ParentPaymentStatus } from '@/hooks/parent-portal/use-parent-payments';
 import { useState } from 'react';

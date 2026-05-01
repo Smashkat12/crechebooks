@@ -38,7 +38,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import type { Quote, CreateQuoteDto } from '@/hooks/use-quotes';
 import type { FeeStructure } from '@/hooks/use-fee-structures';
 

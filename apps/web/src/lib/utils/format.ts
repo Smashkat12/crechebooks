@@ -5,11 +5,11 @@
 
 /**
  * Format a number as South African Rand (ZAR)
- * @param amount - The amount to format (null/undefined returns R 0.00)
+ * @param amount - The amount to format (null/undefined/NaN returns R 0.00)
  * @returns Formatted currency string (e.g., "R 1,234.56")
  */
 export function formatCurrency(amount: number | null | undefined): string {
-  if (amount == null) return 'R 0.00';
+  if (amount == null || isNaN(amount)) return 'R 0.00';
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
     currency: 'ZAR',

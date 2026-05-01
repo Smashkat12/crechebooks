@@ -37,7 +37,7 @@ import {
   ConvertQuoteDialog,
 } from '@/components/accounting/quote-actions';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 export default function QuotesPage() {
   const { toast } = useToast();

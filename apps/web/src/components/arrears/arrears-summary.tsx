@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrearsRow } from "./arrears-columns";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/format";
 import { DollarSign, Clock, AlertTriangle, AlertCircle } from "lucide-react";
 
 interface ArrearsSummaryProps {

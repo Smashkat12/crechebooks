@@ -5,6 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { apiClient, setAuthToken } from '@/lib/api/client';
 
 // Types matching backend DTOs
@@ -162,12 +163,17 @@ export function useEndImpersonation() {
  * Hook to get current impersonation session
  */
 export function useCurrentImpersonation() {
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+
   return useQuery({
     queryKey: ['admin', 'impersonate', 'current'],
     queryFn: async (): Promise<CurrentImpersonationResponse> => {
       const { data } = await apiClient.get('/admin/impersonate/current');
       return data;
     },
+    // Only fire for SUPER_ADMIN — all other roles get 403 from this endpoint
+    enabled: role === 'SUPER_ADMIN',
     // Refresh every minute to keep time remaining accurate
     refetchInterval: 60000,
     // Don't refetch on window focus to avoid unnecessary API calls

@@ -13,7 +13,4 @@ export { DecisionLogger } from './decision-logger';
 export { SdkCategorizer } from './sdk-categorizer';
 export * from './interfaces/categorizer.interface';
 export * from './interfaces/sdk-categorizer.interface';
-export {
-  CATEGORIZER_SYSTEM_PROMPT,
-  buildTenantPromptContext,
-} from './categorizer-prompt';
+export { CATEGORIZER_SYSTEM_PROMPT } from './categorizer-prompt';

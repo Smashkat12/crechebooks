@@ -10,7 +10,6 @@ import type { SdkAgentFactory } from '../../sdk/sdk-agent.factory';
 import type { SdkConfigService } from '../../sdk/sdk-config';
 import type { ClaudeClientService } from '../../sdk/claude-client.service';
 import type { PrismaService } from '../../../database/prisma/prisma.service';
-import type { RuvectorService } from '../../sdk/ruvector.service';
 
 // ─────────────────────────────────────────────────────────────────────
 // Helpers
@@ -111,7 +110,6 @@ describe('ConversationalAgent — LLM wiring', () => {
       agent = new ConversationalAgent(
         factory,
         config,
-        undefined as unknown as RuvectorService,
         prisma as unknown as PrismaService,
         validator,
         claudeClient,
@@ -194,7 +192,6 @@ describe('ConversationalAgent — LLM wiring', () => {
       const agent = new ConversationalAgent(
         factory,
         config,
-        undefined as unknown as RuvectorService,
         prisma as unknown as PrismaService,
         validator,
         unavailable,
@@ -211,7 +208,6 @@ describe('ConversationalAgent — LLM wiring', () => {
       const agent = new ConversationalAgent(
         factory,
         disabledConfig,
-        undefined as unknown as RuvectorService,
         prisma as unknown as PrismaService,
         validator,
         claudeClient,
@@ -227,7 +223,6 @@ describe('ConversationalAgent — LLM wiring', () => {
       const agent = new ConversationalAgent(
         factory,
         config,
-        undefined as unknown as RuvectorService,
         prisma as unknown as PrismaService,
         validator,
         undefined,
@@ -246,7 +241,6 @@ describe('ConversationalAgent — LLM wiring', () => {
       const agent = new ConversationalAgent(
         factory,
         config,
-        undefined as unknown as RuvectorService,
         prisma as unknown as PrismaService,
         validator,
         claudeClient,

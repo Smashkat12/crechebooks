@@ -22,13 +22,11 @@ export enum RecipientType {
  * Communication channels for message delivery
  * - EMAIL: Send via email (Mailgun)
  * - WHATSAPP: Send via WhatsApp Business API
- * - SMS: Send via SMS (Africa's Talking)
  * - ALL: Send via all available channels per recipient preference
  */
 export enum CommunicationChannel {
   EMAIL = 'email',
   WHATSAPP = 'whatsapp',
-  SMS = 'sms',
   ALL = 'all',
 }
 
@@ -130,7 +128,7 @@ export interface ResolvedRecipient {
   name: string;
   /** Email address (if available) */
   email?: string;
-  /** Phone number for SMS/WhatsApp (if available) */
+  /** Phone number for WhatsApp (if available) */
   phone?: string;
   /** Preferred contact method */
   preferredContact?: string;
@@ -158,12 +156,6 @@ export interface DeliveryStats {
   whatsappRead: number;
   /** Number of WhatsApp messages failed */
   whatsappFailed: number;
-  /** Number of SMS messages sent */
-  smsSent: number;
-  /** Number of SMS messages delivered */
-  smsDelivered: number;
-  /** Number of SMS messages failed */
-  smsFailed: number;
 }
 
 /**

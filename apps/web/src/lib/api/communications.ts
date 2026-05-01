@@ -12,7 +12,7 @@ export interface BroadcastMessage {
   subject?: string;
   body: string;
   recipient_type: 'parent' | 'staff' | 'custom';
-  channel: 'email' | 'whatsapp' | 'sms' | 'all';
+  channel: 'email' | 'whatsapp' | 'all';
   status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
   total_recipients: number;
   sent_count: number;
@@ -39,9 +39,6 @@ export interface DeliveryStats {
   whatsapp_delivered?: number;
   whatsapp_read?: number;
   whatsapp_failed?: number;
-  sms_sent?: number;
-  sms_delivered?: number;
-  sms_failed?: number;
 }
 
 export interface RecipientFilter {
@@ -88,7 +85,7 @@ export interface CreateBroadcastDto {
   recipient_type: 'parent' | 'staff' | 'custom';
   recipient_filter?: RecipientFilter;
   recipient_group_id?: string;
-  channel: 'email' | 'whatsapp' | 'sms' | 'all';
+  channel: 'email' | 'whatsapp' | 'all';
   scheduled_at?: string;
 }
 

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { AxiosError } from 'axios';
 import {
   fetchAdminThreads,
@@ -33,13 +34,25 @@ const adminMessageKeys = {
   unknown: () => [...adminMessageKeys.all, 'unknown'] as const,
 };
 
+// ─── Role guard ───────────────────────────────────────────────────────────────
+
+const ADMIN_ROLES = new Set(['ADMIN', 'OWNER', 'SUPER_ADMIN']);
+
+function useIsAdminRole(): boolean {
+  const { data: session } = useSession();
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  return role !== undefined && ADMIN_ROLES.has(role);
+}
+
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export function useAdminThreads(params?: AdminThreadsParams) {
+  const isAdmin = useIsAdminRole();
   return useQuery<AdminThreadsResponse, AxiosError>({
     queryKey: adminMessageKeys.threadList(params),
     queryFn: () => fetchAdminThreads(params),
-    staleTime: 4 * 1000,
+    enabled: isAdmin,
+    staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
     refetchIntervalInBackground: false,
   });
@@ -49,21 +62,24 @@ export function useAdminThread(
   parentId: string,
   params?: AdminThreadParams,
 ) {
+  const isAdmin = useIsAdminRole();
   return useQuery<AdminThreadResponse, AxiosError>({
     queryKey: adminMessageKeys.thread(parentId, params),
     queryFn: () => fetchAdminThread(parentId, params),
-    enabled: !!parentId,
-    staleTime: 4 * 1000,
+    enabled: isAdmin && !!parentId,
+    staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
     refetchIntervalInBackground: false,
   });
 }
 
 export function useUnknownMessages() {
+  const isAdmin = useIsAdminRole();
   return useQuery<UnknownMessage[], AxiosError>({
     queryKey: adminMessageKeys.unknown(),
     queryFn: fetchUnknownMessages,
-    staleTime: 4 * 1000,
+    enabled: isAdmin,
+    staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
     refetchIntervalInBackground: false,
   });

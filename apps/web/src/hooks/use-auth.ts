@@ -15,7 +15,7 @@
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
-import { resetAuthState, clearAuthState, apiClient } from '@/lib/api/client';
+import { resetAuthState, clearAuthState, apiClient, setAuthToken } from '@/lib/api/client';
 
 export function useAuth() {
   const { data: session, status } = useSession();
@@ -23,11 +23,25 @@ export function useAuth() {
 
   // TASK-UI-001: Reset auth state when session is authenticated
   // No localStorage storage - cookies handle authentication automatically
+  //
+  // ALSO sync the NextAuth session's accessToken into apiClient's in-memory
+  // authToken. Without this, the request interceptor races on `await
+  // getSession()` for every call during the first paint — the dashboard fans
+  // out a dozen parallel queries and any whose interceptor returns from
+  // getSession() before NextAuth has hydrated ship without a Bearer header
+  // and come back as 401 "Authorization token required". The user-visible
+  // symptom is "some routes work, some don't" plus a dashboard stuck in
+  // skeleton state because React Query's retry budget swallows the time.
   useEffect(() => {
     if (status === 'authenticated') {
-      resetAuthState(); // Reset 401 handling flag on successful auth
+      resetAuthState();
+      if (session?.accessToken) {
+        setAuthToken(session.accessToken as string);
+      }
+    } else if (status === 'unauthenticated') {
+      setAuthToken(null);
     }
-  }, [status]);
+  }, [status, session?.accessToken]);
 
   const login = useCallback(
     async (email: string, password: string) => {

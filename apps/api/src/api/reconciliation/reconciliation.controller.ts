@@ -44,10 +44,7 @@ import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { ReconciliationService } from '../../database/services/reconciliation.service';
 import { FinancialReportService } from '../../database/services/financial-report.service';
-import { BalanceSheetService } from '../../database/services/balance-sheet.service';
-import { AuditLogService } from '../../database/services/audit-log.service';
 import { BankStatementReconciliationService } from '../../database/services/bank-statement-reconciliation.service';
-import { ComparativeBalanceSheetService } from '../../database/services/comparative-balance-sheet.service';
 import { AccruedBankChargeService } from '../../database/services/accrued-bank-charge.service';
 import { XeroTransactionSplitService } from '../../database/services/xero-transaction-split.service';
 import { FeeInflationCorrectionService } from '../../database/services/fee-inflation-correction.service';
@@ -116,11 +113,8 @@ export class ReconciliationController {
   constructor(
     private readonly reconciliationService: ReconciliationService,
     private readonly financialReportService: FinancialReportService,
-    private readonly balanceSheetService: BalanceSheetService,
-    private readonly auditLogService: AuditLogService,
     private readonly discrepancyService: DiscrepancyService,
     private readonly bankStatementReconciliationService: BankStatementReconciliationService,
-    private readonly comparativeBalanceSheetService: ComparativeBalanceSheetService,
     private readonly splitTransactionMatcherService: SplitTransactionMatcherService,
     private readonly accruedBankChargeService: AccruedBankChargeService,
     private readonly xeroTransactionSplitService: XeroTransactionSplitService,

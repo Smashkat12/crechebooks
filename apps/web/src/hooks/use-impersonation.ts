@@ -4,6 +4,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { apiClient, setAuthToken } from '@/lib/api/client';
 
 // Types matching backend DTOs
@@ -93,6 +94,7 @@ export function useTenantsForImpersonation(search?: string) {
  */
 export function useStartImpersonation() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   return useMutation({
     mutationFn: async (request: StartImpersonationRequest): Promise<ImpersonationResponse> => {
@@ -110,12 +112,14 @@ export function useStartImpersonation() {
       }
 
       // Clear all cached queries to avoid using stale data with old context
-      // Don't refetch immediately - let the new page load fresh
       queryClient.clear();
 
-      // Navigate to dashboard with impersonation active
-      // Use window.location to ensure a full page reload with fresh cookies
-      window.location.href = '/dashboard';
+      // Soft-navigate so the in-memory bearer token survives. Earlier this used
+      // window.location.href, which forced a full reload that wiped the module-
+      // level authToken set above; the page would then fall back to the original
+      // super-admin JWT from the NextAuth session, every tenant endpoint would
+      // 403, and the impersonated dashboard hung in skeleton state.
+      router.push('/dashboard');
     },
   });
 }

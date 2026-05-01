@@ -7,14 +7,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useNotificationStore } from '@/stores/notification-store';
 import { useUnreadCount } from '@/hooks/use-notifications';
-import { useNotificationSocket } from '@/hooks/use-notification-socket';
 import { NotificationPanel } from './notification-panel';
 import { useMobile } from '@/hooks/use-mobile';
 
 export function NotificationBell() {
   const { unreadCount, isOpen, setOpen } = useNotificationStore();
   useUnreadCount();
-  useNotificationSocket();
+  // Live notifications via WebSocket are temporarily disabled. The dashboard
+  // socket entered a tight reconnect loop on Railway that drove React into a
+  // runaway re-render and froze every authenticated page. useUnreadCount's
+  // periodic refetch keeps the badge accurate via plain HTTP until we fix
+  // the underlying socket flow.
 
   const isMobile = useMobile();
 

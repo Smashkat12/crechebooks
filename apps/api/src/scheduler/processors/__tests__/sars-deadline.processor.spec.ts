@@ -3,10 +3,12 @@
  * TASK-SARS-017: SARS Deadline Reminder System
  */
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SarsDeadlineProcessor } from '../sars-deadline.processor';
 import { SarsDeadlineService } from '../../../sars/sars-deadline.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+import { EmailService } from '../../../integrations/email/email.service';
 import {
   DEFAULT_REMINDER_DAYS,
   SARS_DEADLINE_CALENDAR,
@@ -18,6 +20,8 @@ describe('SarsDeadlineProcessor', () => {
   let mockDeadlineService: any;
   let mockAuditLogService: any;
   let mockPrisma: any;
+  let mockEmailService: any;
+  let mockEventEmitter: any;
 
   const tenantId = 'tenant-123';
 
@@ -30,7 +34,7 @@ describe('SarsDeadlineProcessor', () => {
     };
 
     mockAuditLogService = {
-      logAction: jest.fn(),
+      logAction: jest.fn().mockResolvedValue({}),
     };
 
     mockPrisma = {
@@ -39,12 +43,24 @@ describe('SarsDeadlineProcessor', () => {
       },
     };
 
+    mockEmailService = {
+      sendEmailWithOptions: jest
+        .fn()
+        .mockResolvedValue({ messageId: 'msg-001', status: 'sent' }),
+    };
+
+    mockEventEmitter = {
+      emit: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SarsDeadlineProcessor,
         { provide: SarsDeadlineService, useValue: mockDeadlineService },
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: EventEmitter2, useValue: mockEventEmitter },
       ],
     }).compile();
 
@@ -153,6 +169,109 @@ describe('SarsDeadlineProcessor', () => {
       await processor.processJob(mockJob as any);
 
       expect(mockDeadlineService.shouldSendReminder).toHaveBeenCalledTimes(2);
+    });
+
+    it('should call EmailService.sendEmailWithOptions and audit log on email channel', async () => {
+      const deadline = {
+        type: 'EMP201' as const,
+        deadline: new Date('2024-02-07'),
+        daysRemaining: 7,
+        period: '2024-01',
+        isSubmitted: false,
+      };
+
+      mockDeadlineService.getUpcomingDeadlines.mockResolvedValue([deadline]);
+      mockDeadlineService.shouldSendReminder.mockResolvedValue(true);
+      mockDeadlineService.getReminderPreferences.mockResolvedValue({
+        reminderDays: [...DEFAULT_REMINDER_DAYS],
+        channels: ['email'],
+        recipientEmails: ['admin@example.com'],
+        enabled: true,
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@example.com',
+      });
+      mockEmailService.sendEmailWithOptions.mockResolvedValue({
+        messageId: 'mg-123',
+        status: 'sent',
+      });
+
+      await processor.processJob(mockJob as any);
+
+      expect(mockEmailService.sendEmailWithOptions).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'admin@example.com',
+          subject: expect.stringContaining('EMP201'),
+          tags: expect.arrayContaining(['sars-deadline-reminder', 'emp201']),
+          customVariables: expect.objectContaining({
+            tenantId,
+            deadlineType: 'EMP201',
+            period: '2024-01',
+          }),
+        }),
+      );
+
+      // Audit log recorded for send attempt
+      expect(mockAuditLogService.logAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId,
+          entityType: 'SarsDeadlineReminder',
+          entityId: 'EMP201-2024-01',
+          afterValue: expect.objectContaining({
+            deadlineType: 'EMP201',
+            period: '2024-01',
+            status: 'sent',
+          }),
+        }),
+      );
+    });
+
+    it('should audit log with comms_disabled status when COMMS_DISABLED gate fires', async () => {
+      const deadline = {
+        type: 'VAT201' as const,
+        deadline: new Date('2024-03-25'),
+        daysRemaining: 3,
+        period: '2024-02',
+        isSubmitted: false,
+      };
+
+      mockDeadlineService.getUpcomingDeadlines.mockResolvedValue([deadline]);
+      mockDeadlineService.shouldSendReminder.mockResolvedValue(true);
+      mockDeadlineService.getReminderPreferences.mockResolvedValue({
+        reminderDays: [...DEFAULT_REMINDER_DAYS],
+        channels: ['email'],
+        recipientEmails: ['admin@example.com'],
+        enabled: true,
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@example.com',
+      });
+
+      // EmailService returns the comms-disabled sentinel value
+      mockEmailService.sendEmailWithOptions.mockResolvedValue({
+        messageId: 'comms-disabled-noop',
+        status: 'sent',
+      });
+
+      await processor.processJob(mockJob as any);
+
+      // sendEmailWithOptions was still called (guard is inside EmailService)
+      expect(mockEmailService.sendEmailWithOptions).toHaveBeenCalled();
+
+      // Audit log records comms_disabled outcome
+      expect(mockAuditLogService.logAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId,
+          entityType: 'SarsDeadlineReminder',
+          entityId: 'VAT201-2024-02',
+          afterValue: expect.objectContaining({
+            deadlineType: 'VAT201',
+            status: 'comms_disabled',
+          }),
+        }),
+      );
     });
   });
 });

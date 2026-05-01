@@ -61,6 +61,8 @@ import {
   ProfileUpdateSuccessDto,
   BankingDetailsDto,
 } from './dto/staff-profile.dto';
+import { Irp5PortalService } from './irp5-portal.service';
+import { Irp5PdfService } from './irp5-pdf.service';
 import { StaffOnboardingService } from '../../database/services/staff-onboarding.service';
 import { StaffDocumentService } from '../../database/services/staff-document.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -137,6 +139,8 @@ export class StaffPortalController {
     private readonly storageService: StorageService,
     private readonly simplePayLeaveService: SimplePayLeaveService,
     private readonly leaveRequestRepo: LeaveRequestRepository,
+    private readonly irp5PortalService: Irp5PortalService,
+    private readonly irp5PdfService: Irp5PdfService,
   ) {}
 
   @Get('dashboard')
@@ -885,7 +889,7 @@ export class StaffPortalController {
   @ApiQuery({
     name: 'taxYear',
     required: false,
-    description: 'Filter by tax year',
+    description: 'Filter by tax year (numeric, e.g. 2026)',
   })
   @ApiResponse({
     status: 200,
@@ -893,44 +897,44 @@ export class StaffPortalController {
     type: IRP5ListResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getIRP5Documents(
+  async getIRP5Documents(
     @CurrentStaff() session: StaffSessionInfo,
     @Query('taxYear') taxYear?: string,
-  ): IRP5ListResponseDto {
+  ): Promise<IRP5ListResponseDto> {
     this.logger.log(
       `Fetching IRP5 documents for staff: ${session.staff.email}, taxYear: ${taxYear || 'all'}`,
     );
 
-    // IRP5 documents are intentionally empty.
-    //
-    // DEFERRED — FOLLOW-UP REQUIRED:
-    // The SimplePay API (as audited 2026-05-01) exposes no IRP5/tax-certificate
-    // endpoint (no /employees/:id/irp5 or /clients/:id/irp5_certificates route
-    // exists in simplepay-api.client.ts or simplepay-reports.service.ts).
-    // IRP5 generation in SA is driven by the EMP501 reconciliation process and
-    // SARS e@syFile — not by the payroll system directly.
-    //
-    // Options when this becomes a priority:
-    //   A) Wait for SimplePay to expose an IRP5 download API.
-    //   B) Generate IRP5 PDFs internally from SimplePayPayslipImport rows
-    //      aggregated per tax year (March–February) using PayeService.
-    //      That requires a new service + schema work — scope for a future task.
-    //
-    // The web page (apps/web/src/app/staff/tax-documents/page.tsx) handles
-    // empty data gracefully (falls back to mock data with a warning banner).
-    const currentYear = new Date().getFullYear();
+    // Aggregate real payslip data per tax year from SimplePayPayslipImport.
+    // Generated on-demand; no persistence required (Option A).
+    const result = await this.irp5PortalService.listForStaff(
+      session.tenantId,
+      session.staffId,
+    );
 
-    return {
-      data: [],
-      total: 0,
-      availableYears: [currentYear, currentYear - 1],
-    };
+    // If a taxYear filter is supplied, narrow to that year only
+    if (taxYear) {
+      const yearNum = parseInt(taxYear, 10);
+      if (!isNaN(yearNum)) {
+        const filtered = result.data.filter((d) => d.taxYear === yearNum);
+        return {
+          data: filtered,
+          total: filtered.length,
+          availableYears: result.availableYears,
+        };
+      }
+    }
+
+    return result;
   }
 
   @Get('documents/irp5/:id/pdf')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Download IRP5 PDF' })
-  @ApiParam({ name: 'id', description: 'IRP5 document ID' })
+  @ApiParam({
+    name: 'id',
+    description: 'IRP5 document ID — format: irp5-{taxYear} e.g. irp5-2026',
+  })
   @Header('Content-Type', 'application/pdf')
   @ApiResponse({
     status: 200,
@@ -938,19 +942,39 @@ export class StaffPortalController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'IRP5 document not found' })
-  downloadIRP5Pdf(
+  async downloadIRP5Pdf(
     @CurrentStaff() session: StaffSessionInfo,
     @Param('id') id: string,
-  ): void {
+    @Res() res: Response,
+  ): Promise<void> {
     this.logger.log(
       `Downloading IRP5 PDF for staff: ${session.staff.email}, id: ${id}`,
     );
 
-    // IRP5 PDFs are not yet available — see getIRP5Documents() for full rationale.
-    // SimplePay has no IRP5 download endpoint as of 2026-05-01.
-    throw new NotFoundException(
-      'IRP5 documents are not yet available. They will be available after tax year processing.',
+    // ID format: irp5-{taxYear}  e.g. "irp5-2026"
+    const match = /^irp5-(\d{4})$/.exec(id);
+    if (!match) {
+      throw new NotFoundException(`IRP5 document not found: ${id}`);
+    }
+    const taxYear = parseInt(match[1], 10);
+
+    // Verify data exists; tenant + staff scoped (ownership check inside getYearAggregate)
+    const agg = await this.irp5PortalService.getYearAggregate(
+      session.tenantId,
+      session.staffId,
+      taxYear,
     );
+
+    const pdfBuffer = await this.irp5PdfService.generatePdf(agg);
+    const filename = `IRP5-${agg.taxYearPeriod.replace('/', '-')}.pdf`;
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': pdfBuffer.length.toString(),
+    });
+
+    res.send(pdfBuffer);
   }
 
   // ============================================================================

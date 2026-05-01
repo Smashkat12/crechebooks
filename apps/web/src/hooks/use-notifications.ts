@@ -47,6 +47,9 @@ export function useUnreadCount() {
     if (query.data) {
       setUnreadCount(query.data.count);
     }
+  // query.data?.count is the meaningful trigger; query.data is included to
+  // satisfy exhaustive-deps (the callback reads query.data.count).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query.data?.count, setUnreadCount]);
 
   return query;

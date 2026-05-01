@@ -939,6 +939,16 @@ export class ParentPortalController {
       orderBy: { paymentDate: 'asc' },
     });
 
+    // Get credit balances created during this month (overpayments, refunds, credit notes)
+    const creditBalances = await this.prisma.creditBalance.findMany({
+      where: {
+        tenantId,
+        parentId,
+        createdAt: { gte: startOfMonth, lte: endOfMonth },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
     // Build transactions list with running balance
     type TransactionItem = {
       id: string;
@@ -955,7 +965,7 @@ export class ParentPortalController {
     let runningBalanceCents = openingBalanceCents;
     let totalInvoicedCents = 0;
     let totalPaidCents = 0;
-    const totalCreditsCents = 0;
+    let totalCreditsCents = 0;
 
     // Add invoices
     for (const invoice of invoices) {
@@ -992,6 +1002,24 @@ export class ParentPortalController {
         credit: payment.amountCents / 100,
         balance: runningBalanceCents / 100,
         sortDate: payment.paymentDate,
+      });
+    }
+
+    // Add credit balances (reduce balance owed)
+    for (const cb of creditBalances) {
+      runningBalanceCents -= cb.amountCents;
+      totalCreditsCents += cb.amountCents;
+
+      transactions.push({
+        id: cb.id,
+        date: cb.createdAt.toISOString(),
+        description:
+          cb.description ?? `Credit - ${cb.sourceType.replace(/_/g, ' ')}`,
+        type: 'credit',
+        debit: null,
+        credit: cb.amountCents / 100,
+        balance: runningBalanceCents / 100,
+        sortDate: cb.createdAt,
       });
     }
 

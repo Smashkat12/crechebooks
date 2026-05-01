@@ -67,7 +67,7 @@ importers:
         version: link:../../packages/types
       '@modelcontextprotocol/sdk':
         specifier: '>=1.25.3'
-        version: 1.25.3(hono@4.11.7)(zod@3.25.76)
+        version: 1.25.3(hono@4.11.7)(zod@4.3.6)
       '@nestjs/axios':
         specifier: ^4.0.1
         version: 4.0.1(@nestjs/common@11.1.9(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(axios@1.13.2)(rxjs@7.8.2)
@@ -136,7 +136,7 @@ importers:
         version: 0.7.8
       agentic-flow:
         specifier: 2.0.2-alpha
-        version: 2.0.2-alpha(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(hono@4.11.7)(marked@11.2.0))(effect@3.18.4)(encoding@0.1.13)(hono@4.11.7)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3)
+        version: 2.0.2-alpha(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@4.3.6))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(hono@4.11.7)(marked@11.2.0))(effect@3.18.4)(encoding@0.1.13)(hono@4.11.7)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3)
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
@@ -226,7 +226,7 @@ importers:
         version: 0.2.2
       ruvector:
         specifier: ^0.1.96
-        version: 0.1.96(hono@4.11.7)(zod@3.25.76)
+        version: 0.1.96(hono@4.11.7)(zod@4.3.6)
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
@@ -249,8 +249,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
       zod:
-        specifier: ^3.24.1
-        version: 3.25.76
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3.2.0
@@ -11830,6 +11830,19 @@ snapshots:
       - bufferutil
       - supports-color
       - utf-8-validate
+    optional: true
+
+  '@google/genai@1.38.0(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@4.3.6))':
+    dependencies:
+      google-auth-library: 10.5.0
+      protobufjs: 7.5.4
+      ws: 8.18.3
+    optionalDependencies:
+      '@modelcontextprotocol/sdk': 1.25.3(hono@4.11.7)(zod@4.3.6)
+    transitivePeerDependencies:
+      - bufferutil
+      - supports-color
+      - utf-8-validate
 
   '@grpc/grpc-js@1.14.3':
     dependencies:
@@ -15949,11 +15962,11 @@ snapshots:
       - supports-color
     optional: true
 
-  agentic-flow@1.10.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(effect@3.18.4)(hono@4.11.7):
+  agentic-flow@1.10.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@4.3.6))(effect@3.18.4)(hono@4.11.7):
     dependencies:
       '@anthropic-ai/claude-agent-sdk': 0.1.77(zod@3.25.76)
       '@anthropic-ai/sdk': 0.65.0(zod@3.25.76)
-      '@google/genai': 1.38.0(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))
+      '@google/genai': 1.38.0(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@4.3.6))
       '@supabase/supabase-js': 2.91.1
       '@xenova/transformers': 2.17.2
       agentdb: 1.6.1(hono@4.11.7)
@@ -15986,12 +15999,12 @@ snapshots:
       - utf-8-validate
     optional: true
 
-  agentic-flow@2.0.2-alpha(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(hono@4.11.7)(marked@11.2.0))(effect@3.18.4)(encoding@0.1.13)(hono@4.11.7)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3):
+  agentic-flow@2.0.2-alpha(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@4.3.6))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(hono@4.11.7)(marked@11.2.0))(effect@3.18.4)(encoding@0.1.13)(hono@4.11.7)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3):
     dependencies:
       '@anthropic-ai/claude-agent-sdk': 0.1.77(zod@3.25.76)
       '@anthropic-ai/claude-code': 2.1.19
       '@anthropic-ai/sdk': 0.65.0(zod@3.25.76)
-      '@google/genai': 1.38.0(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))
+      '@google/genai': 1.38.0(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@4.3.6))
       '@ruvector/attention': 0.1.4
       '@ruvector/gnn': 0.1.22
       '@ruvector/ruvllm': 0.2.4
@@ -16077,7 +16090,7 @@ snapshots:
       axios: 1.14.0(debug@4.4.3)
       dotenv: 16.6.1
       express: 5.1.0
-      fastmcp: 3.30.0(hono@4.11.7)
+      fastmcp: 3.30.0(effect@3.18.4)(hono@4.11.7)
       gun: 0.2020.1241
       http-proxy-middleware: 3.0.5
       onnxruntime-node: 1.23.2
@@ -16128,7 +16141,7 @@ snapshots:
       uuid: 9.0.1
       zod: 4.3.6
     optionalDependencies:
-      agentic-flow: 1.10.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@3.25.76))(effect@3.18.4)(hono@4.11.7)
+      agentic-flow: 1.10.2(@modelcontextprotocol/sdk@1.25.3(hono@4.11.7)(zod@4.3.6))(effect@3.18.4)(hono@4.11.7)
       better-sqlite3: 11.10.0
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -18084,31 +18097,6 @@ snapshots:
       - hono
       - supports-color
       - sury
-
-  fastmcp@3.30.0(hono@4.11.7):
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.25.3(hono@4.11.7)(zod@4.3.6)
-      '@standard-schema/spec': 1.1.0
-      execa: 9.6.1
-      file-type: 21.3.0
-      fuse.js: 7.1.0
-      mcp-proxy: 6.4.0
-      strict-event-emitter-types: 2.0.0
-      undici: 7.19.1
-      uri-templates: 0.2.0
-      xsschema: 0.4.0-beta.5(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)
-      yargs: 18.0.0
-      zod: 4.3.6
-      zod-to-json-schema: 3.25.1(zod@4.3.6)
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - '@valibot/to-json-schema'
-      - arktype
-      - effect
-      - hono
-      - supports-color
-      - sury
-    optional: true
 
   fastq@1.19.1:
     dependencies:
@@ -21202,6 +21190,22 @@ snapshots:
       - supports-color
       - zod
 
+  ruvector@0.1.96(hono@4.11.7)(zod@4.3.6):
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.25.3(hono@4.11.7)(zod@4.3.6)
+      '@ruvector/attention': 0.1.4
+      '@ruvector/core': 0.1.30
+      '@ruvector/gnn': 0.1.22
+      '@ruvector/sona': 0.1.5
+      chalk: 4.1.2
+      commander: 11.1.0
+      ora: 5.4.1
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - hono
+      - supports-color
+      - zod
+
   rxjs@7.8.1:
     dependencies:
       tslib: 2.8.1
@@ -22688,13 +22692,7 @@ snapshots:
     optionalDependencies:
       effect: 3.18.4
       zod: 4.3.6
-      zod-to-json-schema: 3.25.1(zod@3.25.76)
-
-  xsschema@0.4.0-beta.5(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6):
-    optionalDependencies:
-      zod: 4.3.6
       zod-to-json-schema: 3.25.1(zod@4.3.6)
-    optional: true
 
   xtend@4.0.2: {}
 

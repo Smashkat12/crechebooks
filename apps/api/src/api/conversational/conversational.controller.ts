@@ -16,7 +16,7 @@ import { ConversationalAgent } from '../../agents/conversational/conversational.
 import { AskQuestionDto } from './dto/ask-question.dto';
 import type { ConversationalResponse } from '../../agents/conversational/interfaces/conversational.interface';
 
-@Controller('api/conversational')
+@Controller('conversational')
 @UseGuards(JwtAuthGuard)
 export class ConversationalController {
   constructor(private readonly conversationalAgent: ConversationalAgent) {}

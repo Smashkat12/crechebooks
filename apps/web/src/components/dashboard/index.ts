@@ -7,7 +7,6 @@ export { QuickActions } from './quick-actions';
 export { XeroStatusWidget } from './XeroStatusWidget';
 export { XeroStatusIndicator } from './XeroStatusIndicator';
 export { LearningModeIndicator } from './LearningModeIndicator';
-export { AccuracyMilestone } from './AccuracyMilestone';
 
 // Loading and error handling
 export {

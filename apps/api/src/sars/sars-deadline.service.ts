@@ -131,18 +131,6 @@ export class SarsDeadlineService {
   }
 
   /**
-   * Get deadline date for a specific reference date
-   * Used for calculating deadlines for historical periods
-   *
-   * @param type - SARS deadline type
-   * @param referenceDate - The date to calculate deadline for
-   * @returns Deadline date
-   */
-  getDeadlineDate(type: SarsDeadlineType, referenceDate: Date): Date {
-    return this.getNextDeadline(type, referenceDate);
-  }
-
-  /**
    * Get reminder preferences for a tenant
    *
    * @param tenantId - Tenant ID
@@ -163,67 +151,6 @@ export class SarsDeadlineService {
       recipientEmails: tenant?.email ? [tenant.email] : [],
       enabled: true,
     };
-  }
-
-  /**
-   * Update reminder preferences for a tenant
-   * Note: Would require a TenantSettings model for full implementation
-   *
-   * @param tenantId - Tenant ID
-   * @param prefs - Preferences to update
-   */
-  updateReminderPreferences(
-    tenantId: string,
-    prefs: Partial<DeadlineReminderPrefs>,
-  ): void {
-    this.logger.log(
-      `Updating reminder preferences for tenant ${tenantId}`,
-      prefs,
-    );
-    // TODO: Store in TenantSettings when that table is available
-    // For now, preferences are default-based
-  }
-
-  /**
-   * Get reminder history for a deadline type
-   *
-   * @param tenantId - Tenant ID
-   * @param type - SARS deadline type
-   * @returns Array of past reminders
-   */
-  async getReminderHistory(
-    tenantId: string,
-    type: SarsDeadlineType,
-  ): Promise<DeadlineReminder[]> {
-    // Query audit log for reminder records
-    const auditLogs = await this.prisma.auditLog.findMany({
-      where: {
-        tenantId,
-        entityType: 'SarsDeadlineReminder',
-        action: 'CREATE',
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
-
-    return auditLogs
-      .map((log) => {
-        const details = log.afterValue as Record<string, unknown> | null;
-        if (!details || details.type !== type) {
-          return null;
-        }
-        return {
-          id: log.id,
-          tenantId: log.tenantId,
-          type: details.type as SarsDeadlineType,
-          period: details.period as string,
-          daysRemaining: details.daysRemaining as number,
-          sentAt: log.createdAt,
-          channel: details.channel as 'email' | 'whatsapp',
-          recipients: details.recipients as string[],
-        };
-      })
-      .filter((r): r is DeadlineReminder => r !== null);
   }
 
   /**

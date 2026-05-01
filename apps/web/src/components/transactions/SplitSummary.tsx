@@ -11,7 +11,7 @@
 import * as React from 'react';
 import Decimal from 'decimal.js';
 import { CheckCircle2, XCircle } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 interface SplitSummaryProps {
   transactionAmount: Decimal;

@@ -16,6 +16,7 @@ import { ParentPortalController } from '../parent-portal.controller';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { ParentOnboardingService } from '../../../database/services/parent-onboarding.service';
 import { ParentPortalChildService } from '../parent-portal-child.service';
+import { InvoicePdfService } from '../../../database/services/invoice-pdf.service';
 import { ParentAuthGuard } from '../../auth/guards/parent-auth.guard';
 
 const TENANT_ID = 'tenant-aaa';
@@ -75,6 +76,7 @@ describe('ParentPortalController — getStatementDetail credit-balance integrati
         { provide: PrismaService, useValue: prismaOverride },
         { provide: ParentOnboardingService, useValue: {} },
         { provide: ParentPortalChildService, useValue: {} },
+        { provide: InvoicePdfService, useValue: {} },
       ],
     })
       .overrideGuard(ParentAuthGuard)

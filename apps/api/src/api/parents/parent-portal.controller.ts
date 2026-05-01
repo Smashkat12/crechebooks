@@ -55,6 +55,7 @@ import {
   UpdateParentChildDto,
   ParentChildUpdateResponseDto,
 } from './dto/update-parent-child.dto';
+import { InvoicePdfService } from '../../database/services/invoice-pdf.service';
 
 @ApiTags('Parent Portal')
 @ApiBearerAuth()
@@ -68,6 +69,7 @@ export class ParentPortalController {
     private readonly prisma: PrismaService,
     private readonly parentOnboarding: ParentOnboardingService,
     private readonly parentPortalChild: ParentPortalChildService,
+    private readonly invoicePdfService: InvoicePdfService,
   ) {}
 
   // ============================================================================
@@ -657,20 +659,36 @@ export class ParentPortalController {
     });
 
     if (!invoice) {
-      throw new NotFoundException('Invoice not found');
+      // Return 404 for not found OR ownership mismatch — don't leak existence
+      res.status(404).json({ message: 'Invoice not found' });
+      return;
     }
 
-    // TODO: Integrate with actual PDF generation service
-    // For now, return a placeholder response indicating PDF generation is not yet implemented
-    // In production, this would call the invoice PDF service
+    try {
+      const pdfBuffer = await this.invoicePdfService.generatePdf(
+        tenantId,
+        invoiceId,
+      );
 
-    // Placeholder: Return a simple text response indicating the feature
-    res.setHeader('Content-Type', 'application/json');
-    res.status(501).json({
-      message: 'PDF generation not yet implemented',
-      invoiceNumber: invoice.invoiceNumber,
-      hint: 'Integration with PDF service pending',
-    });
+      const filename = `${invoice.invoiceNumber}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+
+      this.logger.log(
+        `PDF downloaded successfully for invoice ${invoice.invoiceNumber}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate PDF for invoice ${invoiceId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      res.status(500).json({ message: 'Failed to generate PDF' });
+    }
   }
 
   // ============================================================================

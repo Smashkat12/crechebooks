@@ -1114,7 +1114,6 @@ model Parent {
   whatsapp         String?          @db.VarChar(20)
   preferredContact PreferredContact @default(EMAIL) @map("preferred_contact")
   whatsappOptIn    Boolean          @default(false) @map("whatsapp_opt_in")
-  smsOptIn         Boolean          @default(false) @map("sms_opt_in")
   idNumber         String?          @map("id_number") @db.VarChar(20)
   address          String?
   notes            String?

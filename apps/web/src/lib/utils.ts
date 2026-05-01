@@ -6,6 +6,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// DUPLICATION NOTE (frontend-engineer-021): formatCurrency, formatDate, and
+// formatDateTime below are also defined in lib/utils/format.ts. The two files
+// differ: format.ts uses Intl.DateTimeFormat with Africa/Johannesburg timezone
+// (dd/MM/yyyy); this file uses date-fns `format` with 'dd MMM yyyy'. Callers
+// are split ~179 importing from here vs ~23 from format.ts. Do NOT consolidate
+// without auditing all callers for output-format sensitivity.
+
 /**
  * Format currency in South African Rand (ZAR)
  * Handles null, undefined, and NaN values gracefully

@@ -1647,7 +1647,7 @@ export class ParentPortalController {
       invoiceDelivery,
       paymentReminders: (storedPrefs.paymentReminders as boolean) ?? true,
       emailNotifications: (storedPrefs.emailNotifications as boolean) ?? true,
-      marketingOptIn: parent.smsOptIn ?? false,
+      marketingOptIn: false,
       whatsappOptIn: parent.whatsappOptIn ?? false,
       whatsappConsentTimestamp:
         (storedPrefs.whatsappConsentTimestamp as string) || null,
@@ -1787,7 +1787,6 @@ export class ParentPortalController {
     // Build updated preferences
     const updateData: {
       whatsappOptIn?: boolean;
-      smsOptIn?: boolean;
       preferredContact?: 'EMAIL' | 'WHATSAPP' | 'BOTH';
       notes?: string;
     } = {};
@@ -1823,7 +1822,6 @@ export class ParentPortalController {
 
     if (dto.marketingOptIn !== undefined) {
       storedPrefs.marketingOptIn = dto.marketingOptIn;
-      updateData.smsOptIn = dto.marketingOptIn;
     }
 
     if (dto.whatsappConsentTimestamp !== undefined) {

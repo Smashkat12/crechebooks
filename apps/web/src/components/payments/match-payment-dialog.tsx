@@ -67,7 +67,12 @@ export function MatchPaymentDialog({
     try {
       await allocatePayment.mutateAsync({
         paymentId: payment.id,
-        allocations: data.allocations,
+        transactionId: payment.transactionId,
+        // AllocationForm uses camelCase invoiceId; backend expects snake_case invoice_id
+        allocations: data.allocations.map((a) => ({
+          invoice_id: a.invoiceId,
+          amount: a.amount,
+        })),
       });
 
       onSuccess?.();

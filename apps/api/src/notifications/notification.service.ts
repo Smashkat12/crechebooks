@@ -26,8 +26,6 @@ import {
   NotificationPreferences,
   NotificationChannelType,
   Notification,
-  NotificationDeliveryStatus,
-  DeliveryAttempt,
 } from './types/notification.types';
 import { BusinessException } from '../shared/exceptions';
 
@@ -120,104 +118,6 @@ export class NotificationService {
     throw new BusinessException(
       `Failed to send notification to parent ${notification.recipientId}: All preferred channels failed`,
       'NOTIFICATION_DELIVERY_FAILED',
-    );
-  }
-
-  /**
-   * Send notification with automatic fallback chain
-   * Tries all available channels in fallback order until one succeeds
-   *
-   * @param tenantId - Tenant ID for audit logging
-   * @param notification - Notification payload
-   * @returns Delivery result with attempted channels
-   */
-  async sendWithFallback(
-    tenantId: string,
-    notification: NotificationPayload,
-  ): Promise<DeliveryResult> {
-    this.logger.log(
-      `Sending notification with fallback to parent ${notification.recipientId}`,
-    );
-
-    // Get parent preferences
-    const preferences = await this.preferenceService.getPreferences(
-      notification.recipientId,
-    );
-
-    const attempts: DeliveryAttempt[] = [];
-    const attemptedChannels: NotificationChannelType[] = [];
-
-    // Try each channel in fallback order
-    for (const channelType of preferences.fallbackOrder) {
-      const channel = this.channels.get(channelType);
-      if (!channel) {
-        continue;
-      }
-
-      // Check channel availability
-      const available = await channel.isAvailable(notification.recipientId);
-      if (!available) {
-        this.logger.warn(
-          `Channel ${channelType} not available for parent ${notification.recipientId}`,
-        );
-        continue;
-      }
-
-      // Attempt delivery
-      attemptedChannels.push(channelType);
-      const notificationWithChannel: Notification = {
-        ...notification,
-        channelType,
-        tenantId,
-      };
-
-      const result = await channel.send(notificationWithChannel);
-
-      // Record attempt
-      attempts.push({
-        channelType,
-        attemptedAt: new Date(),
-        success: result.success,
-        messageId: result.messageId,
-        error: result.error,
-        errorCode: result.errorCode,
-      });
-
-      // Log delivery attempt
-      await this.logDeliveryAttempt(tenantId, notification.recipientId, result);
-
-      if (result.success) {
-        this.logger.log(
-          `Notification sent successfully via ${channelType} (fallback) to parent ${notification.recipientId}`,
-        );
-        return {
-          ...result,
-          attemptedChannels,
-        };
-      }
-
-      this.logger.warn(
-        `Channel ${channelType} failed, trying next in fallback chain`,
-      );
-    }
-
-    // All channels failed
-    this.logger.error({
-      error: {
-        message: 'All fallback channels failed',
-        name: 'DeliveryError',
-      },
-      file: 'notification.service.ts',
-      function: 'sendWithFallback',
-      inputs: { recipientId: notification.recipientId },
-      attempts,
-      timestamp: new Date().toISOString(),
-    });
-
-    throw new BusinessException(
-      `Failed to send notification to parent ${notification.recipientId}: All fallback channels exhausted`,
-      'NOTIFICATION_DELIVERY_FAILED',
-      { attemptedChannels, attempts },
     );
   }
 

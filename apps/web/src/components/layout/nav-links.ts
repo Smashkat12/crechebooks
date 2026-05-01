@@ -20,6 +20,9 @@ import {
   FilePlus2,
   TrendingUp,
   Inbox,
+  Banknote,
+  Scale,
+  LineChart,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -54,7 +57,10 @@ export const managementNavLinks: NavLink[] = [
 export const complianceNavLinks: NavLink[] = [
   { title: 'Accounting', href: '/accounting/accounts', icon: Calculator },
   { title: 'General Ledger', href: '/accounting/general-ledger', icon: BookOpen },
+  { title: 'Payables', href: '/accounting/payables', icon: Banknote },
+  { title: 'Trial Balance', href: '/accounting/trial-balance', icon: Scale },
   { title: 'Cash Flow', href: '/accounting/cash-flow', icon: TrendingUp },
+  { title: 'Trends', href: '/accounting/cash-flow/trends', icon: LineChart },
   { title: 'Suppliers', href: '/accounting/suppliers', icon: Truck },
   { title: 'SARS', href: '/sars', icon: Building2 },
   { title: 'Reconciliation', href: '/reconciliation', icon: BarChart3 },

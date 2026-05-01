@@ -35,8 +35,17 @@ interface MatchPaymentsParams {
 
 interface AllocatePaymentParams {
   paymentId: string;
+  /**
+   * Bank transaction UUID linked to this payment.
+   * Required by POST /payments (transaction_id field).
+   * Undefined for manually-posted payments with no bank transaction —
+   * the mutation will reject early with a descriptive error.
+   */
+  transactionId?: string;
   allocations: {
-    invoiceId: string;
+    /** invoice_id matches the backend snake_case field */
+    invoice_id: string;
+    /** ZAR decimal amount (e.g. 3450.00 for R3 450). Backend converts to cents. */
     amount: number;
   }[];
 }
@@ -122,14 +131,29 @@ export function useMatchPayments() {
 }
 
 // Manually allocate payment to invoices
+//
+// Calls POST /payments (not /payments/:id/allocate — that sub-route does not exist).
+// Body shape matches ApiAllocatePaymentDto:
+//   { transaction_id: string, allocations: [{ invoice_id, amount }] }
+// where amount is ZAR decimal (the controller rounds to cents server-side).
+//
+// Payments without a linked bank transaction (transactionId undefined) cannot be
+// allocated via this path. The mutationFn rejects immediately with a descriptive
+// error so the dialog can surface it without a network round-trip.
 export function useAllocatePayment() {
   const queryClient = useQueryClient();
 
   return useMutation<{ success: boolean }, AxiosError, AllocatePaymentParams>({
-    mutationFn: async ({ paymentId, allocations }) => {
+    mutationFn: async ({ transactionId, allocations }) => {
+      if (!transactionId) {
+        throw new Error(
+          'This payment has no linked bank transaction and cannot be allocated through this dialog.'
+        );
+      }
       const { data } = await apiClient.post<{ success: boolean }>(
-        endpoints.payments.allocate(paymentId),
+        endpoints.payments.list,
         {
+          transaction_id: transactionId,
           allocations,
         }
       );

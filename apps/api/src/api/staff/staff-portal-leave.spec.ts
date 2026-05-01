@@ -31,6 +31,8 @@ import type { StaffSessionInfo } from '../auth/decorators/current-staff.decorato
 import { LeaveType, LeaveStatus } from './dto/staff-leave.dto';
 import { LeaveRequest } from '@prisma/client';
 import Decimal from 'decimal.js';
+import { Irp5PortalService } from './irp5-portal.service';
+import { Irp5PdfService } from './irp5-pdf.service';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -147,6 +149,14 @@ async function buildModule() {
       { provide: SimplePayRepository, useValue: {} },
       { provide: SimplePayLeaveService, useValue: mockSimplePayLeaveService },
       { provide: LeaveRequestRepository, useValue: mockLeaveRequestRepo },
+      {
+        provide: Irp5PortalService,
+        useValue: {
+          listForStaff: jest.fn().mockResolvedValue({ data: [], total: 0, availableYears: [] }),
+          getYearAggregate: jest.fn().mockRejectedValue(new NotFoundException('no data')),
+        },
+      },
+      { provide: Irp5PdfService, useValue: {} },
       {
         provide: StaffMagicLinkService,
         useValue: { verifySessionToken: jest.fn() },
@@ -469,25 +479,28 @@ describe('StaffPortalController — IRP5 documents (GET)', () => {
     controller = await buildModule();
   });
 
-  it('returns empty data array (SimplePay has no IRP5 API as of 2026-05-01)', () => {
-    const result = controller.getIRP5Documents(mockSession);
+  it('returns empty data array when no payslips are imported', async () => {
+    const result = await controller.getIRP5Documents(mockSession);
 
     expect(result.data).toEqual([]);
     expect(result.total).toBe(0);
   });
 
-  it('returns current and prior year in availableYears', () => {
-    const result = controller.getIRP5Documents(mockSession);
-    const currentYear = new Date().getFullYear();
+  it('returns empty availableYears when no payslips are imported', async () => {
+    const result = await controller.getIRP5Documents(mockSession);
 
-    expect(result.availableYears).toContain(currentYear);
-    expect(result.availableYears).toContain(currentYear - 1);
+    expect(result.availableYears).toEqual([]);
   });
 
-  it('throws NotFoundException when downloading an IRP5 PDF (no SimplePay endpoint)', () => {
-    expect(() =>
-      controller.downloadIRP5Pdf(mockSession, 'irp5-2025-001'),
-    ).toThrow(NotFoundException);
+  it('throws NotFoundException when downloading IRP5 PDF with malformed ID', async () => {
+    const res = {
+      set: jest.fn(),
+      send: jest.fn(),
+    } as unknown as import('express').Response;
+
+    await expect(
+      controller.downloadIRP5Pdf(mockSession, 'irp5-2025-001', res),
+    ).rejects.toThrow(NotFoundException);
   });
 });
 

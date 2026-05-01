@@ -33,31 +33,6 @@ interface IRP5Response {
 }
 
 // ============================================================================
-// Mock Data (for development)
-// ============================================================================
-
-function getMockIRP5Data(): IRP5Response {
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
-
-  const documents: IRP5Document[] = years.map((year, index) => ({
-    id: `irp5-${year}-001`,
-    taxYear: year,
-    taxYearPeriod: `${year - 1}/${year}`,
-    status: index === 0 ? 'pending' : 'available' as const,
-    availableDate: new Date(year, 2, 1), // March 1st of tax year
-    referenceNumber: index === 0 ? undefined : `IRP5/${year}/${Math.floor(100000 + Math.random() * 900000)}`,
-    lastDownloadDate: index > 0 && index < 3 ? new Date(year, 3 + Math.floor(Math.random() * 3), Math.floor(1 + Math.random() * 28)) : undefined,
-  }));
-
-  return {
-    data: documents,
-    total: documents.length,
-    availableYears: years,
-  };
-}
-
-// ============================================================================
 // Loading Skeleton
 // ============================================================================
 
@@ -119,9 +94,8 @@ export default function StaffTaxDocumentsPage() {
         throw new Error('Failed to fetch tax documents');
       }
     } catch (err) {
-      console.warn('IRP5 API error, using mock data:', err);
-      setError('Unable to connect to server. Showing sample data.');
-      setIrp5Data(getMockIRP5Data());
+      console.error('IRP5 API error:', err);
+      setError('Unable to load tax documents. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -191,25 +165,7 @@ export default function StaffTaxDocumentsPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      // Mock download for development
-      if (error?.includes('sample data')) {
-        const doc = irp5Data?.data.find((d) => d.id === id);
-        if (doc) {
-          // Create a mock PDF blob
-          const mockContent = `%PDF-1.4\n%Mock IRP5 Certificate\n%Tax Year: ${doc.taxYearPeriod}\n%%EOF`;
-          const blob = new Blob([mockContent], { type: 'application/pdf' });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.setAttribute('download', `IRP5-${doc.taxYearPeriod.replace('/', '-')}.pdf`);
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        }
-        return;
-      }
-      console.error('Download error:', err);
+      console.error('IRP5 download error:', err);
     }
   };
 
@@ -258,8 +214,8 @@ export default function StaffTaxDocumentsPage() {
         </Alert>
       )}
 
-      {/* IRP5 List */}
-      {irp5Data && (
+      {/* IRP5 List or empty state */}
+      {irp5Data && irp5Data.total > 0 ? (
         <IRP5List
           documents={irp5Data.data}
           availableYears={irp5Data.availableYears}
@@ -267,6 +223,13 @@ export default function StaffTaxDocumentsPage() {
           onYearChange={handleYearChange}
           onDownload={handleDownload}
         />
+      ) : !error && (
+        <div className="text-center py-12 text-muted-foreground">
+          <p className="text-base font-medium">No IRP5 certificates available yet.</p>
+          <p className="text-sm mt-1">
+            Certificates appear here once payslip data has been imported for a completed tax year.
+          </p>
+        </div>
       )}
     </div>
   );

@@ -13,6 +13,7 @@ import {
   NotFoundException,
   StreamableFile,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -58,6 +59,11 @@ import {
 import { InvoicePdfService } from '../../database/services/invoice-pdf.service';
 import { StatementPdfService } from '../../database/services/statement-pdf.service';
 import { PaymentReceiptService } from '../../database/services/payment-receipt.service';
+import { StatementDeliveryService } from '../../database/services/statement-delivery.service';
+import { AuditLogService } from '../../database/services/audit-log.service';
+import { AuditAction } from '../../database/entities/audit-log.entity';
+import { BusinessException } from '../../shared/exceptions';
+import { NotificationChannelType } from '../../notifications/types/notification.types';
 
 @ApiTags('Parent Portal')
 @ApiBearerAuth()
@@ -74,6 +80,8 @@ export class ParentPortalController {
     private readonly invoicePdfService: InvoicePdfService,
     private readonly statementPdfService: StatementPdfService,
     private readonly paymentReceiptService: PaymentReceiptService,
+    private readonly statementDeliveryService: StatementDeliveryService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   // ============================================================================
@@ -1171,6 +1179,7 @@ export class ParentPortalController {
     @Param('month') monthParam: string,
   ): Promise<EmailStatementResponseDto> {
     const parentId = session.parentId;
+    const tenantId = session.tenantId;
     const year = parseInt(yearParam, 10);
     const month = parseInt(monthParam, 10);
 
@@ -1179,10 +1188,32 @@ export class ParentPortalController {
     }
 
     this.logger.debug(
-      `Emailing statement ${year}/${month} to parent ${parentId}`,
+      `Emailing statement ${year}/${month} for parent correlation-id=${parentId.substring(0, 8)}`,
     );
 
-    // Get parent email
+    // Derive period boundaries (same logic as downloadStatementPdf)
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Look up the formal Statement DB record scoped to this parent + tenant + period.
+    // Ownership is enforced by parentId in WHERE — a statement belonging to another
+    // parent or tenant returns null and we respond 404 without leaking existence.
+    const statement = await this.prisma.statement.findFirst({
+      where: {
+        tenantId,
+        parentId,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, statementNumber: true, status: true },
+    });
+
+    if (!statement) {
+      throw new NotFoundException('Statement not found');
+    }
+
+    // Get parent email (needed for response and audit log)
     const parent = await this.prisma.parent.findUnique({
       where: { id: parentId },
       select: { email: true },
@@ -1192,12 +1223,52 @@ export class ParentPortalController {
       throw new NotFoundException('Parent email not found');
     }
 
-    // TODO: Integrate with actual email service
-    // For now, return a success response indicating the feature will be implemented
-    return {
-      message: `Statement for ${this.getMonthName(month)} ${year} will be sent to your email`,
-      sentTo: parent.email,
-    };
+    // Audit-log every send attempt BEFORE dispatch (fields: userId=parentId correlation,
+    // tenantId, statementId, channel, status). No raw PII in afterValue.
+    await this.auditLogService.logAction({
+      tenantId,
+      userId: parentId,
+      entityType: 'ParentPortalStatementEmail',
+      entityId: statement.id,
+      action: AuditAction.UPDATE,
+      beforeValue: { status: statement.status },
+      afterValue: {
+        channel: 'EMAIL',
+        via: 'parent-portal',
+        statementNumber: statement.statementNumber,
+        requestedAt: new Date().toISOString(),
+      },
+      changeSummary: `Parent self-service email request for statement ${statement.statementNumber}`,
+    });
+
+    // Deliver via StatementDeliveryService (EMAIL channel).
+    // COMMS_DISABLED gate: EmailService.sendEmailWithOptions() short-circuits to
+    // { messageId: 'comms-disabled-noop', status: 'sent' } when COMMS_DISABLED=true —
+    // no external API call is made.
+    // Status gate: StatementDeliveryService.deliverStatement() throws BusinessException
+    // if statement is not FINAL.
+    try {
+      const result = await this.statementDeliveryService.deliverStatement({
+        tenantId,
+        statementId: statement.id,
+        userId: parentId,
+        channel: NotificationChannelType.EMAIL,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error ?? 'Delivery failed');
+      }
+
+      return {
+        message: `Statement for ${this.getMonthName(month)} ${year} has been sent to your email`,
+        sentTo: parent.email,
+      };
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   // ============================================================================

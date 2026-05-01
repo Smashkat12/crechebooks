@@ -16,7 +16,9 @@ function LoginContent() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [showEmailLogin, setShowEmailLogin] = useState(
+    process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === 'true',
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

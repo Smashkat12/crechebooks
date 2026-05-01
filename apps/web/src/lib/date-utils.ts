@@ -99,11 +99,11 @@ export function nowSA(): Date {
 }
 
 /**
- * Get today's date at start of day in SA timezone
- * @returns Start of today in SA timezone
+ * Get today's date at start of day in SA timezone (UTC)
+ * @returns Start of today in SA timezone, expressed as a UTC timestamp
  */
 export function todaySA(): Date {
-  return startOfDay(nowSA());
+  return startOfDaySA(nowSA());
 }
 
 // ============================================================================

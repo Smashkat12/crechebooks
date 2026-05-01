@@ -550,11 +550,7 @@ describe('Date Utilities', () => {
     });
 
     describe('isTodaySA', () => {
-      // TODO: The isTodaySA function has an internal inconsistency where todaySA()
-      // uses startOfDay(nowSA()) which differs from startOfDaySA(). This causes
-      // isTodaySA(startOfDaySA(nowSA())) to return false. The function should be
-      // fixed to use consistent timezone handling.
-      it.skip('should return true for today (skipped: function has internal bug)', () => {
+      it('should return true for today', () => {
         const now = nowSA();
         const todayStart = startOfDaySA(now);
         expect(isTodaySA(todayStart)).toBe(true);

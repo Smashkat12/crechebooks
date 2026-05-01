@@ -1,6 +1,6 @@
-import { useQuery, useQueries, useQueryClient, UseQueryResult } from '@tanstack/react-query';
+import { useQueries, useQueryClient, UseQueryResult } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 
@@ -293,46 +293,6 @@ export function usePrefetchDashboardData(year?: number, period?: string) {
   }, [queryClient, year, period]);
 
   return { prefetchDashboard };
-}
-
-// ============================================================================
-// Individual Widget Hooks
-// ============================================================================
-
-/**
- * Hook for just the metrics summary widget.
- * Useful for partial loading scenarios.
- */
-export function useDashboardMetricsOnly(period?: string, year?: number) {
-  return useQuery<DashboardMetrics, AxiosError>({
-    queryKey: queryKeys.dashboard.metrics(period, year),
-    queryFn: () => fetchDashboardMetrics(period, year),
-    ...QUERY_CONFIG.metrics,
-  });
-}
-
-/**
- * Hook for just the trends chart widget.
- * Useful for partial loading scenarios.
- */
-export function useDashboardTrendsOnly(period?: string, year?: number) {
-  return useQuery<DashboardTrends, AxiosError>({
-    queryKey: queryKeys.dashboard.trends(period, year),
-    queryFn: () => fetchDashboardTrends(period, year),
-    ...QUERY_CONFIG.trends,
-  });
-}
-
-/**
- * Hook for just the Xero status widget.
- * Useful for partial loading scenarios.
- */
-export function useXeroStatusOnly() {
-  return useQuery<XeroStatus, AxiosError>({
-    queryKey: queryKeys.xero.status(),
-    queryFn: fetchXeroStatus,
-    ...QUERY_CONFIG.xeroStatus,
-  });
 }
 
 // ============================================================================

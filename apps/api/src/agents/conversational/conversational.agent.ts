@@ -23,7 +23,6 @@ import {
 import { BaseSdkAgent } from '../sdk/base-sdk-agent';
 import { SdkAgentFactory } from '../sdk/sdk-agent.factory';
 import { SdkConfigService } from '../sdk/sdk-config';
-import { RuvectorService } from '../sdk/ruvector.service';
 import { ClaudeClientService } from '../sdk/claude-client.service';
 import type { AgentDefinition } from '../sdk/interfaces/sdk-agent.interface';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -50,9 +49,6 @@ export class ConversationalAgent extends BaseSdkAgent {
   constructor(
     factory: SdkAgentFactory,
     config: SdkConfigService,
-    @Optional()
-    @Inject(RuvectorService)
-    private readonly ruvectorService?: RuvectorService,
     @Optional()
     @Inject(PrismaService)
     private readonly prisma?: PrismaService,

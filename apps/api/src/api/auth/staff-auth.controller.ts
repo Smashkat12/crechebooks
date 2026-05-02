@@ -153,6 +153,7 @@ export class StaffAuthController {
    * In future, could implement token blacklisting via Redis.
    */
   @Post('logout')
+  @Public() // Skip global JwtAuthGuard - staff sessions use their own token type
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({
@@ -177,6 +178,7 @@ export class StaffAuthController {
    * Get current authenticated staff session info.
    */
   @Get('session')
+  @Public() // Skip global JwtAuthGuard - staff sessions use their own token type
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get current staff session info',

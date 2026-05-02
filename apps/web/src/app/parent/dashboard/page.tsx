@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { AlertCircle, Loader2, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -55,6 +56,7 @@ export default function ParentDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null>(null);
+  const [onboardingBannerDismissed, setOnboardingBannerDismissed] = useState(false);
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -74,18 +76,6 @@ export default function ParentDashboardPage() {
         if (onboardingResponse.ok) {
           const status = await onboardingResponse.json();
           setOnboardingStatus(status);
-
-          // Redirect if required items are incomplete
-          if (status.status !== 'COMPLETED') {
-            const hasRequiredIncomplete = status.requiredActions?.some(
-              (action: { isRequired: boolean; isComplete: boolean }) =>
-                action.isRequired && !action.isComplete
-            );
-            if (hasRequiredIncomplete) {
-              router.push('/parent/onboarding');
-              return;
-            }
-          }
         }
       } catch (err) {
         console.warn('Onboarding check failed:', err);
@@ -171,6 +161,33 @@ export default function ParentDashboardPage() {
           Here&apos;s an overview of your account
         </p>
       </div>
+
+      {/* Onboarding incomplete banner */}
+      {!onboardingBannerDismissed &&
+        onboardingStatus &&
+        onboardingStatus.status !== 'COMPLETED' &&
+        onboardingStatus.requiredActions?.some(
+          (a) => a.isRequired && !a.isComplete
+        ) && (
+          <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 flex items-start gap-3">
+            <AlertDescription className="flex-1 text-blue-900 dark:text-blue-100">
+              Complete your profile to unlock all portal features.{' '}
+              <Link
+                href="/parent/onboarding"
+                className="font-medium underline underline-offset-2 hover:no-underline"
+              >
+                Complete profile
+              </Link>
+            </AlertDescription>
+            <button
+              onClick={() => setOnboardingBannerDismissed(true)}
+              aria-label="Dismiss"
+              className="shrink-0 text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </Alert>
+        )}
 
       {/* Arrears Alert Banner */}
       {data.hasArrears && data.daysOverdue && (

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrearsTable, SendReminderDialog } from '@/components/arrears';
@@ -11,6 +12,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import type { ArrearsRow } from '@/components/arrears';
 
 export default function ArrearsPage() {
+  const { toast } = useToast();
   const [reminderOpen, setReminderOpen] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -36,7 +38,7 @@ export default function ArrearsPage() {
     setIsExporting(true);
     try {
       if (arrearsRows.length === 0) {
-        alert('No arrears data to export');
+        toast({ title: 'No data to export', description: 'There are no arrears records to export.', variant: 'destructive' });
         return;
       }
 

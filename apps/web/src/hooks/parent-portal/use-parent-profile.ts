@@ -135,7 +135,7 @@ async function parentPortalFetch<T>(
     throw new Error('Not authenticated. Please log in.');
   }
 
-  const response = await fetch(`${API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${API_URL}/api/v1/parent-portal${endpoint}`, {
     ...options,
     headers: {
       ...options?.headers,
@@ -175,7 +175,7 @@ export function useParentProfile() {
   return useQuery<ParentProfile, Error>({
     queryKey: parentProfileKeys.profile(),
     queryFn: async () => {
-      return parentPortalFetch<ParentProfile>('/parent-portal/profile');
+      return parentPortalFetch<ParentProfile>('/profile');
     },
     staleTime: 30 * 1000, // 30 seconds
   });
@@ -189,7 +189,7 @@ export function useUpdateParentProfile() {
 
   return useMutation<ParentProfile, Error, Partial<ParentProfile>>({
     mutationFn: async (data) => {
-      return parentPortalFetch<ParentProfile>('/parent-portal/profile', {
+      return parentPortalFetch<ParentProfile>('/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
       });
@@ -208,7 +208,7 @@ export function useParentChildren() {
   return useQuery<ParentChild[], Error>({
     queryKey: parentProfileKeys.children(),
     queryFn: async () => {
-      return parentPortalFetch<ParentChild[]>('/parent-portal/children');
+      return parentPortalFetch<ParentChild[]>('/children');
     },
     staleTime: 60 * 1000, // 1 minute
   });
@@ -222,7 +222,7 @@ export function useUpdateCommunicationPrefs() {
 
   return useMutation<CommunicationPreferences, Error, Partial<CommunicationPreferences>>({
     mutationFn: async (prefs) => {
-      return parentPortalFetch<CommunicationPreferences>('/parent-portal/preferences', {
+      return parentPortalFetch<CommunicationPreferences>('/preferences', {
         method: 'PUT',
         body: JSON.stringify(prefs),
       });
@@ -247,7 +247,7 @@ export function useParentChild(childId: string) {
   return useQuery<ParentChild, Error>({
     queryKey: [...parentProfileKeys.children(), childId],
     queryFn: async () => {
-      const children = await parentPortalFetch<ParentChild[]>('/parent-portal/children');
+      const children = await parentPortalFetch<ParentChild[]>('/children');
       const child = children.find((c) => c.id === childId);
       if (!child) throw new Error('Child not found');
       return child;
@@ -265,7 +265,7 @@ export function useUpdateParentChild(childId: string) {
   return useMutation<ParentChildUpdateResponse, Error, UpdateParentChildDto>({
     mutationFn: async (data) => {
       return parentPortalFetch<ParentChildUpdateResponse>(
-        `/parent-portal/children/${childId}`,
+        `/children/${childId}`,
         {
           method: 'PUT',
           body: JSON.stringify(data),
@@ -308,7 +308,7 @@ export function useUpdateParentChild(childId: string) {
 export function useRequestAccountDeletion() {
   return useMutation<{ message: string }, Error, DeleteAccountRequestDto>({
     mutationFn: async (data) => {
-      return parentPortalFetch<{ message: string }>('/parent-portal/delete-request', {
+      return parentPortalFetch<{ message: string }>('/delete-request', {
         method: 'POST',
         body: JSON.stringify(data),
       });

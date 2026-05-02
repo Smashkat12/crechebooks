@@ -27,44 +27,6 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// ============================================================================
-// Mock Data (for development)
-// ============================================================================
-
-function getMockProfile(): StaffProfile {
-  return {
-    personal: {
-      fullName: 'Thandi Nkosi',
-      idNumber: '******1234085',
-      dateOfBirth: new Date(1990, 4, 15),
-      phone: '+27 82 123 4567',
-      email: 'thandi.nkosi@crechebooks.co.za',
-      address: '123 Main Street, Sandton, Johannesburg, Gauteng, 2196',
-    },
-    employment: {
-      position: 'Early Childhood Development Practitioner',
-      department: 'Education',
-      startDate: new Date(2023, 2, 15),
-      employmentType: 'Full-time',
-      employeeNumber: 'EMP-001',
-      managerName: 'Sarah Manager',
-    },
-    banking: {
-      bankName: 'First National Bank',
-      accountNumber: '****4521',
-      branchCode: '250655',
-      accountType: 'Cheque Account',
-      updateNote: 'To update your banking details, please contact HR directly. Changes require verification for your protection.',
-    },
-    emergency: {
-      contactName: 'Sipho Nkosi',
-      relationship: 'Spouse',
-      contactPhone: '+27 83 987 6543',
-      alternatePhone: '+27 11 123 4567',
-    },
-    lastUpdated: new Date(),
-  };
-}
 
 // ============================================================================
 // Loading Skeleton
@@ -100,7 +62,7 @@ export default function StaffProfilePage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/profile`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -118,9 +80,8 @@ export default function StaffProfilePage() {
         throw new Error('Failed to fetch profile');
       }
     } catch (err) {
-      console.warn('Profile API error, using mock data:', err);
-      setError('Unable to connect to server. Showing sample data.');
-      setProfile(getMockProfile());
+      console.error('Profile API error:', err);
+      setError('Unable to load profile. Please try refreshing.');
     } finally {
       setIsLoading(false);
     }
@@ -145,7 +106,7 @@ export default function StaffProfilePage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/profile`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -169,28 +130,7 @@ export default function StaffProfilePage() {
       // Refresh profile data
       await fetchProfile(token);
     } catch (err) {
-      // Mock success for development
-      if (error?.includes('sample data') && profile) {
-        const updatedProfile = { ...profile };
-
-        if (data.phone) {
-          updatedProfile.personal = { ...updatedProfile.personal, phone: data.phone };
-        }
-        if (data.email) {
-          updatedProfile.personal = { ...updatedProfile.personal, email: data.email };
-        }
-        if (data.address) {
-          updatedProfile.personal = { ...updatedProfile.personal, address: data.address };
-        }
-        if (data.emergency) {
-          updatedProfile.emergency = { ...updatedProfile.emergency, ...data.emergency };
-        }
-
-        updatedProfile.lastUpdated = new Date();
-        setProfile(updatedProfile);
-        return;
-      }
-      throw err;
+      setError(err instanceof Error ? err.message : 'Failed to update profile');
     }
   };
 
@@ -231,11 +171,9 @@ export default function StaffProfilePage() {
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="default" className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            {error}
-          </AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 

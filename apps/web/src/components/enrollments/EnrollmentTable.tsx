@@ -9,8 +9,8 @@
  */
 
 import * as React from 'react';
-import { format } from 'date-fns';
 import { MoreHorizontal, ArrowUpDown } from 'lucide-react';
+import { formatDate } from '@/lib/utils/format';
 import {
   Table,
   TableBody,
@@ -164,12 +164,10 @@ export function EnrollmentTable({
               <TableCell>{enrollment.parent_name}</TableCell>
               <TableCell>{enrollment.fee_tier_name}</TableCell>
               <TableCell>
-                {format(new Date(enrollment.start_date), 'MMM d, yyyy')}
+                {formatDate(enrollment.start_date)}
               </TableCell>
               <TableCell>
-                {enrollment.end_date
-                  ? format(new Date(enrollment.end_date), 'MMM d, yyyy')
-                  : '-'}
+                {formatDate(enrollment.end_date)}
               </TableCell>
               <TableCell>
                 <EnrollmentStatusBadge status={enrollment.status} />

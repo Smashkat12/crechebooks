@@ -15,6 +15,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -73,6 +74,7 @@ function PageSkeleton() {
 
 export default function StaffLeavePage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,9 +162,12 @@ export default function StaffLeavePage() {
       if (token) {
         await fetchLeaveData(token);
       }
+      toast({ title: 'Leave request submitted', description: 'Your manager has been notified.' });
       setActiveTab('history');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit leave request');
+      const message = err instanceof Error ? err.message : 'Failed to submit leave request';
+      setError(message);
+      toast({ title: 'Failed to submit leave request', description: message, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }

@@ -34,6 +34,7 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { StaffAuthGuard } from '../auth/guards/staff-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentStaff } from '../auth/decorators/current-staff.decorator';
 import type { StaffSessionInfo } from '../auth/decorators/current-staff.decorator';
 import { SimplePayPayslipService } from '../../integrations/simplepay/simplepay-payslip.service';
@@ -125,8 +126,9 @@ const BCEA_FALLBACK_BALANCES = [
 ];
 
 @ApiTags('Staff Portal')
-@UseGuards(StaffAuthGuard)
 @Controller('staff-portal')
+@Public() // Skip global JwtAuthGuard - StaffAuthGuard handles auth for staff session tokens
+@UseGuards(StaffAuthGuard)
 export class StaffPortalController {
   private readonly logger = new Logger(StaffPortalController.name);
 

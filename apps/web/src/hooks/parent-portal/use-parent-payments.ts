@@ -150,6 +150,7 @@ async function parentPortalFetch<T>(
  * Fetch parent payments list with filters and pagination
  */
 export function useParentPayments(filters?: ParentPaymentsFilters) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentPaymentsResponse, Error>({
     queryKey: parentPaymentKeys.list(filters),
     queryFn: async () => {
@@ -174,6 +175,7 @@ export function useParentPayments(filters?: ParentPaymentsFilters) {
       return parentPortalFetch<ParentPaymentsResponse>(endpoint);
     },
     staleTime: 30 * 1000, // 30 seconds
+    enabled: !!token,
   });
 }
 
@@ -195,12 +197,14 @@ export function useParentPayment(id: string, enabled = true) {
  * Fetch creche bank details for EFT payments
  */
 export function useParentBankDetails() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<CrecheBankDetails, Error>({
     queryKey: parentPaymentKeys.bankDetails(),
     queryFn: async () => {
       return parentPortalFetch<CrecheBankDetails>('/bank-details');
     },
     staleTime: 5 * 60 * 1000, // 5 minutes (bank details don't change often)
+    enabled: !!token,
   });
 }
 

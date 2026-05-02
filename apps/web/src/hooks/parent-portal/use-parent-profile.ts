@@ -172,12 +172,14 @@ async function parentPortalFetch<T>(
  * Fetch parent profile
  */
 export function useParentProfile() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentProfile, Error>({
     queryKey: parentProfileKeys.profile(),
     queryFn: async () => {
       return parentPortalFetch<ParentProfile>('/profile');
     },
     staleTime: 30 * 1000, // 30 seconds
+    enabled: !!token,
   });
 }
 
@@ -205,12 +207,14 @@ export function useUpdateParentProfile() {
  * Fetch parent's enrolled children
  */
 export function useParentChildren() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentChild[], Error>({
     queryKey: parentProfileKeys.children(),
     queryFn: async () => {
       return parentPortalFetch<ParentChild[]>('/children');
     },
     staleTime: 60 * 1000, // 1 minute
+    enabled: !!token,
   });
 }
 
@@ -244,6 +248,7 @@ export function useUpdateCommunicationPrefs() {
  * Fetch a single child by id (derived from the children list cache)
  */
 export function useParentChild(childId: string) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentChild, Error>({
     queryKey: [...parentProfileKeys.children(), childId],
     queryFn: async () => {
@@ -253,6 +258,7 @@ export function useParentChild(childId: string) {
       return child;
     },
     staleTime: 60 * 1000,
+    enabled: !!token && !!childId,
   });
 }
 

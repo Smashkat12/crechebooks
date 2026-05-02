@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AlertTriangle, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrearsTable, SendReminderDialog } from '@/components/arrears';
 import { useArrearsList, useArrearsSummary } from '@/hooks/use-arrears';
 import { formatCurrency } from '@/lib/utils/format';
@@ -15,7 +16,7 @@ export default function ArrearsPage() {
   const [isExporting, setIsExporting] = useState(false);
 
   const { data: arrearsData, isLoading } = useArrearsList();
-  const { data: summary } = useArrearsSummary();
+  const { data: summary, isLoading: summaryLoading } = useArrearsSummary();
 
   // Map API response to ArrearsRow format
   const arrearsRows: ArrearsRow[] = arrearsData?.arrears.map(a => ({
@@ -90,9 +91,13 @@ export default function ArrearsPage() {
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
-              {formatCurrency(summary?.totalOutstanding ?? 0)}
-            </div>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
+                {formatCurrency(summary?.totalOutstanding ?? 0)}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -100,9 +105,13 @@ export default function ArrearsPage() {
             <CardTitle className="text-sm font-medium">90+ Days Overdue</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
-              {formatCurrency(summary?.byAgeBucket.days90Plus ?? 0)}
-            </div>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
+                {formatCurrency(summary?.byAgeBucket.days90Plus ?? 0)}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -110,7 +119,11 @@ export default function ArrearsPage() {
             <CardTitle className="text-sm font-medium">Accounts in Arrears</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.totalAccounts ?? 0}</div>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{summary?.totalAccounts ?? 0}</div>
+            )}
           </CardContent>
         </Card>
       </div>

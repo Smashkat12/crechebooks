@@ -8,6 +8,7 @@ import {
   Calendar,
   FileText,
   User,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +23,11 @@ const navItems: NavItem[] = [
     href: '/staff/dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
+  },
+  {
+    href: '/staff/onboarding',
+    label: 'Onboarding',
+    icon: ClipboardList,
   },
   {
     href: '/staff/payslips',

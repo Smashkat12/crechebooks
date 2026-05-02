@@ -30,6 +30,7 @@ import {
   generatePaymentReference,
   type ParentPaymentsFilters,
 } from '@/hooks/parent-portal/use-parent-payments';
+import { useParentProfile } from '@/hooks/parent-portal/use-parent-profile';
 
 function PaymentsPageContent() {
   const router = useRouter();
@@ -53,17 +54,17 @@ function PaymentsPageContent() {
   // Modal state
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
 
-  // Get parent ID for reference generation (in production, this would come from session)
-  const [parentId, setParentId] = useState<string>('');
+  // Get parent ID for reference generation from the authenticated profile
   const [paymentReference, setPaymentReference] = useState<string>('');
 
-  // Fetch payments and bank details
+  // Fetch payments, bank details and profile (for real parent ID)
   const { data, isLoading, error, isError } = useParentPayments(filters);
   const {
     data: bankDetails,
     isLoading: bankDetailsLoading,
     error: bankDetailsError,
   } = useParentBankDetails();
+  const { data: profile } = useParentProfile();
 
   // Check authentication on mount
   useEffect(() => {
@@ -71,11 +72,14 @@ function PaymentsPageContent() {
     if (!token) {
       router.push('/parent/login');
     }
-    // Extract parent ID from token or session (simplified for demo)
-    const mockParentId = 'P12345678';
-    setParentId(mockParentId);
-    setPaymentReference(generatePaymentReference(mockParentId));
   }, [router]);
+
+  // Generate payment reference once the real parent ID is available
+  useEffect(() => {
+    if (profile?.id) {
+      setPaymentReference(generatePaymentReference(profile.id));
+    }
+  }, [profile?.id]);
 
   // Handle filter changes
   const applyFilters = () => {
@@ -159,7 +163,15 @@ function PaymentsPageContent() {
               You have an outstanding balance of{' '}
               <strong className="text-lg">{formatCurrency(totalOutstanding)}</strong>
             </span>
-            <Button variant="destructive" size="sm" onClick={() => {}}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() =>
+                document
+                  .getElementById('bank-details-card')
+                  ?.scrollIntoView({ behavior: 'smooth' })
+              }
+            >
               Pay Now
             </Button>
           </AlertDescription>
@@ -167,12 +179,14 @@ function PaymentsPageContent() {
       )}
 
       {/* Bank Details Card */}
-      <BankDetailsCard
-        bankDetails={bankDetails}
-        isLoading={bankDetailsLoading}
-        error={bankDetailsError ?? null}
-        paymentReference={paymentReference}
-      />
+      <div id="bank-details-card">
+        <BankDetailsCard
+          bankDetails={bankDetails}
+          isLoading={bankDetailsLoading}
+          error={bankDetailsError ?? null}
+          paymentReference={paymentReference}
+        />
+      </div>
 
       {/* Date Filters */}
       <Card>

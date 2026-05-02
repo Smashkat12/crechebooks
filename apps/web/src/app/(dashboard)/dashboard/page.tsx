@@ -42,15 +42,13 @@ export default function DashboardPage() {
   const { data: onboardingCta, isLoading: onboardingLoading } = useOnboardingDashboardCta();
 
   useEffect(() => {
-    // Redirect to onboarding if required steps are not complete
-    if (!onboardingLoading && onboardingCta?.showOnboarding) {
-      // Check if required steps are incomplete (not just optional steps)
-      // Required steps: address, bankDetails, feeStructure
-      const hasRequiredIncomplete = onboardingCta.progressPercent < 38; // ~3/8 required steps
-      if (hasRequiredIncomplete || onboardingCta.progressPercent === 0) {
-        router.push('/dashboard/onboarding');
-        return;
-      }
+    // Redirect to onboarding only for fresh tenants who haven't started any steps.
+    // showOnboarding=true means the API considers onboarding incomplete.
+    // We only force-redirect when progressPercent === 0 (no steps done) to avoid
+    // interrupting tenants who are partially through non-sequential steps — a
+    // hardcoded percentage threshold (e.g. < 38%) silently misfires for those cases.
+    if (!onboardingLoading && onboardingCta?.showOnboarding && onboardingCta.progressPercent === 0) {
+      router.push('/dashboard/onboarding');
     }
   }, [onboardingCta, onboardingLoading, router]);
 

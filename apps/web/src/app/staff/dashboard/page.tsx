@@ -155,7 +155,7 @@ export default function StaffDashboardPage() {
     if (storedName) {
       setStaffName(storedName);
     } else {
-      fetch(`${API_URL}/api/staff-portal/profile`, {
+      fetch(`${API_URL}/api/v1/staff-portal/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((r) => (r.ok ? r.json() : null))

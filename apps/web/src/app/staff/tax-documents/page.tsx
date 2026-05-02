@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowLeft, FileText, RefreshCw } from 'lucide-react';
 import { IRP5List, type IRP5Document } from '@/components/staff-portal/irp5-list';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -223,10 +223,12 @@ export default function StaffTaxDocumentsPage() {
           onDownload={handleDownload}
         />
       ) : !error && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p className="text-base font-medium">No IRP5 certificates available yet.</p>
-          <p className="text-sm mt-1">
-            Certificates appear here once payslip data has been imported for a completed tax year.
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+          <h2 className="text-lg font-semibold mb-2">No tax documents yet</h2>
+          <p className="text-muted-foreground max-w-sm">
+            IRP5 certificates are issued annually by your employer in March/April. They will appear
+            here once available.
           </p>
         </div>
       )}

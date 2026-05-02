@@ -100,7 +100,7 @@ async function parentPortalFetch<T>(
     throw new Error('Not authenticated. Please log in.');
   }
 
-  const response = await fetch(`${API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${API_URL}/api/v1/parent-portal${endpoint}`, {
     ...options,
     headers: {
       ...options?.headers,
@@ -141,7 +141,7 @@ export function useParentStatements(year: number) {
     queryKey: parentStatementKeys.list(year),
     queryFn: async () => {
       return parentPortalFetch<ParentStatementsListResponse>(
-        `/parent-portal/statements?year=${year}`
+        `/statements?year=${year}`
       );
     },
     staleTime: 60 * 1000, // 1 minute
@@ -160,7 +160,7 @@ export function useParentStatement(
     queryKey: parentStatementKeys.detail(year, month),
     queryFn: async () => {
       return parentPortalFetch<ParentStatementDetail>(
-        `/parent-portal/statements/${year}/${month}`
+        `/statements/${year}/${month}`
       );
     },
     enabled: enabled && !!year && !!month && month >= 1 && month <= 12,

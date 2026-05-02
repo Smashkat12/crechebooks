@@ -216,7 +216,7 @@ export function StaffHeader() {
                 </DropdownMenu>
               )}
 
-              {/* Mobile menu */}
+              {/* Mobile menu — hamburger visible below md (768px) where sidebar is hidden */}
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild className="md:hidden">
                   <Button variant="ghost" size="icon">
@@ -228,7 +228,7 @@ export function StaffHeader() {
                     <span className="sr-only">Toggle menu</span>
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <SheetContent side="left" className="w-[280px] sm:w-[320px]">
                   <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                   <nav className="flex flex-col gap-4 mt-8">
                     {user && (

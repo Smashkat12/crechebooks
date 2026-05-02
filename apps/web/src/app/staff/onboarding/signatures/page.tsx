@@ -67,7 +67,7 @@ export default function SignaturesPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/onboarding/generated-documents`,
+        `${API_URL}/api/v1/staff-portal/onboarding/generated-documents`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -115,7 +115,7 @@ export default function SignaturesPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/onboarding/signatures/${selectedDoc.id}/sign`,
+        `${API_URL}/api/v1/staff-portal/onboarding/signatures/${selectedDoc.id}/sign`,
         {
           method: 'POST',
           headers: {
@@ -149,7 +149,7 @@ export default function SignaturesPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/onboarding/generated-documents/${doc.id}/download`,
+        `${API_URL}/api/v1/staff-portal/onboarding/generated-documents/${doc.id}/download`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }

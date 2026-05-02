@@ -47,121 +47,6 @@ interface LeaveBalancesData {
   employmentStartDate?: Date | string;
 }
 
-// ============================================================================
-// Mock Data (for development)
-// ============================================================================
-
-function getMockBalances(): LeaveBalancesData {
-  const year = new Date().getFullYear();
-  return {
-    balances: [
-      {
-        type: 'annual',
-        name: 'Annual Leave',
-        entitled: 15,
-        used: 5,
-        pending: 2,
-        available: 8,
-        cyclePeriod: `Jan - Dec ${year}`,
-        bceoInfo: '15 working days per year as per BCEA Section 20',
-      },
-      {
-        type: 'sick',
-        name: 'Sick Leave',
-        entitled: 30,
-        used: 3,
-        pending: 0,
-        available: 27,
-        cyclePeriod: `${year - 2} - ${year}`,
-        bceoInfo: '30 days per 3-year cycle as per BCEA Section 22',
-      },
-      {
-        type: 'family',
-        name: 'Family Responsibility Leave',
-        entitled: 3,
-        used: 1,
-        pending: 0,
-        available: 2,
-        cyclePeriod: `Jan - Dec ${year}`,
-        bceoInfo: '3 days per year for family emergencies as per BCEA Section 27',
-      },
-    ],
-    cycleStartDate: new Date(year, 0, 1),
-    cycleEndDate: new Date(year, 11, 31),
-    employmentStartDate: new Date(2023, 2, 15),
-  };
-}
-
-function getMockRequests(): LeaveRequest[] {
-  const today = new Date();
-  return [
-    {
-      id: 'lr-001',
-      type: 'annual',
-      typeName: 'Annual Leave',
-      startDate: new Date(today.getFullYear(), today.getMonth() + 1, 10),
-      endDate: new Date(today.getFullYear(), today.getMonth() + 1, 12),
-      days: 3,
-      status: 'pending',
-      reason: 'Family vacation',
-      createdAt: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000),
-    },
-    {
-      id: 'lr-002',
-      type: 'annual',
-      typeName: 'Annual Leave',
-      startDate: new Date(today.getFullYear(), today.getMonth() - 1, 15),
-      endDate: new Date(today.getFullYear(), today.getMonth() - 1, 19),
-      days: 5,
-      status: 'approved',
-      reason: 'Personal time off',
-      createdAt: new Date(today.getFullYear(), today.getMonth() - 1, 5),
-      reviewerName: 'Sarah Manager',
-      reviewerComments: 'Approved. Enjoy your break!',
-      reviewedAt: new Date(today.getFullYear(), today.getMonth() - 1, 6),
-    },
-    {
-      id: 'lr-003',
-      type: 'sick',
-      typeName: 'Sick Leave',
-      startDate: new Date(today.getFullYear(), today.getMonth() - 2, 8),
-      endDate: new Date(today.getFullYear(), today.getMonth() - 2, 10),
-      days: 3,
-      status: 'approved',
-      reason: 'Flu',
-      createdAt: new Date(today.getFullYear(), today.getMonth() - 2, 8),
-      reviewerName: 'Sarah Manager',
-      reviewedAt: new Date(today.getFullYear(), today.getMonth() - 2, 8),
-    },
-    {
-      id: 'lr-004',
-      type: 'family',
-      typeName: 'Family Responsibility Leave',
-      startDate: new Date(today.getFullYear(), today.getMonth() - 3, 20),
-      endDate: new Date(today.getFullYear(), today.getMonth() - 3, 20),
-      days: 1,
-      status: 'approved',
-      reason: 'Child\'s school event',
-      createdAt: new Date(today.getFullYear(), today.getMonth() - 3, 18),
-      reviewerName: 'Sarah Manager',
-      reviewedAt: new Date(today.getFullYear(), today.getMonth() - 3, 18),
-    },
-    {
-      id: 'lr-005',
-      type: 'annual',
-      typeName: 'Annual Leave',
-      startDate: new Date(today.getFullYear(), today.getMonth() - 4, 1),
-      endDate: new Date(today.getFullYear(), today.getMonth() - 4, 3),
-      days: 3,
-      status: 'rejected',
-      reason: 'Weekend trip',
-      createdAt: new Date(today.getFullYear(), today.getMonth() - 4, -10),
-      reviewerName: 'Sarah Manager',
-      reviewerComments: 'Unfortunately this period is during our busiest time. Please consider alternative dates.',
-      reviewedAt: new Date(today.getFullYear(), today.getMonth() - 4, -9),
-    },
-  ];
-}
 
 // ============================================================================
 // Loading Skeleton
@@ -202,12 +87,12 @@ export default function StaffLeavePage() {
 
     try {
       // Fetch balances
-      const balancesResponse = await fetch(`${API_URL}/api/staff-portal/leave/balances`, {
+      const balancesResponse = await fetch(`${API_URL}/api/v1/staff-portal/leave/balances`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       // Fetch requests
-      const requestsResponse = await fetch(`${API_URL}/api/staff-portal/leave/requests`, {
+      const requestsResponse = await fetch(`${API_URL}/api/v1/staff-portal/leave/requests`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -227,10 +112,8 @@ export default function StaffLeavePage() {
         throw new Error('Failed to fetch leave data');
       }
     } catch (err) {
-      console.warn('Leave API error, using mock data:', err);
-      setError('Unable to connect to server. Showing sample data.');
-      setBalances(getMockBalances());
-      setRequests(getMockRequests());
+      console.error('Leave API error:', err);
+      setError('Unable to load leave data. Please try refreshing.');
     } finally {
       setIsLoading(false);
     }
@@ -252,7 +135,7 @@ export default function StaffLeavePage() {
     const token = localStorage.getItem('staff_session_token');
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/leave/requests`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/leave/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -279,40 +162,7 @@ export default function StaffLeavePage() {
       }
       setActiveTab('history');
     } catch (err) {
-      // Mock success for development
-      if (error?.includes('sample data')) {
-        const newRequest: LeaveRequest = {
-          id: `lr-${Date.now()}`,
-          type: data.type,
-          typeName: data.type.charAt(0).toUpperCase() + data.type.slice(1) + ' Leave',
-          startDate: new Date(data.startDate),
-          endDate: new Date(data.endDate),
-          days: Math.ceil(
-            (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) /
-              (1000 * 60 * 60 * 24)
-          ) + 1,
-          status: 'pending',
-          reason: data.reason,
-          createdAt: new Date(),
-        };
-        setRequests((prev) => [newRequest, ...prev]);
-
-        // Update pending balance
-        if (balances) {
-          const updatedBalances = {
-            ...balances,
-            balances: balances.balances.map((b) =>
-              b.type === data.type
-                ? { ...b, pending: b.pending + newRequest.days, available: b.available - newRequest.days }
-                : b
-            ),
-          };
-          setBalances(updatedBalances);
-        }
-        setActiveTab('history');
-        return;
-      }
-      throw err;
+      setError(err instanceof Error ? err.message : 'Failed to submit leave request');
     } finally {
       setIsSubmitting(false);
     }
@@ -323,7 +173,7 @@ export default function StaffLeavePage() {
     const token = localStorage.getItem('staff_session_token');
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/leave/requests/${id}`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/leave/requests/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -344,30 +194,7 @@ export default function StaffLeavePage() {
         await fetchLeaveData(token);
       }
     } catch (err) {
-      // Mock success for development
-      if (error?.includes('sample data')) {
-        const cancelledRequest = requests.find((r) => r.id === id);
-        if (cancelledRequest) {
-          setRequests((prev) =>
-            prev.map((r) => (r.id === id ? { ...r, status: 'cancelled' as const } : r))
-          );
-
-          // Restore balance
-          if (balances && cancelledRequest.status === 'pending') {
-            const updatedBalances = {
-              ...balances,
-              balances: balances.balances.map((b) =>
-                b.type === cancelledRequest.type
-                  ? { ...b, pending: b.pending - cancelledRequest.days, available: b.available + cancelledRequest.days }
-                  : b
-              ),
-            };
-            setBalances(updatedBalances);
-          }
-        }
-        return;
-      }
-      throw err;
+      setError(err instanceof Error ? err.message : 'Failed to cancel leave request');
     }
   };
 
@@ -418,11 +245,9 @@ export default function StaffLeavePage() {
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="default" className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            {error}
-          </AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 

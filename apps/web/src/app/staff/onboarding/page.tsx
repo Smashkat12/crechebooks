@@ -205,7 +205,7 @@ export default function StaffOnboardingPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/onboarding`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/onboarding`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

@@ -74,7 +74,7 @@ export default function StaffTaxDocumentsPage() {
       }
 
       const response = await fetch(
-        `${API_URL}/api/staff-portal/documents/irp5${params.toString() ? `?${params}` : ''}`,
+        `${API_URL}/api/v1/staff-portal/documents/irp5${params.toString() ? `?${params}` : ''}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -95,7 +95,7 @@ export default function StaffTaxDocumentsPage() {
       }
     } catch (err) {
       console.error('IRP5 API error:', err);
-      setError('Unable to load tax documents. Please try again later.');
+      setError('Unable to load tax documents. Please try refreshing.');
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +126,7 @@ export default function StaffTaxDocumentsPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/documents/irp5/${id}/pdf`,
+        `${API_URL}/api/v1/staff-portal/documents/irp5/${id}/pdf`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -165,7 +165,8 @@ export default function StaffTaxDocumentsPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('IRP5 download error:', err);
+      console.error('Download error:', err);
+      setError('Failed to download document. Please try again.');
     }
   };
 
@@ -206,11 +207,9 @@ export default function StaffTaxDocumentsPage() {
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="default" className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            {error}
-          </AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 

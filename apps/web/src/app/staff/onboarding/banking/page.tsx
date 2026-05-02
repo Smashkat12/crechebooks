@@ -69,7 +69,7 @@ export default function BankingDetailsPage() {
   const fetchCurrentData = async (token: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/profile`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -120,7 +120,7 @@ export default function BankingDetailsPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/onboarding/banking`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/onboarding/banking`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

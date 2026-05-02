@@ -1,5 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+
+function getParentSessionToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('parent_session_token');
+}
 import {
   fetchParentAttachments,
   fetchParentAttachment,
@@ -27,18 +32,21 @@ const parentAttachmentKeys = {
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export function useParentAttachments(params?: { paymentId?: string }) {
+  const token = getParentSessionToken();
   return useQuery<ParentAttachment[], Error>({
     queryKey: parentAttachmentKeys.list(params),
     queryFn: () => fetchParentAttachments(params),
     staleTime: 30 * 1000,
+    enabled: !!token,
   });
 }
 
 export function useParentAttachment(id: string) {
+  const token = getParentSessionToken();
   return useQuery<ParentAttachment, Error>({
     queryKey: parentAttachmentKeys.detail(id),
     queryFn: () => fetchParentAttachment(id),
-    enabled: !!id,
+    enabled: !!token && !!id,
     staleTime: 60 * 1000,
   });
 }

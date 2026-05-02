@@ -163,6 +163,7 @@ async function parentPortalFetch<T>(
  * Fetch parent invoices list with filters and pagination
  */
 export function useParentInvoices(filters?: ParentInvoicesFilters) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentInvoicesResponse, Error>({
     queryKey: parentInvoiceKeys.list(filters),
     queryFn: async () => {
@@ -190,6 +191,7 @@ export function useParentInvoices(filters?: ParentInvoicesFilters) {
       return parentPortalFetch<ParentInvoicesResponse>(endpoint);
     },
     staleTime: 30 * 1000, // 30 seconds
+    enabled: !!token,
   });
 }
 

@@ -137,6 +137,7 @@ async function parentPortalFetch<T>(
  * Fetch parent statements list for a specific year
  */
 export function useParentStatements(year: number) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentStatementsListResponse, Error>({
     queryKey: parentStatementKeys.list(year),
     queryFn: async () => {
@@ -145,6 +146,7 @@ export function useParentStatements(year: number) {
       );
     },
     staleTime: 60 * 1000, // 1 minute
+    enabled: !!token,
   });
 }
 
@@ -156,6 +158,7 @@ export function useParentStatement(
   month: number,
   enabled = true
 ) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentStatementDetail, Error>({
     queryKey: parentStatementKeys.detail(year, month),
     queryFn: async () => {
@@ -163,7 +166,7 @@ export function useParentStatement(
         `/statements/${year}/${month}`
       );
     },
-    enabled: enabled && !!year && !!month && month >= 1 && month <= 12,
+    enabled: !!token && enabled && !!year && !!month && month >= 1 && month <= 12,
     staleTime: 60 * 1000, // 1 minute
   });
 }

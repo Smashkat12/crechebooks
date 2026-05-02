@@ -25,6 +25,48 @@ import {
 
 type FilingType = 'EMP201' | 'VAT201' | 'EMP501' | 'PROVISIONAL_TAX';
 
+/**
+ * SA public holidays for 2026 and 2027 as YYYY-MM-DD strings.
+ * Sources: South African Public Holidays Act 87/1994; SARS eFiling compliance guide.
+ *
+ * When a holiday falls on Sunday the following Monday is also a public holiday
+ * (SA Public Holidays Act §2(2)). Those substitute Mondays are included here.
+ *
+ * Update each year: add new entries, do NOT remove historical dates.
+ */
+const SA_PUBLIC_HOLIDAYS: ReadonlySet<string> = new Set([
+  // 2026
+  '2026-01-01', // New Year's Day
+  '2026-03-21', // Human Rights Day
+  '2026-04-03', // Good Friday
+  '2026-04-06', // Family Day (Easter Monday)
+  '2026-04-27', // Freedom Day
+  '2026-05-01', // Workers' Day
+  '2026-06-16', // Youth Day
+  '2026-08-09', // National Women's Day (Sunday → 2026-08-10 substitute, included below)
+  '2026-08-10', // National Women's Day substitute (9 Aug falls on Sunday)
+  '2026-09-24', // Heritage Day
+  '2026-12-16', // Day of Reconciliation
+  '2026-12-25', // Christmas Day
+  '2026-12-26', // Day of Goodwill (Boxing Day)
+  // 2027
+  '2027-01-01', // New Year's Day
+  '2027-03-21', // Human Rights Day (Sunday → 2027-03-22 substitute)
+  '2027-03-22', // Human Rights Day substitute
+  '2027-03-26', // Good Friday
+  '2027-03-29', // Family Day (Easter Monday)
+  '2027-04-27', // Freedom Day
+  '2027-05-01', // Workers' Day (Saturday → 2027-05-03 substitute)
+  '2027-05-03', // Workers' Day substitute
+  '2027-06-16', // Youth Day
+  '2027-08-09', // National Women's Day
+  '2027-09-24', // Heritage Day
+  '2027-12-16', // Day of Reconciliation
+  '2027-12-25', // Christmas Day
+  '2027-12-26', // Day of Goodwill
+  '2027-12-27', // Christmas Day substitute (25 Dec falls on Saturday)
+]);
+
 interface DeadlineWindow {
   type: FilingType;
   period: string;
@@ -232,23 +274,32 @@ export class SarsReadinessService {
   }
 
   /**
-   * EMP201: due 7th of month following reporting month.
+   * EMP201: due 7th of month following reporting month (EMP201 §3).
    * If the 7th has already passed this month, next deadline is next month's 7th.
-   * Reporting period = the calendar month before dueDate.
+   * When the 7th falls on a weekend or SA public holiday, the deadline advances
+   * to the next business day (SARS eFiling rule).
+   * Reporting period = the calendar month before the unadjusted 7th.
    */
   private emp201Window(ref: Date): DeadlineWindow {
     const y = ref.getFullYear();
     const m = ref.getMonth(); // 0-indexed
 
     // Candidate: 7th of current month (covers last month's payroll)
-    let dueDate = new Date(y, m, 7);
-    if (dueDate <= ref) {
+    let calendarDue = new Date(y, m, 7);
+    if (calendarDue <= ref) {
       // Passed — move to next month
-      dueDate = new Date(y, m + 1, 7);
+      calendarDue = new Date(y, m + 1, 7);
     }
 
-    // Reporting month = month before due date
-    const repMonth = new Date(dueDate.getFullYear(), dueDate.getMonth() - 1, 1);
+    // Advance to next business day if needed (weekend / SA public holiday)
+    const dueDate = this.adjustForBusinessDay(calendarDue);
+
+    // Reporting month = month before the calendar 7th (not the adjusted date)
+    const repMonth = new Date(
+      calendarDue.getFullYear(),
+      calendarDue.getMonth() - 1,
+      1,
+    );
     const period = this.formatYearMonth(repMonth);
     const reportingStart = new Date(
       repMonth.getFullYear(),
@@ -295,17 +346,19 @@ export class SarsReadinessService {
       const y = ref.getFullYear();
       const m = ref.getMonth(); // 0-indexed current month
 
-      // Due date: 25th of current month (covers prior month)
-      let dueDate = new Date(y, m, 25);
-      if (dueDate <= ref) {
+      // Calendar due: 25th of current month (covers prior month)
+      let calendarDue = new Date(y, m, 25);
+      if (calendarDue <= ref) {
         // 25th already passed — next due is 25th of next month
-        dueDate = new Date(y, m + 1, 25);
+        calendarDue = new Date(y, m + 1, 25);
       }
 
-      // Reporting period: the month before the due date
+      const dueDate = this.adjustForBusinessDay(calendarDue);
+
+      // Reporting period: the month before the calendar 25th
       const repMonth = new Date(
-        dueDate.getFullYear(),
-        dueDate.getMonth() - 1,
+        calendarDue.getFullYear(),
+        calendarDue.getMonth() - 1,
         1,
       );
       const reportingStart = new Date(
@@ -370,14 +423,23 @@ export class SarsReadinessService {
     const endStr = this.formatYearMonth(reportingEnd);
     const period = `${startStr}/${endStr}`;
 
-    return { type: 'VAT201', period, dueDate, reportingStart, reportingEnd };
+    // Advance past weekend / SA public holiday
+    const adjustedDueDate = this.adjustForBusinessDay(dueDate);
+
+    return {
+      type: 'VAT201',
+      period,
+      dueDate: adjustedDueDate,
+      reportingStart,
+      reportingEnd,
+    };
   }
 
   /**
    * EMP501: bi-annual.
    *   Interim  — May 31 (covers Mar–Aug payroll)
    *   Annual   — Oct 31 (covers full tax year)
-   * Returns whichever is next.
+   * Returns whichever is next. Deadline adjusted for weekends/SA public holidays.
    */
   private emp501Window(ref: Date): DeadlineWindow {
     const y = ref.getFullYear();
@@ -385,11 +447,13 @@ export class SarsReadinessService {
     const interim = new Date(y, 4, 31); // May 31
     const annual = new Date(y, 9, 31); // Oct 31
 
-    const dueDate =
+    const calendarDue =
       interim > ref ? interim : annual > ref ? annual : new Date(y + 1, 4, 31);
 
-    // Period label: tax year
-    const taxYearStart = dueDate.getMonth() <= 9 ? y - 1 : y; // before Oct = current tax year
+    const dueDate = this.adjustForBusinessDay(calendarDue);
+
+    // Period label: tax year (use calendarDue month to determine which year)
+    const taxYearStart = calendarDue.getMonth() <= 9 ? y - 1 : y; // before Oct = current tax year
     const period = `${taxYearStart}-03/${taxYearStart + 1}-02`;
     const reportingStart = new Date(taxYearStart, 2, 1); // Mar 1
     const reportingEnd = new Date(taxYearStart + 1, 1, 28); // Feb 28
@@ -581,6 +645,27 @@ export class SarsReadinessService {
   // ─────────────────────────────────────────────────────────────────────────
   // Helpers
   // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Advance `date` forward until it lands on a business day (not a Saturday,
+   * Sunday, or South African public holiday).
+   *
+   * SARS rule: when a deadline falls on a non-business day, the return may
+   * be submitted on the next business day.
+   * Source: SARS eFiling guide; Income Tax Act §4; VAT Act §27.
+   */
+  adjustForBusinessDay(date: Date): Date {
+    const result = new Date(date);
+    while (true) {
+      const dow = result.getDay(); // 0=Sun 6=Sat
+      const key = this.formatDate(result); // YYYY-MM-DD local
+      if (dow !== 0 && dow !== 6 && !SA_PUBLIC_HOLIDAYS.has(key)) {
+        break;
+      }
+      result.setDate(result.getDate() + 1);
+    }
+    return result;
+  }
 
   private formatYearMonth(d: Date): string {
     const y = d.getFullYear();

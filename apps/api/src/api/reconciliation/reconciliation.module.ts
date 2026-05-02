@@ -18,6 +18,7 @@ import { ReconciliationController } from './reconciliation.controller';
 import { ReconciliationService } from '../../database/services/reconciliation.service';
 import { ReconciliationRepository } from '../../database/repositories/reconciliation.repository';
 import { FinancialReportService } from '../../database/services/financial-report.service';
+import { AuditLogService } from '../../database/services/audit-log.service';
 import { DiscrepancyService } from '../../database/services/discrepancy.service';
 import { BankStatementReconciliationService } from '../../database/services/bank-statement-reconciliation.service';
 import { BankStatementMatchRepository } from '../../database/repositories/bank-statement-match.repository';
@@ -43,6 +44,7 @@ import { PrismaModule } from '../../database/prisma';
     ReconciliationService,
     ReconciliationRepository,
     FinancialReportService,
+    AuditLogService,
     DiscrepancyService,
     BankStatementReconciliationService,
     BankStatementMatchRepository,

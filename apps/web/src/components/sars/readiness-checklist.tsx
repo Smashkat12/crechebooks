@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getSarsReadiness, SarsReadiness, ReadinessBlocker } from '@/lib/api/sars';
+import { formatDate } from '@/lib/utils/format';
 
 // ─── Severity styling ──────────────────────────────────────────────────────
 
@@ -84,12 +85,7 @@ function DeadlineCountdown({ data }: { data: SarsReadiness }) {
 
   const badgeVariant = overdue || urgent ? 'destructive' : 'secondary';
 
-  // Format due date nicely
-  const dueFormatted = new Date(nextDeadline.dueDate).toLocaleDateString('en-ZA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const dueFormatted = formatDate(nextDeadline.dueDate);
 
   return (
     <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">

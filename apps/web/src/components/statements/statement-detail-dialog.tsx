@@ -18,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useStatement, formatCentsToRands, type StatementStatus } from '@/hooks/use-statements';
+import { formatDate, formatDateTime } from '@/lib/utils/format';
 
 interface StatementDetailDialogProps {
   statementId: string | null;
@@ -64,8 +65,8 @@ export function StatementDetailDialog({
               <span className="inline-block h-4 w-64 animate-pulse rounded-md bg-primary/10" />
             ) : statement ? (
               <>
-                {statement.parent.name} - {new Date(statement.period_start).toLocaleDateString('en-ZA')} to{' '}
-                {new Date(statement.period_end).toLocaleDateString('en-ZA')}
+                {statement.parent.name} - {formatDate(statement.period_start)} to{' '}
+                {formatDate(statement.period_end)}
               </>
             ) : (
               'Statement details'
@@ -127,7 +128,7 @@ export function StatementDetailDialog({
                   {statement.status}
                 </Badge>
                 <span className="text-sm text-muted-foreground">
-                  Generated: {new Date(statement.generated_at).toLocaleString('en-ZA')}
+                  Generated: {formatDateTime(statement.generated_at)}
                 </span>
               </div>
               {statement.total_credits_cents > 0 && (
@@ -158,11 +159,7 @@ export function StatementDetailDialog({
                   {statement.lines.map((line) => (
                     <TableRow key={line.id}>
                       <TableCell>
-                        {new Date(line.date).toLocaleDateString('en-ZA', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {formatDate(line.date)}
                       </TableCell>
                       <TableCell>{line.description}</TableCell>
                       <TableCell>

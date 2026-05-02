@@ -63,9 +63,13 @@ export function ChildrenSummary({ enrolledChildren }: ChildrenSummaryProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-6 text-muted-foreground">
-            <Baby className="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No children enrolled</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Baby className="h-12 w-12 text-muted-foreground mb-3" />
+            <h3 className="font-semibold mb-1">Welcome to your family portal</h3>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Once your child is enrolled at the cr&egrave;che, you&apos;ll see them here. Contact
+              the cr&egrave;che if you&apos;ve enrolled but don&apos;t see your child.
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -1,4 +1,5 @@
 import { useQueries, useQueryClient, UseQueryResult } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { AxiosError } from 'axios';
@@ -197,6 +198,8 @@ export function useDashboardData(
   period?: string
 ): DashboardDataResult {
   const queryClient = useQueryClient();
+  const { status } = useSession();
+  const isAuthed = status === 'authenticated';
 
   // Use parallel queries for independent data sources
   const queries = useQueries({
@@ -205,16 +208,19 @@ export function useDashboardData(
         queryKey: queryKeys.dashboard.metrics(period, year),
         queryFn: () => fetchDashboardMetrics(period, year),
         ...QUERY_CONFIG.metrics,
+        enabled: isAuthed,
       },
       {
         queryKey: queryKeys.dashboard.trends(period, year),
         queryFn: () => fetchDashboardTrends(period, year),
         ...QUERY_CONFIG.trends,
+        enabled: isAuthed,
       },
       {
         queryKey: queryKeys.xero.status(),
         queryFn: fetchXeroStatus,
         ...QUERY_CONFIG.xeroStatus,
+        enabled: isAuthed,
       },
     ],
   });

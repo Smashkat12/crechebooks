@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   BalanceCard,
+  PendingPopBanner,
   RecentInvoices,
   ChildrenSummary,
   QuickActions,
@@ -200,11 +201,14 @@ export default function ParentDashboardPage() {
 
       {/* Balance and Quick Stats */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <BalanceCard
-          currentBalance={data.currentBalance}
-          nextPaymentDue={data.nextPaymentDue || undefined}
-          onPayNow={data.currentBalance > 0 ? handlePayNow : undefined}
-        />
+        <div>
+          <BalanceCard
+            currentBalance={data.currentBalance}
+            nextPaymentDue={data.nextPaymentDue || undefined}
+            onPayNow={data.currentBalance > 0 ? handlePayNow : undefined}
+          />
+          <PendingPopBanner />
+        </div>
 
         {/* Children Summary */}
         <div className="md:col-span-1 lg:col-span-2">

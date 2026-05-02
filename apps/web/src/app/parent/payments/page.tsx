@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { BankDetailsCard } from '@/components/parent-portal/bank-details-card';
 import { PaymentList } from '@/components/parent-portal/payment-list';
 import { PaymentDetail } from '@/components/parent-portal/payment-detail';
+import { PendingPopBanner } from '@/components/parent-portal/pending-pop-banner';
 import { formatCurrency } from '@/lib/utils/format';
 import {
   useParentPayments,
@@ -177,6 +178,9 @@ function PaymentsPageContent() {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Pending PoP indicator */}
+      <PendingPopBanner />
 
       {/* Bank Details Card */}
       <div id="bank-details-card">

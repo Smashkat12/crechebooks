@@ -18,6 +18,7 @@ export { ParentAuthGuard } from './auth-guard';
 
 // Dashboard Components (TASK-PORTAL-012)
 export { BalanceCard } from './balance-card';
+export { PendingPopBanner } from './pending-pop-banner';
 export { RecentInvoices } from './recent-invoices';
 export { ChildrenSummary } from './children-summary';
 export { QuickActions } from './quick-actions';

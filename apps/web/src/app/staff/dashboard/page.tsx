@@ -118,9 +118,24 @@ interface OnboardingStatus {
   requiredActions: Array<{ id: string; isComplete: boolean; isRequired: boolean }>;
 }
 
+interface StaffInfo {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
+/** Derive the greeting name from staff info fields. */
+function resolveGreetingName(info: StaffInfo, fallback?: string): string {
+  const fullName = [info.firstName, info.lastName].filter(Boolean).join(' ').trim();
+  if (fullName) return fullName;
+  if (fallback) return fallback;
+  if (info.email) return info.email;
+  return 'there';
+}
+
 export default function StaffDashboardPage() {
   const router = useRouter();
-  const [staffName, setStaffName] = useState<string>('Staff Member');
+  const [staffName, setStaffName] = useState<string>('there');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -134,10 +149,31 @@ export default function StaffDashboardPage() {
       return;
     }
 
-    // Try to get staff name from stored session data
+    // Resolve greeting name: localStorage value takes precedence (set at login),
+    // otherwise fetch from profile endpoint.
     const storedName = localStorage.getItem('staff_name');
     if (storedName) {
       setStaffName(storedName);
+    } else {
+      fetch(`${API_URL}/api/staff-portal/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          // Profile response shape: { personal: { fullName, email, ... }, ... }
+          const info: StaffInfo = {};
+          if (data.personal?.fullName) {
+            const parts = (data.personal.fullName as string).trim().split(/\s+/);
+            info.firstName = parts[0];
+            info.lastName = parts.slice(1).join(' ') || undefined;
+          }
+          if (data.personal?.email) info.email = data.personal.email as string;
+          setStaffName(resolveGreetingName(info));
+        })
+        .catch(() => {
+          // keep default 'there'
+        });
     }
 
     fetchDashboardData(token);

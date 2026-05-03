@@ -39,3 +39,11 @@ export interface PutObjectResult {
   /** ETag returned by S3 */
   etag: string;
 }
+
+/** Minimal S3 object descriptor returned by listObjectsWithPrefix */
+export interface S3ObjectSummary {
+  /** Full S3 key */
+  key: string;
+  /** S3 LastModified timestamp */
+  lastModified: Date;
+}

@@ -15,7 +15,7 @@
  *  EMP501  — Interim May 31; annual Oct 31 (EMP501 §2)
  */
 import { Injectable, Logger } from '@nestjs/common';
-import { VatCategory } from '@prisma/client';
+import { TaxStatus, VatCategory } from '@prisma/client';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import {
   SarsReadinessResponseDto,
@@ -96,13 +96,16 @@ export class SarsReadinessService {
     const ref = periodRef ? this.parseYearMonth(periodRef) : new Date();
     ref.setHours(0, 0, 0, 0);
 
-    // Fetch tenant vatCategory for VAT201 cadence selection (VAT Act 89/1991 §27).
-    // Defaults to Cat A when null (most common SARS default for newly-registered vendors).
+    // Fetch tenant VAT registration state and category (VAT Act 89/1991 §27).
+    // taxStatus: NOT_REGISTERED tenants have no VAT obligation — vat201 deadline = null.
+    // vatCategory: Cat A default for newly-registered vendors when null.
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { vatCategory: true },
+      select: { vatCategory: true, taxStatus: true },
     });
     const vatCategory: VatCategory | null = tenant?.vatCategory ?? null;
+    const isVatRegistered: boolean =
+      tenant?.taxStatus === ('VAT_REGISTERED' as TaxStatus);
 
     const window = this.nextDeadlineWindow(ref, vatCategory);
     this.logger.debug(
@@ -124,15 +127,19 @@ export class SarsReadinessService {
       ),
     };
 
+    // VAT201 deadline: null when tenant is not VAT-registered (taxStatus !== VAT_REGISTERED).
+    // NOT_REGISTERED tenants have no VAT filing obligation (VAT Act 89/1991 §7).
     const vat201W = this.vat201Window(ref, vatCategory);
-    const vat201Entry: DeadlineEntryDto | null = vat201W
-      ? {
-          dueDate: this.formatDate(vat201W.dueDate),
-          daysRemaining: Math.ceil(
-            (vat201W.dueDate.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24),
-          ),
-        }
-      : null;
+    const vat201Entry: DeadlineEntryDto | null =
+      isVatRegistered && vat201W
+        ? {
+            dueDate: this.formatDate(vat201W.dueDate),
+            daysRemaining: Math.ceil(
+              (vat201W.dueDate.getTime() - ref.getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          }
+        : null;
 
     const deadlines: SarsDeadlinesDto = {
       emp201: emp201Entry,

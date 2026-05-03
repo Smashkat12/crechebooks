@@ -27,8 +27,11 @@ describe('SarsReadinessService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    // Default: no blockers, tenant with Cat A (most common default)
-    mockPrisma.tenant.findUnique.mockResolvedValue({ vatCategory: 'A' });
+    // Default: no blockers, VAT-registered tenant with Cat A (most common default)
+    mockPrisma.tenant.findUnique.mockResolvedValue({
+      vatCategory: 'A',
+      taxStatus: 'VAT_REGISTERED',
+    });
     mockPrisma.transaction.count.mockResolvedValue(0);
     mockPrisma.bankStatementMatch.count.mockResolvedValue(0);
     mockPrisma.staff.findMany.mockResolvedValue([]);
@@ -499,7 +502,7 @@ describe('SarsReadinessService', () => {
       // Tenant findUnique was called with the correct tenantId
       expect(mockPrisma.tenant.findUnique).toHaveBeenCalledWith({
         where: { id: TENANT },
-        select: { vatCategory: true },
+        select: { vatCategory: true, taxStatus: true },
       });
     });
 
@@ -523,6 +526,17 @@ describe('SarsReadinessService', () => {
       mockPrisma.tenant.findUnique.mockResolvedValue(null);
       const result = await service.getReadiness(TENANT, '2026-04');
       expect(result.nextDeadline.type).toBe('EMP201');
+    });
+
+    it('sets deadlines.vat201 = null when tenant taxStatus is NOT_REGISTERED (VAT Act 89/1991 §7)', async () => {
+      // Elle Elephant scenario: taxStatus=NOT_REGISTERED, vatNumber=null, vatCategory=null.
+      // No VAT filing obligation → vat201 deadline must not be surfaced.
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        vatCategory: null,
+        taxStatus: 'NOT_REGISTERED',
+      });
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.deadlines.vat201).toBeNull();
     });
   });
 

@@ -33,21 +33,12 @@ export default function SarsPage() {
   // Submission history — F-A-005
   const { data: submissionsResp, isLoading: submissionsLoading } = useSarsSubmissions();
 
-  // Deadline display helpers
-  const nextDeadline = readiness?.nextDeadline;
-  const emp201DueDate = nextDeadline?.type === 'EMP201' ? nextDeadline.dueDate : null;
-  const vat201DueDate = nextDeadline?.type === 'VAT201' ? nextDeadline.dueDate : null;
-
-  const getDaysUntil = (isoDate: string | null): number | null => {
-    if (!isoDate) return null;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const due = new Date(isoDate);
-    return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  };
-
-  const empDaysUntil = getDaysUntil(emp201DueDate);
-  const vatDaysUntil = getDaysUntil(vat201DueDate);
+  // F2-A-006: read per-return deadlines from the dedicated `deadlines` map so
+  // both cards show a real due date regardless of which is soonest overall.
+  const emp201DueDate = readiness?.deadlines?.emp201?.dueDate ?? null;
+  const vat201DueDate = readiness?.deadlines?.vat201?.dueDate ?? null;
+  const empDaysUntil = readiness?.deadlines?.emp201?.daysRemaining ?? null;
+  const vatDaysUntil = readiness?.deadlines?.vat201?.daysRemaining ?? null;
 
   // Map API response shape to ISarsSubmission expected by SubmissionHistory
   const submissions: ISarsSubmission[] = submissionsResp?.data?.items?.map((item) => ({

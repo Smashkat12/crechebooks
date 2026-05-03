@@ -48,7 +48,7 @@ export function InvoiceCard({ invoice, onViewDetails }: InvoiceCardProps) {
   return (
     <Card
       className={`cursor-pointer transition-colors hover:bg-muted/50 ${
-        invoice.status === 'overdue' ? 'border-red-200 bg-red-50/50' : ''
+        invoice.status === 'overdue' ? 'border-red-200 bg-red-50' : ''
       }`}
       onClick={() => onViewDetails?.(invoice.id)}
     >

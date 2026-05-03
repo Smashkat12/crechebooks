@@ -158,7 +158,7 @@ export function InvoiceList({ invoices, isLoading, onViewInvoice }: InvoiceListP
                   <TableRow
                     key={invoice.id}
                     className={`cursor-pointer ${
-                      invoice.status === 'overdue' ? 'bg-red-50/50' : ''
+                      invoice.status === 'overdue' ? 'bg-red-50' : ''
                     }`}
                     onClick={() => onViewInvoice?.(invoice.id)}
                   >

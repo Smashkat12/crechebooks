@@ -315,9 +315,10 @@ describe('SarsReadinessService', () => {
 
   // ─── Response shape ───────────────────────────────────────────────────────
 
-  it('response always includes nextDeadline, blockers array, and ready flag', async () => {
+  it('response always includes nextDeadline, deadlines, blockers array, and ready flag', async () => {
     const result = await service.getReadiness(TENANT);
     expect(result).toHaveProperty('nextDeadline');
+    expect(result).toHaveProperty('deadlines');
     expect(result).toHaveProperty('blockers');
     expect(result).toHaveProperty('ready');
     expect(typeof result.ready).toBe('boolean');
@@ -327,6 +328,42 @@ describe('SarsReadinessService', () => {
       period: expect.any(String),
       dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       daysRemaining: expect.any(Number),
+    });
+  });
+
+  describe('deadlines map (F2-A-006) — both EMP201 and VAT201 entries', () => {
+    it('deadlines.emp201 is always present with dueDate and daysRemaining', async () => {
+      // On 2026-04 (Cat A tenant), EMP201 next due = 2026-04-07.
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.deadlines.emp201).toMatchObject({
+        dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        daysRemaining: expect.any(Number),
+      });
+      // EMP201 Apr 7 is 6 days from Apr 1 (parseYearMonth gives Apr 1)
+      expect(result.deadlines.emp201.dueDate).toBe('2026-04-07');
+      expect(result.deadlines.emp201.daysRemaining).toBe(6);
+    });
+
+    it('deadlines.vat201 is present for Cat A tenant', async () => {
+      // On 2026-04 (Apr 1), Cat A next VAT201 = May 25
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.deadlines.vat201).not.toBeNull();
+      expect(result.deadlines.vat201!.dueDate).toBe('2026-05-25');
+    });
+
+    it('deadlines.vat201 is null for Cat D tenant (manual cadence)', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({ vatCategory: 'D' });
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.deadlines.vat201).toBeNull();
+    });
+
+    it('deadlines.emp201 and deadlines.vat201 are independent of nextDeadline.type', async () => {
+      // Both cards should have real dates even when EMP201 is the soonest.
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.nextDeadline.type).toBe('EMP201');
+      // VAT201 card still shows a date even though EMP201 is next overall
+      expect(result.deadlines.vat201).not.toBeNull();
+      expect(result.deadlines.emp201.dueDate).not.toBe('');
     });
   });
 

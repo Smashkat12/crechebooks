@@ -18,7 +18,12 @@ export async function middleware(request: NextRequest) {
 
   const isLoggedIn = !!token;
 
-  // Define protected routes
+  // Define protected routes.
+  // NOTE: /staff and /parent are intentionally excluded — both portals use
+  // localStorage-based tokens (staff_session_token / parent_session_token) and
+  // guard auth per-page in client-side useEffect. Adding them here would bounce
+  // magic-link flows (login / verify) to the admin NextAuth login before any
+  // token exists. (JOURNEY3-001)
   const protectedRoutes = [
     '/dashboard',
     '/admin',
@@ -29,7 +34,6 @@ export async function middleware(request: NextRequest) {
     '/sars',
     '/reconciliation',
     '/parents',
-    '/staff',
     '/payroll',
     '/reports',
     '/settings',
@@ -75,7 +79,6 @@ export const config = {
     '/sars/:path*',
     '/reconciliation/:path*',
     '/parents/:path*',
-    '/staff/:path*',
     '/payroll/:path*',
     '/reports/:path*',
     '/settings/:path*',

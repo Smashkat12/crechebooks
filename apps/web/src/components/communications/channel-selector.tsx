@@ -5,7 +5,7 @@
  * TASK-COMM-004: Frontend Communication Dashboard
  */
 
-import { Mail, MessageSquare, Phone, Globe } from 'lucide-react';
+import { Mail, MessageSquare, Globe } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
@@ -21,12 +21,6 @@ const channels = [
     name: 'WhatsApp',
     description: 'Send via WhatsApp',
     icon: MessageSquare,
-  },
-  {
-    id: 'sms',
-    name: 'SMS',
-    description: 'Send via SMS',
-    icon: Phone,
   },
   {
     id: 'all',

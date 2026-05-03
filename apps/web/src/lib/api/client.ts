@@ -111,6 +111,7 @@ apiClient.interceptors.response.use(
         }, 100);
       } catch {
         // If session check fails, redirect to login
+        isHandling401 = false;
         setTimeout(() => {
           window.location.href = '/login';
         }, 100);

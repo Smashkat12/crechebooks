@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 
@@ -122,6 +123,7 @@ function transformInvoiceToArrearsItem(inv: ApiArrearsInvoice): ArrearsItem {
 
 // List arrears with pagination and filters
 export function useArrearsList(params?: ArrearsListParams) {
+  const { status } = useSession();
   return useQuery<ArrearsListResponse, AxiosError>({
     queryKey: queryKeys.arrears.list(params),
     queryFn: async () => {
@@ -149,11 +151,13 @@ export function useArrearsList(params?: ArrearsListParams) {
         limit,
       };
     },
+    enabled: status === 'authenticated',
   });
 }
 
 // Get arrears summary - transforms API response to match ArrearsSummary interface
 export function useArrearsSummary() {
+  const { status } = useSession();
   return useQuery<ArrearsSummary, AxiosError>({
     queryKey: queryKeys.arrears.summary(),
     queryFn: async () => {
@@ -181,6 +185,7 @@ export function useArrearsSummary() {
       };
     },
     staleTime: 60 * 1000, // 1 minute
+    enabled: status === 'authenticated',
   });
 }
 

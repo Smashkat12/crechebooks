@@ -84,7 +84,7 @@ export default function DocumentsUploadPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/onboarding/documents`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/onboarding/documents`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -124,7 +124,7 @@ export default function DocumentsUploadPage() {
       formData.append('file', file);
       formData.append('documentType', documentType);
 
-      const response = await fetch(`${API_URL}/api/staff-portal/onboarding/documents`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/onboarding/documents`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

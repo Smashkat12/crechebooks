@@ -126,7 +126,7 @@ async function parentPortalFetch<T>(
     throw new Error('Not authenticated. Please log in.');
   }
 
-  const response = await fetch(`${API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${API_URL}/api/v1/parent-portal${endpoint}`, {
     ...options,
     headers: {
       ...options?.headers,
@@ -163,6 +163,7 @@ async function parentPortalFetch<T>(
  * Fetch parent invoices list with filters and pagination
  */
 export function useParentInvoices(filters?: ParentInvoicesFilters) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentInvoicesResponse, Error>({
     queryKey: parentInvoiceKeys.list(filters),
     queryFn: async () => {
@@ -185,11 +186,12 @@ export function useParentInvoices(filters?: ParentInvoicesFilters) {
       }
 
       const queryString = params.toString();
-      const endpoint = `/parent-portal/invoices${queryString ? `?${queryString}` : ''}`;
+      const endpoint = `/invoices${queryString ? `?${queryString}` : ''}`;
 
       return parentPortalFetch<ParentInvoicesResponse>(endpoint);
     },
     staleTime: 30 * 1000, // 30 seconds
+    enabled: !!token,
   });
 }
 
@@ -200,7 +202,7 @@ export function useParentInvoice(id: string, enabled = true) {
   return useQuery<ParentInvoiceDetail, Error>({
     queryKey: parentInvoiceKeys.detail(id),
     queryFn: async () => {
-      return parentPortalFetch<ParentInvoiceDetail>(`/parent-portal/invoices/${id}`);
+      return parentPortalFetch<ParentInvoiceDetail>(`/invoices/${id}`);
     },
     enabled: enabled && !!id,
     staleTime: 60 * 1000, // 1 minute

@@ -47,10 +47,6 @@ export default function ReconciliationPage() {
     }
   }, [refreshMatches]);
 
-  if (error || historyError || discrepanciesError || incomeError) {
-    throw new Error(`Failed to load reconciliation: ${(error || historyError || discrepanciesError || incomeError)?.message}`);
-  }
-
   const handleReconciliationSuccess = () => {
     setIsFormOpen(false);
     refetch();
@@ -277,6 +273,14 @@ export default function ReconciliationPage() {
           <Skeleton className="h-28" />
           <Skeleton className="h-28" />
         </div>
+      ) : error || incomeError ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Could not load reconciliation summary.{' '}
+            {(error || incomeError)?.message ?? 'Please try refreshing.'}
+          </AlertDescription>
+        </Alert>
       ) : summary ? (
         <>
           <div className="grid gap-4 md:grid-cols-3">
@@ -348,6 +352,14 @@ export default function ReconciliationPage() {
 
       {discrepanciesLoading ? (
         <Skeleton className="h-48" />
+      ) : discrepanciesError ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Could not load discrepancies.{' '}
+            {discrepanciesError.message ?? 'Please try refreshing.'}
+          </AlertDescription>
+        </Alert>
       ) : discrepancies?.items && discrepancies.items.length > 0 ? (
         <DiscrepancyList items={discrepancies.items} />
       ) : (
@@ -366,11 +378,21 @@ export default function ReconciliationPage() {
         </Card>
       )}
 
-      <ReconciliationHistory
-        reconciliations={history?.data || []}
-        isLoading={historyLoading}
-        onView={handleViewReconciliation}
-      />
+      {historyError ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Could not load reconciliation history.{' '}
+            {historyError.message ?? 'Please try refreshing.'}
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <ReconciliationHistory
+          reconciliations={history?.data || []}
+          isLoading={historyLoading}
+          onView={handleViewReconciliation}
+        />
+      )}
     </div>
   );
 }

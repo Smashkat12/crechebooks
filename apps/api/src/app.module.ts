@@ -12,7 +12,6 @@ import { AdminModule } from './api/admin/admin.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { MetricsModule } from './metrics/metrics.module';
-import { JwtAuthGuard } from './api/auth/guards/jwt-auth.guard';
 import { CombinedAuthGuard } from './api/auth/guards/api-key-auth.guard';
 import { TenantGuard } from './api/auth/guards/tenant.guard';
 import { RolesGuard } from './api/auth/guards/roles.guard';

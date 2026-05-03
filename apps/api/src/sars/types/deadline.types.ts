@@ -127,13 +127,3 @@ export const SARS_DEADLINE_CALENDAR = {
     frequency: 'ANNUAL' as const,
   },
 } as const;
-
-/**
- * Deadline check job data
- */
-export interface SarsDeadlineCheckJobData {
-  tenantId: string;
-  triggeredBy: 'cron' | 'manual' | 'event';
-  scheduledAt: Date;
-  metadata?: Record<string, unknown>;
-}

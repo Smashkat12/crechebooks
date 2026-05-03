@@ -199,7 +199,7 @@ export default function BroadcastDetailPage() {
       {broadcast.delivery_stats && (
         <DeliveryStatsChart
           stats={{ ...broadcast.delivery_stats, total: broadcast.total_recipients }}
-          channel={broadcast.channel as 'email' | 'whatsapp' | 'sms' | 'all'}
+          channel={broadcast.channel as 'email' | 'whatsapp' | 'all'}
         />
       )}
 

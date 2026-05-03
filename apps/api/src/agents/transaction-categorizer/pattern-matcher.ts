@@ -106,40 +106,4 @@ export class PatternMatcher {
     const matches = this.match(payee, description, amountCents, isCredit);
     return matches.length > 0 ? matches[0] : null;
   }
-
-  /**
-   * Get all patterns that match, regardless of confidence
-   */
-  getAllMatches(payee: string, description: string): PatternMatch[] {
-    return this.match(payee, description);
-  }
-
-  /**
-   * Check if a specific pattern matches
-   */
-  matchesPattern(
-    patternId: string,
-    payee: string,
-    description: string,
-  ): boolean {
-    const context = this.contextLoader.getContext();
-    const pattern = context.patterns.find((p) => p.id === patternId);
-
-    if (!pattern) {
-      return false;
-    }
-
-    try {
-      let regex = this.compiledPatterns.get(pattern.id);
-      if (!regex) {
-        regex = new RegExp(pattern.regex, 'i');
-        this.compiledPatterns.set(pattern.id, regex);
-      }
-
-      const textToMatch = `${payee} ${description}`.toUpperCase();
-      return regex.test(textToMatch);
-    } catch {
-      return false;
-    }
-  }
 }

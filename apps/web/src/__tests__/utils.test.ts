@@ -10,7 +10,8 @@
  * - Edge cases and error handling
  */
 
-import { cn, formatCurrency, formatDate, formatDateTime } from '../lib/utils';
+import { cn } from '../lib/utils';
+import { formatCurrency, formatDate, formatDateTime } from '../lib/utils/format';
 
 describe('Utils', () => {
   describe('cn (classname merger)', () => {
@@ -250,34 +251,35 @@ describe('Utils', () => {
   });
 
   describe('formatDate', () => {
+    // Canonical format: yyyy/MM/dd in Africa/Johannesburg timezone (Intl.DateTimeFormat en-ZA)
     describe('Date object input', () => {
       it('should format Date object correctly', () => {
         const date = new Date('2026-01-15');
         const result = formatDate(date);
 
-        // Format is 'dd MMM yyyy' -> "15 Jan 2026"
-        expect(result).toMatch(/\d{2} [A-Za-z]{3} \d{4}/);
-        expect(result).toBe('15 Jan 2026');
+        // Format is yyyy/MM/dd -> "2026/01/15"
+        expect(result).toMatch(/\d{4}\/\d{2}\/\d{2}/);
+        expect(result).toBe('2026/01/15');
       });
 
       it('should handle different months', () => {
-        expect(formatDate(new Date('2026-06-01'))).toBe('01 Jun 2026');
-        expect(formatDate(new Date('2026-12-25'))).toBe('25 Dec 2026');
+        expect(formatDate(new Date('2026-06-01'))).toBe('2026/06/01');
+        expect(formatDate(new Date('2026-12-25'))).toBe('2026/12/25');
       });
 
       it('should handle different years', () => {
-        expect(formatDate(new Date('2020-01-01'))).toBe('01 Jan 2020');
-        expect(formatDate(new Date('2030-01-01'))).toBe('01 Jan 2030');
+        expect(formatDate(new Date('2020-01-01'))).toBe('2020/01/01');
+        expect(formatDate(new Date('2030-01-01'))).toBe('2030/01/01');
       });
     });
 
     describe('string input', () => {
       it('should format ISO date string', () => {
-        expect(formatDate('2026-01-15')).toBe('15 Jan 2026');
+        expect(formatDate('2026-01-15')).toBe('2026/01/15');
       });
 
       it('should format ISO datetime string', () => {
-        expect(formatDate('2026-01-15T10:30:00Z')).toMatch(/\d{2} [A-Za-z]{3} \d{4}/);
+        expect(formatDate('2026-01-15T10:30:00Z')).toMatch(/\d{4}\/\d{2}\/\d{2}/);
       });
     });
 
@@ -303,27 +305,28 @@ describe('Utils', () => {
 
     describe('edge cases', () => {
       it('should handle leap year dates', () => {
-        expect(formatDate(new Date('2024-02-29'))).toBe('29 Feb 2024');
+        expect(formatDate(new Date('2024-02-29'))).toBe('2024/02/29');
       });
 
       it('should handle end of year', () => {
-        expect(formatDate(new Date('2026-12-31'))).toBe('31 Dec 2026');
+        expect(formatDate(new Date('2026-12-31'))).toBe('2026/12/31');
       });
 
       it('should handle start of year', () => {
-        expect(formatDate(new Date('2026-01-01'))).toBe('01 Jan 2026');
+        expect(formatDate(new Date('2026-01-01'))).toBe('2026/01/01');
       });
     });
   });
 
   describe('formatDateTime', () => {
+    // Canonical format: yyyy/MM/dd, HH:mm in Africa/Johannesburg timezone (Intl.DateTimeFormat en-ZA)
     describe('Date object input', () => {
       it('should format Date object with time', () => {
         const date = new Date('2026-01-15T10:30:00');
         const result = formatDateTime(date);
 
-        // Format is 'dd MMM yyyy HH:mm'
-        expect(result).toMatch(/\d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}/);
+        // Format is yyyy/MM/dd, HH:mm
+        expect(result).toMatch(/\d{4}\/\d{2}\/\d{2}, \d{2}:\d{2}/);
       });
 
       it('should handle midnight', () => {
@@ -352,7 +355,7 @@ describe('Utils', () => {
       it('should format ISO datetime string', () => {
         const result = formatDateTime('2026-01-15T10:30:00');
 
-        expect(result).toMatch(/\d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}/);
+        expect(result).toMatch(/\d{4}\/\d{2}\/\d{2}, \d{2}:\d{2}/);
       });
     });
 
@@ -405,7 +408,7 @@ describe('Utils', () => {
 
       expect(className).toBe('text-right font-mono');
       expect(currency).toMatch(/R.*1.*234[,.]56/);
-      expect(date).toBe('15 Jan 2026');
+      expect(date).toBe('2026/01/15');
     });
 
     it('should handle conditional formatting display', () => {

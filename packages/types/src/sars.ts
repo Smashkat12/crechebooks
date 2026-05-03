@@ -108,11 +108,11 @@ export enum SarsSubmissionType {
 
 export enum SarsSubmissionStatus {
   DRAFT = 'DRAFT',
-  GENERATED = 'GENERATED',
-  REVIEWED = 'REVIEWED',
+  READY = 'READY',
   SUBMITTED = 'SUBMITTED',
   ACCEPTED = 'ACCEPTED',
   REJECTED = 'REJECTED',
+  ACKNOWLEDGED = 'ACKNOWLEDGED',
 }
 
 export interface IVAT201 {

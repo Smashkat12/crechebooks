@@ -460,21 +460,6 @@ describe('ConfidenceScorer', () => {
     expect(scorer.meetsAutoApplyThreshold(79, 80)).toBe(false);
     expect(scorer.meetsAutoApplyThreshold(100, 80)).toBe(true);
   });
-
-  it('should explain confidence calculation', () => {
-    const explanation = scorer.explain({
-      patternConfidence: 95,
-      hasPatternMatch: true,
-      hasHistoricalMatch: true,
-      historicalMatchCount: 3,
-      isAmountTypical: true,
-      descriptionQuality: 50,
-    });
-
-    expect(explanation).toContain('Pattern');
-    expect(explanation).toContain('Historical');
-    expect(explanation).toContain('Typical amount');
-  });
 });
 
 describe('ContextLoader', () => {
@@ -500,18 +485,5 @@ describe('ContextLoader', () => {
     expect(context.chartOfAccounts.length).toBeGreaterThan(0);
 
     expect(context.autoApplyThreshold).toBe(85); // 0.85 from payee_patterns.json
-  });
-
-  it('should validate account codes', () => {
-    expect(contextLoader.isValidAccountCode('8100')).toBe(true);
-    expect(contextLoader.isValidAccountCode('9999')).toBe(false);
-  });
-
-  it('should get account by code', () => {
-    // Account 8100 is Interest Expense per chart_of_accounts.json
-    const account = contextLoader.getAccount('8100');
-
-    expect(account).toBeDefined();
-    expect(account?.name).toContain('Interest');
   });
 });

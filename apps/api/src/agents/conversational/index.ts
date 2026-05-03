@@ -11,8 +11,4 @@ export {
   formatCents,
   classifyQueryComplexity,
   routeModel,
-  CONVERSATIONAL_SYSTEM_PROMPT,
-  CONVERSATIONAL_MODEL,
-  CONVERSATIONAL_MAX_TOKENS,
-  CONVERSATIONAL_TEMPERATURE,
 } from './conversational-prompt';

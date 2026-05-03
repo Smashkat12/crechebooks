@@ -13,10 +13,58 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Shield, LayoutDashboard, LogOut, Menu, ChevronRight } from 'lucide-react';
+import {
+  Shield,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  ChevronRight,
+  Building2,
+  Users,
+  BarChart3,
+  ScrollText,
+  Mail,
+  BookOpen,
+  CalendarCheck,
+  FileCheck,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { TenantSwitcher } from './TenantSwitcher';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useState } from 'react';
+
+/** Mirror of AdminSidebar navigation — kept in sync manually. */
+const adminNavigation = [
+  {
+    title: 'Overview',
+    items: [
+      { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: 'Management',
+    items: [
+      { name: 'Tenants', href: '/admin/tenants', icon: Building2 },
+      { name: 'Users', href: '/admin/users', icon: Users },
+      { name: 'Class Groups', href: '/admin/class-groups', icon: BookOpen },
+      { name: 'Attendance', href: '/admin/attendance', icon: CalendarCheck },
+      { name: 'Payment proofs', href: '/admin/payment-attachments', icon: FileCheck },
+    ],
+  },
+  {
+    title: 'Insights',
+    items: [
+      { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+      { name: 'Audit Logs', href: '/admin/audit-logs', icon: ScrollText },
+    ],
+  },
+  {
+    title: 'Inquiries',
+    items: [
+      { name: 'Submissions', href: '/admin/submissions', icon: Mail },
+    ],
+  },
+];
 
 const breadcrumbMap: Record<string, string> = {
   '/admin': 'Dashboard',
@@ -55,11 +103,12 @@ export function AdminHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card">
       <div className="flex h-16 items-center px-4 lg:px-6">
-        {/* Mobile menu */}
+        {/* Mobile menu — mirrors AdminSidebar navigation 1:1 */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="lg:hidden mr-2">
               <Menu className="h-5 w-5" />
+              <span className="sr-only">Open navigation menu</span>
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-64 p-0">
@@ -69,16 +118,37 @@ export function AdminHeader() {
                 <span className="font-semibold">Admin Portal</span>
               </div>
             </div>
-            <nav className="p-4 space-y-2">
-              {Object.entries(breadcrumbMap).map(([href, label]) => (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent"
-                >
-                  {label}
-                </Link>
+            <nav className="p-4 space-y-6 overflow-y-auto">
+              {adminNavigation.map((section) => (
+                <div key={section.title}>
+                  <h3 className="mb-2 px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {section.title}
+                  </h3>
+                  <ul className="space-y-1">
+                    {section.items.map((item) => {
+                      const isActive =
+                        pathname === item.href ||
+                        (item.href !== '/admin' && pathname.startsWith(item.href));
+                      return (
+                        <li key={item.name}>
+                          <Link
+                            href={item.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={cn(
+                              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors min-h-[44px]',
+                              isActive
+                                ? 'bg-primary text-primary-foreground'
+                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            )}
+                          >
+                            <item.icon className="h-4 w-4 flex-shrink-0" />
+                            <span>{item.name}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               ))}
             </nav>
           </SheetContent>

@@ -45,7 +45,7 @@ import {
 } from '@/hooks/use-suppliers';
 import { useAccountsList } from '@/hooks/use-accounts';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 export default function SupplierDetailPage() {
   const params = useParams();

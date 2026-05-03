@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import type { IReconciliation, ReconciliationStatus } from '@crechebooks/types';
 
 interface ReconciliationHistoryProps {

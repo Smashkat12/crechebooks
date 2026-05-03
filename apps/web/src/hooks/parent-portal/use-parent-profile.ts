@@ -135,7 +135,7 @@ async function parentPortalFetch<T>(
     throw new Error('Not authenticated. Please log in.');
   }
 
-  const response = await fetch(`${API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${API_URL}/api/v1/parent-portal${endpoint}`, {
     ...options,
     headers: {
       ...options?.headers,
@@ -172,12 +172,14 @@ async function parentPortalFetch<T>(
  * Fetch parent profile
  */
 export function useParentProfile() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentProfile, Error>({
     queryKey: parentProfileKeys.profile(),
     queryFn: async () => {
-      return parentPortalFetch<ParentProfile>('/parent-portal/profile');
+      return parentPortalFetch<ParentProfile>('/profile');
     },
     staleTime: 30 * 1000, // 30 seconds
+    enabled: !!token,
   });
 }
 
@@ -189,7 +191,7 @@ export function useUpdateParentProfile() {
 
   return useMutation<ParentProfile, Error, Partial<ParentProfile>>({
     mutationFn: async (data) => {
-      return parentPortalFetch<ParentProfile>('/parent-portal/profile', {
+      return parentPortalFetch<ParentProfile>('/profile', {
         method: 'PUT',
         body: JSON.stringify(data),
       });
@@ -205,12 +207,14 @@ export function useUpdateParentProfile() {
  * Fetch parent's enrolled children
  */
 export function useParentChildren() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentChild[], Error>({
     queryKey: parentProfileKeys.children(),
     queryFn: async () => {
-      return parentPortalFetch<ParentChild[]>('/parent-portal/children');
+      return parentPortalFetch<ParentChild[]>('/children');
     },
     staleTime: 60 * 1000, // 1 minute
+    enabled: !!token,
   });
 }
 
@@ -222,7 +226,7 @@ export function useUpdateCommunicationPrefs() {
 
   return useMutation<CommunicationPreferences, Error, Partial<CommunicationPreferences>>({
     mutationFn: async (prefs) => {
-      return parentPortalFetch<CommunicationPreferences>('/parent-portal/preferences', {
+      return parentPortalFetch<CommunicationPreferences>('/preferences', {
         method: 'PUT',
         body: JSON.stringify(prefs),
       });
@@ -244,15 +248,17 @@ export function useUpdateCommunicationPrefs() {
  * Fetch a single child by id (derived from the children list cache)
  */
 export function useParentChild(childId: string) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentChild, Error>({
     queryKey: [...parentProfileKeys.children(), childId],
     queryFn: async () => {
-      const children = await parentPortalFetch<ParentChild[]>('/parent-portal/children');
+      const children = await parentPortalFetch<ParentChild[]>('/children');
       const child = children.find((c) => c.id === childId);
       if (!child) throw new Error('Child not found');
       return child;
     },
     staleTime: 60 * 1000,
+    enabled: !!token && !!childId,
   });
 }
 
@@ -265,7 +271,7 @@ export function useUpdateParentChild(childId: string) {
   return useMutation<ParentChildUpdateResponse, Error, UpdateParentChildDto>({
     mutationFn: async (data) => {
       return parentPortalFetch<ParentChildUpdateResponse>(
-        `/parent-portal/children/${childId}`,
+        `/children/${childId}`,
         {
           method: 'PUT',
           body: JSON.stringify(data),
@@ -308,7 +314,7 @@ export function useUpdateParentChild(childId: string) {
 export function useRequestAccountDeletion() {
   return useMutation<{ message: string }, Error, DeleteAccountRequestDto>({
     mutationFn: async (data) => {
-      return parentPortalFetch<{ message: string }>('/parent-portal/delete-request', {
+      return parentPortalFetch<{ message: string }>('/delete-request', {
         method: 'POST',
         body: JSON.stringify(data),
       });

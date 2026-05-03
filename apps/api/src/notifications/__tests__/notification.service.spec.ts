@@ -14,9 +14,7 @@ import { WhatsAppProviderService } from '../../integrations/whatsapp/services/wh
 import { NotificationService } from '../notification.service';
 import { EmailChannelAdapter } from '../adapters/email-channel.adapter';
 import { WhatsAppChannelAdapter } from '../adapters/whatsapp-channel.adapter';
-import { SmsChannelAdapter } from '../adapters/sms-channel.adapter';
 import { NotificationPreferenceService } from '../notification-preference.service';
-import { SMS_GATEWAY_TOKEN } from '../interfaces/sms-gateway.interface';
 import {
   NotificationChannelType,
   NotificationDeliveryStatus,
@@ -50,7 +48,6 @@ describe('NotificationService', () => {
         NotificationPreferenceService,
         EmailChannelAdapter,
         WhatsAppChannelAdapter,
-        SmsChannelAdapter,
         {
           provide: PrismaService,
           useValue: {
@@ -75,16 +72,6 @@ describe('NotificationService', () => {
           provide: AuditLogService,
           useValue: {
             logAction: jest.fn(),
-          },
-        },
-        {
-          provide: SMS_GATEWAY_TOKEN,
-          useValue: {
-            send: jest.fn().mockResolvedValue({
-              messageId: 'sms-123',
-              status: 'sent',
-            }),
-            isConfigured: jest.fn().mockReturnValue(true),
           },
         },
       ],
@@ -185,65 +172,6 @@ describe('NotificationService', () => {
       await expect(service.send(mockTenantId, notification)).rejects.toThrow(
         BusinessException,
       );
-    });
-  });
-
-  describe('sendWithFallback', () => {
-    it('should fallback to EMAIL when WHATSAPP fails', async () => {
-      // Mock parent with WHATSAPP preference
-      (prisma.parent.findUnique as jest.Mock).mockResolvedValue({
-        id: mockParentId,
-        email: 'parent@example.com',
-        phone: '+27123456789',
-        whatsapp: '+27123456789',
-        preferredContact: PreferredContact.WHATSAPP,
-        whatsappOptIn: true,
-        firstName: 'John',
-        lastName: 'Doe',
-      });
-
-      // WhatsApp provider not configured — triggers fallback to EMAIL
-      whatsAppProviderService.isConfigured.mockReturnValue(false);
-
-      (emailService.isValidEmail as jest.Mock).mockReturnValue(true);
-      (emailService.sendEmail as jest.Mock).mockResolvedValue({
-        messageId: 'email-fallback-123',
-        status: 'sent',
-      });
-
-      const notification: NotificationPayload = {
-        recipientId: mockParentId,
-        subject: 'Fallback Test',
-        body: 'Testing fallback',
-      };
-
-      const result = await service.sendWithFallback(mockTenantId, notification);
-
-      expect(result.success).toBe(true);
-      expect(result.channelUsed).toBe(NotificationChannelType.EMAIL);
-      expect(result.attemptedChannels).toContain(NotificationChannelType.EMAIL);
-    });
-
-    it('should throw error if all fallback channels fail', async () => {
-      // Mock parent with no valid channels
-      (prisma.parent.findUnique as jest.Mock).mockResolvedValue({
-        id: mockParentId,
-        email: null,
-        phone: null,
-        whatsapp: null,
-        preferredContact: PreferredContact.BOTH,
-        whatsappOptIn: false,
-      });
-
-      const notification: NotificationPayload = {
-        recipientId: mockParentId,
-        subject: 'Test',
-        body: 'Test',
-      };
-
-      await expect(
-        service.sendWithFallback(mockTenantId, notification),
-      ).rejects.toThrow(BusinessException);
     });
   });
 

@@ -75,9 +75,11 @@ interface NavSectionProps {
   pathname: string;
   /** Map of link href to prefetch handlers */
   prefetchHandlers?: Record<string, () => void>;
+  /** Optional extra class applied to the items wrapper for visual hierarchy */
+  itemsClassName?: string;
 }
 
-function NavSection({ title, links, collapsed, pathname, prefetchHandlers }: NavSectionProps) {
+function NavSection({ title, links, collapsed, pathname, prefetchHandlers, itemsClassName }: NavSectionProps) {
   return (
     <div className="space-y-1">
       {!collapsed && (
@@ -85,15 +87,17 @@ function NavSection({ title, links, collapsed, pathname, prefetchHandlers }: Nav
           {title}
         </h3>
       )}
-      {links.map((link) => (
-        <NavItem
-          key={link.href}
-          link={link}
-          collapsed={collapsed}
-          isActive={pathname === link.href || pathname.startsWith(`${link.href}/`)}
-          onMouseEnter={prefetchHandlers?.[link.href]}
-        />
-      ))}
+      <div className={itemsClassName}>
+        {links.map((link) => (
+          <NavItem
+            key={link.href}
+            link={link}
+            collapsed={collapsed}
+            isActive={pathname === link.href || pathname.startsWith(`${link.href}/`)}
+            onMouseEnter={prefetchHandlers?.[link.href]}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -178,6 +182,7 @@ export function Sidebar() {
             links={complianceNavLinks}
             collapsed={sidebarCollapsed}
             pathname={pathname}
+            itemsClassName="pl-2"
           />
         </div>
 

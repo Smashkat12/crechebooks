@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowLeft, FileText, RefreshCw } from 'lucide-react';
 import { IRP5List, type IRP5Document } from '@/components/staff-portal/irp5-list';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -30,31 +30,6 @@ interface IRP5Response {
   data: IRP5Document[];
   total: number;
   availableYears: number[];
-}
-
-// ============================================================================
-// Mock Data (for development)
-// ============================================================================
-
-function getMockIRP5Data(): IRP5Response {
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
-
-  const documents: IRP5Document[] = years.map((year, index) => ({
-    id: `irp5-${year}-001`,
-    taxYear: year,
-    taxYearPeriod: `${year - 1}/${year}`,
-    status: index === 0 ? 'pending' : 'available' as const,
-    availableDate: new Date(year, 2, 1), // March 1st of tax year
-    referenceNumber: index === 0 ? undefined : `IRP5/${year}/${Math.floor(100000 + Math.random() * 900000)}`,
-    lastDownloadDate: index > 0 && index < 3 ? new Date(year, 3 + Math.floor(Math.random() * 3), Math.floor(1 + Math.random() * 28)) : undefined,
-  }));
-
-  return {
-    data: documents,
-    total: documents.length,
-    availableYears: years,
-  };
 }
 
 // ============================================================================
@@ -99,7 +74,7 @@ export default function StaffTaxDocumentsPage() {
       }
 
       const response = await fetch(
-        `${API_URL}/api/staff-portal/documents/irp5${params.toString() ? `?${params}` : ''}`,
+        `${API_URL}/api/v1/staff-portal/documents/irp5${params.toString() ? `?${params}` : ''}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -119,9 +94,8 @@ export default function StaffTaxDocumentsPage() {
         throw new Error('Failed to fetch tax documents');
       }
     } catch (err) {
-      console.warn('IRP5 API error, using mock data:', err);
-      setError('Unable to connect to server. Showing sample data.');
-      setIrp5Data(getMockIRP5Data());
+      console.error('IRP5 API error:', err);
+      setError('Unable to load tax documents. Please try refreshing.');
     } finally {
       setIsLoading(false);
     }
@@ -152,7 +126,7 @@ export default function StaffTaxDocumentsPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/documents/irp5/${id}/pdf`,
+        `${API_URL}/api/v1/staff-portal/documents/irp5/${id}/pdf`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -191,25 +165,8 @@ export default function StaffTaxDocumentsPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      // Mock download for development
-      if (error?.includes('sample data')) {
-        const doc = irp5Data?.data.find((d) => d.id === id);
-        if (doc) {
-          // Create a mock PDF blob
-          const mockContent = `%PDF-1.4\n%Mock IRP5 Certificate\n%Tax Year: ${doc.taxYearPeriod}\n%%EOF`;
-          const blob = new Blob([mockContent], { type: 'application/pdf' });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.setAttribute('download', `IRP5-${doc.taxYearPeriod.replace('/', '-')}.pdf`);
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        }
-        return;
-      }
       console.error('Download error:', err);
+      setError('Failed to download document. Please try again.');
     }
   };
 
@@ -250,16 +207,14 @@ export default function StaffTaxDocumentsPage() {
 
       {/* Error Alert */}
       {error && (
-        <Alert variant="default" className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            {error}
-          </AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {/* IRP5 List */}
-      {irp5Data && (
+      {/* IRP5 List or empty state */}
+      {irp5Data && irp5Data.total > 0 ? (
         <IRP5List
           documents={irp5Data.data}
           availableYears={irp5Data.availableYears}
@@ -267,6 +222,15 @@ export default function StaffTaxDocumentsPage() {
           onYearChange={handleYearChange}
           onDownload={handleDownload}
         />
+      ) : !error && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+          <h2 className="text-lg font-semibold mb-2">No tax documents yet</h2>
+          <p className="text-muted-foreground max-w-sm">
+            IRP5 certificates are issued annually by your employer in March/April. They will appear
+            here once available.
+          </p>
+        </div>
       )}
     </div>
   );

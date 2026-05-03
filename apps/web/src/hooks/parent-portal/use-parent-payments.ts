@@ -113,7 +113,7 @@ async function parentPortalFetch<T>(
     throw new Error('Not authenticated. Please log in.');
   }
 
-  const response = await fetch(`${API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${API_URL}/api/v1/parent-portal${endpoint}`, {
     ...options,
     headers: {
       ...options?.headers,
@@ -150,6 +150,7 @@ async function parentPortalFetch<T>(
  * Fetch parent payments list with filters and pagination
  */
 export function useParentPayments(filters?: ParentPaymentsFilters) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<ParentPaymentsResponse, Error>({
     queryKey: parentPaymentKeys.list(filters),
     queryFn: async () => {
@@ -169,11 +170,12 @@ export function useParentPayments(filters?: ParentPaymentsFilters) {
       }
 
       const queryString = params.toString();
-      const endpoint = `/parent-portal/payments${queryString ? `?${queryString}` : ''}`;
+      const endpoint = `/payments${queryString ? `?${queryString}` : ''}`;
 
       return parentPortalFetch<ParentPaymentsResponse>(endpoint);
     },
     staleTime: 30 * 1000, // 30 seconds
+    enabled: !!token,
   });
 }
 
@@ -184,7 +186,7 @@ export function useParentPayment(id: string, enabled = true) {
   return useQuery<ParentPaymentDetail, Error>({
     queryKey: parentPaymentKeys.detail(id),
     queryFn: async () => {
-      return parentPortalFetch<ParentPaymentDetail>(`/parent-portal/payments/${id}`);
+      return parentPortalFetch<ParentPaymentDetail>(`/payments/${id}`);
     },
     enabled: enabled && !!id,
     staleTime: 60 * 1000, // 1 minute
@@ -195,12 +197,14 @@ export function useParentPayment(id: string, enabled = true) {
  * Fetch creche bank details for EFT payments
  */
 export function useParentBankDetails() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('parent_session_token') : null;
   return useQuery<CrecheBankDetails, Error>({
     queryKey: parentPaymentKeys.bankDetails(),
     queryFn: async () => {
-      return parentPortalFetch<CrecheBankDetails>('/parent-portal/bank-details');
+      return parentPortalFetch<CrecheBankDetails>('/bank-details');
     },
     staleTime: 5 * 60 * 1000, // 5 minutes (bank details don't change often)
+    enabled: !!token,
   });
 }
 

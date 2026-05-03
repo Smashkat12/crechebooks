@@ -23,6 +23,7 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   NotFound,
   NoSuchKey,
 } from '@aws-sdk/client-s3';
@@ -34,6 +35,7 @@ import {
   PresignUploadOptions,
   PresignUploadResult,
   PutObjectResult,
+  S3ObjectSummary,
 } from './storage.types';
 import type { S3ConfigType } from './storage.config';
 
@@ -359,6 +361,46 @@ export class StorageService {
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       { expiresIn: ttlSeconds },
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // List objects by prefix (used by orphan sweep)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * List all objects whose key starts with the given prefix, paginating
+   * automatically.  Returns at most `maxKeys` results (default 10 000).
+   *
+   * The prefix is NOT tenant-validated here — callers are responsible for
+   * constructing scoped prefixes via buildKey / the StorageKind path convention.
+   */
+  async listObjectsWithPrefix(
+    prefix: string,
+    maxKeys = 10_000,
+  ): Promise<S3ObjectSummary[]> {
+    const results: S3ObjectSummary[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const response = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          MaxKeys: Math.min(maxKeys - results.length, 1000),
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      for (const obj of response.Contents ?? []) {
+        if (obj.Key && obj.LastModified) {
+          results.push({ key: obj.Key, lastModified: obj.LastModified });
+        }
+      }
+
+      continuationToken = response.NextContinuationToken;
+    } while (continuationToken && results.length < maxKeys);
+
+    return results;
   }
 
   // ---------------------------------------------------------------------------

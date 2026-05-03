@@ -1,4 +1,5 @@
 #!/bin/sh
+# Force redeploy: 2026-05-02T00:26:00Z
 set -e
 
 echo "Checking DATABASE_URL..."

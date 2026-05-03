@@ -25,7 +25,6 @@ import {
 } from '../conversational-prompt';
 import type { SdkAgentFactory } from '../../sdk/sdk-agent.factory';
 import type { SdkConfigService } from '../../sdk/sdk-config';
-import type { RuvectorService } from '../../sdk/ruvector.service';
 import type { PrismaService } from '../../../database/prisma/prisma.service';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -108,7 +107,6 @@ describe('ConversationalAgent', () => {
     agent = new ConversationalAgent(
       mockFactory,
       mockConfig,
-      undefined as unknown as RuvectorService,
       mockPrisma as unknown as PrismaService,
       queryValidator,
     );
@@ -647,7 +645,6 @@ describe('ConversationalAgent', () => {
       const agentWithoutPrisma = new ConversationalAgent(
         mockFactory,
         mockConfig,
-        undefined as unknown as RuvectorService,
         undefined as unknown as PrismaService,
         queryValidator,
       );

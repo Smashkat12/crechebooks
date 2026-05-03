@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSuppliersList, usePayablesSummary } from '@/hooks/use-suppliers';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 export default function PayablesAgingPage() {
   const { data: payablesSummary, isLoading: summaryLoading } = usePayablesSummary();

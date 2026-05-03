@@ -10,7 +10,6 @@ import {
   NotificationChannelType,
   Notification,
   DeliveryResult,
-  NotificationDeliveryStatus,
 } from '../types/notification.types';
 
 export interface INotificationChannel {
@@ -40,11 +39,4 @@ export interface INotificationChannel {
    */
   send(notification: Notification): Promise<DeliveryResult>;
 
-  /**
-   * Get delivery status for a previously sent message
-   *
-   * @param messageId - Message ID from send() result
-   * @returns Current delivery status
-   */
-  getDeliveryStatus(messageId: string): Promise<NotificationDeliveryStatus>;
 }

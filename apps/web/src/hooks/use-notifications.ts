@@ -2,6 +2,7 @@
 
 import { useMutation, useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { apiClient } from '@/lib/api/client';
 import { useNotificationStore } from '@/stores/notification-store';
 import type { NotificationListResponse } from '@/types/notification.types';
@@ -13,6 +14,7 @@ export const NOTIFICATION_KEYS = {
 };
 
 export function useNotifications() {
+  const { status } = useSession();
   return useInfiniteQuery<NotificationListResponse>({
     queryKey: NOTIFICATION_KEYS.list(),
     queryFn: async ({ pageParam }) => {
@@ -27,10 +29,12 @@ export function useNotifications() {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.meta.nextCursor,
     staleTime: 30_000,
+    enabled: status === 'authenticated',
   });
 }
 
 export function useUnreadCount() {
+  const { status } = useSession();
   const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
 
   const query = useQuery<{ count: number }>({
@@ -41,6 +45,7 @@ export function useUnreadCount() {
     },
     refetchInterval: 60_000,
     staleTime: 15_000,
+    enabled: status === 'authenticated',
   });
 
   useEffect(() => {

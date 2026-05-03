@@ -93,7 +93,6 @@ function transformFilterDto(
       hasOutstandingBalance: pf.has_outstanding_balance,
       daysOverdue: pf.days_overdue,
       whatsappOptIn: pf.whatsapp_opt_in,
-      smsOptIn: pf.sms_opt_in,
     } as ParentFilter;
   }
 

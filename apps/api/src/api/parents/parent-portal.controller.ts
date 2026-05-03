@@ -13,6 +13,7 @@ import {
   NotFoundException,
   StreamableFile,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -55,6 +56,14 @@ import {
   UpdateParentChildDto,
   ParentChildUpdateResponseDto,
 } from './dto/update-parent-child.dto';
+import { InvoicePdfService } from '../../database/services/invoice-pdf.service';
+import { StatementPdfService } from '../../database/services/statement-pdf.service';
+import { PaymentReceiptService } from '../../database/services/payment-receipt.service';
+import { StatementDeliveryService } from '../../database/services/statement-delivery.service';
+import { AuditLogService } from '../../database/services/audit-log.service';
+import { AuditAction } from '../../database/entities/audit-log.entity';
+import { BusinessException } from '../../shared/exceptions';
+import { NotificationChannelType } from '../../notifications/types/notification.types';
 
 @ApiTags('Parent Portal')
 @ApiBearerAuth()
@@ -68,6 +77,11 @@ export class ParentPortalController {
     private readonly prisma: PrismaService,
     private readonly parentOnboarding: ParentOnboardingService,
     private readonly parentPortalChild: ParentPortalChildService,
+    private readonly invoicePdfService: InvoicePdfService,
+    private readonly statementPdfService: StatementPdfService,
+    private readonly paymentReceiptService: PaymentReceiptService,
+    private readonly statementDeliveryService: StatementDeliveryService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   // ============================================================================
@@ -657,20 +671,36 @@ export class ParentPortalController {
     });
 
     if (!invoice) {
-      throw new NotFoundException('Invoice not found');
+      // Return 404 for not found OR ownership mismatch — don't leak existence
+      res.status(404).json({ message: 'Invoice not found' });
+      return;
     }
 
-    // TODO: Integrate with actual PDF generation service
-    // For now, return a placeholder response indicating PDF generation is not yet implemented
-    // In production, this would call the invoice PDF service
+    try {
+      const pdfBuffer = await this.invoicePdfService.generatePdf(
+        tenantId,
+        invoiceId,
+      );
 
-    // Placeholder: Return a simple text response indicating the feature
-    res.setHeader('Content-Type', 'application/json');
-    res.status(501).json({
-      message: 'PDF generation not yet implemented',
-      invoiceNumber: invoice.invoiceNumber,
-      hint: 'Integration with PDF service pending',
-    });
+      const filename = `${invoice.invoiceNumber}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+
+      this.logger.log(
+        `PDF downloaded successfully for invoice ${invoice.invoiceNumber}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate PDF for invoice ${invoiceId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      res.status(500).json({ message: 'Failed to generate PDF' });
+    }
   }
 
   // ============================================================================
@@ -939,6 +969,16 @@ export class ParentPortalController {
       orderBy: { paymentDate: 'asc' },
     });
 
+    // Get credit balances created during this month (overpayments, refunds, credit notes)
+    const creditBalances = await this.prisma.creditBalance.findMany({
+      where: {
+        tenantId,
+        parentId,
+        createdAt: { gte: startOfMonth, lte: endOfMonth },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
     // Build transactions list with running balance
     type TransactionItem = {
       id: string;
@@ -955,7 +995,7 @@ export class ParentPortalController {
     let runningBalanceCents = openingBalanceCents;
     let totalInvoicedCents = 0;
     let totalPaidCents = 0;
-    const totalCreditsCents = 0;
+    let totalCreditsCents = 0;
 
     // Add invoices
     for (const invoice of invoices) {
@@ -992,6 +1032,24 @@ export class ParentPortalController {
         credit: payment.amountCents / 100,
         balance: runningBalanceCents / 100,
         sortDate: payment.paymentDate,
+      });
+    }
+
+    // Add credit balances (reduce balance owed)
+    for (const cb of creditBalances) {
+      runningBalanceCents -= cb.amountCents;
+      totalCreditsCents += cb.amountCents;
+
+      transactions.push({
+        id: cb.id,
+        date: cb.createdAt.toISOString(),
+        description:
+          cb.description ?? `Credit - ${cb.sourceType.replace(/_/g, ' ')}`,
+        type: 'credit',
+        debit: null,
+        credit: cb.amountCents / 100,
+        balance: runningBalanceCents / 100,
+        sortDate: cb.createdAt,
       });
     }
 
@@ -1036,13 +1094,14 @@ export class ParentPortalController {
   @ApiParam({ name: 'month', description: 'Statement month (1-12)' })
   @ApiResponse({ status: 200, description: 'PDF file' })
   @ApiResponse({ status: 404, description: 'Statement not found' })
-  downloadStatementPdf(
+  async downloadStatementPdf(
     @CurrentParent() session: ParentSession,
     @Param('year') yearParam: string,
     @Param('month') monthParam: string,
     @Res() res: Response,
-  ): void {
+  ): Promise<void> {
     const parentId = session.parentId;
+    const tenantId = session.tenantId;
     const year = parseInt(yearParam, 10);
     const month = parseInt(monthParam, 10);
 
@@ -1054,14 +1113,54 @@ export class ParentPortalController {
       `Downloading PDF for statement ${year}/${month}, parent ${parentId}`,
     );
 
-    // TODO: Integrate with actual PDF generation service
-    // For now, return a placeholder response
-    res.setHeader('Content-Type', 'application/json');
-    res.status(501).json({
-      message: 'Statement PDF generation not yet implemented',
-      period: `${this.getMonthName(month)} ${year}`,
-      hint: 'Integration with PDF service pending',
+    // Derive period boundaries for the requested month
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Look up the Statement DB record scoped to this parent + tenant + period.
+    // Ownership is enforced by including parentId in the WHERE clause — a
+    // statement belonging to another parent returns null and we respond 404
+    // without leaking existence.
+    const statement = await this.prisma.statement.findFirst({
+      where: {
+        tenantId,
+        parentId,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
+      },
+      orderBy: { createdAt: 'desc' },
     });
+
+    if (!statement) {
+      res.status(404).json({ message: 'Statement not found' });
+      return;
+    }
+
+    try {
+      const pdfBuffer = await this.statementPdfService.generatePdf(
+        tenantId,
+        statement.id,
+      );
+
+      const filename = `${statement.statementNumber}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.send(pdfBuffer);
+
+      this.logger.log(
+        `Statement PDF downloaded for statement ${statement.statementNumber}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate PDF for statement ${statement.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      res.status(500).json({ message: 'Failed to generate PDF' });
+    }
   }
 
   @Post('statements/:year/:month/email')
@@ -1080,6 +1179,7 @@ export class ParentPortalController {
     @Param('month') monthParam: string,
   ): Promise<EmailStatementResponseDto> {
     const parentId = session.parentId;
+    const tenantId = session.tenantId;
     const year = parseInt(yearParam, 10);
     const month = parseInt(monthParam, 10);
 
@@ -1088,10 +1188,32 @@ export class ParentPortalController {
     }
 
     this.logger.debug(
-      `Emailing statement ${year}/${month} to parent ${parentId}`,
+      `Emailing statement ${year}/${month} for parent correlation-id=${parentId.substring(0, 8)}`,
     );
 
-    // Get parent email
+    // Derive period boundaries (same logic as downloadStatementPdf)
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = new Date(year, month, 0, 23, 59, 59, 999);
+
+    // Look up the formal Statement DB record scoped to this parent + tenant + period.
+    // Ownership is enforced by parentId in WHERE — a statement belonging to another
+    // parent or tenant returns null and we respond 404 without leaking existence.
+    const statement = await this.prisma.statement.findFirst({
+      where: {
+        tenantId,
+        parentId,
+        periodStart: { gte: periodStart },
+        periodEnd: { lte: periodEnd },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, statementNumber: true, status: true },
+    });
+
+    if (!statement) {
+      throw new NotFoundException('Statement not found');
+    }
+
+    // Get parent email (needed for response and audit log)
     const parent = await this.prisma.parent.findUnique({
       where: { id: parentId },
       select: { email: true },
@@ -1101,12 +1223,52 @@ export class ParentPortalController {
       throw new NotFoundException('Parent email not found');
     }
 
-    // TODO: Integrate with actual email service
-    // For now, return a success response indicating the feature will be implemented
-    return {
-      message: `Statement for ${this.getMonthName(month)} ${year} will be sent to your email`,
-      sentTo: parent.email,
-    };
+    // Audit-log every send attempt BEFORE dispatch (fields: userId=parentId correlation,
+    // tenantId, statementId, channel, status). No raw PII in afterValue.
+    await this.auditLogService.logAction({
+      tenantId,
+      userId: parentId,
+      entityType: 'ParentPortalStatementEmail',
+      entityId: statement.id,
+      action: AuditAction.UPDATE,
+      beforeValue: { status: statement.status },
+      afterValue: {
+        channel: 'EMAIL',
+        via: 'parent-portal',
+        statementNumber: statement.statementNumber,
+        requestedAt: new Date().toISOString(),
+      },
+      changeSummary: `Parent self-service email request for statement ${statement.statementNumber}`,
+    });
+
+    // Deliver via StatementDeliveryService (EMAIL channel).
+    // COMMS_DISABLED gate: EmailService.sendEmailWithOptions() short-circuits to
+    // { messageId: 'comms-disabled-noop', status: 'sent' } when COMMS_DISABLED=true —
+    // no external API call is made.
+    // Status gate: StatementDeliveryService.deliverStatement() throws BusinessException
+    // if statement is not FINAL.
+    try {
+      const result = await this.statementDeliveryService.deliverStatement({
+        tenantId,
+        statementId: statement.id,
+        userId: parentId,
+        channel: NotificationChannelType.EMAIL,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error ?? 'Delivery failed');
+      }
+
+      return {
+        message: `Statement for ${this.getMonthName(month)} ${year} has been sent to your email`,
+        sentTo: parent.email,
+      };
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   // ============================================================================
@@ -1271,6 +1433,7 @@ export class ParentPortalController {
             },
           },
         },
+        receipt: { select: { paymentId: true } },
       },
     });
 
@@ -1302,7 +1465,9 @@ export class ParentPortalController {
       method: payment.matchType || 'EFT',
       status: this.mapPaymentStatus(payment.deletedAt, payment.paymentDate),
       allocations,
-      hasReceipt: false, // TODO: Implement receipt generation
+      // True when a persisted receipt already exists in S3; false means one
+      // can still be generated on demand via GET payments/:id/receipt
+      hasReceipt: !!payment.receipt,
       notes: undefined,
     };
   }
@@ -1315,8 +1480,8 @@ export class ParentPortalController {
   async downloadPaymentReceipt(
     @CurrentParent() session: ParentSession,
     @Param('id') paymentId: string,
-    @Res() res: Response,
-  ): Promise<void> {
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
     const parentId = session.parentId;
     const tenantId = session.tenantId;
 
@@ -1324,7 +1489,8 @@ export class ParentPortalController {
       `Downloading receipt for payment ${paymentId}, parent ${parentId}`,
     );
 
-    // Verify payment belongs to this parent
+    // Verify payment belongs to this parent (parent → invoice → payment chain).
+    // Returns null for not-found OR ownership/tenant mismatch — no existence leak.
     const payment = await this.prisma.payment.findFirst({
       where: {
         id: paymentId,
@@ -1337,13 +1503,28 @@ export class ParentPortalController {
       throw new NotFoundException('Payment not found');
     }
 
-    // TODO: Integrate with actual PDF generation service
-    res.setHeader('Content-Type', 'application/json');
-    res.status(501).json({
-      message: 'Receipt generation not yet implemented',
-      paymentId: payment.id,
-      hint: 'Integration with PDF service pending',
+    // Cache-or-generate receipt, then stream from S3 — mirrors the admin
+    // GET /payments/:paymentId/receipt pattern in payment.controller.ts
+    const receipt = await this.paymentReceiptService.getOrGenerateReceipt(
+      tenantId,
+      paymentId,
+    );
+
+    const stream = await this.paymentReceiptService.streamReceipt(
+      tenantId,
+      receipt.s3Key,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${receipt.receiptNumber}.pdf"`,
     });
+
+    this.logger.log(
+      `Streaming receipt ${receipt.receiptNumber} for payment ${paymentId} (cached=${receipt.cached})`,
+    );
+
+    return new StreamableFile(stream);
   }
 
   @Get('bank-details')
@@ -1466,7 +1647,7 @@ export class ParentPortalController {
       invoiceDelivery,
       paymentReminders: (storedPrefs.paymentReminders as boolean) ?? true,
       emailNotifications: (storedPrefs.emailNotifications as boolean) ?? true,
-      marketingOptIn: parent.smsOptIn ?? false,
+      marketingOptIn: false,
       whatsappOptIn: parent.whatsappOptIn ?? false,
       whatsappConsentTimestamp:
         (storedPrefs.whatsappConsentTimestamp as string) || null,
@@ -1606,7 +1787,6 @@ export class ParentPortalController {
     // Build updated preferences
     const updateData: {
       whatsappOptIn?: boolean;
-      smsOptIn?: boolean;
       preferredContact?: 'EMAIL' | 'WHATSAPP' | 'BOTH';
       notes?: string;
     } = {};
@@ -1642,7 +1822,6 @@ export class ParentPortalController {
 
     if (dto.marketingOptIn !== undefined) {
       storedPrefs.marketingOptIn = dto.marketingOptIn;
-      updateData.smsOptIn = dto.marketingOptIn;
     }
 
     if (dto.whatsappConsentTimestamp !== undefined) {

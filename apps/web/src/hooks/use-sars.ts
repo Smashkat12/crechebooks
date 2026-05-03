@@ -3,6 +3,26 @@ import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 import type { ISarsSubmission } from '@crechebooks/types';
 
+/** Response shape for GET /sars/submissions (F-A-005) */
+export interface SarsSubmissionsApiResponse {
+  success: boolean;
+  data: {
+    items: Array<{
+      id: string;
+      submission_type: string;
+      period: string;
+      status: string;
+      submitted_at: string | null;
+      sars_reference: string | null;
+      is_finalized: boolean;
+      created_at: string;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+  };
+}
+
 // Types for API responses
 interface VAT201Response {
   period: string;
@@ -73,12 +93,14 @@ export function useEMP201(period: string, enabled = true) {
   });
 }
 
-// Get SARS submission history
+// Get SARS submission history (F-A-005)
 export function useSarsSubmissions() {
-  return useQuery<ISarsSubmission[], AxiosError>({
+  return useQuery<SarsSubmissionsApiResponse, AxiosError>({
     queryKey: queryKeys.sars.submissions(),
     queryFn: async () => {
-      const { data } = await apiClient.get<ISarsSubmission[]>(endpoints.sars.submissions);
+      const { data } = await apiClient.get<SarsSubmissionsApiResponse>(
+        endpoints.sars.submissions,
+      );
       return data;
     },
   });

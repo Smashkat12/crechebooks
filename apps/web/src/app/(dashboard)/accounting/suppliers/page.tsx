@@ -16,7 +16,7 @@ import { DataTableSkeleton } from '@/components/tables/data-table-skeleton';
 import { Input } from '@/components/ui/input';
 import { useSuppliersList, usePayablesSummary, type Supplier } from '@/hooks/use-suppliers';
 import { createSupplierColumns } from '@/components/accounting/supplier-columns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 export default function SuppliersPage() {
   const router = useRouter();

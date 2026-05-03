@@ -35,7 +35,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Scissors, AlertCircle, CheckCircle2, Info, ArrowRight } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import { toast } from '@/hooks/use-toast';
 import { useDetectSplitParams, useCreateXeroSplit } from '@/hooks/use-xero-split';
 import type { SplitDetectionResult } from '@/lib/api/xero-split';

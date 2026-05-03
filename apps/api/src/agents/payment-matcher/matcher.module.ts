@@ -17,8 +17,6 @@ import { SdkAgentModule } from '../sdk';
 import { AgentMemoryModule } from '../memory/agent-memory.module';
 import { AuditTrailModule } from '../audit/audit-trail.module';
 import { HybridScorer } from '../shared/hybrid-scorer';
-import { AccuracyTracker } from '../shared/accuracy-tracker';
-import { ScoringRouter } from '../shared/scoring-router';
 import { RolloutModule } from '../rollout/rollout.module';
 
 @Module({
@@ -34,8 +32,6 @@ import { RolloutModule } from '../rollout/rollout.module';
     MatchDecisionLogger,
     SdkPaymentMatcher,
     HybridScorer,
-    AccuracyTracker,
-    ScoringRouter,
   ],
   exports: [PaymentMatcherAgent],
 })

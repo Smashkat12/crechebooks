@@ -6,9 +6,10 @@ import {
   Loader2,
   AlertCircle,
   ExternalLink,
+  Info,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useParentMessages } from '@/hooks/parent-portal/use-parent-messages';
@@ -106,6 +107,16 @@ export default function ParentMessagesPage() {
         </p>
       </div>
 
+      {/* Read-only disclosure */}
+      <Alert variant="default">
+        <Info className="h-4 w-4" />
+        <AlertTitle>View only</AlertTitle>
+        <AlertDescription>
+          Messages from your cr&egrave;che appear here. To reply, please contact
+          your cr&egrave;che directly via WhatsApp, email, or phone.
+        </AlertDescription>
+      </Alert>
+
       {/* Error */}
       {error && (
         <Alert variant="destructive">
@@ -152,12 +163,6 @@ export default function ParentMessagesPage() {
         </Card>
       )}
 
-      {/* Read-only notice */}
-      {!isLoading && messages.length > 0 && (
-        <p className="text-xs text-muted-foreground text-center">
-          To reply, please send a WhatsApp message directly to the school.
-        </p>
-      )}
     </div>
   );
 }

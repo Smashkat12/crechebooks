@@ -55,7 +55,7 @@ export default function TaxInfoPage() {
   const fetchCurrentData = async (token: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/profile`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -88,7 +88,7 @@ export default function TaxInfoPage() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/onboarding/tax`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/onboarding/tax`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

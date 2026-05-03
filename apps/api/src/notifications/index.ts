@@ -10,4 +10,3 @@ export * from './types/notification.types';
 export * from './interfaces/notification-channel.interface';
 export * from './adapters/email-channel.adapter';
 export * from './adapters/whatsapp-channel.adapter';
-export * from './adapters/sms-channel.adapter';

@@ -98,7 +98,7 @@ export function RecipientPreview({ recipientType, filter, channel }: RecipientPr
                     {r.email}
                   </Badge>
                 )}
-                {r.phone && (channel === 'whatsapp' || channel === 'sms' || channel === 'all') && (
+                {r.phone && (channel === 'whatsapp' || channel === 'all') && (
                   <Badge variant="outline" className="text-xs">
                     <MessageSquare className="mr-1 h-3 w-3" />
                     {r.phone}

@@ -1,13 +1,14 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { PaymentTable } from '@/components/payments';
 import { useAuth } from '@/hooks/use-auth';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info } from 'lucide-react';
-import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 export default function PaymentsPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const tenantId = user?.tenantId ?? '';
 
@@ -20,18 +21,15 @@ export default function PaymentsPage() {
             Track and match incoming payments to invoices
           </p>
         </div>
+        <Button onClick={() => router.push('/transactions')}>
+          <ArrowRight className="h-4 w-4 mr-2" />
+          Categorize transactions
+        </Button>
       </div>
 
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          Payments are created when income transactions are categorized and allocated to parents.{' '}
-          <Link href="/transactions" className="font-medium underline underline-offset-4">
-            Go to Transactions
-          </Link>{' '}
-          to categorize income and create payments.
-        </AlertDescription>
-      </Alert>
+      <p className="text-sm text-muted-foreground">
+        Payments are created when income transactions are categorized and allocated to parents.
+      </p>
 
       <Card>
         <CardContent className="pt-6">

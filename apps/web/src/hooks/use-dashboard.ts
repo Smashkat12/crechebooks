@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 
@@ -53,6 +54,7 @@ interface DashboardTrends {
 
 // Get dashboard metrics
 export function useDashboardMetrics(period?: string, year?: number) {
+  const { status } = useSession();
   return useQuery<DashboardMetrics, AxiosError>({
     queryKey: queryKeys.dashboard.metrics(period, year),
     queryFn: async () => {
@@ -63,11 +65,13 @@ export function useDashboardMetrics(period?: string, year?: number) {
     },
     staleTime: 30 * 1000, // 30 seconds - dashboard data changes frequently
     refetchInterval: 60 * 1000, // Refetch every minute when on dashboard
+    enabled: status === 'authenticated',
   });
 }
 
 // Get dashboard trends
 export function useDashboardTrends(period?: string, year?: number) {
+  const { status } = useSession();
   return useQuery<DashboardTrends, AxiosError>({
     queryKey: queryKeys.dashboard.trends(period, year),
     queryFn: async () => {
@@ -77,6 +81,7 @@ export function useDashboardTrends(period?: string, year?: number) {
       return data;
     },
     staleTime: 60 * 1000, // 1 minute - trends don't change as frequently
+    enabled: status === 'authenticated',
   });
 }
 
@@ -97,6 +102,7 @@ interface AvailablePeriods {
 
 // Get available periods for the tenant
 export function useAvailablePeriods() {
+  const { status } = useSession();
   return useQuery<AvailablePeriods, AxiosError>({
     queryKey: queryKeys.dashboard.availablePeriods(),
     queryFn: async () => {
@@ -104,5 +110,6 @@ export function useAvailablePeriods() {
       return data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes - periods don't change frequently
+    enabled: status === 'authenticated',
   });
 }

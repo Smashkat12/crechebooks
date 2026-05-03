@@ -30,7 +30,8 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api";
 import { calculateInvoiceVAT, type OrganizationConfig } from "@/lib/vat";
 

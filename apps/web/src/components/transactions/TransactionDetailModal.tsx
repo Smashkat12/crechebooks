@@ -37,7 +37,7 @@ import {
   Split,
   GitBranch,
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { ConfidenceBadge } from './confidence-badge';
 
 export interface TransactionDetailModalProps {

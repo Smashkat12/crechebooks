@@ -1114,7 +1114,6 @@ model Parent {
   whatsapp         String?          @db.VarChar(20)
   preferredContact PreferredContact @default(EMAIL) @map("preferred_contact")
   whatsappOptIn    Boolean          @default(false) @map("whatsapp_opt_in")
-  smsOptIn         Boolean          @default(false) @map("sms_opt_in")
   idNumber         String?          @map("id_number") @db.VarChar(20)
   address          String?
   notes            String?
@@ -3706,10 +3705,6 @@ model MessageRecipient {
   whatsappStatus String?   @map("whatsapp_status") @db.VarChar(20) // pending, sent, delivered, read, failed
   whatsappSentAt DateTime? @map("whatsapp_sent_at")
   whatsappWamid  String?   @map("whatsapp_wamid") @db.VarChar(100) // WhatsApp Message ID
-
-  smsStatus    String?   @map("sms_status") @db.VarChar(20) // pending, sent, delivered, failed
-  smsSentAt    DateTime? @map("sms_sent_at")
-  smsMessageId String?   @map("sms_message_id") @db.VarChar(255)
 
   // Error tracking
   lastError  String? @map("last_error") @db.Text

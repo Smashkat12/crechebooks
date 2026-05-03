@@ -13,7 +13,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import { ValidationWarnings } from './validation-warnings';
 import { UIF_CONSTANTS } from '@crechebooks/types';
 

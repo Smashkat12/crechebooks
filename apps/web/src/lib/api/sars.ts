@@ -20,8 +20,24 @@ export interface ReadinessBlocker {
   count: number;
 }
 
+export interface DeadlineEntry {
+  dueDate: string;
+  daysRemaining: number;
+}
+
+export interface SarsDeadlines {
+  emp201: DeadlineEntry;
+  vat201: DeadlineEntry | null;
+}
+
 export interface SarsReadiness {
   nextDeadline: NextDeadline;
+  /**
+   * Per-return deadline entries (F2-A-006).
+   * Populated independently so each UI card shows its own due date
+   * regardless of which return is soonest overall.
+   */
+  deadlines: SarsDeadlines;
   blockers: ReadinessBlocker[];
   ready: boolean;
 }

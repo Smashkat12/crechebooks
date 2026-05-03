@@ -3,7 +3,7 @@
 import { AlertTriangle, CreditCard } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 interface ArrearsAlertProps {
   daysOverdue: number;

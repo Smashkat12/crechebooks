@@ -47,7 +47,7 @@ import {
   useDeletePayrollJournal,
   type PayrollJournal,
 } from '@/hooks/use-xero-payroll';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils/format';
 import { useToast } from '@/hooks/use-toast';
 
 interface JournalDetailDialogProps {

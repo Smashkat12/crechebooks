@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAvailableTransactions, useManualMatch, type AvailableTransaction } from '@/hooks/use-reconciliation';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import { toast } from '@/hooks/use-toast';
 
 interface ManualMatchDialogProps {

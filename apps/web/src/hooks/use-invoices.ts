@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 import type { IInvoice, IInvoiceLine, InvoiceStatus } from '@crechebooks/types';
@@ -202,6 +203,7 @@ function transformInvoice(apiInvoice: ApiInvoiceResponse): InvoiceWithLines {
 
 // List invoices with pagination and filters
 export function useInvoicesList(params?: InvoiceListParams) {
+  const { status } = useSession();
   return useQuery<InvoicesListResponse, AxiosError>({
     queryKey: queryKeys.invoices.list(params),
     queryFn: async () => {
@@ -227,6 +229,7 @@ export function useInvoicesList(params?: InvoiceListParams) {
         limit: data.meta.limit,
       };
     },
+    enabled: status === 'authenticated',
   });
 }
 

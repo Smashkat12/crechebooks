@@ -131,6 +131,12 @@ export class SdkSarsExplainer extends BaseSdkAgent {
   /**
    * Execute inference via ClaudeClientService (Requesty proxy).
    *
+   * This is a live functional path — NOT the legacy agentic-flow stub.
+   * When ClaudeClientService is injected and ANTHROPIC_API_KEY is set,
+   * this makes a real LLM call. When the client is unavailable or throws,
+   * executeWithFallback() in explain() catches the error and routes to
+   * buildFallbackExplanation(). Both paths are in regular use.
+   *
    * @param _agentDef - Agent definition (prompt is taken from SARS_EXPLAINER_SYSTEM_PROMPT)
    * @param userMessage - User message containing the pre-built SARS prompt
    * @param _tenantId - Tenant ID (reserved for future isolation)

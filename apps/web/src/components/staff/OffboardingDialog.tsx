@@ -36,7 +36,7 @@ import {
   useSettlementPreview,
   useInitiateOffboarding,
 } from '@/hooks/use-staff-offboarding';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 interface OffboardingDialogProps {
   staffId: string;

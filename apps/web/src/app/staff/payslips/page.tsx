@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,26 +32,6 @@ interface PayslipSummary {
   status: 'paid' | 'pending' | 'processing';
 }
 
-function getMockPayslips(year: number): PayslipSummary[] {
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const months = year === currentYear ? currentMonth + 1 : 12;
-
-  return Array.from({ length: months }, (_, i) => ({
-    id: `ps-${year}-${String(i + 1).padStart(2, '0')}`,
-    payDate: new Date(year, i, 25).toISOString(),
-    period: new Date(year, i).toLocaleString('default', {
-      month: 'long',
-      year: 'numeric',
-    }),
-    periodStart: new Date(year, i, 1).toISOString(),
-    periodEnd: new Date(year, i + 1, 0).toISOString(),
-    grossPay: 18500,
-    netPay: 15234.56,
-    totalDeductions: 3265.44,
-    status: 'paid' as const,
-  })).reverse();
-}
 
 function PayslipsSkeleton() {
   return (
@@ -64,6 +45,7 @@ function PayslipsSkeleton() {
 
 export default function StaffPayslipsPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [payslips, setPayslips] = useState<PayslipSummary[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>(
@@ -90,7 +72,7 @@ export default function StaffPayslipsPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/payslips?year=${year}`,
+        `${API_URL}/api/v1/staff-portal/payslips?year=${year}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -109,9 +91,8 @@ export default function StaffPayslipsPage() {
       const data = await response.json();
       setPayslips(data.data);
     } catch (err) {
-      console.warn('Payslips API error, using mock data:', err);
-      setError('Unable to connect to server. Showing sample data.');
-      setPayslips(getMockPayslips(parseInt(year)));
+      console.error('Payslips API error:', err);
+      setError('Unable to load payslips. Please try refreshing.');
     } finally {
       setIsLoading(false);
     }
@@ -127,25 +108,32 @@ export default function StaffPayslipsPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/payslips/${id}/pdf`,
+        `${API_URL}/api/v1/staff-portal/payslips/${id}/pdf`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `payslip-${id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
       }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payslip-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
     } catch (err) {
       console.error('Download failed:', err);
+      toast({
+        title: 'Could not download payslip',
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -176,14 +164,9 @@ export default function StaffPayslipsPage() {
       </div>
 
       {error && (
-        <Alert
-          variant="default"
-          className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20"
-        >
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            {error}
-          </AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 

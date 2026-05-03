@@ -142,23 +142,3 @@ describe('TesseractOcrParser', () => {
     });
   });
 });
-
-describe('TesseractOcrParser - Integration', () => {
-  // These tests require actual PDF files and Tesseract processing
-  // They are marked with increased timeout since OCR can be slow
-
-  describe('Real PDF processing', () => {
-    // Skip these tests in CI unless we have test fixtures
-    // The tests above cover the unit testing aspect
-
-    it.skip('should process a real scanned PDF', async () => {
-      // This test would require a real scanned PDF fixture
-      // Implementation would look like:
-      // const buffer = await fs.readFile('fixtures/scanned-statement.pdf');
-      // const parser = new TesseractOcrParser();
-      // const result = await parser.extractText(buffer);
-      // expect(result.text.length).toBeGreaterThan(0);
-      // await parser.terminate();
-    }, 60000);
-  });
-});

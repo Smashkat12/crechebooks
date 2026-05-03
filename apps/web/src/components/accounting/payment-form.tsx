@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import type { RecordPaymentDto, SupplierBill } from '@/hooks/use-suppliers';
 
 const paymentFormSchema = z.object({

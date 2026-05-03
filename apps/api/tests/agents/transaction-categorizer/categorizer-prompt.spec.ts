@@ -4,10 +4,7 @@
  *
  * Tests for CATEGORIZER_SYSTEM_PROMPT content and buildTenantPromptContext().
  */
-import {
-  CATEGORIZER_SYSTEM_PROMPT,
-  buildTenantPromptContext,
-} from '../../../src/agents/transaction-categorizer/categorizer-prompt';
+import { CATEGORIZER_SYSTEM_PROMPT } from '../../../src/agents/transaction-categorizer/categorizer-prompt';
 
 describe('CATEGORIZER_SYSTEM_PROMPT', () => {
   it('should contain Section 12(h) VAT exemption reference', () => {
@@ -99,73 +96,5 @@ describe('CATEGORIZER_SYSTEM_PROMPT', () => {
 
   it('should mention salary rule', () => {
     expect(CATEGORIZER_SYSTEM_PROMPT).toContain('5000, not 6000');
-  });
-});
-
-describe('buildTenantPromptContext()', () => {
-  it('should add auto-apply threshold', () => {
-    const context = buildTenantPromptContext({
-      autoApplyThreshold: 85,
-    });
-
-    expect(context).toContain('Auto-apply threshold: 85%');
-  });
-
-  it('should add business type when provided', () => {
-    const context = buildTenantPromptContext({
-      autoApplyThreshold: 80,
-      businessType: 'Creche / ECD Centre',
-    });
-
-    expect(context).toContain('Business type: Creche / ECD Centre');
-  });
-
-  it('should not add business type when not provided', () => {
-    const context = buildTenantPromptContext({
-      autoApplyThreshold: 80,
-    });
-
-    expect(context).not.toContain('Business type');
-  });
-
-  it('should add custom account codes when provided', () => {
-    const context = buildTenantPromptContext({
-      autoApplyThreshold: 80,
-      customAccountCodes: [
-        {
-          code: '4050',
-          name: 'Aftercare Fees',
-          description: 'Income from aftercare program',
-        },
-        {
-          code: '5050',
-          name: 'Art Supplies',
-          description: 'Crafts and art materials',
-        },
-      ],
-    });
-
-    expect(context).toContain('Custom Account Codes');
-    expect(context).toContain('4050');
-    expect(context).toContain('Aftercare Fees');
-    expect(context).toContain('5050');
-    expect(context).toContain('Art Supplies');
-  });
-
-  it('should not add custom codes section when empty', () => {
-    const context = buildTenantPromptContext({
-      autoApplyThreshold: 80,
-      customAccountCodes: [],
-    });
-
-    expect(context).not.toContain('Custom Account Codes');
-  });
-
-  it('should contain tenant-specific context header', () => {
-    const context = buildTenantPromptContext({
-      autoApplyThreshold: 80,
-    });
-
-    expect(context).toContain('TENANT-SPECIFIC CONTEXT');
   });
 });

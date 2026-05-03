@@ -34,7 +34,7 @@ import {
 import { Sparkles, AlertCircle, User, Receipt } from 'lucide-react';
 import { CategorySelect } from './category-select';
 import { ConfidenceBadge } from './confidence-badge';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { useCategorizeTransaction } from '@/hooks/use-transactions';
 import { useParentsList } from '@/hooks/use-parents';
 import { useToast } from '@/hooks/use-toast';

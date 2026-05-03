@@ -21,6 +21,8 @@ import {
   SarsReadinessResponseDto,
   ReadinessBlockerDto,
   NextDeadlineDto,
+  DeadlineEntryDto,
+  SarsDeadlinesDto,
 } from './dto/readiness.dto';
 
 type FilingType = 'EMP201' | 'VAT201' | 'EMP501' | 'PROVISIONAL_TAX';
@@ -110,6 +112,32 @@ export class SarsReadinessService {
     const daysRemaining = Math.ceil(
       (window.dueDate.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24),
     );
+
+    // ── Per-return deadline entries (F2-A-006) ─────────────────────────────
+    // Compute each return's own next deadline independently so both UI cards
+    // can show a real due date regardless of which is the overall soonest.
+    const emp201W = this.emp201Window(ref);
+    const emp201Entry: DeadlineEntryDto = {
+      dueDate: this.formatDate(emp201W.dueDate),
+      daysRemaining: Math.ceil(
+        (emp201W.dueDate.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    };
+
+    const vat201W = this.vat201Window(ref, vatCategory);
+    const vat201Entry: DeadlineEntryDto | null = vat201W
+      ? {
+          dueDate: this.formatDate(vat201W.dueDate),
+          daysRemaining: Math.ceil(
+            (vat201W.dueDate.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24),
+          ),
+        }
+      : null;
+
+    const deadlines: SarsDeadlinesDto = {
+      emp201: emp201Entry,
+      vat201: vat201Entry,
+    };
 
     const blockers: ReadinessBlockerDto[] = [];
 
@@ -243,7 +271,7 @@ export class SarsReadinessService {
       daysRemaining,
     };
 
-    return { nextDeadline, blockers, ready };
+    return { nextDeadline, deadlines, blockers, ready };
   }
 
   // ─────────────────────────────────────────────────────────────────────────

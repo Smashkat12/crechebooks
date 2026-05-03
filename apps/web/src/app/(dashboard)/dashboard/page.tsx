@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { DollarSign, Receipt, AlertTriangle, Users, RefreshCw } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import Link from 'next/link';
+import { DollarSign, Receipt, AlertTriangle, Users, RefreshCw, X } from 'lucide-react';
 import {
   MetricCard,
   IncomeExpenseChart,
@@ -33,24 +33,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
  * - Retry logic for failed requests
  */
 export default function DashboardPage() {
-  const router = useRouter();
-
   // Selected financial year (null = all time / auto-detect from latest transaction)
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
-  // Check onboarding status - redirect if required steps incomplete
-  const { data: onboardingCta, isLoading: onboardingLoading } = useOnboardingDashboardCta();
+  // Onboarding banner state (dismissal is React-state-only; resets on navigation)
+  const [onboardingBannerDismissed, setOnboardingBannerDismissed] = useState(false);
 
-  useEffect(() => {
-    // Redirect to onboarding only for fresh tenants who haven't started any steps.
-    // showOnboarding=true means the API considers onboarding incomplete.
-    // We only force-redirect when progressPercent === 0 (no steps done) to avoid
-    // interrupting tenants who are partially through non-sequential steps — a
-    // hardcoded percentage threshold (e.g. < 38%) silently misfires for those cases.
-    if (!onboardingLoading && onboardingCta?.showOnboarding && onboardingCta.progressPercent === 0) {
-      router.push('/dashboard/onboarding');
-    }
-  }, [onboardingCta, onboardingLoading, router]);
+  // Fetch onboarding CTA info to drive the setup banner
+  const { data: onboardingCta, isLoading: onboardingLoading } = useOnboardingDashboardCta();
 
   // Fetch available periods to populate the selector
   const { data: availablePeriods, isLoading: periodsLoading } = useAvailablePeriods();
@@ -148,7 +138,30 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Onboarding redirect handled in useEffect - users with incomplete required steps are redirected */}
+      {/* Onboarding setup banner — shows when setup is incomplete; dismissal is React-state-only */}
+      {!onboardingBannerDismissed && onboardingCta?.showOnboarding && (
+        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20 flex items-start gap-3">
+          <div className="flex-1">
+            <AlertTitle className="text-blue-900 dark:text-blue-100">Set up CrecheBooks</AlertTitle>
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              {onboardingCta.message}{' '}
+              <Link
+                href="/onboarding"
+                className="font-medium underline underline-offset-2 hover:no-underline"
+              >
+                Continue setup
+              </Link>
+            </AlertDescription>
+          </div>
+          <button
+            onClick={() => setOnboardingBannerDismissed(true)}
+            aria-label="Dismiss"
+            className="shrink-0 text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 mt-0.5"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </Alert>
+      )}
 
       {/* Partial loading indicator */}
       {hasError && partialDataLoaded > 0 && (

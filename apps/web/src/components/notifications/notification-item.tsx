@@ -21,7 +21,7 @@ const typeConfig: Record<string, { icon: React.ElementType; color: string }> = {
   RECONCILIATION_COMPLETE: { icon: CheckCircle, color: 'text-green-600' },
   RECONCILIATION_DISCREPANCY: { icon: AlertTriangle, color: 'text-amber-600' },
   XERO_SYNC_FAILURE: { icon: XCircle, color: 'text-red-600' },
-  STAFF_LEAVE_REQUEST: { icon: Users, color: 'text-purple-600' },
+  STAFF_LEAVE_REQUESTED: { icon: Users, color: 'text-purple-600' },
   STAFF_LEAVE_DECISION: { icon: Users, color: 'text-purple-600' },
   STAFF_ONBOARDING_COMPLETE: { icon: UserPlus, color: 'text-green-600' },
   PAYSLIP_AVAILABLE: { icon: FileText, color: 'text-blue-600' },

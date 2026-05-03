@@ -292,6 +292,20 @@ describe('StaffOnboardingController — S3 upload', () => {
 // StaffPortalController — upload via staff session token
 // ---------------------------------------------------------------------------
 
+const mockOnboardingProgress = {
+  onboarding: { id: 'onb-id', staffId: STAFF_ID, status: 'IN_PROGRESS', currentStep: 'PERSONAL_INFO' },
+  checklistItems: [],
+  documents: [],
+  progress: { totalItems: 14, completedItems: 0, requiredItems: 10, completedRequiredItems: 0, percentComplete: 0, requiredPercentComplete: 0, byCategory: {} },
+};
+
+const mockOnboardingService = {
+  ensureOnboardingForStaff: jest.fn().mockResolvedValue(mockOnboardingProgress),
+  linkDocumentToChecklistItem: jest.fn().mockResolvedValue(undefined),
+  updateOnboardingStep: jest.fn().mockResolvedValue(mockOnboardingProgress),
+  getOnboardingByStaffId: jest.fn().mockResolvedValue(mockOnboardingProgress),
+};
+
 describe('StaffPortalController — S3 upload', () => {
   let controller: StaffPortalController;
 
@@ -302,7 +316,7 @@ describe('StaffPortalController — S3 upload', () => {
       controllers: [StaffPortalController],
       providers: [
         { provide: StaffDocumentService, useValue: mockDocumentService },
-        { provide: StaffOnboardingService, useValue: {} },
+        { provide: StaffOnboardingService, useValue: mockOnboardingService },
         { provide: StorageService, useValue: mockStorageService },
         { provide: PrismaService, useValue: {} },
         { provide: SimplePayPayslipService, useValue: {} },
@@ -371,6 +385,126 @@ describe('StaffPortalController — S3 upload', () => {
       await expect(
         controller.uploadOnboardingDocument(mockSession, mockFile(), ''),
       ).rejects.toThrow(BadRequestException);
+    });
+
+  });
+});
+
+// ---------------------------------------------------------------------------
+// StaffPortalController — onboarding step bootstrap (Bug #1)
+// Verifies that PATCH onboarding/tax and onboarding/banking call
+// ensureOnboardingForStaff + updateOnboardingStep unconditionally even
+// when no staff_onboardings row existed before.
+// ---------------------------------------------------------------------------
+
+describe('StaffPortalController — onboarding bootstrap on first step update', () => {
+  let controller: StaffPortalController;
+  const mockPrisma = {
+    staff: {
+      update: jest.fn().mockResolvedValue({ id: STAFF_ID }),
+    },
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [StaffPortalController],
+      providers: [
+        { provide: StaffDocumentService, useValue: mockDocumentService },
+        { provide: StaffOnboardingService, useValue: mockOnboardingService },
+        { provide: StorageService, useValue: mockStorageService },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: SimplePayPayslipService, useValue: {} },
+        { provide: SimplePayRepository, useValue: {} },
+        {
+          provide: StaffMagicLinkService,
+          useValue: { verifySessionToken: jest.fn() },
+        },
+      ],
+    })
+      .overrideGuard(StaffAuthGuard)
+      .useValue(passthroughGuard)
+      .compile();
+
+    controller = module.get<StaffPortalController>(StaffPortalController);
+  });
+
+  describe('updateTaxInfo — PATCH /staff-portal/onboarding/tax', () => {
+    it('calls ensureOnboardingForStaff with staffId and tenantId', async () => {
+      await controller.updateTaxInfo(mockSession, { taxNumber: '1234567890' });
+
+      expect(mockOnboardingService.ensureOnboardingForStaff).toHaveBeenCalledWith(
+        STAFF_ID,
+        TENANT_ID,
+      );
+    });
+
+    it('calls updateOnboardingStep with TAX_INFO step after ensuring row', async () => {
+      await controller.updateTaxInfo(mockSession, { taxNumber: '1234567890' });
+
+      expect(mockOnboardingService.updateOnboardingStep).toHaveBeenCalledWith(
+        STAFF_ID,
+        expect.objectContaining({ step: 'TAX_INFO' }),
+        STAFF_ID,
+        TENANT_ID,
+      );
+    });
+
+    it('calls updateOnboardingStep even when ensureOnboardingForStaff returns fresh row', async () => {
+      mockOnboardingService.ensureOnboardingForStaff.mockResolvedValueOnce({
+        ...mockOnboardingProgress,
+        onboarding: { ...mockOnboardingProgress.onboarding, status: 'IN_PROGRESS' },
+      });
+
+      await controller.updateTaxInfo(mockSession, { taxStatus: 'REGISTERED' });
+
+      expect(mockOnboardingService.updateOnboardingStep).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns success response', async () => {
+      const result = await controller.updateTaxInfo(mockSession, { taxNumber: '9876543210' });
+
+      expect(result).toEqual({
+        success: true,
+        message: 'Tax information updated successfully',
+      });
+    });
+  });
+
+  describe('updateBankingDetails — PATCH /staff-portal/onboarding/banking', () => {
+    it('calls ensureOnboardingForStaff with staffId and tenantId', async () => {
+      await controller.updateBankingDetails(mockSession, { bankName: 'FNB' });
+
+      expect(mockOnboardingService.ensureOnboardingForStaff).toHaveBeenCalledWith(
+        STAFF_ID,
+        TENANT_ID,
+      );
+    });
+
+    it('calls updateOnboardingStep with BANKING step after ensuring row', async () => {
+      await controller.updateBankingDetails(mockSession, {
+        bankName: 'FNB',
+        bankAccount: '62012345678',
+        bankBranchCode: '250655',
+        bankAccountType: 'CHEQUE',
+      });
+
+      expect(mockOnboardingService.updateOnboardingStep).toHaveBeenCalledWith(
+        STAFF_ID,
+        expect.objectContaining({ step: 'BANKING' }),
+        STAFF_ID,
+        TENANT_ID,
+      );
+    });
+
+    it('returns success response', async () => {
+      const result = await controller.updateBankingDetails(mockSession, { bankName: 'ABSA' });
+
+      expect(result).toEqual({
+        success: true,
+        message: 'Banking details updated successfully',
+      });
     });
   });
 });

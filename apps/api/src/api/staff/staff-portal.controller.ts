@@ -1307,21 +1307,21 @@ export class StaffPortalController {
       },
     });
 
-    // Update onboarding step if exists
-    const onboarding = await this.onboardingService.getOnboardingByStaffId(
+    // Ensure onboarding row exists (bootstrap for staff created outside
+    // the invitation flow), then advance the TAX_INFO step.
+    await this.onboardingService.ensureOnboardingForStaff(
       session.staffId,
+      session.tenantId,
     );
-    if (onboarding) {
-      await this.onboardingService.updateOnboardingStep(
-        session.staffId,
-        {
-          step: 'TAX_INFO' as OnboardingStep,
-          data: body,
-        },
-        session.staffId,
-        session.tenantId || '',
-      );
-    }
+    await this.onboardingService.updateOnboardingStep(
+      session.staffId,
+      {
+        step: 'TAX_INFO' as OnboardingStep,
+        data: body,
+      },
+      session.staffId,
+      session.tenantId,
+    );
 
     return {
       success: true,
@@ -1361,21 +1361,21 @@ export class StaffPortalController {
       },
     });
 
-    // Update onboarding step if exists
-    const onboarding = await this.onboardingService.getOnboardingByStaffId(
+    // Ensure onboarding row exists (bootstrap for staff created outside
+    // the invitation flow), then advance the BANKING step.
+    await this.onboardingService.ensureOnboardingForStaff(
       session.staffId,
+      session.tenantId,
     );
-    if (onboarding) {
-      await this.onboardingService.updateOnboardingStep(
-        session.staffId,
-        {
-          step: 'BANKING' as OnboardingStep,
-          data: body,
-        },
-        session.staffId,
-        session.tenantId || '',
-      );
-    }
+    await this.onboardingService.updateOnboardingStep(
+      session.staffId,
+      {
+        step: 'BANKING' as OnboardingStep,
+        data: body,
+      },
+      session.staffId,
+      session.tenantId,
+    );
 
     return {
       success: true,

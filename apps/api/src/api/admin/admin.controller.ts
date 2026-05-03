@@ -10,6 +10,8 @@ import {
   Res,
   BadRequestException,
   StreamableFile,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,6 +27,7 @@ import type { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AdminService } from './admin.service';
+import { PopOrphanSweepJob } from '../../jobs/pop-orphan-sweep.job';
 import {
   ContactSubmissionsResponseDto,
   DemoRequestsResponseDto,
@@ -68,7 +71,10 @@ const MAX_EXPORT_DAYS = 366;
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
 
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly popOrphanSweepJob: PopOrphanSweepJob,
+  ) {}
 
   // ============================================
   // CONTACT & DEMO SUBMISSIONS
@@ -781,5 +787,42 @@ export class AdminController {
   async getAuditLogResourceTypes(): Promise<string[]> {
     this.logger.debug('Getting audit log resource types');
     return this.adminService.getAuditLogResourceTypes();
+  }
+
+  // ============================================
+  // STORAGE — ORPHAN SWEEP (F2-P-001)
+  // ============================================
+
+  @Post('storage/sweep-orphans')
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Sweep S3 for orphaned proof-of-payment objects (F2-P-001). ' +
+      'An orphan is an S3 object older than 24h with no matching payment_attachments row. ' +
+      'Pass ?dryRun=true to preview without deleting.',
+  })
+  @ApiQuery({
+    name: 'dryRun',
+    required: false,
+    type: Boolean,
+    description:
+      'When true, identify orphans but do not delete them. Default false.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '{ scanned, orphans, deleted, s3Errors }',
+  })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'SUPER_ADMIN role required' })
+  async sweepOrphanStorage(@Query('dryRun') dryRunParam?: string): Promise<{
+    scanned: number;
+    orphans: number;
+    deleted: number;
+    s3Errors: number;
+  }> {
+    const dryRun = dryRunParam === 'true' || dryRunParam === '1';
+    this.logger.log(`sweepOrphanStorage triggered dryRun=${dryRun}`);
+    return this.popOrphanSweepJob.runSweep({ dryRun });
   }
 }

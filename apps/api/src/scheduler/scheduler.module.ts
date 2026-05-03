@@ -11,6 +11,7 @@ import { XeroSyncRecoveryProcessor } from './processors/xero-sync-recovery.proce
 import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
 import { StaffInvitationCleanupJob } from '../jobs/staff-invitation-cleanup.job';
 import { PaymentAttachmentJanitorJob } from '../jobs/payment-attachment-janitor.job';
+import { PopOrphanSweepJob } from '../jobs/pop-orphan-sweep.job';
 import { StaffModule } from '../api/staff/staff.module';
 import { StorageModule } from '../integrations/storage/storage.module';
 import { InvoiceScheduleService } from '../billing/invoice-schedule.service';
@@ -110,12 +111,14 @@ const schedulerProviders = isRedisConfigured()
 // TASK-FEAT-102: ArrearsReminderJob uses @nestjs/schedule for daily reminders
 // TASK-STAFF-INVITE-001: StaffInvitationCleanupJob — daily 03:00 SAST invite expiry
 // PaymentAttachmentJanitorJob — daily 03:00 SAST orphan PENDING attachment purge (60d)
+// PopOrphanSweepJob — F2-P-001: daily 04:00 SAST sweep S3 for PoP objects with no DB row (24h)
 // Always register them as they use NestJS cron scheduling
 const cronProviders = [
   XeroSyncRecoveryProcessor,
   ArrearsReminderJob,
   StaffInvitationCleanupJob,
   PaymentAttachmentJanitorJob,
+  PopOrphanSweepJob,
 ];
 
 // TASK-BILL-016 / TASK-PAY-015: tenant-customisable scheduling services.
@@ -158,6 +161,7 @@ const billingSchedulingProviders = isRedisConfigured()
     ArrearsReminderJob, // TASK-FEAT-102: Export for manual triggering
     StaffInvitationCleanupJob, // TASK-STAFF-INVITE-001: Export for manual triggering
     PaymentAttachmentJanitorJob, // Export for manual triggering if needed
+    PopOrphanSweepJob, // F2-P-001: Export for admin endpoint triggering
   ],
 })
 export class SchedulerModule {}

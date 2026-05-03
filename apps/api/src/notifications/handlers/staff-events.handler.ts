@@ -32,7 +32,7 @@ export class StaffEventsHandler {
       await this.emitter.notifyAdmins(event.tenantId, {
         type: 'STAFF_LEAVE_REQUESTED',
         title: `Leave request: ${event.staffName}`,
-        body: `${event.staffName} requested ${event.days} day${event.days === 1 ? '' : 's'} ${event.leaveType} leave (${period})`,
+        body: `${event.staffName} requested ${event.days} day${event.days === 1 ? '' : 's'} ${event.leaveType} leave (${period}). Any admin can approve.`,
         actionUrl: '/staff/leave',
         metadata: {
           staffId: event.staffId,

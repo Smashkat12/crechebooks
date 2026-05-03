@@ -387,6 +387,32 @@ describe('StaffPortalController — S3 upload', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('calls ensureOnboardingForStaff with staffId and tenantId after upload', async () => {
+      await controller.uploadOnboardingDocument(
+        mockSession,
+        mockFile(),
+        'ID_DOCUMENT',
+      );
+
+      expect(mockOnboardingService.ensureOnboardingForStaff).toHaveBeenCalledWith(
+        STAFF_ID,
+        TENANT_ID,
+      );
+    });
+
+    it('calls linkDocumentToChecklistItem with staffId and documentType after upload', async () => {
+      await controller.uploadOnboardingDocument(
+        mockSession,
+        mockFile(),
+        'ID_DOCUMENT',
+      );
+
+      expect(mockOnboardingService.linkDocumentToChecklistItem).toHaveBeenCalledWith(
+        STAFF_ID,
+        'ID_DOCUMENT',
+        STAFF_ID,
+      );
+    });
   });
 });
 

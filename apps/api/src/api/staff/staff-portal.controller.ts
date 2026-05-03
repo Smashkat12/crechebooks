@@ -1496,6 +1496,16 @@ export class StaffPortalController {
       staffId,
     );
 
+    // Ensure onboarding row exists so the checklist item can be marked complete.
+    await this.onboardingService.ensureOnboardingForStaff(staffId, tenantId);
+
+    // Auto-advance the matching checklist item for this document type.
+    await this.onboardingService.linkDocumentToChecklistItem(
+      staffId,
+      documentType,
+      staffId,
+    );
+
     return {
       success: true,
       message: 'Document uploaded successfully',

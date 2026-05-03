@@ -53,6 +53,7 @@ import {
   ApiGenerateEmp201Dto,
   ApiEmp201ResponseDto,
 } from './dto';
+import { SarsSubmissionsListResponseDto } from './dto/sars-submissions-list.dto';
 import {
   Emp201DownloadQueryDto,
   Emp501DownloadQueryDto,
@@ -119,6 +120,138 @@ export class SarsController {
     }
 
     return this.sarsReadiness.getReadiness(tenantId, period);
+  }
+
+  /**
+   * GET /sars/submissions
+   *
+   * Returns paginated SARS submission history for the authenticated tenant.
+   * Tenant-scoped from JWT. Admin/Owner/Accountant only.
+   *
+   * Query params:
+   *   type  — optional, one of VAT201 | EMP201 | EMP501
+   *   from  — optional YYYY-MM, filters periodStart >= first day of month
+   *   to    — optional YYYY-MM, filters periodEnd <= last day of month
+   *   page  — optional integer >= 1 (default 1)
+   *   limit — optional integer 1–100 (default 20)
+   */
+  @Get('submissions')
+  @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiOperation({ summary: 'List SARS submission history for the tenant' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['VAT201', 'EMP201', 'EMP501'],
+    description: 'Filter by submission type',
+  })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'Filter from period start YYYY-MM',
+    example: '2026-01',
+  })
+  @ApiQuery({
+    name: 'to',
+    required: false,
+    description: 'Filter to period end YYYY-MM',
+    example: '2026-12',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page 1-100 (default 20)',
+    example: 20,
+  })
+  @ApiResponse({ status: 200, type: SarsSubmissionsListResponseDto })
+  @ApiForbiddenResponse({
+    description: 'Requires OWNER, ADMIN, or ACCOUNTANT role',
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async listSubmissions(
+    @Query('type') type: string | undefined,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() user: IUser,
+  ): Promise<SarsSubmissionsListResponseDto> {
+    const tenantId = getTenantId(user);
+
+    // Validate query params
+    if (type && !['VAT201', 'EMP201', 'EMP501'].includes(type)) {
+      throw new BadRequestException('type must be one of VAT201, EMP201, EMP501');
+    }
+    if (from && !/^\d{4}-(0[1-9]|1[0-2])$/.test(from)) {
+      throw new BadRequestException('from must be in YYYY-MM format');
+    }
+    if (to && !/^\d{4}-(0[1-9]|1[0-2])$/.test(to)) {
+      throw new BadRequestException('to must be in YYYY-MM format');
+    }
+
+    const pageNum = page ? Math.max(1, parseInt(page, 10)) : 1;
+    const limitNum = limit
+      ? Math.min(100, Math.max(1, parseInt(limit, 10)))
+      : 20;
+
+    // Build filter for repository
+    const filter: {
+      submissionType?: string;
+      periodStart?: Date;
+      periodEnd?: Date;
+    } = {};
+
+    if (type) {
+      filter.submissionType = type;
+    }
+    if (from) {
+      const [y, m] = from.split('-').map(Number);
+      filter.periodStart = new Date(y, m - 1, 1);
+    }
+    if (to) {
+      const [y, m] = to.split('-').map(Number);
+      // Last day of the month
+      filter.periodEnd = new Date(y, m, 0);
+    }
+
+    // Fetch all matching (repository orders by periodStart desc)
+    const all = await this.sarsSubmissionRepo.findByTenantId(
+      tenantId,
+      filter as Parameters<typeof this.sarsSubmissionRepo.findByTenantId>[1],
+    );
+
+    const total = all.length;
+    const offset = (pageNum - 1) * limitNum;
+    const items = all.slice(offset, offset + limitNum);
+
+    this.logger.log(
+      `List submissions: tenant=${tenantId} total=${total} page=${pageNum}`,
+    );
+
+    return {
+      success: true,
+      data: {
+        items: items.map((s) => ({
+          id: s.id,
+          submission_type: s.submissionType,
+          period: s.periodStart.toISOString().slice(0, 7),
+          status: s.status,
+          submitted_at: s.submittedAt?.toISOString() ?? null,
+          sars_reference: s.sarsReference ?? null,
+          is_finalized: s.isFinalized,
+          created_at: s.createdAt.toISOString(),
+        })),
+        total,
+        page: pageNum,
+        limit: limitNum,
+      },
+    };
   }
 
   @Post(':id/submit')

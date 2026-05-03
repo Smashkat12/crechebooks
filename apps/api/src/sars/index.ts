@@ -10,7 +10,6 @@ export type {
   UpcomingDeadline,
   DeadlineReminderPrefs,
   DeadlineReminder,
-  SarsDeadlineCheckJobData,
   Vat201FilingFrequency,
 } from './types/deadline.types';
 export {

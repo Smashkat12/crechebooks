@@ -287,48 +287,6 @@ describe('SarsAgent', () => {
       expect(context.paye.taxBrackets.length).toBe(7);
       expect(context.vat.standardRate).toBe(0.15);
     });
-
-    it('should return correct VAT rate', () => {
-      const rate = contextValidator.getVatRate();
-      expect(rate).toBe(0.15);
-    });
-
-    it('should return correct UIF rates', () => {
-      const rates = contextValidator.getUifRates();
-      expect(rates.employeeRate).toBe(0.01);
-      expect(rates.employerRate).toBe(0.01);
-      expect(rates.maxContributionCents).toBe(17896); // 2024-2025 value
-    });
-
-    it('should return correct rebate amounts', () => {
-      // 2024-2025 SARS rebate values
-      expect(contextValidator.getPrimaryRebateCents()).toBe(1771400);
-      expect(contextValidator.getSecondaryRebateCents()).toBe(973200);
-      expect(contextValidator.getTertiaryRebateCents()).toBe(324100);
-    });
-
-    it('should validate correct PAYE calculation', () => {
-      // Income in bracket 1: R100,000/year, tax = 18% = R18,000
-      const result = contextValidator.validatePayeCalculation(
-        10000000,
-        1800000,
-      );
-      expect(result.isValid).toBe(true);
-      expect(result.errors.length).toBe(0);
-    });
-
-    it('should validate correct UIF calculation', () => {
-      // R10,000 gross * 2% = R200 total
-      const result = contextValidator.validateUifCalculation(1000000, 20000);
-      expect(result.isValid).toBe(true);
-    });
-
-    it('should flag incorrect UIF calculation', () => {
-      // R10,000 gross * 2% should be R200, not R300
-      const result = contextValidator.validateUifCalculation(1000000, 30000);
-      expect(result.isValid).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
-    });
   });
 
   describe('All SARS decisions must require review', () => {

@@ -26,8 +26,12 @@ import type { Response } from 'express';
 import type { IUser } from '../../database/entities/user.entity';
 import type { StaffSessionInfo } from '../auth/decorators/current-staff.decorator';
 import { SimplePayPayslipService } from '../../integrations/simplepay/simplepay-payslip.service';
+import { SimplePayLeaveService } from '../../integrations/simplepay/simplepay-leave.service';
 import { SimplePayRepository } from '../../database/repositories/simplepay.repository';
+import { LeaveRequestRepository } from '../../database/repositories/leave-request.repository';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { Irp5PortalService } from './irp5-portal.service';
+import { Irp5PdfService } from './irp5-pdf.service';
 
 // ---------------------------------------------------------------------------
 // Test constants
@@ -303,6 +307,10 @@ describe('StaffPortalController — S3 upload', () => {
         { provide: PrismaService, useValue: {} },
         { provide: SimplePayPayslipService, useValue: {} },
         { provide: SimplePayRepository, useValue: {} },
+        { provide: SimplePayLeaveService, useValue: {} },
+        { provide: LeaveRequestRepository, useValue: {} },
+        { provide: Irp5PortalService, useValue: {} },
+        { provide: Irp5PdfService, useValue: {} },
         // StaffAuthGuard dependencies — needed even when overriding, because
         // NestJS instantiates the guard class before applying overrides.
         {

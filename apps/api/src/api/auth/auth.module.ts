@@ -25,7 +25,6 @@ import { RedisModule } from '../../common/redis/redis.module';
 import { RateLimitModule } from '../../common/rate-limit/rate-limit.module';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { CsrfStoreService } from './csrf-store.service';
-import { FailedAttemptsService } from './failed-attempts.service';
 import { MailgunModule } from '../../integrations/mailgun/mailgun.module';
 import { AdminModule } from '../admin/admin.module';
 
@@ -111,7 +110,6 @@ export type AuthProvider = 'auth0' | 'jwt';
     CombinedAuthGuard,
     RateLimitGuard,
     CsrfStoreService,
-    FailedAttemptsService,
   ],
   exports: [
     AuthService,
@@ -127,7 +125,6 @@ export type AuthProvider = 'auth0' | 'jwt';
     CombinedAuthGuard,
     RateLimitGuard,
     CsrfStoreService,
-    FailedAttemptsService,
   ],
 })
 export class AuthModule implements OnModuleInit {

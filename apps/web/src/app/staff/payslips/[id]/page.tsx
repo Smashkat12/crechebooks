@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,47 +59,6 @@ interface PayslipDetail {
   bankAccount?: string;
 }
 
-function getMockPayslipDetail(id: string): PayslipDetail {
-  const parts = id.split('-');
-  const year = parseInt(parts[1]) || new Date().getFullYear();
-  const month = parseInt(parts[2]) - 1 || new Date().getMonth();
-
-  return {
-    id,
-    payDate: new Date(year, month, 25).toISOString(),
-    period: new Date(year, month).toLocaleString('default', {
-      month: 'long',
-      year: 'numeric',
-    }),
-    periodStart: new Date(year, month, 1).toISOString(),
-    periodEnd: new Date(year, month + 1, 0).toISOString(),
-    grossPay: 18500,
-    netPay: 15234.56,
-    totalDeductions: 3265.44,
-    status: 'paid',
-    earnings: [
-      { name: 'Basic Salary', amount: 17000 },
-      { name: 'Housing Allowance', amount: 1000 },
-      { name: 'Transport Allowance', amount: 500 },
-    ],
-    deductions: [
-      { name: 'PAYE Tax', amount: 2475, type: 'tax' },
-      { name: 'UIF (Employee)', amount: 148.5, type: 'uif' },
-      { name: 'Pension Fund', amount: 555, type: 'pension' },
-      { name: 'Medical Aid', amount: 86.94, type: 'medical' },
-    ],
-    employerContributions: [
-      { name: 'UIF (Employer)', amount: 148.5 },
-      { name: 'SDL', amount: 185 },
-      { name: 'Pension (Employer)', amount: 555 },
-    ],
-    totalEarnings: 18500,
-    totalTax: 2475,
-    totalEmployerContributions: 888.5,
-    paymentMethod: 'Bank Transfer',
-    bankAccount: '****4521',
-  };
-}
 
 function PayslipDetailSkeleton() {
   return (
@@ -120,6 +80,7 @@ export default function PayslipDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [payslip, setPayslip] = useState<PayslipDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +100,7 @@ export default function PayslipDetailPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/payslips/${id}`,
+        `${API_URL}/api/v1/staff-portal/payslips/${id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -158,9 +119,8 @@ export default function PayslipDetailPage() {
       const data = await response.json();
       setPayslip(data);
     } catch (err) {
-      console.warn('Payslip detail API error, using mock data:', err);
-      setError('Unable to connect to server. Showing sample data.');
-      setPayslip(getMockPayslipDetail(id));
+      console.error('Payslip detail API error:', err);
+      setError('Unable to load payslip. Please try refreshing.');
     } finally {
       setIsLoading(false);
     }
@@ -172,25 +132,32 @@ export default function PayslipDetailPage() {
 
     try {
       const response = await fetch(
-        `${API_URL}/api/staff-portal/payslips/${id}/pdf`,
+        `${API_URL}/api/v1/staff-portal/payslips/${id}/pdf`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
-      if (response.ok) {
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `payslip-${id}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
       }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payslip-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
     } catch (err) {
       console.error('Download failed:', err);
+      toast({
+        title: 'Could not download payslip',
+        description: err instanceof Error ? err.message : 'Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -239,14 +206,9 @@ export default function PayslipDetailPage() {
       </div>
 
       {error && (
-        <Alert
-          variant="default"
-          className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20"
-        >
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            {error}
-          </AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 

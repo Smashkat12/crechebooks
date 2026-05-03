@@ -33,7 +33,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import { toast } from '@/hooks/use-toast';
 import { useUnmatch, type BankStatementMatch, type BankStatementReconciliationResult, type AvailableTransaction } from '@/hooks/use-reconciliation';
 import { ManualMatchDialog } from './manual-match-dialog';

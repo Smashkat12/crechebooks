@@ -24,7 +24,6 @@ export const endpoints = {
   },
   payments: {
     list: '/payments',
-    detail: (id: string) => `/payments/${id}`,
     match: '/payments/match',
     allocate: (id: string) => `/payments/${id}/allocate`,
     suggestions: (id: string) => `/payments/${id}/suggestions`,
@@ -225,7 +224,6 @@ export const endpoints = {
     unreadCount: '/notifications/unread-count',
     markRead: (id: string) => `/notifications/${id}/read`,
     markAllRead: '/notifications/read-all',
-    delete: (id: string) => `/notifications/${id}`,
     // Parent portal
     parentList: '/parent-portal/notifications',
     parentUnreadCount: '/parent-portal/notifications/unread-count',

@@ -294,41 +294,4 @@ export class AdhocCommunicationService {
   ): Promise<BroadcastMessage[]> {
     return this.broadcastEntity.findByTenant(tenantId, options);
   }
-
-  /**
-   * Preview recipient count before creating broadcast
-   *
-   * @param tenantId - Tenant ID
-   * @param dto - Broadcast data (for filter criteria)
-   */
-  async previewRecipientCount(
-    tenantId: string,
-    dto: Pick<
-      CreateBroadcastDto,
-      'recipientType' | 'recipientFilter' | 'channel'
-    >,
-  ): Promise<number> {
-    return this.recipientResolver.previewCount(
-      tenantId,
-      dto.recipientType,
-      dto.recipientFilter,
-      dto.channel,
-    );
-  }
-
-  /**
-   * Get delivery statistics for a broadcast
-   *
-   * @param tenantId - Tenant ID
-   * @param broadcastId - Broadcast ID
-   */
-  async getDeliveryStats(tenantId: string, broadcastId: string) {
-    const broadcast = await this.broadcastEntity.findById(broadcastId);
-
-    if (!broadcast || broadcast.tenantId !== tenantId) {
-      throw new NotFoundException(`Broadcast ${broadcastId} not found`);
-    }
-
-    return this.recipientEntity.getDeliveryStats(broadcastId);
-  }
 }

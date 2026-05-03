@@ -139,6 +139,13 @@ export class StaffMagicLinkService {
     // Build magic link URL
     const magicLinkUrl = `${this.config.portalBaseUrl}/staff/verify?token=${encodeURIComponent(token)}`;
 
+    if (this.configService.get<string>('COMMS_DISABLED') === 'true') {
+      this.logger.warn(
+        `[COMMS_DISABLED] Staff magic link for ${email} (staff ${staff.id}): ${magicLinkUrl}`,
+      );
+      return true;
+    }
+
     // Send email via Mailgun
     try {
       await this.sendMagicLinkEmail(staff.email, staff.firstName, magicLinkUrl);

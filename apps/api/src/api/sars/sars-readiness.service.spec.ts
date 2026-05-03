@@ -80,11 +80,12 @@ describe('SarsReadinessService', () => {
       //   — that's in the past! So VAT201 next = Mar 25.
       //   EMP201 Feb 7 < VAT201 Mar 25 → EMP201 still nearest.
       // Point: EMP201 monthly is almost always the nearest due date.
-      // Verify that when we pick June (EMP201 due Jun 7, VAT201 May-Jun due Jul 25)
-      // we correctly return EMP201 as nearest.
+      // Verify that when we pick June (EMP201 calendar due Jun 7 which is a Sunday →
+      // adjusted to Jun 8, VAT201 May-Jun due Jul 25) we correctly return EMP201 as nearest.
       const result = await service.getReadiness(TENANT, '2026-06');
       expect(result.nextDeadline.type).toBe('EMP201');
-      expect(result.nextDeadline.dueDate).toBe('2026-06-07');
+      // Jun 7 2026 is a Sunday → adjusts to Mon Jun 8 (F-A-006)
+      expect(result.nextDeadline.dueDate).toBe('2026-06-08');
     });
   });
 
@@ -178,8 +179,9 @@ describe('SarsReadinessService', () => {
     // The integration test for staff.count guard uses '2026-04' (EMP201 window) to confirm
     // the query is NOT called outside EMP501 context.
 
-    it('emp501Window returns EMP501 type with Oct 31 for ref in Oct', () => {
+    it('emp501Window returns EMP501 type with Oct 31 for ref in Oct (adjusted for Sat → Mon)', () => {
       // Verify the window shape — used as basis for blocker tests below.
+      // Oct 31 2026 is a Saturday → adjusts to Nov 2 (Mon; Nov 1 is Sunday).
       const ref = new Date(2026, 9, 15); // Oct 15 2026 — after Oct 7 EMP201 deadline
       const svc = service as unknown as Record<
         string,
@@ -187,7 +189,7 @@ describe('SarsReadinessService', () => {
       >;
       const w = svc['emp501Window'](ref);
       expect(w.type).toBe('EMP501');
-      expect(w.dueDate).toEqual(new Date(2026, 9, 31)); // Oct 31
+      expect(w.dueDate).toEqual(new Date(2026, 10, 2)); // Nov 2 (Sat → Sun → Mon)
     });
 
     it('adds warning blocker when active staff have no SimplePay mapping (EMP501 §4)', async () => {
@@ -313,9 +315,10 @@ describe('SarsReadinessService', () => {
 
   // ─── Response shape ───────────────────────────────────────────────────────
 
-  it('response always includes nextDeadline, blockers array, and ready flag', async () => {
+  it('response always includes nextDeadline, deadlines, blockers array, and ready flag', async () => {
     const result = await service.getReadiness(TENANT);
     expect(result).toHaveProperty('nextDeadline');
+    expect(result).toHaveProperty('deadlines');
     expect(result).toHaveProperty('blockers');
     expect(result).toHaveProperty('ready');
     expect(typeof result.ready).toBe('boolean');
@@ -325,6 +328,42 @@ describe('SarsReadinessService', () => {
       period: expect.any(String),
       dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       daysRemaining: expect.any(Number),
+    });
+  });
+
+  describe('deadlines map (F2-A-006) — both EMP201 and VAT201 entries', () => {
+    it('deadlines.emp201 is always present with dueDate and daysRemaining', async () => {
+      // On 2026-04 (Cat A tenant), EMP201 next due = 2026-04-07.
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.deadlines.emp201).toMatchObject({
+        dueDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+        daysRemaining: expect.any(Number),
+      });
+      // EMP201 Apr 7 is 6 days from Apr 1 (parseYearMonth gives Apr 1)
+      expect(result.deadlines.emp201.dueDate).toBe('2026-04-07');
+      expect(result.deadlines.emp201.daysRemaining).toBe(6);
+    });
+
+    it('deadlines.vat201 is present for Cat A tenant', async () => {
+      // On 2026-04 (Apr 1), Cat A next VAT201 = May 25
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.deadlines.vat201).not.toBeNull();
+      expect(result.deadlines.vat201!.dueDate).toBe('2026-05-25');
+    });
+
+    it('deadlines.vat201 is null for Cat D tenant (manual cadence)', async () => {
+      mockPrisma.tenant.findUnique.mockResolvedValue({ vatCategory: 'D' });
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.deadlines.vat201).toBeNull();
+    });
+
+    it('deadlines.emp201 and deadlines.vat201 are independent of nextDeadline.type', async () => {
+      // Both cards should have real dates even when EMP201 is the soonest.
+      const result = await service.getReadiness(TENANT, '2026-04');
+      expect(result.nextDeadline.type).toBe('EMP201');
+      // VAT201 card still shows a date even though EMP201 is next overall
+      expect(result.deadlines.vat201).not.toBeNull();
+      expect(result.deadlines.emp201.dueDate).not.toBe('');
     });
   });
 
@@ -377,32 +416,35 @@ describe('SarsReadinessService', () => {
       expect(w!.dueDate).toEqual(new Date(2026, 1, 25)); // Feb 25
     });
 
-    // Cat B: Feb-Mar period → due Apr 25
-    it('returns Apr 25 for a ref date in Mar (Feb-Mar period)', () => {
+    // Cat B: Feb-Mar period → due Apr 25. Apr 25 2026 is Saturday → Apr 26 Sun
+    // → Apr 27 Freedom Day (public holiday) → Apr 28 Tue (first business day)
+    it('returns Apr 28 for a ref date in Mar (Feb-Mar period; Apr 25 is Sat, Apr 27 is Freedom Day)', () => {
       const ref = new Date(2026, 2, 1); // Mar 1 2026
       const w = service.vat201Window(ref, 'B' as VatCategory);
       expect(w).not.toBeNull();
-      expect(w!.dueDate).toEqual(new Date(2026, 3, 25)); // Apr 25
+      expect(w!.dueDate).toEqual(new Date(2026, 3, 28)); // Apr 28 (Sat→Sun→FreedomDay→Tue)
       expect(w!.period).toBe('2026-02/2026-03');
     });
 
-    // Cat B: Oct-Nov period → due Dec 25
-    it('returns Dec 25 for a ref date in Nov (Oct-Nov period)', () => {
+    // Cat B: Oct-Nov period → calendar due Dec 25. Dec 25 (Christmas PH Fri)
+    // → Dec 26 (Boxing Day PH Sat) → Dec 27 (Sun) → Dec 28 (Mon, no PH) → first business day
+    it('returns Dec 28 for a ref date in Nov (Oct-Nov period; Christmas→Boxing Day→Sun→Mon)', () => {
       const ref = new Date(2026, 10, 1); // Nov 1 2026
       const w = service.vat201Window(ref, 'B' as VatCategory);
       expect(w).not.toBeNull();
-      expect(w!.dueDate).toEqual(new Date(2026, 11, 25)); // Dec 25
+      expect(w!.dueDate).toEqual(new Date(2026, 11, 28)); // Dec 28
       expect(w!.period).toBe('2026-10/2026-11');
     });
   });
 
   describe('vat201Window — Category C (monthly)', () => {
-    // Cat C: on Apr 10, prior month = Mar, due Apr 25
-    it('returns Apr 25 for Mar period when ref is Apr 10', () => {
+    // Cat C: on Apr 10, prior month = Mar, calendar due Apr 25.
+    // Apr 25 2026 is Saturday → Apr 26 Sun → Apr 27 Freedom Day (PH) → Apr 28 Tue
+    it('returns Apr 28 for Mar period when ref is Apr 10 (Apr 25 Sat → Freedom Day Mon → Tue)', () => {
       const ref = new Date(2026, 3, 10); // Apr 10 2026
       const w = service.vat201Window(ref, 'C' as VatCategory);
       expect(w).not.toBeNull();
-      expect(w!.dueDate).toEqual(new Date(2026, 3, 25)); // Apr 25
+      expect(w!.dueDate).toEqual(new Date(2026, 3, 28)); // Apr 28
       expect(w!.period).toBe('2026-03');
     });
 
@@ -481,6 +523,42 @@ describe('SarsReadinessService', () => {
       mockPrisma.tenant.findUnique.mockResolvedValue(null);
       const result = await service.getReadiness(TENANT, '2026-04');
       expect(result.nextDeadline.type).toBe('EMP201');
+    });
+  });
+
+  // ─── F-A-006: adjustForBusinessDay — weekend/SA public holiday shift ─────
+  // SARS rule: when the statutory deadline falls on a weekend or public holiday,
+  // the return may be submitted on the next business day.
+  // Sources: SA Public Holidays Act 87/1994; SARS eFiling compliance guide.
+
+  describe('adjustForBusinessDay (F-A-006)', () => {
+    it('2026-06-07 is a Sunday → advances to Monday 2026-06-08 (EMP201 case)', () => {
+      const sunday = new Date(2026, 5, 7); // June 7 2026
+      const result = service.adjustForBusinessDay(sunday);
+      expect(result).toEqual(new Date(2026, 5, 8)); // June 8
+    });
+
+    it('2026-12-07 is a Monday → stays 2026-12-07 (no adjustment)', () => {
+      const monday = new Date(2026, 11, 7); // Dec 7 2026
+      const result = service.adjustForBusinessDay(monday);
+      expect(result).toEqual(new Date(2026, 11, 7)); // Dec 7
+    });
+
+    it('2026-12-26 is a Saturday and SA public holiday (Boxing Day) → advances to Monday 2026-12-28 (Sat blocked as weekend+PH; Sun blocked; Mon is first business day)', () => {
+      // Boxing Day (26 Dec) falls Saturday 2026 — blocked by both weekend and public holiday.
+      // Dec 27 is Sunday — blocked. Dec 28 is Monday, not a public holiday → first business day.
+      // SA Public Holidays Act §2(2) only creates a substitute when the holiday falls on Sunday.
+      const boxingDay = new Date(2026, 11, 26); // Dec 26 2026
+      const result = service.adjustForBusinessDay(boxingDay);
+      expect(result).toEqual(new Date(2026, 11, 28)); // Dec 28 (Mon)
+    });
+
+    it('2026-01-25 is a Sunday (VAT201 Cat A Jan 25 due date) → advances to Monday 2026-01-26', () => {
+      // Cat A VAT201 Nov-Dec period → due Jan 25.
+      // Jan 25 2026 is a Sunday → next business day is Jan 26 (no holiday).
+      const sunday = new Date(2026, 0, 25); // Jan 25 2026
+      const result = service.adjustForBusinessDay(sunday);
+      expect(result).toEqual(new Date(2026, 0, 26)); // Jan 26
     });
   });
 });

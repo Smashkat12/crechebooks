@@ -25,7 +25,6 @@ import { StatementRepository } from '../../database/repositories/statement.repos
 import { ParentAccountService } from '../../database/services/parent-account.service';
 import { ParentRepository } from '../../database/repositories/parent.repository';
 import { StatementDeliveryService } from '../../database/services/statement-delivery.service';
-import { SchedulerService } from '../../scheduler/scheduler.service';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -148,12 +147,8 @@ async function buildController(
       { provide: ParentRepository, useValue: makeParentRepository(parent) },
       {
         provide: StatementDeliveryService,
-        useValue: {
-          deliverStatement: jest.fn(),
-          bulkDeliverStatements: jest.fn(),
-        },
+        useValue: { deliverStatement: jest.fn() },
       },
-      { provide: SchedulerService, useValue: null },
     ],
   }).compile();
 
@@ -257,7 +252,6 @@ describe('StatementController — formatFullName serialisation (AUDIT-BILL-06)',
             useValue: makeParentRepository(parentWithMiddle),
           },
           { provide: StatementDeliveryService, useValue: {} },
-          { provide: SchedulerService, useValue: null },
         ],
       }).compile();
 

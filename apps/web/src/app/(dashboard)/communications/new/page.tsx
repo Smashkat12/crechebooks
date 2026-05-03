@@ -130,7 +130,7 @@ export default function NewBroadcastPage() {
     try {
       const dto: CreateBroadcastDto = {
         recipient_type: formData.recipientType as 'parent' | 'staff' | 'custom',
-        channel: formData.channel as 'email' | 'whatsapp' | 'sms' | 'all',
+        channel: formData.channel as 'email' | 'whatsapp' | 'all',
         subject: formData.subject || undefined,
         body: formData.body,
       };
@@ -146,7 +146,7 @@ export default function NewBroadcastPage() {
     try {
       const dto: CreateBroadcastDto = {
         recipient_type: formData.recipientType as 'parent' | 'staff' | 'custom',
-        channel: formData.channel as 'email' | 'whatsapp' | 'sms' | 'all',
+        channel: formData.channel as 'email' | 'whatsapp' | 'all',
         subject: formData.subject || undefined,
         body: formData.body,
       };

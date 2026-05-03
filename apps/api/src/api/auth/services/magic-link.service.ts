@@ -140,6 +140,13 @@ export class MagicLinkService {
     // Build magic link URL
     const magicLinkUrl = `${this.config.portalBaseUrl}/parent/verify?token=${encodeURIComponent(token)}`;
 
+    if (this.configService.get<string>('COMMS_DISABLED') === 'true') {
+      this.logger.warn(
+        `[COMMS_DISABLED] Parent magic link for ${email} (parent ${parent.id}): ${magicLinkUrl}`,
+      );
+      return true;
+    }
+
     // Send email via Mailgun
     try {
       await this.sendMagicLinkEmail(

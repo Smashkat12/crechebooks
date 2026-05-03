@@ -38,7 +38,7 @@ async function parentPortalFetch<T>(
   const token = getParentToken();
   if (!token) throw new Error('Not authenticated. Please log in.');
 
-  const response = await fetch(`${PARENT_API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${PARENT_API_URL}/api/v1/parent-portal${endpoint}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -70,6 +70,6 @@ async function parentPortalFetch<T>(
 
 export async function fetchParentMessages(): Promise<ParentMessagesResponse> {
   return parentPortalFetch<ParentMessagesResponse>(
-    '/parent-portal/messages',
+    '/messages',
   );
 }

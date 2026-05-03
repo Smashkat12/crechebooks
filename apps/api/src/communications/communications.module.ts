@@ -4,7 +4,7 @@
  * TASK-COMM-002: Ad-hoc Communication Service
  *
  * Provides entity services and communication orchestration for broadcast messaging.
- * Supports multi-channel communication (email, WhatsApp, SMS).
+ * Supports multi-channel communication (email, WhatsApp).
  */
 
 import { Module, forwardRef, Logger, OnModuleInit } from '@nestjs/common';

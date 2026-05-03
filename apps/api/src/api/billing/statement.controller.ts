@@ -21,8 +21,6 @@ import {
   UseGuards,
   BadRequestException,
   NotFoundException as NestNotFoundException,
-  Optional,
-  Inject,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
 import { formatFullName } from '../../common/utils';
@@ -65,19 +63,10 @@ import {
   StatementLineDto,
   StatementParentDto,
   DeliverStatementDto,
-  BulkDeliverStatementDto,
   DeliverStatementResponseDto,
-  BulkDeliverResponseDto,
-  ScheduleStatementGenerationDto,
-  ScheduleStatementResponseDto,
 } from './dto/statement.dto';
 import { StatementDeliveryService } from '../../database/services/statement-delivery.service';
 import { NotificationChannelType } from '../../notifications/types/notification.types';
-import { SchedulerService } from '../../scheduler/scheduler.service';
-import {
-  QUEUE_NAMES,
-  StatementGenerationJobData,
-} from '../../scheduler/types/scheduler.types';
 
 @Controller('statements')
 @ApiTags('Statements')
@@ -92,9 +81,6 @@ export class StatementController {
     private readonly parentAccountService: ParentAccountService,
     private readonly parentRepository: ParentRepository,
     private readonly statementDeliveryService: StatementDeliveryService,
-    @Optional()
-    @Inject(SchedulerService)
-    private readonly schedulerService: SchedulerService | null,
   ) {}
 
   /**
@@ -819,158 +805,6 @@ export class StatementController {
       if (error instanceof NotFoundException) {
         throw new NestNotFoundException(error.message);
       }
-      if (error instanceof BusinessException) {
-        throw new BadRequestException(error.message);
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Bulk deliver statements
-   */
-  @Post('deliver/bulk')
-  @HttpCode(200)
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({
-    summary: 'Bulk deliver statements',
-    description: 'Sends multiple statements to their respective parents',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Bulk delivery completed',
-    type: BulkDeliverResponseDto,
-  })
-  @ApiForbiddenResponse({
-    description: 'Insufficient permissions (requires OWNER or ADMIN)',
-  })
-  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
-  async bulkDeliver(
-    @Body() dto: BulkDeliverStatementDto,
-    @CurrentUser() user: IUser,
-  ): Promise<BulkDeliverResponseDto> {
-    const tenantId = getTenantId(user);
-
-    this.logger.log(
-      `Bulk delivering ${dto.statement_ids.length} statements for tenant ${tenantId}`,
-    );
-
-    const result = await this.statementDeliveryService.bulkDeliverStatements({
-      tenantId,
-      statementIds: dto.statement_ids,
-      userId: user.id,
-      channel: dto.channel
-        ? (dto.channel as NotificationChannelType)
-        : undefined,
-    });
-
-    return {
-      success: true,
-      data: {
-        sent: result.sent,
-        failed: result.failed,
-        results: result.results.map((r) => ({
-          statement_id: r.statementId,
-          parent_id: r.parentId,
-          success: r.success,
-          channel: r.channel,
-          message_id: r.messageId,
-          error: r.error,
-          delivered_at: r.deliveredAt,
-        })),
-      },
-    };
-  }
-
-  /**
-   * Schedule monthly statement generation
-   */
-  @Post('schedule')
-  @HttpCode(202)
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(RolesGuard)
-  @ApiOperation({
-    summary: 'Schedule monthly statement generation',
-    description:
-      'Queues a background job to generate statements for a specific month. Requires Redis to be configured.',
-  })
-  @ApiResponse({
-    status: 202,
-    description: 'Statement generation job scheduled',
-    type: ScheduleStatementResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Invalid input or scheduler not available',
-  })
-  @ApiForbiddenResponse({
-    description: 'Insufficient permissions (requires OWNER or ADMIN)',
-  })
-  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
-  async scheduleGeneration(
-    @Body() dto: ScheduleStatementGenerationDto,
-    @CurrentUser() user: IUser,
-  ): Promise<ScheduleStatementResponseDto> {
-    const tenantId = getTenantId(user);
-
-    this.logger.log(
-      `Scheduling statement generation for tenant ${tenantId}, month ${dto.statement_month}`,
-    );
-
-    // Check if scheduler is available (Redis configured)
-    if (!this.schedulerService) {
-      throw new BadRequestException(
-        'Scheduler not available. Redis must be configured to use scheduled jobs. ' +
-          'Use the /generate/bulk endpoint for immediate generation instead.',
-      );
-    }
-
-    try {
-      // Build job data
-      const jobData: StatementGenerationJobData = {
-        tenantId,
-        statementMonth: dto.statement_month,
-        parentIds: dto.parent_ids,
-        onlyWithActivity: dto.only_with_activity,
-        onlyWithBalance: dto.only_with_balance,
-        dryRun: dto.dry_run,
-        autoFinalize: dto.auto_finalize,
-        autoDeliver: dto.auto_deliver,
-        triggeredBy: 'manual',
-        scheduledAt: new Date(),
-      };
-
-      // Queue the job
-      const job = await this.schedulerService.scheduleJob(
-        QUEUE_NAMES.STATEMENT_GENERATION,
-        jobData,
-      );
-
-      return {
-        success: true,
-        message: 'Statement generation job scheduled successfully',
-        data: {
-          job_id: String(job.id),
-          queue: QUEUE_NAMES.STATEMENT_GENERATION,
-          status: 'waiting',
-          statement_month: dto.statement_month,
-          scheduled_at: new Date(),
-        },
-      };
-    } catch (error) {
-      this.logger.error({
-        error: {
-          message: error instanceof Error ? error.message : String(error),
-          name: error instanceof Error ? error.name : 'UnknownError',
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-        file: 'statement.controller.ts',
-        function: 'scheduleGeneration',
-        inputs: { tenantId, statementMonth: dto.statement_month },
-        timestamp: new Date().toISOString(),
-      });
-
       if (error instanceof BusinessException) {
         throw new BadRequestException(error.message);
       }

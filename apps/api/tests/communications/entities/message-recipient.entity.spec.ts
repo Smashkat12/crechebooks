@@ -33,9 +33,6 @@ describe('MessageRecipientEntity', () => {
     whatsappStatus: DeliveryStatus.PENDING,
     whatsappSentAt: null,
     whatsappWamid: null,
-    smsStatus: DeliveryStatus.PENDING,
-    smsSentAt: null,
-    smsMessageId: null,
     lastError: null,
     retryCount: 0,
     createdAt: new Date(),
@@ -244,45 +241,20 @@ describe('MessageRecipientEntity', () => {
     });
   });
 
-  describe('updateSmsStatus', () => {
-    it('should update SMS status', async () => {
-      const updatedRecipient = {
-        ...mockRecipient,
-        smsStatus: DeliveryStatus.SENT,
-        smsMessageId: 'sms-123',
-      };
-      mockPrismaService.messageRecipient.update.mockResolvedValue(
-        updatedRecipient,
-      );
-
-      const result = await entity.updateSmsStatus(
-        mockBroadcastId,
-        mockRecipientId,
-        DeliveryStatus.SENT,
-        'sms-123',
-      );
-
-      expect(result.smsStatus).toBe(DeliveryStatus.SENT);
-    });
-  });
-
   describe('getDeliveryStats', () => {
     it('should calculate delivery statistics', async () => {
       const recipients = [
         {
           emailStatus: DeliveryStatus.DELIVERED,
           whatsappStatus: DeliveryStatus.READ,
-          smsStatus: DeliveryStatus.DELIVERED,
         },
         {
           emailStatus: DeliveryStatus.SENT,
           whatsappStatus: DeliveryStatus.DELIVERED,
-          smsStatus: DeliveryStatus.SENT,
         },
         {
           emailStatus: DeliveryStatus.FAILED,
           whatsappStatus: DeliveryStatus.FAILED,
-          smsStatus: null,
         },
       ];
       mockPrismaService.messageRecipient.findMany.mockResolvedValue(recipients);
@@ -298,8 +270,6 @@ describe('MessageRecipientEntity', () => {
       expect(stats.whatsappDelivered).toBe(2);
       expect(stats.whatsappRead).toBe(1);
       expect(stats.whatsappFailed).toBe(1);
-      expect(stats.smsSent).toBe(2);
-      expect(stats.smsDelivered).toBe(1);
     });
   });
 
@@ -322,7 +292,6 @@ describe('MessageRecipientEntity', () => {
           OR: [
             { emailStatus: DeliveryStatus.FAILED },
             { whatsappStatus: DeliveryStatus.FAILED },
-            { smsStatus: DeliveryStatus.FAILED },
           ],
         },
       });
@@ -373,7 +342,6 @@ describe('MessageRecipientEntity', () => {
         ...mockRecipient,
         emailStatus: DeliveryStatus.FAILED,
         whatsappStatus: DeliveryStatus.FAILED,
-        smsStatus: DeliveryStatus.FAILED,
         lastError: 'Connection timeout',
         retryCount: 1,
       });

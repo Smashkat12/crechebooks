@@ -44,7 +44,6 @@ describe('ArrearsReminderJob', () => {
     email: 'john.doe@email.com',
     whatsapp: '+27987654321',
     whatsappOptIn: true,
-    smsOptIn: true,
     preferredContact: 'email',
     isActive: true,
   };

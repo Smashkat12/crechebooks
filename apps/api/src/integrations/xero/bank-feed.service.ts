@@ -313,6 +313,7 @@ export class BankFeedService {
         while (hasMorePages) {
           await this.checkRateLimit(tenantId);
 
+          // BUILD-TAG: bank-feed where-clause Date>= server-side filter (3cc98bb)
           // Fetch bank transactions from Xero for this account.
           // Two server-side filters:
           //   - where: BankAccount.AccountID + Date>=DateTime(...) restricts the

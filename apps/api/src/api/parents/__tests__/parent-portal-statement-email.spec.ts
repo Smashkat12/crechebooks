@@ -36,8 +36,16 @@ const STATEMENT_NUMBER = 'STMT-2026-002';
 const PARENT_EMAIL = 'parent@example.com';
 
 const PARENT_SESSION: ParentSession = {
+  id: 'parent-session-1',
   parentId: PARENT_ID,
   tenantId: TENANT_ID,
+  parent: {
+    id: PARENT_ID,
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: PARENT_EMAIL,
+    tenantId: TENANT_ID,
+  },
 };
 
 const STATEMENT_ROW = {

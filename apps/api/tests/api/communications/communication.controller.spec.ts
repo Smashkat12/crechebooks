@@ -268,9 +268,6 @@ describe('CommunicationController', () => {
         whatsappDelivered: 0,
         whatsappRead: 0,
         whatsappFailed: 0,
-        smsSent: 0,
-        smsDelivered: 0,
-        smsFailed: 0,
       });
 
       const result = await controller.getBroadcast('broadcast-123', mockUser);

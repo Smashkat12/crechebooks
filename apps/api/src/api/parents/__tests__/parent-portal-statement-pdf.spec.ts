@@ -20,6 +20,8 @@ import { ParentPortalChildService } from '../parent-portal-child.service';
 import { InvoicePdfService } from '../../../database/services/invoice-pdf.service';
 import { StatementPdfService } from '../../../database/services/statement-pdf.service';
 import { PaymentReceiptService } from '../../../database/services/payment-receipt.service';
+import { StatementDeliveryService } from '../../../database/services/statement-delivery.service';
+import { AuditLogService } from '../../../database/services/audit-log.service';
 import { ParentAuthGuard } from '../../auth/guards/parent-auth.guard';
 import type { ParentSession } from '../../auth/decorators/current-parent.decorator';
 
@@ -29,8 +31,16 @@ const STATEMENT_ID = 'stmt-xyz';
 const STATEMENT_NUMBER = 'STMT-2026-001';
 
 const PARENT_SESSION: ParentSession = {
+  id: 'parent-session-1',
   parentId: PARENT_ID,
   tenantId: TENANT_ID,
+  parent: {
+    id: PARENT_ID,
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: 'jane@example.com',
+    tenantId: TENANT_ID,
+  },
 };
 
 const STATEMENT_ROW = {
@@ -79,6 +89,8 @@ function buildModule(
       { provide: InvoicePdfService, useValue: {} },
       { provide: StatementPdfService, useValue: mockStatementPdfService },
       { provide: PaymentReceiptService, useValue: {} },
+      { provide: StatementDeliveryService, useValue: {} },
+      { provide: AuditLogService, useValue: { logAction: jest.fn() } },
     ],
   })
     .overrideGuard(ParentAuthGuard)

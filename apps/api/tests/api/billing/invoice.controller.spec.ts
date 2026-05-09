@@ -53,7 +53,6 @@ describe('InvoiceController', () => {
     whatsapp: null,
     preferredContact: PreferredContact.EMAIL,
     whatsappOptIn: false,
-    smsOptIn: false,
     idNumber: null,
     address: null,
     notes: null,

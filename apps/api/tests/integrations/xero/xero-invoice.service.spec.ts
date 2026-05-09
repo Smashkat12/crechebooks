@@ -75,7 +75,6 @@ describe('XeroInvoiceService', () => {
     whatsapp: '+27821234567',
     preferredContact: 'EMAIL',
     whatsappOptIn: true,
-    smsOptIn: false,
     idNumber: '8501015800086',
     address: '123 Main Road, Sandton, Johannesburg',
     notes: null,

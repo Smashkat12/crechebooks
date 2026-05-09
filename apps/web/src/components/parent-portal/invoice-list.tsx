@@ -23,7 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { InvoiceCard, type InvoiceCardData, type InvoiceStatus } from './invoice-card';
 
 export interface InvoiceListItem {
@@ -158,7 +158,7 @@ export function InvoiceList({ invoices, isLoading, onViewInvoice }: InvoiceListP
                   <TableRow
                     key={invoice.id}
                     className={`cursor-pointer ${
-                      invoice.status === 'overdue' ? 'bg-red-50/50' : ''
+                      invoice.status === 'overdue' ? 'bg-red-50' : ''
                     }`}
                     onClick={() => onViewInvoice?.(invoice.id)}
                   >

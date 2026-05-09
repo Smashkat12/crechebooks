@@ -342,6 +342,40 @@ describe('BankFeedService', () => {
 
       expect(result.connectionId).toBe('specific-conn');
     });
+
+    it('should pass fromDate as ifModifiedSince so Xero filters server-side', async () => {
+      const activeConnection = {
+        id: connectionId,
+        tenantId,
+        xeroAccountId,
+        status: BankConnectionStatus.ACTIVE,
+        accountName: 'Test Account',
+      };
+      mockPrisma.bankConnection.findMany.mockResolvedValue([activeConnection]);
+
+      const getBankTransactions = jest
+        .fn()
+        .mockResolvedValue({ body: { bankTransactions: [] } });
+
+      jest
+        .spyOn(service as unknown as {
+          getAuthenticatedClient: (tenantId: string) => Promise<unknown>;
+        }, 'getAuthenticatedClient')
+        .mockResolvedValue({
+          client: { accountingApi: { getBankTransactions } },
+          xeroTenantId: 'xero-tenant',
+        });
+
+      const fromDate = new Date('2026-03-12T00:00:00.000Z');
+
+      await service.syncTransactions(tenantId, { fromDate });
+
+      expect(getBankTransactions).toHaveBeenCalled();
+      const callArgs = getBankTransactions.mock.calls[0];
+      expect(callArgs[0]).toBe('xero-tenant');
+      expect(callArgs[1]).toBe(fromDate);
+      expect(callArgs[2]).toContain(xeroAccountId);
+    });
   });
 
   describe('verifyWebhookSignature', () => {

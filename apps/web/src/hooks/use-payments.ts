@@ -29,14 +29,19 @@ interface PaymentSuggestion {
   reason: string;
 }
 
-interface MatchPaymentsParams {
-  paymentIds: string[];
-}
-
 interface AllocatePaymentParams {
   paymentId: string;
+  /**
+   * Bank transaction UUID linked to this payment.
+   * Required by POST /payments (transaction_id field).
+   * Undefined for manually-posted payments with no bank transaction —
+   * the mutation will reject early with a descriptive error.
+   */
+  transactionId?: string;
   allocations: {
-    invoiceId: string;
+    /** invoice_id matches the backend snake_case field */
+    invoice_id: string;
+    /** ZAR decimal amount (e.g. 3450.00 for R3 450). Backend converts to cents. */
     amount: number;
   }[];
 }
@@ -54,31 +59,6 @@ export function usePaymentsList(params?: PaymentListParams) {
   });
 }
 
-// Get unmatched payments
-export function useUnmatchedPayments() {
-  return useQuery<IPayment[], AxiosError>({
-    queryKey: queryKeys.payments.unmatched(),
-    queryFn: async () => {
-      const { data } = await apiClient.get<PaymentsListResponse>(endpoints.payments.list, {
-        params: { status: 'unmatched', limit: 100 },
-      });
-      return data.payments;
-    },
-  });
-}
-
-// Get single payment detail
-export function usePayment(id: string, enabled = true) {
-  return useQuery<IPayment, AxiosError>({
-    queryKey: queryKeys.payments.detail(id),
-    queryFn: async () => {
-      const { data } = await apiClient.get<IPayment>(endpoints.payments.detail(id));
-      return data;
-    },
-    enabled: enabled && !!id,
-  });
-}
-
 // Get matching suggestions for a payment
 export function usePaymentSuggestions(id: string, enabled = true) {
   return useQuery<PaymentSuggestion[], AxiosError>({
@@ -93,43 +73,30 @@ export function usePaymentSuggestions(id: string, enabled = true) {
   });
 }
 
-// Match payments automatically
-export function useMatchPayments() {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    { success: boolean; matched: number; unmatched: number },
-    AxiosError,
-    MatchPaymentsParams
-  >({
-    mutationFn: async ({ paymentIds }) => {
-      const { data } = await apiClient.post<{
-        success: boolean;
-        matched: number;
-        unmatched: number;
-      }>(endpoints.payments.match, {
-        paymentIds,
-      });
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.arrears.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
-    },
-  });
-}
-
 // Manually allocate payment to invoices
+//
+// Calls POST /payments (not /payments/:id/allocate — that sub-route does not exist).
+// Body shape matches ApiAllocatePaymentDto:
+//   { transaction_id: string, allocations: [{ invoice_id, amount }] }
+// where amount is ZAR decimal (the controller rounds to cents server-side).
+//
+// Payments without a linked bank transaction (transactionId undefined) cannot be
+// allocated via this path. The mutationFn rejects immediately with a descriptive
+// error so the dialog can surface it without a network round-trip.
 export function useAllocatePayment() {
   const queryClient = useQueryClient();
 
   return useMutation<{ success: boolean }, AxiosError, AllocatePaymentParams>({
-    mutationFn: async ({ paymentId, allocations }) => {
+    mutationFn: async ({ transactionId, allocations }) => {
+      if (!transactionId) {
+        throw new Error(
+          'This payment has no linked bank transaction and cannot be allocated through this dialog.'
+        );
+      }
       const { data } = await apiClient.post<{ success: boolean }>(
-        endpoints.payments.allocate(paymentId),
+        endpoints.payments.list,
         {
+          transaction_id: transactionId,
           allocations,
         }
       );

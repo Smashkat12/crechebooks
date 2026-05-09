@@ -38,7 +38,7 @@ import {
   useDownloadParentInvoicePdf,
   type ParentInvoiceStatus,
 } from '@/hooks/parent-portal/use-parent-invoices';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { useToast } from '@/hooks/use-toast';
 
 const statusConfig: Record<

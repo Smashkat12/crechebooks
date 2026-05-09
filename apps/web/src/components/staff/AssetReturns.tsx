@@ -43,7 +43,7 @@ import {
   useUpdateAssetReturn,
   type AssetReturn,
 } from '@/hooks/use-staff-offboarding';
-import { formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils/format';
 
 interface AssetReturnsProps {
   staffId: string;

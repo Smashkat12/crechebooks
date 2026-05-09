@@ -14,10 +14,10 @@ export default function SignupPage() {
       <div className="w-full max-w-2xl space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">
+          <h1 className="text-4xl font-bold tracking-tight text-gray-900">
             Start Your Free Trial
           </h1>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-gray-600">
             Join hundreds of creches managing their operations with CrecheBooks
           </p>
         </div>

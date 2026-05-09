@@ -62,6 +62,8 @@ RUN pnpm install --frozen-lockfile --offline || pnpm install --frozen-lockfile
 # Build arguments for environment variables at build time
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_ENABLE_DEV_LOGIN
+ENV NEXT_PUBLIC_ENABLE_DEV_LOGIN=$NEXT_PUBLIC_ENABLE_DEV_LOGIN
 
 # Build shared types package first (required by web app)
 RUN pnpm --filter @crechebooks/types build

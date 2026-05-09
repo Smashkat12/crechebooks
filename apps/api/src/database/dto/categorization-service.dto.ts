@@ -149,10 +149,6 @@ export interface AICategorization {
 export const CATEGORIZATION_CONSTANTS = {
   /** Minimum confidence for auto-categorization */
   AUTO_THRESHOLD: 80,
-  /** Confidence boost from pattern match */
-  PATTERN_BOOST: 15,
-  /** AI agent timeout in milliseconds */
-  AI_TIMEOUT_MS: 30000,
   /** Maximum split tolerance in cents */
   SPLIT_TOLERANCE_CENTS: 1,
 } as const;

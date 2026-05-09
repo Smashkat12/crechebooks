@@ -60,9 +60,53 @@ export class ReadinessBlockerDto {
   count!: number;
 }
 
+/**
+ * Per-return deadline entry — dueDate and daysRemaining only.
+ * Used in the `deadlines` map so each card can show its own due date
+ * regardless of which deadline is soonest overall.
+ */
+export class DeadlineEntryDto {
+  @ApiProperty({
+    example: '2026-05-07',
+    description:
+      'ISO YYYY-MM-DD due date (adjusted for weekends / SA public holidays)',
+  })
+  dueDate!: string;
+
+  @ApiProperty({
+    example: 5,
+    description: 'Days remaining (negative if overdue)',
+  })
+  daysRemaining!: number;
+}
+
+export class SarsDeadlinesDto {
+  @ApiPropertyOptional({
+    type: DeadlineEntryDto,
+    description: 'Next EMP201 deadline. Always present.',
+    nullable: false,
+  })
+  emp201!: DeadlineEntryDto;
+
+  @ApiPropertyOptional({
+    type: DeadlineEntryDto,
+    description:
+      'Next VAT201 deadline. Null when tenant VAT category is D, E, or F (manual cadence) or tenant is not VAT-registered.',
+    nullable: true,
+  })
+  vat201!: DeadlineEntryDto | null;
+}
+
 export class SarsReadinessResponseDto {
   @ApiProperty({ type: NextDeadlineDto })
   nextDeadline!: NextDeadlineDto;
+
+  /**
+   * Per-return deadlines — lets each UI card show its own due date independently
+   * of which deadline is soonest overall (F2-A-006).
+   */
+  @ApiProperty({ type: SarsDeadlinesDto })
+  deadlines!: SarsDeadlinesDto;
 
   @ApiProperty({
     type: [ReadinessBlockerDto],

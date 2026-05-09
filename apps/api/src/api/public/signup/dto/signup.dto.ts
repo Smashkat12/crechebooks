@@ -1,11 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
+  IsBoolean,
   MaxLength,
   MinLength,
   Matches,
+  ValidateIf,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import {
@@ -28,29 +31,71 @@ export class SignupDto {
   @Transform(({ value }) => value?.trim())
   crecheName: string;
 
-  @ApiProperty({
+  /**
+   * Canonical admin name field.
+   * Required unless the legacy alias `fullName` is provided instead.
+   */
+  @ApiPropertyOptional({
     description: 'Admin user full name',
     example: 'Sarah Johnson',
     maxLength: 100,
   })
+  @ValidateIf((o: SignupDto) => !o.fullName)
   @IsNotEmpty()
   @IsString()
   @MaxLength(100)
   @SanitizeName()
   @Transform(({ value }) => normalizeName(value))
-  adminName: string;
+  adminName?: string;
 
-  @ApiProperty({
+  /**
+   * Legacy form alias for adminName — accepted to avoid forbidNonWhitelisted 400.
+   * Service resolves: adminName ?? fullName.
+   */
+  @ApiPropertyOptional({
+    description: 'Alias for adminName (legacy form field)',
+    maxLength: 100,
+  })
+  @ValidateIf((o: SignupDto) => !o.adminName)
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(100)
+  @SanitizeName()
+  @Transform(({ value }) => normalizeName(value))
+  fullName?: string;
+
+  /**
+   * Canonical admin email field.
+   * Required unless the legacy alias `email` is provided instead.
+   */
+  @ApiPropertyOptional({
     description: 'Admin email address (will be used for login)',
     example: 'sarah@littlelearners.co.za',
     maxLength: 255,
   })
+  @ValidateIf((o: SignupDto) => !o.email)
   @IsNotEmpty()
   @IsEmail()
   @MaxLength(255)
   @SanitizeEmail()
   @Transform(({ value }) => value?.toLowerCase().trim())
-  adminEmail: string;
+  adminEmail?: string;
+
+  /**
+   * Legacy form alias for adminEmail — accepted to avoid forbidNonWhitelisted 400.
+   * Service resolves: adminEmail ?? email.
+   */
+  @ApiPropertyOptional({
+    description: 'Alias for adminEmail (legacy form field)',
+    maxLength: 255,
+  })
+  @ValidateIf((o: SignupDto) => !o.adminEmail)
+  @IsNotEmpty()
+  @IsEmail()
+  @MaxLength(255)
+  @SanitizeEmail()
+  @Transform(({ value }) => value?.toLowerCase().trim())
+  email?: string;
 
   @ApiProperty({
     description:
@@ -83,52 +128,88 @@ export class SignupDto {
   @Transform(({ value }) => value?.trim())
   phone: string;
 
-  @ApiProperty({
-    description: 'Physical address line 1',
+  @ApiPropertyOptional({
+    description:
+      'Physical address line 1 (collected during onboarding if not provided)',
     example: '123 Main Street',
     maxLength: 200,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(200)
   @SanitizeString()
-  @Transform(({ value }) => value?.trim())
-  addressLine1: string;
+  @Transform(({ value }) => value?.trim() || '')
+  addressLine1?: string;
 
-  @ApiProperty({
-    description: 'City',
+  @ApiPropertyOptional({
+    description: 'City (collected during onboarding if not provided)',
     example: 'Johannesburg',
     maxLength: 100,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(100)
   @SanitizeString()
-  @Transform(({ value }) => value?.trim())
-  city: string;
+  @Transform(({ value }) => value?.trim() || '')
+  city?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Province',
     example: 'Gauteng',
     maxLength: 50,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(50)
   @SanitizeString()
-  @Transform(({ value }) => value?.trim())
-  province: string;
+  @Transform(({ value }) => value?.trim() || '')
+  province?: string;
 
-  @ApiProperty({
-    description: 'Postal code',
+  @ApiPropertyOptional({
+    description: 'Postal code (collected during onboarding if not provided)',
     example: '2000',
     maxLength: 10,
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   @MaxLength(10)
-  @Transform(({ value }) => value?.trim())
-  postalCode: string;
+  @Transform(({ value }) => value?.trim() || '')
+  postalCode?: string;
+
+  // ---------- Optional metadata fields (from form, stored/logged but not required) ----------
+
+  @ApiPropertyOptional({
+    description: 'Number of children range selected in signup form',
+    maxLength: 20,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  numberOfChildren?: string;
+
+  @ApiPropertyOptional({ description: 'Marketing consent flag' })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => Boolean(value))
+  marketingOptIn?: boolean;
+
+  @ApiPropertyOptional({ description: 'Alias for marketingOptIn' })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => Boolean(value))
+  marketingConsent?: boolean;
+
+  @ApiPropertyOptional({ description: 'Terms acceptance flag' })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => Boolean(value))
+  acceptTerms?: boolean;
+
+  @ApiPropertyOptional({ description: 'Alias for acceptTerms' })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => Boolean(value))
+  termsAccepted?: boolean;
 }
 
 export class SignupResponseDto {

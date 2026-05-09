@@ -18,14 +18,11 @@ interface DeliveryStats {
   whatsapp_delivered?: number;
   whatsapp_read?: number;
   whatsapp_failed?: number;
-  sms_sent?: number;
-  sms_delivered?: number;
-  sms_failed?: number;
 }
 
 interface DeliveryStatsChartProps {
   stats: DeliveryStats;
-  channel: 'email' | 'whatsapp' | 'sms' | 'all';
+  channel: 'email' | 'whatsapp' | 'all';
 }
 
 function StatItem({

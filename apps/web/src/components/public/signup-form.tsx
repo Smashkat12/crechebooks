@@ -230,7 +230,22 @@ export function SignupForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Signup failed');
+        // data.error is an object from GlobalExceptionFilter: { code, message, ... }
+        // Fall through: structured message → raw message → fallback string
+        const serverMessage =
+          (data?.error?.message as string | undefined) ??
+          (data?.message as string | undefined) ??
+          null;
+        // Don't surface raw validation constraint strings to users
+        const isValidationError =
+          data?.error?.code === 'VALIDATION_ERROR' ||
+          (typeof serverMessage === 'string' &&
+            serverMessage.includes('should not exist'));
+        throw new Error(
+          isValidationError
+            ? 'Some form fields could not be processed. Please review your details and try again.'
+            : (serverMessage ?? 'Signup failed. Please try again.'),
+        );
       }
 
       // Calculate trial expiry date (14 days from now)
@@ -396,6 +411,7 @@ export function SignupForm() {
                 <Input
                   id="crecheName"
                   placeholder="e.g., Little Angels Creche"
+                  autoComplete="organization"
                   value={formData.crecheName}
                   onChange={(e) => updateField('crecheName', e.target.value)}
                   className={cn(errors.crecheName && 'border-destructive')}
@@ -410,6 +426,7 @@ export function SignupForm() {
                 <Input
                   id="tradingName"
                   placeholder="If different from creche name"
+                  autoComplete="off"
                   value={formData.tradingName}
                   onChange={(e) => updateField('tradingName', e.target.value)}
                 />
@@ -485,6 +502,7 @@ export function SignupForm() {
                 <Input
                   id="fullName"
                   placeholder="John Doe"
+                  autoComplete="name"
                   value={formData.fullName}
                   onChange={(e) => updateField('fullName', e.target.value)}
                   className={cn(errors.fullName && 'border-destructive')}
@@ -502,6 +520,7 @@ export function SignupForm() {
                   id="email"
                   type="email"
                   placeholder="john@example.com"
+                  autoComplete="email"
                   value={formData.email}
                   onChange={(e) => updateField('email', e.target.value)}
                   className={cn(errors.email && 'border-destructive')}
@@ -519,6 +538,7 @@ export function SignupForm() {
                   id="phone"
                   type="tel"
                   placeholder="0821234567"
+                  autoComplete="tel"
                   value={formData.phone}
                   onChange={(e) => updateField('phone', e.target.value)}
                   className={cn(errors.phone && 'border-destructive')}
@@ -537,6 +557,7 @@ export function SignupForm() {
                     id="password"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter a strong password"
+                    autoComplete="new-password"
                     value={formData.password}
                     onChange={(e) => updateField('password', e.target.value)}
                     className={cn(
@@ -590,6 +611,7 @@ export function SignupForm() {
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Re-enter your password"
+                    autoComplete="new-password"
                     value={formData.confirmPassword}
                     onChange={(e) =>
                       updateField('confirmPassword', e.target.value)

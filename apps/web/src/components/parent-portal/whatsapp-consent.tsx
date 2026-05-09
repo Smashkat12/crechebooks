@@ -19,7 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils/format';
 
 interface WhatsAppConsentProps {
   isOptedIn: boolean;

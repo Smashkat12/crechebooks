@@ -15,7 +15,7 @@ import { ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 
 export type InvoiceStatus = 'paid' | 'pending' | 'overdue';
 
@@ -48,7 +48,7 @@ export function InvoiceCard({ invoice, onViewDetails }: InvoiceCardProps) {
   return (
     <Card
       className={`cursor-pointer transition-colors hover:bg-muted/50 ${
-        invoice.status === 'overdue' ? 'border-red-200 bg-red-50/50' : ''
+        invoice.status === 'overdue' ? 'border-red-200 bg-red-50' : ''
       }`}
       onClick={() => onViewDetails?.(invoice.id)}
     >

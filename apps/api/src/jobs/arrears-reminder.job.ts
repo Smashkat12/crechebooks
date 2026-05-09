@@ -61,7 +61,6 @@ export interface OverdueInvoice {
     email: string | null;
     whatsapp: string | null;
     whatsappOptIn: boolean;
-    smsOptIn: boolean;
     preferredContact: string;
     isActive: boolean;
   };
@@ -433,7 +432,6 @@ export class ArrearsReminderJob implements OnModuleDestroy {
             email: true,
             whatsapp: true,
             whatsappOptIn: true,
-            smsOptIn: true,
             preferredContact: true,
             isActive: true,
           },

@@ -14,18 +14,6 @@
 export type SarsType = 'PAYE' | 'UIF' | 'EMP201' | 'VAT201';
 
 /**
- * Configuration for the SARS explainer LLM agent.
- */
-export interface SarsExplainerConfig {
-  /** Model identifier (e.g., 'sonnet' for nuanced explanations) */
-  model: string;
-  /** Maximum tokens for the explanation response */
-  maxTokens: number;
-  /** Temperature for response generation (low for consistency) */
-  temperature: number;
-}
-
-/**
  * Context about the SARS calculation being explained.
  */
 export interface ExplanationContext {
@@ -35,52 +23,4 @@ export interface ExplanationContext {
   period: string;
   /** Type of SARS calculation */
   type: SarsType;
-}
-
-/**
- * Input data for PAYE explanation.
- * All monetary values are in CENTS (integers).
- */
-export interface PayeExplanationInput {
-  grossAmountCents: number;
-  taxBeforeRebatesCents: number;
-  totalRebatesCents: number;
-  medicalCreditsCents: number;
-  payeCents: number;
-}
-
-/**
- * Input data for UIF explanation.
- * All monetary values are in CENTS (integers).
- */
-export interface UifExplanationInput {
-  grossAmountCents: number;
-  employeeContributionCents: number;
-  employerContributionCents: number;
-  totalContributionCents: number;
-  isAboveCap: boolean;
-}
-
-/**
- * Input data for EMP201 explanation.
- * All monetary values are in CENTS (integers).
- */
-export interface Emp201ExplanationInput {
-  totalPayeCents: number;
-  totalUifCents: number;
-  totalSdlCents: number;
-  totalPayableCents: number;
-  employeeCount: number;
-  period: string;
-}
-
-/**
- * Input data for VAT201 explanation.
- * All monetary values are in CENTS (integers).
- */
-export interface Vat201ExplanationInput {
-  outputVatCents: number;
-  inputVatCents: number;
-  netVatCents: number;
-  periodStr: string;
 }

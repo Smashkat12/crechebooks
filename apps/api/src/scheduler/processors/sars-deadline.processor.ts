@@ -12,10 +12,12 @@ import { BaseProcessor } from './base.processor';
 import { QUEUE_NAMES, SarsDeadlineJobData } from '../types/scheduler.types';
 import { SarsDeadlineService } from '../../sars/sars-deadline.service';
 import { AuditLogService } from '../../database/services/audit-log.service';
+import { AuditAction } from '../../database/entities/audit-log.entity';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { UpcomingDeadline } from '../../sars/types/deadline.types';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { SarsDeadlineEvent } from '../../database/events/domain-events';
+import { EmailService } from '../../integrations/email/email.service';
 
 @Injectable()
 @Processor(QUEUE_NAMES.SARS_DEADLINE)
@@ -27,6 +29,7 @@ export class SarsDeadlineProcessor extends BaseProcessor<SarsDeadlineJobData> {
     private readonly auditLogService: AuditLogService,
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly emailService: EmailService,
   ) {
     super(QUEUE_NAMES.SARS_DEADLINE);
   }
@@ -130,7 +133,13 @@ export class SarsDeadlineProcessor extends BaseProcessor<SarsDeadlineJobData> {
     for (const channel of prefs.channels) {
       try {
         if (channel === 'email') {
-          this.sendEmailReminder(prefs.recipientEmails, subject, body);
+          await this.sendEmailReminder(
+            tenantId,
+            deadline,
+            prefs.recipientEmails,
+            subject,
+            body,
+          );
         } else if (channel === 'whatsapp') {
           // WhatsApp integration pending (TASK-BILL-015)
           this.logger.debug('WhatsApp channel pending implementation');
@@ -239,23 +248,66 @@ This is an automated reminder.
   }
 
   /**
-   * Send email reminder
-   * Note: Uses placeholder until email service is integrated
+   * Send email reminder via EmailService.
+   * COMMS_DISABLED gate is enforced inside sendEmailWithOptions — no additional
+   * gate needed here. The audit log records the attempt and its outcome.
    */
-  private sendEmailReminder(
+  private async sendEmailReminder(
+    tenantId: string,
+    deadline: UpcomingDeadline,
     recipients: string[],
     subject: string,
     body: string,
-  ): void {
-    // TODO: Integrate with email service when available
-    this.logger.log({
-      message: 'Email reminder queued',
-      recipients,
-      subject,
-      bodyPreview: body.substring(0, 100) + '...',
-    });
+  ): Promise<void> {
+    let status: 'sent' | 'queued' | 'failed' | 'comms_disabled' = 'failed';
 
-    // For now, just log the email
-    // Email service integration pending
+    try {
+      for (const recipient of recipients) {
+        const result = await this.emailService.sendEmailWithOptions({
+          to: recipient,
+          subject,
+          body,
+          tags: ['sars-deadline-reminder', deadline.type.toLowerCase()],
+          customVariables: {
+            tenantId,
+            deadlineType: deadline.type,
+            period: deadline.period,
+          },
+        });
+
+        // sendEmailWithOptions returns messageId 'comms-disabled-noop' when gated
+        if (result.messageId === 'comms-disabled-noop') {
+          status = 'comms_disabled';
+        } else {
+          status = result.status;
+        }
+
+        this.logger.log(
+          `SARS deadline email (${deadline.type} ${deadline.period}) → ${recipient}: ${status}`,
+        );
+      }
+    } catch (error) {
+      status = 'failed';
+      this.logger.error(
+        `Failed to send SARS deadline email for ${deadline.type} ${deadline.period}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    } finally {
+      // Audit log: one entry per send attempt regardless of outcome (EMP201 §3.2 comms trail)
+      await this.auditLogService.logAction({
+        tenantId,
+        entityType: 'SarsDeadlineReminder',
+        entityId: `${deadline.type}-${deadline.period}`,
+        action: AuditAction.CREATE,
+        afterValue: {
+          deadlineType: deadline.type,
+          period: deadline.period,
+          scheduledFor: deadline.deadline,
+          recipients,
+          status,
+        },
+        changeSummary: `SARS ${deadline.type} deadline reminder email: ${status}`,
+      });
+    }
   }
 }

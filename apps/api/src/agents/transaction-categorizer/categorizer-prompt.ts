@@ -128,38 +128,3 @@ Return a JSON object with these exact fields:
 7. All amounts are in CENTS (integers) — do NOT convert to rands
 8. When in doubt between two codes, pick the more specific one and note the uncertainty
 `;
-
-/**
- * Build a tenant-specific prompt addendum with custom context.
- * This adds any tenant-specific overrides or notes to the base prompt.
- *
- * @param tenantConfig - Tenant-specific configuration
- * @returns Formatted string to append to the system prompt
- */
-export function buildTenantPromptContext(tenantConfig: {
-  autoApplyThreshold: number;
-  customAccountCodes?: Array<{
-    code: string;
-    name: string;
-    description: string;
-  }>;
-  businessType?: string;
-}): string {
-  const lines = [
-    `\n## TENANT-SPECIFIC CONTEXT`,
-    `- Auto-apply threshold: ${String(tenantConfig.autoApplyThreshold)}%`,
-  ];
-
-  if (tenantConfig.businessType) {
-    lines.push(`- Business type: ${tenantConfig.businessType}`);
-  }
-
-  if (tenantConfig.customAccountCodes?.length) {
-    lines.push(`\n### Custom Account Codes`);
-    for (const code of tenantConfig.customAccountCodes) {
-      lines.push(`- ${code.code}: ${code.name} — ${code.description}`);
-    }
-  }
-
-  return lines.join('\n');
-}

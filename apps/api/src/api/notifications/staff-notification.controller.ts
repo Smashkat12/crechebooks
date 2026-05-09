@@ -17,6 +17,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { StaffAuthGuard } from '../auth/guards/staff-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { CurrentStaff } from '../auth/decorators/current-staff.decorator';
 import type { StaffSessionInfo } from '../auth/decorators/current-staff.decorator';
 import { InAppNotificationService } from '../../notifications/in-app-notification.service';
@@ -29,6 +30,7 @@ import {
 @ApiTags('Staff Portal - Notifications')
 @ApiBearerAuth()
 @Controller('staff-portal/notifications')
+@Public() // Skip global JwtAuthGuard - StaffAuthGuard handles staff session tokens
 @UseGuards(StaffAuthGuard)
 export class StaffNotificationController {
   private readonly logger = new Logger(StaffNotificationController.name);

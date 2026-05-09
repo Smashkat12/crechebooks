@@ -71,11 +71,6 @@ export class ParentFilterDto {
   @IsOptional()
   @IsBoolean()
   whatsapp_opt_in?: boolean;
-
-  @ApiPropertyOptional({ description: 'Filter by SMS opt-in status' })
-  @IsOptional()
-  @IsBoolean()
-  sms_opt_in?: boolean;
 }
 
 /**
@@ -139,7 +134,7 @@ export class RecipientFilterDto {
  */
 export class CreateBroadcastDto {
   @ApiPropertyOptional({
-    description: 'Email subject line (optional for WhatsApp/SMS)',
+    description: 'Email subject line (optional for WhatsApp)',
     maxLength: 200,
   })
   @IsOptional()

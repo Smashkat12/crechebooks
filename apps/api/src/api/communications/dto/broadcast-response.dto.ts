@@ -45,15 +45,6 @@ export class DeliveryStatsDto {
   @ApiProperty({ description: 'Number of WhatsApp messages failed' })
   whatsapp_failed: number;
 
-  @ApiProperty({ description: 'Number of SMS messages sent' })
-  sms_sent: number;
-
-  @ApiProperty({ description: 'Number of SMS messages delivered' })
-  sms_delivered: number;
-
-  @ApiProperty({ description: 'Number of SMS messages failed' })
-  sms_failed: number;
-
   constructor(stats: DeliveryStats) {
     this.total = stats.total;
     this.email_sent = stats.emailSent;
@@ -64,9 +55,6 @@ export class DeliveryStatsDto {
     this.whatsapp_delivered = stats.whatsappDelivered;
     this.whatsapp_read = stats.whatsappRead;
     this.whatsapp_failed = stats.whatsappFailed;
-    this.sms_sent = stats.smsSent;
-    this.sms_delivered = stats.smsDelivered;
-    this.sms_failed = stats.smsFailed;
   }
 }
 

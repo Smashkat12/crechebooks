@@ -205,7 +205,7 @@ async function parentAttendanceFetch<T>(endpoint: string): Promise<T> {
   const token = getParentToken();
   if (!token) throw new Error('Not authenticated. Please log in.');
 
-  const response = await fetch(`${PARENT_API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${PARENT_API_URL}/api/v1/parent-portal${endpoint}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -238,7 +238,7 @@ export async function fetchParentChildAttendance(
     ? '?' + new URLSearchParams(params as Record<string, string>).toString()
     : '';
   return parentAttendanceFetch<ParentAttendanceRecord[]>(
-    `/parent-portal/attendance/child/${childId}${query}`,
+    `/attendance/child/${childId}${query}`,
   );
 }
 
@@ -246,7 +246,7 @@ export async function fetchParentChildAttendanceSummary(
   childId: string,
 ): Promise<ParentAttendanceSummary> {
   return parentAttendanceFetch<ParentAttendanceSummary>(
-    `/parent-portal/attendance/child/${childId}/summary`,
+    `/attendance/child/${childId}/summary`,
   );
 }
 
@@ -281,7 +281,7 @@ async function parentAbsenceFetch<T>(
   const token = getParentToken();
   if (!token) throw new Error('Not authenticated. Please log in.');
 
-  const response = await fetch(`${PARENT_API_URL}/api/v1${endpoint}`, {
+  const response = await fetch(`${PARENT_API_URL}/api/v1/parent-portal${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -316,7 +316,7 @@ export async function reportAbsence(
   dto: ReportAbsenceDto,
 ): Promise<AbsenceReportResponse> {
   return parentAbsenceFetch<AbsenceReportResponse>(
-    `/parent-portal/children/${childId}/absences`,
+    `/children/${childId}/absences`,
     { method: 'POST', body: JSON.stringify(dto) },
   );
 }
@@ -329,7 +329,7 @@ export async function fetchAbsenceReports(
     ? '?' + new URLSearchParams(params as Record<string, string>).toString()
     : '';
   return parentAbsenceFetch<AbsenceReportsListResponse>(
-    `/parent-portal/children/${childId}/absences${query}`,
+    `/children/${childId}/absences${query}`,
   );
 }
 
@@ -338,7 +338,7 @@ export async function cancelAbsenceReport(
   absenceId: string,
 ): Promise<void> {
   return parentAbsenceFetch<void>(
-    `/parent-portal/children/${childId}/absences/${absenceId}`,
+    `/children/${childId}/absences/${absenceId}`,
     { method: 'DELETE' },
   );
 }

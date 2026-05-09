@@ -35,7 +35,7 @@ import {
   useCompleteOffboarding,
   type OffboardingStatus,
 } from '@/hooks/use-staff-offboarding';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate, formatCurrency } from '@/lib/utils/format';
 
 interface OffboardingStatusCardProps {
   staffId: string;

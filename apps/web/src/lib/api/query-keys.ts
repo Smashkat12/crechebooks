@@ -22,7 +22,6 @@ export const queryKeys = {
     lists: () => [...queryKeys.payments.all, 'list'] as const,
     list: (params?: Record<string, unknown>) => [...queryKeys.payments.lists(), params] as const,
     detail: (id: string) => [...queryKeys.payments.all, 'detail', id] as const,
-    unmatched: () => [...queryKeys.payments.all, 'unmatched'] as const,
     suggestions: (id: string) => [...queryKeys.payments.all, 'suggestions', id] as const,
   },
   // Arrears
@@ -92,7 +91,6 @@ export const queryKeys = {
   reports: {
     all: ['reports'] as const,
     incomeStatement: (params?: Record<string, unknown>) => [...queryKeys.reports.all, 'income-statement', params] as const,
-    balanceSheet: (params?: Record<string, unknown>) => [...queryKeys.reports.all, 'balance-sheet', params] as const,
     agedReceivables: () => [...queryKeys.reports.all, 'aged-receivables'] as const,
   },
   // Fee Structures

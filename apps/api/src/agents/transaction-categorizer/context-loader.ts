@@ -147,25 +147,4 @@ export class ContextLoader implements OnModuleInit {
     }
     return this.context;
   }
-
-  /**
-   * Get pattern by account code
-   */
-  getPattern(accountCode: string): PayeePattern | undefined {
-    return this.context?.patterns.find((p) => p.accountCode === accountCode);
-  }
-
-  /**
-   * Get account by code
-   */
-  getAccount(code: string): ChartOfAccountsEntry | undefined {
-    return this.context?.chartOfAccounts.find((a) => a.code === code);
-  }
-
-  /**
-   * Validate account code exists in chart of accounts
-   */
-  isValidAccountCode(code: string): boolean {
-    return this.context?.chartOfAccounts.some((a) => a.code === code) ?? false;
-  }
 }

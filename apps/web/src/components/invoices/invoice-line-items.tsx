@@ -17,7 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils/format";
 import { isItemVATExempt, DEFAULT_VAT_RATE } from "@/lib/vat";
 import type { InvoiceLine } from "@/types/invoice";
 import { LINE_TYPE_LABELS, type LineType } from "@/types/invoice";

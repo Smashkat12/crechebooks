@@ -21,12 +21,25 @@ export class SignupService {
   ) {}
 
   async signup(dto: SignupDto): Promise<SignupResponseDto> {
+    // Resolve canonical fields from legacy aliases (JOURNEY1-005 DTO compatibility)
+    const resolvedEmail = (dto.adminEmail ?? dto.email ?? '')
+      .toLowerCase()
+      .trim();
+    const resolvedName = dto.adminName ?? dto.fullName ?? '';
+
+    if (!resolvedEmail) {
+      throw new BadRequestException('Email address is required.');
+    }
+    if (!resolvedName) {
+      throw new BadRequestException('Admin name is required.');
+    }
+
     let auth0UserId: string | null = null;
 
     try {
       // Check if tenant with this email already exists
       const existingTenant = await this.prisma.tenant.findUnique({
-        where: { email: dto.adminEmail },
+        where: { email: resolvedEmail },
       });
 
       if (existingTenant) {
@@ -37,7 +50,7 @@ export class SignupService {
 
       // Check if user with this email already exists
       const existingUser = await this.prisma.user.findFirst({
-        where: { email: dto.adminEmail },
+        where: { email: resolvedEmail },
       });
 
       if (existingUser) {
@@ -60,38 +73,46 @@ export class SignupService {
       // Create Auth0 user if Auth0 Management API is configured
       let auth0Id: string;
       if (this.auth0Management.isConfigured()) {
-        this.logger.debug(`Creating Auth0 user for: ${dto.adminEmail}`);
+        this.logger.debug(`Creating Auth0 user for: ${resolvedEmail}`);
 
         // Check if user already exists in Auth0
-        const existingAuth0User = await this.auth0Management.getUserByEmail(
-          dto.adminEmail,
-        );
+        const existingAuth0User =
+          await this.auth0Management.getUserByEmail(resolvedEmail);
 
         if (existingAuth0User) {
           // User exists in Auth0 but not in our database - use their existing auth0Id
           auth0Id = existingAuth0User.user_id;
           this.logger.log(
-            `Found existing Auth0 user: ${auth0Id} for ${dto.adminEmail}`,
+            `Found existing Auth0 user: ${auth0Id} for ${resolvedEmail}`,
           );
         } else {
           // Create new Auth0 user
           const auth0User = await this.auth0Management.createUser({
-            email: dto.adminEmail,
+            email: resolvedEmail,
             password: dto.password,
-            name: dto.adminName,
+            name: resolvedName,
           });
           auth0Id = auth0User.user_id;
           auth0UserId = auth0Id; // Track for cleanup on failure
           this.logger.log(
-            `Created Auth0 user: ${auth0Id} for ${dto.adminEmail}`,
+            `Created Auth0 user: ${auth0Id} for ${resolvedEmail}`,
           );
         }
       } else {
         // Auth0 not configured - use temporary ID (for development only)
         auth0Id = `auth0|temp-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         this.logger.warn(
-          `Auth0 Management API not configured. Using temporary auth0Id for ${dto.adminEmail}. ` +
+          `Auth0 Management API not configured. Using temporary auth0Id for ${resolvedEmail}. ` +
             'Configure AUTH0_MANAGEMENT_CLIENT_ID and AUTH0_MANAGEMENT_CLIENT_SECRET for production.',
+        );
+      }
+
+      // Log optional metadata from form (not persisted to DB columns)
+      const marketingConsent =
+        dto.marketingOptIn ?? dto.marketingConsent ?? false;
+      if (dto.numberOfChildren) {
+        this.logger.debug(
+          `Signup metadata: numberOfChildren=${dto.numberOfChildren}, marketingConsent=${marketingConsent}`,
         );
       }
 
@@ -101,12 +122,12 @@ export class SignupService {
         const tenant = await tx.tenant.create({
           data: {
             name: dto.crecheName,
-            email: dto.adminEmail,
+            email: resolvedEmail,
             phone: dto.phone,
-            addressLine1: dto.addressLine1,
-            city: dto.city,
-            province: dto.province,
-            postalCode: dto.postalCode,
+            addressLine1: dto.addressLine1 ?? '',
+            city: dto.city ?? '',
+            province: dto.province ?? '',
+            postalCode: dto.postalCode ?? '',
             subscriptionStatus: 'TRIAL',
             trialExpiresAt,
           },
@@ -117,8 +138,8 @@ export class SignupService {
           data: {
             tenantId: tenant.id,
             auth0Id: auth0Id,
-            email: dto.adminEmail,
-            name: dto.adminName,
+            email: resolvedEmail,
+            name: resolvedName,
             role: 'ADMIN',
             isActive: true,
             currentTenantId: tenant.id,
@@ -155,12 +176,13 @@ export class SignupService {
         });
 
         // TASK-ACCT-014: Create onboarding progress record
-        // Address is already provided during signup, so mark it complete
+        // Only mark addressSet=true if the signup form actually provided an address
+        const addressProvided = !!(dto.addressLine1 && dto.city);
         await tx.onboardingProgress.create({
           data: {
             tenantId: tenant.id,
-            addressSet: true, // Signup form collects address
-            lastActiveStep: 'bankDetails', // Next step after address
+            addressSet: addressProvided,
+            lastActiveStep: addressProvided ? 'bankDetails' : 'address',
           },
         });
 
@@ -168,7 +190,7 @@ export class SignupService {
       });
 
       this.logger.log(
-        `Trial signup completed for ${dto.crecheName} (${dto.adminEmail}). ` +
+        `Trial signup completed for ${dto.crecheName} (${resolvedEmail}). ` +
           `Tenant: ${result.tenant.id}, User: ${result.user.id}, Auth0: ${auth0Id}`,
       );
 
@@ -200,7 +222,7 @@ export class SignupService {
       }
 
       this.logger.error(
-        `Failed to process signup for ${dto.adminEmail}. Error code: ${error.code}, Message: ${error.message}`,
+        `Failed to process signup for ${resolvedEmail}. Error code: ${error.code}, Message: ${error.message}`,
         error.stack,
       );
 

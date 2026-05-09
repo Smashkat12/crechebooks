@@ -45,7 +45,7 @@ import {
   useConvertQuote,
 } from '@/hooks/use-quotes';
 import { useToast } from '@/hooks/use-toast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 export default function QuoteDetailPage() {
   const params = useParams();

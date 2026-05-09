@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { useParent } from "@/hooks/use-parents";
 import { useInvoicesList } from "@/hooks/use-invoices";
 import { usePaymentsList } from "@/hooks/use-payments";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { formatFullName } from "@/lib/utils/name-formatter";
 import { Skeleton } from "@/components/ui/skeleton";
 

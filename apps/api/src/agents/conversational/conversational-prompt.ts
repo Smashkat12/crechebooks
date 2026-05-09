@@ -65,21 +65,6 @@ COMMUNICATION STYLE:
 RESPONSE FORMAT: Plain text. Clear, human-friendly language. No JSON unless specifically requested.`;
 
 /**
- * Default model for conversational queries (sonnet for nuanced responses).
- */
-export const CONVERSATIONAL_MODEL = 'sonnet';
-
-/**
- * Maximum tokens for conversational responses.
- */
-export const CONVERSATIONAL_MAX_TOKENS = 1024;
-
-/**
- * Temperature for conversational responses (moderate for natural language).
- */
-export const CONVERSATIONAL_TEMPERATURE = 0.3;
-
-/**
  * Convert cents to formatted Rands string (e.g., 123456 -> "R1,234.56").
  * @param cents - Amount in cents (integer)
  * @returns Formatted Rand string

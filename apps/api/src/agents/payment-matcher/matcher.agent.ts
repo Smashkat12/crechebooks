@@ -30,8 +30,6 @@ import {
 } from './interfaces/matcher.interface';
 import { SdkPaymentMatcher } from './sdk-matcher';
 import type { MatchSource } from './interfaces/sdk-matcher.interface';
-import { HybridScorer } from '../shared/hybrid-scorer';
-import { AgentMemoryService } from '../memory/agent-memory.service';
 import { ShadowRunner } from '../rollout/shadow-runner';
 import type { ComparisonResult } from '../rollout/interfaces/rollout.interface';
 
@@ -60,12 +58,6 @@ export class PaymentMatcherAgent {
     @Optional()
     @Inject(SdkPaymentMatcher)
     private readonly sdkMatcher?: SdkPaymentMatcher,
-    @Optional()
-    @Inject(HybridScorer)
-    private readonly hybridScorer?: HybridScorer,
-    @Optional()
-    @Inject(AgentMemoryService)
-    private readonly agentMemory?: AgentMemoryService,
     @Optional()
     @Inject(ShadowRunner)
     private readonly shadowRunner?: ShadowRunner,

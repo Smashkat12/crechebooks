@@ -4,7 +4,7 @@ import { AlertTriangle, AlertCircle, Copy, FileQuestion } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import type { IReconciliationItem } from '@crechebooks/types';
 
 type DiscrepancyType = 'missing_transaction' | 'amount_mismatch' | 'duplicate';

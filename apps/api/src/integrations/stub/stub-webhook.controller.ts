@@ -62,58 +62,46 @@ export class StubWebhookController {
     @Body() rawPayload: Record<string, unknown>,
     @Headers('x-stub-signature') signature?: string,
   ): Promise<{ received: boolean; processed: number }> {
-    // Stub's actual webhook shape isn't documented in our codebase. Log the
-    // envelope so we can iterate on the parser. Include status/received plus
-    // a sniff of `response` (truncated, no full transaction dump).
-    const responsePreview =
-      rawPayload.response === undefined
-        ? 'absent'
-        : typeof rawPayload.response === 'string'
-          ? `string(len=${rawPayload.response.length})`
-          : Array.isArray(rawPayload.response)
-            ? `array(len=${rawPayload.response.length})`
-            : typeof rawPayload.response === 'object' && rawPayload.response
-              ? `object(keys=[${Object.keys(rawPayload.response).join(',')}])`
-              : `${typeof rawPayload.response}`;
-    this.logger.log(
-      `Received Stub webhook. keys=[${Object.keys(rawPayload ?? {}).join(', ')}] ` +
-        `status=${JSON.stringify(rawPayload.status)} ` +
-        `received=${JSON.stringify(rawPayload.received)} ` +
-        `response=${responsePreview}`,
-    );
+    // Stub envelope (verified from prod logs):
+    //   { date, timestamp, signature, status, received, response }
+    //   received = { webhook, uid, type, appid, direction }   ← echoes our request
+    //   response = { error, transactions, hardrefreshing }     ← actual payload
+    // `hardrefreshing: true` signals Stub is fetching fresh data from FNB and
+    // will deliver the result in a follow-up webhook — no transactions in this
+    // envelope yet, just acknowledgement that the pull is in flight.
+    const received = (rawPayload.received as Record<string, unknown>) ?? {};
+    const response = (rawPayload.response as Record<string, unknown>) ?? {};
+    const uid = (received.uid as string) ?? '';
+    const event = (received.type as string) ?? 'unknown';
+    const direction = (received.direction as string) ?? '';
+    const transactionsRaw = response.transactions;
+    const error = response.error;
+    const hardrefreshing = response.hardrefreshing === true;
 
-    // Be permissive about field names — Stub may use 'business_uid', 'uid',
-    // 'business_id', etc. Same for event/transactions placement.
     const payload: StubWebhookPayload = {
-      event:
-        (rawPayload.event as string) ??
-        (rawPayload.type as string) ??
-        (rawPayload.kind as string) ??
-        'unknown',
-      uid:
-        (rawPayload.uid as string) ??
-        (rawPayload.business_uid as string) ??
-        (rawPayload.businessUid as string) ??
-        (rawPayload.business_id as string) ??
-        (rawPayload.businessId as string) ??
-        '',
-      data:
-        (rawPayload.data as StubWebhookPayload['data']) ??
-        (rawPayload.payload as StubWebhookPayload['data']) ??
-        // Some webhook designs put transactions at the top level
-        (Array.isArray(rawPayload.transactions)
-          ? {
-              transactions:
-                rawPayload.transactions as StubWebhookPayload['data']['transactions'],
-            }
-          : { transactions: [] }),
+      event,
+      uid,
+      data: {
+        transactions: Array.isArray(transactionsRaw)
+          ? (transactionsRaw as StubWebhookPayload['data']['transactions'])
+          : [],
+      },
       timestamp: (rawPayload.timestamp as string) ?? new Date().toISOString(),
     };
 
     this.logger.log(
-      `Parsed Stub webhook: event=${payload.event}, uid=${payload.uid}, ` +
-        `txCount=${payload.data.transactions?.length ?? 0}`,
+      `Stub webhook: type=${event} direction=${direction} uid=${uid} ` +
+        `status=${JSON.stringify(rawPayload.status)} ` +
+        `txCount=${payload.data.transactions?.length ?? 0} ` +
+        `hardrefreshing=${hardrefreshing} ` +
+        `error=${error === null || error === undefined ? 'null' : JSON.stringify(error)}`,
     );
+
+    // If Stub reports it's still fetching, this envelope has nothing for us
+    // to import — wait for the follow-up webhook.
+    if (hardrefreshing && (payload.data.transactions?.length ?? 0) === 0) {
+      return { received: true, processed: 0 };
+    }
 
     // Verify HMAC signature if webhook secret is configured
     if (this.webhookSecret) {

@@ -108,33 +108,59 @@ export class StubWebhookController {
         try {
           const stubRef = `stub-${tx.id}`;
 
-          // Check if transaction already exists (idempotent via reference)
-          const existing = await this.prisma.transaction.findFirst({
-            where: {
-              tenantId,
-              reference: stubRef,
-            },
+          // Idempotency: same Stub transaction already imported.
+          const existingStub = await this.prisma.transaction.findFirst({
+            where: { tenantId, reference: stubRef },
           });
 
-          if (existing) {
+          if (existingStub) {
             this.logger.debug(
               `Stub transaction ${tx.id} already imported, skipping`,
             );
             continue;
           }
 
-          // Convert Stub amount (Rands) to cents
-          const amountCents = Math.round(tx.amount * 100);
+          // Convert Stub amount (Rands) to cents.
+          const amountCents = Math.abs(Math.round(tx.amount * 100));
+          const isCredit = tx.type === 'income';
+          const txDate = new Date(tx.date);
+
+          // Cross-source dedup: a row with the same date + amount + isCredit
+          // for this tenant/account is almost certainly the same FNB
+          // transaction we already pulled via Xero. Skip rather than double-import.
+          const dayStart = new Date(txDate);
+          dayStart.setUTCHours(0, 0, 0, 0);
+          const dayEnd = new Date(txDate);
+          dayEnd.setUTCHours(23, 59, 59, 999);
+
+          const existingFromOtherSource =
+            await this.prisma.transaction.findFirst({
+              where: {
+                tenantId,
+                bankAccount: 'Business Account',
+                amountCents,
+                isCredit,
+                date: { gte: dayStart, lte: dayEnd },
+                source: ImportSource.BANK_FEED,
+              },
+            });
+
+          if (existingFromOtherSource) {
+            this.logger.debug(
+              `Stub transaction ${tx.id} matches existing tx ${existingFromOtherSource.id} (same day + amount + direction), skipping`,
+            );
+            continue;
+          }
 
           await this.prisma.transaction.create({
             data: {
               tenantId,
-              date: new Date(tx.date),
+              date: txDate,
               description: tx.description,
-              amountCents: Math.abs(amountCents),
-              isCredit: tx.type === 'income',
+              amountCents,
+              isCredit,
               reference: stubRef,
-              bankAccount: 'Stub Bank Feed',
+              bankAccount: 'Business Account',
               source: ImportSource.BANK_FEED,
               status: 'PENDING',
             },

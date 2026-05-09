@@ -59,11 +59,47 @@ export class StubWebhookController {
   @Public()
   @HttpCode(HttpStatus.OK)
   async handleWebhook(
-    @Body() payload: StubWebhookPayload,
+    @Body() rawPayload: Record<string, unknown>,
     @Headers('x-stub-signature') signature?: string,
   ): Promise<{ received: boolean; processed: number }> {
+    // Stub's actual webhook shape isn't documented in our codebase. Log the
+    // raw envelope (top-level keys) so we can iterate on the parser without
+    // dumping potentially sensitive transaction data into Railway logs.
     this.logger.log(
-      `Received Stub webhook: event=${payload.event}, uid=${payload.uid}`,
+      `Received Stub webhook. Top-level keys: [${Object.keys(rawPayload ?? {}).join(', ')}]`,
+    );
+
+    // Be permissive about field names — Stub may use 'business_uid', 'uid',
+    // 'business_id', etc. Same for event/transactions placement.
+    const payload: StubWebhookPayload = {
+      event:
+        (rawPayload.event as string) ??
+        (rawPayload.type as string) ??
+        (rawPayload.kind as string) ??
+        'unknown',
+      uid:
+        (rawPayload.uid as string) ??
+        (rawPayload.business_uid as string) ??
+        (rawPayload.businessUid as string) ??
+        (rawPayload.business_id as string) ??
+        (rawPayload.businessId as string) ??
+        '',
+      data:
+        (rawPayload.data as StubWebhookPayload['data']) ??
+        (rawPayload.payload as StubWebhookPayload['data']) ??
+        // Some webhook designs put transactions at the top level
+        (Array.isArray(rawPayload.transactions)
+          ? {
+              transactions:
+                rawPayload.transactions as StubWebhookPayload['data']['transactions'],
+            }
+          : { transactions: [] }),
+      timestamp: (rawPayload.timestamp as string) ?? new Date().toISOString(),
+    };
+
+    this.logger.log(
+      `Parsed Stub webhook: event=${payload.event}, uid=${payload.uid}, ` +
+        `txCount=${payload.data.transactions?.length ?? 0}`,
     );
 
     // Verify HMAC signature if webhook secret is configured

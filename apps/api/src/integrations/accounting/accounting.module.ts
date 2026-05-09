@@ -18,6 +18,12 @@ import { DynamicModule, Logger, Module, type Provider } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ACCOUNTING_PROVIDER } from './accounting-provider.token';
 import { AccountingController } from './accounting.controller';
+// StubModule is always imported so its webhook + bank-feed controllers stay
+// mounted regardless of ACCOUNTING_PROVIDER. This lets us use Stub purely as
+// a bank-feed source while a different provider (e.g. xero) handles the rest
+// of the accounting surface. The provider-specific switch below only decides
+// which adapter binds to ACCOUNTING_PROVIDER.
+import { StubModule } from '../stub/stub.module';
 
 /** Supported provider identifiers. */
 export type AccountingProviderType = 'xero' | 'stub';
@@ -72,7 +78,7 @@ export class AccountingModule {
     return {
       module: AccountingModule,
       global: true,
-      imports: [ConfigModule, ...(imports ?? [])],
+      imports: [ConfigModule, StubModule, ...(imports ?? [])],
       controllers: [AccountingController],
       providers: [...providers],
       exports: [ACCOUNTING_PROVIDER],
@@ -114,9 +120,9 @@ export class AccountingModule {
       }
 
       case 'stub': {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { StubModule } = require('../stub/stub.module');
-
+        // StubModule is already imported unconditionally at the top of this
+        // file, so StubAccountingAdapter is already a registered provider.
+        // We just need to bind it to the ACCOUNTING_PROVIDER token here.
         /* eslint-disable @typescript-eslint/no-require-imports */
         const {
           StubAccountingAdapter,
@@ -124,13 +130,12 @@ export class AccountingModule {
         /* eslint-enable @typescript-eslint/no-require-imports */
 
         AccountingModule.logger.log(
-          'Stub.africa provider selected -- registering StubAccountingAdapter',
+          'Stub.africa provider selected -- binding StubAccountingAdapter to ACCOUNTING_PROVIDER',
         );
 
         return {
-          imports: [StubModule],
+          imports: [],
           providers: [
-            StubAccountingAdapter,
             {
               provide: ACCOUNTING_PROVIDER,
               useExisting: StubAccountingAdapter,

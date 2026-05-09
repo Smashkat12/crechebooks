@@ -17,6 +17,7 @@ import { PrismaModule } from '../../database/prisma/prisma.module';
 import { StubApiClient } from './stub-api.client';
 import { StubAccountingAdapter } from './stub-accounting.adapter';
 import { StubWebhookController } from './stub-webhook.controller';
+import { StubBankFeedController } from './stub-bank-feed.controller';
 
 @Module({
   imports: [
@@ -27,7 +28,7 @@ import { StubWebhookController } from './stub-webhook.controller';
       maxRedirects: 5,
     }),
   ],
-  controllers: [StubWebhookController],
+  controllers: [StubWebhookController, StubBankFeedController],
   providers: [StubApiClient, StubAccountingAdapter],
   exports: [StubApiClient, StubAccountingAdapter],
 })

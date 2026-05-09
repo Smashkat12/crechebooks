@@ -313,16 +313,27 @@ export class BankFeedService {
         while (hasMorePages) {
           await this.checkRateLimit(tenantId);
 
-          // Fetch bank transactions from Xero for this account
-          // Note: Xero API requires GUID values wrapped in Guid() function
-          // Pass fromDate as ifModifiedSince so Xero filters server-side instead of
-          // returning the entire history every page — otherwise a tenant with thousands
-          // of historical transactions trips the per-minute rate limit and the sync fails.
+          // Fetch bank transactions from Xero for this account.
+          // Two server-side filters:
+          //   - where: BankAccount.AccountID + Date>=DateTime(...) restricts the
+          //     result set Xero paginates through. ifModifiedSince alone does NOT
+          //     filter — it's the HTTP If-Modified-Since header (304 vs 200), so
+          //     without a Date filter every sync paginates the full history and
+          //     trips Xero's 60/min rate limit at ~page 30.
+          //   - ifModifiedSince: still passed so Xero can short-circuit with 304
+          //     if nothing changed.
+          // Note: Xero API requires GUID values wrapped in Guid() function.
+          const wherePartsForPage = [
+            `BankAccount.AccountID==Guid("${connection.xeroAccountId}")`,
+            `Date>=DateTime(${fromDate.getUTCFullYear()},${fromDate.getUTCMonth() + 1},${fromDate.getUTCDate()})`,
+          ];
+          const whereClause = wherePartsForPage.join(' AND ');
+
           const bankTransactionsResponse =
             await client.accountingApi.getBankTransactions(
               xeroTenantId,
               fromDate, // ifModifiedSince
-              `BankAccount.AccountID==Guid("${connection.xeroAccountId}")`, // where
+              whereClause, // where
               undefined, // order
               page, // page number (1-indexed)
               undefined, // unitdp

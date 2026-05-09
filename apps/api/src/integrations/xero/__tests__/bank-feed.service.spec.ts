@@ -343,7 +343,7 @@ describe('BankFeedService', () => {
       expect(result.connectionId).toBe('specific-conn');
     });
 
-    it('should pass fromDate as ifModifiedSince so Xero filters server-side', async () => {
+    it('should pass fromDate as both ifModifiedSince and a Date>= where filter', async () => {
       const activeConnection = {
         id: connectionId,
         tenantId,
@@ -366,15 +366,16 @@ describe('BankFeedService', () => {
           xeroTenantId: 'xero-tenant',
         });
 
-      const fromDate = new Date('2026-03-12T00:00:00.000Z');
+      const fromDate = new Date(Date.UTC(2026, 2, 12)); // 2026-03-12 UTC
 
       await service.syncTransactions(tenantId, { fromDate });
 
       expect(getBankTransactions).toHaveBeenCalled();
       const callArgs = getBankTransactions.mock.calls[0];
       expect(callArgs[0]).toBe('xero-tenant');
-      expect(callArgs[1]).toBe(fromDate);
+      expect(callArgs[1]).toBe(fromDate); // ifModifiedSince still passed
       expect(callArgs[2]).toContain(xeroAccountId);
+      expect(callArgs[2]).toContain('Date>=DateTime(2026,3,12)');
     });
   });
 

@@ -315,10 +315,13 @@ export class BankFeedService {
 
           // Fetch bank transactions from Xero for this account
           // Note: Xero API requires GUID values wrapped in Guid() function
+          // Pass fromDate as ifModifiedSince so Xero filters server-side instead of
+          // returning the entire history every page — otherwise a tenant with thousands
+          // of historical transactions trips the per-minute rate limit and the sync fails.
           const bankTransactionsResponse =
             await client.accountingApi.getBankTransactions(
               xeroTenantId,
-              undefined, // ifModifiedSince
+              fromDate, // ifModifiedSince
               `BankAccount.AccountID==Guid("${connection.xeroAccountId}")`, // where
               undefined, // order
               page, // page number (1-indexed)

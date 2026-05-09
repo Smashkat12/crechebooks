@@ -63,10 +63,23 @@ export class StubWebhookController {
     @Headers('x-stub-signature') signature?: string,
   ): Promise<{ received: boolean; processed: number }> {
     // Stub's actual webhook shape isn't documented in our codebase. Log the
-    // raw envelope (top-level keys) so we can iterate on the parser without
-    // dumping potentially sensitive transaction data into Railway logs.
+    // envelope so we can iterate on the parser. Include status/received plus
+    // a sniff of `response` (truncated, no full transaction dump).
+    const responsePreview =
+      rawPayload.response === undefined
+        ? 'absent'
+        : typeof rawPayload.response === 'string'
+          ? `string(len=${rawPayload.response.length})`
+          : Array.isArray(rawPayload.response)
+            ? `array(len=${rawPayload.response.length})`
+            : typeof rawPayload.response === 'object' && rawPayload.response
+              ? `object(keys=[${Object.keys(rawPayload.response).join(',')}])`
+              : `${typeof rawPayload.response}`;
     this.logger.log(
-      `Received Stub webhook. Top-level keys: [${Object.keys(rawPayload ?? {}).join(', ')}]`,
+      `Received Stub webhook. keys=[${Object.keys(rawPayload ?? {}).join(', ')}] ` +
+        `status=${JSON.stringify(rawPayload.status)} ` +
+        `received=${JSON.stringify(rawPayload.received)} ` +
+        `response=${responsePreview}`,
     );
 
     // Be permissive about field names — Stub may use 'business_uid', 'uid',

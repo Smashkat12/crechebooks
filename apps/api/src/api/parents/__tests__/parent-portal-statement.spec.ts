@@ -17,14 +17,26 @@ import { PrismaService } from '../../../database/prisma/prisma.service';
 import { ParentOnboardingService } from '../../../database/services/parent-onboarding.service';
 import { ParentPortalChildService } from '../parent-portal-child.service';
 import { InvoicePdfService } from '../../../database/services/invoice-pdf.service';
+import { StatementPdfService } from '../../../database/services/statement-pdf.service';
+import { PaymentReceiptService } from '../../../database/services/payment-receipt.service';
+import { StatementDeliveryService } from '../../../database/services/statement-delivery.service';
+import { AuditLogService } from '../../../database/services/audit-log.service';
 import { ParentAuthGuard } from '../../auth/guards/parent-auth.guard';
 
 const TENANT_ID = 'tenant-aaa';
 const PARENT_ID = 'parent-111';
 
 const PARENT_SESSION = {
+  id: 'parent-session-1',
   parentId: PARENT_ID,
   tenantId: TENANT_ID,
+  parent: {
+    id: PARENT_ID,
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: 'jane@example.com',
+    tenantId: TENANT_ID,
+  },
 };
 
 const PARENT_ROW = {
@@ -77,6 +89,10 @@ describe('ParentPortalController — getStatementDetail credit-balance integrati
         { provide: ParentOnboardingService, useValue: {} },
         { provide: ParentPortalChildService, useValue: {} },
         { provide: InvoicePdfService, useValue: {} },
+        { provide: StatementPdfService, useValue: {} },
+        { provide: PaymentReceiptService, useValue: {} },
+        { provide: StatementDeliveryService, useValue: {} },
+        { provide: AuditLogService, useValue: { logAction: jest.fn() } },
       ],
     })
       .overrideGuard(ParentAuthGuard)

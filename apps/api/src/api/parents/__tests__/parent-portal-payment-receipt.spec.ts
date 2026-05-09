@@ -23,6 +23,8 @@ import { ParentPortalChildService } from '../parent-portal-child.service';
 import { InvoicePdfService } from '../../../database/services/invoice-pdf.service';
 import { StatementPdfService } from '../../../database/services/statement-pdf.service';
 import { PaymentReceiptService } from '../../../database/services/payment-receipt.service';
+import { StatementDeliveryService } from '../../../database/services/statement-delivery.service';
+import { AuditLogService } from '../../../database/services/audit-log.service';
 import { ParentAuthGuard } from '../../auth/guards/parent-auth.guard';
 import type { ParentSession } from '../../auth/decorators/current-parent.decorator';
 
@@ -33,8 +35,16 @@ const RECEIPT_NUMBER = 'REC-2026-00001';
 const S3_KEY = `${TENANT_ID}/payment-receipts/${RECEIPT_NUMBER}.pdf`;
 
 const PARENT_SESSION: ParentSession = {
+  id: 'parent-session-1',
   parentId: PARENT_ID,
   tenantId: TENANT_ID,
+  parent: {
+    id: PARENT_ID,
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: 'jane@example.com',
+    tenantId: TENANT_ID,
+  },
 };
 
 const PAYMENT_ROW = {
@@ -105,6 +115,8 @@ function buildModule(
       { provide: InvoicePdfService, useValue: {} },
       { provide: StatementPdfService, useValue: {} },
       { provide: PaymentReceiptService, useValue: mockReceiptService },
+      { provide: StatementDeliveryService, useValue: {} },
+      { provide: AuditLogService, useValue: { logAction: jest.fn() } },
     ],
   })
     .overrideGuard(ParentAuthGuard)
@@ -279,6 +291,8 @@ describe('ParentPortalController — getPaymentDetail hasReceipt', () => {
         { provide: InvoicePdfService, useValue: {} },
         { provide: StatementPdfService, useValue: {} },
         { provide: PaymentReceiptService, useValue: {} },
+        { provide: StatementDeliveryService, useValue: {} },
+        { provide: AuditLogService, useValue: { logAction: jest.fn() } },
       ],
     })
       .overrideGuard(ParentAuthGuard)

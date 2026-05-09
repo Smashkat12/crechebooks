@@ -17,7 +17,7 @@ async function fetchParentApi<T>(
 ): Promise<T> {
   const token = getToken();
   if (!token) throw new Error('No parent session token');
-  const res = await fetch(`${API_URL}/api/v1${path}`, {
+  const res = await fetch(`${API_URL}/api/v1/parent-portal${path}`, {
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -35,7 +35,7 @@ export function useParentUnreadCount() {
   const refresh = useCallback(async () => {
     try {
       const data = await fetchParentApi<{ count: number }>(
-        '/parent-portal/notifications/unread-count',
+        '/notifications/unread-count',
       );
       setCount(data.count);
     } catch {
@@ -54,7 +54,7 @@ export function useParentUnreadCount() {
 
 export function useParentMarkAsRead() {
   return useCallback(async (id: string) => {
-    await fetchParentApi(`/parent-portal/notifications/${id}/read`, {
+    await fetchParentApi(`/notifications/${id}/read`, {
       method: 'PATCH',
     });
   }, []);
@@ -62,7 +62,7 @@ export function useParentMarkAsRead() {
 
 export function useParentMarkAllAsRead() {
   return useCallback(async () => {
-    await fetchParentApi('/parent-portal/notifications/read-all', {
+    await fetchParentApi('/notifications/read-all', {
       method: 'PATCH',
     });
   }, []);
@@ -77,7 +77,7 @@ export function useParentNotificationList() {
       const data = await fetchParentApi<{
         data: NotificationItem[];
         meta: Record<string, unknown>;
-      }>('/parent-portal/notifications?limit=20');
+      }>('/notifications?limit=20');
       setNotifications(data.data);
     } catch {
       /* silent */

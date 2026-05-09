@@ -140,6 +140,39 @@ export class StaffOnboardingService {
   }
 
   /**
+   * Ensure a staff_onboardings row exists for the given staff member.
+   *
+   * Staff created outside the formal invitation flow (seeds, direct inserts,
+   * legacy staff) have no row. Rather than silently skipping step updates we
+   * bootstrap one here so all PATCH onboarding/* handlers work for any staff.
+   *
+   * Returns the OnboardingProgressResponse exactly as getOnboardingByStaffId
+   * does, so callers can use it immediately.
+   */
+  async ensureOnboardingForStaff(
+    staffId: string,
+    tenantId: string,
+  ): Promise<OnboardingProgressResponse> {
+    const existing =
+      await this.onboardingRepo.findOnboardingByStaffId(staffId);
+    if (existing) {
+      return this.getOnboardingProgress(existing.id);
+    }
+
+    this.logger.log(
+      `No staff_onboardings row for ${staffId} — bootstrapping IN_PROGRESS record`,
+    );
+
+    // Reuse createOnboarding which creates the row + seeds DEFAULT_ONBOARDING_CHECKLIST
+    const created = await this.onboardingRepo.createOnboarding(tenantId, {
+      staffId,
+      useDefaultChecklist: true,
+    });
+
+    return this.getOnboardingProgress(created.id);
+  }
+
+  /**
    * Step order for onboarding wizard
    */
   private readonly stepOrder: OnboardingStep[] = [

@@ -6,10 +6,15 @@ import { AdminService } from './admin.service';
 import { ImpersonationController } from './impersonation.controller';
 import { ImpersonationService } from './impersonation.service';
 import { PrismaModule } from '../../database/prisma';
+import { DatabaseModule } from '../../database/database.module';
+import { StorageModule } from '../../integrations/storage/storage.module';
+import { PopOrphanSweepJob } from '../../jobs/pop-orphan-sweep.job';
 
 @Module({
   imports: [
     PrismaModule,
+    DatabaseModule, // provides AuditLogService for PopOrphanSweepJob
+    StorageModule, // provides StorageService for PopOrphanSweepJob
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -22,7 +27,7 @@ import { PrismaModule } from '../../database/prisma';
     }),
   ],
   controllers: [AdminController, ImpersonationController],
-  providers: [AdminService, ImpersonationService],
+  providers: [AdminService, ImpersonationService, PopOrphanSweepJob],
   exports: [AdminService, ImpersonationService],
 })
 export class AdminModule {}

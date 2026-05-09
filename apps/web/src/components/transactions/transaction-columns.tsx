@@ -20,7 +20,7 @@ import {
 import { MoreHorizontal, Eye, Edit, Trash2, Split, GitBranch } from 'lucide-react';
 import { ConfidenceBadge } from './confidence-badge';
 import { CategorizationReasoning } from './CategorizationReasoning';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate } from '@/lib/utils/format';
 
 interface TransactionActionsProps {
   transaction: ITransaction;

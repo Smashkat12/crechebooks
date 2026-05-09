@@ -3,19 +3,22 @@
 import { useState } from 'react';
 import { AlertTriangle, Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrearsTable, SendReminderDialog } from '@/components/arrears';
 import { useArrearsList, useArrearsSummary } from '@/hooks/use-arrears';
 import { formatCurrency } from '@/lib/utils/format';
 import type { ArrearsRow } from '@/components/arrears';
 
 export default function ArrearsPage() {
+  const { toast } = useToast();
   const [reminderOpen, setReminderOpen] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   const { data: arrearsData, isLoading } = useArrearsList();
-  const { data: summary } = useArrearsSummary();
+  const { data: summary, isLoading: summaryLoading } = useArrearsSummary();
 
   // Map API response to ArrearsRow format
   const arrearsRows: ArrearsRow[] = arrearsData?.arrears.map(a => ({
@@ -35,7 +38,7 @@ export default function ArrearsPage() {
     setIsExporting(true);
     try {
       if (arrearsRows.length === 0) {
-        alert('No arrears data to export');
+        toast({ title: 'No data to export', description: 'There are no arrears records to export.', variant: 'destructive' });
         return;
       }
 
@@ -90,9 +93,13 @@ export default function ArrearsPage() {
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
-              {formatCurrency(summary?.totalOutstanding ?? 0)}
-            </div>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
+                {formatCurrency(summary?.totalOutstanding ?? 0)}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -100,9 +107,13 @@ export default function ArrearsPage() {
             <CardTitle className="text-sm font-medium">90+ Days Overdue</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
-              {formatCurrency(summary?.byAgeBucket.days90Plus ?? 0)}
-            </div>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-32" />
+            ) : (
+              <div className="text-2xl font-bold text-destructive" suppressHydrationWarning>
+                {formatCurrency(summary?.byAgeBucket.days90Plus ?? 0)}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -110,7 +121,11 @@ export default function ArrearsPage() {
             <CardTitle className="text-sm font-medium">Accounts in Arrears</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{summary?.totalAccounts ?? 0}</div>
+            {summaryLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold">{summary?.totalAccounts ?? 0}</div>
+            )}
           </CardContent>
         </Card>
       </div>

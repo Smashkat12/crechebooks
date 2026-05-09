@@ -10,6 +10,8 @@ import { StaffPortalController } from './staff-portal.controller';
 import { StaffInvitationController } from './staff-invitation.controller';
 import { StaffInviteAcceptController } from './staff-invite-accept.controller';
 import { StaffInvitationService } from './staff-invitation.service';
+import { Irp5PortalService } from './irp5-portal.service';
+import { Irp5PdfService } from './irp5-pdf.service';
 import { StaffRepository } from '../../database/repositories/staff.repository';
 import { LeaveRequestRepository } from '../../database/repositories/leave-request.repository';
 import { DatabaseModule } from '../../database/database.module';
@@ -38,7 +40,13 @@ import { MailgunModule } from '../../integrations/mailgun/mailgun.module';
     StaffInvitationController,
     StaffInviteAcceptController,
   ],
-  providers: [StaffRepository, LeaveRequestRepository, StaffInvitationService],
+  providers: [
+    StaffRepository,
+    LeaveRequestRepository,
+    StaffInvitationService,
+    Irp5PortalService,
+    Irp5PdfService,
+  ],
   exports: [StaffRepository, LeaveRequestRepository, StaffInvitationService],
 })
 export class StaffModule {}

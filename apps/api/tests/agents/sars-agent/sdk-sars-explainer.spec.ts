@@ -19,10 +19,6 @@ import type { ExplanationContext } from '../../../src/agents/sars-agent/interfac
 import {
   SARS_EXPLAINER_SYSTEM_PROMPT,
   SARS_EXPLAINER_MODEL,
-  buildPayePrompt,
-  buildUifPrompt,
-  buildEmp201Prompt,
-  buildVat201Prompt,
   formatCentsAsRands,
 } from '../../../src/agents/sars-agent/sars-prompt';
 
@@ -292,81 +288,6 @@ describe('SdkSarsExplainer', () => {
       expect(formatCentsAsRands(2500000)).toBe('R25,000.00');
       expect(formatCentsAsRands(50)).toBe('R0.50');
       expect(formatCentsAsRands(100000000)).toBe('R1,000,000.00');
-    });
-
-    it('should build PAYE prompt with rands', () => {
-      const breakdown: SarsBreakdown = {
-        grossAmountCents: 2500000,
-        taxBeforeRebatesCents: 500000,
-        totalRebatesCents: 150000,
-        medicalCreditsCents: 30000,
-        payeCents: 320000,
-      };
-
-      const prompt = buildPayePrompt(breakdown);
-
-      expect(prompt).toContain('R25,000.00');
-      expect(prompt).toContain('R5,000.00');
-      expect(prompt).toContain('R1,500.00');
-      expect(prompt).toContain('R300.00');
-      expect(prompt).toContain('R3,200.00');
-      expect(prompt).toContain('PAYE');
-    });
-
-    it('should build UIF prompt with rands', () => {
-      const breakdown: SarsBreakdown = {
-        grossAmountCents: 1500000,
-        uifCents: 30000,
-      };
-
-      const prompt = buildUifPrompt(breakdown, false);
-
-      expect(prompt).toContain('R15,000.00');
-      expect(prompt).toContain('R300.00');
-      expect(prompt).toContain('UIF');
-      expect(prompt).toContain('No');
-    });
-
-    it('should build UIF prompt with cap indicator', () => {
-      const breakdown: SarsBreakdown = {
-        grossAmountCents: 5000000,
-        uifCents: 35424,
-      };
-
-      const prompt = buildUifPrompt(breakdown, true);
-
-      expect(prompt).toContain('capped');
-    });
-
-    it('should build EMP201 prompt with rands', () => {
-      const breakdown: SarsBreakdown = {
-        payeCents: 200000,
-        uifCents: 35424,
-        sdlCents: 20000,
-      };
-
-      const prompt = buildEmp201Prompt(breakdown, 5, '2025-01');
-
-      expect(prompt).toContain('R2,000.00');
-      expect(prompt).toContain('R354.24');
-      expect(prompt).toContain('R200.00');
-      expect(prompt).toContain('5');
-      expect(prompt).toContain('2025-01');
-      expect(prompt).toContain('EMP201');
-    });
-
-    it('should build VAT201 prompt with rands', () => {
-      const breakdown: SarsBreakdown = {
-        outputVatCents: 150000,
-        inputVatCents: 80000,
-      };
-
-      const prompt = buildVat201Prompt(breakdown, '2025-01 to 2025-01');
-
-      expect(prompt).toContain('R1,500.00');
-      expect(prompt).toContain('R800.00');
-      expect(prompt).toContain('VAT201');
-      expect(prompt).toContain('Section 12(h)');
     });
   });
 

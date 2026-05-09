@@ -163,5 +163,3 @@ export function getStubCategory(
 
   return isCredit ? 'Sales' : 'Cost of Goods Sold';
 }
-
-export const STUB_CATEGORY_MAP = ACCOUNT_MAP;

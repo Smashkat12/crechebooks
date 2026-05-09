@@ -28,7 +28,7 @@ import { AlertCircle, Plus, Loader2 } from 'lucide-react';
 import { SplitRowInput } from './SplitRowInput';
 import { SplitSummary } from './SplitSummary';
 import { useSplitTransaction } from '@/hooks/useSplitTransaction';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 
 export interface SplitRow {
   id: string;

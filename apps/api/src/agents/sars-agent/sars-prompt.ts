@@ -75,7 +75,7 @@ export function formatCentsAsRands(cents: number): string {
  * @param breakdown - Pre-calculated PAYE breakdown
  * @returns Formatted prompt string for PAYE explanation
  */
-export function buildPayePrompt(breakdown: SarsBreakdown): string {
+function buildPayePrompt(breakdown: SarsBreakdown): string {
   const gross = formatCentsAsRands(breakdown.grossAmountCents ?? 0);
   const taxBeforeRebates = formatCentsAsRands(
     breakdown.taxBeforeRebatesCents ?? 0,
@@ -102,10 +102,7 @@ export function buildPayePrompt(breakdown: SarsBreakdown): string {
  * @param isAboveCap - Whether the gross is above the UIF contribution cap
  * @returns Formatted prompt string for UIF explanation
  */
-export function buildUifPrompt(
-  breakdown: SarsBreakdown,
-  isAboveCap: boolean,
-): string {
+function buildUifPrompt(breakdown: SarsBreakdown, isAboveCap: boolean): string {
   const gross = formatCentsAsRands(breakdown.grossAmountCents ?? 0);
   const totalUif = formatCentsAsRands(breakdown.uifCents ?? 0);
   const halfUif = formatCentsAsRands((breakdown.uifCents ?? 0) / 2);
@@ -129,7 +126,7 @@ export function buildUifPrompt(
  * @param period - Tax period (e.g., "2025-01")
  * @returns Formatted prompt string for EMP201 explanation
  */
-export function buildEmp201Prompt(
+function buildEmp201Prompt(
   breakdown: SarsBreakdown,
   employeeCount: number,
   period: string,
@@ -162,7 +159,7 @@ export function buildEmp201Prompt(
  * @param periodStr - Period string (e.g., "2025-01 to 2025-01")
  * @returns Formatted prompt string for VAT201 explanation
  */
-export function buildVat201Prompt(
+function buildVat201Prompt(
   breakdown: SarsBreakdown,
   periodStr: string,
 ): string {

@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Patch,
-  Delete,
   Param,
   Query,
   Body,
@@ -107,20 +106,6 @@ export class NotificationController {
       user.id,
     );
     return { count };
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a notification' })
-  @ApiParam({ name: 'id', description: 'Notification ID' })
-  @ApiResponse({ status: 204, description: 'Notification deleted' })
-  @ApiResponse({ status: 404, description: 'Notification not found' })
-  async delete(
-    @CurrentUser() user: IUser,
-    @Param('id') id: string,
-  ): Promise<void> {
-    const tenantId = getTenantId(user);
-    await this.inAppNotificationService.deleteNotification(id, tenantId);
   }
 
   @Get('preferences')

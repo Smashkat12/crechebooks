@@ -55,10 +55,8 @@ export interface NotificationPreferences {
   fallbackOrder: NotificationChannelType[];
   emailEnabled: boolean;
   whatsappEnabled: boolean;
-  smsEnabled: boolean;
   emailOptIn: boolean;
   whatsappOptIn: boolean;
-  smsOptIn: boolean;
 }
 
 export interface ChannelAvailability {

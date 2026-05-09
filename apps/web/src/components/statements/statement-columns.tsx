@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Eye, Download, CheckCircle, Send } from 'lucide-react';
 import type { StatementSummary, StatementStatus } from '@/hooks/use-statements';
 import { formatCentsToRands } from '@/hooks/use-statements';
+import { formatDate, formatDateTime } from '@/lib/utils/format';
 
 const statusVariants: Record<StatementStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   DRAFT: 'secondary',
@@ -66,15 +67,8 @@ export function createStatementColumns({
       accessorKey: 'period',
       header: 'Period',
       cell: ({ row }) => {
-        const start = new Date(row.original.period_start).toLocaleDateString('en-ZA', {
-          day: 'numeric',
-          month: 'short',
-        });
-        const end = new Date(row.original.period_end).toLocaleDateString('en-ZA', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        });
+        const start = formatDate(row.original.period_start);
+        const end = formatDate(row.original.period_end);
         return `${start} - ${end}`;
       },
     },
@@ -125,12 +119,7 @@ export function createStatementColumns({
     {
       accessorKey: 'generated_at',
       header: 'Generated',
-      cell: ({ row }) =>
-        new Date(row.original.generated_at).toLocaleDateString('en-ZA', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        }),
+      cell: ({ row }) => formatDate(row.original.generated_at),
     },
     {
       id: 'actions',

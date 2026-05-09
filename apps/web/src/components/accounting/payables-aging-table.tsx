@@ -15,7 +15,7 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import type { SupplierBill } from '@/hooks/use-suppliers';
 
 interface SupplierAgingRow {

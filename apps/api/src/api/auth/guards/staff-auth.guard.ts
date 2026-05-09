@@ -13,8 +13,6 @@ import {
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { StaffMagicLinkService } from '../services/staff-magic-link.service';
 
 @Injectable()
@@ -22,21 +20,13 @@ export class StaffAuthGuard implements CanActivate {
   private readonly logger = new Logger(StaffAuthGuard.name);
 
   constructor(
-    private readonly reflector: Reflector,
     private readonly staffMagicLinkService: StaffMagicLinkService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Check if route is marked as public
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-
-    if (isPublic) {
-      return true;
-    }
-
+    // StaffAuthGuard always authenticates — it does not check @Public().
+    // The @Public() decorator is for global guards (JwtAuthGuard, TenantGuard).
+    // This guard is applied explicitly via @UseGuards and must always run.
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
 

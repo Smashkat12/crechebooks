@@ -9,7 +9,7 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { QuoteStatusBadge } from './quote-status-badge';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils/format';
 import type { Quote } from '@/hooks/use-quotes';
 
 interface QuotePreviewProps {

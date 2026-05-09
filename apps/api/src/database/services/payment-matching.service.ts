@@ -1126,6 +1126,73 @@ export class PaymentMatchingService {
   }
 
   /**
+   * Return match candidates for a single transaction without applying any.
+   * Used by GET /payments/:paymentId/suggestions to power the match dialog.
+   *
+   * Scoring is identical to matchPayments — exact matches rank first (100),
+   * then partial/fuzzy candidates, capped at MAX_CANDIDATES.
+   *
+   * @param tenantId  - Tenant ID (query is tenant-scoped)
+   * @param transactionId - Bank transaction ID to score against outstanding invoices
+   * @returns Candidates sorted by confidence DESC, up to MAX_CANDIDATES entries
+   */
+  async getSuggestionsForTransaction(
+    tenantId: string,
+    transactionId: string,
+  ): Promise<MatchCandidate[]> {
+    // Load transaction — tenant-scoped for isolation
+    const transaction = await this.prisma.transaction.findFirst({
+      where: { id: transactionId, tenantId, isDeleted: false },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction', transactionId);
+    }
+
+    // Load outstanding invoices (same allow-list as matchPayments)
+    const outstandingInvoices = await this.getOutstandingInvoices(tenantId);
+
+    if (outstandingInvoices.length === 0) {
+      return [];
+    }
+
+    // Populate uniqueFirstNames for this call so name scoring is accurate
+    const childNameMap = new Map<string, Set<string>>();
+    for (const inv of outstandingInvoices) {
+      const name = inv.child.firstName.toLowerCase().trim();
+      if (!childNameMap.has(name)) childNameMap.set(name, new Set());
+      childNameMap.get(name)!.add(inv.childId);
+    }
+    this.uniqueFirstNames = new Set(
+      [...childNameMap.entries()]
+        .filter(([, childIds]) => childIds.size === 1)
+        .map(([name]) => name),
+    );
+
+    // Exact matches rank above fuzzy ones — combine and deduplicate by invoiceId
+    const exactCandidates = this.findExactMatches(
+      transaction,
+      outstandingInvoices,
+    );
+    const partialCandidates = this.findPartialMatches(
+      transaction,
+      outstandingInvoices,
+    );
+
+    const seen = new Set<string>();
+    const merged: MatchCandidate[] = [];
+
+    for (const c of [...exactCandidates, ...partialCandidates]) {
+      if (!seen.has(c.invoiceId)) {
+        seen.add(c.invoiceId);
+        merged.push(c);
+      }
+    }
+
+    return merged.slice(0, MAX_CANDIDATES);
+  }
+
+  /**
    * Manually apply a suggested match (called from API)
    * @throws NotFoundException if transaction or invoice not found
    * @throws BusinessException if transaction already allocated

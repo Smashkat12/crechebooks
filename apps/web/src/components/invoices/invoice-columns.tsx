@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
 import type { Invoice } from "@/types/invoice";
 import { InvoiceStatusBadge } from "./invoice-status-badge";
 

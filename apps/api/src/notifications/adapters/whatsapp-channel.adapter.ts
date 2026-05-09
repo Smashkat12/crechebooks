@@ -183,13 +183,4 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
     }
   }
 
-  /**
-   * Get delivery status for WhatsApp message
-   */
-  getDeliveryStatus(_messageId: string): Promise<NotificationDeliveryStatus> {
-    // WhatsApp status is updated via webhooks
-    // For now, we return SENT status
-    // In a production system, this would query the audit log or a message tracking table
-    return Promise.resolve(NotificationDeliveryStatus.SENT);
-  }
 }

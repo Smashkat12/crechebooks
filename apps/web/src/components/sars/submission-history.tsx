@@ -1,7 +1,7 @@
 'use client';
 
 import { format } from 'date-fns';
-import { CheckCircle2, Clock, AlertCircle, FileText, Download } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, FileText, Download, Send } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,11 +23,11 @@ interface SubmissionHistoryProps {
 
 const statusConfig: Record<SarsSubmissionStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof CheckCircle2 }> = {
   DRAFT: { label: 'Draft', variant: 'outline', icon: FileText },
-  GENERATED: { label: 'Generated', variant: 'secondary', icon: FileText },
-  REVIEWED: { label: 'Reviewed', variant: 'secondary', icon: Clock },
+  READY: { label: 'Ready to Submit', variant: 'outline', icon: Send },
   SUBMITTED: { label: 'Submitted', variant: 'default', icon: Clock },
   ACCEPTED: { label: 'Accepted', variant: 'default', icon: CheckCircle2 },
   REJECTED: { label: 'Rejected', variant: 'destructive', icon: AlertCircle },
+  ACKNOWLEDGED: { label: 'Acknowledged', variant: 'secondary', icon: CheckCircle2 },
 };
 
 const typeLabels: Record<SarsSubmissionType, string> = {
@@ -93,8 +93,8 @@ export function SubmissionHistory({
               </TableHeader>
               <TableBody>
                 {submissions.map((submission) => {
-                  const status = statusConfig[submission.status];
-                  const StatusIcon = status.icon;
+                  const status = statusConfig[submission.status as SarsSubmissionStatus];
+                  const StatusIcon = status?.icon ?? FileText;
 
                   return (
                     <TableRow key={submission.id}>
@@ -106,9 +106,9 @@ export function SubmissionHistory({
                         {format(new Date(submission.generatedAt), 'dd MMM yyyy')}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={status.variant} className="gap-1">
+                        <Badge variant={status?.variant ?? 'outline'} className="gap-1">
                           <StatusIcon className="h-3 w-3" />
-                          {status.label}
+                          {status?.label ?? submission.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm">

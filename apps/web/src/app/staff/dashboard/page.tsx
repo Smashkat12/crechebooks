@@ -66,74 +66,6 @@ interface DashboardData {
   }>;
 }
 
-// Mock data for development/demo when API is unavailable
-function getMockData(): DashboardData {
-  const today = new Date();
-  return {
-    employmentStatus: {
-      position: 'Early Childhood Development Practitioner',
-      department: 'Education',
-      startDate: new Date('2023-03-15').toISOString(),
-      status: 'active',
-      employeeNumber: 'EMP-001',
-    },
-    recentPayslips: [
-      {
-        id: 'ps-001',
-        payDate: new Date(today.getFullYear(), today.getMonth(), 25).toISOString(),
-        period: `${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
-        grossPay: 18500,
-        netPay: 15234.56,
-      },
-      {
-        id: 'ps-002',
-        payDate: new Date(today.getFullYear(), today.getMonth() - 1, 25).toISOString(),
-        period: `${new Date(today.getFullYear(), today.getMonth() - 1).toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
-        grossPay: 18500,
-        netPay: 15234.56,
-      },
-      {
-        id: 'ps-003',
-        payDate: new Date(today.getFullYear(), today.getMonth() - 2, 25).toISOString(),
-        period: `${new Date(today.getFullYear(), today.getMonth() - 2).toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`,
-        grossPay: 18500,
-        netPay: 15234.56,
-      },
-    ],
-    leaveBalance: {
-      annual: 15,
-      annualUsed: 5,
-      sick: 10,
-      sickUsed: 2,
-      family: 3,
-      familyUsed: 0,
-    },
-    nextPayDate: new Date(today.getFullYear(), today.getMonth() + 1, 25).toISOString(),
-    ytdEarnings: {
-      grossEarnings: 111000,
-      netEarnings: 91407.36,
-      totalTax: 14850,
-      totalDeductions: 4742.64,
-    },
-    announcements: [
-      {
-        id: 'ann-001',
-        title: 'School Closure - Public Holiday',
-        content:
-          'The school will be closed on Monday for the public holiday. Normal operations resume on Tuesday.',
-        createdAt: new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        priority: 'high',
-      },
-      {
-        id: 'ann-002',
-        title: 'Staff Meeting Reminder',
-        content: 'Monthly staff meeting this Friday at 2pm in the main hall.',
-        createdAt: new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        priority: 'medium',
-      },
-    ],
-  };
-}
 
 function QuickActionCard({
   href,
@@ -186,9 +118,24 @@ interface OnboardingStatus {
   requiredActions: Array<{ id: string; isComplete: boolean; isRequired: boolean }>;
 }
 
+interface StaffInfo {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
+/** Derive the greeting name from staff info fields. */
+function resolveGreetingName(info: StaffInfo, fallback?: string): string {
+  const fullName = [info.firstName, info.lastName].filter(Boolean).join(' ').trim();
+  if (fullName) return fullName;
+  if (fallback) return fallback;
+  if (info.email) return info.email;
+  return 'there';
+}
+
 export default function StaffDashboardPage() {
   const router = useRouter();
-  const [staffName, setStaffName] = useState<string>('Staff Member');
+  const [staffName, setStaffName] = useState<string>('there');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -202,10 +149,31 @@ export default function StaffDashboardPage() {
       return;
     }
 
-    // Try to get staff name from stored session data
+    // Resolve greeting name: localStorage value takes precedence (set at login),
+    // otherwise fetch from profile endpoint.
     const storedName = localStorage.getItem('staff_name');
     if (storedName) {
       setStaffName(storedName);
+    } else {
+      fetch(`${API_URL}/api/v1/staff-portal/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          // Profile response shape: { personal: { fullName, email, ... }, ... }
+          const info: StaffInfo = {};
+          if (data.personal?.fullName) {
+            const parts = (data.personal.fullName as string).trim().split(/\s+/);
+            info.firstName = parts[0];
+            info.lastName = parts.slice(1).join(' ') || undefined;
+          }
+          if (data.personal?.email) info.email = data.personal.email as string;
+          setStaffName(resolveGreetingName(info));
+        })
+        .catch(() => {
+          // keep default 'there'
+        });
     }
 
     fetchDashboardData(token);
@@ -227,7 +195,7 @@ export default function StaffDashboardPage() {
 
   const fetchOnboardingStatus = async (token: string) => {
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/onboarding`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/onboarding`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -247,7 +215,7 @@ export default function StaffDashboardPage() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/staff-portal/dashboard`, {
+      const response = await fetch(`${API_URL}/api/v1/staff-portal/dashboard`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -266,10 +234,8 @@ export default function StaffDashboardPage() {
       const data = await response.json();
       setDashboardData(data);
     } catch (err) {
-      // Use mock data for development when API is unavailable
-      console.warn('Dashboard API error, using mock data:', err);
-      setError('Unable to connect to server. Showing sample data.');
-      setDashboardData(getMockData());
+      console.error('Dashboard API error:', err);
+      setError('Unable to load dashboard. Please try refreshing.');
     } finally {
       setIsLoading(false);
     }
@@ -331,11 +297,9 @@ export default function StaffDashboardPage() {
       </div>
 
       {error && (
-        <Alert variant="default" className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
-          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-          <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-            {error}
-          </AlertDescription>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 

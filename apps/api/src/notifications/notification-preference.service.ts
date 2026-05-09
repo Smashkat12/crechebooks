@@ -54,10 +54,8 @@ export class NotificationPreferenceService {
       fallbackOrder,
       emailEnabled: !!parent.email,
       whatsappEnabled: !!parent.whatsapp || !!parent.phone,
-      smsEnabled: false, // SMS not yet implemented
       emailOptIn: true, // Email doesn't require explicit opt-in (implied consent via signup)
       whatsappOptIn: parent.whatsappOptIn,
-      smsOptIn: false, // SMS not yet implemented
     };
   }
 
@@ -121,7 +119,7 @@ export class NotificationPreferenceService {
 
   /**
    * Build fallback order based on preferred contact
-   * Default: WhatsApp > Email > SMS
+   * Default: WhatsApp > Email
    */
   private buildFallbackOrder(
     preferredContact: PreferredContact,
@@ -131,19 +129,16 @@ export class NotificationPreferenceService {
         return [
           NotificationChannelType.EMAIL,
           NotificationChannelType.WHATSAPP,
-          NotificationChannelType.SMS,
         ];
       case PreferredContact.WHATSAPP:
         return [
           NotificationChannelType.WHATSAPP,
           NotificationChannelType.EMAIL,
-          NotificationChannelType.SMS,
         ];
       case PreferredContact.BOTH:
         return [
           NotificationChannelType.WHATSAPP,
           NotificationChannelType.EMAIL,
-          NotificationChannelType.SMS,
         ];
     }
   }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdminController } from './admin.controller';
@@ -13,7 +13,10 @@ import { PopOrphanSweepJob } from '../../jobs/pop-orphan-sweep.job';
 @Module({
   imports: [
     PrismaModule,
-    DatabaseModule, // provides AuditLogService for PopOrphanSweepJob
+    // forwardRef breaks the cycle AdminModule → DatabaseModule → WhatsAppModule
+    // → AuthModule → AdminModule. Without this NestJS sees DatabaseModule as
+    // undefined at scan time and crashes on bootstrap.
+    forwardRef(() => DatabaseModule), // provides AuditLogService for PopOrphanSweepJob
     StorageModule, // provides StorageService for PopOrphanSweepJob
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -16,7 +16,7 @@ import {
   Get,
   Param,
   Body,
-  UseGuards,
+
   HttpCode,
   HttpStatus,
   Logger,
@@ -29,7 +29,6 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -40,7 +39,7 @@ import { StaffInvitationService } from './staff-invitation.service';
 @ApiTags('Staff Invitations')
 @ApiBearerAuth()
 @Controller('staff')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class StaffInvitationController {
   private readonly logger = new Logger(StaffInvitationController.name);
 

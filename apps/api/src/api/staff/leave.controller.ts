@@ -17,7 +17,7 @@ import {
   Param,
   Body,
   Query,
-  UseGuards,
+
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -48,8 +48,6 @@ import type {
   StaffLeaveRequestedEvent,
   StaffLeaveDecisionEvent,
 } from '../../database/events/domain-events';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
@@ -159,7 +157,7 @@ class ApiRejectLeaveRequestDto {
 @ApiTags('Staff Leave')
 @ApiBearerAuth()
 @Controller('staff')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class LeaveController {
   private readonly logger = new Logger(LeaveController.name);
 

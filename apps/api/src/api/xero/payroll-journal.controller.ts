@@ -19,7 +19,7 @@ import {
   Param,
   Body,
   Query,
-  UseGuards,
+
   HttpStatus,
   HttpCode,
   Logger,
@@ -42,8 +42,6 @@ import {
   PayrollJournalStatus,
   XeroAccountType,
 } from '@prisma/client';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { XeroPayrollJournalService } from '../../database/services/xero-payroll-journal.service';
@@ -71,7 +69,7 @@ import type { IUser } from '../../database/entities/user.entity';
 @Controller('xero/payroll-journals')
 @ApiTags('Xero Payroll Journals')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class XeroPayrollJournalController {
   private readonly logger = new Logger(XeroPayrollJournalController.name);
 
@@ -575,7 +573,7 @@ export class XeroPayrollJournalController {
 @Controller('xero/account-mappings')
 @ApiTags('Xero Account Mappings')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class XeroAccountMappingController {
   private readonly logger = new Logger(XeroAccountMappingController.name);
 

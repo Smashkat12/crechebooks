@@ -15,7 +15,7 @@ import {
   Query,
   Logger,
   HttpCode,
-  UseGuards,
+
   BadRequestException,
   Res,
   ServiceUnavailableException,
@@ -41,8 +41,6 @@ import { SarsFileGeneratorService } from '../../database/services/sars-file-gene
 import { SarsReadinessService } from './sars-readiness.service';
 import { SarsReadinessResponseDto } from './dto/readiness.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import {
@@ -88,7 +86,7 @@ export class SarsController {
    */
   @Get('readiness')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Filing readiness checklist for the next SARS deadline',
     description:
@@ -137,7 +135,7 @@ export class SarsController {
    */
   @Get('submissions')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({ summary: 'List SARS submission history for the tenant' })
   @ApiQuery({
     name: 'type',
@@ -257,7 +255,7 @@ export class SarsController {
   @Post(':id/submit')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({ summary: 'Mark SARS submission as submitted to eFiling' })
   @ApiParam({ name: 'id', description: 'SARS submission ID (UUID)' })
   @ApiResponse({ status: 200, type: SarsSubmissionResponseDto })
@@ -307,7 +305,7 @@ export class SarsController {
   @Post('vat201')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({ summary: 'Generate VAT201 return for period' })
   @ApiResponse({ status: 201, type: ApiVat201ResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid date format or period' })
@@ -378,7 +376,7 @@ export class SarsController {
   @Post('emp201')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({ summary: 'Generate EMP201 return for period' })
   @ApiResponse({ status: 201, type: ApiEmp201ResponseDto })
   @ApiResponse({
@@ -478,7 +476,7 @@ export class SarsController {
    */
   @Get('emp201/download')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Download EMP201 CSV for SARS eFiling',
     description:
@@ -563,7 +561,7 @@ export class SarsController {
    */
   @Get('emp501/download')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Download EMP501 CSV for SARS annual reconciliation',
     description:

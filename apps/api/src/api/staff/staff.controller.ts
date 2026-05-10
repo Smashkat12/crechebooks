@@ -7,7 +7,7 @@ import {
   Param,
   Body,
   Query,
-  UseGuards,
+
   HttpCode,
   HttpStatus,
   NotFoundException,
@@ -22,8 +22,6 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
@@ -78,7 +76,7 @@ function toSnakeCase(staff: Staff): Record<string, unknown> {
 @ApiTags('Staff')
 @ApiBearerAuth()
 @Controller('staff')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class StaffController {
   private readonly logger = new Logger(StaffController.name);
 

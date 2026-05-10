@@ -18,7 +18,7 @@ import {
   Param,
   Logger,
   HttpCode,
-  UseGuards,
+
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
@@ -47,8 +47,6 @@ import {
   OffboardingReason,
 } from '../../database/dto/offboarding.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import { EnrollmentStatus } from '../../database/entities/enrollment.entity';
@@ -73,7 +71,7 @@ interface EnrollmentResponse {
 @Controller('enrollments')
 @ApiTags('Enrollments')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class EnrollmentController {
   private readonly logger = new Logger(EnrollmentController.name);
 

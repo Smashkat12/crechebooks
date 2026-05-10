@@ -151,6 +151,14 @@ export class MatchPaymentsDto {
   @IsArray()
   @IsUUID('4', { each: true })
   transactionIds?: string[];
+
+  /**
+   * Preview-only mode. When true, the matcher returns the same scoring
+   * results it would normally use to decide auto-apply, but writes nothing —
+   * no Payment rows are created and no Invoice statuses change.
+   */
+  @IsOptional()
+  dryRun?: boolean;
 }
 
 /**

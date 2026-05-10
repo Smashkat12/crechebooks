@@ -1,5 +1,5 @@
 // src/api/payment/dto/match-payments.dto.ts
-import { IsOptional, IsArray, IsUUID } from 'class-validator';
+import { IsOptional, IsArray, IsUUID, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -17,4 +17,15 @@ export class ApiMatchPaymentsDto {
   @IsArray()
   @IsUUID('4', { each: true })
   transaction_ids?: string[]; // snake_case for API
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Preview only — return the matches the engine would auto-apply ' +
+      'without creating Payment rows or updating invoices.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  dry_run?: boolean;
 }

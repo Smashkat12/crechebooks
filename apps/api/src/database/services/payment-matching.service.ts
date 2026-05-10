@@ -221,6 +221,8 @@ export class PaymentMatchingService {
         const applied = await this.autoApplyMatch(
           exactMatches[0],
           dto.tenantId!,
+          'deterministic',
+          dto.dryRun ?? false,
         );
         results.push({
           transactionId: transaction.id,
@@ -258,6 +260,8 @@ export class PaymentMatchingService {
         const applied = await this.autoApplyMatch(
           highConfidence[0],
           dto.tenantId!,
+          'deterministic',
+          dto.dryRun ?? false,
         );
         results.push({
           transactionId: transaction.id,
@@ -272,6 +276,7 @@ export class PaymentMatchingService {
           transaction,
           partialMatches,
           dto.tenantId!,
+          dto.dryRun ?? false,
         );
 
         if (agentResult.status === 'AUTO_APPLIED') {
@@ -308,7 +313,12 @@ export class PaymentMatchingService {
         if (uniqueParents.size === 1) {
           // Single parent identified by name — auto-apply
           const best = [...uniqueParents.values()][0];
-          const applied = await this.autoApplyMatch(best, dto.tenantId!);
+          const applied = await this.autoApplyMatch(
+            best,
+            dto.tenantId!,
+            'deterministic',
+            dto.dryRun ?? false,
+          );
           results.push({
             transactionId: transaction.id,
             status: 'AUTO_APPLIED',
@@ -322,6 +332,7 @@ export class PaymentMatchingService {
             transaction,
             partialMatches,
             dto.tenantId!,
+            dto.dryRun ?? false,
           );
           if (agentResult.status === 'AUTO_APPLIED') {
             results.push(agentResult);
@@ -1060,6 +1071,7 @@ export class PaymentMatchingService {
     candidate: MatchCandidate,
     tenantId: string,
     source: MatchSource = 'deterministic',
+    dryRun = false,
   ): Promise<AppliedMatch> {
     // Double-check not already allocated (race condition protection)
     if (await this.isTransactionAllocated(candidate.transactionId)) {
@@ -1072,6 +1084,19 @@ export class PaymentMatchingService {
     // Determine match type based on confidence
     const matchType =
       candidate.confidenceScore === 100 ? MatchType.EXACT : MatchType.PARTIAL;
+
+    // Preview mode: return a synthetic AppliedMatch without persisting.
+    if (dryRun) {
+      return {
+        paymentId: 'dry-run',
+        transactionId: candidate.transactionId,
+        invoiceId: candidate.invoiceId,
+        invoiceNumber: candidate.invoiceNumber,
+        amountCents: candidate.transactionAmountCents,
+        confidenceScore: candidate.confidenceScore,
+        source,
+      };
+    }
 
     // Create payment record
     const payment = await this.paymentRepo.create({
@@ -1457,6 +1482,7 @@ export class PaymentMatchingService {
     transaction: Transaction,
     candidates: MatchCandidate[],
     tenantId: string,
+    dryRun = false,
   ): Promise<TransactionMatchResult> {
     this.logger.log(
       `Resolving ambiguous match for transaction ${transaction.id} with ${candidates.length} candidates`,
@@ -1588,6 +1614,7 @@ export class PaymentMatchingService {
         selectedCandidate,
         tenantId,
         agentDecision.source ?? 'deterministic',
+        dryRun,
       );
 
       return {

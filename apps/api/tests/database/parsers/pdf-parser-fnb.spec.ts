@@ -69,6 +69,42 @@ describe('PdfParser - FNB decline-row regression', () => {
     expect(totalCents).toBe(13939);
   });
 
+  it('flags missing-merchant rows with [Unknown Merchant] prefix', async () => {
+    // Captured pattern from prod: the GoDaddy charge on 24 Mar 2026 came
+    // through pdf-parse without the merchant column at all — the extracted
+    // text was just "24 Mar400568*9888 22 Mar238.2610,576.42Cr3.68".
+    // The card-mask preprocessing then turns "400568*9888" into
+    // "400568*XXXX", leaving description = "400568*XXXX 22 Mar". These
+    // rows have a real amount + date but unknown merchant; they need to
+    // be obviously identifiable for manual review.
+    const noMerchant = `FNB
+Statement Period : 01 March 2026 to 31 March 2026
+24 Mar400568*9888 22 Mar238.2610,576.42Cr3.68
+24 MarPOS Purchase Real Merchant400568*9888 22 Mar500.0010,076.42Cr
+`;
+    jest.resetModules();
+    jest.doMock('pdf-parse', () =>
+      jest.fn(async () => ({ text: noMerchant, numpages: 1 })),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    const { PdfParser: FreshPdfParser } = require('../../../src/database/parsers/pdf-parser');
+    const parser = new FreshPdfParser();
+    const txs = await parser.parse(Buffer.from('x'));
+
+    const flagged = txs.find((t: { description: string }) =>
+      t.description.startsWith('[Unknown Merchant]'),
+    );
+    expect(flagged).toBeDefined();
+    expect(flagged.amountCents).toBe(23826);
+
+    // The real-merchant row should NOT be prefixed
+    const real = txs.find((t: { description: string }) =>
+      /Real Merchant/i.test(t.description),
+    );
+    expect(real).toBeDefined();
+    expect(real.description).not.toContain('[Unknown Merchant]');
+  });
+
   it('rejects footer/page-summary rows with short or numeric descriptions', async () => {
     // Captured pattern from prod: page wraps in the FNB statement leak as
     // single-character-description rows like "1 33.54" or "9 9.00" that

@@ -113,10 +113,10 @@ export class PdfParser {
       upperText.includes('FIRST NATIONAL BANK')
     ) {
       this.logger.log('Detected FNB format');
-      if (process.env.FNB_PARSE_DEBUG === '1') {
-        for (const line of text.split('\n')) {
-          if (line.trim()) this.logger.log(`FNB-RAW: ${line}`);
-        }
+      // TEMP-DIAG: dump raw text once so we can lock in the regex for
+      // declined-card rows. Strip after we have a fix.
+      for (const line of text.split('\n')) {
+        if (line.trim()) this.logger.log(`FNB-RAW: ${line}`);
       }
       return this.parseFNB(text);
     }

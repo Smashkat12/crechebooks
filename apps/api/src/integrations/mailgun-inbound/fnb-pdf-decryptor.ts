@@ -53,18 +53,34 @@ export async function decryptPdf(
   try {
     await writeFile(inPath, encryptedBuffer);
 
-    // Sanity-check the PDF header so we know whether the failure is at the
-    // bytes-on-the-wire layer or specifically at decrypt time.
+    // Sanity-check the PDF header.
     const header = encryptedBuffer.subarray(0, 8).toString('binary');
     const looksLikePdf = header.startsWith('%PDF-');
+    // Scan a wider window for /Encrypt — encrypt dict can live deep in the
+    // trailer for streaming-friendly PDFs.
     const hasEncryptMarker = encryptedBuffer
-      .subarray(0, Math.min(2048, encryptedBuffer.length))
       .toString('binary')
       .includes('/Encrypt');
     logger.log(
       `qpdf input: size=${encryptedBuffer.length} header=${JSON.stringify(header)} ` +
         `looksLikePdf=${looksLikePdf} hasEncryptMarker=${hasEncryptMarker}`,
     );
+
+    if (!looksLikePdf) {
+      throw new PdfDecryptError(
+        `Buffer does not look like a PDF (header=${JSON.stringify(header)})`,
+      );
+    }
+
+    // Gmail decrypts FNB statement PDFs during its preview / antivirus scan
+    // and forwards the decrypted bytes. In that case there's no encryption
+    // to remove — pass the buffer straight through.
+    if (!hasEncryptMarker) {
+      logger.log(
+        'PDF has no /Encrypt marker — already decrypted, skipping qpdf',
+      );
+      return encryptedBuffer;
+    }
 
     try {
       const { stdout, stderr } = await execFileAsync('qpdf', [

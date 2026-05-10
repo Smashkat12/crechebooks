@@ -113,6 +113,11 @@ export class PdfParser {
       upperText.includes('FIRST NATIONAL BANK')
     ) {
       this.logger.log('Detected FNB format');
+      if (process.env.FNB_PARSE_DEBUG === '1') {
+        for (const line of text.split('\n')) {
+          if (line.trim()) this.logger.log(`FNB-RAW: ${line}`);
+        }
+      }
       return this.parseFNB(text);
     }
 

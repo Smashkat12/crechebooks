@@ -39,6 +39,7 @@ describe('TransactionRepository.updateCategorization', () => {
 
     const repo = new TransactionRepository(
       fake as unknown as ConstructorParameters<typeof TransactionRepository>[0],
+      {} as unknown as ConstructorParameters<typeof TransactionRepository>[1],
     );
 
     const result = await repo.updateCategorization(
@@ -70,6 +71,7 @@ describe('TransactionRepository.updateCategorization', () => {
 
     const repo = new TransactionRepository(
       fake as unknown as ConstructorParameters<typeof TransactionRepository>[0],
+      {} as unknown as ConstructorParameters<typeof TransactionRepository>[1],
     );
 
     await repo.updateCategorization(TENANT, TX, 'CATEGORIZED', null);
@@ -86,6 +88,7 @@ describe('TransactionRepository.updateCategorization', () => {
 
     const repo = new TransactionRepository(
       fake as unknown as ConstructorParameters<typeof TransactionRepository>[0],
+      {} as unknown as ConstructorParameters<typeof TransactionRepository>[1],
     );
 
     await expect(

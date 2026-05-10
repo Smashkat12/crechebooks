@@ -68,4 +68,40 @@ describe('PdfParser - FNB decline-row regression', () => {
     );
     expect(totalCents).toBe(13939);
   });
+
+  it('rejects footer/page-summary rows with short or numeric descriptions', async () => {
+    // Captured pattern from prod: page wraps in the FNB statement leak as
+    // single-character-description rows like "1 33.54" or "9 9.00" that
+    // the regex matches but represent nothing real. We caught these in the
+    // April import (6 such rows leaked through and had to be deleted).
+    const noisy = `FNB
+Statement Period : 01 March 2026 to 31 March 2026
+17 Mar1 33.54 198.53
+17 Mar9 9.00 207.53
+17 Mar1. 8.60 216.13
+20 MarFNB App Payment From Real Parent450.00Cr1,000.00Cr
+21 AprMonthly Account Fee93.00331.92
+`;
+    jest.resetModules();
+    jest.doMock('pdf-parse', () =>
+      jest.fn(async () => ({ text: noisy, numpages: 1 })),
+    );
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    const { PdfParser: FreshPdfParser } = require('../../../src/database/parsers/pdf-parser');
+    const parser = new FreshPdfParser();
+    const txs = await parser.parse(Buffer.from('x'));
+
+    // Only the two real transactions should survive — bogus 1/9/1. rows
+    // must be filtered.
+    const descriptions = txs.map((t: { description: string }) => t.description);
+    expect(descriptions).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('FNB App Payment From Real Parent'),
+        expect.stringContaining('Monthly Account Fee'),
+      ]),
+    );
+    expect(descriptions).not.toContain('1');
+    expect(descriptions).not.toContain('9');
+    expect(descriptions).not.toContain('1.');
+  });
 });

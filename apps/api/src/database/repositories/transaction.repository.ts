@@ -470,6 +470,52 @@ export class TransactionRepository {
   }
 
   /**
+   * Update both transaction status AND xero_account_code in a single write.
+   * Use this from the categorisation flow so the account code lands on the
+   * transaction row that financial-report.service / general-ledger.service
+   * read from. Without this, categorisations sit in the categorizations
+   * table but the income statement never sees them.
+   *
+   * Pass `accountCode = null` for split categorisations — the transaction
+   * doesn't have a single xero_account_code in that case; consumers must
+   * look at the categorizations table to sum across split lines.
+   *
+   * @throws NotFoundException if transaction doesn't exist or belongs to different tenant
+   * @throws DatabaseException for database errors
+   */
+  async updateCategorization(
+    tenantId: string,
+    id: string,
+    status: 'PENDING' | 'CATEGORIZED' | 'REVIEW_REQUIRED' | 'SYNCED',
+    accountCode: string | null,
+  ): Promise<Transaction> {
+    try {
+      const existing = await this.findById(tenantId, id);
+      if (!existing) {
+        throw new NotFoundException('Transaction', id);
+      }
+
+      return await this.prisma.transaction.update({
+        where: { id },
+        data: { status, xeroAccountCode: accountCode },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to update transaction categorisation: ${id} status=${status} account=${accountCode ?? 'NULL'}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new DatabaseException(
+        'updateCategorization',
+        'Failed to update transaction categorisation',
+        error instanceof Error ? error : undefined,
+      );
+    }
+  }
+
+  /**
    * Find transaction by Xero transaction ID
    * @returns Transaction or null if not found
    * @throws DatabaseException for database errors

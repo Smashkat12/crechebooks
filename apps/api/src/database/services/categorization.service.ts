@@ -297,11 +297,16 @@ export class CategorizationService {
     const categorization =
       await this.categorizationRepo.create(categorizationDto);
 
-    // Update transaction status
-    await this.transactionRepo.updateStatus(
+    // Update transaction status + xero_account_code so income statement /
+    // GL / trial balance see this categorisation. Only commit the account
+    // code when we've auto-applied; AI_SUGGESTED rows wait for review.
+    await this.transactionRepo.updateCategorization(
       tenantId,
       transactionId,
       transactionStatus,
+      isAutoApply && !categorizationDto.isSplit
+        ? categorizationDto.accountCode
+        : null,
     );
 
     // Create audit trail
@@ -433,11 +438,15 @@ export class CategorizationService {
       }
     }
 
-    // Update transaction status
-    await this.transactionRepo.updateStatus(
+    // Update transaction status + xero_account_code. For splits we leave
+    // the field NULL — a single transaction crosses multiple accounts and
+    // consumers must read the categorizations table to sum across split
+    // lines. Non-split USER_OVERRIDE always commits the account code.
+    await this.transactionRepo.updateCategorization(
       tenantId,
       transactionId,
       TransactionStatus.CATEGORIZED,
+      dto.isSplit ? null : dto.accountCode,
     );
 
     // Create audit trail
@@ -802,11 +811,13 @@ export class CategorizationService {
     const categorization =
       await this.categorizationRepo.create(categorizationDto);
 
-    // Update transaction status
-    await this.transactionRepo.updateStatus(
+    // Recurring matches are auto-applied; write the account code through
+    // to the transaction so financial reports pick it up.
+    await this.transactionRepo.updateCategorization(
       tenantId,
       transaction.id,
       TransactionStatus.CATEGORIZED,
+      categorizationDto.accountCode,
     );
 
     // Create audit trail

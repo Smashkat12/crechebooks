@@ -84,11 +84,13 @@ RUN sed 's|"@crechebooks/types": "workspace:\*"|"@crechebooks/types": "file:../p
 FROM node:20-slim AS runner
 
 # Install required system dependencies and dumb-init
+# qpdf: decrypt password-protected FNB statement PDFs received via Mailgun
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
     ca-certificates \
     dumb-init \
     wget \
+    qpdf \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

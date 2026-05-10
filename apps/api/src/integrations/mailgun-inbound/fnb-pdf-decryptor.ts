@@ -53,24 +53,43 @@ export async function decryptPdf(
   try {
     await writeFile(inPath, encryptedBuffer);
 
+    // Sanity-check the PDF header so we know whether the failure is at the
+    // bytes-on-the-wire layer or specifically at decrypt time.
+    const header = encryptedBuffer.subarray(0, 8).toString('binary');
+    const looksLikePdf = header.startsWith('%PDF-');
+    const hasEncryptMarker = encryptedBuffer
+      .subarray(0, Math.min(2048, encryptedBuffer.length))
+      .toString('binary')
+      .includes('/Encrypt');
+    logger.log(
+      `qpdf input: size=${encryptedBuffer.length} header=${JSON.stringify(header)} ` +
+        `looksLikePdf=${looksLikePdf} hasEncryptMarker=${hasEncryptMarker}`,
+    );
+
     try {
-      await execFileAsync('qpdf', [
+      const { stdout, stderr } = await execFileAsync('qpdf', [
         `--password=${password}`,
         '--decrypt',
         inPath,
         outPath,
       ]);
+      if (stderr) logger.warn(`qpdf stderr: ${stderr.trim()}`);
+      if (stdout) logger.log(`qpdf stdout: ${stdout.trim()}`);
     } catch (err) {
       // qpdf returns non-zero on warnings even when output is usable.
       // Exit code 3 means "warnings, output written" — still successful.
       const code = (err as { code?: number }).code;
+      const stderr = (err as { stderr?: string }).stderr ?? '';
+      const stdout = (err as { stdout?: string }).stdout ?? '';
       if (code !== 3) {
         throw new PdfDecryptError(
-          `qpdf failed (exit ${code ?? '?'}): ${err instanceof Error ? err.message : String(err)}`,
+          `qpdf failed (exit ${code ?? '?'}): stderr=${stderr.trim() || '<empty>'} stdout=${stdout.trim() || '<empty>'}`,
           err,
         );
       }
-      logger.warn('qpdf produced warnings but decrypted successfully');
+      logger.warn(
+        `qpdf produced warnings but decrypted successfully: ${stderr.trim()}`,
+      );
     }
 
     const decrypted = await readFile(outPath);

@@ -10,7 +10,7 @@ import {
   Param,
   Body,
   Query,
-  UseGuards,
+
   HttpCode,
   HttpStatus,
   Logger,
@@ -25,8 +25,6 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
@@ -41,7 +39,7 @@ import { AccountType } from '@prisma/client';
 @ApiTags('Chart of Accounts')
 @ApiBearerAuth()
 @Controller('accounts')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class ChartOfAccountController {
   private readonly logger = new Logger(ChartOfAccountController.name);
 

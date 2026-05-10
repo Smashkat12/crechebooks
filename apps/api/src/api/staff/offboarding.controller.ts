@@ -35,7 +35,7 @@ import {
   Body,
   Query,
   Res,
-  UseGuards,
+
   HttpStatus,
   HttpCode,
   ParseIntPipe,
@@ -51,8 +51,6 @@ import {
   ApiExtraModels,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
@@ -83,7 +81,7 @@ import { StaffOffboardingStatus } from '../../database/entities/staff-offboardin
 @ApiTags('Staff Offboarding')
 @ApiBearerAuth()
 @Controller('staff/:staffId/offboarding')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class StaffOffboardingController {
   constructor(
     private readonly offboardingService: StaffOffboardingService,
@@ -687,7 +685,7 @@ export class StaffOffboardingController {
 @ApiTags('Staff Offboardings')
 @ApiBearerAuth()
 @Controller('staff/offboardings')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class StaffOffboardingsController {
   constructor(
     private readonly offboardingService: StaffOffboardingService,

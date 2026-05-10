@@ -7,7 +7,7 @@ import {
   Get,
   Param,
   Query,
-  UseGuards,
+
   Logger,
   BadRequestException,
   Res,
@@ -23,8 +23,6 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
@@ -36,7 +34,7 @@ import { TenantRepository } from '../../database/repositories/tenant.repository'
 @ApiTags('General Ledger')
 @ApiBearerAuth()
 @Controller('general-ledger')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class GeneralLedgerController {
   private readonly logger = new Logger(GeneralLedgerController.name);
 

@@ -17,7 +17,7 @@ import {
   Param,
   Query,
   Res,
-  UseGuards,
+
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -33,8 +33,6 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { UserRole, SimplePaySyncStatus } from '@prisma/client';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -71,7 +69,7 @@ import {
 @ApiTags('SimplePay Integration')
 @ApiBearerAuth()
 @Controller('integrations/simplepay')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 @ApiExtraModels(
   SetupConnectionDto,
   ConnectionStatusDto,

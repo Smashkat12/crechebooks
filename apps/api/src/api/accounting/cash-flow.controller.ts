@@ -11,8 +11,6 @@ import {
   ApiResponse,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
@@ -22,7 +20,7 @@ import { CashFlowService } from '../../database/services/cash-flow.service';
 @ApiTags('Cash Flow')
 @ApiBearerAuth()
 @Controller('cash-flow')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class CashFlowController {
   private readonly logger = new Logger(CashFlowController.name);
 

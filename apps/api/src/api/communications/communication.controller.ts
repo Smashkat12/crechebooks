@@ -18,7 +18,7 @@ import {
   Param,
   Logger,
   HttpCode,
-  UseGuards,
+
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
@@ -46,8 +46,6 @@ import {
   StaffFilter,
 } from '../../communications/types/communication.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import { NotFoundException } from '../../shared/exceptions';
@@ -116,7 +114,7 @@ function transformFilterDto(
 @Controller('communications')
 @ApiTags('Communications')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class CommunicationController {
   private readonly logger = new Logger(CommunicationController.name);
 

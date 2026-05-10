@@ -8,7 +8,7 @@ import {
   Post,
   Patch,
   Body,
-  UseGuards,
+
   Logger,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
@@ -18,8 +18,6 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '../../database/entities/user.entity';
@@ -34,7 +32,7 @@ import {
 @ApiTags('Onboarding')
 @ApiBearerAuth()
 @Controller('onboarding')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class OnboardingController {
   private readonly logger = new Logger(OnboardingController.name);
 

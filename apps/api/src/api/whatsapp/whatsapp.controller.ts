@@ -13,7 +13,7 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
+
   Logger,
   HttpCode,
 } from '@nestjs/common';
@@ -28,8 +28,6 @@ import {
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { WhatsAppService } from '../../integrations/whatsapp/whatsapp.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { getTenantId } from '../auth/utils/tenant-assertions';
@@ -50,7 +48,7 @@ import {
 @Controller('whatsapp')
 @ApiTags('WhatsApp')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class WhatsAppController {
   private readonly logger = new Logger(WhatsAppController.name);
 

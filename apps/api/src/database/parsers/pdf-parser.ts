@@ -212,7 +212,13 @@ export class PdfParser {
    */
   private parseFNB(text: string): ParsedTransaction[] {
     const transactions: ParsedTransaction[] = [];
-    const lines = text.split('\n');
+    // Card-number masks (e.g. "400568******2678") sit immediately before the
+    // amount in pdf-parse output, so the trailing 4 digits of the masked card
+    // get glued onto the amount: "2678" + "6.00" looks like "26786.00", and
+    // a R6 decline fee gets extracted as R26,786. Replace the 4-digit suffix
+    // with X's so the regex sees a clean break before the amount.
+    const cleanText = text.replace(/(\d{6}\*+)\d{4}/g, '$1XXXX');
+    const lines = cleanText.split('\n');
 
     // Month mapping for normalization
     const monthMap: Record<string, string> = {

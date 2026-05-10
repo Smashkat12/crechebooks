@@ -405,6 +405,7 @@ export class PaymentController {
     const result = await this.paymentMatchingService.matchPayments({
       tenantId: getTenantId(user),
       transactionIds: dto.transaction_ids, // snake_case -> camelCase
+      dryRun: dto.dry_run,
     });
 
     this.logger.log(

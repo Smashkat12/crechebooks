@@ -29,7 +29,11 @@ import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
 import { Public } from '../../api/auth/decorators/public.decorator';
 import { TransactionImportService } from '../../database/services/transaction-import.service';
-import { decryptPdf, PdfDecryptError } from './fnb-pdf-decryptor';
+import {
+  decryptPdf,
+  fnbPasswordCandidates,
+  PdfDecryptError,
+} from './fnb-pdf-decryptor';
 
 interface MailgunInboundBody {
   recipient?: string;
@@ -139,7 +143,8 @@ export class MailgunInboundController {
         this.logger.log(
           `Decrypting PDF: ${pdf.originalname} (${pdf.size} bytes)`,
         );
-        const decrypted = await decryptPdf(pdf.buffer, this.fnbPassword);
+        const candidates = fnbPasswordCandidates(this.fnbPassword);
+        const decrypted = await decryptPdf(pdf.buffer, candidates);
 
         const result = await this.importService.importFromFile(
           {

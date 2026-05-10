@@ -96,17 +96,26 @@ export class MailgunInboundController {
       throw new BadRequestException('Server not configured for FNB statements');
     }
 
-    // Filter to FNB statement senders only — defence in depth even though
-    // the Mailgun route filter should already restrict this.
+    // Identify FNB statements. We accept either:
+    //   (a) direct FNB sender (statements@fnb.co.za etc.) — for future direct-receive flows
+    //   (b) any email whose subject matches FNB's statement pattern — covers
+    //       Gmail-forwarded mail where the From: header is the forwarder,
+    //       not the original sender. Subject-based gating is safe given
+    //       the Mailgun route already restricts what reaches this webhook.
     const sender = (body.sender ?? body.from ?? '').toLowerCase();
-    const isFnbStatement =
+    const subject = (body.subject ?? '').toLowerCase();
+    const isFnbDirectSender =
       sender.includes('fnbstatements.co.za') ||
       sender.includes('fnbcheque@') ||
       sender.includes('@fnb.co.za');
+    const isFnbForwardedSubject =
+      subject.includes('fnb statement:') ||
+      (subject.includes('fnb statement') && subject.includes('elle elephant'));
+    const isFnbStatement = isFnbDirectSender || isFnbForwardedSubject;
 
     if (!isFnbStatement) {
       this.logger.warn(
-        `Rejecting inbound from non-FNB sender: ${sender}`,
+        `Rejecting inbound: sender="${sender}" subject="${subject}" — no FNB signal`,
       );
       return { status: 'ignored', processed: 0, skipped: files.length };
     }

@@ -72,12 +72,13 @@ export async function decryptPdf(
     throw new PdfDecryptError('Empty PDF buffer');
   }
 
-  const candidates = Array.isArray(passwordOrCandidates)
+  // Prepend empty-string candidate. Gmail's antivirus rescan strips the
+  // user (open) password and re-saves with only owner-restrictions intact,
+  // leaving an /Encrypt dictionary qpdf can unlock with an empty password.
+  const provided = Array.isArray(passwordOrCandidates)
     ? passwordOrCandidates
     : [passwordOrCandidates];
-  if (candidates.length === 0 || candidates.every((c) => !c)) {
-    throw new PdfDecryptError('No password candidates provided');
-  }
+  const candidates = ['', ...provided];
 
   const id = randomBytes(8).toString('hex');
   const inPath = join(tmpdir(), `fnb-enc-${id}.pdf`);
@@ -131,7 +132,6 @@ export async function decryptPdf(
 
     const errors: string[] = [];
     for (const password of candidates) {
-      if (!password) continue;
       try {
         await execFileAsync('qpdf', [
           `--password=${password}`,

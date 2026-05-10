@@ -6,7 +6,7 @@ import {
   Body,
   Logger,
   HttpCode,
-  UseGuards,
+
   Res,
   Header,
 } from '@nestjs/common';
@@ -31,8 +31,6 @@ import {
   ArrearsReportOptions,
 } from '../../database/services/arrears-report-pdf.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import {
@@ -47,7 +45,7 @@ import {
 @Controller('arrears')
 @ApiTags('Arrears')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
+
 export class ArrearsController {
   private readonly logger = new Logger(ArrearsController.name);
 

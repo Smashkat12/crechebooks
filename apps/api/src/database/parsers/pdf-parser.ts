@@ -321,12 +321,28 @@ export class PdfParser {
           continue;
         }
 
+        // Detect rows where pdf-parse dropped the merchant name entirely.
+        // Real transaction descriptions always start with a merchant prefix
+        // ("POS Purchase X", "Card Purchase X", "Magtape Credit X", etc.).
+        // When pdf-parse fails to extract the merchant column (rare PDF
+        // text-layer rendering glitch we saw with GoDaddy on the 24 Mar 2026
+        // statement), the description we capture is just the card-mask +
+        // reference-date suffix like "400568*XXXX 22 Mar". Flag those so
+        // they show up as obviously needing review instead of getting
+        // silently auto-categorised to General Expenses.
+        const finalDescription =
+          /^\d{6}\*+\w+\s+\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(
+            cleanDescription,
+          )
+            ? `[Unknown Merchant] ${cleanDescription}`
+            : cleanDescription;
+
         // Extract payee name
-        const payeeName = extractPayeeName(cleanDescription);
+        const payeeName = extractPayeeName(finalDescription);
 
         transactions.push({
           date,
-          description: cleanDescription,
+          description: finalDescription,
           payeeName,
           reference: null,
           amountCents,

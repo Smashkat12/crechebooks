@@ -8,7 +8,6 @@ import {
   Param,
   Logger,
   HttpCode,
-  UseGuards,
   BadRequestException,
   Res,
 } from '@nestjs/common';
@@ -32,8 +31,6 @@ import { InvoiceDeliveryService } from '../../database/services/invoice-delivery
 import { AdhocChargeService } from '../../database/services/adhoc-charge.service';
 import { InvoicePdfService } from '../../database/services/invoice-pdf.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { CombinedAuthGuard } from '../auth/guards/api-key-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import {
@@ -333,7 +330,7 @@ export class InvoiceController {
   @Post('generate')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(CombinedAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Generate monthly invoices for enrolled children',
     description:
@@ -409,7 +406,7 @@ export class InvoiceController {
   @Post('catch-up')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(CombinedAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Generate catch-up invoices for historic enrollments',
     description:
@@ -455,7 +452,7 @@ export class InvoiceController {
   @Post('send')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(CombinedAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Send invoices to parents',
     description:
@@ -504,7 +501,7 @@ export class InvoiceController {
   @Post(':id/charges')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(CombinedAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Add an ad-hoc charge to an invoice',
     description:
@@ -608,7 +605,7 @@ export class InvoiceController {
   @Delete(':id/charges/:lineId')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(CombinedAuthGuard, RolesGuard)
+
   @ApiOperation({
     summary: 'Remove an ad-hoc charge from an invoice',
     description:

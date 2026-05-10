@@ -109,6 +109,26 @@ export async function decryptPdf(
       return encryptedBuffer;
     }
 
+    // Diagnostic: dump qpdf version + encryption scheme so we can tell
+    // whether the password really is wrong or our qpdf can't handle the
+    // encryption algorithm.
+    try {
+      const { stdout: ver } = await execFileAsync('qpdf', ['--version']);
+      logger.log(`qpdf version: ${ver.split('\n')[0]}`);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const { stdout: enc } = await execFileAsync('qpdf', [
+        '--show-encryption',
+        inPath,
+      ]);
+      logger.log(`qpdf show-encryption:\n${enc.trim()}`);
+    } catch (err) {
+      const stderr = ((err as { stderr?: string }).stderr ?? '').trim();
+      logger.warn(`qpdf show-encryption failed: ${stderr}`);
+    }
+
     const errors: string[] = [];
     for (const password of candidates) {
       if (!password) continue;

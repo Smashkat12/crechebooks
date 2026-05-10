@@ -304,6 +304,23 @@ export class PdfParser {
         // Clean up description
         const cleanDescription = description.trim();
 
+        // Reject footer / page-number artifacts. The FNB regex occasionally
+        // matches a stray page-summary line like "1" or "9" as a transaction
+        // when the layout breaks across pages. Real transaction descriptions
+        // are always at least a few alphabetic characters; bare digits or
+        // single-character strings are noise and produce bogus rows on the
+        // bank statement (we caught & deleted "1" / "9" / "1." rows from
+        // the April import this way).
+        if (
+          cleanDescription.length < 3 ||
+          /^[\d.\s]+$/.test(cleanDescription)
+        ) {
+          this.logger.debug(
+            `Skipping bogus FNB line ${i + 1}: short/numeric description "${cleanDescription}"`,
+          );
+          continue;
+        }
+
         // Extract payee name
         const payeeName = extractPayeeName(cleanDescription);
 

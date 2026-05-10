@@ -154,7 +154,13 @@ export class PaymentMatchingService {
       };
     }
 
-    // 2. Get outstanding invoices with parent/child relations
+    // 2. Get outstanding invoices with parent/child relations.
+    // Mutated in-place as the batch progresses: every time we auto-apply
+    // a match the consumed invoice's amountPaidCents is bumped (and the
+    // invoice is removed once fully paid), so subsequent transactions in
+    // the same batch don't all collapse onto the same oldest invoice.
+    // Without this, three R1,000 payments from the same parent on a single
+    // run would all match the same R1,000 invoice and over-pay it 3x.
     const outstandingInvoices = await this.getOutstandingInvoices(
       dto.tenantId!,
     );
@@ -224,6 +230,11 @@ export class PaymentMatchingService {
           'deterministic',
           dto.dryRun ?? false,
         );
+        this.markInvoicePaidInBatch(
+          outstandingInvoices,
+          applied.invoiceId,
+          applied.amountCents,
+        );
         results.push({
           transactionId: transaction.id,
           status: 'AUTO_APPLIED',
@@ -263,6 +274,11 @@ export class PaymentMatchingService {
           'deterministic',
           dto.dryRun ?? false,
         );
+        this.markInvoicePaidInBatch(
+          outstandingInvoices,
+          applied.invoiceId,
+          applied.amountCents,
+        );
         results.push({
           transactionId: transaction.id,
           status: 'AUTO_APPLIED',
@@ -280,6 +296,13 @@ export class PaymentMatchingService {
         );
 
         if (agentResult.status === 'AUTO_APPLIED') {
+          if (agentResult.appliedMatch) {
+            this.markInvoicePaidInBatch(
+              outstandingInvoices,
+              agentResult.appliedMatch.invoiceId,
+              agentResult.appliedMatch.amountCents,
+            );
+          }
           results.push(agentResult);
           autoApplied++;
         } else {
@@ -319,6 +342,11 @@ export class PaymentMatchingService {
             'deterministic',
             dto.dryRun ?? false,
           );
+          this.markInvoicePaidInBatch(
+            outstandingInvoices,
+            applied.invoiceId,
+            applied.amountCents,
+          );
           results.push({
             transactionId: transaction.id,
             status: 'AUTO_APPLIED',
@@ -335,6 +363,13 @@ export class PaymentMatchingService {
             dto.dryRun ?? false,
           );
           if (agentResult.status === 'AUTO_APPLIED') {
+            if (agentResult.appliedMatch) {
+              this.markInvoicePaidInBatch(
+                outstandingInvoices,
+                agentResult.appliedMatch.invoiceId,
+                agentResult.appliedMatch.amountCents,
+              );
+            }
             results.push(agentResult);
             autoApplied++;
           } else {
@@ -1386,6 +1421,29 @@ export class PaymentMatchingService {
    * have not been issued to the parent yet, so payment cannot be expected
    * against them; matching to DRAFT would corrupt allocation accounting.
    */
+  /**
+   * Mutate the in-flight outstandingInvoices list to reflect a freshly-applied
+   * payment. Bumps amountPaidCents on the consumed invoice; if that brings it
+   * to or above totalCents, drops the invoice from the candidate list so
+   * downstream matchers in the same batch don't reconsider it.
+   *
+   * Also works for dry-run mode — appliedMatch carries the synthetic amount
+   * the matcher would have written, so the preview correctly mirrors what
+   * the real run would do across multiple transactions.
+   */
+  private markInvoicePaidInBatch(
+    invoices: InvoiceWithRelations[],
+    invoiceId: string,
+    amountCents: number,
+  ): void {
+    const idx = invoices.findIndex((inv) => inv.id === invoiceId);
+    if (idx < 0) return;
+    invoices[idx].amountPaidCents += amountCents;
+    if (invoices[idx].amountPaidCents >= invoices[idx].totalCents) {
+      invoices.splice(idx, 1);
+    }
+  }
+
   private async getOutstandingInvoices(
     tenantId: string,
   ): Promise<InvoiceWithRelations[]> {

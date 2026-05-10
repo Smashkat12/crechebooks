@@ -36,6 +36,16 @@ import { BusinessException } from '../../shared/exceptions';
 // Configure Decimal.js for banker's rounding
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_EVEN });
 
+/**
+ * Per-account contribution from a single transaction. A non-split transaction
+ * produces one contribution (its xero_account_code with the full amount).
+ * A split transaction produces N contributions, one per split line.
+ */
+interface AccountContribution {
+  accountCode: string;
+  amountCents: number;
+}
+
 @Injectable()
 export class FinancialReportService {
   private readonly logger = new Logger(FinancialReportService.name);
@@ -44,6 +54,68 @@ export class FinancialReportService {
     private readonly prisma: PrismaService,
     private readonly invoiceRepo: InvoiceRepository,
   ) {}
+
+  /**
+   * Resolve per-account contributions for a batch of transactions, taking
+   * split categorisations into account.
+   *
+   * Why this exists: the income statement / balance sheet / trial balance
+   * used to read tx.xeroAccountCode directly. That's correct for normal
+   * transactions but undercounts splits — a split tx has xeroAccountCode
+   * = NULL (consumers must read the categorizations table to find the
+   * per-account breakdown). Without this helper, every split transaction
+   * fell into the '9999 uncategorised' bucket.
+   *
+   * Returns: Map<transactionId, AccountContribution[]> where the contribution
+   * list sums to the transaction amount (within rounding).
+   */
+  private async resolveAccountContributions(
+    transactions: { id: string; xeroAccountCode: string | null; amountCents: number }[],
+  ): Promise<Map<string, AccountContribution[]>> {
+    const result = new Map<string, AccountContribution[]>();
+    if (transactions.length === 0) return result;
+
+    // One query for every split categorisation across the batch.
+    const splits = await this.prisma.categorization.findMany({
+      where: {
+        transactionId: { in: transactions.map((t) => t.id) },
+        isSplit: true,
+      },
+      select: {
+        transactionId: true,
+        accountCode: true,
+        splitAmountCents: true,
+      },
+    });
+
+    const splitsByTx = new Map<string, typeof splits>();
+    for (const s of splits) {
+      const list = splitsByTx.get(s.transactionId) ?? [];
+      list.push(s);
+      splitsByTx.set(s.transactionId, list);
+    }
+
+    for (const tx of transactions) {
+      const txSplits = splitsByTx.get(tx.id);
+      if (txSplits && txSplits.length > 0) {
+        result.set(
+          tx.id,
+          txSplits.map((s) => ({
+            accountCode: s.accountCode,
+            amountCents: s.splitAmountCents ?? 0,
+          })),
+        );
+      } else {
+        result.set(tx.id, [
+          {
+            accountCode: tx.xeroAccountCode ?? '9999',
+            amountCents: tx.amountCents,
+          },
+        ]);
+      }
+    }
+    return result;
+  }
 
   /**
    * Generate Income Statement (Profit & Loss) for a period
@@ -94,32 +166,33 @@ export class FinancialReportService {
       },
     });
 
-    // Separate income and expenses using xero_account_code
+    // Separate income and expenses using xero_account_code, expanded for splits.
+    const contributions = await this.resolveAccountContributions(transactions);
     const incomeByAccount = new Map<string, Decimal>();
     const expensesByAccount = new Map<string, Decimal>();
 
     for (const tx of transactions) {
-      const accountCode = tx.xeroAccountCode || '9999';
-
-      if (tx.isCredit) {
-        // Credit transactions are income (or equity injections)
-        if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
-          const current = incomeByAccount.get(accountCode) || new Decimal(0);
-          incomeByAccount.set(accountCode, current.plus(tx.amountCents));
+      for (const { accountCode, amountCents } of contributions.get(tx.id) ?? []) {
+        if (tx.isCredit) {
+          // Credit transactions are income (or equity injections)
+          if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
+            const current = incomeByAccount.get(accountCode) || new Decimal(0);
+            incomeByAccount.set(accountCode, current.plus(amountCents));
+          } else {
+            // Credit to an expense account = refund/reversal, reduce expenses
+            const current = expensesByAccount.get(accountCode) || new Decimal(0);
+            expensesByAccount.set(accountCode, current.minus(amountCents));
+          }
         } else {
-          // Credit to an expense account = refund/reversal, reduce expenses
-          const current = expensesByAccount.get(accountCode) || new Decimal(0);
-          expensesByAccount.set(accountCode, current.minus(tx.amountCents));
-        }
-      } else {
-        // Debit transactions
-        if (isExpenseAccount(accountCode)) {
-          const current = expensesByAccount.get(accountCode) || new Decimal(0);
-          expensesByAccount.set(accountCode, current.plus(tx.amountCents));
-        } else if (isIncomeAccount(accountCode)) {
-          // Debit to income account = reversal/refund, reduce income
-          const current = incomeByAccount.get(accountCode) || new Decimal(0);
-          incomeByAccount.set(accountCode, current.minus(tx.amountCents));
+          // Debit transactions
+          if (isExpenseAccount(accountCode)) {
+            const current = expensesByAccount.get(accountCode) || new Decimal(0);
+            expensesByAccount.set(accountCode, current.plus(amountCents));
+          } else if (isIncomeAccount(accountCode)) {
+            // Debit to income account = reversal/refund, reduce income
+            const current = incomeByAccount.get(accountCode) || new Decimal(0);
+            incomeByAccount.set(accountCode, current.minus(amountCents));
+          }
         }
       }
     }
@@ -239,45 +312,48 @@ export class FinancialReportService {
     let totalIncomeCents = new Decimal(0);
     let totalExpensesCents = new Decimal(0);
 
-    for (const tx of transactions) {
-      const accountCode = tx.xeroAccountCode || '9999';
+    const contributions = await this.resolveAccountContributions(transactions);
 
-      // Every transaction affects the bank balance
+    for (const tx of transactions) {
+      // Every transaction affects the bank balance once, regardless of how
+      // its other side splits across accounts.
       if (tx.isCredit) {
         bankBalanceCents = bankBalanceCents.plus(tx.amountCents);
       } else {
         bankBalanceCents = bankBalanceCents.minus(tx.amountCents);
       }
 
-      // Track income and expenses for retained earnings calculation
-      if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
-        if (tx.isCredit) {
-          totalIncomeCents = totalIncomeCents.plus(tx.amountCents);
-        } else {
-          totalIncomeCents = totalIncomeCents.minus(tx.amountCents);
-        }
-      } else if (isExpenseAccount(accountCode)) {
-        if (tx.isCredit) {
-          // Refund reduces expenses
-          totalExpensesCents = totalExpensesCents.minus(tx.amountCents);
-        } else {
-          totalExpensesCents = totalExpensesCents.plus(tx.amountCents);
-        }
-      } else if (isAssetAccount(accountCode) && accountCode !== '1035') {
-        // Non-bank asset account — debit increases, credit decreases
-        const current = accountBalances.get(accountCode) || new Decimal(0);
-        if (tx.isCredit) {
-          accountBalances.set(accountCode, current.minus(tx.amountCents));
-        } else {
-          accountBalances.set(accountCode, current.plus(tx.amountCents));
-        }
-      } else if (isLiabilityAccount(accountCode)) {
-        // Liability account — credit increases, debit decreases
-        const current = accountBalances.get(accountCode) || new Decimal(0);
-        if (tx.isCredit) {
-          accountBalances.set(accountCode, current.plus(tx.amountCents));
-        } else {
-          accountBalances.set(accountCode, current.minus(tx.amountCents));
+      for (const { accountCode, amountCents } of contributions.get(tx.id) ?? []) {
+        // Track income and expenses for retained earnings calculation
+        if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
+          if (tx.isCredit) {
+            totalIncomeCents = totalIncomeCents.plus(amountCents);
+          } else {
+            totalIncomeCents = totalIncomeCents.minus(amountCents);
+          }
+        } else if (isExpenseAccount(accountCode)) {
+          if (tx.isCredit) {
+            // Refund reduces expenses
+            totalExpensesCents = totalExpensesCents.minus(amountCents);
+          } else {
+            totalExpensesCents = totalExpensesCents.plus(amountCents);
+          }
+        } else if (isAssetAccount(accountCode) && accountCode !== '1035') {
+          // Non-bank asset account — debit increases, credit decreases
+          const current = accountBalances.get(accountCode) || new Decimal(0);
+          if (tx.isCredit) {
+            accountBalances.set(accountCode, current.minus(amountCents));
+          } else {
+            accountBalances.set(accountCode, current.plus(amountCents));
+          }
+        } else if (isLiabilityAccount(accountCode)) {
+          // Liability account — credit increases, debit decreases
+          const current = accountBalances.get(accountCode) || new Decimal(0);
+          if (tx.isCredit) {
+            accountBalances.set(accountCode, current.plus(amountCents));
+          } else {
+            accountBalances.set(accountCode, current.minus(amountCents));
+          }
         }
       }
     }
@@ -504,30 +580,32 @@ export class FinancialReportService {
       },
     });
 
-    // Group by xero_account_code
+    // Group by xero_account_code, expanded for splits.
+    const contributions = await this.resolveAccountContributions(transactions);
     const accountBalances = new Map<
       string,
       { debits: Decimal; credits: Decimal; name: string }
     >();
 
     for (const tx of transactions) {
-      const accountCode = tx.xeroAccountCode || '9999';
-      const accountName =
-        accountNameMap.get(accountCode) || this.getAccountName(accountCode);
+      for (const { accountCode, amountCents } of contributions.get(tx.id) ?? []) {
+        const accountName =
+          accountNameMap.get(accountCode) || this.getAccountName(accountCode);
 
-      if (!accountBalances.has(accountCode)) {
-        accountBalances.set(accountCode, {
-          debits: new Decimal(0),
-          credits: new Decimal(0),
-          name: accountName,
-        });
-      }
+        if (!accountBalances.has(accountCode)) {
+          accountBalances.set(accountCode, {
+            debits: new Decimal(0),
+            credits: new Decimal(0),
+            name: accountName,
+          });
+        }
 
-      const account = accountBalances.get(accountCode)!;
-      if (tx.isCredit) {
-        account.credits = account.credits.plus(tx.amountCents);
-      } else {
-        account.debits = account.debits.plus(tx.amountCents);
+        const account = accountBalances.get(accountCode)!;
+        if (tx.isCredit) {
+          account.credits = account.credits.plus(amountCents);
+        } else {
+          account.debits = account.debits.plus(amountCents);
+        }
       }
     }
 

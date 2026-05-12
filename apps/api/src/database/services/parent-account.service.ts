@@ -325,10 +325,38 @@ export class ParentAccountService {
       });
     }
 
-    // 3. Sort by date
+    // 3. Get credit balances created in period (overpayments, refunds, manual credits).
+    // These reduce the parent's balance independently of invoices/payments.
+    // Note: calculateOpeningBalance subtracts unapplied credits before periodStart,
+    // and subtracts unapplied credits before periodEnd+1 — so including these as
+    // CREDIT_NOTE lines keeps the running balance in step with closing balance.
+    const creditBalances = await this.prisma.creditBalance.findMany({
+      where: {
+        tenantId,
+        parentId,
+        createdAt: { gte: periodStart, lte: periodEnd },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    for (const cb of creditBalances) {
+      transactions.push({
+        id: cb.id,
+        date: cb.createdAt,
+        type: 'CREDIT_NOTE',
+        referenceNumber: cb.sourceId ?? cb.id.substring(0, 8).toUpperCase(),
+        description:
+          cb.description ?? `Credit - ${cb.sourceType.replace(/_/g, ' ')}`,
+        debitCents: 0,
+        creditCents: cb.amountCents,
+        runningBalanceCents: 0,
+      });
+    }
+
+    // 4. Sort by date
     transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // 4. Calculate running balance (starting from opening balance)
+    // 5. Calculate running balance (starting from opening balance)
     const openingBalance = await this.calculateOpeningBalance(
       tenantId,
       parentId,

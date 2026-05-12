@@ -15,17 +15,11 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import {
-  Statement,
-  StatementLine,
-  Tenant,
-  Parent,
-  Child,
-} from '@prisma/client';
+import { Statement, StatementLine, Tenant, Parent, Child } from '@prisma/client';
 import { TenantRepository } from '../repositories/tenant.repository';
 import { ParentRepository } from '../repositories/parent.repository';
 import { StatementRepository } from '../repositories/statement.repository';
-import { NotFoundException, BusinessException } from '../../shared/exceptions';
+import { NotFoundException } from '../../shared/exceptions';
 import { formatFullName } from '../../common/utils/name-formatter';
 
 /**
@@ -43,14 +37,54 @@ export interface StatementPdfOptions {
 }
 
 /**
- * Internal type for statement with lines and parent data
- */
-type StatementWithLines = Statement & { lines: StatementLine[] };
-
-/**
  * Parent with children included
  */
 type ParentWithChildren = Parent & { children: Child[] };
+
+/**
+ * Shape the PDF renderer needs from a "statement-like" object.
+ * Both persisted Statement rows and live ledger snapshots satisfy this.
+ */
+export interface RenderableStatement {
+  statementNumber: string;
+  periodStart: Date;
+  periodEnd: Date;
+  createdAt: Date;
+  openingBalanceCents: number;
+  totalChargesCents: number;
+  totalPaymentsCents: number;
+  totalCreditsCents: number | null;
+  closingBalanceCents: number;
+}
+
+/**
+ * Shape the PDF renderer needs from a single statement line.
+ * Both persisted StatementLine rows and live ledger lines satisfy this.
+ */
+export interface RenderableLine {
+  date: Date;
+  description: string;
+  referenceNumber: string | null;
+  debitCents: number;
+  creditCents: number;
+  balanceCents: number;
+}
+
+/**
+ * Input for rendering a live (non-persisted) ledger PDF.
+ */
+export interface LedgerPdfInput {
+  tenantId: string;
+  parentId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  openingBalanceCents: number;
+  totalChargesCents: number;
+  totalPaymentsCents: number;
+  totalCreditsCents: number;
+  closingBalanceCents: number;
+  lines: RenderableLine[];
+}
 
 /**
  * PDF rendering constants
@@ -119,7 +153,6 @@ export class StatementPdfService {
    * @param options - PDF generation options
    * @returns PDF buffer
    * @throws NotFoundException if statement or tenant not found
-   * @throws BusinessException for invalid data
    */
   async generatePdf(
     tenantId: string,
@@ -149,7 +182,77 @@ export class StatementPdfService {
       throw new NotFoundException('Parent', statement.parentId);
     }
 
-    // 4. Create PDF document
+    return this.renderPdfBuffer(
+      tenant,
+      parent as ParentWithChildren,
+      statement,
+      statement.lines,
+      options,
+    );
+  }
+
+  /**
+   * Generate PDF for a live ledger (no persisted Statement row).
+   * The header shows a "LIVE" placeholder for the statement number and uses
+   * "now" as the generated-at timestamp.
+   *
+   * @param input - Computed ledger data
+   * @param options - PDF generation options
+   * @returns PDF buffer
+   */
+  async generateLedgerPdf(
+    input: LedgerPdfInput,
+    options: StatementPdfOptions = {},
+  ): Promise<Buffer> {
+    this.logger.log(
+      `Generating live ledger PDF for parent ${input.parentId} (${input.periodStart.toISOString()} → ${input.periodEnd.toISOString()})`,
+    );
+
+    const tenant = await this.tenantRepo.findById(input.tenantId);
+    if (!tenant) {
+      throw new NotFoundException('Tenant', input.tenantId);
+    }
+
+    const parent = await this.parentRepo.findById(
+      input.parentId,
+      input.tenantId,
+    );
+    if (!parent) {
+      throw new NotFoundException('Parent', input.parentId);
+    }
+
+    const statementLike: RenderableStatement = {
+      statementNumber: 'LIVE',
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      createdAt: new Date(),
+      openingBalanceCents: input.openingBalanceCents,
+      totalChargesCents: input.totalChargesCents,
+      totalPaymentsCents: input.totalPaymentsCents,
+      totalCreditsCents: input.totalCreditsCents,
+      closingBalanceCents: input.closingBalanceCents,
+    };
+
+    return this.renderPdfBuffer(
+      tenant,
+      parent as ParentWithChildren,
+      statementLike,
+      input.lines,
+      options,
+    );
+  }
+
+  /**
+   * Shared PDF rendering pipeline. Builds the document from already-resolved
+   * tenant, parent, statement-like data, and lines.
+   */
+  private async renderPdfBuffer(
+    tenant: Tenant,
+    parent: ParentWithChildren,
+    statementLike: RenderableStatement,
+    lines: RenderableLine[],
+    options: StatementPdfOptions,
+  ): Promise<Buffer> {
     const doc = new PDFDocument({
       size: 'A4',
       margins: {
@@ -159,18 +262,16 @@ export class StatementPdfService {
         right: PDF_CONSTANTS.MARGIN_RIGHT,
       },
       info: {
-        Title: `Statement ${statement.statementNumber}`,
+        Title: `Statement ${statementLike.statementNumber}`,
         Author: tenant.name,
         Subject: 'Account Statement',
         Creator: 'CrecheBooks',
       },
     });
 
-    // Collect PDF chunks
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
 
-    // Wait for PDF to finish
     const pdfPromise = new Promise<Buffer>((resolve, reject) => {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
@@ -178,51 +279,39 @@ export class StatementPdfService {
 
     const primaryColor = options.primaryColor || PDF_CONSTANTS.DEFAULT_PRIMARY;
 
-    // 5. Render PDF sections
     let yPosition: number = PDF_CONSTANTS.MARGIN_TOP;
 
-    // Header with logo and tenant info
     yPosition = this.renderHeader(
       doc,
       tenant,
-      statement,
+      statementLike,
       options.logo,
       primaryColor,
       yPosition,
     );
 
-    // Parent details section
-    yPosition = this.renderParentDetails(
-      doc,
-      parent as ParentWithChildren,
-      yPosition,
-    );
+    yPosition = this.renderParentDetails(doc, parent, yPosition);
 
-    // Statement summary
-    yPosition = this.renderSummary(doc, statement, primaryColor, yPosition);
+    yPosition = this.renderSummary(doc, statementLike, primaryColor, yPosition);
 
-    // Transaction table
     yPosition = this.renderTransactionTable(
       doc,
-      statement.lines,
+      lines,
       primaryColor,
       yPosition,
     );
 
-    // Balance summary box
     yPosition = this.renderBalanceSummary(
       doc,
-      statement,
+      statementLike,
       primaryColor,
       yPosition,
     );
 
-    // Optional: Payment instructions
     if (options.includePaymentInstructions) {
       const childNames =
-        (parent as ParentWithChildren).children
-          ?.map((c) => formatFullName(c))
-          .join(' or ') || "your child's full name";
+        parent.children?.map((c) => formatFullName(c)).join(' or ') ||
+        "your child's full name";
       yPosition = this.renderPaymentInstructions(
         doc,
         tenant,
@@ -232,15 +321,13 @@ export class StatementPdfService {
       );
     }
 
-    // Footer
     this.renderFooter(doc, tenant);
 
-    // Finalize PDF
     doc.end();
 
     const pdfBuffer = await pdfPromise;
     this.logger.log(
-      `Generated PDF for statement ${statement.statementNumber}: ${pdfBuffer.length} bytes`,
+      `Generated PDF (${statementLike.statementNumber}): ${pdfBuffer.length} bytes`,
     );
 
     return pdfBuffer;
@@ -252,7 +339,7 @@ export class StatementPdfService {
   private renderHeader(
     doc: PDFKit.PDFDocument,
     tenant: Tenant,
-    statement: Statement,
+    statement: RenderableStatement,
     logo: Buffer | undefined,
     primaryColor: string,
     startY: number,
@@ -432,7 +519,7 @@ export class StatementPdfService {
    */
   private renderSummary(
     doc: PDFKit.PDFDocument,
-    statement: Statement,
+    statement: RenderableStatement,
     primaryColor: string,
     startY: number,
   ): number {
@@ -445,7 +532,7 @@ export class StatementPdfService {
    */
   private renderTransactionTable(
     doc: PDFKit.PDFDocument,
-    lines: StatementLine[],
+    lines: RenderableLine[],
     primaryColor: string,
     startY: number,
   ): number {
@@ -643,7 +730,7 @@ export class StatementPdfService {
    */
   private renderBalanceSummary(
     doc: PDFKit.PDFDocument,
-    statement: Statement,
+    statement: RenderableStatement,
     primaryColor: string,
     startY: number,
   ): number {

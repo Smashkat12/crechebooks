@@ -287,6 +287,9 @@ export class StatementPdfService {
         left: PDF_CONSTANTS.MARGIN_LEFT,
         right: PDF_CONSTANTS.MARGIN_RIGHT,
       },
+      // bufferPages is required for renderFooter() to use switchToPage()
+      // for adding the page-number footer to every page.
+      bufferPages: true,
       info: {
         Title: `Statement ${statementLike.statementNumber}`,
         Author: tenant.name,
@@ -1024,13 +1027,16 @@ export class StatementPdfService {
       PDF_CONSTANTS.MARGIN_LEFT -
       PDF_CONSTANTS.MARGIN_RIGHT;
 
-    // Add footer to each page
+    // Add footer to each page.
+    // PDFKit's bufferedPageRange().start may be 0 or 1 depending on whether
+    // the first auto-added page was already flushed. Use the returned start
+    // as the index base — the loop must run i in [start, start + count).
     const pages = (
       doc as unknown as {
         bufferedPageRange: () => { start: number; count: number };
       }
     ).bufferedPageRange();
-    for (let i = 0; i < pages.count; i++) {
+    for (let i = pages.start; i < pages.start + pages.count; i++) {
       doc.switchToPage(i);
 
       // Divider line
@@ -1049,7 +1055,7 @@ export class StatementPdfService {
         .fontSize(PDF_CONSTANTS.FONT_SIZE_SMALL)
         .fillColor(PDF_CONSTANTS.TEXT_MUTED)
         .text(
-          `Page ${i + 1} of ${pages.count}`,
+          `Page ${i - pages.start + 1} of ${pages.count}`,
           PDF_CONSTANTS.MARGIN_LEFT,
           footerY,
           { align: 'center', width: contentWidth },

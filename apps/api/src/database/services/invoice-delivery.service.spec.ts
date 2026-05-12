@@ -175,7 +175,6 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(false);
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockInvoiceRepo: any = module.get(InvoiceRepository);
     mockInvoiceRepo.findById.mockResolvedValue(buildDraftInvoice());
 
@@ -199,13 +198,12 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(false); // COMMS_DISABLED=false
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockInvoiceRepo: any = module.get(InvoiceRepository);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const mockEmailService: any = module.get(EmailService);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const mockWAProviderService: any = module.get(WhatsAppProviderService);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const mockAuditLogService: any = module.get(AuditLogService);
 
     mockInvoiceRepo.update.mockResolvedValue(undefined);
@@ -221,7 +219,9 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
 
     // Adapters must NOT be called
     expect(mockEmailService.sendEmailWithOptions).not.toHaveBeenCalled();
-    expect(mockWAProviderService.sendInvoiceNotification).not.toHaveBeenCalled();
+    expect(
+      mockWAProviderService.sendInvoiceNotification,
+    ).not.toHaveBeenCalled();
 
     // DB must be updated for each invoice
     expect(mockInvoiceRepo.update).toHaveBeenCalledWith(
@@ -250,9 +250,8 @@ describe('InvoiceDeliveryService — sendInvoices staging-safety gate', () => {
     const module = await buildModule(true); // COMMS_DISABLED=true
     service = module.get<InvoiceDeliveryService>(InvoiceDeliveryService);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockInvoiceRepo: any = module.get(InvoiceRepository);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const mockEmailService: any = module.get(EmailService);
 
     mockInvoiceRepo.findById.mockResolvedValue(buildDraftInvoice());

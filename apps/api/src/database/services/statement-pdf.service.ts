@@ -253,6 +253,32 @@ export class StatementPdfService {
     lines: RenderableLine[],
     options: StatementPdfOptions,
   ): Promise<Buffer> {
+    try {
+      return await this.renderPdfBufferInner(
+        tenant,
+        parent,
+        statementLike,
+        lines,
+        options,
+      );
+    } catch (err) {
+      this.logger.error(
+        `PDF render failed for statement=${statementLike.statementNumber} parent=${parent?.id} tenant=${tenant?.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw err;
+    }
+  }
+
+  private async renderPdfBufferInner(
+    tenant: Tenant,
+    parent: ParentWithChildren,
+    statementLike: RenderableStatement,
+    lines: RenderableLine[],
+    options: StatementPdfOptions,
+  ): Promise<Buffer> {
     const doc = new PDFDocument({
       size: 'A4',
       margins: {

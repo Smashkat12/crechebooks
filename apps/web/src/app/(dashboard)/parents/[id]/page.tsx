@@ -22,6 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import { EnrollmentSuccessModal, EnrollChildDialog, type EnrollmentData } from '@/components/enrollments';
 import { WhatsAppOptIn } from '@/components/parents/whatsapp-opt-in';
 import { WhatsAppMessageHistory } from '@/components/parents/whatsapp-message-history';
+import { ParentAccountTab } from '@/components/parents/parent-account-tab';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ParentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -222,6 +224,13 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
         </div>
       </div>
 
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="account">Account</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -461,6 +470,12 @@ export default function ParentDetailPage({ params }: ParentDetailPageProps) {
         />
         <WhatsAppMessageHistory parentId={id} />
       </div>
+        </TabsContent>
+
+        <TabsContent value="account">
+          <ParentAccountTab parentId={id} />
+        </TabsContent>
+      </Tabs>
 
       {/* Enroll existing child dialog */}
       <EnrollChildDialog

@@ -15,7 +15,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { Statement, StatementLine, Tenant, Parent, Child } from '@prisma/client';
+import { Tenant, Parent, Child } from '@prisma/client';
 import { TenantRepository } from '../repositories/tenant.repository';
 import { ParentRepository } from '../repositories/parent.repository';
 import { StatementRepository } from '../repositories/statement.repository';

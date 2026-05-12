@@ -107,6 +107,8 @@ export function useAllocatePayment() {
       queryClient.invalidateQueries({ queryKey: queryKeys.payments.lists() });
       queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.arrears.all });
+      // Allocating a payment changes parent balances → invalidate live ledgers/account summaries
+      queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
     },
   });
 }

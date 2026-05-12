@@ -904,8 +904,7 @@ export class ParentPortalController {
     const transactions = ledger.lines
       .filter(
         (l) =>
-          l.lineType !== 'OPENING_BALANCE' &&
-          l.lineType !== 'CLOSING_BALANCE',
+          l.lineType !== 'OPENING_BALANCE' && l.lineType !== 'CLOSING_BALANCE',
       )
       .map((l, idx) => {
         const isDebit = l.debitCents > 0;

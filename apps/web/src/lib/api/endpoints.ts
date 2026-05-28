@@ -131,6 +131,9 @@ export const endpoints = {
     deliver: (id: string) => `/statements/${id}/deliver`,
     forParent: (parentId: string) => `/statements/parents/${parentId}`,
     parentAccount: (parentId: string) => `/statements/parents/${parentId}/account`,
+    parentLedger: (parentId: string) => `/statements/parents/${parentId}/ledger`,
+    parentLedgerPdf: (parentId: string) =>
+      `/statements/parents/${parentId}/ledger/pdf`,
   },
   xeroSplits: {
     detect: '/reconciliation/xero-splits/detect',

@@ -271,6 +271,8 @@ export function useGenerateInvoices() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.invoices.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      // Generating invoices changes parent balances → invalidate live ledgers/account summaries
+      queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
     },
   });
 }
@@ -377,6 +379,8 @@ export function useDeleteInvoice() {
       queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() });
       // Also invalidate dashboard as it may show invoice counts
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all });
+      // Deleting an invoice changes parent balances → invalidate live ledgers/account summaries
+      queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
     },
   });
 }

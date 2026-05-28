@@ -11,6 +11,8 @@ interface StatementTableProps {
   onDownload: (statement: StatementSummary) => void;
   onFinalize: (statement: StatementSummary) => void;
   onSend: (statement: StatementSummary) => void;
+  /** Default status filter — used by archive view to start on "FINAL" */
+  defaultStatus?: StatementStatus | 'all';
 }
 
 export function StatementTable({
@@ -18,8 +20,9 @@ export function StatementTable({
   onDownload,
   onFinalize,
   onSend,
+  defaultStatus = 'all',
 }: StatementTableProps) {
-  const [status, setStatus] = useState<StatementStatus | 'all'>('all');
+  const [status, setStatus] = useState<StatementStatus | 'all'>(defaultStatus);
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
   const [pagination, setPagination] = useState({
@@ -43,7 +46,7 @@ export function StatementTable({
   });
 
   const handleReset = () => {
-    setStatus('all');
+    setStatus(defaultStatus);
     setPeriodStart('');
     setPeriodEnd('');
     setPagination({ pageIndex: 0, pageSize: 20 });

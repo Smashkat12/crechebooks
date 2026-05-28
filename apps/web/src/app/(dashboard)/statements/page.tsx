@@ -1,25 +1,34 @@
 'use client';
 
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { ClipboardList } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { StatementTable, GenerateStatementDialog } from '@/components/statements';
+import { StatementTable } from '@/components/statements';
 import { StatementDetailDialog } from '@/components/statements/statement-detail-dialog';
-import { useDownloadStatementPdf, useFinalizeStatement, useDeliverStatement, type StatementSummary } from '@/hooks/use-statements';
+import {
+  useDownloadStatementPdf,
+  useFinalizeStatement,
+  useDeliverStatement,
+  type StatementSummary,
+} from '@/hooks/use-statements';
 import { useToast } from '@/hooks/use-toast';
-import { queryKeys } from '@/lib/api';
 
+/**
+ * Sent Statements archive.
+ *
+ * This page used to be the primary place to "Generate Statements" for a
+ * period. With the live ledger on the parent detail page (Account tab) as
+ * the primary view, generation now happens implicitly when an admin
+ * presses "Send to Parent" there. This page records what has been sent.
+ */
 export default function StatementsPage() {
-  const queryClient = useQueryClient();
   const { downloadPdf } = useDownloadStatementPdf();
   const finalizeStatement = useFinalizeStatement();
   const deliverStatement = useDeliverStatement();
   const { toast } = useToast();
 
-  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
-  const [selectedStatementId, setSelectedStatementId] = useState<string | null>(null);
+  const [selectedStatementId, setSelectedStatementId] = useState<string | null>(
+    null,
+  );
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const handleView = (statement: StatementSummary) => {
@@ -35,10 +44,12 @@ export default function StatementsPage() {
         description: `Downloading ${statement.statement_number}.pdf`,
       });
     } catch (error) {
-      console.error('Download failed:', error);
       toast({
         title: 'Download failed',
-        description: error instanceof Error ? error.message : 'Failed to download statement',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to download statement',
         variant: 'destructive',
       });
     }
@@ -52,10 +63,12 @@ export default function StatementsPage() {
         description: `${statement.statement_number} has been finalized`,
       });
     } catch (error) {
-      console.error('Finalize failed:', error);
       toast({
         title: 'Finalize failed',
-        description: error instanceof Error ? error.message : 'Failed to finalize statement',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to finalize statement',
         variant: 'destructive',
       });
     }
@@ -69,32 +82,24 @@ export default function StatementsPage() {
         description: `${statement.statement_number} has been sent to ${statement.parent.name}`,
       });
     } catch (error) {
-      console.error('Send failed:', error);
       toast({
         title: 'Send failed',
-        description: error instanceof Error ? error.message : 'Failed to send statement',
+        description:
+          error instanceof Error ? error.message : 'Failed to send statement',
         variant: 'destructive',
       });
     }
   };
 
-  const handleGenerateSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: queryKeys.statements.all });
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Statements</h1>
-          <p className="text-muted-foreground">
-            Generate and manage parent account statements
-          </p>
-        </div>
-        <Button onClick={() => setGenerateDialogOpen(true)}>
-          <ClipboardList className="h-4 w-4 mr-2" />
-          Generate Statements
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Sent Statements</h1>
+        <p className="text-muted-foreground">
+          Archive of statements sent to parents. Open a parent profile and use
+          the Account tab to view the current live ledger or send a new
+          statement.
+        </p>
       </div>
 
       <Card>
@@ -104,15 +109,10 @@ export default function StatementsPage() {
             onDownload={handleDownload}
             onFinalize={handleFinalize}
             onSend={handleSend}
+            defaultStatus="DELIVERED"
           />
         </CardContent>
       </Card>
-
-      <GenerateStatementDialog
-        isOpen={generateDialogOpen}
-        onClose={() => setGenerateDialogOpen(false)}
-        onSuccess={handleGenerateSuccess}
-      />
 
       <StatementDetailDialog
         statementId={selectedStatementId}

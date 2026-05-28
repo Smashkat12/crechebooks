@@ -64,6 +64,8 @@ import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
 import { BusinessException } from '../../shared/exceptions';
 import { NotificationChannelType } from '../../notifications/types/notification.types';
+import { ParentAccountService } from '../../database/services/parent-account.service';
+import { StatementGenerationService } from '../../database/services/statement-generation.service';
 
 @ApiTags('Parent Portal')
 @ApiBearerAuth()
@@ -82,6 +84,8 @@ export class ParentPortalController {
     private readonly paymentReceiptService: PaymentReceiptService,
     private readonly statementDeliveryService: StatementDeliveryService,
     private readonly auditLogService: AuditLogService,
+    private readonly parentAccountService: ParentAccountService,
+    private readonly statementGenerationService: StatementGenerationService,
   ) {}
 
   // ============================================================================
@@ -756,10 +760,12 @@ export class ParentPortalController {
       `Fetching statements for parent ${parentId}, year ${year}`,
     );
 
-    // Find all months that have transactions (invoices or payments)
+    // Find all months that have transactions (invoices or payments).
+    // Balances come from ParentAccountService — the same authority used by
+    // the admin live ledger and StatementGenerationService — so credit
+    // balances, void invoices, and deletes are handled consistently.
     const statements: ParentStatementsListDto['statements'] = [];
 
-    // Get invoices and payments for the year
     const startOfYear = new Date(year, 0, 1);
     const endOfYear = new Date(year, 11, 31, 23, 59, 59, 999);
 
@@ -768,14 +774,9 @@ export class ParentPortalController {
         parentId,
         tenantId,
         isDeleted: false,
-        createdAt: { gte: startOfYear, lte: endOfYear },
+        issueDate: { gte: startOfYear, lte: endOfYear },
       },
-      select: {
-        id: true,
-        totalCents: true,
-        amountPaidCents: true,
-        createdAt: true,
-      },
+      select: { id: true, issueDate: true },
     });
 
     const payments = await this.prisma.payment.findMany({
@@ -785,81 +786,25 @@ export class ParentPortalController {
         paymentDate: { gte: startOfYear, lte: endOfYear },
         invoice: { parentId },
       },
-      select: {
-        id: true,
-        amountCents: true,
-        paymentDate: true,
-      },
+      select: { id: true, paymentDate: true },
     });
 
-    // Group by month and calculate stats
-    const monthlyData: Map<
-      number,
-      {
-        invoices: number;
-        payments: number;
-        invoiceTotal: number;
-        paymentTotal: number;
-      }
-    > = new Map();
-
-    // Initialize months that have data
+    // Bucket activity by month — we only show months with movement.
+    const monthlyTxnCounts: Map<number, number> = new Map();
     for (const invoice of invoices) {
-      const month = invoice.createdAt.getMonth() + 1;
-      const existing = monthlyData.get(month) || {
-        invoices: 0,
-        payments: 0,
-        invoiceTotal: 0,
-        paymentTotal: 0,
-      };
-      existing.invoices++;
-      existing.invoiceTotal += invoice.totalCents;
-      monthlyData.set(month, existing);
+      const month = invoice.issueDate.getMonth() + 1;
+      monthlyTxnCounts.set(month, (monthlyTxnCounts.get(month) ?? 0) + 1);
     }
-
     for (const payment of payments) {
       const month = payment.paymentDate.getMonth() + 1;
-      const existing = monthlyData.get(month) || {
-        invoices: 0,
-        payments: 0,
-        invoiceTotal: 0,
-        paymentTotal: 0,
-      };
-      existing.payments++;
-      existing.paymentTotal += payment.amountCents;
-      monthlyData.set(month, existing);
+      monthlyTxnCounts.set(month, (monthlyTxnCounts.get(month) ?? 0) + 1);
     }
 
-    // Calculate running balance and create statement items
-    let runningBalance = 0;
-
-    // Get opening balance (sum of all unpaid amounts before this year)
-    const priorInvoices = await this.prisma.invoice.findMany({
-      where: {
-        parentId,
-        tenantId,
-        isDeleted: false,
-        createdAt: { lt: startOfYear },
-      },
-      select: { totalCents: true, amountPaidCents: true },
-    });
-
-    for (const inv of priorInvoices) {
-      runningBalance += inv.totalCents - inv.amountPaidCents;
-    }
-
-    // Create statements for each month that has data
-    const sortedMonths = Array.from(monthlyData.keys()).sort((a, b) => a - b);
+    const sortedMonths = Array.from(monthlyTxnCounts.keys()).sort(
+      (a, b) => a - b,
+    );
 
     for (const month of sortedMonths) {
-      const data = monthlyData.get(month)!;
-      const openingBalance = runningBalance;
-
-      // Net movement: invoices increase balance, payments decrease
-      const netMovement = (data.invoiceTotal - data.paymentTotal) / 100;
-      runningBalance += data.invoiceTotal - data.paymentTotal;
-      const closingBalance = runningBalance / 100;
-
       // Don't include future months
       if (
         year > currentDate.getFullYear() ||
@@ -869,13 +814,29 @@ export class ParentPortalController {
         continue;
       }
 
+      const startOfMonth = new Date(year, month - 1, 1);
+      const startOfNextMonth = new Date(year, month, 1);
+
+      const [openingCents, closingCents] = await Promise.all([
+        this.parentAccountService.calculateOpeningBalance(
+          tenantId,
+          parentId,
+          startOfMonth,
+        ),
+        this.parentAccountService.calculateOpeningBalance(
+          tenantId,
+          parentId,
+          startOfNextMonth,
+        ),
+      ]);
+
       statements.push({
         year,
         month,
         periodLabel: `${this.getMonthName(month)} ${year}`,
-        transactionCount: data.invoices + data.payments,
-        openingBalance: openingBalance / 100,
-        closingBalance,
+        transactionCount: monthlyTxnCounts.get(month) ?? 0,
+        openingBalance: openingCents / 100,
+        closingBalance: closingCents / 100,
         status: 'available',
       });
     }
@@ -924,152 +885,50 @@ export class ParentPortalController {
       throw new NotFoundException('Parent not found');
     }
 
-    // Calculate date range for the month
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+    // Whole-month period boundaries
+    const periodStart = new Date(year, month - 1, 1);
+    const periodEnd = new Date(year, month, 0, 23, 59, 59, 999);
 
-    // Get opening balance (sum of all unpaid amounts before this month)
-    const priorInvoices = await this.prisma.invoice.findMany({
-      where: {
-        parentId,
-        tenantId,
-        isDeleted: false,
-        createdAt: { lt: startOfMonth },
-      },
-      select: { totalCents: true, amountPaidCents: true },
+    // Reuse the same math the admin live ledger uses so opening/closing
+    // balances stay in lockstep across both surfaces.
+    const ledger = await this.statementGenerationService.computeLiveLedger({
+      tenantId,
+      parentId,
+      periodStart,
+      periodEnd,
     });
 
-    let openingBalanceCents = 0;
-    for (const inv of priorInvoices) {
-      openingBalanceCents += inv.totalCents - inv.amountPaidCents;
-    }
-
-    // Get invoices for this month
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        parentId,
-        tenantId,
-        isDeleted: false,
-        createdAt: { gte: startOfMonth, lte: endOfMonth },
-      },
-      include: {
-        child: { select: { firstName: true, lastName: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // Get payments for this month
-    const payments = await this.prisma.payment.findMany({
-      where: {
-        tenantId,
-        deletedAt: null,
-        paymentDate: { gte: startOfMonth, lte: endOfMonth },
-        invoice: { parentId },
-      },
-      orderBy: { paymentDate: 'asc' },
-    });
-
-    // Get credit balances created during this month (overpayments, refunds, credit notes)
-    const creditBalances = await this.prisma.creditBalance.findMany({
-      where: {
-        tenantId,
-        parentId,
-        createdAt: { gte: startOfMonth, lte: endOfMonth },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // Build transactions list with running balance
-    type TransactionItem = {
-      id: string;
-      date: string;
-      description: string;
-      type: 'invoice' | 'payment' | 'credit';
-      debit: number | null;
-      credit: number | null;
-      balance: number;
-      sortDate: Date;
-    };
-
-    const transactions: TransactionItem[] = [];
-    let runningBalanceCents = openingBalanceCents;
-    let totalInvoicedCents = 0;
-    let totalPaidCents = 0;
-    let totalCreditsCents = 0;
-
-    // Add invoices
-    for (const invoice of invoices) {
-      runningBalanceCents += invoice.totalCents;
-      totalInvoicedCents += invoice.totalCents;
-
-      const childName = invoice.child
-        ? `${invoice.child.firstName} ${invoice.child.lastName}`
-        : 'Unknown';
-
-      transactions.push({
-        id: invoice.id,
-        date: invoice.createdAt.toISOString(),
-        description: `${invoice.invoiceNumber} - ${childName}`,
-        type: 'invoice',
-        debit: invoice.totalCents / 100,
-        credit: null,
-        balance: runningBalanceCents / 100,
-        sortDate: invoice.createdAt,
+    // Map LiveLedger lines onto the parent-portal transaction shape.
+    // OPENING_BALANCE and CLOSING_BALANCE marker rows are filtered out —
+    // those values surface in the dedicated opening/closing fields below.
+    const transactions = ledger.lines
+      .filter(
+        (l) =>
+          l.lineType !== 'OPENING_BALANCE' && l.lineType !== 'CLOSING_BALANCE',
+      )
+      .map((l, idx) => {
+        const isDebit = l.debitCents > 0;
+        let type: 'invoice' | 'payment' | 'credit';
+        if (l.lineType === 'INVOICE') type = 'invoice';
+        else if (l.lineType === 'CREDIT_NOTE') type = 'credit';
+        else type = 'payment'; // PAYMENT, ADJUSTMENT
+        return {
+          id: l.referenceId ?? `live-${idx}`,
+          date: l.date.toISOString(),
+          description: l.referenceNumber
+            ? `${l.referenceNumber} - ${l.description}`
+            : l.description,
+          type,
+          debit: isDebit ? l.debitCents / 100 : null,
+          credit: l.creditCents > 0 ? l.creditCents / 100 : null,
+          balance: l.balanceCents / 100,
+        };
       });
-    }
 
-    // Add payments
-    for (const payment of payments) {
-      runningBalanceCents -= payment.amountCents;
-      totalPaidCents += payment.amountCents;
-
-      transactions.push({
-        id: payment.id,
-        date: payment.paymentDate.toISOString(),
-        description: `Payment - ${payment.matchType || 'EFT'} Ref: ${payment.reference || 'N/A'}`,
-        type: 'payment',
-        debit: null,
-        credit: payment.amountCents / 100,
-        balance: runningBalanceCents / 100,
-        sortDate: payment.paymentDate,
-      });
-    }
-
-    // Add credit balances (reduce balance owed)
-    for (const cb of creditBalances) {
-      runningBalanceCents -= cb.amountCents;
-      totalCreditsCents += cb.amountCents;
-
-      transactions.push({
-        id: cb.id,
-        date: cb.createdAt.toISOString(),
-        description:
-          cb.description ?? `Credit - ${cb.sourceType.replace(/_/g, ' ')}`,
-        type: 'credit',
-        debit: null,
-        credit: cb.amountCents / 100,
-        balance: runningBalanceCents / 100,
-        sortDate: cb.createdAt,
-      });
-    }
-
-    // Sort transactions by date
-    transactions.sort((a, b) => a.sortDate.getTime() - b.sortDate.getTime());
-
-    // Recalculate running balance after sorting
-    let sortedRunningBalanceCents = openingBalanceCents;
-    for (const txn of transactions) {
-      if (txn.type === 'invoice') {
-        sortedRunningBalanceCents += (txn.debit || 0) * 100;
-      } else {
-        sortedRunningBalanceCents -= (txn.credit || 0) * 100;
-      }
-      txn.balance = sortedRunningBalanceCents / 100;
-    }
-
-    const closingBalanceCents = sortedRunningBalanceCents;
     const netMovementCents =
-      totalInvoicedCents - totalPaidCents - totalCreditsCents;
+      ledger.totalChargesCents -
+      ledger.totalPaymentsCents -
+      ledger.totalCreditsCents;
 
     return {
       year,
@@ -1078,13 +937,13 @@ export class ParentPortalController {
       parentName: `${parent.firstName} ${parent.lastName}`,
       parentEmail: parent.email || undefined,
       accountNumber: `ACC-${parentId.substring(0, 8).toUpperCase()}`,
-      openingBalance: openingBalanceCents / 100,
-      closingBalance: closingBalanceCents / 100,
-      totalInvoiced: totalInvoicedCents / 100,
-      totalPaid: totalPaidCents / 100,
-      totalCredits: totalCreditsCents / 100,
+      openingBalance: ledger.openingBalanceCents / 100,
+      closingBalance: ledger.closingBalanceCents / 100,
+      totalInvoiced: ledger.totalChargesCents / 100,
+      totalPaid: ledger.totalPaymentsCents / 100,
+      totalCredits: ledger.totalCreditsCents / 100,
       netMovement: netMovementCents / 100,
-      transactions: transactions.map(({ sortDate, ...txn }) => txn),
+      transactions,
     };
   }
 

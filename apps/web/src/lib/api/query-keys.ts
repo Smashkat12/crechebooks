@@ -136,6 +136,8 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.statements.all, 'detail', id] as const,
     forParent: (parentId: string) => [...queryKeys.statements.all, 'parent', parentId] as const,
     parentAccount: (parentId: string) => [...queryKeys.statements.all, 'account', parentId] as const,
+    parentLedger: (parentId: string, params?: Record<string, unknown>) =>
+      [...queryKeys.statements.all, 'ledger', parentId, params] as const,
   },
   // Xero Transaction Splits
   xeroSplits: {

@@ -553,6 +553,89 @@ export class ParentStatementsResponseDto {
 }
 
 // ============================================================================
+// Live Ledger DTOs (no Statement persistence)
+// ============================================================================
+
+/**
+ * Query params for live ledger endpoint
+ */
+export class ParentLedgerQueryDto {
+  @ApiPropertyOptional({
+    description:
+      'Period start date (YYYY-MM-DD). Defaults to 3 months before period_end.',
+    example: '2025-01-01',
+  })
+  @IsOptional()
+  @IsDateString()
+  period_start?: string;
+
+  @ApiPropertyOptional({
+    description: 'Period end date (YYYY-MM-DD). Defaults to today.',
+    example: '2025-03-31',
+  })
+  @IsOptional()
+  @IsDateString()
+  period_end?: string;
+}
+
+/**
+ * Live ledger payload — same shape as StatementDetailDto without
+ * persistence fields (id, statement_number, status, generated_at).
+ */
+export class ParentLedgerDto {
+  @ApiProperty({ description: 'Parent information', type: StatementParentDto })
+  parent: StatementParentDto;
+
+  @ApiProperty({
+    description: 'Period start date (YYYY-MM-DD)',
+    example: '2025-01-01',
+  })
+  period_start: string;
+
+  @ApiProperty({
+    description: 'Period end date (YYYY-MM-DD)',
+    example: '2025-03-31',
+  })
+  period_end: string;
+
+  @ApiProperty({ description: 'Opening balance in cents', example: 0 })
+  opening_balance_cents: number;
+
+  @ApiProperty({ description: 'Total charges in cents', example: 500000 })
+  total_charges_cents: number;
+
+  @ApiProperty({ description: 'Total payments in cents', example: 250000 })
+  total_payments_cents: number;
+
+  @ApiProperty({ description: 'Total credits in cents', example: 0 })
+  total_credits_cents: number;
+
+  @ApiProperty({ description: 'Closing balance in cents', example: 250000 })
+  closing_balance_cents: number;
+
+  @ApiProperty({ description: 'Statement lines', type: [StatementLineDto] })
+  lines: StatementLineDto[];
+
+  @ApiProperty({
+    description:
+      'Whether this is a live computed view (always true for this endpoint)',
+    example: true,
+  })
+  is_live: boolean;
+}
+
+/**
+ * Live ledger response wrapper
+ */
+export class ParentLedgerResponseDto {
+  @ApiProperty({ example: true })
+  success: boolean;
+
+  @ApiProperty({ type: ParentLedgerDto })
+  data: ParentLedgerDto;
+}
+
+// ============================================================================
 // Delivery DTOs
 // ============================================================================
 

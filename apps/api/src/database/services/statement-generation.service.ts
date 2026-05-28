@@ -67,7 +67,7 @@ export interface BulkGenerateResult {
 /**
  * Internal type for statement line data before persistence
  */
-interface StatementLineData {
+export interface StatementLineData {
   date: Date;
   description: string;
   lineType:
@@ -90,6 +90,23 @@ interface StatementLineData {
  */
 export type StatementWithLines = Statement & { lines: StatementLine[] };
 
+/**
+ * Live (non-persisted) ledger snapshot for a parent.
+ * Same shape as a Statement but without persistence fields.
+ */
+export interface LiveLedger {
+  tenantId: string;
+  parentId: string;
+  periodStart: Date;
+  periodEnd: Date;
+  openingBalanceCents: number;
+  totalChargesCents: number;
+  totalPaymentsCents: number;
+  totalCreditsCents: number;
+  closingBalanceCents: number;
+  lines: StatementLineData[];
+}
+
 @Injectable()
 export class StatementGenerationService {
   private readonly logger = new Logger(StatementGenerationService.name);
@@ -100,6 +117,82 @@ export class StatementGenerationService {
     private readonly parentRepo: ParentRepository,
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  /**
+   * Compute a live ledger snapshot for a parent. Pure read — does NOT
+   * persist a Statement record. Used by the live ledger endpoint and as
+   * the math/validation step of generateStatement().
+   *
+   * @param input - Parent + period
+   * @returns Computed ledger with opening balance, lines, totals, closing balance
+   * @throws NotFoundException if parent not found
+   * @throws BusinessException for validation errors
+   */
+  async computeLiveLedger(input: {
+    tenantId: string;
+    parentId: string;
+    periodStart: Date;
+    periodEnd: Date;
+  }): Promise<LiveLedger> {
+    const { tenantId, parentId, periodStart, periodEnd } = input;
+
+    // Validate parent exists and belongs to tenant
+    const parent = await this.parentRepo.findById(parentId, tenantId);
+    if (!parent) {
+      throw new NotFoundException('Parent', parentId);
+    }
+
+    // Validate period
+    if (periodStart >= periodEnd) {
+      throw new BusinessException(
+        'Period start must be before period end',
+        'INVALID_PERIOD',
+        {
+          periodStart: periodStart.toISOString(),
+          periodEnd: periodEnd.toISOString(),
+        },
+      );
+    }
+
+    // Opening balance at periodStart
+    const openingBalanceCents =
+      await this.parentAccountService.calculateOpeningBalance(
+        tenantId,
+        parentId,
+        periodStart,
+      );
+
+    // Transactions in period
+    const transactions =
+      await this.parentAccountService.getTransactionsForPeriod(
+        tenantId,
+        parentId,
+        periodStart,
+        periodEnd,
+      );
+
+    // Lines + totals
+    const lines = this.buildStatementLines(
+      openingBalanceCents,
+      transactions,
+      periodStart,
+      periodEnd,
+    );
+    const totals = this.calculateTotals(lines);
+
+    return {
+      tenantId,
+      parentId,
+      periodStart,
+      periodEnd,
+      openingBalanceCents,
+      totalChargesCents: totals.totalChargesCents,
+      totalPaymentsCents: totals.totalPaymentsCents,
+      totalCreditsCents: totals.totalCreditsCents,
+      closingBalanceCents: totals.closingBalanceCents,
+      lines,
+    };
+  }
 
   /**
    * Generate a statement for a single parent
@@ -118,56 +211,21 @@ export class StatementGenerationService {
       `Generating statement for parent ${parentId} from ${periodStart.toISOString()} to ${periodEnd.toISOString()}`,
     );
 
-    // 1. Validate parent exists and belongs to tenant
-    const parent = await this.parentRepo.findById(parentId, tenantId);
-    if (!parent) {
-      throw new NotFoundException('Parent', parentId);
-    }
-
-    // 2. Validate period
-    if (periodStart >= periodEnd) {
-      throw new BusinessException(
-        'Period start must be before period end',
-        'INVALID_PERIOD',
-        {
-          periodStart: periodStart.toISOString(),
-          periodEnd: periodEnd.toISOString(),
-        },
-      );
-    }
-
-    // 3. Get opening balance at periodStart
-    const openingBalanceCents =
-      await this.parentAccountService.calculateOpeningBalance(
-        tenantId,
-        parentId,
-        periodStart,
-      );
-
-    // 4. Get all transactions in period
-    const transactions =
-      await this.parentAccountService.getTransactionsForPeriod(
-        tenantId,
-        parentId,
-        periodStart,
-        periodEnd,
-      );
-
-    // 5. Build statement lines with running balance
-    const lineData = this.buildStatementLines(
-      openingBalanceCents,
-      transactions,
+    // 1-6. Compute the ledger snapshot (validation + math)
+    const ledger = await this.computeLiveLedger({
+      tenantId,
+      parentId,
       periodStart,
       periodEnd,
-    );
-
-    // 6. Calculate totals from lines
+    });
     const {
+      openingBalanceCents,
       totalChargesCents,
       totalPaymentsCents,
       totalCreditsCents,
       closingBalanceCents,
-    } = this.calculateTotals(lineData);
+      lines: lineData,
+    } = ledger;
 
     // 7. Generate statement number
     const statementNumber =

@@ -64,9 +64,12 @@ import {
   StatementParentDto,
   DeliverStatementDto,
   DeliverStatementResponseDto,
+  ParentLedgerQueryDto,
+  ParentLedgerResponseDto,
 } from './dto/statement.dto';
 import { StatementDeliveryService } from '../../database/services/statement-delivery.service';
 import { NotificationChannelType } from '../../notifications/types/notification.types';
+import { resolveLedgerPeriod } from './utils/ledger-period';
 
 @Controller('statements')
 @ApiTags('Statements')
@@ -801,6 +804,192 @@ export class StatementController {
           delivered_at: result.deliveredAt,
         },
       };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NestNotFoundException(error.message);
+      }
+      if (error instanceof BusinessException) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Live ledger for a parent (no Statement persistence).
+   * Always reflects the current state of invoices/payments — no
+   * regeneration needed when underlying data changes.
+   */
+  @Get('parents/:parentId/ledger')
+  @ApiOperation({
+    summary: 'Get live ledger for a parent',
+    description:
+      'Returns a computed ledger snapshot (opening balance, lines, totals, closing balance) without creating a Statement record. Defaults to the last 3 months ending today.',
+  })
+  @ApiParam({ name: 'parentId', description: 'Parent ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ledger computed successfully',
+    type: ParentLedgerResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Parent not found' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  async getLedger(
+    @Param('parentId') parentId: string,
+    @Query() query: ParentLedgerQueryDto,
+    @CurrentUser() user: IUser,
+  ): Promise<ParentLedgerResponseDto> {
+    const tenantId = getTenantId(user);
+    const { periodStart, periodEnd } = resolveLedgerPeriod(
+      query.period_start,
+      query.period_end,
+    );
+
+    this.logger.debug(
+      `Live ledger for parent=${parentId} tenant=${tenantId} period=${periodStart.toISOString()}..${periodEnd.toISOString()}`,
+    );
+
+    try {
+      const ledger = await this.statementGenerationService.computeLiveLedger({
+        tenantId,
+        parentId,
+        periodStart,
+        periodEnd,
+      });
+
+      const parent = await this.parentRepository.findById(parentId, tenantId);
+      if (!parent) {
+        throw new NotFoundException('Parent', parentId);
+      }
+
+      const parentDto: StatementParentDto = {
+        id: parent.id,
+        name: formatFullName(parent),
+        email: parent.email,
+        phone: parent.phone,
+      };
+
+      const lines: StatementLineDto[] = ledger.lines.map((line, idx) => ({
+        // No DB id for live lines — use a deterministic positional id so
+        // React keys remain stable across renders of the same payload.
+        id: `live-${idx}`,
+        date: line.date.toISOString().split('T')[0],
+        description: line.description,
+        line_type: line.lineType,
+        reference_number: line.referenceNumber ?? null,
+        debit_cents: line.debitCents,
+        credit_cents: line.creditCents,
+        balance_cents: line.balanceCents,
+      }));
+
+      return {
+        success: true,
+        data: {
+          parent: parentDto,
+          period_start: periodStart.toISOString().split('T')[0],
+          period_end: periodEnd.toISOString().split('T')[0],
+          opening_balance_cents: ledger.openingBalanceCents,
+          total_charges_cents: ledger.totalChargesCents,
+          total_payments_cents: ledger.totalPaymentsCents,
+          total_credits_cents: ledger.totalCreditsCents,
+          closing_balance_cents: ledger.closingBalanceCents,
+          lines,
+          is_live: true,
+        },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NestNotFoundException(error.message);
+      }
+      if (error instanceof BusinessException) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Live ledger PDF for a parent (no Statement persistence).
+   */
+  @Get('parents/:parentId/ledger/pdf')
+  @ApiOperation({
+    summary: 'Download live ledger as PDF',
+    description:
+      'Generates a PDF for the live ledger without creating a Statement record. Defaults to the last 3 months ending today.',
+  })
+  @ApiParam({ name: 'parentId', description: 'Parent ID' })
+  @ApiProduces('application/pdf')
+  @ApiResponse({
+    status: 200,
+    description: 'PDF file stream',
+    content: {
+      'application/pdf': {
+        schema: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Parent not found' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  @Header('Content-Type', 'application/pdf')
+  async downloadLedgerPdf(
+    @Param('parentId') parentId: string,
+    @Query() query: ParentLedgerQueryDto,
+    @CurrentUser() user: IUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    const tenantId = getTenantId(user);
+    const { periodStart, periodEnd } = resolveLedgerPeriod(
+      query.period_start,
+      query.period_end,
+    );
+
+    this.logger.log(
+      `Live ledger PDF for parent=${parentId} tenant=${tenantId} period=${periodStart.toISOString()}..${periodEnd.toISOString()}`,
+    );
+
+    try {
+      const ledger = await this.statementGenerationService.computeLiveLedger({
+        tenantId,
+        parentId,
+        periodStart,
+        periodEnd,
+      });
+
+      const pdfBuffer = await this.statementPdfService.generateLedgerPdf(
+        {
+          tenantId,
+          parentId,
+          periodStart,
+          periodEnd,
+          openingBalanceCents: ledger.openingBalanceCents,
+          totalChargesCents: ledger.totalChargesCents,
+          totalPaymentsCents: ledger.totalPaymentsCents,
+          totalCreditsCents: ledger.totalCreditsCents,
+          closingBalanceCents: ledger.closingBalanceCents,
+          lines: ledger.lines.map((line) => ({
+            date: line.date,
+            description: line.description,
+            referenceNumber: line.referenceNumber ?? null,
+            debitCents: line.debitCents,
+            creditCents: line.creditCents,
+            balanceCents: line.balanceCents,
+          })),
+        },
+        { includePaymentInstructions: true },
+      );
+
+      const filename = `Ledger_${parentId}_${periodStart.toISOString().split('T')[0]}_${periodEnd.toISOString().split('T')[0]}.pdf`;
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': pdfBuffer.length.toString(),
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      });
+
+      res.end(pdfBuffer);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw new NestNotFoundException(error.message);

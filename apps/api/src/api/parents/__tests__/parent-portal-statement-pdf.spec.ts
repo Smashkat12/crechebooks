@@ -22,6 +22,8 @@ import { StatementPdfService } from '../../../database/services/statement-pdf.se
 import { PaymentReceiptService } from '../../../database/services/payment-receipt.service';
 import { StatementDeliveryService } from '../../../database/services/statement-delivery.service';
 import { AuditLogService } from '../../../database/services/audit-log.service';
+import { ParentAccountService } from '../../../database/services/parent-account.service';
+import { StatementGenerationService } from '../../../database/services/statement-generation.service';
 import { ParentAuthGuard } from '../../auth/guards/parent-auth.guard';
 import type { ParentSession } from '../../auth/decorators/current-parent.decorator';
 
@@ -91,6 +93,8 @@ function buildModule(
       { provide: PaymentReceiptService, useValue: {} },
       { provide: StatementDeliveryService, useValue: {} },
       { provide: AuditLogService, useValue: { logAction: jest.fn() } },
+      { provide: ParentAccountService, useValue: {} },
+      { provide: StatementGenerationService, useValue: {} },
     ],
   })
     .overrideGuard(ParentAuthGuard)

@@ -312,13 +312,21 @@ export class ParentAccountService {
     });
 
     for (const payment of payments) {
+      // Put the allocated invoice number in the reference column so the
+      // description can stay short and unambiguous. Falls back to the bank
+      // reference if there's no invoice link (shouldn't happen — payments
+      // are always invoice-allocated — but defensive).
+      const invoiceRef = payment.invoice?.invoiceNumber;
       transactions.push({
         id: payment.id,
         date: payment.paymentDate,
         type: 'PAYMENT',
         referenceNumber:
-          payment.reference ?? payment.transaction?.reference ?? 'PAYMENT',
-        description: `Payment received - Invoice ${payment.invoice?.invoiceNumber ?? 'Unknown'}`,
+          invoiceRef ??
+          payment.reference ??
+          payment.transaction?.reference ??
+          'PAYMENT',
+        description: 'Payment received',
         debitCents: 0,
         creditCents: payment.amountCents,
         runningBalanceCents: 0,

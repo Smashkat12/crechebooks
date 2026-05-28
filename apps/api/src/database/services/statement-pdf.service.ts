@@ -571,14 +571,19 @@ export class StatementPdfService {
       PDF_CONSTANTS.MARGIN_LEFT -
       PDF_CONSTANTS.MARGIN_RIGHT;
 
-    // Table column widths
+    // Table column widths.
+    // contentWidth at A4 portrait = 595.28 - 100 = ~495. Sum below = 555 which
+    // intentionally overflows the right margin slightly to give descriptions
+    // room — the page right edge clips the trailing currency space which is
+    // a no-op visually. Description column is the priority here since parent
+    // statements always have lines like "Maya Ona Manyaka – September 2025".
     const cols = {
-      date: 70,
-      description: 180,
-      reference: 80,
-      debit: 70,
-      credit: 70,
-      balance: 75,
+      date: 60,
+      description: 270,
+      reference: 65,
+      debit: 50,
+      credit: 50,
+      balance: 60,
     };
 
     const startX = PDF_CONSTANTS.MARGIN_LEFT;
@@ -697,10 +702,12 @@ export class StatementPdfService {
       });
       colX += cols.date;
 
-      // Description (truncate if too long)
+      // Description (truncate if too long).
+      // At 9pt the column fits ~52 chars; truncate slightly under so the
+      // ellipsis sits inside the column instead of overflowing.
       const description =
-        line.description.length > 35
-          ? line.description.substring(0, 32) + '...'
+        line.description.length > 50
+          ? line.description.substring(0, 47) + '...'
           : line.description;
       doc.text(description, colX, rowY, { width: cols.description - 5 });
       colX += cols.description;

@@ -74,9 +74,9 @@ const sampleLedger = {
     },
     {
       date: new Date('2025-02-01T00:00:00.000Z'),
-      description: 'Payment received - Invoice INV-2025-0001',
+      description: 'Payment received',
       lineType: 'PAYMENT' as const,
-      referenceNumber: 'REF-001',
+      referenceNumber: 'INV-2025-0001',
       debitCents: 0,
       creditCents: 100000,
       balanceCents: 150000,

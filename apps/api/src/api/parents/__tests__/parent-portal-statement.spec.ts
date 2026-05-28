@@ -72,9 +72,9 @@ function makePaymentLine(overrides: Partial<{
 }> = {}) {
   return {
     date: new Date('2026-04-10T10:00:00.000Z'),
-    description: 'Payment received - Invoice INV-001',
+    description: 'Payment received',
     lineType: 'PAYMENT' as const,
-    referenceNumber: 'REF-001',
+    referenceNumber: 'INV-001',
     referenceId: 'pay-1',
     debitCents: 0,
     creditCents: 50000,

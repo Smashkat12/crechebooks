@@ -95,7 +95,11 @@ class CreateApiKeyResponse extends ApiKeyResponse {
 }
 
 @ApiTags('API Keys')
-@Controller('api/v1/auth/api-keys')
+// NestJS applies a global 'api/v1' prefix (main.ts setGlobalPrefix), so this
+// path must be RELATIVE — '/auth/api-keys'. Previously 'api/v1/auth/api-keys'
+// doubled the prefix, serving routes at /api/v1/api/v1/auth/api-keys (the real
+// /api/v1/auth/api-keys 404'd, breaking all API-key management in the web UI).
+@Controller('auth/api-keys')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ApiKeyController {

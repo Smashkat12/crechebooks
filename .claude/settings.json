@@ -70,7 +70,8 @@
       "mcp__claude-flow__*",
       "mcp__ruv-swarm",
       "mcp__ruv-swarm__*",
-      "mcp__flow-nexus__*"
+      "mcp__flow-nexus__*",
+      "mcp__agentic-flow__*"
     ],
     "deny": [
       "Bash(rm -rf /)"
@@ -416,7 +417,7 @@
     }
   },
   "includeCoAuthoredBy": true,
-  "enabledMcpjsonServers": ["claude-flow@alpha", "ruv-swarm"],
+  "enabledMcpjsonServers": ["claude-flow@alpha", "ruv-swarm", "agentic-flow"],
   "statusLine": {
     "type": "command",
     "command": ".claude/helpers/statusline.cjs"

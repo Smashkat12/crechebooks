@@ -1,0 +1,62 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx crechebooks-harness*)",
+      "mcp__crechebooks-harness__*",
+      "mcp__code_index__search_code",
+      "mcp__code_index__list_files",
+      "mcp__code_index__read_file",
+      "mcp__crechebooks__tenant_info",
+      "mcp__crechebooks__dashboard_metrics",
+      "mcp__crechebooks__list_invoices",
+      "mcp__crechebooks__list_payments",
+      "mcp__crechebooks__arrears_report",
+      "mcp__crechebooks__reconciliation_summary",
+      "mcp__crechebooks__generate_invoices",
+      "mcp__crechebooks__match_payments",
+      "Bash(npm test*)",
+      "Bash(npm run*)",
+      "Bash(git diff*)",
+      "Bash(git status*)",
+      "Bash(git log*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(git push*)",
+      "Bash(rm -rf*)"
+    ]
+  },
+  "mcpServers": {
+    "crechebooks-harness": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "crechebooks-harness@latest",
+        "mcp",
+        "start"
+      ]
+    },
+    "code_index": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "crechebooks-harness@latest",
+        "mcp",
+        "index"
+      ]
+    },
+    "crechebooks": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "crechebooks-harness@latest",
+        "mcp",
+        "domain"
+      ],
+      "env": {
+        "CB_ENVIRONMENT": "staging"
+      }
+    }
+  }
+}

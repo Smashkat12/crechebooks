@@ -100,6 +100,10 @@ test-results/
 
 # Claude Code / MCP local development artifacts
 **/.claude/
+# ...but the generated harness OWNS its .claude/ host config (it ships in the
+# npm package and is part of the deliverable), so keep it tracked.
+!packages/crechebooks-harness/.claude/
+!packages/crechebooks-harness/.claude/**
 **/.mcp.json
 **/claude-flow
 **/.swarm/

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "algorithm": "ed25519",
+  "manifest_sha256": "85e711f24a591a75b30d262826f2d307721e5d1b36915a9c098e513e88306601",
+  "signature": "k0VsZEYjlohdG/JG6GN4bBMqLtY5A8x4ioWztGXzSBXuWdWNaRx0I47zaX3BiTxvToONbAL9Xue4sy3u499RAA==",
+  "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAZRPZ/d3UgG+wR4DtI4K752v10tKCI9lmYu2uLO3DwSo=\n-----END PUBLIC KEY-----\n",
+  "signed_at": "2026-06-21T18:47:25.725Z",
+  "signer": null
+}

@@ -87,7 +87,8 @@ Statement Period : 01 March 2026 to 31 March 2026
       jest.fn(async () => ({ text: noMerchant, numpages: 1 })),
     );
     // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-    const { PdfParser: FreshPdfParser } = require('../../../src/database/parsers/pdf-parser');
+    const freshModule = require('../../../src/database/parsers/pdf-parser');
+    const FreshPdfParser = freshModule.PdfParser;
     const parser = new FreshPdfParser();
     const txs = await parser.parse(Buffer.from('x'));
 
@@ -123,7 +124,8 @@ Statement Period : 01 March 2026 to 31 March 2026
       jest.fn(async () => ({ text: noisy, numpages: 1 })),
     );
     // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-    const { PdfParser: FreshPdfParser } = require('../../../src/database/parsers/pdf-parser');
+    const freshModule = require('../../../src/database/parsers/pdf-parser');
+    const FreshPdfParser = freshModule.PdfParser;
     const parser = new FreshPdfParser();
     const txs = await parser.parse(Buffer.from('x'));
 

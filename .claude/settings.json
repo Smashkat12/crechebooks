@@ -36,9 +36,7 @@
     "CB_API_URL": "https://api.elleelephant.co.za",
     "CB_STAGING_API_URL": "https://api-staging-5287.up.railway.app",
     "CB_TENANT_ID": "bdff4374-64d5-420c-b454-8e85e9df552a",
-    "CB_ENVIRONMENT": "staging",
-    "CRECHEBOOKS_API_KEY": "cb_prod_s3mY1nDdLDOnIKEOxDA05m3Pk7fw7H_I",
-    "CB_STAGING_API_KEY": "cb_stag_qPgepI71_StYquKjXJs2z3B2U-rH4xzb"
+    "CB_ENVIRONMENT": "staging"
   },
   "permissions": {
     "allow": [

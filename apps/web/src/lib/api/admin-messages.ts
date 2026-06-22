@@ -56,7 +56,16 @@ export interface AdminThreadsResponse {
   limit: number;
 }
 
+export interface AdminThreadParent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  whatsapp: string | null;
+}
+
 export interface AdminThreadResponse {
+  parent: AdminThreadParent;
   messages: AdminMessage[];
   nextCursor: string | null;
 }

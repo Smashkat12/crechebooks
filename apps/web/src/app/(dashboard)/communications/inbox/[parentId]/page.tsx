@@ -416,10 +416,12 @@ export default function ConversationPage({
         </Link>
         <div className="flex-1 min-w-0">
           <p className="font-semibold truncate">
-            {parentId}
+            {data?.parent
+              ? `${data.parent.firstName} ${data.parent.lastName}`.trim()
+              : 'Conversation'}
           </p>
         </div>
-        <Link href={`/parents?search=${parentId}`}>
+        <Link href={`/parents/${parentId}`}>
           <Button variant="ghost" size="sm" className="gap-1 text-xs">
             <ExternalLink className="h-3 w-3" />
             Parent profile

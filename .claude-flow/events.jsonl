@@ -1,0 +1,51 @@
+{"type": "SessionEnd", "session": "unknown", "duration": 1778362349.8199666, "timestamp": 1778362349.8361197}
+{"type": "SessionEnd", "session": "unknown", "duration": 1778362349.8234575, "timestamp": 1778362349.8448396}
+{"type": "SessionStart", "session": "session-1778426322", "previousSession": null, "restoredState": true, "timestamp": 1778426322.7043953}
+{"type": "SessionStart", "session": "session-1778456570", "previousSession": "session-1778426322", "restoredState": true, "timestamp": 1778456570.5691774}
+{"type": "SessionStart", "session": "session-1778534194", "previousSession": "session-1778456570", "restoredState": true, "timestamp": 1778534194.9144905}
+{"type": "SessionStart", "session": "session-1778534194", "previousSession": "session-1778534194", "restoredState": true, "timestamp": 1778534195.0065992}
+{"type": "SessionEnd", "session": "unknown", "duration": 23.8801372051239, "timestamp": 1778534218.9332623}
+{"type": "SessionStart", "session": "session-1778535678", "previousSession": "session-1778534194", "restoredState": true, "timestamp": 1778535678.7616477}
+{"type": "SessionEnd", "session": "unknown", "duration": 181.62664556503296, "timestamp": 1778535860.4254897}
+{"type": "SessionStart", "session": "session-1778535863", "previousSession": "session-1778535678", "restoredState": true, "timestamp": 1778535863.7794063}
+{"type": "SessionStart", "session": "session-1778536082", "previousSession": "session-1778535863", "restoredState": true, "timestamp": 1778536082.5378795}
+{"type": "SessionEnd", "session": "unknown", "duration": 7739.522286891937, "timestamp": 1778543822.0992064}
+{"type": "SessionStart", "session": "session-1778543825", "previousSession": "session-1778536082", "restoredState": true, "timestamp": 1778543825.5305588}
+{"type": "SessionEnd", "session": "unknown", "duration": 1396.1805028915405, "timestamp": 1778545221.7398815}
+{"type": "SessionStart", "session": "session-1778545230", "previousSession": "session-1778543825", "restoredState": true, "timestamp": 1778545230.7409735}
+{"type": "SessionStart", "session": "session-1779051999", "previousSession": "session-1778545230", "restoredState": true, "timestamp": 1779051999.1091669}
+{"type": "SessionStart", "session": "session-1779051999", "previousSession": "session-1779051999", "restoredState": true, "timestamp": 1779051999.2329383}
+{"type": "SessionEnd", "session": "unknown", "duration": 21.103691577911377, "timestamp": 1779052020.4061878}
+{"type": "SessionStart", "session": "session-1779899875", "previousSession": "session-1779051999", "restoredState": true, "timestamp": 1779899875.857428}
+{"type": "SessionStart", "session": "session-1779899875", "previousSession": "session-1779051999", "restoredState": true, "timestamp": 1779899875.8642237}
+{"type": "SessionEnd", "session": "unknown", "duration": 51.13981795310974, "timestamp": 1779899927.0675077}
+{"type": "SessionStart", "session": "session-1779963555", "previousSession": "session-1779899875", "restoredState": true, "timestamp": 1779963555.6319304}
+{"type": "SessionStart", "session": "session-1779995217", "previousSession": "session-1779963555", "restoredState": true, "timestamp": 1779995217.4206145}
+{"type": "SessionEnd", "session": "unknown", "duration": 2426.2719962596893, "timestamp": 1779997643.7238877}
+{"type": "SessionEnd", "session": "unknown", "duration": 2426.628579378128, "timestamp": 1779997644.0821347}
+{"type": "SessionStart", "session": "session-1780349131", "previousSession": "session-1779995217", "restoredState": true, "timestamp": 1780349131.8339417}
+{"type": "SessionStart", "session": "session-1780349131", "previousSession": "session-1779995217", "restoredState": true, "timestamp": 1780349131.8893845}
+{"type": "SessionEnd", "session": "unknown", "duration": 60.10291242599487, "timestamp": 1780349192.1068935}
+{"type": "SessionEnd", "session": "unknown", "duration": 60.62268018722534, "timestamp": 1780349192.6282544}
+{"type": "SessionStart", "session": "session-1781121339", "previousSession": "session-1780349131", "restoredState": true, "timestamp": 1781121339.1473453}
+{"type": "SessionStart", "session": "session-1781121339", "previousSession": "session-1780349131", "restoredState": true, "timestamp": 1781121339.143269}
+{"type": "SessionEnd", "session": "unknown", "duration": 40.891197204589844, "timestamp": 1781121380.1354256}
+{"type": "SessionStart", "session": "session-1782051429", "previousSession": "session-1781121339", "restoredState": true, "timestamp": 1782051429.146921}
+{"type": "SessionStart", "session": "session-1782051429", "previousSession": "session-1781121339", "restoredState": true, "timestamp": 1782051429.178184}
+{"type": "SessionEnd", "session": "unknown", "duration": 50.23456048965454, "timestamp": 1782051479.4869776}
+{"type": "SessionStart", "session": "session-1782057180", "previousSession": "session-1782051429", "restoredState": true, "timestamp": 1782057180.8122606}
+{"type": "SessionEnd", "session": "unknown", "duration": 138.10327243804932, "timestamp": 1782057318.9514167}
+{"type": "SessionStart", "session": "session-1782057323", "previousSession": "session-1782057180", "restoredState": true, "timestamp": 1782057323.2907906}
+{"type": "SessionStart", "session": "session-1782071992", "previousSession": "session-1782057323", "restoredState": true, "timestamp": 1782071992.3708436}
+{"type": "SessionEnd", "session": "unknown", "duration": 25.641961336135864, "timestamp": 1782072018.0538433}
+{"type": "SessionEnd", "session": "unknown", "duration": 102.47448229789734, "timestamp": 1782072094.8887475}
+{"type": "SessionStart", "session": "session-1782072117", "previousSession": "session-1782071992", "restoredState": true, "timestamp": 1782072117.9125593}
+{"type": "SessionEnd", "session": "unknown", "duration": 9.704850196838379, "timestamp": 1782072127.6526136}
+{"type": "SessionStart", "session": "session-1782072131", "previousSession": "session-1782072117", "restoredState": true, "timestamp": 1782072131.9539177}
+{"type": "SessionEnd", "session": "unknown", "duration": 5970.764370679855, "timestamp": 1782078102.7455206}
+{"type": "SessionStart", "session": "session-1782078257", "previousSession": "session-1782072131", "restoredState": true, "timestamp": 1782078257.7746615}
+{"type": "SessionStart", "session": "session-1782078272", "previousSession": "session-1782078257", "restoredState": true, "timestamp": 1782078272.6925511}
+{"type": "SessionEnd", "session": "unknown", "duration": 259.1033864021301, "timestamp": 1782078531.8410149}
+{"type": "SessionStart", "session": "session-1782078544", "previousSession": "session-1782078272", "restoredState": true, "timestamp": 1782078544.4688897}
+{"type": "SessionEnd", "session": "unknown", "duration": 639.9407932758331, "timestamp": 1782079184.4425526}
+{"type": "SessionStart", "session": "session-1782102755", "previousSession": "session-1782078544", "restoredState": true, "timestamp": 1782102755.9392114}

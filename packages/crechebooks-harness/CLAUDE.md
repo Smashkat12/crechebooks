@@ -49,7 +49,13 @@ Two stdio MCP servers ship with the harness (wired in `.claude/settings.json`):
 | `reconciliation_summary` | Bank reconciliation status per period |
 | `generate_invoices` ✎ | Generate DRAFT invoices (no send) — preview-default, confirm to write |
 | `match_payments` ✎ | AI-allocate payments to invoices — preview-default, confirm to write |
+| `allocate_payment` ✎ | Manually allocate a payment to invoices — preview-default, confirm to write |
 | `send_invoices` ✎⚠ | Send to parents — **hard-blocked on staging**, production-only, confirm |
+
+These tools are **generated from a declarative spec** (`src/mcp/domain-spec.js`) by
+`tool-factory.js` — adding a tool is **one spec entry** (`name`, `method`, `path`, params,
+`write?`, `parentContact?`); the inputSchema, handler, and read/preview/confirm/staging-block
+safety are derived automatically. No hand-coded handler per tool.
 
 Reads use a thin zero-dep HTTPS client (`CRECHEBOOKS_API_KEY` / `CB_API_URL` / `CB_TENANT_ID`
 from env, defaults to **staging**); the key is never logged or returned.

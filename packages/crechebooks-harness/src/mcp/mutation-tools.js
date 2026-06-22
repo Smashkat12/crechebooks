@@ -15,11 +15,13 @@
 // production-only.
 
 import { resolveTarget, authHeaders, httpRequest } from './cb-client.js';
+import { buildToolset } from './tool-factory.js';
+import { DOMAIN_SPEC } from './domain-spec.js';
 
 // Paths that cause a parent/guardian to be contacted — the dangerous set.
 const PARENT_CONTACT = /\/(send|broadcast|remind|reminder|reminders|notify|whatsapp|email|message)(\/|\?|$)/i;
 // Explicit allowlist of write paths this server may target.
-const WRITE_ALLOWLIST = ['/invoices/generate', '/invoices/send', '/payments/match'];
+const WRITE_ALLOWLIST = ['/invoices/generate', '/invoices/send', '/payments/match', '/payments'];
 
 /**
  * Plan a mutation. Pure (no I/O) so it can be unit tested. Returns one of:
@@ -72,56 +74,7 @@ async function cbWrite(method, pathname, body, confirm) {
   return res;
 }
 
-export const mutationToolset = [
-  {
-    name: 'generate_invoices',
-    description:
-      'Generate monthly DRAFT invoices for enrolled children (does NOT send them). Preview-default; set confirm=true to write. POST /invoices/generate.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        month: { type: 'string', description: 'Billing month YYYY-MM, e.g. 2026-06.' },
-        confirm: { type: 'boolean', description: 'Must be true to actually generate; otherwise returns a preview.' },
-      },
-      required: ['month'],
-    },
-    handler: (a) => cbWrite('POST', '/invoices/generate', { month: String(a.month) }, a.confirm === true),
-  },
-  {
-    name: 'match_payments',
-    description:
-      'Run AI payment matching to allocate unallocated payments to invoices (internal, no parent contact). Preview-default; confirm=true to write. POST /payments/match.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        minConfidence: { type: 'number', description: 'Optional confidence threshold 0–1.' },
-        confirm: { type: 'boolean', description: 'Must be true to actually allocate; otherwise returns a preview.' },
-      },
-      additionalProperties: false,
-    },
-    handler: (a) => {
-      const body = a.minConfidence != null ? { minConfidence: Number(a.minConfidence) } : {};
-      return cbWrite('POST', '/payments/match', body, a.confirm === true);
-    },
-  },
-  {
-    name: 'send_invoices',
-    description:
-      'Send invoices to parents (email/WhatsApp). PARENT-CONTACTING — hard-blocked on staging; production-only with confirm=true. POST /invoices/send.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        ids: { type: 'array', items: { type: 'string' }, description: 'Invoice IDs; omit to send all unsent DRAFTs.' },
-        channel: { type: 'string', description: 'email | whatsapp | both.' },
-        confirm: { type: 'boolean', description: 'Must be true to actually send (production only).' },
-      },
-      additionalProperties: false,
-    },
-    handler: (a) => {
-      const body = {};
-      if (Array.isArray(a.ids)) body.ids = a.ids.map(String);
-      if (a.channel) body.channel = String(a.channel);
-      return cbWrite('POST', '/invoices/send', body, a.confirm === true);
-    },
-  },
-];
+export const mutationToolset = buildToolset(
+  DOMAIN_SPEC.filter((s) => s.method !== 'GET'),
+  { cbWrite },
+);

@@ -3,9 +3,9 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "crechebooks-harness@0.1.0",
-  "documentNamespace": "https://spdx.org/spdxdocs/crechebooks-harness-0.1.0-85e711f24a591a75",
+  "documentNamespace": "https://spdx.org/spdxdocs/crechebooks-harness-0.1.0-343c6cda53454ba2",
   "creationInfo": {
-    "created": "2026-06-21T18:47:25.696Z",
+    "created": "2026-06-22T01:30:04.271Z",
     "creators": [
       "Tool: crechebooks-harness sbom",
       "Organization: crechebooks"

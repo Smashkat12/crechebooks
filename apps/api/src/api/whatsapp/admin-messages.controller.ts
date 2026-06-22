@@ -75,6 +75,7 @@ export class AdminMessagesController {
       getTenantId(user),
       query.limit ?? 50,
       query.offset ?? 0,
+      query.search,
     );
   }
 

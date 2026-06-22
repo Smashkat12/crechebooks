@@ -44,7 +44,7 @@
     "src/agents/implementer.ts": "c09ede0c63dccb55a72c3228d2357eed6572b7fe12249593726118752706000f",
     "src/agents/reviewer.ts": "3da85264a7f51ac5e1021869d2cb41f7cb56dbcf7992b04daf5def4ff7f72d1e",
     "src/agents/test-writer.ts": "4391d99e89c85618df49ee2f457d5884b4aff666503e2ceb3503e91c3f1b25e6",
-    "src/gates/manifest.js": "326ec1edeb9815090e47a6bf46bdef10d72eb002f0f0b92461bdef5c737f9199",
+    "src/gates/manifest.js": "3a2e104fd8a13d282497c1798c267f43d4a224987067decc20772db9e7f8ad28",
     "src/gates/mcp-scan.js": "5f1916c8f8da174a0e7991d9158b2b70a847606675e6e2ed3b5e8fdad2defc89",
     "src/gates/sbom.js": "968b42da383a75fe4ea61a5937204c8233cf3971ec43cd0d5852a8ce203a7878",
     "src/gates/sign.js": "489f2523cf206bb0dcf5a2ad3d6c068051aea66a8d697119fd177fcc8054143f",
@@ -60,7 +60,7 @@
     "src/mcp/tools.js": "57be11c83b95c6dc462c50bfc5e3e42ddf35256249a2b42719736c0a8ac2fc72",
     "tsconfig.json": "8b4e730a1aa39162ac574455d7a98e1881f5313ca80ffe503b9652dcf0c76b9d"
   },
-  "generated_at": "2026-06-22T04:25:10.801Z",
+  "generated_at": "2026-06-22T07:51:07.179Z",
   "meta": {
     "surface": "cli",
     "regenerated_by": "crechebooks: closed mcp gap + library skill"

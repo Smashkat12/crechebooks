@@ -36,6 +36,7 @@ import {
   useCanReplyInbox,
 } from '@/hooks/admin/use-admin-messages';
 import type { AdminMessage } from '@/hooks/admin/use-admin-messages';
+import { useTenant } from '@/hooks/useTenant';
 import { WHATSAPP_TEMPLATES, type WhatsAppTemplate } from '@/lib/utils/whatsapp-templates';
 import type { AxiosError } from 'axios';
 
@@ -126,20 +127,29 @@ function TemplatePickerModal({
   open,
   onClose,
   parentId,
+  parentFirstName,
 }: {
   open: boolean;
   onClose: () => void;
   parentId: string;
+  parentFirstName?: string;
 }) {
   const { toast } = useToast();
+  const { data: tenant } = useTenant();
   const [selected, setSelected] = useState<WhatsAppTemplate | null>(null);
   const [params, setParams] = useState<Record<string, string>>({});
   const { mutate: sendTemplate, isPending } = useSendTemplate(parentId);
 
+  // Pre-fill the variables we can derive from the current conversation + tenant
+  // context (parent first name, creche name); the rest stay blank to fill in.
   function handleSelectTemplate(tpl: WhatsAppTemplate) {
     setSelected(tpl);
+    const context: Record<string, string | undefined> = {
+      parent_name: parentFirstName,
+      school_name: tenant?.tradingName,
+    };
     const initial: Record<string, string> = {};
-    tpl.variables.forEach((v) => { initial[v] = ''; });
+    tpl.variables.forEach((v) => { initial[v] = context[v] ?? ''; });
     setParams(initial);
   }
 
@@ -257,10 +267,12 @@ function ReplyBox({
   parentId,
   requiresTemplate,
   lastInboundAt,
+  parentFirstName,
 }: {
   parentId: string;
   requiresTemplate: boolean;
   lastInboundAt: string | null;
+  parentFirstName?: string;
 }) {
   const { toast } = useToast();
   const [body, setBody] = useState('');
@@ -322,6 +334,7 @@ function ReplyBox({
           open={templateOpen}
           onClose={() => setTemplateOpen(false)}
           parentId={parentId}
+          parentFirstName={parentFirstName}
         />
       </div>
     );
@@ -479,6 +492,7 @@ export default function ConversationPage({
             parentId={parentId}
             requiresTemplate={requiresTemplate}
             lastInboundAt={lastInboundAt}
+            parentFirstName={data?.parent?.firstName}
           />
         ) : (
           <div className="border-t px-4 py-3 text-center text-sm text-muted-foreground">

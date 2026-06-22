@@ -7,7 +7,7 @@
 // the keypair) is generated provenance and is excluded from the hashed set —
 // the manifest attests the *source*, the witness signs the *manifest*.
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
@@ -19,11 +19,16 @@ const sha256Hex = (buf) => createHash('sha256').update(buf).digest('hex');
 export function computeFiles(root) {
   const files = {};
   const walk = (dir) => {
-    for (const entry of readdirSync(dir).sort()) {
-      if (SKIP.has(entry)) continue;
-      const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
-      else files[path.relative(root, full)] = sha256Hex(readFileSync(full));
+    // withFileTypes: the entry's type comes from the directory read itself, so
+    // there is no separate stat→read on the same path (avoids a TOCTOU race).
+    const entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) =>
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+    );
+    for (const entry of entries) {
+      if (SKIP.has(entry.name)) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) files[path.relative(root, full)] = sha256Hex(readFileSync(full));
     }
   };
   walk(root);

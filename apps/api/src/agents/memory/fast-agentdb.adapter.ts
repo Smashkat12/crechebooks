@@ -115,9 +115,16 @@ export class FastAgentDBAdapter implements AgentDBInterface {
         this.configService?.get<number>('AGENTDB_MAX_EPISODES') ?? 50_000,
       ) as unknown as FastAgentDBInstance;
 
-      // Dynamic import to avoid hard dependency on agentic-flow
-      const { ReflexionMemory } = await import('agentic-flow/agentdb');
-      this.reflexionMemory = new ReflexionMemory() as ReflexionMemoryInstance;
+      // Dynamic import to avoid a hard dependency on agentic-flow. Loaded via a
+      // non-literal specifier: agentic-flow >=2.0.14 no longer publishes the
+      // `./agentdb` subpath in its exports map, so this is a truly OPTIONAL
+      // runtime dependency — the surrounding try/catch disables the feature
+      // gracefully when it isn't resolvable.
+      const agentdbModule = 'agentic-flow/agentdb';
+      const { ReflexionMemory } = (await import(agentdbModule)) as {
+        ReflexionMemory: new () => ReflexionMemoryInstance;
+      };
+      this.reflexionMemory = new ReflexionMemory();
 
       this.initialized = true;
       this.logger.log(

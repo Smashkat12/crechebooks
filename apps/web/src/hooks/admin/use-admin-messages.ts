@@ -34,24 +34,41 @@ const adminMessageKeys = {
   unknown: () => [...adminMessageKeys.all, 'unknown'] as const,
 };
 
-// ─── Role guard ───────────────────────────────────────────────────────────────
+// ─── Role guards ──────────────────────────────────────────────────────────────
+// Mirror the API @Roles on admin-messages.controller.ts:
+//   reads  (threads / thread / unknown)            → OWNER, ADMIN, VIEWER
+//   writes (reply / send-template / read / link)   → OWNER, ADMIN
+// SUPER_ADMIN is a platform role with no tenant, so it can't reach the tenant
+// inbox (TenantGuard) — intentionally excluded.
 
-const ADMIN_ROLES = new Set(['ADMIN', 'OWNER', 'SUPER_ADMIN']);
+const INBOX_READ_ROLES = new Set(['OWNER', 'ADMIN', 'VIEWER']);
+const INBOX_WRITE_ROLES = new Set(['OWNER', 'ADMIN']);
 
-function useIsAdminRole(): boolean {
+function useUserRole(): string | undefined {
   const { data: session } = useSession();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  return role !== undefined && ADMIN_ROLES.has(role);
+  return (session?.user as { role?: string } | undefined)?.role;
+}
+
+/** Can the user view the inbox (read endpoints)? */
+function useCanViewInbox(): boolean {
+  const role = useUserRole();
+  return role !== undefined && INBOX_READ_ROLES.has(role);
+}
+
+/** Can the user reply / send templates (write endpoints)? VIEWER is read-only. */
+export function useCanReplyInbox(): boolean {
+  const role = useUserRole();
+  return role !== undefined && INBOX_WRITE_ROLES.has(role);
 }
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export function useAdminThreads(params?: AdminThreadsParams) {
-  const isAdmin = useIsAdminRole();
+  const canView = useCanViewInbox();
   return useQuery<AdminThreadsResponse, AxiosError>({
     queryKey: adminMessageKeys.threadList(params),
     queryFn: () => fetchAdminThreads(params),
-    enabled: isAdmin,
+    enabled: canView,
     staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
     refetchIntervalInBackground: false,
@@ -62,11 +79,11 @@ export function useAdminThread(
   parentId: string,
   params?: AdminThreadParams,
 ) {
-  const isAdmin = useIsAdminRole();
+  const canView = useCanViewInbox();
   return useQuery<AdminThreadResponse, AxiosError>({
     queryKey: adminMessageKeys.thread(parentId, params),
     queryFn: () => fetchAdminThread(parentId, params),
-    enabled: isAdmin && !!parentId,
+    enabled: canView && !!parentId,
     staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
     refetchIntervalInBackground: false,
@@ -74,11 +91,11 @@ export function useAdminThread(
 }
 
 export function useUnknownMessages() {
-  const isAdmin = useIsAdminRole();
+  const canView = useCanViewInbox();
   return useQuery<UnknownMessage[], AxiosError>({
     queryKey: adminMessageKeys.unknown(),
     queryFn: fetchUnknownMessages,
-    enabled: isAdmin,
+    enabled: canView,
     staleTime: 5 * 1000,
     refetchInterval: 5 * 1000,
     refetchIntervalInBackground: false,

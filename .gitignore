@@ -124,3 +124,6 @@ docs/data
 # pi multi-team — ephemeral runtime state
 .pi/multi-team/sessions/
 .pi/multi-team/logs/
+
+# pnpm-only repo — npm lockfile is stray (Dependabot scans it as phantom alerts)
+/package-lock.json

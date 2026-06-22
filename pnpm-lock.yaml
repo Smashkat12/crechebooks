@@ -64,7 +64,7 @@ importers:
         version: 12.6.2
       claude-flow:
         specifier: 3.1.0-alpha.2
-        version: 3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(effect@3.21.4)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0)
+        version: 3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0)
       prettier:
         specifier: ^3.4.2
         version: 3.7.4
@@ -151,7 +151,7 @@ importers:
         version: 11.0.0
       agentic-flow:
         specifier: 2.0.2-alpha
-        version: 2.0.2-alpha(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(effect@3.21.4)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0))(effect@3.21.4)(encoding@0.1.13)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3)
+        version: 2.0.2-alpha(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0))(effect@3.21.4)(encoding@0.1.13)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3)
       archiver:
         specifier: ^7.0.1
         version: 7.0.1
@@ -207,8 +207,8 @@ importers:
         specifier: ^10.2.3
         version: 10.4.0
       nodemailer:
-        specifier: ^8.0.7
-        version: 8.0.7
+        specifier: ^9.0.1
+        version: 9.0.1
       opossum:
         specifier: ^9.0.0
         version: 9.0.0
@@ -8323,8 +8323,8 @@ packages:
   node-releases@2.0.27:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
 
-  nodemailer@8.0.7:
-    resolution: {integrity: sha512-pkjE4mkBzQjdJT4/UmlKl3pX0rC9fZmjh7c6C9o7lv66Ac6w9WCnzPzhbPNxwZAzlF4mdq4CSWB5+FbK6FWCow==}
+  nodemailer@9.0.1:
+    resolution: {integrity: sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw==}
     engines: {node: '>=6.0.0'}
 
   nopt@5.0.0:
@@ -15995,7 +15995,7 @@ snapshots:
       - utf-8-validate
     optional: true
 
-  agentic-flow@2.0.2-alpha(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(effect@3.21.4)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0))(effect@3.21.4)(encoding@0.1.13)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3):
+  agentic-flow@2.0.2-alpha(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0))(effect@3.21.4)(encoding@0.1.13)(jiti@2.6.1)(marked@11.2.0)(terser@5.44.1)(tsx@4.21.0)(typescript@5.9.3):
     dependencies:
       '@anthropic-ai/claude-agent-sdk': 0.1.77(zod@3.25.76)
       '@anthropic-ai/claude-code': 2.1.185
@@ -16037,7 +16037,7 @@ snapshots:
       '@ruvector/attention-darwin-x64': 0.1.4
       '@ruvector/attention-linux-x64-gnu': 0.1.4
       '@ruvector/attention-win32-x64-msvc': 0.1.4
-      claude-flow: 3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(effect@3.21.4)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0)
+      claude-flow: 3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - '@modelcontextprotocol/sdk'
@@ -16069,7 +16069,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  agentic-flow@2.0.6(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(effect@3.21.4)(encoding@0.1.13)(marked@11.2.0):
+  agentic-flow@2.0.6(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(marked@11.2.0):
     dependencies:
       '@anthropic-ai/claude-agent-sdk': 0.1.77(zod@3.25.76)
       '@anthropic-ai/sdk': 0.65.0(zod@3.25.76)
@@ -16085,7 +16085,7 @@ snapshots:
       axios: 1.18.0(debug@4.4.3)
       dotenv: 16.6.1
       express: 5.1.0
-      fastmcp: 3.30.0(effect@3.21.4)
+      fastmcp: 3.30.0
       gun: 0.2020.1241
       http-proxy-middleware: 3.0.7
       onnxruntime-node: 1.23.2
@@ -16896,7 +16896,7 @@ snapshots:
     dependencies:
       clsx: 2.1.1
 
-  claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(effect@3.21.4)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0):
+  claude-flow@3.1.0-alpha.2(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0):
     dependencies:
       semver: 7.7.3
       zod: 3.25.76
@@ -16908,7 +16908,7 @@ snapshots:
       '@ruvector/router-linux-x64-gnu': 0.1.27
       '@ruvector/sona': 0.1.5
       agentdb: 2.0.0-alpha.3.4(@types/node@22.19.3)(encoding@0.1.13)(express@5.1.0)(marked@11.2.0)
-      agentic-flow: 2.0.6(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(effect@3.21.4)(encoding@0.1.13)(marked@11.2.0)
+      agentic-flow: 2.0.6(@modelcontextprotocol/sdk@1.29.0(zod@3.25.76))(@types/node@22.19.3)(encoding@0.1.13)(marked@11.2.0)
       bcrypt: 5.1.1(encoding@0.1.13)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
@@ -18058,6 +18058,30 @@ snapshots:
       path-expression-matcher: 1.5.0
       strnum: 2.2.3
 
+  fastmcp@3.30.0:
+    dependencies:
+      '@modelcontextprotocol/sdk': 1.29.0(zod@4.3.6)
+      '@standard-schema/spec': 1.1.0
+      execa: 9.6.1
+      file-type: 21.3.0
+      fuse.js: 7.1.0
+      mcp-proxy: 6.4.0
+      strict-event-emitter-types: 2.0.0
+      undici: 7.28.0
+      uri-templates: 0.2.0
+      xsschema: 0.4.0-beta.5(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)
+      yargs: 18.0.0
+      zod: 4.3.6
+      zod-to-json-schema: 3.25.1(zod@4.3.6)
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - '@valibot/to-json-schema'
+      - arktype
+      - effect
+      - supports-color
+      - sury
+    optional: true
+
   fastmcp@3.30.0(effect@3.21.4):
     dependencies:
       '@modelcontextprotocol/sdk': 1.29.0(zod@4.3.6)
@@ -18069,10 +18093,10 @@ snapshots:
       strict-event-emitter-types: 2.0.0
       undici: 7.28.0
       uri-templates: 0.2.0
-      xsschema: 0.4.0-beta.5(effect@3.21.4)(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6)
+      xsschema: 0.4.0-beta.5(effect@3.21.4)(zod-to-json-schema@3.25.1(zod@3.25.76))(zod@4.3.6)
       yargs: 18.0.0
       zod: 4.3.6
-      zod-to-json-schema: 3.25.1(zod@3.25.76)
+      zod-to-json-schema: 3.25.1(zod@4.3.6)
     transitivePeerDependencies:
       - '@cfworker/json-schema'
       - '@valibot/to-json-schema'
@@ -20077,7 +20101,7 @@ snapshots:
 
   node-releases@2.0.27: {}
 
-  nodemailer@8.0.7: {}
+  nodemailer@9.0.1: {}
 
   nopt@5.0.0:
     dependencies:
@@ -22665,11 +22689,17 @@ snapshots:
 
   xmlhttprequest-ssl@2.1.2: {}
 
-  xsschema@0.4.0-beta.5(effect@3.21.4)(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6):
+  xsschema@0.4.0-beta.5(effect@3.21.4)(zod-to-json-schema@3.25.1(zod@3.25.76))(zod@4.3.6):
     optionalDependencies:
       effect: 3.21.4
       zod: 4.3.6
       zod-to-json-schema: 3.25.1(zod@3.25.76)
+
+  xsschema@0.4.0-beta.5(zod-to-json-schema@3.25.1(zod@4.3.6))(zod@4.3.6):
+    optionalDependencies:
+      zod: 4.3.6
+      zod-to-json-schema: 3.25.1(zod@4.3.6)
+    optional: true
 
   xtend@4.0.2: {}
 

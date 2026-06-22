@@ -94,6 +94,7 @@ export class AdminMessagesService {
     tenantId: string,
     limit: number,
     offset: number,
+    search?: string,
   ): Promise<ThreadListResult> {
     // Aggregate: find all parentIds that have at least one message, ordered by
     // most-recent message, then join parent name + unread count.
@@ -104,12 +105,28 @@ export class AdminMessagesService {
     // 2. Fetch unread counts and last snippet in a second query.
 
     // Step 1: distinct parents (excluding null) + most-recent message time.
+    // Optional name search: restrict to parents whose name matches `search`.
+    let parentIdWhere: { not: null } | { in: string[] } = { not: null };
+    if (search?.trim()) {
+      const term = search.trim();
+      const matches = await this.prisma.parent.findMany({
+        where: {
+          tenantId,
+          OR: [
+            { firstName: { contains: term, mode: 'insensitive' } },
+            { middleName: { contains: term, mode: 'insensitive' } },
+            { lastName: { contains: term, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      parentIdWhere = { in: matches.map((p) => p.id) };
+    }
+    const where = { tenantId, parentId: parentIdWhere };
+
     const groups = await this.prisma.whatsAppMessage.groupBy({
       by: ['parentId'],
-      where: {
-        tenantId,
-        parentId: { not: null },
-      },
+      where,
       _max: { createdAt: true },
       orderBy: { _max: { createdAt: 'desc' } },
       skip: offset,
@@ -119,7 +136,7 @@ export class AdminMessagesService {
     const total = await this.prisma.whatsAppMessage
       .groupBy({
         by: ['parentId'],
-        where: { tenantId, parentId: { not: null } },
+        where,
       })
       .then((r) => r.length);
 

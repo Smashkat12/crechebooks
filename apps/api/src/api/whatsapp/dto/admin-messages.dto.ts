@@ -11,6 +11,7 @@ import {
   Max,
   IsIn,
   IsUUID,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -40,7 +41,15 @@ export class PaginationQueryDto {
 // GET /threads query
 // ---------------------------------------------------------------------------
 
-export class ListThreadsQueryDto extends PaginationQueryDto {}
+export class ListThreadsQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({
+    description: 'Filter threads by parent name (case-insensitive contains).',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  search?: string;
+}
 
 // ---------------------------------------------------------------------------
 // GET /threads/:parentId query

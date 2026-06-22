@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "algorithm": "ed25519",
-  "manifest_sha256": "343c6cda53454ba2a60e8bffd88b0319f076b891f8ae15311b1ff7f394b2f79b",
-  "signature": "MwD8SszDYtBjmYdZm9jo5fWg/0yaPmqX3ER0Xht/Xg32izPb+l1SLlFVXv/G5+RAxllVghd7+c6Bw8nbqgjcBw==",
+  "manifest_sha256": "9a831efd5c3e544f92a46e3d7c56dbdd5c5a4bc886b37348d6c5a9355b0f78c0",
+  "signature": "L8cBbphNEsJq3yDjSU8Z0fAS/pYvxqzfHLyD3lSMSDAv9dCP8JvC7tUsMMDfc6Nvjokoseyiyr1VYlan+sooBQ==",
   "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAZRPZ/d3UgG+wR4DtI4K752v10tKCI9lmYu2uLO3DwSo=\n-----END PUBLIC KEY-----\n",
-  "signed_at": "2026-06-22T01:30:04.303Z",
+  "signed_at": "2026-06-22T04:25:10.856Z",
   "signer": null
 }

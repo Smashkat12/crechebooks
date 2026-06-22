@@ -16,7 +16,9 @@ describe('tool-factory — spec-driven generation', () => {
     expect(names).toEqual(
       expect.arrayContaining([
         'tenant_info', 'dashboard_metrics', 'list_invoices', 'list_payments', 'arrears_report',
-        'reconciliation_summary', 'generate_invoices', 'match_payments', 'allocate_payment', 'send_invoices',
+        'reconciliation_summary', 'list_transactions', 'banking_accounts', 'banking_summary',
+        'reconciliation_discrepancies', 'income_statement',
+        'generate_invoices', 'match_payments', 'allocate_payment', 'send_invoices',
       ]),
     );
   });

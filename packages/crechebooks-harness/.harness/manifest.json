@@ -35,7 +35,7 @@
     "__tests__/mcp.test.ts": "7f71ddaedf177b167859fcddeb6930c7e7d21b5b20b96db8aef9a59de52f9f82",
     "__tests__/mutation.test.ts": "2014e586a30d9152f7d4666ee22e8e3292544881880965bbaea18b913bfd4528",
     "__tests__/smoke.test.ts": "d57f00d9b685ccda00fb650595109e826431f9547d8c15d56554f814224f9611",
-    "__tests__/tool-factory.test.ts": "bec2323ffe6f9eec37c935e6c797bae8a5540c8de96987e405f8f19b5cfd6665",
+    "__tests__/tool-factory.test.ts": "71164446d5682a06314a4b4cea8944a28ffe57de5f15fb9ac9a63ac85cc35a89",
     "bin/cli.js": "d5e07c907835d93ecccb6b15c64dbae0d5ed51b6311d5745e6824ac1f9de1d02",
     "docs/ARCHITECTURE.md": "60cc0bf7112639e7dafae0b5297dd2e31e0caea5f05ca781a9a52179cbccc49f",
     "package.json": "7e2ec91e52ea854eda80a535b43f2b12ddb0532cb077eb1a2313a8d00ecc70ae",
@@ -51,7 +51,7 @@
     "src/gates/validate.js": "37f0595e3ef13a85ee55b4d4cf793ab0b2c6b62a45493a05ca0cf6e90af1aeae",
     "src/init.ts": "a9cf0831f7824a123fe6af6f62e9d158aa44b4504e3869243de6a5672970e3c2",
     "src/mcp/cb-client.js": "f96085fa7b0acef2bd7803bcc123eccaaaee7f3118bc746f062bff15172c89ea",
-    "src/mcp/domain-spec.js": "40bf89d79d40def9c7d65a3fd4e5556d99119f976664a68c966adca80747b7aa",
+    "src/mcp/domain-spec.js": "0699c0117ddf37bd6419eeb3a16b2643dc40ffe524b449e2a2629a7eadb21e4a",
     "src/mcp/domain-tools.js": "558262e16ec64f7c31be2ec14a40d50f455f524ef8b12ac1679f636989cc8229",
     "src/mcp/index-tools.js": "11796afe488b95d335aa852d872fe512f9771fcc253d4c042a7e412b1344226d",
     "src/mcp/mutation-tools.js": "40b661c2795315b39ce5c4b6a0515c7aba896036486afbec1e49d67e8ab28461",
@@ -60,7 +60,7 @@
     "src/mcp/tools.js": "57be11c83b95c6dc462c50bfc5e3e42ddf35256249a2b42719736c0a8ac2fc72",
     "tsconfig.json": "8b4e730a1aa39162ac574455d7a98e1881f5313ca80ffe503b9652dcf0c76b9d"
   },
-  "generated_at": "2026-06-22T01:30:04.244Z",
+  "generated_at": "2026-06-22T04:25:10.801Z",
   "meta": {
     "surface": "cli",
     "regenerated_by": "crechebooks: closed mcp gap + library skill"

@@ -62,6 +62,45 @@ export const DOMAIN_SPEC = [
     description: 'Bank reconciliation status summary per period.',
   },
 
+  {
+    name: 'list_transactions',
+    method: 'GET',
+    path: '/transactions',
+    description: 'List bank transactions, optionally filtered by status.',
+    params: {
+      status: { type: 'string', in: 'query', description: 'PENDING | CATEGORIZED | …' },
+      limit: { type: 'number', in: 'query', description: 'Max rows (default 25, cap 100).', default: 25, max: 100 },
+    },
+  },
+  {
+    name: 'banking_accounts',
+    method: 'GET',
+    path: '/banking/accounts',
+    description: 'List linked bank accounts.',
+  },
+  {
+    name: 'banking_summary',
+    method: 'GET',
+    path: '/banking/accounts/summary',
+    description: 'Bank account summary (balances across linked accounts).',
+  },
+  {
+    name: 'reconciliation_discrepancies',
+    method: 'GET',
+    path: '/reconciliation/discrepancies',
+    description: 'Outstanding bank-reconciliation discrepancies for review.',
+  },
+  {
+    name: 'income_statement',
+    method: 'GET',
+    path: '/reconciliation/income-statement',
+    description: 'Income statement (revenue vs expenses) for a date range, from reconciled data.',
+    params: {
+      period_start: { type: 'string', in: 'query', required: true, description: 'ISO 8601 start date, e.g. 2026-03-01.' },
+      period_end: { type: 'string', in: 'query', required: true, description: 'ISO 8601 end date, e.g. 2026-03-31.' },
+    },
+  },
+
   // ── guarded writes (preview-default; confirm:true to execute) ───────────
   {
     name: 'generate_invoices',

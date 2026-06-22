@@ -70,7 +70,7 @@ lint:
 
 # TypeScript type check
 typecheck:
-    pnpm exec tsc --noEmit --project apps/api/tsconfig.json
+    cd apps/api && npx tsc --noEmit -p tsconfig.json
 
 # Full validation (lint + typecheck + test)
 validate: lint typecheck test

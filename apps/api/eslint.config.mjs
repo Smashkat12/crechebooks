@@ -37,6 +37,14 @@ export default tseslint.config(
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/restrict-template-expressions': 'warn',
       '@typescript-eslint/require-await': 'warn',
+      // Stopgap (2026-06-22): these two fire as FALSE POSITIVES under typescript-eslint
+      // 8.50 + TypeScript 5.9.3 — the type-aware program resolves some globals (Error,
+      // Date) as 'error' types, so e.g. `throw new PdfDecryptError()` (which extends
+      // Error) is flagged. `tsc --noEmit` passes; the code is correct. Downgraded to
+      // 'warn' so CI/preflight aren't blocked by phantom errors. Restore to 'error'
+      // once the TS / typescript-eslint versions are realigned.
+      '@typescript-eslint/only-throw-error': 'warn',
+      '@typescript-eslint/no-redundant-type-constituents': 'warn',
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },

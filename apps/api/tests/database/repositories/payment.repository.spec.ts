@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
+import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { CreatePaymentDto } from '../../../src/database/dto/payment.dto';
 import {
   MatchType,
@@ -37,7 +38,9 @@ describe('PaymentRepository', () => {
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PrismaService, PaymentRepository],
+      // PaymentRepository now injects InvoiceRepository (used by softDelete /
+      // restore to recompute the invoice balance), so it must be provided.
+      providers: [PrismaService, InvoiceRepository, PaymentRepository],
     }).compile();
 
     prisma = module.get<PrismaService>(PrismaService);

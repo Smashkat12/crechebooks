@@ -13,6 +13,36 @@ import {
   DatabaseException,
 } from '../../shared/exceptions';
 
+/**
+ * Pure function: derive the correct invoice status from payment state.
+ * Single source of truth used by both recomputePaidAndStatus() and the backfill script.
+ *
+ * Rules:
+ *  - VOID is sticky (owned by void workflows)
+ *  - OVERDUE / VIEWED are NOT set here (owned by schedulers / delivery tracking)
+ *  - DRAFT is preserved when clampedPaid === 0 and current status is DRAFT
+ *  - Otherwise 0-paid → SENT, partial → PARTIALLY_PAID, full → PAID
+ */
+export function deriveInvoiceStatus(
+  clampedPaid: number,
+  totalCents: number,
+  currentStatus: InvoiceStatus,
+): InvoiceStatus {
+  if (currentStatus === InvoiceStatus.VOID) {
+    return InvoiceStatus.VOID;
+  }
+  if (clampedPaid >= totalCents) {
+    return InvoiceStatus.PAID;
+  }
+  if (clampedPaid > 0) {
+    return InvoiceStatus.PARTIALLY_PAID;
+  }
+  // clampedPaid === 0
+  return currentStatus === InvoiceStatus.DRAFT
+    ? InvoiceStatus.DRAFT
+    : InvoiceStatus.SENT;
+}
+
 @Injectable()
 export class InvoiceRepository {
   private readonly logger = new Logger(InvoiceRepository.name);
@@ -599,14 +629,62 @@ export class InvoiceRepository {
   }
 
   /**
-   * Record a payment on an invoice
+   * Recompute amountPaidCents and status for an invoice from its payment rows.
+   * Must be called inside an existing Prisma transaction so the payment write
+   * and the invoice counter update are atomic.
+   *
+   * @param tx  - Active Prisma transaction client
+   * @param invoiceId - Invoice to recompute
+   * @returns Updated invoice record
+   */
+  async recomputePaidAndStatus(
+    tx: Prisma.TransactionClient,
+    invoiceId: string,
+  ): Promise<Invoice> {
+    const invoice = await tx.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice) {
+      throw new NotFoundException('Invoice', invoiceId);
+    }
+
+    const aggregate = await tx.payment.aggregate({
+      where: { invoiceId, isReversed: false, deletedAt: null },
+      _sum: { amountCents: true },
+    });
+    const derivedPaid = aggregate._sum.amountCents ?? 0;
+
+    const clampedPaid = Math.max(0, Math.min(derivedPaid, invoice.totalCents));
+    if (clampedPaid !== derivedPaid) {
+      this.logger.warn(
+        `recomputePaidAndStatus: clamped paid for invoice ${invoiceId}: derivedPaid=${derivedPaid} totalCents=${invoice.totalCents}`,
+      );
+    }
+
+    const status = deriveInvoiceStatus(
+      clampedPaid,
+      invoice.totalCents,
+      invoice.status as InvoiceStatus,
+    );
+
+    return tx.invoice.update({
+      where: { id: invoiceId },
+      data: { amountPaidCents: clampedPaid, status },
+    });
+  }
+
+  /**
+   * Record a payment on an invoice.
+   * Wraps in a transaction and recomputes amountPaidCents + status from payment rows.
+   * The amountCents parameter is accepted for backward-compatibility but is not used
+   * for the counter — the counter is always derived from the payment table.
+   *
    * @throws NotFoundException if invoice doesn't exist
    * @throws DatabaseException for database errors
    */
   async recordPayment(
     id: string,
     tenantId: string,
-    amountCents: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _amountCents: number,
   ): Promise<Invoice> {
     try {
       const existing = await this.findById(id, tenantId);
@@ -614,23 +692,8 @@ export class InvoiceRepository {
         throw new NotFoundException('Invoice', id);
       }
 
-      const newAmountPaid = existing.amountPaidCents + amountCents;
-      let newStatus: InvoiceStatus = existing.status as InvoiceStatus;
-
-      if (newAmountPaid >= existing.totalCents) {
-        newStatus = InvoiceStatus.PAID;
-      } else if (newAmountPaid > 0) {
-        newStatus = InvoiceStatus.PARTIALLY_PAID;
-      } else if (newAmountPaid === 0) {
-        newStatus = InvoiceStatus.SENT;
-      }
-
-      return await this.prisma.invoice.update({
-        where: { id },
-        data: {
-          amountPaidCents: newAmountPaid,
-          status: newStatus,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        return this.recomputePaidAndStatus(tx, id);
       });
     } catch (error) {
       if (error instanceof NotFoundException) {

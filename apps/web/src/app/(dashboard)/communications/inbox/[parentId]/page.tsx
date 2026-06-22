@@ -33,6 +33,7 @@ import {
   useReplyAdmin,
   useSendTemplate,
   useMarkAllRead,
+  useCanReplyInbox,
 } from '@/hooks/admin/use-admin-messages';
 import type { AdminMessage } from '@/hooks/admin/use-admin-messages';
 import { WHATSAPP_TEMPLATES, type WhatsAppTemplate } from '@/lib/utils/whatsapp-templates';
@@ -375,6 +376,7 @@ export default function ConversationPage({
 
   const { data, isLoading, error } = useAdminThread(parentId, { order: 'asc', limit: 100 });
   const { mutate: markAllRead } = useMarkAllRead(parentId);
+  const canReply = useCanReplyInbox();
 
   const messages = data?.messages ?? [];
 
@@ -468,13 +470,19 @@ export default function ConversationPage({
         </div>
       </div>
 
-      {/* Reply box */}
+      {/* Reply box — write actions are OWNER/ADMIN only; VIEWER is read-only */}
       <div className="flex-shrink-0">
-        <ReplyBox
-          parentId={parentId}
-          requiresTemplate={requiresTemplate}
-          lastInboundAt={lastInboundAt}
-        />
+        {canReply ? (
+          <ReplyBox
+            parentId={parentId}
+            requiresTemplate={requiresTemplate}
+            lastInboundAt={lastInboundAt}
+          />
+        ) : (
+          <div className="border-t px-4 py-3 text-center text-sm text-muted-foreground">
+            You have read-only access — replying is restricted to admins.
+          </div>
+        )}
       </div>
     </div>
   );

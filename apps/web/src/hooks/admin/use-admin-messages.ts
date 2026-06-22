@@ -35,14 +35,14 @@ const adminMessageKeys = {
 };
 
 // ─── Role guards ──────────────────────────────────────────────────────────────
-// Mirror the API @Roles on admin-messages.controller.ts:
-//   reads  (threads / thread / unknown)            → OWNER, ADMIN, VIEWER
-//   writes (reply / send-template / read / link)   → OWNER, ADMIN
-// SUPER_ADMIN is a platform role with no tenant, so it can't reach the tenant
-// inbox (TenantGuard) — intentionally excluded.
+// Mirror the API's effective authorization for the admin-messages endpoints:
+//   reads  (threads / thread / unknown)          → @Roles OWNER, ADMIN, VIEWER
+//   writes (reply / send-template / read / link)  → @Roles OWNER, ADMIN
+// PLUS RolesGuard grants SUPER_ADMIN full access (bypasses @Roles, see
+// roles.guard.ts), so SUPER_ADMIN can read AND write the inbox — include it in both.
 
-const INBOX_READ_ROLES = new Set(['OWNER', 'ADMIN', 'VIEWER']);
-const INBOX_WRITE_ROLES = new Set(['OWNER', 'ADMIN']);
+const INBOX_READ_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'ADMIN', 'VIEWER']);
+const INBOX_WRITE_ROLES = new Set(['SUPER_ADMIN', 'OWNER', 'ADMIN']);
 
 function useUserRole(): string | undefined {
   const { data: session } = useSession();

@@ -38,7 +38,7 @@ fi
 
 if [ "$DO_TYPE" -eq 1 ]; then
   step "typecheck apps/api (tsc --noEmit)"
-  pnpm exec tsc --noEmit --project apps/api/tsconfig.json >/dev/null 2>&1 && ok "api typecheck clean" || bad "api typecheck errors"
+  (cd apps/api && npx tsc --noEmit -p tsconfig.json) >/dev/null 2>&1 && ok "api typecheck clean" || bad "api typecheck errors"
   step "typecheck apps/web (tsc --noEmit)"
   (cd apps/web && npx tsc --noEmit >/dev/null 2>&1) && ok "web typecheck clean" || bad "web typecheck errors"
 fi

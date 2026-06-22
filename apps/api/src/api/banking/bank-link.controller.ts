@@ -35,7 +35,6 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { StitchBankingService } from '../../integrations/banking/stitch.service';
 import { BankSyncJob } from '../../jobs/bank-sync.job';
@@ -65,7 +64,6 @@ interface IUser {
 
 @ApiTags('Banking')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('banking')
 export class BankLinkController {
   private readonly logger = new Logger(BankLinkController.name);

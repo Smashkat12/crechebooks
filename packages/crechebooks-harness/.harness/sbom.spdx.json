@@ -1,0 +1,165 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "crechebooks-harness@0.1.0",
+  "documentNamespace": "https://spdx.org/spdxdocs/crechebooks-harness-0.1.0-f33613d1faa53cda",
+  "creationInfo": {
+    "created": "2026-06-22T07:51:07.205Z",
+    "creators": [
+      "Tool: crechebooks-harness sbom",
+      "Organization: crechebooks"
+    ]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-0",
+      "name": "crechebooks-harness",
+      "versionInfo": "0.1.0",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "supplier": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-1",
+      "name": "@metaharness/darwin",
+      "versionInfo": "0.2.8",
+      "downloadLocation": "https://registry.npmjs.org/@metaharness/darwin",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@metaharness/darwin@0.2.8"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-2",
+      "name": "@metaharness/host-claude-code",
+      "versionInfo": "0.1.2",
+      "downloadLocation": "https://registry.npmjs.org/@metaharness/host-claude-code",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@metaharness/host-claude-code@0.1.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-3",
+      "name": "@metaharness/kernel",
+      "versionInfo": "0.1.2",
+      "downloadLocation": "https://registry.npmjs.org/@metaharness/kernel",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@metaharness/kernel@0.1.2"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-4",
+      "name": "@types/node",
+      "versionInfo": "20.19.43",
+      "downloadLocation": "https://registry.npmjs.org/@types/node",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/@types/node@20.19.43"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-5",
+      "name": "typescript",
+      "versionInfo": "5.9.3",
+      "downloadLocation": "https://registry.npmjs.org/typescript",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/typescript@5.9.3"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-6",
+      "name": "vitest",
+      "versionInfo": "3.2.6",
+      "downloadLocation": "https://registry.npmjs.org/vitest",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:npm/vitest@3.2.6"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relatedSpdxElement": "SPDXRef-Package-0",
+      "relationshipType": "DESCRIBES"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-1",
+      "relatedSpdxElement": "SPDXRef-Package-0",
+      "relationshipType": "DEV_DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-0",
+      "relatedSpdxElement": "SPDXRef-Package-2",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-0",
+      "relatedSpdxElement": "SPDXRef-Package-3",
+      "relationshipType": "DEPENDS_ON"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-4",
+      "relatedSpdxElement": "SPDXRef-Package-0",
+      "relationshipType": "DEV_DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-5",
+      "relatedSpdxElement": "SPDXRef-Package-0",
+      "relationshipType": "DEV_DEPENDENCY_OF"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-6",
+      "relatedSpdxElement": "SPDXRef-Package-0",
+      "relationshipType": "DEV_DEPENDENCY_OF"
+    }
+  ]
+}

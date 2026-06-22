@@ -49,8 +49,6 @@ import { AccruedBankChargeService } from '../../database/services/accrued-bank-c
 import { XeroTransactionSplitService } from '../../database/services/xero-transaction-split.service';
 import { FeeInflationCorrectionService } from '../../database/services/fee-inflation-correction.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
 import {
@@ -125,7 +123,6 @@ export class ReconciliationController {
   @Post()
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Run bank reconciliation for period' })
   @ApiResponse({
     status: 201,
@@ -197,7 +194,6 @@ export class ReconciliationController {
   @Get()
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'List reconciliations with filtering and pagination',
   })
@@ -281,7 +277,6 @@ export class ReconciliationController {
   @Get('discrepancies')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Get all discrepancies for review' })
   @ApiResponse({
     status: 200,
@@ -379,7 +374,6 @@ export class ReconciliationController {
   @Get('summary')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Get reconciliation summary' })
   @ApiResponse({ status: 200, type: ReconciliationSummaryResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
@@ -461,7 +455,6 @@ export class ReconciliationController {
   @Get('income-statement')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Generate Income Statement (Profit & Loss)' })
   @ApiResponse({ status: 200, type: ApiIncomeStatementResponseDto })
   @ApiResponse({
@@ -534,7 +527,6 @@ export class ReconciliationController {
   @Get('income-statement/export')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Export Income Statement as PDF or Excel' })
   @ApiResponse({
     status: 200,
@@ -629,7 +621,6 @@ export class ReconciliationController {
   @Post('bank-statement')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({
     summary: 'Reconcile bank statement PDF with Xero transactions',
@@ -733,7 +724,6 @@ export class ReconciliationController {
   @Post('bank-statement/rematch-all')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary:
       'Re-match all DISCREPANCY reconciliations without re-parsing PDFs. Processes chronologically so boundary exclusions cascade.',
@@ -815,7 +805,6 @@ export class ReconciliationController {
   @Get('bank-statement/unmatched-closed')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary:
       'List IN_BANK_ONLY entries that remain inside RECONCILED periods. Indicates bank transactions with no matching book entry in a closed period.',
@@ -945,7 +934,6 @@ export class ReconciliationController {
   @Post(':id/accept-discrepancies')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary:
       'Accept remaining discrepancies and mark reconciliation as RECONCILED. For use after manual review of small items.',
@@ -977,7 +965,6 @@ export class ReconciliationController {
   @Post(':id/rematch')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary:
       'Re-match a reconciliation without re-parsing the PDF. Uses existing bank data and re-runs matching with boundary-date exclusion.',
@@ -1052,7 +1039,6 @@ export class ReconciliationController {
   @Get(':id/matches')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Get bank statement matches for a reconciliation' })
   @ApiParam({ name: 'id', description: 'Reconciliation ID' })
   @ApiResponse({
@@ -1114,7 +1100,6 @@ export class ReconciliationController {
   @Get(':id/unmatched')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Get unmatched transactions for a reconciliation' })
   @ApiParam({ name: 'id', description: 'Reconciliation ID' })
   @ApiForbiddenResponse({
@@ -1167,7 +1152,6 @@ export class ReconciliationController {
   @Post(':id/matches/:matchId/manual-match')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Manually match a bank statement record with a transaction',
   })
@@ -1218,7 +1202,6 @@ export class ReconciliationController {
   @Post(':id/matches/:matchId/unmatch')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Unmatch a previously matched bank statement record',
   })
@@ -1265,7 +1248,6 @@ export class ReconciliationController {
   @Get(':id/available-transactions')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Get available transactions for manual matching' })
   @ApiParam({ name: 'id', description: 'Reconciliation ID' })
   @ApiForbiddenResponse({
@@ -1312,7 +1294,6 @@ export class ReconciliationController {
   @Post('split-matches/suggest')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Suggest split matches for a bank transaction',
     description:
@@ -1352,7 +1333,6 @@ export class ReconciliationController {
   @Post('split-matches/confirm')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Confirm a split match and create payments',
     description:
@@ -1397,7 +1377,6 @@ export class ReconciliationController {
   @Post('split-matches/reject')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Reject a split match suggestion',
   })
@@ -1439,7 +1418,6 @@ export class ReconciliationController {
   @Get('split-matches')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'List split matches with filtering and pagination',
   })
@@ -1478,7 +1456,6 @@ export class ReconciliationController {
   @Get('split-matches/:splitMatchId')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Get a single split match by ID',
   })
@@ -1521,7 +1498,6 @@ export class ReconciliationController {
   @Get('accrued-charges')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'List accrued bank charges with filtering and pagination',
     description:
@@ -1566,7 +1542,6 @@ export class ReconciliationController {
   @Get('accrued-charges/summary')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Get accrued bank charges summary statistics',
     description:
@@ -1598,7 +1573,6 @@ export class ReconciliationController {
   @Get('accrued-charges/:chargeId')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Get a single accrued charge by ID' })
   @ApiParam({ name: 'chargeId', description: 'Accrued charge ID' })
   @ApiResponse({
@@ -1632,7 +1606,6 @@ export class ReconciliationController {
   @Post('accrued-charges')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Create an accrued bank charge record',
     description:
@@ -1672,7 +1645,6 @@ export class ReconciliationController {
   @Post('accrued-charges/:chargeId/match')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Match accrued charge to actual fee transaction',
     description:
@@ -1722,7 +1694,6 @@ export class ReconciliationController {
   @Patch('accrued-charges/:chargeId/status')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Update accrued charge status',
     description:
@@ -1767,7 +1738,6 @@ export class ReconciliationController {
   @Post('accrued-charges/auto-match')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Auto-match pending accrued charges',
     description:
@@ -1813,7 +1783,6 @@ export class ReconciliationController {
 
   @Post('xero-splits/detect')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Detect split parameters for a Xero transaction',
@@ -1849,7 +1818,6 @@ export class ReconciliationController {
 
   @Post('xero-splits')
   @HttpCode(201)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Split a Xero transaction into net amount + fee',
@@ -1890,7 +1858,6 @@ export class ReconciliationController {
 
   @Post('xero-splits/:id/confirm')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Confirm a pending Xero transaction split',
@@ -1931,7 +1898,6 @@ export class ReconciliationController {
 
   @Post('xero-splits/:id/cancel')
   @HttpCode(200)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
   @ApiOperation({
     summary: 'Cancel a Xero transaction split',
@@ -1971,7 +1937,6 @@ export class ReconciliationController {
   }
 
   @Get('xero-splits')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
   @ApiOperation({
     summary: 'List Xero transaction splits',
@@ -2006,7 +1971,6 @@ export class ReconciliationController {
   }
 
   @Get('xero-splits/summary')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
   @ApiOperation({
     summary: 'Get Xero transaction split summary',
@@ -2035,7 +1999,6 @@ export class ReconciliationController {
   }
 
   @Get('xero-splits/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
   @ApiOperation({
     summary: 'Get a Xero transaction split by ID',
@@ -2068,7 +2031,6 @@ export class ReconciliationController {
   }
 
   @Get('xero-splits/by-xero-transaction/:xeroTransactionId')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
   @ApiOperation({
     summary: 'Get a Xero transaction split by Xero transaction ID',
@@ -2114,7 +2076,6 @@ export class ReconciliationController {
   @Post('fee-corrections/preview')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Preview fee inflation corrections (dry-run)',
     description:
@@ -2147,7 +2108,6 @@ export class ReconciliationController {
   @Post('fee-corrections/apply')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Apply fee inflation corrections',
     description:
@@ -2180,7 +2140,6 @@ export class ReconciliationController {
   @Post('fee-corrections/match-monthly')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Match monthly fee aggregates to charge transactions',
     description:
@@ -2245,7 +2204,6 @@ export class ReconciliationController {
   @Get(':id')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT, UserRole.VIEWER)
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({ summary: 'Get single reconciliation by ID' })
   @ApiParam({ name: 'id', description: 'Reconciliation ID' })
   @ApiResponse({

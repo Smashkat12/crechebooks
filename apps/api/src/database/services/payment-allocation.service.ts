@@ -12,7 +12,7 @@
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { PaymentAllocatedEvent } from '../events/domain-events';
-import { Payment, Invoice, InvoiceStatus } from '@prisma/client';
+import { Payment, Invoice } from '@prisma/client';
 import Decimal from 'decimal.js';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentRepository } from '../repositories/payment.repository';
@@ -406,24 +406,8 @@ export class PaymentAllocationService {
 
           createdPayments.push(payment);
 
-          // Update invoice via recordPayment logic within transaction
-          const newAmountPaid =
-            invoice.amountPaidCents + allocation.amountCents;
-          let newStatus: InvoiceStatus = invoice.status;
-
-          if (newAmountPaid >= invoice.totalCents) {
-            newStatus = InvoiceStatus.PAID;
-          } else if (newAmountPaid > 0) {
-            newStatus = InvoiceStatus.PARTIALLY_PAID;
-          }
-
-          await tx.invoice.update({
-            where: { id: allocation.invoiceId },
-            data: {
-              amountPaidCents: newAmountPaid,
-              status: newStatus,
-            },
-          });
+          // Recompute invoice counter from payment rows (derives PAID/PARTIALLY_PAID correctly)
+          await this.invoiceRepo.recomputePaidAndStatus(tx, allocation.invoiceId);
 
           invoicesUpdated.push(allocation.invoiceId);
         }
@@ -753,21 +737,29 @@ export class PaymentAllocationService {
 
     const beforeValue = { ...payment };
 
-    // 3. Reverse payment using PaymentRepository.reverse() method
-    const reversedPayment = await this.paymentRepo.reverse(
+    // 3. Atomically mark payment reversed and recompute invoice counter in one transaction
+    let reversedPayment: Payment;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: dto.paymentId },
+        data: {
+          isReversed: true,
+          reversedAt: new Date(),
+          reversalReason: dto.reason,
+        },
+      });
+      await this.invoiceRepo.recomputePaidAndStatus(tx, payment.invoiceId);
+    });
+
+    // Reload the reversed payment record after the transaction
+    const reloaded = await this.paymentRepo.findById(
       dto.paymentId,
       dto.tenantId!,
-      {
-        reversalReason: dto.reason,
-      },
     );
-
-    // 4. Revert invoice amount: invoiceRepo.recordPayment(id, -payment.amountCents)
-    await this.invoiceRepo.recordPayment(
-      payment.invoiceId,
-      dto.tenantId!,
-      -payment.amountCents,
-    );
+    if (!reloaded) {
+      throw new NotFoundException('Payment', dto.paymentId);
+    }
+    reversedPayment = reloaded;
 
     // 5. Audit log the reversal
     await this.auditLogService.logAction({

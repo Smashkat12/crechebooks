@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# pre-push hook — runs scripts/preflight.sh (lint + typecheck, non-destructive)
+# before a push is allowed, so CI's "Lint & Type Check" can't surprise you.
+#
+# Skip a single push:  git push --no-verify     (or  PREFLIGHT_SKIP=1 git push)
+# Install via:         scripts/install-hooks.sh  (or  just install-hooks)
+[ "${PREFLIGHT_SKIP:-0}" = "1" ] && exit 0
+ROOT="$(git rev-parse --show-toplevel)"
+exec "$ROOT/scripts/preflight.sh"

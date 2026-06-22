@@ -8,6 +8,10 @@ import {
   DeliveryMethod,
 } from '../../../src/database/entities/invoice.entity';
 import {
+  MatchType,
+  MatchedBy,
+} from '../../../src/database/entities/payment.entity';
+import {
   NotFoundException,
   ConflictException,
 } from '../../../src/shared/exceptions';
@@ -699,43 +703,120 @@ describe('InvoiceRepository', () => {
   });
 
   describe('recordPayment', () => {
-    it('should record partial payment', async () => {
-      const created = await repository.create(testInvoiceData);
+    // recordPayment now DERIVES amountPaidCents from the invoice's active
+    // (non-reversed, non-deleted) Payment rows; the amount argument is ignored.
+    // These tests seed real Payment rows, then call recordPayment and assert
+    // the derived counter + status.
+
+    // Seeds an active payment row for an invoice (isReversed:false, deletedAt:null)
+    async function seedPayment(
+      invoiceId: string,
+      amountCents: number,
+    ): Promise<void> {
+      await prisma.payment.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceId,
+          amountCents,
+          paymentDate: new Date('2025-01-15'),
+          matchType: MatchType.EXACT,
+          matchedBy: MatchedBy.AI_AUTO,
+          matchConfidence: 1.0,
+        },
+      });
+    }
+
+    it('should record partial payment (derived from a partial payment row)', async () => {
+      const created = await repository.create(testInvoiceData); // totalCents 450000
+      await seedPayment(created.id, 200000); // R2,000 partial
 
       const updated = await repository.recordPayment(
         created.id,
         testTenant.id,
-        200000,
-      ); // R2,000
+        0, // amount arg is ignored — counter is derived from rows
+      );
 
       expect(updated.amountPaidCents).toBe(200000);
       expect(updated.status).toBe(InvoiceStatus.PARTIALLY_PAID);
     });
 
-    it('should mark as paid when full amount received', async () => {
-      const created = await repository.create(testInvoiceData);
+    it('should mark as paid when payment rows sum to the full amount', async () => {
+      const created = await repository.create(testInvoiceData); // totalCents 450000
+      // Two payment rows summing to the full total
+      await seedPayment(created.id, 250000);
+      await seedPayment(created.id, 200000);
 
       const updated = await repository.recordPayment(
         created.id,
         testTenant.id,
-        450000,
-      ); // Full amount
+        0, // ignored
+      );
 
       expect(updated.amountPaidCents).toBe(450000);
       expect(updated.status).toBe(InvoiceStatus.PAID);
     });
 
-    it('should handle overpayment', async () => {
-      const created = await repository.create(testInvoiceData);
+    it('should clamp overpayment to totalCents and mark PAID', async () => {
+      const created = await repository.create(testInvoiceData); // totalCents 450000
+      // Single payment row exceeding the invoice total
+      await seedPayment(created.id, 500000);
 
       const updated = await repository.recordPayment(
         created.id,
         testTenant.id,
-        500000,
-      ); // More than total
+        0, // ignored
+      );
 
-      expect(updated.amountPaidCents).toBe(500000);
+      // Derived paid (500000) is clamped to totalCents (450000)
+      expect(updated.amountPaidCents).toBe(450000);
       expect(updated.status).toBe(InvoiceStatus.PAID);
+    });
+
+    it('should exclude reversed and soft-deleted payment rows from the derived total', async () => {
+      const created = await repository.create(testInvoiceData); // totalCents 450000
+
+      // Active payment counts
+      await seedPayment(created.id, 200000);
+
+      // Reversed payment must NOT count
+      await prisma.payment.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceId: created.id,
+          amountCents: 100000,
+          paymentDate: new Date('2025-01-16'),
+          matchType: MatchType.EXACT,
+          matchedBy: MatchedBy.AI_AUTO,
+          matchConfidence: 1.0,
+          isReversed: true,
+          reversedAt: new Date(),
+          reversalReason: 'test reversal',
+        },
+      });
+
+      // Soft-deleted payment must NOT count
+      await prisma.payment.create({
+        data: {
+          tenantId: testTenant.id,
+          invoiceId: created.id,
+          amountCents: 150000,
+          paymentDate: new Date('2025-01-17'),
+          matchType: MatchType.EXACT,
+          matchedBy: MatchedBy.AI_AUTO,
+          matchConfidence: 1.0,
+          deletedAt: new Date(),
+        },
+      });
+
+      const updated = await repository.recordPayment(
+        created.id,
+        testTenant.id,
+        0, // ignored
+      );
+
+      // Only the single 200000 active row counts
+      expect(updated.amountPaidCents).toBe(200000);
+      expect(updated.status).toBe(InvoiceStatus.PARTIALLY_PAID);
     });
 
     it('should throw NotFoundException for non-existent invoice', async () => {

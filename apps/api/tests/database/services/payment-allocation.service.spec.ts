@@ -23,6 +23,8 @@ import { AccruedBankChargeService } from '../../../src/database/services/accrued
 import { BankFeeService } from '../../../src/database/services/bank-fee.service';
 import { XeroTransactionSplitStatus } from '@prisma/client';
 import { XeroTransactionSplitStatusDto } from '../../../src/database/dto/xero-transaction-split.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ACCOUNTING_PROVIDER } from '../../../src/integrations/accounting/accounting-provider.token';
 
 /**
  * Mock XeroSyncService - external API integration
@@ -90,6 +92,14 @@ describe('PaymentAllocationService', () => {
           provide: XeroTransactionSplitService,
           useValue: mockXeroTransactionSplitService,
         },
+        // EventEmitter2 is required by PaymentAllocationService for domain events
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
+        // ACCOUNTING_PROVIDER is @Optional() but Nest still requires a binding
+        // when it is listed as a constructor parameter via @Inject().
+        { provide: ACCOUNTING_PROVIDER, useValue: null },
       ],
     }).compile();
 
@@ -1824,6 +1834,262 @@ describe('PaymentAllocationService', () => {
       expect(result.payments[0].amountCents).toBe(5000);
       // Unallocated should be R50 (10000 NET - 5000 allocated), NOT R56.36 (10636 GROSS - 5000)
       expect(result.unallocatedAmountCents).toBe(5000);
+    });
+  });
+
+  /**
+   * Balance-Integrity Fix Tests
+   *
+   * These tests exercise the new derive-from-rows behaviour:
+   *  - reverseAllocation is atomic (single $transaction) and produces the
+   *    correct amountPaidCents / status on the invoice by calling
+   *    InvoiceRepository.recomputePaidAndStatus inside the tx.
+   *  - reverse of a partial allocation drops to PARTIALLY_PAID, not SENT.
+   *  - concurrent allocations do not lose updates (old read-modify-write
+   *    would land at 5000; derive-from-rows gives 10000).
+   *  - status transitions driven by recompute match the truth table.
+   *  - overpayment path still works correctly (PAID at totalCents, excess in
+   *    CreditBalance) – recompute did not break it.
+   */
+  describe('Balance Integrity Fix', () => {
+    // ── reverseAllocation is atomic and correct ────────────────────────────────
+
+    describe('reverseAllocation – single $transaction atomicity', () => {
+      it('full payment reversed: amountPaidCents=0, status=SENT, isReversed=true', async () => {
+        const invoice = await createInvoice({ totalCents: 10000 });
+        const transaction = await createTransaction({ amountCents: 10000 });
+
+        const allocation = await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: transaction.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 10000 }],
+        });
+
+        // Invoice should be PAID after allocation
+        const paidInvoice = await invoiceRepo.findById(
+          invoice.id,
+          testTenant.id,
+        );
+        expect(paidInvoice?.status).toBe(InvoiceStatus.PAID);
+        expect(paidInvoice?.amountPaidCents).toBe(10000);
+
+        // Reverse
+        const reversed = await service.reverseAllocation({
+          tenantId: testTenant.id,
+          paymentId: allocation.payments[0].id,
+          reason: 'integrity test reversal',
+        });
+
+        // Payment row is reversed
+        expect(reversed.isReversed).toBe(true);
+        expect(reversed.reversalReason).toBe('integrity test reversal');
+
+        // Invoice counter recomputed from rows
+        const updatedInvoice = await invoiceRepo.findById(
+          invoice.id,
+          testTenant.id,
+        );
+        expect(updatedInvoice?.amountPaidCents).toBe(0);
+        expect(updatedInvoice?.status).toBe(InvoiceStatus.SENT);
+      });
+
+      it('reversing one of two payments leaves PARTIALLY_PAID at the remaining amount', async () => {
+        // Invoice total 10000 with two payments: 6000 + 4000
+        const invoice = await createInvoice({ totalCents: 10000 });
+
+        const tx1 = await createTransaction({ amountCents: 6000 });
+        const tx2 = await createTransaction({ amountCents: 4000 });
+
+        const alloc1 = await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: tx1.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 6000 }],
+        });
+
+        const alloc2 = await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: tx2.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 4000 }],
+        });
+
+        // Invoice should be PAID
+        const paidInv = await invoiceRepo.findById(invoice.id, testTenant.id);
+        expect(paidInv?.status).toBe(InvoiceStatus.PAID);
+
+        // Reverse the 4000-cent payment
+        await service.reverseAllocation({
+          tenantId: testTenant.id,
+          paymentId: alloc2.payments[0].id,
+          reason: 'partial reverse',
+        });
+
+        const updatedInvoice = await invoiceRepo.findById(
+          invoice.id,
+          testTenant.id,
+        );
+        expect(updatedInvoice?.amountPaidCents).toBe(6000);
+        expect(updatedInvoice?.status).toBe(InvoiceStatus.PARTIALLY_PAID);
+      });
+    });
+
+    // ── Concurrent allocations do not lose updates ─────────────────────────────
+
+    describe('concurrent allocations – derive-from-rows prevents lost update', () => {
+      it('two concurrent 5000-cent allocations on a 10000-cent invoice land at paid=10000', async () => {
+        const invoice = await createInvoice({ totalCents: 10000 });
+        const tx1 = await createTransaction({ amountCents: 5000 });
+        const tx2 = await createTransaction({ amountCents: 5000 });
+
+        // Fire both allocations concurrently
+        await Promise.all([
+          service.allocatePayment({
+            tenantId: testTenant.id,
+            transactionId: tx1.id,
+            allocations: [{ invoiceId: invoice.id, amountCents: 5000 }],
+          }),
+          service.allocatePayment({
+            tenantId: testTenant.id,
+            transactionId: tx2.id,
+            allocations: [{ invoiceId: invoice.id, amountCents: 5000 }],
+          }),
+        ]);
+
+        const finalInvoice = await invoiceRepo.findById(
+          invoice.id,
+          testTenant.id,
+        );
+        const payments = await prisma.payment.findMany({
+          where: { invoiceId: invoice.id, deletedAt: null, isReversed: false },
+        });
+
+        // Exactly 2 payment rows created
+        expect(payments).toHaveLength(2);
+
+        // amountPaidCents must reflect the SUM of both rows (not just one)
+        expect(finalInvoice?.amountPaidCents).toBe(10000);
+        expect(finalInvoice?.status).toBe(InvoiceStatus.PAID);
+      });
+    });
+
+    // ── Status transitions via recompute match the truth table ─────────────────
+
+    describe('status transitions via recomputePaidAndStatus', () => {
+      it('SENT invoice with zero active payments stays SENT after recompute', async () => {
+        const invoice = await createInvoice({
+          totalCents: 10000,
+          status: InvoiceStatus.SENT,
+          amountPaidCents: 0,
+        });
+        const tx = await createTransaction({ amountCents: 5000 });
+
+        const alloc = await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: tx.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 5000 }],
+        });
+
+        // Reverse to drive paid back to 0
+        await service.reverseAllocation({
+          tenantId: testTenant.id,
+          paymentId: alloc.payments[0].id,
+          reason: 'revert to zero',
+        });
+
+        const inv = await invoiceRepo.findById(invoice.id, testTenant.id);
+        expect(inv?.amountPaidCents).toBe(0);
+        expect(inv?.status).toBe(InvoiceStatus.SENT);
+      });
+
+      it('partial payment -> PARTIALLY_PAID -> full payment -> PAID', async () => {
+        const invoice = await createInvoice({ totalCents: 10000 });
+        const tx1 = await createTransaction({ amountCents: 4000 });
+        const tx2 = await createTransaction({ amountCents: 6000 });
+
+        await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: tx1.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 4000 }],
+        });
+
+        const partial = await invoiceRepo.findById(invoice.id, testTenant.id);
+        expect(partial?.status).toBe(InvoiceStatus.PARTIALLY_PAID);
+        expect(partial?.amountPaidCents).toBe(4000);
+
+        await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: tx2.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 6000 }],
+        });
+
+        const paid = await invoiceRepo.findById(invoice.id, testTenant.id);
+        expect(paid?.status).toBe(InvoiceStatus.PAID);
+        expect(paid?.amountPaidCents).toBe(10000);
+      });
+    });
+
+    // ── Overpayment behaviour is unaffected by the fix ─────────────────────────
+
+    describe('overpayment still works correctly after fix', () => {
+      it('overpayment: invoice becomes PAID at totalCents, excess in CreditBalance', async () => {
+        // Invoice total 10000, payment attempts to allocate 15000 (overpayment)
+        const invoice = await createInvoice({
+          totalCents: 10000,
+          status: InvoiceStatus.SENT,
+          amountPaidCents: 0,
+        });
+        const tx = await createTransaction({ amountCents: 15000 });
+
+        const result = await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: tx.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 15000 }],
+        });
+
+        // Payment record is capped at outstanding (10000)
+        expect(result.payments[0].amountCents).toBe(10000);
+        expect(result.payments[0].matchType).toBe('OVERPAYMENT');
+
+        // Invoice is PAID and amountPaidCents === totalCents (clamped)
+        const updatedInvoice = await invoiceRepo.findById(
+          invoice.id,
+          testTenant.id,
+        );
+        expect(updatedInvoice?.status).toBe(InvoiceStatus.PAID);
+        expect(updatedInvoice?.amountPaidCents).toBe(10000);
+
+        // A CreditBalance row exists for the excess (5000)
+        const creditBalance = await prisma.creditBalance.findFirst({
+          where: { tenantId: testTenant.id, parentId: invoice.parentId },
+        });
+        expect(creditBalance).not.toBeNull();
+        expect(creditBalance?.amountCents).toBe(5000);
+      });
+
+      it('reversing the overpayment payment resets invoice to SENT', async () => {
+        const invoice = await createInvoice({
+          totalCents: 10000,
+          status: InvoiceStatus.SENT,
+          amountPaidCents: 0,
+        });
+        const tx = await createTransaction({ amountCents: 15000 });
+
+        const result = await service.allocatePayment({
+          tenantId: testTenant.id,
+          transactionId: tx.id,
+          allocations: [{ invoiceId: invoice.id, amountCents: 15000 }],
+        });
+
+        await service.reverseAllocation({
+          tenantId: testTenant.id,
+          paymentId: result.payments[0].id,
+          reason: 'overpayment reversal test',
+        });
+
+        const inv = await invoiceRepo.findById(invoice.id, testTenant.id);
+        // After reversing the only active payment (10000), paid = 0 -> SENT
+        expect(inv?.amountPaidCents).toBe(0);
+        expect(inv?.status).toBe(InvoiceStatus.SENT);
+      });
     });
   });
 });

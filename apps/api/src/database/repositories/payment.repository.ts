@@ -12,12 +12,16 @@ import {
   ConflictException,
   DatabaseException,
 } from '../../shared/exceptions';
+import { InvoiceRepository } from './invoice.repository';
 
 @Injectable()
 export class PaymentRepository {
   private readonly logger = new Logger(PaymentRepository.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly invoiceRepo: InvoiceRepository,
+  ) {}
 
   /**
    * Create a new payment linking a transaction to an invoice
@@ -426,6 +430,9 @@ export class PaymentRepository {
           data: { deletedAt: new Date() },
         });
 
+        // Step 4: Recompute invoice amountPaidCents and status from remaining rows
+        await this.invoiceRepo.recomputePaidAndStatus(tx, existing.invoiceId);
+
         this.logger.debug(
           `TASK-DATA-003: Payment ${id} soft-deleted with audit trail`,
         );
@@ -494,6 +501,9 @@ export class PaymentRepository {
           where: { id },
           data: { deletedAt: null },
         });
+
+        // Step 4: Recompute invoice amountPaidCents and status from all active rows
+        await this.invoiceRepo.recomputePaidAndStatus(tx, existing.invoiceId);
 
         this.logger.debug(
           `TASK-DATA-003: Payment ${id} restored with audit trail`,

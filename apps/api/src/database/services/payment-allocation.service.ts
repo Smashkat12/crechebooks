@@ -738,7 +738,6 @@ export class PaymentAllocationService {
     const beforeValue = { ...payment };
 
     // 3. Atomically mark payment reversed and recompute invoice counter in one transaction
-    let reversedPayment: Payment;
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: dto.paymentId },
@@ -759,7 +758,7 @@ export class PaymentAllocationService {
     if (!reloaded) {
       throw new NotFoundException('Payment', dto.paymentId);
     }
-    reversedPayment = reloaded;
+    const reversedPayment = reloaded;
 
     // 5. Audit log the reversal
     await this.auditLogService.logAction({

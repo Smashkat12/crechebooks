@@ -70,7 +70,7 @@ lint:
 
 # TypeScript type check
 typecheck:
-    pnpm exec tsc --noEmit --project apps/api/tsconfig.json
+    cd apps/api && npx tsc --noEmit -p tsconfig.json
 
 # Full validation (lint + typecheck + test)
 validate: lint typecheck test
@@ -88,3 +88,16 @@ reset-infra:
 # Prisma studio
 studio:
     pnpm prisma:studio
+
+# Fast, non-destructive pre-push gate (predicts CI lint + typecheck)
+preflight:
+    scripts/preflight.sh
+
+# Install git hooks (pre-push runs preflight before each push)
+install-hooks:
+    scripts/install-hooks.sh
+
+# Push a branch and poll a URL until it's live. e.g.:
+#   just deploy-verify --push staging --url https://api-staging-5287.up.railway.app/health --expect-status 200
+deploy-verify *ARGS:
+    scripts/deploy-verify.sh {{ARGS}}

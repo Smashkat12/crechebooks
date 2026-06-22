@@ -1,0 +1,4 @@
+# The Ed25519 private signing key never leaves this machine.
+signing.key
+# …but track the public key so anyone can verify the witness signature.
+!signing.pub

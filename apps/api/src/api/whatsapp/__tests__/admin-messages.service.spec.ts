@@ -169,6 +169,45 @@ describe('listThreads', () => {
     expect(result.threads[0].lastMessageSnippet).toBe('Hello');
   });
 
+  it('1b. search → restricts groupBy to parents matching the name (tenant-scoped)', async () => {
+    prisma.parent.findMany.mockResolvedValue([{ id: PARENT_A }]);
+    prisma.whatsAppMessage.groupBy
+      .mockResolvedValueOnce([
+        { parentId: PARENT_A, _max: { createdAt: WITHIN_24H } },
+      ])
+      .mockResolvedValueOnce([{ parentId: PARENT_A }]);
+    prisma.whatsAppMessage.findFirst.mockResolvedValue(makeMsg());
+    prisma.parent.findUnique.mockResolvedValue({
+      firstName: 'Alice',
+      lastName: 'Smith',
+    });
+
+    const result = await service.listThreads(TENANT_A, 50, 0, 'ali');
+
+    // looked up matching parents, scoped to the tenant
+    expect(prisma.parent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: TENANT_A }),
+      }),
+    );
+    // groupBy restricted to matched ids (not the default { not: null })
+    const where = prisma.whatsAppMessage.groupBy.mock.calls[0][0].where;
+    expect(where.parentId).toEqual({ in: [PARENT_A] });
+    expect(result.threads).toHaveLength(1);
+  });
+
+  it('1c. empty search → no parent lookup, default filter', async () => {
+    prisma.whatsAppMessage.groupBy
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    await service.listThreads(TENANT_A, 50, 0, '');
+
+    expect(prisma.parent.findMany).not.toHaveBeenCalled();
+    const where = prisma.whatsAppMessage.groupBy.mock.calls[0][0].where;
+    expect(where.parentId).toEqual({ not: null });
+  });
+
   it('2. tenant isolation — groupBy scoped to tenantId', async () => {
     prisma.whatsAppMessage.groupBy
       .mockResolvedValueOnce([])

@@ -13,6 +13,8 @@
 //     NEVER logged or returned in tool output.
 
 import { resolveTarget, authHeaders, httpRequest } from './cb-client.js';
+import { buildToolset } from './tool-factory.js';
+import { DOMAIN_SPEC } from './domain-spec.js';
 
 const READ_PREFIXES = [
   '/tenants', '/dashboard', '/invoices', '/payments', '/arrears', '/reconciliation',
@@ -49,62 +51,8 @@ async function cbApi(pathname, { query } = {}) {
   return httpRequest('GET', plan.url, plan.headers, null);
 }
 
-const str = (v) => (v == null ? undefined : String(v));
 
-export const domainToolset = [
-  {
-    name: 'tenant_info',
-    description: 'Current tenant (creche) details and settings — GET /tenants/me.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    handler: () => cbApi('/tenants/me'),
-  },
-  {
-    name: 'dashboard_metrics',
-    description: 'Financial dashboard: revenue invoiced vs collected, arrears, enrollment — GET /dashboard/metrics.',
-    inputSchema: {
-      type: 'object',
-      properties: { period: { type: 'string', description: 'e.g. current-month, last-quarter, ytd.' } },
-      additionalProperties: false,
-    },
-    handler: (a) => cbApi('/dashboard/metrics', { query: a.period ? { period: str(a.period) } : {} }),
-  },
-  {
-    name: 'list_invoices',
-    description: 'List invoices, optionally filtered by status — GET /invoices (?status=&limit=).',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', description: 'DRAFT | SENT | PAID | OVERDUE …' },
-        limit: { type: 'number', description: 'Max rows (default 25, cap 100).' },
-      },
-      additionalProperties: false,
-    },
-    handler: (a) => {
-      const query = { limit: String(Math.min(Number(a.limit) || 25, 100)) };
-      if (a.status) query.status = str(a.status);
-      return cbApi('/invoices', { query });
-    },
-  },
-  {
-    name: 'list_payments',
-    description: 'List payments, optionally filtered by status (e.g. UNALLOCATED) — GET /payments.',
-    inputSchema: {
-      type: 'object',
-      properties: { status: { type: 'string', description: 'e.g. UNALLOCATED, ALLOCATED.' } },
-      additionalProperties: false,
-    },
-    handler: (a) => cbApi('/payments', { query: a.status ? { status: str(a.status) } : {} }),
-  },
-  {
-    name: 'arrears_report',
-    description: 'Outstanding arrears with aging/debtor detail — GET /payments/arrears.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    handler: () => cbApi('/payments/arrears'),
-  },
-  {
-    name: 'reconciliation_summary',
-    description: 'Bank reconciliation status summary per period — GET /reconciliation/summary.',
-    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
-    handler: () => cbApi('/reconciliation/summary'),
-  },
-];
+export const domainToolset = buildToolset(
+  DOMAIN_SPEC.filter((s) => s.method === 'GET'),
+  { cbApi },
+);

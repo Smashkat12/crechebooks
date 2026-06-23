@@ -37,6 +37,8 @@ import {
 } from '@/hooks/admin/use-admin-messages';
 import type { AdminMessage } from '@/hooks/admin/use-admin-messages';
 import { useTenant } from '@/hooks/useTenant';
+import { useInvoicesList } from '@/hooks/use-invoices';
+import { formatCurrency } from '@/lib/utils/format';
 import { WHATSAPP_TEMPLATES, type WhatsAppTemplate } from '@/lib/utils/whatsapp-templates';
 import type { AxiosError } from 'axios';
 
@@ -136,18 +138,43 @@ function TemplatePickerModal({
 }) {
   const { toast } = useToast();
   const { data: tenant } = useTenant();
+  const { data: invoicesData } = useInvoicesList(
+    { parentId, limit: 100 },
+    { enabled: open },
+  );
   const [selected, setSelected] = useState<WhatsAppTemplate | null>(null);
   const [params, setParams] = useState<Record<string, string>>({});
   const { mutate: sendTemplate, isPending } = useSendTemplate(parentId);
 
-  // Pre-fill the variables we can derive from the current conversation + tenant
-  // context (parent first name, creche name); the rest stay blank to fill in.
+  // Pre-fill the variables we can derive from context: parent first name, creche
+  // name, and — from the parent's outstanding invoices — the latest unpaid
+  // invoice's number/amount/due-date plus total arrears owed. The rest stay blank.
   function handleSelectTemplate(tpl: WhatsAppTemplate) {
     setSelected(tpl);
+
+    const balanceCents = (inv: {
+      totalCents?: number;
+      amountPaidCents?: number;
+    }) => (inv.totalCents ?? 0) - (inv.amountPaidCents ?? 0);
+    const unpaid = (invoicesData?.invoices ?? [])
+      .filter((inv) => balanceCents(inv) > 0)
+      .sort(
+        (a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime(),
+      );
+    const latest = unpaid[0];
+    const owedCents = unpaid.reduce((sum, inv) => sum + balanceCents(inv), 0);
+
     const context: Record<string, string | undefined> = {
       parent_name: parentFirstName,
       school_name: tenant?.tradingName,
+      invoice_number: latest?.invoiceNumber,
+      amount: latest ? formatCurrency(balanceCents(latest) / 100) : undefined,
+      due_date: latest
+        ? format(new Date(latest.dueDate), 'd MMM yyyy')
+        : undefined,
+      amount_owed: owedCents > 0 ? formatCurrency(owedCents / 100) : undefined,
     };
+
     const initial: Record<string, string> = {};
     tpl.variables.forEach((v) => { initial[v] = context[v] ?? ''; });
     setParams(initial);

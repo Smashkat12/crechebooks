@@ -162,15 +162,48 @@ export function useEducationExemptAccounts() {
   });
 }
 
+// Trial balance is served by the general-ledger endpoint (there is no
+// /accounts/trial-balance route — the old path 404'd). Its shape uses `lines`
+// (cents), so we adapt it to the TrialBalanceResponse the page/table expect.
+interface GLTrialBalanceResponse {
+  asOfDate: string;
+  lines: Array<{
+    accountCode: string;
+    accountName: string;
+    accountType: string;
+    debitBalanceCents: number;
+    creditBalanceCents: number;
+  }>;
+  totalDebitsCents: number;
+  totalCreditsCents: number;
+  isBalanced: boolean;
+}
+
 // Get trial balance
 export function useTrialBalance(asOfDate: string, enabled = true) {
   return useQuery<TrialBalanceResponse, AxiosError>({
     queryKey: queryKeys.accounts.trialBalance(asOfDate),
     queryFn: async () => {
-      const { data } = await apiClient.get<ApiResponse<TrialBalanceResponse>>(endpoints.accounts.trialBalance, {
-        params: { as_of_date: asOfDate },
-      });
-      return data.data;
+      const { data } = await apiClient.get<ApiResponse<GLTrialBalanceResponse>>(
+        endpoints.generalLedger.trialBalance,
+        { params: { as_of_date: asOfDate } },
+      );
+      const tb = data.data;
+      // Table renders amounts in cents (formatZAR(cents)) — pass through as-is.
+      return {
+        asOfDate: tb.asOfDate,
+        entries: tb.lines.map((l) => ({
+          accountId: l.accountCode, // table uses this only as a React key
+          accountCode: l.accountCode,
+          accountName: l.accountName,
+          accountType: l.accountType as AccountType,
+          debitBalance: l.debitBalanceCents,
+          creditBalance: l.creditBalanceCents,
+        })),
+        totalDebits: tb.totalDebitsCents,
+        totalCredits: tb.totalCreditsCents,
+        isBalanced: tb.isBalanced,
+      };
     },
     enabled: enabled && !!asOfDate,
   });

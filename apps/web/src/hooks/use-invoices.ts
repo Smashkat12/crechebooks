@@ -202,7 +202,10 @@ function transformInvoice(apiInvoice: ApiInvoiceResponse): InvoiceWithLines {
 }
 
 // List invoices with pagination and filters
-export function useInvoicesList(params?: InvoiceListParams) {
+export function useInvoicesList(
+  params?: InvoiceListParams,
+  options?: { enabled?: boolean },
+) {
   const { status } = useSession();
   return useQuery<InvoicesListResponse, AxiosError>({
     queryKey: queryKeys.invoices.list(params),
@@ -229,7 +232,7 @@ export function useInvoicesList(params?: InvoiceListParams) {
         limit: data.meta.limit,
       };
     },
-    enabled: status === 'authenticated',
+    enabled: status === 'authenticated' && (options?.enabled ?? true),
   });
 }
 

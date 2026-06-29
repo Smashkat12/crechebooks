@@ -33,7 +33,7 @@
     "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
     "vitest": "^3.0.0",
-    "@metaharness/darwin": "^0.2.2"
+    "@metaharness/darwin": "^0.7.1"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -5,11 +5,37 @@
 import { PrismaService } from '../../src/database/prisma/prisma.service';
 
 /**
+ * Guard against truncating a non-test database. Local runs inherit
+ * apps/api/.env, whose DATABASE_URL points at the dev database — without
+ * this check a test run would TRUNCATE CASCADE every table in it.
+ */
+function assertSafeToTruncate(): void {
+  if (process.env.ALLOW_DB_TRUNCATE === 'true') {
+    return;
+  }
+  const url = process.env.DATABASE_URL ?? '';
+  let dbName = '';
+  try {
+    dbName = new URL(url).pathname.replace(/^\//, '');
+  } catch {
+    // fall through to the error below with an empty name
+  }
+  if (!dbName.includes('test')) {
+    throw new Error(
+      `cleanDatabase() refused to TRUNCATE database "${dbName || '<unparseable DATABASE_URL>'}": ` +
+        'the database name must contain "test" (e.g. crechebooks_test), ' +
+        'or set ALLOW_DB_TRUNCATE=true to override.',
+    );
+  }
+}
+
+/**
  * Clean all application data from the test database.
  * Uses raw SQL TRUNCATE CASCADE to avoid FK ordering issues.
  * This is safe for tests because each test should set up its own data.
  */
 export async function cleanDatabase(prisma: PrismaService): Promise<void> {
+  assertSafeToTruncate();
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
       accrued_bank_charges,
@@ -56,8 +82,6 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
       parent_generated_documents,
       parents,
       payee_patterns,
-      payment_gateway_transactions,
-      payment_links,
       payments,
       payroll_adjustments,
       payroll_journal_lines,

@@ -42,10 +42,10 @@ roadmap:
 decisions_log:
   - date: "2025-12-19"
     decision: "Claude Code CLI subscription over direct API (cost)"
-    source: "CrecheBookkeeper-PRD.md:10-22"
+    source: "docs/archive/CrecheBookkeeper-PRD.md:10-22"
   - date: "2025-12-19"
     decision: "L4 autonomy for high-confidence categorization; L2 for low-confidence and SARS"
-    source: "CrecheBookkeeper-PRD.md:692-714"
+    source: "docs/archive/CrecheBookkeeper-PRD.md:692-714"
 
 session_observations: []
 

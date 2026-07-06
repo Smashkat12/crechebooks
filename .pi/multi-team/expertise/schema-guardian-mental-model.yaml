@@ -34,7 +34,7 @@ drift_detection_recipe:
   flag_changes_in_prisma7:
     - "`--to-schema-datamodel` → `--to-schema` (datamodel suffix removed)"
     - "`--from-url` → removed entirely; use `--from-config-datasource` (requires prisma.config.ts)"
-    - "`--from-config-datasource` reads DATABASE_URL from env via prisma.config.ts. The repo's prisma.config.ts is at the project root and uses `process.env.DATABASE_URL`."
+    - "`--from-config-datasource` reads DATABASE_URL from env via prisma.config.ts. The repo's prisma.config.ts lives at apps/api/prisma.config.ts and uses `process.env.DATABASE_URL`."
 
   canonical_db_vs_schema: |
     # Compares the live DB to schema.prisma. This is THE check.

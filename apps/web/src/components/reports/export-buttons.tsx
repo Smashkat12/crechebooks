@@ -37,6 +37,13 @@ interface ExportButtonsProps {
   hasInsights?: boolean;
   /** Optional className for custom styling */
   className?: string;
+  /**
+   * Formats to offer, sourced from GET /reports/types `exportFormats`.
+   * `undefined` = show all formats (graceful fallback when the field is
+   * absent). An empty array hides the export control entirely — the
+   * selected report type has no supported export format yet.
+   */
+  formats?: ExportFormat[];
 }
 
 /**
@@ -53,9 +60,17 @@ export function ExportButtons({
   disabled = false,
   hasInsights = false,
   className,
+  formats,
 }: ExportButtonsProps) {
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
   const [includeAI, setIncludeAI] = useState(true);
+
+  // Empty array = the selected report type has no supported export format.
+  if (formats && formats.length === 0) {
+    return null;
+  }
+
+  const showFormat = (format: ExportFormat) => !formats || formats.includes(format);
 
   const handleExport = async (format: ExportFormat) => {
     setExporting(format);
@@ -70,8 +85,8 @@ export function ExportButtons({
 
   return (
     <div className="flex items-center gap-3">
-      {/* AI Toggle - Only show when insights are available */}
-      {hasInsights && (
+      {/* AI Toggle - Only show when insights are available and PDF is offered */}
+      {hasInsights && showFormat('pdf') && (
         <div className="flex items-center gap-2">
           <Checkbox
             id="include-ai"
@@ -105,33 +120,41 @@ export function ExportButtons({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={() => handleExport('pdf')}
-            disabled={!!exporting}
-          >
-            <FileText className="h-4 w-4 mr-2" aria-hidden="true" />
-            <span>
-              PDF Report
-              {includeAI && hasInsights && (
-                <span className="text-muted-foreground ml-1">(with AI)</span>
-              )}
-            </span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => handleExport('xlsx')}
-            disabled={!!exporting}
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-2" aria-hidden="true" />
-            Excel Spreadsheet
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handleExport('csv')}
-            disabled={!!exporting}
-          >
-            <Table2 className="h-4 w-4 mr-2" aria-hidden="true" />
-            CSV Data
-          </DropdownMenuItem>
+          {showFormat('pdf') && (
+            <DropdownMenuItem
+              onClick={() => handleExport('pdf')}
+              disabled={!!exporting}
+            >
+              <FileText className="h-4 w-4 mr-2" aria-hidden="true" />
+              <span>
+                PDF Report
+                {includeAI && hasInsights && (
+                  <span className="text-muted-foreground ml-1">(with AI)</span>
+                )}
+              </span>
+            </DropdownMenuItem>
+          )}
+          {showFormat('pdf') && (showFormat('xlsx') || showFormat('csv')) && (
+            <DropdownMenuSeparator />
+          )}
+          {showFormat('xlsx') && (
+            <DropdownMenuItem
+              onClick={() => handleExport('xlsx')}
+              disabled={!!exporting}
+            >
+              <FileSpreadsheet className="h-4 w-4 mr-2" aria-hidden="true" />
+              Excel Spreadsheet
+            </DropdownMenuItem>
+          )}
+          {showFormat('csv') && (
+            <DropdownMenuItem
+              onClick={() => handleExport('csv')}
+              disabled={!!exporting}
+            >
+              <Table2 className="h-4 w-4 mr-2" aria-hidden="true" />
+              CSV Data
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

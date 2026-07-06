@@ -47,3 +47,24 @@ export async function getSarsReadiness(period?: string): Promise<SarsReadiness> 
   const { data } = await apiClient.get<SarsReadiness>('/sars/readiness', { params });
   return data;
 }
+
+/**
+ * Download the EMP201 CSV for a given tax year/period from
+ * GET /sars/emp201/download (SimplePay-backed file generation).
+ */
+export async function downloadEmp201Csv(
+  taxYear: number,
+  taxPeriod: number
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await apiClient.get('/sars/emp201/download', {
+    params: { taxYear: String(taxYear), taxPeriod: String(taxPeriod) },
+    responseType: 'blob',
+  });
+
+  const disposition = response.headers['content-disposition'] as string | undefined;
+  const match = disposition?.match(/filename="?([^"]+)"?/);
+  const filename =
+    match?.[1] ?? `EMP201-${taxYear}-${String(taxPeriod).padStart(2, '0')}.csv`;
+
+  return { blob: response.data as Blob, filename };
+}

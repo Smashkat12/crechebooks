@@ -1,28 +1,72 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Download, Send } from 'lucide-react';
+import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PeriodSelector } from '@/components/sars';
 import { formatCurrency } from '@/lib/utils/format';
+import { useEMP201 } from '@/hooks/use-sars';
+import { downloadEmp201Csv } from '@/lib/api/sars';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Emp201Page() {
   const now = new Date();
   const [period, setPeriod] = useState(
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   );
+  const { toast } = useToast();
+  const { data: emp201Data, isLoading, error, refetch } = useEMP201(period);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  // Mock EMP201 data - in production this would come from a hook
-  const emp201Data = {
-    period,
-    totalPaye: 12500,
-    totalUif: 850,
-    totalSdl: 425,
-    employeeCount: 5,
-    totalPayable: 13775,
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const [year, month] = period.split('-').map(Number);
+      const { blob, filename } = await downloadEmp201Csv(year, month);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast({
+        title: 'Download failed',
+        description: 'Could not generate the EMP201 CSV. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDownloading(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <p className="text-destructive">{error.message}</p>
+        <Button onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
+
+  if (!emp201Data) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-muted-foreground">No EMP201 data available for this period</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -36,21 +80,24 @@ export default function Emp201Page() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">EMP201 Declaration</h1>
             <p className="text-muted-foreground">
-              Prepare and submit monthly employer declaration to SARS
+              Prepare the monthly employer declaration for SARS eFiling
             </p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleDownload} disabled={isDownloading}>
             <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
-          <Button>
-            <Send className="h-4 w-4 mr-2" />
-            Submit to SARS
+            {isDownloading ? 'Downloading...' : 'Download'}
           </Button>
         </div>
       </div>
+
+      <Alert>
+        <AlertDescription>
+          CrecheBooks does not submit EMP201 returns to SARS automatically. Download the CSV
+          and file it via the SARS eFiling portal.
+        </AlertDescription>
+      </Alert>
 
       <div className="flex items-center gap-4">
         <PeriodSelector
@@ -94,7 +141,9 @@ export default function Emp201Page() {
             <CardTitle className="text-sm font-medium">Total Payable</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{formatCurrency(emp201Data.totalPayable)}</div>
+            <div className="text-2xl font-bold text-primary">
+              {formatCurrency(emp201Data.totalDue)}
+            </div>
             <p className="text-xs text-muted-foreground">{emp201Data.employeeCount} employees</p>
           </CardContent>
         </Card>
@@ -122,10 +171,26 @@ export default function Emp201Page() {
           </div>
           <div className="flex justify-between py-2 font-semibold text-lg">
             <span>Total Amount Due</span>
-            <span className="font-mono">{formatCurrency(emp201Data.totalPayable)}</span>
+            <span className="font-mono">{formatCurrency(emp201Data.totalDue)}</span>
           </div>
         </CardContent>
       </Card>
+
+      {emp201Data.validationIssues.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Validation Issues</CardTitle>
+            <CardDescription>Review before filing with SARS</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+              {emp201Data.validationIssues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

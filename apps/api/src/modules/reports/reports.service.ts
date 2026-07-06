@@ -357,25 +357,12 @@ export class ReportsService {
         );
         break;
       }
-      default: {
-        // For unsupported types, fall back to generating an income statement for the period
-        this.logger.warn(
-          `Export for ${type} not yet implemented, generating income statement instead`,
+      default:
+        // NO FALLBACK: never silently substitute a different report type
+        throw new BadRequestException(
+          `Export is not yet supported for report type ${type}. ` +
+            `Supported types: ${ReportType.INCOME_STATEMENT}, ${ReportType.BALANCE_SHEET}.`,
         );
-        const fallbackReport =
-          await this.financialReportService.generateIncomeStatement(
-            tenantId,
-            start,
-            end,
-          );
-        buffer = await this.exportIncomeStatement(
-          fallbackReport,
-          format,
-          tenantName,
-          includeInsights,
-          tenantId,
-        );
-      }
     }
 
     // Build filename
@@ -436,10 +423,9 @@ export class ReportsService {
       case ReportType.VAT_REPORT:
         return this.generateVatReportData(tenantId, start, end);
       default:
-        return this.financialReportService.generateIncomeStatement(
-          tenantId,
-          start,
-          end,
+        // NO FALLBACK: never silently substitute income-statement data
+        throw new BadRequestException(
+          `Report type ${type} is not yet supported`,
         );
     }
   }
@@ -1468,16 +1454,25 @@ export class ReportsService {
 
   /**
    * Export balance sheet to the specified format.
+   *
+   * Only CSV is currently implemented. Other formats are rejected rather
+   * than silently returning CSV bytes labelled as PDF/Excel.
    */
   private async exportBalanceSheet(
     report: BalanceSheet,
     format: ExportFormat,
     tenantName: string,
   ): Promise<Buffer> {
-    // For now, return a simple CSV for balance sheet
-    // Full implementation would be in TASK-REPORTS-003
+    if (format !== ExportFormat.CSV) {
+      // NO FALLBACK: full PDF/Excel implementation would be in TASK-REPORTS-003
+      throw new BadRequestException(
+        `Balance sheet export is currently only available as ${ExportFormat.CSV}. ` +
+          `Requested format: ${format}.`,
+      );
+    }
+
     const lines = [
-      `"${tenantName} - Balance Sheet"`,
+      this.escapeCsv(`${tenantName} - Balance Sheet`),
       `"As at: ${report.asOfDate.toISOString().slice(0, 10)}"`,
       '',
       '"Section","Account Code","Account Name","Amount (Cents)","Amount (Rands)"',
@@ -1487,7 +1482,7 @@ export class ReportsService {
 
     for (const item of report.assets.current) {
       lines.push(
-        `"Current Assets","${item.accountCode}","${item.accountName}",${item.amountCents},${item.amountRands}`,
+        `"Current Assets",${this.escapeCsv(item.accountCode)},${this.escapeCsv(item.accountName)},${item.amountCents},${item.amountRands}`,
       );
     }
     lines.push(
@@ -1498,7 +1493,7 @@ export class ReportsService {
     lines.push('"CURRENT LIABILITIES"');
     for (const item of report.liabilities.current) {
       lines.push(
-        `"Current Liabilities","${item.accountCode}","${item.accountName}",${item.amountCents},${item.amountRands}`,
+        `"Current Liabilities",${this.escapeCsv(item.accountCode)},${this.escapeCsv(item.accountName)},${item.amountCents},${item.amountRands}`,
       );
     }
     lines.push(
@@ -1509,7 +1504,7 @@ export class ReportsService {
     lines.push('"EQUITY"');
     for (const item of report.equity.breakdown) {
       lines.push(
-        `"Equity","${item.accountCode}","${item.accountName}",${item.amountCents},${item.amountRands}`,
+        `"Equity",${this.escapeCsv(item.accountCode)},${this.escapeCsv(item.accountName)},${item.amountCents},${item.amountRands}`,
       );
     }
     lines.push(
@@ -1533,7 +1528,7 @@ export class ReportsService {
     tenantName: string,
   ): Buffer {
     const lines: string[] = [
-      `"${tenantName} - Income Statement"`,
+      this.escapeCsv(`${tenantName} - Income Statement`),
       `"Period: ${report.period.start.toISOString().slice(0, 10)} to ${report.period.end.toISOString().slice(0, 10)}"`,
       '',
       '"Account Code","Account Name","Amount (Cents)","Amount (Rands)"',
@@ -1543,7 +1538,7 @@ export class ReportsService {
 
     for (const item of report.income.breakdown) {
       lines.push(
-        `"${item.accountCode}","${item.accountName}",${item.amountCents},${item.amountRands}`,
+        `${this.escapeCsv(item.accountCode)},${this.escapeCsv(item.accountName)},${item.amountCents},${item.amountRands}`,
       );
     }
     lines.push(
@@ -1555,7 +1550,7 @@ export class ReportsService {
 
     for (const item of report.expenses.breakdown) {
       lines.push(
-        `"${item.accountCode}","${item.accountName}",${item.amountCents},${item.amountRands}`,
+        `${this.escapeCsv(item.accountCode)},${this.escapeCsv(item.accountName)},${item.amountCents},${item.amountRands}`,
       );
     }
     lines.push(
@@ -1570,6 +1565,18 @@ export class ReportsService {
     lines.push(`"Generated: ${report.generatedAt.toISOString()}"`);
 
     return Buffer.from(lines.join('\n'), 'utf-8');
+  }
+
+  /**
+   * Escape a value for CSV output: wrap in quotes and double any embedded
+   * quotes so tenant/account names cannot break the row structure.
+   * Same convention as ArrearsService.escapeCsvValue.
+   */
+  private escapeCsv(value: string | number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return '""';
+    }
+    return `"${String(value).replace(/"/g, '""')}"`;
   }
 
   // ========================================

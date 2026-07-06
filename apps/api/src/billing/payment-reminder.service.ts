@@ -10,10 +10,21 @@
  * - Idempotent bootstrap: remove-then-schedule prevents stacked repeatables
  * - Manual trigger support
  * - Schedule cancellation
+ *
+ * BUGFIX (multi-tenant cron collision): Bull keys a repeatable job by queue
+ * name + repeat options (cron/every + tz + jobId) — NOT by job payload data.
+ * Every tenant previously shared the identical repeat key ('0 9 * * *' with
+ * no jobId), so each bootstrap loop iteration removed and replaced the
+ * *same* repeatable — only the last-processed tenant ended up with a
+ * working daily reminder cron. Fix: every repeatable job is now keyed with
+ * a per-tenant jobId (`payment-reminder:<tenantId>`), via a directly
+ * injected Bull queue (see InvoiceScheduleService for the identical pattern
+ * and full rationale).
  */
 
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import type { Job } from 'bull';
+import { InjectQueue } from '@nestjs/bull';
+import type { Job, Queue } from 'bull';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { PrismaService } from '../database/prisma/prisma.service';
 import { AuditLogService } from '../database/services/audit-log.service';
@@ -21,6 +32,7 @@ import { AuditAction } from '../database/entities/audit-log.entity';
 import {
   QUEUE_NAMES,
   PaymentReminderJobData,
+  DEFAULT_JOB_OPTIONS,
 } from '../scheduler/types/scheduler.types';
 import { BusinessException } from '../shared/exceptions';
 import { InvoiceStatus } from '../database/entities/invoice.entity';
@@ -45,9 +57,19 @@ export class PaymentReminderService implements OnApplicationBootstrap {
 
   constructor(
     private readonly schedulerService: SchedulerService,
+    @InjectQueue(QUEUE_NAMES.PAYMENT_REMINDER)
+    private readonly reminderQueue: Queue<PaymentReminderJobData>,
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  /**
+   * Deterministic per-tenant Bull repeatable jobId. Ensures each tenant's
+   * repeatable cron is keyed independently (see BUGFIX note in file header).
+   */
+  private getRepeatableJobId(tenantId: string): string {
+    return `${QUEUE_NAMES.PAYMENT_REMINDER}:${tenantId}`;
+  }
 
   /**
    * Bootstrap hook: register the daily payment-reminder cron for every
@@ -55,8 +77,8 @@ export class PaymentReminderService implements OnApplicationBootstrap {
    *
    * Cron schedule: '0 9 * * *' = 09:00 SAST daily.
    *
-   * Idempotency: removeRepeatableCronJob() is called before scheduleReminders()
-   * for each tenant. Repeated cold-starts are safe.
+   * Idempotency: this tenant's repeatable is removed (by jobId) before being
+   * re-scheduled. Repeated cold-starts are safe.
    */
   async onApplicationBootstrap(): Promise<void> {
     const activeTenants = await this.prisma.tenant.findMany({
@@ -79,10 +101,12 @@ export class PaymentReminderService implements OnApplicationBootstrap {
 
     for (const tenant of activeTenants) {
       try {
-        await this.schedulerService.removeRepeatableCronJob(
-          QUEUE_NAMES.PAYMENT_REMINDER,
-          DEFAULT_CRON,
-        );
+        // Scoped to this tenant's jobId only — does NOT remove other
+        // tenants' repeatables (see BUGFIX note in file header).
+        await this.reminderQueue.removeRepeatable({
+          cron: DEFAULT_CRON,
+          jobId: this.getRepeatableJobId(tenant.id),
+        });
         await this.scheduleReminders(tenant.id, DEFAULT_CRON);
         this.logger.log(
           `Registered reminder cron for tenant ${tenant.id} (${tenant.name})`,
@@ -141,12 +165,14 @@ export class PaymentReminderService implements OnApplicationBootstrap {
       reminderType: 'gentle', // Type determined at runtime based on days overdue
     };
 
-    // Schedule recurring cron job
-    await this.schedulerService.scheduleCronJob(
-      QUEUE_NAMES.PAYMENT_REMINDER,
-      jobData,
-      cronExpression,
-    );
+    // Schedule recurring cron job, keyed to this tenant's jobId so Bull
+    // treats each tenant's repeatable as independent (see BUGFIX note above).
+    const jobId = this.getRepeatableJobId(tenantId);
+    await this.reminderQueue.add(jobData, {
+      ...DEFAULT_JOB_OPTIONS,
+      jobId,
+      repeat: { cron: cronExpression },
+    });
 
     this.logger.log({
       message: 'Payment reminders scheduled',
@@ -154,6 +180,7 @@ export class PaymentReminderService implements OnApplicationBootstrap {
       tenantName: tenant.name,
       cronExpression,
       timezone: DEFAULT_TIMEZONE,
+      jobId,
       timestamp: new Date().toISOString(),
     });
 
@@ -179,10 +206,10 @@ export class PaymentReminderService implements OnApplicationBootstrap {
    * @param tenantId - Tenant ID
    */
   async cancelReminders(tenantId: string): Promise<void> {
-    await this.schedulerService.removeRepeatableCronJob(
-      QUEUE_NAMES.PAYMENT_REMINDER,
-      DEFAULT_CRON,
-    );
+    await this.reminderQueue.removeRepeatable({
+      cron: DEFAULT_CRON,
+      jobId: this.getRepeatableJobId(tenantId),
+    });
 
     this.logger.log({
       message: 'Payment reminder schedule cancellation requested',

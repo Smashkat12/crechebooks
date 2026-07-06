@@ -82,6 +82,27 @@ export class XeroSyncRecoveryProcessor {
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async processRecovery(): Promise<RecoveryRunResult> {
+    // The per-entity sync handlers below (syncInvoice, syncPayment, etc.)
+    // were never implemented — they only look the entity up and log
+    // "Would sync ... to Xero". Running this job would therefore mark
+    // pending items COMPLETED without any Xero write (real sync lives in
+    // database/services/xero-sync.service.ts). Keep the job disabled until
+    // the handlers perform real writes.
+    if (process.env.XERO_SYNC_RECOVERY_ENABLED !== 'true') {
+      this.logger.debug(
+        'Xero sync recovery is disabled (handlers not implemented); pending items left untouched. Set XERO_SYNC_RECOVERY_ENABLED=true only once real sync is implemented.',
+      );
+      return {
+        startedAt: new Date(),
+        completedAt: new Date(),
+        itemsProcessed: 0,
+        itemsSucceeded: 0,
+        itemsFailed: 0,
+        circuitState: this.circuitBreaker.getState(),
+        errors: [],
+      };
+    }
+
     // Prevent concurrent runs
     if (this.isRunning) {
       this.logger.debug('Recovery job already running, skipping');

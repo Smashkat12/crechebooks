@@ -1,8 +1,15 @@
 /**
  * Invoice Schedule Service Tests
  * TASK-BILL-016: Invoice Generation Scheduling Cron Job
+ *
+ * BUGFIX (multi-tenant cron collision): scheduleTenantInvoices/cancelSchedule
+ * now call the injected Bull queue directly (queue.add/removeRepeatable) with
+ * a per-tenant jobId, instead of SchedulerService.scheduleCronJob/
+ * removeRepeatableCronJob (which do not thread a jobId through). Tests below
+ * mock the injected queue accordingly.
  */
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bull';
 import { InvoiceScheduleService } from '../invoice-schedule.service';
 import { SchedulerService } from '../../scheduler/scheduler.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -13,6 +20,7 @@ import { QUEUE_NAMES } from '../../scheduler/types/scheduler.types';
 describe('InvoiceScheduleService', () => {
   let service: InvoiceScheduleService;
   let mockSchedulerService: any;
+  let mockInvoiceQueue: any;
   let mockPrisma: any;
   let mockAuditLogService: any;
 
@@ -23,6 +31,11 @@ describe('InvoiceScheduleService', () => {
       scheduleCronJob: jest.fn(),
       scheduleJob: jest.fn(),
       removeRepeatableCronJob: jest.fn(),
+    };
+
+    mockInvoiceQueue = {
+      add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+      removeRepeatable: jest.fn().mockResolvedValue(undefined),
     };
 
     mockPrisma = {
@@ -40,6 +53,10 @@ describe('InvoiceScheduleService', () => {
       providers: [
         InvoiceScheduleService,
         { provide: SchedulerService, useValue: mockSchedulerService },
+        {
+          provide: getQueueToken(QUEUE_NAMES.INVOICE_GENERATION),
+          useValue: mockInvoiceQueue,
+        },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditLogService, useValue: mockAuditLogService },
       ],
@@ -49,7 +66,7 @@ describe('InvoiceScheduleService', () => {
   });
 
   describe('scheduleTenantInvoices', () => {
-    it('should schedule invoices with default cron (6AM on 1st)', async () => {
+    it('should schedule invoices with default cron (6AM on 1st), keyed by per-tenant jobId', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: tenantId,
         name: 'Test Creche',
@@ -57,14 +74,16 @@ describe('InvoiceScheduleService', () => {
 
       await service.scheduleTenantInvoices(tenantId);
 
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.INVOICE_GENERATION,
+      expect(mockInvoiceQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId,
           triggeredBy: 'cron',
           dryRun: false,
         }),
-        '0 6 1 * *',
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`,
+          repeat: { cron: '0 6 1 * *' },
+        }),
       );
 
       expect(mockAuditLogService.logAction).toHaveBeenCalled();
@@ -80,10 +99,12 @@ describe('InvoiceScheduleService', () => {
 
       await service.scheduleTenantInvoices(tenantId, customCron);
 
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.INVOICE_GENERATION,
+      expect(mockInvoiceQueue.add).toHaveBeenCalledWith(
         expect.any(Object),
-        customCron,
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`,
+          repeat: { cron: customCron },
+        }),
       );
     });
 
@@ -189,8 +210,6 @@ describe('InvoiceScheduleService', () => {
 
   describe('cancelSchedule', () => {
     it('should cancel schedule and log audit', async () => {
-      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
-
       await service.cancelSchedule(tenantId);
 
       expect(mockAuditLogService.logAction).toHaveBeenCalledWith(
@@ -204,15 +223,13 @@ describe('InvoiceScheduleService', () => {
       );
     });
 
-    it('should invoke removeRepeatableCronJob with INVOICE_GENERATION queue and default cron', async () => {
-      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
-
+    it('should invoke queue.removeRepeatable with default cron and this tenant jobId only', async () => {
       await service.cancelSchedule(tenantId);
 
-      expect(mockSchedulerService.removeRepeatableCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.INVOICE_GENERATION,
-        '0 6 1 * *',
-      );
+      expect(mockInvoiceQueue.removeRepeatable).toHaveBeenCalledWith({
+        cron: '0 6 1 * *',
+        jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`,
+      });
     });
   });
 
@@ -222,7 +239,6 @@ describe('InvoiceScheduleService', () => {
         id: tenantId,
         name: 'Test Creche',
       });
-      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
 
       const newCron = '0 9 5 * *';
 
@@ -239,10 +255,12 @@ describe('InvoiceScheduleService', () => {
       );
 
       // Then schedule new
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.INVOICE_GENERATION,
+      expect(mockInvoiceQueue.add).toHaveBeenCalledWith(
         expect.any(Object),
-        newCron,
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`,
+          repeat: { cron: newCron },
+        }),
       );
     });
 
@@ -251,16 +269,14 @@ describe('InvoiceScheduleService', () => {
         id: tenantId,
         name: 'Test Creche',
       });
-      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
 
       const callOrder: string[] = [];
-      mockSchedulerService.removeRepeatableCronJob.mockImplementation(
-        async () => {
-          callOrder.push('cancel');
-        },
-      );
-      mockSchedulerService.scheduleCronJob.mockImplementation(async () => {
+      mockInvoiceQueue.removeRepeatable.mockImplementation(async () => {
+        callOrder.push('cancel');
+      });
+      mockInvoiceQueue.add.mockImplementation(async () => {
         callOrder.push('schedule');
+        return { id: 'job-1' };
       });
 
       await service.updateSchedule(tenantId, '0 9 5 * *');
@@ -342,15 +358,15 @@ describe('InvoiceScheduleService', () => {
       await service.scheduleTenantInvoices(tenantId);
 
       // Verify the billingMonth format in the job data
-      const call = mockSchedulerService.scheduleCronJob.mock.calls[0];
-      const jobData = call[1];
+      const call = mockInvoiceQueue.add.mock.calls[0];
+      const jobData = call[0];
 
       expect(jobData.billingMonth).toMatch(/^\d{4}-\d{2}$/);
     });
   });
 
   describe('onApplicationBootstrap', () => {
-    it('calls scheduleCronJob once per ACTIVE tenant', async () => {
+    it('calls queue.add once per ACTIVE tenant, each with a distinct per-tenant jobId', async () => {
       mockPrisma.tenant.findMany = jest.fn().mockResolvedValue([
         { id: 'tenant-a', name: 'Creche A' },
         { id: 'tenant-b', name: 'Creche B' },
@@ -362,22 +378,42 @@ describe('InvoiceScheduleService', () => {
 
       await service.onApplicationBootstrap();
 
-      // removeRepeatableCronJob called once per tenant before scheduling
-      expect(
-        mockSchedulerService.removeRepeatableCronJob,
-      ).toHaveBeenCalledTimes(2);
-      // scheduleCronJob called once per tenant
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.INVOICE_GENERATION,
+      // removeRepeatable called once per tenant before scheduling
+      expect(mockInvoiceQueue.removeRepeatable).toHaveBeenCalledTimes(2);
+      expect(mockInvoiceQueue.removeRepeatable).toHaveBeenCalledWith({
+        cron: '0 6 1 * *',
+        jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:tenant-a`,
+      });
+      expect(mockInvoiceQueue.removeRepeatable).toHaveBeenCalledWith({
+        cron: '0 6 1 * *',
+        jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:tenant-b`,
+      });
+
+      // queue.add called once per tenant, each with its own jobId (this is
+      // the crux of the multi-tenant collision fix — both tenants get a
+      // real, independent repeatable job).
+      expect(mockInvoiceQueue.add).toHaveBeenCalledTimes(2);
+      expect(mockInvoiceQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 'tenant-a' }),
-        '0 6 1 * *',
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:tenant-a`,
+          repeat: { cron: '0 6 1 * *' },
+        }),
       );
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.INVOICE_GENERATION,
+      expect(mockInvoiceQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 'tenant-b' }),
-        '0 6 1 * *',
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:tenant-b`,
+          repeat: { cron: '0 6 1 * *' },
+        }),
       );
+
+      // The two jobIds must differ — this is what prevents tenant-b's
+      // removeRepeatable from ever targeting tenant-a's repeatable.
+      const jobIds = mockInvoiceQueue.add.mock.calls.map(
+        (call: any[]) => call[1].jobId,
+      );
+      expect(new Set(jobIds).size).toBe(2);
     });
 
     it('is idempotent: calling twice results in remove-then-schedule for each call', async () => {
@@ -392,12 +428,10 @@ describe('InvoiceScheduleService', () => {
       await service.onApplicationBootstrap();
       await service.onApplicationBootstrap();
 
-      // removeRepeatableCronJob called before each scheduleCronJob on each bootstrap
-      // 2 bootstraps × 1 tenant = 2 remove calls, 2 schedule calls
-      expect(
-        mockSchedulerService.removeRepeatableCronJob,
-      ).toHaveBeenCalledTimes(2);
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
+      // removeRepeatable called before each queue.add on each bootstrap
+      // 2 bootstraps × 1 tenant = 2 remove calls, 2 add calls
+      expect(mockInvoiceQueue.removeRepeatable).toHaveBeenCalledTimes(2);
+      expect(mockInvoiceQueue.add).toHaveBeenCalledTimes(2);
     });
 
     it('skips registration when no ACTIVE tenants exist', async () => {
@@ -405,7 +439,7 @@ describe('InvoiceScheduleService', () => {
 
       await service.onApplicationBootstrap();
 
-      expect(mockSchedulerService.scheduleCronJob).not.toHaveBeenCalled();
+      expect(mockInvoiceQueue.add).not.toHaveBeenCalled();
     });
 
     it('continues registering remaining tenants if one fails', async () => {
@@ -421,11 +455,12 @@ describe('InvoiceScheduleService', () => {
       await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
 
       // tenant-b was still scheduled despite tenant-a failing
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(1);
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.INVOICE_GENERATION,
+      expect(mockInvoiceQueue.add).toHaveBeenCalledTimes(1);
+      expect(mockInvoiceQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 'tenant-b' }),
-        '0 6 1 * *',
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:tenant-b`,
+        }),
       );
     });
   });

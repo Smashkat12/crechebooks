@@ -20,7 +20,7 @@ import { XeroSyncService } from '../../../database/services/xero-sync.service';
 import type { IUser } from '../../../database/entities/user.entity';
 
 // Mock TokenManager so it doesn't try to read env vars / decrypt tokens
-jest.mock('../../../mcp/xero-mcp/auth/token-manager', () => ({
+jest.mock('../../../integrations/xero/client/auth/token-manager', () => ({
   TokenManager: jest.fn().mockImplementation(() => ({
     hasValidConnection: jest.fn().mockResolvedValue(true),
     getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),

@@ -6,9 +6,6 @@
 // Chart of Accounts
 export * from './chart-of-accounts.constants';
 
-// Invoice Line Type to Account Mapping
-export * from './line-type-accounts.constants';
-
 // VAT Constants
 export * from './vat.constants';
 

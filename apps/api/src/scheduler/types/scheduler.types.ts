@@ -5,8 +5,6 @@ export const QUEUE_NAMES = {
   BANK_SYNC: 'bank-sync',
   STATEMENT_GENERATION: 'statement-generation',
   SIMPLEPAY_SYNC: 'simplepay-sync',
-  /** TASK-WA-006: Queue for WhatsApp message retries with exponential backoff */
-  WHATSAPP_RETRY: 'whatsapp-retry',
   /** TASK-COMM-002: Queue for broadcast message processing */
   BROADCAST: 'broadcast',
   NOTIFICATION: 'notification',

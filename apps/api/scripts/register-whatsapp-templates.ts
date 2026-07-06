@@ -8,7 +8,7 @@
  *
  * Usage:
  *   cd apps/api
- *   npx tsx src/scripts/register-whatsapp-templates.ts
+ *   npx tsx scripts/register-whatsapp-templates.ts
  *
  * Required environment variables:
  *   - TWILIO_ACCOUNT_SID
@@ -19,8 +19,8 @@
  */
 
 import 'dotenv/config';
-import { ALL_TEMPLATES } from '../integrations/whatsapp/templates/content-templates';
-import type { ContentTemplateDefinition } from '../integrations/whatsapp/types/content.types';
+import { ALL_TEMPLATES } from '../src/integrations/whatsapp/templates/content-templates';
+import type { ContentTemplateDefinition } from '../src/integrations/whatsapp/types/content.types';
 
 // Twilio API configuration
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;

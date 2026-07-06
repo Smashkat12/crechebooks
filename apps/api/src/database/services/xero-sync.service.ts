@@ -60,15 +60,15 @@ import {
 } from '../entities/xero-account.entity';
 import { SUSPENSE_ACCOUNT_CODE } from '../entities/categorization-journal.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
-import { RateLimiter } from '../../mcp/xero-mcp/utils/rate-limiter';
+import { RateLimiter } from '../../integrations/xero/client/utils/rate-limiter';
 
 // Import Xero MCP tools
 import {
   getAccounts,
   getTransactions,
   updateTransaction,
-} from '../../mcp/xero-mcp/tools';
-import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
+} from '../../integrations/xero/client/tools';
+import { TokenManager } from '../../integrations/xero/client/auth/token-manager';
 
 // Error message indicating transaction is reconciled and cannot be edited
 const RECONCILED_TRANSACTION_ERROR =
@@ -912,7 +912,7 @@ export class XeroSyncService {
 
       // Import createContact tool
       const { createContact } =
-        await import('../../mcp/xero-mcp/tools/index.js');
+        await import('../../integrations/xero/client/tools/index.js');
 
       // Create contact via Xero API
       const contactName = `${parent.firstName} ${parent.lastName}`;

@@ -528,7 +528,7 @@ export class XeroContactService {
   private getAccessToken(tenantId: string): Promise<string> {
     // Import and use TokenManager
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { TokenManager } = require('../../mcp/xero-mcp/auth/token-manager');
+    const { TokenManager } = require('../../integrations/xero/client/auth/token-manager');
     const tokenManager = new TokenManager(this.prisma);
     return tokenManager.getAccessToken(tenantId);
   }

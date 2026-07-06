@@ -4,8 +4,15 @@
  *
  * Focuses on cancelReminders() wiring and the cancel-before-schedule
  * ordering guarantee introduced by AUDIT-BILL-05.
+ *
+ * BUGFIX (multi-tenant cron collision): scheduleReminders/cancelReminders
+ * now call the injected Bull queue directly (queue.add/removeRepeatable)
+ * with a per-tenant jobId, instead of SchedulerService.scheduleCronJob/
+ * removeRepeatableCronJob (which do not thread a jobId through). Tests
+ * below mock the injected queue accordingly.
  */
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bull';
 import { PaymentReminderService } from '../payment-reminder.service';
 import { SchedulerService } from '../../scheduler/scheduler.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
@@ -21,6 +28,7 @@ describe('PaymentReminderService', () => {
       'scheduleCronJob' | 'scheduleJob' | 'removeRepeatableCronJob'
     >
   >;
+  let mockReminderQueue: any;
   let mockPrisma: any;
   let mockAuditLogService: any;
 
@@ -31,6 +39,11 @@ describe('PaymentReminderService', () => {
       scheduleCronJob: jest.fn(),
       scheduleJob: jest.fn(),
       removeRepeatableCronJob: jest.fn(),
+    };
+
+    mockReminderQueue = {
+      add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+      removeRepeatable: jest.fn().mockResolvedValue(undefined),
     };
 
     mockPrisma = {
@@ -50,6 +63,10 @@ describe('PaymentReminderService', () => {
       providers: [
         PaymentReminderService,
         { provide: SchedulerService, useValue: mockSchedulerService },
+        {
+          provide: getQueueToken(QUEUE_NAMES.PAYMENT_REMINDER),
+          useValue: mockReminderQueue,
+        },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditLogService, useValue: mockAuditLogService },
       ],
@@ -59,24 +76,23 @@ describe('PaymentReminderService', () => {
   });
 
   describe('scheduleReminders', () => {
-    it('should schedule reminders with default cron (09:00 SAST daily)', async () => {
+    it('should schedule reminders with default cron (09:00 SAST daily), keyed by per-tenant jobId', async () => {
       mockPrisma.tenant.findUnique.mockResolvedValue({
         id: tenantId,
         name: 'Test Creche',
       });
-      mockSchedulerService.scheduleCronJob.mockResolvedValue({
-        id: 'job-1',
-      } as any);
 
       await service.scheduleReminders(tenantId);
 
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.PAYMENT_REMINDER,
+      expect(mockReminderQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId,
           triggeredBy: 'cron',
         }),
-        '0 9 * * *',
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.PAYMENT_REMINDER}:${tenantId}`,
+          repeat: { cron: '0 9 * * *' },
+        }),
       );
       expect(mockAuditLogService.logAction).toHaveBeenCalled();
     });
@@ -102,20 +118,16 @@ describe('PaymentReminderService', () => {
   });
 
   describe('cancelReminders', () => {
-    it('should invoke removeRepeatableCronJob with PAYMENT_REMINDER queue and default cron', async () => {
-      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
-
+    it('should invoke queue.removeRepeatable with default cron and this tenant jobId only', async () => {
       await service.cancelReminders(tenantId);
 
-      expect(mockSchedulerService.removeRepeatableCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.PAYMENT_REMINDER,
-        '0 9 * * *',
-      );
+      expect(mockReminderQueue.removeRepeatable).toHaveBeenCalledWith({
+        cron: '0 9 * * *',
+        jobId: `${QUEUE_NAMES.PAYMENT_REMINDER}:${tenantId}`,
+      });
     });
 
     it('should audit-log the cancellation', async () => {
-      mockSchedulerService.removeRepeatableCronJob.mockResolvedValue(undefined);
-
       await service.cancelReminders(tenantId);
 
       expect(mockAuditLogService.logAction).toHaveBeenCalledWith(
@@ -154,7 +166,7 @@ describe('PaymentReminderService', () => {
   });
 
   describe('onApplicationBootstrap', () => {
-    it('calls scheduleReminders once per ACTIVE tenant', async () => {
+    it('calls queue.add once per ACTIVE tenant, each with a distinct per-tenant jobId', async () => {
       mockPrisma.tenant.findMany.mockResolvedValue([
         { id: 'tenant-a', name: 'Creche A' },
         { id: 'tenant-b', name: 'Creche B' },
@@ -165,20 +177,28 @@ describe('PaymentReminderService', () => {
 
       await service.onApplicationBootstrap();
 
-      expect(
-        mockSchedulerService.removeRepeatableCronJob,
-      ).toHaveBeenCalledTimes(2);
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.PAYMENT_REMINDER,
+      expect(mockReminderQueue.removeRepeatable).toHaveBeenCalledTimes(2);
+      expect(mockReminderQueue.add).toHaveBeenCalledTimes(2);
+      expect(mockReminderQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 'tenant-a' }),
-        '0 9 * * *',
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.PAYMENT_REMINDER}:tenant-a`,
+          repeat: { cron: '0 9 * * *' },
+        }),
       );
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledWith(
-        QUEUE_NAMES.PAYMENT_REMINDER,
+      expect(mockReminderQueue.add).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: 'tenant-b' }),
-        '0 9 * * *',
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.PAYMENT_REMINDER}:tenant-b`,
+          repeat: { cron: '0 9 * * *' },
+        }),
       );
+
+      // Distinct jobIds are the crux of the multi-tenant collision fix.
+      const jobIds = mockReminderQueue.add.mock.calls.map(
+        (call: any[]) => call[1].jobId,
+      );
+      expect(new Set(jobIds).size).toBe(2);
     });
 
     it('is idempotent: calling twice does remove-then-schedule each time', async () => {
@@ -193,10 +213,8 @@ describe('PaymentReminderService', () => {
       await service.onApplicationBootstrap();
       await service.onApplicationBootstrap();
 
-      expect(
-        mockSchedulerService.removeRepeatableCronJob,
-      ).toHaveBeenCalledTimes(2);
-      expect(mockSchedulerService.scheduleCronJob).toHaveBeenCalledTimes(2);
+      expect(mockReminderQueue.removeRepeatable).toHaveBeenCalledTimes(2);
+      expect(mockReminderQueue.add).toHaveBeenCalledTimes(2);
     });
 
     it('skips registration when no ACTIVE tenants exist', async () => {
@@ -204,7 +222,7 @@ describe('PaymentReminderService', () => {
 
       await service.onApplicationBootstrap();
 
-      expect(mockSchedulerService.scheduleCronJob).not.toHaveBeenCalled();
+      expect(mockReminderQueue.add).not.toHaveBeenCalled();
     });
   });
 });

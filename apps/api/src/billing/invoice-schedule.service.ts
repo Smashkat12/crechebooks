@@ -14,10 +14,24 @@
  * Staging-safety contract: delivery suppression is enforced inside
  * InvoiceSchedulerProcessor (COMMS_DISABLED flag + APP_ENV guard). This
  * service only registers/removes Bull repeatable jobs; it does NOT send.
+ *
+ * BUGFIX (multi-tenant cron collision): Bull keys a repeatable job by queue
+ * name + repeat options (cron/every + tz + jobId) — NOT by job payload data.
+ * Every tenant previously shared the identical repeat key ('0 6 1 * *' with
+ * no jobId), so each bootstrap loop iteration removed and replaced the
+ * *same* repeatable — only the last-processed tenant ended up with a
+ * working cron. Fix: every repeatable job is now keyed with a per-tenant
+ * jobId (`invoice-generation:<tenantId>`). Bull's own SchedulerService
+ * wrapper (scheduleCronJob/removeRepeatableCronJob) does not thread a jobId
+ * through to the queue, so this service injects the same Bull queue that
+ * SchedulerService uses (registered once per app in SchedulerModule) and
+ * calls queue.add()/removeRepeatable() directly for repeat-job registration
+ * only. SchedulerService is still used for one-off manual jobs.
  */
 
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import type { Job } from 'bull';
+import { InjectQueue } from '@nestjs/bull';
+import type { Job, Queue } from 'bull';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { PrismaService } from '../database/prisma/prisma.service';
 import { AuditLogService } from '../database/services/audit-log.service';
@@ -25,6 +39,7 @@ import { AuditAction } from '../database/entities/audit-log.entity';
 import {
   QUEUE_NAMES,
   InvoiceGenerationJobData,
+  DEFAULT_JOB_OPTIONS,
 } from '../scheduler/types/scheduler.types';
 import { BusinessException } from '../shared/exceptions';
 import { SubscriptionStatus } from '../database/entities/tenant.entity';
@@ -51,9 +66,19 @@ export class InvoiceScheduleService implements OnApplicationBootstrap {
 
   constructor(
     private readonly schedulerService: SchedulerService,
+    @InjectQueue(QUEUE_NAMES.INVOICE_GENERATION)
+    private readonly invoiceQueue: Queue<InvoiceGenerationJobData>,
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  /**
+   * Deterministic per-tenant Bull repeatable jobId. Ensures each tenant's
+   * repeatable cron is keyed independently (see BUGFIX note in file header).
+   */
+  private getRepeatableJobId(tenantId: string): string {
+    return `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`;
+  }
 
   /**
    * Bootstrap hook: register the monthly invoice-generation cron for every
@@ -61,8 +86,8 @@ export class InvoiceScheduleService implements OnApplicationBootstrap {
    *
    * Cron schedule: '0 6 1 * *' = 06:00 SAST on the 1st of each month.
    *
-   * Idempotency: removeRepeatableCronJob() is called before scheduleCronJob()
-   * for each tenant. Bull's removeRepeatable() is a no-op when the repeatable
+   * Idempotency: this tenant's repeatable is removed (by jobId) before being
+   * re-scheduled. Bull's removeRepeatable() is a no-op when the repeatable
    * does not exist, so repeated cold-starts are safe.
    *
    * Staging-safety: this method only enqueues the *generation* job. Delivery
@@ -90,11 +115,13 @@ export class InvoiceScheduleService implements OnApplicationBootstrap {
 
     for (const tenant of activeTenants) {
       try {
-        // Remove-then-schedule ensures no stacked repeatables on restart
-        await this.schedulerService.removeRepeatableCronJob(
-          QUEUE_NAMES.INVOICE_GENERATION,
-          DEFAULT_CRON,
-        );
+        // Remove-then-schedule ensures no stacked repeatables on restart.
+        // Scoped to this tenant's jobId only — does NOT remove other
+        // tenants' repeatables (see BUGFIX note in file header).
+        await this.invoiceQueue.removeRepeatable({
+          cron: DEFAULT_CRON,
+          jobId: this.getRepeatableJobId(tenant.id),
+        });
         await this.scheduleTenantInvoices(
           tenant.id,
           DEFAULT_CRON,
@@ -164,12 +191,14 @@ export class InvoiceScheduleService implements OnApplicationBootstrap {
       dryRun: false,
     };
 
-    // Schedule recurring cron job
-    await this.schedulerService.scheduleCronJob(
-      QUEUE_NAMES.INVOICE_GENERATION,
-      jobData,
-      cronExpression,
-    );
+    // Schedule recurring cron job, keyed to this tenant's jobId so Bull
+    // treats each tenant's repeatable as independent (see BUGFIX note above).
+    const jobId = this.getRepeatableJobId(tenantId);
+    await this.invoiceQueue.add(jobData, {
+      ...DEFAULT_JOB_OPTIONS,
+      jobId,
+      repeat: { cron: cronExpression },
+    });
 
     this.logger.log({
       message: 'Invoice generation scheduled',
@@ -177,6 +206,7 @@ export class InvoiceScheduleService implements OnApplicationBootstrap {
       tenantName: tenant.name,
       cronExpression,
       timezone,
+      jobId,
       nextBillingMonth: nextMonth,
       timestamp: new Date().toISOString(),
     });
@@ -203,10 +233,10 @@ export class InvoiceScheduleService implements OnApplicationBootstrap {
    * @param tenantId - Tenant ID
    */
   async cancelSchedule(tenantId: string): Promise<void> {
-    await this.schedulerService.removeRepeatableCronJob(
-      QUEUE_NAMES.INVOICE_GENERATION,
-      DEFAULT_CRON,
-    );
+    await this.invoiceQueue.removeRepeatable({
+      cron: DEFAULT_CRON,
+      jobId: this.getRepeatableJobId(tenantId),
+    });
 
     this.logger.log({
       message: 'Invoice schedule cancellation requested',

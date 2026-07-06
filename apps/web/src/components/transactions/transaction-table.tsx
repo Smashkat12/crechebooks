@@ -71,10 +71,6 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
     setDetailModalOpen(true);
   };
 
-  const handleDelete = async (transaction: ITransaction) => {
-    // TODO: Implement delete confirmation and mutation
-  };
-
   const handleSplit = (transaction: ITransaction) => {
     setSplitTransaction(transaction);
     setSplitModalOpen(true);
@@ -94,10 +90,12 @@ export function TransactionTable({ tenantId, className, year }: TransactionTable
       onView: handleView,
       onEdit: handleEdit,
       onSplit: handleSplit,
-      onDelete: handleDelete,
+      // No DELETE /transactions/:id endpoint exists in the API — the menu
+      // item is omitted rather than wired to a no-op (see getTransactionColumns,
+      // which only renders "Delete" when onDelete is passed).
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handleView, handleEdit, handleSplit, handleDelete]
+    [handleView, handleEdit, handleSplit]
   );
 
   if (isLoading) {

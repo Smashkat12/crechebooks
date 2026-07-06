@@ -28,9 +28,15 @@ import {
   ReportDashboardSkeleton,
 } from '@/components/reports';
 import type { DateRange, ExportFormat } from '@/components/reports';
-import { useReportData } from '@/hooks/use-report-data';
+import { useReportData, useReportTypes } from '@/hooks/use-report-data';
 import { useAIInsights } from '@/hooks/use-ai-insights';
 import { useExportReport } from '@/hooks/useExportReport';
+
+/** Maps the backend's uppercase export format enum to the frontend's lowercase union. */
+function toExportFormat(format: 'PDF' | 'EXCEL' | 'CSV'): ExportFormat {
+  if (format === 'EXCEL') return 'xlsx';
+  return format.toLowerCase() as ExportFormat;
+}
 
 /**
  * Error state component with retry button.
@@ -99,6 +105,16 @@ export default function ReportsPage() {
     isLoading: insightsLoading,
   } = useAIInsights(selectedReport, reportData);
 
+  // Report type catalogue - sources which export formats are supported per
+  // type (GET /reports/types). Undefined/absent exportFormats falls back to
+  // showing all formats, matching prior behaviour.
+  const { data: reportTypesData } = useReportTypes();
+  const selectedReportTypeInfo = reportTypesData?.types.find(
+    (t) => t.type === selectedReport
+  );
+  const allowedExportFormats: ExportFormat[] | undefined =
+    selectedReportTypeInfo?.exportFormats.map(toExportFormat);
+
   // Export mutation
   const exportReport = useExportReport();
 
@@ -153,6 +169,7 @@ export default function ReportsPage() {
             onExport={handleExport}
             disabled={!reportData || dataLoading || exportReport.isPending}
             hasInsights={!!aiInsights}
+            formats={allowedExportFormats}
           />
         </div>
       </div>

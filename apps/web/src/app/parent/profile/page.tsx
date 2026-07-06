@@ -37,6 +37,7 @@ import {
   useParentProfile,
   useUpdateParentProfile,
   useUpdateCommunicationPrefs,
+  useRequestAccountDeletion,
   type ParentProfile,
   type CommunicationPreferences,
 } from '@/hooks/parent-portal/use-parent-profile';
@@ -59,12 +60,13 @@ function ProfilePageContent() {
   // State for delete account modal
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch profile data
   const { data: profile, isLoading: profileLoading, error: profileError, isError: isProfileError } = useParentProfile();
   const updateProfileMutation = useUpdateParentProfile();
   const updatePrefsMutation = useUpdateCommunicationPrefs();
+  const requestDeletionMutation = useRequestAccountDeletion();
+  const isDeleting = requestDeletionMutation.isPending;
 
   // Check authentication on mount
   useEffect(() => {
@@ -107,17 +109,13 @@ function ProfilePageContent() {
   };
 
   const handleDeleteAccountRequest = async () => {
-    setIsDeleting(true);
     try {
-      // In production, this would call the API
-      // await requestAccountDeletion({ reason: deleteReason });
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      const result = await requestDeletionMutation.mutateAsync({
+        reason: deleteReason || undefined,
+      });
       toast({
         title: 'Deletion Request Submitted',
-        description: 'Your account deletion request has been submitted. You will receive confirmation via email.',
+        description: result.message,
       });
       setDeleteDialogOpen(false);
       setDeleteReason('');
@@ -127,8 +125,6 @@ function ProfilePageContent() {
         description: error instanceof Error ? error.message : 'Failed to submit deletion request',
         variant: 'destructive',
       });
-    } finally {
-      setIsDeleting(false);
     }
   };
 

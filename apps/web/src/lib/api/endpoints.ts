@@ -48,6 +48,7 @@ export const endpoints = {
   sars: {
     vat201: '/sars/vat201',
     emp201: '/sars/emp201',
+    emp201Download: '/sars/emp201/download',
     submit: (id: string) => `/sars/${id}/submit`,
     submissions: '/sars/submissions',
     readiness: '/sars/readiness',

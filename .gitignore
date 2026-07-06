@@ -72,6 +72,19 @@ output.txt
 .claude-flow/pids/
 .claude-flow/security/
 .claude-flow/swarm/
+.claude-flow/.trend-cache.json
+.claude-flow/events.jsonl
+.claude-flow/neural/models.json
+.claude-flow/session-state.json
+.claude-flow/tasks/store.json
+
+# claude-flow runtime state at repo root (generated, never commit)
+/.ai/
+/agents/*.json
+
+# Exported bank data and pipeline logs — never commit
+transactions*.csv
+pipeline-logs.txt
 
 # Memory and session data (local state)
 **/memory/backups/

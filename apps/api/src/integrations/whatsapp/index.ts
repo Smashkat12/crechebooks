@@ -1,6 +1,5 @@
 export { WhatsAppService } from './whatsapp.service';
 export { WhatsAppModule } from './whatsapp.module';
-export { WhatsAppTemplateService } from './services/template.service';
 export { WhatsAppMessageEntity } from './entities/whatsapp-message.entity';
 export type {
   WhatsAppMessageResult,
@@ -11,21 +10,6 @@ export type {
   WhatsAppDeliveryStatus,
   WhatsAppConfig,
 } from './types/whatsapp.types';
-
-// TASK-WA-002: Template Management Types
-export type {
-  TemplateDefinition,
-  TemplateParameterDef,
-  TemplateParameterValues,
-  BuiltTemplate,
-  TemplateValidationResult,
-  TemplateUsageContext,
-} from './types/template.types';
-export {
-  CRECHEBOOKS_TEMPLATES,
-  getTemplateDefinition,
-  templateRequiresOptIn,
-} from './types/template.types';
 
 // TASK-WA-001: Message History Types
 export {

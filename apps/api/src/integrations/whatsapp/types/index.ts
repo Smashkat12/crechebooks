@@ -7,5 +7,4 @@ export * from './button.types';
 export * from './content.types';
 export * from './message-history.types';
 export * from './session.types';
-export * from './template.types';
 export * from './whatsapp.types';

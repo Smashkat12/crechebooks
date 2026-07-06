@@ -15,14 +15,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { XeroClient } from 'xero-node';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
+import { TokenManager } from '../../integrations/xero/client/auth/token-manager';
 import { XeroAuthService } from './xero-auth.service';
 import { XeroInvoiceService } from './xero-invoice.service';
 import { XeroContactService } from './xero-contact.service';
 import { XeroPaymentService } from './xero-payment.service';
 import { BankFeedService } from './bank-feed.service';
 import { XeroJournalService } from './xero-journal.service';
-import { getAccounts } from '../../mcp/xero-mcp/tools';
+import { getAccounts } from '../../integrations/xero/client/tools';
 
 import type { AccountingProvider } from '../accounting/interfaces/accounting-provider.interface';
 import type {

@@ -36,7 +36,7 @@ import {
 import { UpsertAccountMappingDto } from '../../../src/database/dto/xero-payroll-journal.dto';
 
 // Mock TokenManager and rate limiter
-jest.mock('../../../src/mcp/xero-mcp/auth/token-manager', () => ({
+jest.mock('../../../src/integrations/xero/client/auth/token-manager', () => ({
   TokenManager: jest.fn().mockImplementation(() => ({
     hasValidConnection: jest.fn().mockResolvedValue(true),
     getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
@@ -44,7 +44,7 @@ jest.mock('../../../src/mcp/xero-mcp/auth/token-manager', () => ({
   })),
 }));
 
-jest.mock('../../../src/mcp/xero-mcp/utils/rate-limiter', () => ({
+jest.mock('../../../src/integrations/xero/client/utils/rate-limiter', () => ({
   RateLimiter: jest.fn().mockImplementation(() => ({
     acquire: jest.fn().mockResolvedValue(undefined),
   })),
@@ -105,7 +105,7 @@ jest.mock('xero-node', () => ({
   })),
 }));
 
-import { TokenManager } from '../../../src/mcp/xero-mcp/auth/token-manager';
+import { TokenManager } from '../../../src/integrations/xero/client/auth/token-manager';
 
 describe('XeroAccountMappingService', () => {
   let service: XeroAccountMappingService;

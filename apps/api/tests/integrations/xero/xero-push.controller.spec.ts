@@ -13,13 +13,13 @@ import { XeroSyncGateway } from '../../../src/integrations/xero/xero.gateway';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
 import { XeroAuthService } from '../../../src/integrations/xero/xero-auth.service';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
-import { TokenManager } from '../../../src/mcp/xero-mcp/auth/token-manager';
+import { TokenManager } from '../../../src/integrations/xero/client/auth/token-manager';
 import { IUser, UserRole } from '../../../src/database/entities/user.entity';
 import { TransactionStatus } from '../../../src/database/entities/transaction.entity';
 import { BusinessException } from '../../../src/shared/exceptions';
 
 // Mock TokenManager
-jest.mock('../../../src/mcp/xero-mcp/auth/token-manager', () => ({
+jest.mock('../../../src/integrations/xero/client/auth/token-manager', () => ({
   TokenManager: jest.fn().mockImplementation(() => ({
     hasValidConnection: jest.fn(),
     getAccessToken: jest.fn(),

@@ -48,8 +48,8 @@ import {
   ExternalServiceException,
 } from '../../shared/exceptions';
 import { AuditAction } from '../entities/audit-log.entity';
-import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
-import { RateLimiter } from '../../mcp/xero-mcp/utils/rate-limiter';
+import { TokenManager } from '../../integrations/xero/client/auth/token-manager';
+import { RateLimiter } from '../../integrations/xero/client/utils/rate-limiter';
 
 // Required account types for basic payroll journal
 const REQUIRED_ACCOUNT_TYPES: XeroAccountType[] = [

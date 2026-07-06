@@ -7,10 +7,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { XeroAutoSyncJob } from '../xero-auto-sync.job';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { BankFeedService, Xero429Error } from '../bank-feed.service';
-import * as TokenManagerModule from '../../../mcp/xero-mcp/auth/token-manager';
+import * as TokenManagerModule from '../../../integrations/xero/client/auth/token-manager';
 
 // Mock the TokenManager so it doesn't try to decrypt real tokens
-jest.mock('../../../mcp/xero-mcp/auth/token-manager', () => ({
+jest.mock('../../../integrations/xero/client/auth/token-manager', () => ({
   TokenManager: jest.fn().mockImplementation(() => ({
     hasValidConnection: jest.fn(),
   })),

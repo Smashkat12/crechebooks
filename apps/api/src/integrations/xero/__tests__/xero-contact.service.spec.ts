@@ -72,7 +72,7 @@ describe('XeroContactService', () => {
   };
 
   // Mock TokenManager
-  jest.mock('../../../mcp/xero-mcp/auth/token-manager', () => ({
+  jest.mock('../../../integrations/xero/client/auth/token-manager', () => ({
     TokenManager: jest.fn().mockImplementation(() => ({
       getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
     })),

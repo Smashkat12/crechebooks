@@ -5,14 +5,14 @@
 
 import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PrismaService } from '../../../src/database/prisma/prisma.service';
+import { PrismaService } from '../../../../src/database/prisma/prisma.service';
 import {
   TokenManager,
   TokenSet,
-} from '../../../src/mcp/xero-mcp/auth/token-manager';
-import { Encryption } from '../../../src/mcp/xero-mcp/auth/encryption';
-import { TokenNotFoundError } from '../../../src/mcp/xero-mcp/utils/error-handler';
-import { cleanDatabase } from '../../helpers/clean-database';
+} from '../../../../src/integrations/xero/client/auth/token-manager';
+import { Encryption } from '../../../../src/integrations/xero/client/auth/encryption';
+import { TokenNotFoundError } from '../../../../src/integrations/xero/client/utils/error-handler';
+import { cleanDatabase } from '../../../helpers/clean-database';
 
 describe('TokenManager', () => {
   let prisma: PrismaService;

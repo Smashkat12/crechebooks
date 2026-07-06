@@ -23,7 +23,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { BankFeedService, Xero429Error } from './bank-feed.service';
-import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
+import { TokenManager } from '../../integrations/xero/client/auth/token-manager';
 
 /** Minimum buffer (ms) before the access-token expiry that we still consider "usable". */
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;

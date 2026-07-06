@@ -4,7 +4,7 @@
  * Full Xero API integration requires Xero sandbox credentials.
  */
 
-import { XeroMCPError } from '../../../../src/mcp/xero-mcp/utils/error-handler';
+import { XeroMCPError } from '../../../../../src/integrations/xero/client/utils/error-handler';
 
 describe('GetAccounts Tool', () => {
   describe('input validation', () => {

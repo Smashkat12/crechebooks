@@ -193,4 +193,3 @@ export function LogoForm({ onComplete, onCancel }: LogoFormProps) {
   );
 }
 
-export default LogoForm;

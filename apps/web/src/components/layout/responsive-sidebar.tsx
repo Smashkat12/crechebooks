@@ -381,4 +381,3 @@ export function ResponsiveSidebar({ className }: ResponsiveSidebarProps) {
 // Export drawer trigger for use in Header
 export { DrawerSidebar };
 
-export default ResponsiveSidebar;

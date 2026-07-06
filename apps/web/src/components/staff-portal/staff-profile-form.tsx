@@ -505,4 +505,3 @@ export function StaffProfileForm({ profile, onUpdateProfile, className }: StaffP
   );
 }
 
-export default StaffProfileForm;

@@ -15,10 +15,6 @@ interface TransactionsListResponse {
   limit: number;
 }
 
-interface CategorizationSuggestion extends ICategorizationResult {
-  categoryName: string;
-}
-
 interface TransactionListParams extends Record<string, unknown> {
   page?: number;
   limit?: number;
@@ -55,11 +51,6 @@ const ACCOUNT_CODE_TO_NAME: Record<string, string> = {
   '5800': 'Taxes and Licenses',
   '5900': 'Other Expenses',
 };
-
-interface BatchCategorizeParams {
-  transactionIds: string[];
-  categoryId: string;
-}
 
 // API response types (snake_case from backend)
 interface ApiCategorization {
@@ -144,34 +135,6 @@ export function useTransactionsList(params?: TransactionListParams) {
   });
 }
 
-// Get single transaction detail
-export function useTransaction(id: string, enabled = true) {
-  return useQuery<TransactionWithCategorization, AxiosError>({
-    queryKey: queryKeys.transactions.detail(id),
-    queryFn: async () => {
-      const { data } = await apiClient.get<TransactionWithCategorization>(
-        endpoints.transactions.detail(id)
-      );
-      return data;
-    },
-    enabled: enabled && !!id,
-  });
-}
-
-// Get categorization suggestions for a transaction
-export function useTransactionSuggestions(id: string, enabled = true) {
-  return useQuery<CategorizationSuggestion[], AxiosError>({
-    queryKey: queryKeys.transactions.suggestions(id),
-    queryFn: async () => {
-      const { data } = await apiClient.get<CategorizationSuggestion[]>(
-        endpoints.transactions.suggestions(id)
-      );
-      return data;
-    },
-    enabled: enabled && !!id,
-  });
-}
-
 /**
  * Xero sync status enum
  * TASK-XERO-005: Auto-push categorization on user review
@@ -248,27 +211,6 @@ export function useCategorizeTransaction() {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.lists() });
       queryClient.invalidateQueries({ queryKey: queryKeys.transactions.detail(data.id) });
-    },
-  });
-}
-
-// Batch categorize multiple transactions
-export function useBatchCategorize() {
-  const queryClient = useQueryClient();
-
-  return useMutation<{ success: boolean; count: number }, AxiosError, BatchCategorizeParams>({
-    mutationFn: async ({ transactionIds, categoryId }) => {
-      const { data } = await apiClient.post<{ success: boolean; count: number }>(
-        endpoints.transactions.batchCategorize,
-        {
-          transactionIds,
-          categoryId,
-        }
-      );
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
     },
   });
 }

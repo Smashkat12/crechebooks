@@ -299,4 +299,3 @@ export function LeavePolicy({ className, compact = false }: LeavePolicyProps) {
   );
 }
 
-export default LeavePolicy;

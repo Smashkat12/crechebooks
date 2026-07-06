@@ -56,20 +56,6 @@ export function useFeeStructures() {
   });
 }
 
-// Get single fee structure
-export function useFeeStructure(id: string, enabled = true) {
-  return useQuery<FeeStructure, AxiosError>({
-    queryKey: queryKeys.feeStructures.detail(id),
-    queryFn: async () => {
-      const { data } = await apiClient.get<FeeStructure>(
-        endpoints.feeStructures.detail(id)
-      );
-      return data;
-    },
-    enabled: enabled && !!id,
-  });
-}
-
 // Create fee structure
 export function useCreateFeeStructure() {
   const queryClient = useQueryClient();
@@ -88,31 +74,6 @@ export function useCreateFeeStructure() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.feeStructures.all });
-    },
-  });
-}
-
-// Update fee structure
-export function useUpdateFeeStructure() {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    { success: boolean; data: FeeStructure },
-    AxiosError,
-    { id: string } & Partial<CreateFeeStructureParams>
-  >({
-    mutationFn: async ({ id, ...params }) => {
-      const { data } = await apiClient.put<{ success: boolean; data: FeeStructure }>(
-        endpoints.feeStructures.detail(id),
-        params
-      );
-      return data;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.feeStructures.all });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.feeStructures.detail(variables.id),
-      });
     },
   });
 }

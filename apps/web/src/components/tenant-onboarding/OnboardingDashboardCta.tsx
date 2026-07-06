@@ -102,4 +102,3 @@ export function OnboardingDashboardCta({ className }: OnboardingDashboardCtaProp
   );
 }
 
-export default OnboardingDashboardCta;

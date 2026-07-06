@@ -284,4 +284,3 @@ export function InvoiceForm({ onComplete, onCancel }: InvoiceFormProps) {
   );
 }
 
-export default InvoiceForm;

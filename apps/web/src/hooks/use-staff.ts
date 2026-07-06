@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
-import type { IStaff, IPayrollPeriod } from '@crechebooks/types';
+import type { IStaff } from '@crechebooks/types';
 import { StaffStatus } from '@crechebooks/types';
 
 // API response type (snake_case from backend)
@@ -84,21 +84,6 @@ interface StaffListParams extends Record<string, unknown> {
   role?: string;
 }
 
-interface PayrollListResponse {
-  payrolls: IPayrollPeriod[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-interface PayrollListParams extends Record<string, unknown> {
-  page?: number;
-  limit?: number;
-  staffId?: string;
-  month?: number;
-  year?: number;
-}
-
 interface ProcessPayrollParams {
   month: number;
   year: number;
@@ -157,31 +142,6 @@ export function useStaff(id: string, enabled = true) {
     queryFn: async () => {
       const { data } = await apiClient.get<ApiStaffResponse>(endpoints.staff.detail(id));
       return transformStaff(data);
-    },
-    enabled: enabled && !!id,
-  });
-}
-
-// List payroll records
-export function usePayrollList(params?: PayrollListParams) {
-  return useQuery<PayrollListResponse, AxiosError>({
-    queryKey: queryKeys.payroll.list(params),
-    queryFn: async () => {
-      const { data } = await apiClient.get<PayrollListResponse>(endpoints.payroll.list, {
-        params,
-      });
-      return data;
-    },
-  });
-}
-
-// Get single payroll detail
-export function usePayroll(id: string, enabled = true) {
-  return useQuery<IPayrollPeriod, AxiosError>({
-    queryKey: queryKeys.payroll.detail(id),
-    queryFn: async () => {
-      const { data } = await apiClient.get<IPayrollPeriod>(endpoints.payroll.detail(id));
-      return data;
     },
     enabled: enabled && !!id,
   });

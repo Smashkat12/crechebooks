@@ -95,7 +95,7 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
 /**
  * Default templates for each escalation level
  */
-export const DEFAULT_TEMPLATES: Omit<ReminderTemplate, 'id' | 'updatedAt'>[] = [
+const DEFAULT_TEMPLATES: Omit<ReminderTemplate, 'id' | 'updatedAt'>[] = [
   {
     name: 'Friendly Reminder - Email',
     escalationLevel: 'FRIENDLY',
@@ -218,21 +218,6 @@ export function useTemplates(channel: 'email' | 'whatsapp') {
       await new Promise(resolve => setTimeout(resolve, 300));
       return generateMockTemplates().filter(t => t.channel === channel);
     },
-  });
-}
-
-/**
- * Hook to fetch a single template
- */
-export function useTemplate(id: string) {
-  return useQuery({
-    queryKey: templateKeys.detail(id),
-    queryFn: async (): Promise<ReminderTemplate | null> => {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 200));
-      return generateMockTemplates().find(t => t.id === id) || null;
-    },
-    enabled: !!id,
   });
 }
 

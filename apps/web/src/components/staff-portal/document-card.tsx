@@ -238,4 +238,3 @@ export function DocumentCard({
   );
 }
 
-export default DocumentCard;

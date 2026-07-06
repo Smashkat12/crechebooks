@@ -346,4 +346,3 @@ export function EmergencyContactForm({ contact, onSave, className }: EmergencyCo
   );
 }
 
-export default EmergencyContactForm;

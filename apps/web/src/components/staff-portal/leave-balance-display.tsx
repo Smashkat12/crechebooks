@@ -205,4 +205,3 @@ export function LeaveBalanceDisplay({
   );
 }
 
-export default LeaveBalanceDisplay;

@@ -174,4 +174,3 @@ export function VatConfigForm({ onComplete, onCancel }: VatConfigFormProps) {
   );
 }
 
-export default VatConfigForm;

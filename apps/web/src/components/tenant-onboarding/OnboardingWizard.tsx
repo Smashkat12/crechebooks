@@ -403,4 +403,3 @@ export function OnboardingWizard() {
   );
 }
 
-export default OnboardingWizard;

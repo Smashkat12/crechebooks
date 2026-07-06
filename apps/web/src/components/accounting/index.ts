@@ -15,4 +15,3 @@ export { SupplierForm } from './supplier-form';
 export { BillForm } from './bill-form';
 export { BillTable } from './bill-table';
 export { PaymentForm } from './payment-form';
-export { PayablesAgingTable } from './payables-aging-table';

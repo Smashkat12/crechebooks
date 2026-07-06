@@ -264,4 +264,3 @@ export {
   SA_DATE_FORMAT,
 } from '@/lib/date-utils';
 
-export default DatePicker;

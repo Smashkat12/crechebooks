@@ -282,4 +282,3 @@ export function IRP5List({
   );
 }
 
-export default IRP5List;

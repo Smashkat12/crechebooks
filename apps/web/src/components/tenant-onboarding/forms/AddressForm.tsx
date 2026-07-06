@@ -175,4 +175,3 @@ export function AddressForm({ onComplete, onCancel }: AddressFormProps) {
   );
 }
 
-export default AddressForm;

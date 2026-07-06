@@ -65,12 +65,6 @@ export interface UpdateAccountDto {
   xeroAccountId?: string;
 }
 
-export interface AccountSummary {
-  type: AccountType;
-  count: number;
-  activeCount: number;
-}
-
 export interface TrialBalanceEntry {
   accountId: string;
   accountCode: string;
@@ -125,40 +119,6 @@ export function useAccount(id: string, enabled = true) {
       return data.data;
     },
     enabled: enabled && !!id,
-  });
-}
-
-// Get account by code
-export function useAccountByCode(code: string, enabled = true) {
-  return useQuery<Account, AxiosError>({
-    queryKey: queryKeys.accounts.byCode(code),
-    queryFn: async () => {
-      const { data } = await apiClient.get<ApiResponse<Account>>(endpoints.accounts.byCode(code));
-      return data.data;
-    },
-    enabled: enabled && !!code,
-  });
-}
-
-// Get account summary
-export function useAccountSummary() {
-  return useQuery<AccountSummary[], AxiosError>({
-    queryKey: queryKeys.accounts.summary(),
-    queryFn: async () => {
-      const { data } = await apiClient.get<ApiResponse<AccountSummary[]>>(endpoints.accounts.summary);
-      return data.data;
-    },
-  });
-}
-
-// Get education exempt accounts
-export function useEducationExemptAccounts() {
-  return useQuery<Account[], AxiosError>({
-    queryKey: queryKeys.accounts.educationExempt(),
-    queryFn: async () => {
-      const { data } = await apiClient.get<ApiListResponse<Account>>(endpoints.accounts.educationExempt);
-      return data.data;
-    },
   });
 }
 

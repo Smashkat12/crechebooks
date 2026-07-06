@@ -4,27 +4,18 @@
  *
  * Provides hooks for:
  * - Detecting split parameters from amount mismatches
- * - Creating, confirming, and cancelling splits
- * - Listing and filtering splits
- * - Getting split summaries
+ * - Creating splits
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { queryKeys } from '@/lib/api';
 import {
   detectSplitParams,
   createXeroSplit,
-  confirmXeroSplit,
-  cancelXeroSplit,
-  getXeroSplit,
-  getXeroSplitByTransaction,
-  listXeroSplits,
-  getXeroSplitsSummary,
   type XeroSplit,
   type SplitDetectionResult,
   type CreateXeroSplitRequest,
-  type XeroSplitFilterParams,
   type XeroSplitStatus,
 } from '@/lib/api/xero-split';
 
@@ -85,94 +76,3 @@ export function useCreateXeroSplit() {
   });
 }
 
-/**
- * Hook to confirm a pending split
- */
-export function useConfirmXeroSplit() {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    XeroSplit,
-    AxiosError,
-    { splitId: string; bankTransactionId?: string; createMatch?: boolean }
-  >({
-    mutationFn: ({ splitId, bankTransactionId, createMatch }) =>
-      confirmXeroSplit(splitId, bankTransactionId, createMatch),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.xeroSplits.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
-      queryClient.setQueryData(queryKeys.xeroSplits.detail(data.id), data);
-    },
-  });
-}
-
-/**
- * Hook to cancel a split
- */
-export function useCancelXeroSplit() {
-  const queryClient = useQueryClient();
-
-  return useMutation<XeroSplit, AxiosError, { splitId: string; reason?: string }>({
-    mutationFn: ({ splitId, reason }) => cancelXeroSplit(splitId, reason),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.xeroSplits.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.reconciliation.all });
-      queryClient.setQueryData(queryKeys.xeroSplits.detail(data.id), data);
-    },
-  });
-}
-
-/**
- * Hook to get a split by ID
- */
-export function useXeroSplit(splitId: string | null) {
-  return useQuery<XeroSplit, AxiosError>({
-    queryKey: queryKeys.xeroSplits.detail(splitId || ''),
-    queryFn: () => getXeroSplit(splitId!),
-    enabled: !!splitId,
-  });
-}
-
-/**
- * Hook to get a split by Xero transaction ID
- */
-export function useXeroSplitByTransaction(xeroTransactionId: string | null) {
-  return useQuery<XeroSplit | null, AxiosError>({
-    queryKey: queryKeys.xeroSplits.byXeroTransaction(xeroTransactionId || ''),
-    queryFn: () => getXeroSplitByTransaction(xeroTransactionId!),
-    enabled: !!xeroTransactionId,
-  });
-}
-
-/**
- * Hook to list Xero splits with filtering
- */
-export function useXeroSplits(params?: XeroSplitFilterParams) {
-  return useQuery<
-    { splits: XeroSplit[]; total: number; page: number; limit: number; totalPages: number },
-    AxiosError
-  >({
-    queryKey: queryKeys.xeroSplits.list(params as Record<string, unknown> | undefined),
-    queryFn: () => listXeroSplits(params),
-  });
-}
-
-/**
- * Hook to get Xero splits summary
- */
-export function useXeroSplitsSummary() {
-  return useQuery<
-    {
-      totalCount: number;
-      byStatus: Record<XeroSplitStatus, number>;
-      totalOriginalCents: number;
-      totalNetCents: number;
-      totalFeeCents: number;
-      byFeeType: Record<string, { count: number; totalFeeCents: number }>;
-    },
-    AxiosError
-  >({
-    queryKey: queryKeys.xeroSplits.summary(),
-    queryFn: getXeroSplitsSummary,
-  });
-}

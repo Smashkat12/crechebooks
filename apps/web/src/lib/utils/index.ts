@@ -12,18 +12,6 @@ export {
   formatNumber,
 } from './format';
 
-// Helper utilities
-export {
-  getStatusBadgeVariant,
-  truncate,
-  pluralize,
-  initials,
-  slugify,
-  isEmpty,
-  debounce,
-  type BadgeVariant,
-} from './helpers';
-
 // Constants
 export {
   CURRENCY_CODE,

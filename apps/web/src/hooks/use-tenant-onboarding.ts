@@ -15,7 +15,6 @@ import {
   getOnboardingDashboardCta,
   updateOnboardingStep,
   autoDetectOnboardingProgress,
-  resetOnboardingProgress,
   type OnboardingProgressResponse,
   type OnboardingDashboardCta,
   type UpdateStepAction,
@@ -83,30 +82,4 @@ export function useAutoDetectOnboarding() {
       queryClient.invalidateQueries({ queryKey: tenantOnboardingKeys.all });
     },
   });
-}
-
-/**
- * Reset onboarding progress
- */
-export function useResetOnboarding() {
-  const queryClient = useQueryClient();
-
-  return useMutation<{ success: boolean }, AxiosError>({
-    mutationFn: resetOnboardingProgress,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: tenantOnboardingKeys.all });
-    },
-  });
-}
-
-/**
- * Hook to invalidate all onboarding queries
- */
-export function useInvalidateOnboarding() {
-  const queryClient = useQueryClient();
-
-  return {
-    invalidateAll: () =>
-      queryClient.invalidateQueries({ queryKey: tenantOnboardingKeys.all }),
-  };
 }

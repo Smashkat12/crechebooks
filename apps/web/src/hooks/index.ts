@@ -73,5 +73,3 @@ export * from './use-whatsapp';
 
 // Notification hooks
 export * from './use-notifications';
-export { useWebSocket } from './use-websocket';
-export { useNotificationSocket } from './use-notification-socket';

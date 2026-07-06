@@ -351,4 +351,3 @@ export function LeaveRequestForm({
   );
 }
 
-export default LeaveRequestForm;

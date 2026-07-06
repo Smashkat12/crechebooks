@@ -18,4 +18,3 @@ export * from './custom-recipient-picker';
 
 // TASK-COMM-006: Analytics
 export * from './delivery-stats-chart';
-export * from './recipient-delivery-table';

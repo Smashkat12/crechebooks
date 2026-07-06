@@ -451,4 +451,3 @@ export function ChildEnrollForm({ onComplete, onCancel }: ChildEnrollFormProps) 
   );
 }
 
-export default ChildEnrollForm;

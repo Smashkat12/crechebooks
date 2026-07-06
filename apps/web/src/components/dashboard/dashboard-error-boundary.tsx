@@ -370,4 +370,3 @@ export function withDashboardErrorBoundary<P extends object>(
   return ComponentWithErrorBoundary;
 }
 
-export default DashboardErrorBoundary;

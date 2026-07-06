@@ -141,4 +141,3 @@ export function BankConnectForm({ onComplete, onCancel }: BankConnectFormProps) 
   );
 }
 
-export default BankConnectForm;

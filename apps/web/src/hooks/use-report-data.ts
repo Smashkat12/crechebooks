@@ -151,6 +151,44 @@ export const reportDataQueryKeys = {
  *   { from: new Date('2025-01-01'), to: new Date('2025-01-31') }
  * );
  */
+/**
+ * A single report type entry from GET /reports/types, including which
+ * export formats the export endpoint actually supports for that type
+ * (empty array = not exportable yet).
+ */
+export interface ReportTypeInfo {
+  type: ReportType;
+  name: string;
+  description: string;
+  available: boolean;
+  exportFormats: Array<'PDF' | 'EXCEL' | 'CSV'>;
+}
+
+export interface ReportTypesResponse {
+  types: ReportTypeInfo[];
+}
+
+export const reportTypesQueryKeys = {
+  all: ['report-types'] as const,
+};
+
+/**
+ * Hook for fetching the report type catalogue, including per-type
+ * exportFormats (F-A-XXX: reports page now only offers export formats
+ * the API advertises rather than hardcoding all formats for all types).
+ */
+export function useReportTypes() {
+  return useQuery<ReportTypesResponse, AxiosError>({
+    queryKey: reportTypesQueryKeys.all,
+    queryFn: async () => {
+      const { data } = await apiClient.get<ReportTypesResponse>('/reports/types');
+      return data;
+    },
+    staleTime: 60 * 60 * 1000, // 1 hour - the report type catalogue rarely changes
+    retry: 1,
+  });
+}
+
 export function useReportData(type: ReportType | undefined, dateRange: DateRange | undefined) {
   const fromDate = dateRange?.from?.toISOString().split('T')[0];
   const toDate = dateRange?.to?.toISOString().split('T')[0];

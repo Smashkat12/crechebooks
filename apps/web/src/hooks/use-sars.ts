@@ -40,18 +40,55 @@ interface VAT201Response {
   }[];
 }
 
-interface EMP201Response {
+export interface EMP201Response {
+  id: string;
   period: string;
+  status: string;
   totalPaye: number;
   totalUif: number;
   totalSdl: number;
+  totalDue: number;
+  employeeCount: number;
   employees: {
-    id: string;
-    name: string;
+    staffId: string;
+    fullName: string;
+    grossRemuneration: number;
     paye: number;
-    uif: number;
-    sdl: number;
+    uifEmployee: number;
+    uifEmployer: number;
   }[];
+  validationIssues: string[];
+  deadline: string;
+}
+
+// API response shape (snake_case Rands) from POST /sars/emp201
+interface ApiEmp201Response {
+  success: boolean;
+  data: {
+    id: string;
+    submission_type: string;
+    period: string;
+    status: string;
+    summary: {
+      employee_count: number;
+      total_gross: number;
+      total_paye: number;
+      total_uif: number;
+      total_sdl: number;
+      total_due: number;
+    };
+    employees: Array<{
+      staff_id: string;
+      full_name: string;
+      gross_remuneration: number;
+      paye: number;
+      uif_employee: number;
+      uif_employer: number;
+    }>;
+    validation_issues: string[];
+    deadline: string;
+    document_url: string;
+  };
 }
 
 interface SubmissionResponse {
@@ -79,16 +116,42 @@ export function useVAT201(period: string, enabled = true) {
   });
 }
 
-// Get EMP201 data for a period
+// Get (generate) EMP201 data for a period.
+// There is no standalone GET for an existing return — the backend upserts a
+// DRAFT submission on each POST /sars/emp201 call (idempotent per period),
+// so it's used here as the queryFn. Mirrors useSarsVat201's pattern.
 export function useEMP201(period: string, enabled = true) {
   return useQuery<EMP201Response, AxiosError>({
     queryKey: queryKeys.sars.emp201(period),
     queryFn: async () => {
-      const { data } = await apiClient.get<EMP201Response>(endpoints.sars.emp201, {
-        params: { period },
+      const { data } = await apiClient.post<ApiEmp201Response>(endpoints.sars.emp201, {
+        period_month: period,
       });
-      return data;
+      const apiData = data.data;
+
+      return {
+        id: apiData.id,
+        period: apiData.period,
+        status: apiData.status,
+        totalPaye: apiData.summary.total_paye,
+        totalUif: apiData.summary.total_uif,
+        totalSdl: apiData.summary.total_sdl,
+        totalDue: apiData.summary.total_due,
+        employeeCount: apiData.summary.employee_count,
+        employees: apiData.employees.map((e) => ({
+          staffId: e.staff_id,
+          fullName: e.full_name,
+          grossRemuneration: e.gross_remuneration,
+          paye: e.paye,
+          uifEmployee: e.uif_employee,
+          uifEmployer: e.uif_employer,
+        })),
+        validationIssues: apiData.validation_issues,
+        deadline: apiData.deadline,
+      };
     },
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
     enabled: enabled && !!period,
   });
 }

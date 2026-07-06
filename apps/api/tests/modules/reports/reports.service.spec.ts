@@ -16,11 +16,16 @@ import { RedisService } from '../../../src/common/redis/redis.service';
 import { FinancialReportService } from '../../../src/database/services/financial-report.service';
 import { CashFlowReportService } from '../../../src/database/services/cash-flow-report.service';
 import { AgedPayablesService } from '../../../src/database/services/aged-payables.service';
+import { ArrearsService } from '../../../src/database/services/arrears.service';
+import { VatService } from '../../../src/database/services/vat.service';
 import { PdfGeneratorService } from '../../../src/modules/reports/pdf-generator.service';
 import { ReportSynthesisAgent } from '../../../src/agents/report-synthesis';
 import { ReportType } from '../../../src/modules/reports/dto/report-data.dto';
 import { ExportFormat } from '../../../src/modules/reports/dto/export-report.dto';
-import type { IncomeStatement } from '../../../src/database/dto/financial-report.dto';
+import type {
+  IncomeStatement,
+  BalanceSheet,
+} from '../../../src/database/dto/financial-report.dto';
 import type { SdkExecutionResult } from '../../../src/agents/sdk/interfaces/sdk-agent.interface';
 import type { AIInsights } from '../../../src/agents/report-synthesis';
 
@@ -151,6 +156,16 @@ describe('ReportsService', () => {
         .mockReturnValue('Supplier bills feature coming soon'),
     };
 
+    const mockArrearsService = {
+      getArrearsReport: jest.fn(),
+    };
+
+    const mockVatService = {
+      calculateOutputVat: jest.fn(),
+      calculateInputVat: jest.fn(),
+      getFlaggedItems: jest.fn(),
+    };
+
     const mockPdfGeneratorService = {
       generateReportPdf: jest.fn(),
     };
@@ -172,6 +187,8 @@ describe('ReportsService', () => {
           provide: AgedPayablesService,
           useValue: mockAgedPayablesService,
         },
+        { provide: ArrearsService, useValue: mockArrearsService },
+        { provide: VatService, useValue: mockVatService },
         { provide: ReportSynthesisAgent, useValue: mockReportSynthesisAgent },
         { provide: PdfGeneratorService, useValue: mockPdfGeneratorService },
       ],
@@ -260,6 +277,23 @@ describe('ReportsService', () => {
           testTenantId,
         ),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for unsupported report type', async () => {
+      await expect(
+        service.getReportData(
+          ReportType.AGED_PAYABLES,
+          testStart,
+          testEnd,
+          testTenantId,
+          false,
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      // Must never silently substitute income-statement data
+      expect(
+        financialReportService.generateIncomeStatement,
+      ).not.toHaveBeenCalled();
     });
 
     it('should build chart data correctly', async () => {
@@ -525,6 +559,168 @@ describe('ReportsService', () => {
         'income-statement-2025-01-01-to-2025-12-31.pdf',
       );
     });
+
+    it.each([
+      ReportType.CASH_FLOW,
+      ReportType.AGED_RECEIVABLES,
+      ReportType.VAT_REPORT,
+      ReportType.AGED_PAYABLES,
+    ])(
+      'should throw BadRequestException for unimplemented export type %s',
+      async (type) => {
+        await expect(
+          service.exportReport(
+            type,
+            testStart,
+            testEnd,
+            ExportFormat.PDF,
+            false,
+            testTenantId,
+          ),
+        ).rejects.toThrow(BadRequestException);
+
+        // Must never silently substitute an income statement
+        expect(
+          financialReportService.generateIncomeStatement,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should escape embedded quotes and commas in CSV account names', async () => {
+      financialReportService.generateIncomeStatement.mockResolvedValue({
+        ...testIncomeStatement,
+        income: {
+          totalCents: 15000000,
+          totalRands: 150000,
+          breakdown: [
+            {
+              accountCode: '4000',
+              accountName: 'School "Fees", Extra',
+              amountCents: 15000000,
+              amountRands: 150000,
+            },
+          ],
+        },
+      });
+
+      const result = await service.exportReport(
+        ReportType.INCOME_STATEMENT,
+        testStart,
+        testEnd,
+        ExportFormat.CSV,
+        false,
+        testTenantId,
+      );
+
+      const csvContent = result.buffer.toString();
+      expect(csvContent).toContain('"School ""Fees"", Extra"');
+      expect(csvContent).not.toContain('"School "Fees", Extra"');
+    });
+  });
+
+  describe('exportReport - balance sheet', () => {
+    const testBalanceSheet: BalanceSheet = {
+      tenantId: testTenantId,
+      asOfDate: testEnd,
+      assets: {
+        totalCents: 5000000,
+        totalRands: 50000,
+        current: [
+          {
+            accountCode: '1000',
+            accountName: 'Bank "Main", Cheque',
+            amountCents: 5000000,
+            amountRands: 50000,
+          },
+        ],
+        nonCurrent: [],
+      },
+      liabilities: {
+        totalCents: 2000000,
+        totalRands: 20000,
+        current: [
+          {
+            accountCode: '2000',
+            accountName: 'Accounts Payable',
+            amountCents: 2000000,
+            amountRands: 20000,
+          },
+        ],
+        nonCurrent: [],
+      },
+      equity: {
+        totalCents: 3000000,
+        totalRands: 30000,
+        breakdown: [
+          {
+            accountCode: '3000',
+            accountName: 'Retained Earnings',
+            amountCents: 3000000,
+            amountRands: 30000,
+          },
+        ],
+      },
+      isBalanced: true,
+      generatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      (prismaService.tenant.findUnique as jest.Mock).mockResolvedValue({
+        id: testTenantId,
+        name: 'Test Creche',
+      } as any);
+      financialReportService.generateBalanceSheet.mockResolvedValue(
+        testBalanceSheet,
+      );
+    });
+
+    it('should export balance sheet as CSV', async () => {
+      const result = await service.exportReport(
+        ReportType.BALANCE_SHEET,
+        testStart,
+        testEnd,
+        ExportFormat.CSV,
+        false,
+        testTenantId,
+      );
+
+      expect(result.filename).toContain('.csv');
+      expect(result.contentType).toBe('text/csv');
+      const csvContent = result.buffer.toString();
+      expect(csvContent).toContain('Balance Sheet');
+      expect(csvContent).toContain('CURRENT ASSETS');
+    });
+
+    it('should escape embedded quotes in balance sheet CSV account names', async () => {
+      const result = await service.exportReport(
+        ReportType.BALANCE_SHEET,
+        testStart,
+        testEnd,
+        ExportFormat.CSV,
+        false,
+        testTenantId,
+      );
+
+      const csvContent = result.buffer.toString();
+      expect(csvContent).toContain('"Bank ""Main"", Cheque"');
+      expect(csvContent).not.toContain('"Bank "Main", Cheque"');
+    });
+
+    it.each([ExportFormat.PDF, ExportFormat.EXCEL])(
+      'should throw BadRequestException for balance sheet %s export',
+      async (format) => {
+        await expect(
+          service.exportReport(
+            ReportType.BALANCE_SHEET,
+            testStart,
+            testEnd,
+            format,
+            false,
+            testTenantId,
+          ),
+        ).rejects.toThrow(BadRequestException);
+      },
+    );
   });
 
   describe('caching behavior', () => {

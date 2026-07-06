@@ -3,7 +3,7 @@
  * Tests rate limiting functionality without mocks
  */
 
-import { RateLimiter } from '../../../src/mcp/xero-mcp/utils/rate-limiter';
+import { RateLimiter } from '../../../../src/integrations/xero/client/utils/rate-limiter';
 
 describe('RateLimiter', () => {
   let rateLimiter: RateLimiter;

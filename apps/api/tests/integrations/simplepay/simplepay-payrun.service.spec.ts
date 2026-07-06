@@ -15,7 +15,6 @@ import { SimplePayRepository } from '../../../src/database/repositories/simplepa
 import { EncryptionService } from '../../../src/shared/services/encryption.service';
 import {
   PayRunSyncStatus,
-  DEFAULT_XERO_JOURNAL_CONFIG,
   SimplePayWave,
   SimplePayPayRun,
   SimplePayPayslip,
@@ -548,112 +547,6 @@ describe('SimplePayPayRunService', () => {
 
       expect(pending).toHaveLength(1);
       expect(pending[0].simplePayPayRunId).toBe('pr-pending');
-    });
-  });
-
-  describe('postPayRunToXero', () => {
-    let syncId: string;
-
-    beforeEach(async () => {
-      // Create test data that balances for Xero journal:
-      // Debits: Gross (250,000) + UIF Employer (2,500) + SDL (2,500) = 255,000
-      // Credits: Net (200,000) + PAYE (45,000) + UIF Employee (2,500) + UIF Employer (2,500) + SDL (2,500) = 252,500
-      // For balance: Gross must equal Net + PAYE + UIF_Employee
-      // 250,000 = 202,500 + 45,000 + 2,500 = 250,000 (balanced!)
-      const sync = await payRunSyncRepo.create({
-        tenantId: tenant.id,
-        simplePayPayRunId: 'pr-to-post',
-        waveId: 1,
-        waveName: 'Monthly',
-        periodStart: new Date('2026-01-01'),
-        periodEnd: new Date('2026-01-31'),
-        payDate: new Date('2026-01-25'),
-        status: 'finalized',
-        employeeCount: 15,
-        totalGrossCents: 25000000, // R250,000
-        totalNetCents: 20250000, // R202,500 (250,000 - 45,000 - 2,500)
-        totalPayeCents: 4500000, // R45,000
-        totalUifEmployeeCents: 250000, // R2,500
-        totalUifEmployerCents: 250000, // R2,500 (employer portion - adds to both debit and credit)
-        totalSdlCents: 250000, // R2,500 (adds to both debit and credit)
-        totalEtiCents: 0,
-        accountingData: mockAccounting as unknown as Record<string, unknown>,
-      });
-      await payRunSyncRepo.updateSyncStatus(sync.id, PayRunSyncStatus.SYNCED);
-      syncId = sync.id;
-    });
-
-    it('should post pay run to Xero and return success', async () => {
-      const result = await service.postPayRunToXero(tenant.id, syncId);
-
-      expect(result.success).toBe(true);
-      expect(result.xeroJournalId).toBeDefined();
-      expect(result.xeroJournalId).toMatch(/^MJ-/);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should update pay run sync status to XERO_POSTED', async () => {
-      await service.postPayRunToXero(tenant.id, syncId);
-
-      const updated = await payRunSyncRepo.findById(syncId, tenant.id);
-      expect(updated?.syncStatus).toBe(PayRunSyncStatus.XERO_POSTED);
-      expect(updated?.xeroJournalId).toBeDefined();
-      expect(updated?.xeroSyncedAt).toBeDefined();
-    });
-
-    it('should fail if pay run is already posted', async () => {
-      await payRunSyncRepo.markXeroPosted(syncId, 'MJ-EXISTING');
-
-      const result = await service.postPayRunToXero(tenant.id, syncId);
-
-      expect(result.success).toBe(false);
-      expect(result.errors).toContain(
-        'Pay run has already been posted to Xero',
-      );
-    });
-
-    it('should fail if pay run is not synced yet', async () => {
-      const pendingSync = await payRunSyncRepo.create({
-        tenantId: tenant.id,
-        simplePayPayRunId: 'pr-not-synced',
-        waveId: 1,
-        waveName: 'Monthly',
-        periodStart: new Date('2026-03-01'),
-        periodEnd: new Date('2026-03-31'),
-        payDate: new Date('2026-03-25'),
-        status: 'finalized',
-        employeeCount: 15,
-        totalGrossCents: 25000000,
-        totalNetCents: 18000000,
-        totalPayeCents: 4500000,
-        totalUifEmployeeCents: 250000,
-        totalUifEmployerCents: 250000,
-        totalSdlCents: 250000,
-        totalEtiCents: 0,
-      });
-
-      const result = await service.postPayRunToXero(tenant.id, pendingSync.id);
-
-      expect(result.success).toBe(false);
-      expect(result.errors).toContain(
-        'Pay run has not been synced from SimplePay yet. Sync first.',
-      );
-    });
-
-    it('should use custom journal config if provided', async () => {
-      const customConfig = {
-        ...DEFAULT_XERO_JOURNAL_CONFIG,
-        salaryExpenseCode: '7100',
-        narrationPrefix: 'Custom Payroll',
-      };
-
-      const result = await service.postPayRunToXero(
-        tenant.id,
-        syncId,
-        customConfig,
-      );
-
-      expect(result.success).toBe(true);
     });
   });
 

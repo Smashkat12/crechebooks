@@ -99,28 +99,6 @@ export interface SimplePayAccounting {
   };
 }
 
-// Xero Journal configuration for posting
-export interface XeroJournalConfig {
-  salaryExpenseCode: string;
-  salaryPayableCode: string;
-  payePayableCode: string;
-  uifPayableCode: string;
-  sdlPayableCode: string;
-  etiReceivableCode: string;
-  narrationPrefix: string;
-}
-
-// Default Xero journal configuration for South African payroll
-export const DEFAULT_XERO_JOURNAL_CONFIG: XeroJournalConfig = {
-  salaryExpenseCode: '6100', // Salaries and Wages
-  salaryPayableCode: '2100', // Accrued Wages Payable
-  payePayableCode: '2200', // PAYE Payable
-  uifPayableCode: '2210', // UIF Payable
-  sdlPayableCode: '2220', // SDL Payable
-  etiReceivableCode: '1400', // ETI Receivable
-  narrationPrefix: 'SimplePay Payroll',
-};
-
 // Pay run summary with calculated totals
 export interface PayRunSummary {
   id: string;

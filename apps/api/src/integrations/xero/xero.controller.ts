@@ -36,7 +36,7 @@ import { UserRole } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { XeroClient } from 'xero-node';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { TokenManager, TokenSet } from '../../mcp/xero-mcp/auth/token-manager';
+import { TokenManager, TokenSet } from '../../integrations/xero/client/auth/token-manager';
 import { BankFeedService } from './bank-feed.service';
 import { XeroSyncGateway } from './xero.gateway';
 import { XeroSyncService } from '../../database/services/xero-sync.service';

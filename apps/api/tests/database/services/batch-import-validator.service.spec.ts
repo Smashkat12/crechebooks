@@ -49,6 +49,7 @@ describe('BatchImportValidatorService', () => {
   beforeEach(async () => {
     // Clean up
     await prisma.auditLog.deleteMany({});
+    await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});
     await prisma.tenant.deleteMany({
       where: { email: { contains: 'test-batch' } },
@@ -70,6 +71,7 @@ describe('BatchImportValidatorService', () => {
 
   afterEach(async () => {
     await prisma.auditLog.deleteMany({});
+    await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});
     if (testTenant) {
       await prisma.tenant

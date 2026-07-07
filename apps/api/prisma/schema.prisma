@@ -743,6 +743,14 @@ model Tenant {
   // TASK-SDK-012: Feature Flags for SDK Rollout
   featureFlags FeatureFlag[]
 
+  // Orchestrator Workflow Runs — persisted invocations of executeWorkflow
+  workflowRuns WorkflowRun[]
+
+  // Per-tenant opt-in for the monthly MONTH_END orchestrator cron. Default OFF —
+  // the cron enumerates ACTIVE tenants and skips any where this flag is false,
+  // so no automation runs until an operator flips it explicitly.
+  orchestratorMonthEndEnabled Boolean @default(false) @map("orchestrator_month_end_enabled")
+
   // TASK-CLI-001: API Keys for CLI/MCP Access
   apiKeys ApiKey[]
 
@@ -4227,6 +4235,42 @@ model FeatureFlag {
   @@unique([tenantId, flag])
   @@index([tenantId])
   @@map("feature_flags")
+}
+
+// ============================================
+// Orchestrator Workflow Runs
+// Persists every invocation of OrchestratorAgent.executeWorkflow so operators
+// can inspect current state, replay history, and gate month-end automation
+// on a per-tenant basis. See apps/api/src/agents/orchestrator/workflow-run.
+// ============================================
+
+enum WorkflowRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  AWAITING_ESCALATION
+}
+
+model WorkflowRun {
+  id           String            @id @default(uuid())
+  tenantId     String            @map("tenant_id")
+  workflowType String            @map("workflow_type") @db.VarChar(50)
+  status       WorkflowRunStatus @default(RUNNING)
+  triggeredBy  String            @map("triggered_by") @db.VarChar(30)
+  currentStep  String?           @map("current_step") @db.VarChar(80)
+  input        Json?
+  output       Json?
+  error        String?           @db.Text
+  escalatedTo  String?           @map("escalated_to") @db.VarChar(120)
+  startedAt    DateTime          @default(now()) @map("started_at")
+  completedAt  DateTime?         @map("completed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startedAt])
+  @@index([tenantId, workflowType, startedAt])
+  @@index([status, startedAt])
+  @@map("workflow_runs")
 }
 
 // TASK-STUB-012: Shadow Comparison persistence for SHADOW mode analysis

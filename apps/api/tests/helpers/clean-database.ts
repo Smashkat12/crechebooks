@@ -128,6 +128,7 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
       vat_adjustments,
       webhook_logs,
       whatsapp_messages,
+      workflow_runs,
       xero_account_mappings,
       xero_accounts,
       xero_contact_mappings,

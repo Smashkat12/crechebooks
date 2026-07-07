@@ -86,6 +86,17 @@ export class UpdateTransactionDto extends PartialType(CreateTransactionDto) {
   @Type(() => Date)
   @IsDate()
   reconciledAt?: Date;
+
+  // TASK-TRANS-022: Reversal detection fields — allow the reversal service
+  // and any future admin endpoint to update via the DTO surface instead of
+  // reaching around Prisma directly.
+  @IsOptional()
+  @IsBoolean()
+  isReversal?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  reversesTransactionId?: string | null;
 }
 
 export class TransactionFilterDto {

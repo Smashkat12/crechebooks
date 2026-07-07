@@ -19,7 +19,6 @@ import { RedisService } from '../../common/redis/redis.service';
 import { FinancialReportService } from '../../database/services/financial-report.service';
 import { CashFlowReportService } from '../../database/services/cash-flow-report.service';
 import type { CashFlowStatement } from '../../database/services/cash-flow-report.service';
-import { AgedPayablesService } from '../../database/services/aged-payables.service';
 import { ArrearsService } from '../../database/services/arrears.service';
 import type { ArrearsReport } from '../../database/dto/arrears.dto';
 import { VatService } from '../../database/services/vat.service';
@@ -102,7 +101,6 @@ export class ReportsService {
     private readonly redis: RedisService,
     private readonly financialReportService: FinancialReportService,
     private readonly cashFlowReportService: CashFlowReportService,
-    private readonly agedPayablesService: AgedPayablesService,
     private readonly arrearsService: ArrearsService,
     private readonly vatService: VatService,
     private readonly reportSynthesisAgent: ReportSynthesisAgent,

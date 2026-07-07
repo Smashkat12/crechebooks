@@ -12,10 +12,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StaffOnboardingRepository } from '../repositories/staff-onboarding.repository';
 import { NotFoundException } from '../../shared/exceptions';
-import {
-  WelcomePackOptions,
-  WelcomePackResult,
-} from '../dto/staff-onboarding.dto';
+import { WelcomePackOptions } from '../dto/staff-onboarding.dto';
 
 // Dynamic import for PDFKit (CommonJS module)
 type PDFDocument = InstanceType<typeof import('pdfkit')>;
@@ -421,33 +418,5 @@ export class WelcomePackPdfService {
         welcomePackSentAt: new Date(),
       });
     }
-  }
-
-  /**
-   * Generate and store welcome pack, returning metadata
-   */
-  async generateAndStoreWelcomePack(
-    staffId: string,
-    tenantId: string,
-    options: WelcomePackOptions = {},
-  ): Promise<WelcomePackResult> {
-    const pdfBuffer = await this.generateWelcomePack(
-      staffId,
-      tenantId,
-      options,
-    );
-
-    // Mark as generated
-    await this.markWelcomePackGenerated(staffId);
-
-    // In a real implementation, you would upload to cloud storage here
-    // For now, we return a placeholder URL
-    const timestamp = Date.now();
-    const pdfUrl = `/api/staff/${staffId}/welcome-pack/${timestamp}.pdf`;
-
-    return {
-      pdfUrl,
-      generatedAt: new Date(),
-    };
   }
 }

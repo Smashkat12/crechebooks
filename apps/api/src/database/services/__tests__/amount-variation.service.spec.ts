@@ -9,7 +9,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Decimal } from 'decimal.js';
 import { AmountVariationService } from '../amount-variation.service';
 import { TransactionRepository } from '../../repositories/transaction.repository';
-import { PrismaService } from '../../prisma/prisma.service';
 import {
   Transaction,
   ImportSource,
@@ -20,7 +19,6 @@ import {
 describe('AmountVariationService', () => {
   let service: AmountVariationService;
   let transactionRepo: jest.Mocked<TransactionRepository>;
-  let prisma: jest.Mocked<PrismaService>;
 
   const TENANT_ID = 'test-tenant-123';
   const PAYEE_NAME = 'ESKOM';
@@ -30,12 +28,6 @@ describe('AmountVariationService', () => {
       findByTenant: jest.fn(),
     };
 
-    const mockPrisma = {
-      auditLog: {
-        create: jest.fn().mockResolvedValue({} as any),
-      },
-    } as unknown as jest.Mocked<PrismaService>;
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AmountVariationService,
@@ -43,19 +35,11 @@ describe('AmountVariationService', () => {
           provide: TransactionRepository,
           useValue: mockTransactionRepo,
         },
-        {
-          provide: PrismaService,
-          useValue: mockPrisma,
-        },
       ],
     }).compile();
 
     service = module.get<AmountVariationService>(AmountVariationService);
     transactionRepo = module.get(TransactionRepository);
-    prisma = module.get(PrismaService);
-
-    // Clear cache before each test
-    service.clearCache();
   });
 
   describe('analyzeVariation', () => {
@@ -156,33 +140,8 @@ describe('AmountVariationService', () => {
 
       expect(result).not.toBeNull();
       expect(Math.abs(result!.zScore)).toBeGreaterThan(2);
-      expect(result!.thresholdType).toBe('percentage'); // default
-    });
-
-    it('should use z-score threshold when configured', async () => {
-      // Clear cache to ensure fresh config
-      service.clearCache();
-
-      const amounts = [500000, 490000, 510000, 495000, 505000];
-      transactionRepo.findByTenant.mockResolvedValue(
-        createPaginatedResult(createTransactions(amounts)),
-      );
-
-      // Set z-score threshold BEFORE analyzing
-      await service.setThresholdConfig(TENANT_ID, {
-        thresholdType: 'z_score',
-        zScoreThreshold: 2.5,
-      });
-
-      const result = await service.analyzeVariation(
-        TENANT_ID,
-        PAYEE_NAME,
-        new Decimal(530000),
-      );
-
-      expect(result).not.toBeNull();
-      expect(result!.thresholdType).toBe('z_score');
-      expect(result!.thresholdValue).toBe(2.5);
+      expect(result!.thresholdType).toBe('percentage');
+      expect(result!.thresholdValue).toBe(30);
     });
 
     it('should handle negative amounts correctly', async () => {
@@ -225,133 +184,6 @@ describe('AmountVariationService', () => {
     });
   });
 
-  describe('getThresholdConfig', () => {
-    it('should return default config for new tenant', () => {
-      const config = service.getThresholdConfig(TENANT_ID);
-
-      expect(config.tenantId).toBe(TENANT_ID);
-      expect(config.thresholdType).toBe('percentage');
-      expect(config.percentageThreshold).toBe(30);
-      expect(config.zScoreThreshold).toBe(2.5);
-    });
-
-    it('should cache config for repeated calls', () => {
-      const config1 = service.getThresholdConfig(TENANT_ID);
-      const config2 = service.getThresholdConfig(TENANT_ID);
-
-      expect(config1).toBe(config2); // Same object reference (cached)
-    });
-
-    it('should support per-payee config', () => {
-      const config = service.getThresholdConfig(TENANT_ID, PAYEE_NAME);
-
-      expect(config.tenantId).toBe(TENANT_ID);
-      expect(config.payee).toBe(PAYEE_NAME);
-    });
-
-    it('should normalize payee name for cache key', () => {
-      const config1 = service.getThresholdConfig(TENANT_ID, 'Eskom');
-      const config2 = service.getThresholdConfig(TENANT_ID, 'ESKOM');
-      const config3 = service.getThresholdConfig(TENANT_ID, '  eskom  ');
-
-      // All three should have the same underlying config (cache hit after first)
-      // but the payee field reflects what was passed in
-      expect(config1.payee).toBe('Eskom');
-      expect(config2.payee).toBe('Eskom'); // Cache hit, same object
-      expect(config3.payee).toBe('Eskom'); // Cache hit, same object
-    });
-  });
-
-  describe('setThresholdConfig', () => {
-    it('should update percentage threshold', async () => {
-      const updated = await service.setThresholdConfig(TENANT_ID, {
-        thresholdType: 'percentage',
-        percentageThreshold: 50,
-      });
-
-      expect(updated.thresholdType).toBe('percentage');
-      expect(updated.percentageThreshold).toBe(50);
-    });
-
-    it('should update z-score threshold', async () => {
-      const updated = await service.setThresholdConfig(TENANT_ID, {
-        thresholdType: 'z_score',
-        zScoreThreshold: 3.0,
-      });
-
-      expect(updated.thresholdType).toBe('z_score');
-      expect(updated.zScoreThreshold).toBe(3.0);
-    });
-
-    it('should update absolute threshold', async () => {
-      const updated = await service.setThresholdConfig(TENANT_ID, {
-        thresholdType: 'absolute',
-        absoluteThresholdCents: 10000, // R100
-      });
-
-      expect(updated.thresholdType).toBe('absolute');
-      expect(updated.absoluteThresholdCents).toBe(10000);
-    });
-
-    it('should support per-payee threshold override', async () => {
-      const updated = await service.setThresholdConfig(
-        TENANT_ID,
-        {
-          thresholdType: 'percentage',
-          percentageThreshold: 10, // Stricter for this payee
-        },
-        PAYEE_NAME,
-      );
-
-      expect(updated.payee).toBe(PAYEE_NAME);
-      expect(updated.percentageThreshold).toBe(10);
-    });
-
-    it('should create audit log entry', async () => {
-      await service.setThresholdConfig(TENANT_ID, {
-        thresholdType: 'percentage',
-        percentageThreshold: 50,
-      });
-
-      expect(prisma.auditLog.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            tenantId: TENANT_ID,
-            entityType: 'AmountThresholdConfig',
-            action: 'UPDATE',
-          }),
-        }),
-      );
-    });
-
-    it('should validate percentage threshold type', async () => {
-      await expect(
-        service.setThresholdConfig(TENANT_ID, {
-          thresholdType: 'percentage',
-          // Missing percentageThreshold
-        }),
-      ).rejects.toThrow('percentageThreshold required');
-    });
-
-    it('should validate absolute threshold type', async () => {
-      await expect(
-        service.setThresholdConfig(TENANT_ID, {
-          thresholdType: 'absolute',
-          // Missing absoluteThresholdCents
-        }),
-      ).rejects.toThrow('absoluteThresholdCents required');
-    });
-
-    it('should validate z-score threshold type', async () => {
-      await expect(
-        service.setThresholdConfig(TENANT_ID, {
-          thresholdType: 'z_score',
-          // Missing zScoreThreshold
-        }),
-      ).rejects.toThrow('zScoreThreshold required');
-    });
-  });
-
   describe('getPayeeStatistics', () => {
     it('should return null when insufficient data', async () => {
       transactionRepo.findByTenant.mockResolvedValue(
@@ -390,31 +222,6 @@ describe('AmountVariationService', () => {
       expect(stats).not.toBeNull();
       expect(stats!.stdDevAmountCents).toBeGreaterThan(200000);
       expect(stats!.maxAmountCents).toBe(1000000);
-    });
-  });
-
-  describe('clearCache', () => {
-    it('should clear all cached threshold configs', async () => {
-      // Set multiple configs
-      await service.setThresholdConfig(TENANT_ID, {
-        thresholdType: 'percentage',
-        percentageThreshold: 50,
-      });
-      await service.setThresholdConfig(
-        TENANT_ID,
-        {
-          thresholdType: 'percentage',
-          percentageThreshold: 25,
-        },
-        PAYEE_NAME,
-      );
-
-      // Clear cache
-      service.clearCache();
-
-      // Next call should return default
-      const config = service.getThresholdConfig(TENANT_ID);
-      expect(config.percentageThreshold).toBe(30); // Default
     });
   });
 

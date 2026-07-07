@@ -111,7 +111,6 @@ import { ParentConsentFormsPdfService } from './services/parent-consent-forms-pd
 import { ParentOnboardingService } from './services/parent-onboarding.service';
 // TASK-REPORTS-005: Missing Report Types
 import { CashFlowReportService } from './services/cash-flow-report.service';
-import { AgedPayablesService } from './services/aged-payables.service';
 import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { EmailModule } from '../integrations/email/email.module';
 import { NotificationModule } from '../notifications/notification.module';
@@ -266,7 +265,6 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ParentOnboardingService,
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
-    AgedPayablesService,
     // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
     ReminderTemplateService,
   ],
@@ -386,7 +384,6 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ParentOnboardingService,
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
-    AgedPayablesService,
     // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
     ReminderTemplateService,
   ],

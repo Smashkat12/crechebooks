@@ -382,16 +382,6 @@ export interface WelcomePackOptions {
 }
 
 /**
- * Welcome pack generation result
- */
-export interface WelcomePackResult {
-  pdfUrl: string;
-  generatedAt: Date;
-  sentAt?: Date;
-  sentTo?: string;
-}
-
-/**
  * Document expiry warning
  */
 export interface DocumentExpiryWarning {

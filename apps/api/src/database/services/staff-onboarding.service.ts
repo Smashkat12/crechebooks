@@ -628,10 +628,41 @@ export class StaffOnboardingService {
       verificationPending: stats.verificationPending,
       completed: stats.completed,
       cancelled: stats.cancelled,
-      averageCompletionDays: null, // TODO: Calculate from completed onboardings
+      averageCompletionDays:
+        await this.calculateAverageCompletionDays(tenantId),
       recentOnboardings: enrichedOnboardings,
       pendingDocuments: pendingDocumentsWithNames,
     };
+  }
+
+  /**
+   * Compute the mean number of days from onboarding start (createdAt) to
+   * completion (completedAt), across all completed onboardings for the tenant.
+   * Returns null when no completed onboardings exist yet.
+   */
+  private async calculateAverageCompletionDays(
+    tenantId: string,
+  ): Promise<number | null> {
+    const completed = await this.prisma.staffOnboarding.findMany({
+      where: {
+        tenantId,
+        status: 'COMPLETED',
+        completedAt: { not: null },
+      },
+      select: { createdAt: true, completedAt: true },
+    });
+
+    if (completed.length === 0) {
+      return null;
+    }
+
+    const MS_PER_DAY = 1000 * 60 * 60 * 24;
+    const totalDays = completed.reduce((sum, o) => {
+      const durationMs = o.completedAt!.getTime() - o.createdAt.getTime();
+      return sum + durationMs / MS_PER_DAY;
+    }, 0);
+
+    return Math.round((totalDays / completed.length) * 10) / 10;
   }
 
   /**

@@ -700,9 +700,6 @@ model Tenant {
   // TASK-REL-101: Circuit Breaker Pending Sync Queue
   pendingSyncs PendingSync[]
 
-  // TASK-INT-101: Stitch Open Banking Integration
-  linkedBankAccounts LinkedBankAccount[]
-
   // TASK-WA-001: WhatsApp Message History
   whatsAppMessages WhatsAppMessage[]
 
@@ -1984,71 +1981,6 @@ model BankConnection {
   // so it lives as a SQL-only index. `prisma migrate diff` will surface this as
   // an "extra index" — accepted drift, same pattern as vector_embeddings HNSW.
   @@map("bank_connections")
-}
-
-// TASK-INT-101: Open Banking Integration via Stitch API
-enum LinkedBankAccountStatus {
-  PENDING // OAuth flow initiated, waiting for callback
-  ACTIVE // Account linked and syncing
-  EXPIRED // Consent expired (90 days)
-  REVOKED // User revoked access
-  ERROR // Sync error occurred
-}
-
-// TASK-INT-101: Linked bank accounts for Open Banking (Stitch API)
-// Stores encrypted access/refresh tokens for SA banks (FNB, Standard, Nedbank, ABSA, Capitec)
-model LinkedBankAccount {
-  id                  String                  @id @default(uuid())
-  tenantId            String                  @map("tenant_id")
-  bankName            String                  @map("bank_name") @db.VarChar(100)
-  accountHolderName   String?                 @map("account_holder_name") @db.VarChar(200)
-  accountNumberMasked String                  @map("account_number_masked") @db.VarChar(20) // Last 4 digits only
-  accountType         String                  @map("account_type") @db.VarChar(50) // CURRENT, SAVINGS, etc.
-  stitchAccountId     String                  @unique @map("stitch_account_id") @db.VarChar(100)
-  accessToken         String                  @map("access_token") @db.Text // AES-256 encrypted
-  refreshToken        String                  @map("refresh_token") @db.Text // AES-256 encrypted
-  tokenExpiresAt      DateTime                @map("token_expires_at")
-  consentExpiresAt    DateTime                @map("consent_expires_at") // 90-day regulatory limit
-  consentGrantedAt    DateTime                @map("consent_granted_at")
-  lastSyncedAt        DateTime?               @map("last_synced_at")
-  lastSyncError       String?                 @map("last_sync_error") @db.Text
-  syncErrorCount      Int                     @default(0) @map("sync_error_count")
-  status              LinkedBankAccountStatus @default(PENDING)
-  metadata            Json? // Additional bank-specific metadata
-  createdAt           DateTime                @default(now()) @map("created_at")
-  updatedAt           DateTime                @updatedAt @map("updated_at")
-
-  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bankSyncHistory LinkedBankSyncEvent[]
-
-  @@index([tenantId, status])
-  @@index([consentExpiresAt])
-  @@index([lastSyncedAt])
-  @@map("linked_bank_accounts")
-}
-
-// TASK-INT-101: Bank sync event audit log
-// Tracks all sync operations for compliance and debugging
-model LinkedBankSyncEvent {
-  id                    String    @id @default(uuid())
-  linkedBankAccountId   String    @map("linked_bank_account_id")
-  syncType              String    @map("sync_type") @db.VarChar(50) // SCHEDULED, MANUAL, REFRESH_TOKEN
-  startedAt             DateTime  @default(now()) @map("started_at")
-  completedAt           DateTime? @map("completed_at")
-  transactionsFetched   Int?      @map("transactions_fetched")
-  transactionsImported  Int?      @map("transactions_imported")
-  transactionsDuplicate Int?      @map("transactions_duplicate")
-  status                String    @map("status") @db.VarChar(20) // SUCCESS, FAILED, PARTIAL
-  errorMessage          String?   @map("error_message") @db.Text
-  errorCode             String?   @map("error_code") @db.VarChar(50)
-  durationMs            Int?      @map("duration_ms")
-  createdAt             DateTime  @default(now()) @map("created_at")
-
-  linkedBankAccount LinkedBankAccount @relation(fields: [linkedBankAccountId], references: [id], onDelete: Cascade)
-
-  @@index([linkedBankAccountId, startedAt])
-  @@index([status])
-  @@map("linked_bank_sync_events")
 }
 
 // TASK-TRANS-017: Transaction Categorization Accuracy Tracking

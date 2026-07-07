@@ -60,9 +60,6 @@ export class ShutdownService implements OnApplicationShutdown {
     @InjectQueue(QUEUE_NAMES.SARS_DEADLINE)
     sarsDeadlineQueue?: Queue,
     @Optional()
-    @InjectQueue(QUEUE_NAMES.BANK_SYNC)
-    bankSyncQueue?: Queue,
-    @Optional()
     @InjectQueue(QUEUE_NAMES.STATEMENT_GENERATION)
     statementGenerationQueue?: Queue,
     @Optional()
@@ -89,9 +86,6 @@ export class ShutdownService implements OnApplicationShutdown {
         name: QUEUE_NAMES.SARS_DEADLINE,
         queue: sarsDeadlineQueue,
       });
-    }
-    if (bankSyncQueue) {
-      this.queues.push({ name: QUEUE_NAMES.BANK_SYNC, queue: bankSyncQueue });
     }
     if (statementGenerationQueue) {
       this.queues.push({

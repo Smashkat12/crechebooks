@@ -71,8 +71,6 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
       invoice_number_counters,
       invoices,
       leave_requests,
-      linked_bank_accounts,
-      linked_bank_sync_events,
       manual_match_history,
       message_recipients,
       onboarding_checklist_items,

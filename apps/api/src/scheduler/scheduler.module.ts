@@ -77,9 +77,6 @@ const bullImports = isRedisConfigured()
           name: QUEUE_NAMES.SARS_DEADLINE,
         },
         {
-          name: QUEUE_NAMES.BANK_SYNC,
-        },
-        {
           name: QUEUE_NAMES.STATEMENT_GENERATION,
         },
       ),

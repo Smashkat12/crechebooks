@@ -1,7 +1,6 @@
 export const QUEUE_NAMES = {
   INVOICE_GENERATION: 'invoice-generation',
   SARS_DEADLINE: 'sars-deadline',
-  BANK_SYNC: 'bank-sync',
   STATEMENT_GENERATION: 'statement-generation',
   SIMPLEPAY_SYNC: 'simplepay-sync',
   /** TASK-COMM-002: Queue for broadcast message processing */
@@ -31,11 +30,6 @@ export interface SarsDeadlineJobData extends ScheduledJobData {
    */
   submissionType?: 'VAT201' | 'EMP201' | 'EMP501';
   daysUntilDeadline?: number;
-}
-
-export interface BankSyncJobData extends ScheduledJobData {
-  accountId?: string;
-  fullSync?: boolean;
 }
 
 export interface StatementGenerationJobData extends ScheduledJobData {

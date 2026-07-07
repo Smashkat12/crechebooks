@@ -368,6 +368,7 @@ describe('ReportSynthesisAgent', () => {
       jest.spyOn(agent, 'isSdkAvailable').mockReturnValue(true);
       claudeClient.sendMessage.mockResolvedValue({
         content: 'This is not valid JSON',
+        contentBlocks: [{ type: 'text', text: 'This is not valid JSON' }],
         model: 'claude-sonnet-4-20250514',
         usage: { inputTokens: 100, outputTokens: 50 },
         stopReason: 'end_turn',
@@ -385,15 +386,19 @@ describe('ReportSynthesisAgent', () => {
 
     it('should fallback when Claude returns incomplete response', async () => {
       jest.spyOn(agent, 'isSdkAvailable').mockReturnValue(true);
-      claudeClient.sendMessage.mockResolvedValue({
-        content: JSON.stringify({
+      {
+        const incompleteContent = JSON.stringify({
           executiveSummary: 'Test',
           // Missing required fields
-        }),
-        model: 'claude-sonnet-4-20250514',
-        usage: { inputTokens: 100, outputTokens: 50 },
-        stopReason: 'end_turn',
-      });
+        });
+        claudeClient.sendMessage.mockResolvedValue({
+          content: incompleteContent,
+          contentBlocks: [{ type: 'text', text: incompleteContent }],
+          model: 'claude-sonnet-4-20250514',
+          usage: { inputTokens: 100, outputTokens: 50 },
+          stopReason: 'end_turn',
+        });
+      }
 
       const result = await agent.synthesizeReport(
         ReportType.INCOME_STATEMENT,
@@ -407,12 +412,17 @@ describe('ReportSynthesisAgent', () => {
 
     it('should handle Claude response with markdown code blocks', async () => {
       jest.spyOn(agent, 'isSdkAvailable').mockReturnValue(true);
-      claudeClient.sendMessage.mockResolvedValue({
-        content: '```json\n' + JSON.stringify(validClaudeResponse) + '\n```',
-        model: 'claude-sonnet-4-20250514',
-        usage: { inputTokens: 500, outputTokens: 300 },
-        stopReason: 'end_turn',
-      });
+      {
+        const wrapped =
+          '```json\n' + JSON.stringify(validClaudeResponse) + '\n```';
+        claudeClient.sendMessage.mockResolvedValue({
+          content: wrapped,
+          contentBlocks: [{ type: 'text', text: wrapped }],
+          model: 'claude-sonnet-4-20250514',
+          usage: { inputTokens: 500, outputTokens: 300 },
+          stopReason: 'end_turn',
+        });
+      }
 
       const result = await agent.synthesizeReport(
         ReportType.INCOME_STATEMENT,

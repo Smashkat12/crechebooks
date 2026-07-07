@@ -14,12 +14,59 @@
 
 import { Logger } from '@nestjs/common';
 import { SdkAgentFactory } from './sdk-agent.factory';
-import { SdkConfigService } from './sdk-config';
+import { AgentType, SdkConfigService } from './sdk-config';
 import {
   AgentDefinition,
   SdkAgentInterface,
   SdkExecutionResult,
 } from './interfaces/sdk-agent.interface';
+import type {
+  ClaudeClientService,
+  ClaudeContentBlock,
+  ClaudeMessage,
+  ClaudeResponse,
+} from './claude-client.service';
+import type { AgentToolRegistry } from './tools/tool-registry.service';
+import { AgentToolError } from './tools/interfaces/agent-tool.interface';
+
+/**
+ * Result of {@link BaseSdkAgent.runWithTools} — an LLM turn that may have
+ * dispatched one or more tool calls.
+ */
+export interface ToolLoopResult {
+  /** Final `end_turn` assistant text, or the last tool_use turn's text. */
+  content: string;
+  /** Number of full tool-use iterations executed. */
+  toolCalls: number;
+  /** Stop reason on the terminal turn. */
+  stopReason: string;
+  /** Raw content blocks of the final assistant turn. */
+  finalBlocks: ClaudeContentBlock[];
+}
+
+/**
+ * Options for {@link BaseSdkAgent.runWithTools}.
+ */
+export interface RunWithToolsOptions {
+  /** Which agent's tool allowlist to enforce. */
+  agentType: AgentType;
+  /** Tenant scope for tool handlers. */
+  tenantId: string;
+  /** Optional acting user for audit-log attribution. */
+  userId?: string;
+  /** Optional agent identifier for audit-log attribution. */
+  agentId?: string;
+  /** System prompt (defaults to the agent definition's prompt). */
+  systemPrompt?: string;
+  /** Initial user message. */
+  userMessage: string;
+  /** Model name (default: agent's configured model). */
+  model?: string;
+  /** Hard cap on tool-use iterations (default 5) to avoid runaway loops. */
+  maxIterations?: number;
+  /** Max tokens per turn (forwarded to Claude API). */
+  maxTokensPerTurn?: number;
+}
 
 /**
  * Abstract base class for all SDK-enhanced agents.
@@ -116,5 +163,146 @@ export abstract class BaseSdkAgent implements SdkAgentInterface {
         durationMs: Date.now() - fallbackStartTime,
       };
     }
+  }
+
+  /**
+   * Run a multi-turn LLM conversation with real tool bindings.
+   *
+   * The loop:
+   *   1. Send the user message to Claude with the agent's tool definitions.
+   *   2. If the response contains any `tool_use` blocks, execute each via the
+   *      registry, append the assistant turn + a matching `tool_result` user
+   *      turn to the message history, and loop.
+   *   3. If the response's stop_reason is `end_turn` (or the iteration cap is
+   *      reached), return the final text.
+   *
+   * Errors from tool handlers are surfaced back to the LLM as `tool_result`
+   * blocks with `is_error: true` — the model can then self-correct or abort.
+   * The registry enforces the per-agent tool allowlist; the LLM cannot call
+   * a tool that wasn't declared for it.
+   */
+  async runWithTools(
+    claude: ClaudeClientService,
+    registry: AgentToolRegistry,
+    options: RunWithToolsOptions,
+  ): Promise<ToolLoopResult> {
+    if (!claude.isAvailable()) {
+      throw new Error(
+        'Claude client not available. Check ANTHROPIC_API_KEY configuration.',
+      );
+    }
+    const agentDef = this.getAgentDefinition(options.tenantId);
+    const systemPrompt = options.systemPrompt ?? agentDef.prompt;
+    const toolDefs = registry.getToolDefinitionsForAgent(options.agentType);
+    const maxIterations = options.maxIterations ?? 5;
+
+    const messages: ClaudeMessage[] = [
+      { role: 'user', content: options.userMessage },
+    ];
+
+    let toolCalls = 0;
+    let lastResponse: ClaudeResponse | undefined;
+
+    for (let i = 0; i < maxIterations; i++) {
+      const response = await claude.sendMessage({
+        systemPrompt,
+        messages,
+        model: options.model ?? agentDef.model,
+        tools: toolDefs,
+        maxTokens: options.maxTokensPerTurn,
+      });
+      lastResponse = response;
+
+      const toolUseBlocks = response.contentBlocks.filter(
+        (b): b is Extract<ClaudeContentBlock, { type: 'tool_use' }> =>
+          b.type === 'tool_use',
+      );
+
+      // Terminal: LLM did not request any tool.
+      if (toolUseBlocks.length === 0 || response.stopReason !== 'tool_use') {
+        return {
+          content: response.content,
+          toolCalls,
+          stopReason: response.stopReason,
+          finalBlocks: response.contentBlocks,
+        };
+      }
+
+      // Assistant turn — full content blocks, so the model can see its own
+      // tool_use ids on the next turn.
+      messages.push({ role: 'assistant', content: response.contentBlocks });
+
+      // Execute each tool_use, then feed all tool_results back in ONE user
+      // turn (Anthropic requires results to be grouped together).
+      const resultBlocks: ClaudeContentBlock[] = [];
+      for (const use of toolUseBlocks) {
+        toolCalls += 1;
+        try {
+          const result = await registry.executeForAgent(
+            options.agentType,
+            use.name,
+            use.input,
+            {
+              tenantId: options.tenantId,
+              userId: options.userId,
+              agentId: options.agentId,
+            },
+          );
+          resultBlocks.push({
+            type: 'tool_result',
+            tool_use_id: use.id,
+            content: serialiseToolResult(result),
+            is_error: false,
+          });
+        } catch (err) {
+          const message =
+            err instanceof AgentToolError
+              ? `${err.code}: ${err.message}`
+              : err instanceof Error
+                ? err.message
+                : String(err);
+          this.logger.warn(
+            `Tool "${use.name}" failed for agent "${options.agentType}": ${message}`,
+          );
+          resultBlocks.push({
+            type: 'tool_result',
+            tool_use_id: use.id,
+            content: message,
+            is_error: true,
+          });
+        }
+      }
+      messages.push({ role: 'user', content: resultBlocks });
+    }
+
+    // Iteration cap hit. Return whatever the last response said, plus a hint.
+    this.logger.warn(
+      `runWithTools hit iteration cap (${String(maxIterations)}) for agent "${options.agentType}"`,
+    );
+    return {
+      content:
+        lastResponse?.content ??
+        `Tool-use loop exceeded ${String(maxIterations)} iterations without a final answer.`,
+      toolCalls,
+      stopReason: 'max_iterations',
+      finalBlocks: lastResponse?.contentBlocks ?? [],
+    };
+  }
+}
+
+/**
+ * Serialise a tool handler result for the LLM. Anthropic tool_result blocks
+ * accept a string body — we JSON-stringify structured data and pass strings
+ * through unchanged.
+ */
+function serialiseToolResult(result: unknown): string {
+  if (result == null) return 'null';
+  if (typeof result === 'string') return result;
+  try {
+    return JSON.stringify(result);
+  } catch {
+    // JSON.stringify only throws on cyclic structures. Fall back to a fixed
+    // marker rather than `String(result)`, which would flag as base-toString.
+    return '[unserialisable tool result]';
   }
 }

@@ -29,6 +29,7 @@ import { AccruedBankChargeService } from '../../../src/database/services/accrued
 import { BankFeeService } from '../../../src/database/services/bank-fee.service';
 import { FeeInflationCorrectionService } from '../../../src/database/services/fee-inflation-correction.service';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   Tenant,
   Reconciliation,
@@ -64,6 +65,9 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+      },
+      bankStatementMatch: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       $transaction: jest.fn((fn) => fn(mockPrisma)),
     };
@@ -171,6 +175,10 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
               unmatched: [],
             }),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();
@@ -1262,7 +1270,12 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
       expect(result.reason).toContain('Date differs');
     });
 
-    it('should return IN_BANK_ONLY for low description similarity', () => {
+    it('should fall back to amount+date match (0.7 confidence) for low description similarity with exact amount+date', () => {
+      // TASK-RECON: commit 7a99051 added the amount+date fallback so that entries
+      // from different data sources (bank statement vs Xero-truncated feed
+      // descriptions) still match when amount and date are exact, even though
+      // the description similarity is low. This supersedes the pre-fallback
+      // IN_BANK_ONLY expectation for this scenario.
       mockToleranceConfig.isWithinTolerance.mockReturnValue(true);
       mockToleranceConfig.isDateWithinTolerance.mockReturnValue(true);
       (mockToleranceConfig as any).descriptionSimilarityThreshold = 0.9; // High threshold
@@ -1283,7 +1296,9 @@ describe('BankStatementReconciliationService (Unit Tests)', () => {
 
       const result = (service as any).evaluateMatch(bankTx, xeroTx);
 
-      expect(result.status).toBe(BankStatementMatchStatus.IN_BANK_ONLY);
+      expect(result.status).toBe(BankStatementMatchStatus.MATCHED);
+      expect(result.confidence).toBe(0.7);
+      expect(result.reason).toContain('Amount+date match');
     });
 
     it('should handle credit/debit mismatch', () => {
@@ -1450,6 +1465,10 @@ describe('BankStatementReconciliationService (Integration Tests)', () => {
               unmatched: [],
             }),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();

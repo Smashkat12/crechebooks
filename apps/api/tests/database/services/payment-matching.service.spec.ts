@@ -829,7 +829,12 @@ describe('PaymentMatchingService', () => {
       );
 
       expect(score).toBe(100); // 40 + 40 + 20 (capped at 100)
-      expect(reasons).toContain('Exact parent name match');
+      // Reason labels are generic (not parent/child-specific) since the
+      // 29b548b refactor — verify the exact-name match fired against the parent.
+      expect(reasons.some((r: string) => r.includes('Exact name match'))).toBe(
+        true,
+      );
+      expect(reasons.some((r: string) => r.includes('John Smith'))).toBe(true);
     });
 
     it('should handle name variations with similarity scoring', async () => {
@@ -999,9 +1004,9 @@ describe('PaymentMatchingService', () => {
 
       // Should get amount (40) + child name match (15-20)
       expect(score).toBeGreaterThanOrEqual(55);
-      expect(
-        reasons.some((r: string) => r.toLowerCase().includes('child')),
-      ).toBe(true);
+      // Reason labels are generic (not parent/child-specific) since the
+      // 29b548b refactor — verify the match reason cites the child's name.
+      expect(reasons.some((r: string) => r.includes('Emily'))).toBe(true);
     });
 
     it('should match when transaction description contains child full name', async () => {
@@ -1037,9 +1042,9 @@ describe('PaymentMatchingService', () => {
 
       // Should get amount (40) + strong child name match (18-20)
       expect(score).toBeGreaterThanOrEqual(55);
-      expect(
-        reasons.some((r: string) => r.toLowerCase().includes('child')),
-      ).toBe(true);
+      // Reason labels are generic (not parent/child-specific) since the
+      // 29b548b refactor — verify the match reason cites the child's name.
+      expect(reasons.some((r: string) => r.includes('Emily'))).toBe(true);
     });
 
     it('should extract names from FNB banking description format', async () => {

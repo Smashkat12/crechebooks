@@ -466,7 +466,29 @@ describe('E2E: SARS Submission Flow', () => {
     });
 
     it('should calculate SDL when payroll exceeds R500k annually', async () => {
-      // Current total: R15k + R50k = R65k/month = R780k/year > R500k threshold
+      // AUDIT-TAX-07 (commit bc27027): SDLA §4(b) exemption is tested against
+      // the ROLLING 12-MONTH ACTUAL gross (SUM of APPROVED payrolls in the
+      // window ending on the period-end month), not `currentMonthGross * 12`.
+      // Current month alone (R15k + R50k = R65k) is below the R500k rolling
+      // threshold, so seed one extra APPROVED payroll earlier in the rolling
+      // window (2024-06) to push the trailing-12-month gross over R500k.
+      // See src/database/services/emp201.service.ts calculateSdl().
+      await prisma.payroll.create({
+        data: {
+          tenantId: testTenant.id,
+          staffId: staff2Id,
+          payPeriodStart: new Date(2024, 5, 1), // Jun 2024 (within rolling window)
+          payPeriodEnd: new Date(2024, 5, 30),
+          basicSalaryCents: 45000000, // R450,000
+          grossSalaryCents: 45000000,
+          netSalaryCents: 45000000,
+          payeCents: 0,
+          uifEmployeeCents: 0,
+          uifEmployerCents: 0,
+          status: PayrollStatus.APPROVED,
+        },
+      });
+
       const response = await request(app.getHttpServer())
         .post('/sars/emp201')
         .set('Authorization', `Bearer ${authToken}`)

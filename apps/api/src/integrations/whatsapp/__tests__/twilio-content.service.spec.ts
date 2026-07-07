@@ -292,7 +292,8 @@ describe('TwilioContentService', () => {
         (call) =>
           call[0].includes('/Content') &&
           call[1]?.method === 'POST' &&
-          !call[0].includes('/ApprovalRequests'),
+          !call[0].includes('/ApprovalRequests') &&
+          String(call[1]?.body ?? '').includes('session_quick_reply_'),
       );
       expect(createCall).toBeDefined();
 
@@ -336,7 +337,8 @@ describe('TwilioContentService', () => {
         (call) =>
           call[0].includes('/Content') &&
           call[1]?.method === 'POST' &&
-          !call[0].includes('/ApprovalRequests'),
+          !call[0].includes('/ApprovalRequests') &&
+          String(call[1]?.body ?? '').includes('session_quick_reply_'),
       );
 
       const requestBody = JSON.parse(createCall[1].body);
@@ -365,7 +367,8 @@ describe('TwilioContentService', () => {
         (call) =>
           call[0].includes('/Content') &&
           call[1]?.method === 'POST' &&
-          !call[0].includes('/ApprovalRequests'),
+          !call[0].includes('/ApprovalRequests') &&
+          String(call[1]?.body ?? '').includes('list_picker_'),
       );
 
       const requestBody = JSON.parse(createCall[1].body);
@@ -411,7 +414,8 @@ describe('TwilioContentService', () => {
         (call) =>
           call[0].includes('/Content') &&
           call[1]?.method === 'POST' &&
-          !call[0].includes('/ApprovalRequests'),
+          !call[0].includes('/ApprovalRequests') &&
+          String(call[1]?.body ?? '').includes('list_picker_'),
       );
 
       const requestBody = JSON.parse(createCall[1].body);

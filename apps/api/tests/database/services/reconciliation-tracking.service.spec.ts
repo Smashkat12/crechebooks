@@ -5,6 +5,7 @@
  */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { BankStatementMatchRepository } from '../../../src/database/repositories/bank-statement-match.repository';
 import { ReconciliationRepository } from '../../../src/database/repositories/reconciliation.repository';
@@ -117,6 +118,10 @@ describe('BankStatementReconciliationService - RECON-004 & RECON-005', () => {
               explanation: 'mock',
             }),
           },
+        },
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
         },
       ],
     }).compile();

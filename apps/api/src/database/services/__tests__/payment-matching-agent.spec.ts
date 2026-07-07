@@ -82,13 +82,17 @@ describe('PaymentMatchingService - Agent Integration', () => {
     },
   };
 
-  // Invoice 2: Also matches on amount and name
+  // Invoice 2: Also matches on amount and name, but belongs to a DIFFERENT
+  // parent who shares the same name. Two distinct name-identified parents is
+  // what makes the match ambiguous under the name-identified fast path
+  // (3c0749f) — same-parent duplicates are de-duplicated and auto-applied
+  // without consulting the agent.
   const mockInvoiceWithRelations2 = {
     id: mockInvoiceId2,
     invoiceNumber: 'INV-2024-003', // Different invoice number
     totalCents: 100000,
     amountPaidCents: 0,
-    parentId: 'parent-001',
+    parentId: 'parent-002',
     status: 'SENT',
     tenantId: mockTenantId,
     isDeleted: false,
@@ -96,7 +100,7 @@ describe('PaymentMatchingService - Agent Integration', () => {
     billingPeriodEnd: new Date('2024-01-31'),
     dueDate: new Date('2024-02-15'),
     parent: {
-      id: 'parent-001',
+      id: 'parent-002',
       firstName: 'John',
       lastName: 'Smith',
     },
@@ -131,7 +135,9 @@ describe('PaymentMatchingService - Agent Integration', () => {
         {
           provide: PaymentRepository,
           useValue: {
-            create: jest.fn(),
+            // autoApplyMatch reads payment.id off the created record for the
+            // audit log, so the default mock must resolve a payment object.
+            create: jest.fn().mockResolvedValue({ id: 'payment-default' }),
           },
         },
         {
@@ -159,6 +165,12 @@ describe('PaymentMatchingService - Agent Integration', () => {
     prisma = module.get<PrismaService>(PrismaService);
     paymentAgent = module.get<PaymentMatcherAgent>(PaymentMatcherAgent);
     auditLogService = module.get<AuditLogService>(AuditLogService);
+
+    // markInvoicePaidInBatch mutates the invoice objects returned by
+    // prisma.invoice.findMany, so an auto-apply in one test would leave the
+    // shared fixtures "paid" for the next. Reset the mutated field per test.
+    mockInvoiceWithRelations1.amountPaidCents = 0;
+    mockInvoiceWithRelations2.amountPaidCents = 0;
   });
 
   afterEach(() => {

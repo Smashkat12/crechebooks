@@ -15,6 +15,7 @@ import {
   BookOpen,
   CalendarCheck,
   FileCheck,
+  Bot,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ const navigation = [
     items: [
       { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
       { name: 'Audit Logs', href: '/admin/audit-logs', icon: ScrollText },
+      { name: 'Agent Rollout', href: '/admin/agent-rollout', icon: Bot },
     ],
   },
   {

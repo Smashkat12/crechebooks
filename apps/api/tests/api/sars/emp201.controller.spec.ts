@@ -14,6 +14,7 @@ import { SarsSubmissionRepository } from '../../../src/database/repositories/sar
 import { Vat201Service } from '../../../src/database/services/vat201.service';
 import { Emp201Service } from '../../../src/database/services/emp201.service';
 import { SarsFileGeneratorService } from '../../../src/database/services/sars-file-generator.service';
+import { SarsReadinessService } from '../../../src/api/sars/sars-readiness.service';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { SarsSubmission } from '@prisma/client';
 import type { ApiGenerateEmp201Dto } from '../../../src/api/sars/dto';
@@ -87,6 +88,10 @@ describe('SarsController - EMP201 Endpoint', () => {
             generateEmp201Csv: jest.fn(),
             generateEmp501Csv: jest.fn(),
           },
+        },
+        {
+          provide: SarsReadinessService,
+          useValue: { getReadiness: jest.fn() },
         },
       ],
     }).compile();

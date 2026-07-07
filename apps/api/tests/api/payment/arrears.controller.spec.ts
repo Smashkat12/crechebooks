@@ -14,6 +14,7 @@ import { PaymentAllocationService } from '../../../src/database/services/payment
 import { PaymentReceiptService } from '../../../src/database/services/payment-receipt.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
+import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type {
@@ -98,6 +99,13 @@ describe('PaymentController - getArrearsReport', () => {
         {
           provide: InvoiceRepository,
           useValue: { findById: jest.fn() },
+        },
+        {
+          provide: PrismaService,
+          useValue: {
+            invoice: { findMany: jest.fn() },
+            payment: { findFirst: jest.fn() },
+          },
         },
       ],
     }).compile();

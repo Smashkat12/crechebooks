@@ -18,6 +18,7 @@ import { SarsController } from '../../../src/api/sars/sars.controller';
 import { Vat201Service } from '../../../src/database/services/vat201.service';
 import { Emp201Service } from '../../../src/database/services/emp201.service';
 import { SarsFileGeneratorService } from '../../../src/database/services/sars-file-generator.service';
+import { SarsReadinessService } from '../../../src/api/sars/sars-readiness.service';
 import { SarsSubmissionRepository } from '../../../src/database/repositories/sars-submission.repository';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import type { ApiGenerateVat201Dto } from '../../../src/api/sars/dto/vat201.dto';
@@ -98,6 +99,10 @@ describe('SarsController - POST /sars/vat201', () => {
             generateEmp201Csv: jest.fn(),
             generateEmp501Csv: jest.fn(),
           },
+        },
+        {
+          provide: SarsReadinessService,
+          useValue: { getReadiness: jest.fn() },
         },
       ],
     }).compile();

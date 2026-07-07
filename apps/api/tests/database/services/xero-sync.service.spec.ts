@@ -13,6 +13,7 @@ import { CategorizationRepository } from '../../../src/database/repositories/cat
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
+import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { ConflictDetectionService } from '../../../src/database/services/conflict-detection.service';
 import { ConflictResolutionService } from '../../../src/database/services/conflict-resolution.service';
 import { XeroCircuitBreaker } from '../../../src/integrations/circuit-breaker';
@@ -101,6 +102,7 @@ describe('XeroSyncService', () => {
         TransactionRepository,
         CategorizationRepository,
         PaymentRepository,
+        InvoiceRepository,
         XeroAccountRepository,
         CategorizationJournalRepository,
         AuditLogService,
@@ -692,6 +694,7 @@ describe('XeroSyncService', () => {
           TransactionRepository,
           CategorizationRepository,
           PaymentRepository,
+          InvoiceRepository,
           XeroAccountRepository,
           CategorizationJournalRepository,
           AuditLogService,

@@ -84,17 +84,18 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      // Create bank transaction (not synced to Xero)
-      await prisma.transaction.create({
+      // detectDiscrepancies reads from bank_statement_matches (source of truth
+      // populated by the reconciliation service), not the transactions table
+      // directly — see commit d95ee8a.
+      await prisma.bankStatementMatch.create({
         data: {
           tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-15'),
-          description: 'Bank deposit not in Xero',
-          amountCents: 5000,
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Bank deposit not in Xero',
+          bankAmountCents: 5000,
+          bankIsCredit: true,
+          status: 'IN_BANK_ONLY',
         },
       });
 
@@ -125,7 +126,7 @@ describe('DiscrepancyService', () => {
       });
 
       // Create Xero transaction (synced but not in bank)
-      await prisma.transaction.create({
+      const xeroTx = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
           bankAccount: 'FNB-001',
@@ -139,6 +140,23 @@ describe('DiscrepancyService', () => {
         },
       });
 
+      await prisma.bankStatementMatch.create({
+        data: {
+          tenantId: testTenant.id,
+          reconciliationId: recon.id,
+          bankDate: xeroTx.date,
+          bankDescription: '',
+          bankAmountCents: 0,
+          bankIsCredit: false,
+          transactionId: xeroTx.id,
+          xeroDate: xeroTx.date,
+          xeroDescription: xeroTx.description,
+          xeroAmountCents: 8000,
+          xeroIsCredit: true,
+          status: 'IN_XERO_ONLY',
+        },
+      });
+
       const report = await service.detectDiscrepancies(testTenant.id, recon.id);
 
       expect(report.discrepancyCount).toBe(1);
@@ -147,7 +165,7 @@ describe('DiscrepancyService', () => {
       expect(report.discrepancies[0].type).toBe(
         DiscrepancyType.IN_XERO_NOT_BANK,
       );
-      expect(report.discrepancies[0].xeroTransactionId).toBe('XERO-123');
+      expect(report.discrepancies[0].xeroTransactionId).toBe(xeroTx.id);
     });
 
     it('should detect AMOUNT_MISMATCH', async () => {
@@ -165,23 +183,8 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      // Create bank transaction
-      await prisma.transaction.create({
-        data: {
-          tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-15'),
-          description: 'Payment',
-          reference: 'REF-001',
-          amountCents: 10000,
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
-        },
-      });
-
-      // Create Xero transaction with different amount
-      await prisma.transaction.create({
+      // Create Xero transaction with different amount (referenced by the match row)
+      const xeroTx = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
           bankAccount: 'FNB-001',
@@ -193,6 +196,23 @@ describe('DiscrepancyService', () => {
           isCredit: true,
           source: 'MANUAL',
           status: TransactionStatus.SYNCED,
+        },
+      });
+
+      await prisma.bankStatementMatch.create({
+        data: {
+          tenantId: testTenant.id,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Payment',
+          bankAmountCents: 10000,
+          bankIsCredit: true,
+          transactionId: xeroTx.id,
+          xeroDate: xeroTx.date,
+          xeroDescription: xeroTx.description,
+          xeroAmountCents: 9500,
+          xeroIsCredit: true,
+          status: 'AMOUNT_MISMATCH',
         },
       });
 
@@ -222,23 +242,8 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      // Create bank transaction
-      await prisma.transaction.create({
-        data: {
-          tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-15'),
-          description: 'Payment',
-          reference: 'REF-002',
-          amountCents: 15000,
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
-        },
-      });
-
-      // Create Xero transaction with different date
-      await prisma.transaction.create({
+      // Create Xero transaction with different date (referenced by the match row)
+      const xeroTx = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
           bankAccount: 'FNB-001',
@@ -253,6 +258,23 @@ describe('DiscrepancyService', () => {
         },
       });
 
+      await prisma.bankStatementMatch.create({
+        data: {
+          tenantId: testTenant.id,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Payment',
+          bankAmountCents: 15000,
+          bankIsCredit: true,
+          transactionId: xeroTx.id,
+          xeroDate: xeroTx.date,
+          xeroDescription: xeroTx.description,
+          xeroAmountCents: 15000,
+          xeroIsCredit: true,
+          status: 'DATE_MISMATCH',
+        },
+      });
+
       const report = await service.detectDiscrepancies(testTenant.id, recon.id);
 
       expect(report.discrepancyCount).toBe(1);
@@ -260,7 +282,9 @@ describe('DiscrepancyService', () => {
       expect(report.discrepancies[0].type).toBe(DiscrepancyType.DATE_MISMATCH);
     });
 
-    it('should match transactions by reference correctly', async () => {
+    it('should not report a discrepancy for a MATCHED bank-statement-match row', async () => {
+      // detectDiscrepancies treats MATCHED as "successfully matched — not a
+      // discrepancy" (see status filter at the top of the loop).
       const recon = await prisma.reconciliation.create({
         data: {
           tenantId: testTenant.id,
@@ -275,22 +299,7 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      // Create matching bank and Xero transactions with same reference
-      await prisma.transaction.create({
-        data: {
-          tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-15'),
-          description: 'Payment',
-          reference: 'MATCH-REF',
-          amountCents: 20000,
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
-        },
-      });
-
-      await prisma.transaction.create({
+      const xeroTx = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
           bankAccount: 'FNB-001',
@@ -305,6 +314,23 @@ describe('DiscrepancyService', () => {
         },
       });
 
+      await prisma.bankStatementMatch.create({
+        data: {
+          tenantId: testTenant.id,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Payment',
+          bankAmountCents: 20000,
+          bankIsCredit: true,
+          transactionId: xeroTx.id,
+          xeroDate: xeroTx.date,
+          xeroDescription: xeroTx.description,
+          xeroAmountCents: 20000,
+          xeroIsCredit: true,
+          status: 'MATCHED',
+        },
+      });
+
       const report = await service.detectDiscrepancies(testTenant.id, recon.id);
 
       // Should have no discrepancies as they match
@@ -313,7 +339,8 @@ describe('DiscrepancyService', () => {
       expect(report.summary.inXeroNotBank).toBe(0);
     });
 
-    it('should match transactions by amount and date when no reference', async () => {
+    it('should not report a discrepancy for a FEE_ADJUSTED_MATCH row', async () => {
+      // FEE_ADJUSTED_MATCH is also excluded from discrepancies alongside MATCHED.
       const recon = await prisma.reconciliation.create({
         data: {
           tenantId: testTenant.id,
@@ -328,21 +355,7 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      // Create matching transactions without reference
-      await prisma.transaction.create({
-        data: {
-          tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-20'),
-          description: 'Payment without ref',
-          amountCents: 25000,
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
-        },
-      });
-
-      await prisma.transaction.create({
+      const xeroTx = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
           bankAccount: 'FNB-001',
@@ -353,6 +366,23 @@ describe('DiscrepancyService', () => {
           isCredit: true,
           source: 'MANUAL',
           status: TransactionStatus.SYNCED,
+        },
+      });
+
+      await prisma.bankStatementMatch.create({
+        data: {
+          tenantId: testTenant.id,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-20'),
+          bankDescription: 'Payment without ref',
+          bankAmountCents: 24500,
+          bankIsCredit: true,
+          transactionId: xeroTx.id,
+          xeroDate: xeroTx.date,
+          xeroDescription: xeroTx.description,
+          xeroAmountCents: 25000,
+          xeroIsCredit: true,
+          status: 'FEE_ADJUSTED_MATCH',
         },
       });
 
@@ -512,16 +542,15 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      await prisma.transaction.create({
+      await prisma.bankStatementMatch.create({
         data: {
           tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-15'),
-          description: 'Small transaction',
-          amountCents: 500, // R5
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Small transaction',
+          bankAmountCents: 500, // R5
+          bankIsCredit: true,
+          status: 'IN_BANK_ONLY',
         },
       });
 
@@ -545,16 +574,15 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      await prisma.transaction.create({
+      await prisma.bankStatementMatch.create({
         data: {
           tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-15'),
-          description: 'Medium transaction',
-          amountCents: 5000, // R50
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Medium transaction',
+          bankAmountCents: 5000, // R50
+          bankIsCredit: true,
+          status: 'IN_BANK_ONLY',
         },
       });
 
@@ -578,16 +606,15 @@ describe('DiscrepancyService', () => {
         },
       });
 
-      await prisma.transaction.create({
+      await prisma.bankStatementMatch.create({
         data: {
           tenantId: testTenant.id,
-          bankAccount: 'FNB-001',
-          date: new Date('2025-01-15'),
-          description: 'Large transaction',
-          amountCents: 50000, // R500
-          isCredit: true,
-          source: 'CSV_IMPORT',
-          status: TransactionStatus.PENDING,
+          reconciliationId: recon.id,
+          bankDate: new Date('2025-01-15'),
+          bankDescription: 'Large transaction',
+          bankAmountCents: 50000, // R500
+          bankIsCredit: true,
+          status: 'IN_BANK_ONLY',
         },
       });
 

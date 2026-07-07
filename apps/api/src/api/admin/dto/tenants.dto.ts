@@ -103,6 +103,15 @@ export class UpdateTenantDto {
   @IsOptional()
   @IsEnum(SubscriptionPlan)
   subscriptionPlan?: SubscriptionPlan;
+
+  @ApiPropertyOptional({
+    description:
+      'Opt this tenant into the scheduled monthly statement-generation cron. ' +
+      'Default false; only true tenants are enrolled at bootstrap.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  statementScheduleEnabled?: boolean;
 }
 
 export class SuspendTenantDto {

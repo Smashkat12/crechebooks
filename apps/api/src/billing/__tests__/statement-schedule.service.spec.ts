@@ -245,19 +245,65 @@ describe('StatementScheduleService', () => {
   });
 
   describe('onApplicationBootstrap', () => {
-    it('enrolls zero tenants by default (opt-in gate not yet backed by schema)', async () => {
+    it('does not enroll ACTIVE tenants that have statementScheduleEnabled=false (default)', async () => {
       mockPrisma.tenant.findMany = jest.fn().mockResolvedValue([
-        { id: 'tenant-a', name: 'Creche A' },
-        { id: 'tenant-b', name: 'Creche B' },
+        {
+          id: 'tenant-a',
+          name: 'Creche A',
+          statementScheduleEnabled: false,
+        },
+        {
+          id: 'tenant-b',
+          name: 'Creche B',
+          statementScheduleEnabled: false,
+        },
       ]);
 
       await service.onApplicationBootstrap();
 
-      // isStatementScheduleEnabled() always returns false until
-      // schema-guardian adds a tenant-level enablement column — this is the
-      // deliberate opt-in safety default (see file header).
+      // Opt-in flag is the default (false) — bootstrap enrols zero tenants,
+      // preserving the OPT-IN SAFETY invariant from the service file header.
       expect(mockStatementQueue.add).not.toHaveBeenCalled();
       expect(mockStatementQueue.removeRepeatable).not.toHaveBeenCalled();
+    });
+
+    it('enrolls only ACTIVE tenants with statementScheduleEnabled=true', async () => {
+      mockPrisma.tenant.findMany = jest.fn().mockResolvedValue([
+        {
+          id: 'tenant-opted-in',
+          name: 'Creche Opted-In',
+          statementScheduleEnabled: true,
+        },
+        {
+          id: 'tenant-opted-out',
+          name: 'Creche Opted-Out',
+          statementScheduleEnabled: false,
+        },
+      ]);
+      // scheduleTenantStatements re-fetches the tenant for its name — return
+      // the opted-in tenant so the schedule call succeeds.
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        id: 'tenant-opted-in',
+        name: 'Creche Opted-In',
+      });
+
+      await service.onApplicationBootstrap();
+
+      // Exactly one add() — only the opted-in tenant is enrolled.
+      expect(mockStatementQueue.add).toHaveBeenCalledTimes(1);
+      expect(mockStatementQueue.add).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: 'tenant-opted-in' }),
+        expect.objectContaining({
+          jobId: `${QUEUE_NAMES.STATEMENT_GENERATION}:tenant-opted-in`,
+        }),
+      );
+      // Remove-then-schedule idempotency: the opted-in tenant is
+      // pre-cleaned; the opted-out tenant is never touched.
+      expect(mockStatementQueue.removeRepeatable).toHaveBeenCalledTimes(1);
+      expect(mockStatementQueue.removeRepeatable).toHaveBeenCalledWith({
+        cron: '0 7 1 * *',
+        jobId: `${QUEUE_NAMES.STATEMENT_GENERATION}:tenant-opted-in`,
+      });
     });
 
     it('skips registration when no ACTIVE tenants exist', async () => {

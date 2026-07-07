@@ -15,6 +15,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Readable } from 'stream';
 import { AdminService } from '../admin.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+import { AuditLogService } from '../../../database/services/audit-log.service';
 import { AuditAction } from '@prisma/client';
 import { AuditLogExportQueryDto } from '../dto/audit-logs.dto';
 
@@ -101,6 +102,7 @@ describe('AdminService.exportAuditLogsCsv', () => {
       providers: [
         AdminService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: AuditLogService, useValue: { logAction: jest.fn() } },
       ],
     }).compile();
 

@@ -40,8 +40,10 @@ test.describe('Dashboard', () => {
   });
 
   test('should navigate to transactions from dashboard', async ({ page }) => {
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    // Wait for the dashboard to actually finish loading. `networkidle` never
+    // settles here because the page has long-poll / websocket / analytics
+    // beacons — wait for a real readiness signal instead.
+    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     // Navigate directly via URL to verify route works
     await page.goto('/transactions');
@@ -49,8 +51,8 @@ test.describe('Dashboard', () => {
   });
 
   test('should navigate to invoices from dashboard', async ({ page }) => {
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    // Wait for the dashboard to actually finish loading (see note above).
+    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     // Navigate directly via URL to verify route works
     await page.goto('/invoices');
@@ -58,8 +60,8 @@ test.describe('Dashboard', () => {
   });
 
   test('should navigate to payments from dashboard', async ({ page }) => {
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    // Wait for the dashboard to actually finish loading (see note above).
+    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     // Navigate directly via URL to verify route works
     await page.goto('/payments');
@@ -67,8 +69,8 @@ test.describe('Dashboard', () => {
   });
 
   test('should navigate to SARS from dashboard', async ({ page }) => {
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    // Wait for the dashboard to actually finish loading (see note above).
+    await expect(page.getByRole('heading', { name: /dashboard/i })).toBeVisible({ timeout: 15000 });
 
     // Navigate directly via URL to verify route works
     await page.goto('/sars');

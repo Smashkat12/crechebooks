@@ -6,6 +6,12 @@ export const QUEUE_NAMES = {
   /** TASK-COMM-002: Queue for broadcast message processing */
   BROADCAST: 'broadcast',
   NOTIFICATION: 'notification',
+  /**
+   * Orchestrator month-end / bank-import / tax-submission workflow runs
+   * enqueued by OrchestratorScheduleService. Gated by
+   * tenants.orchestrator_month_end_enabled for the cron path.
+   */
+  ORCHESTRATOR_WORKFLOW: 'orchestrator-workflow',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -47,6 +53,20 @@ export interface StatementGenerationJobData extends ScheduledJobData {
   autoFinalize?: boolean;
   /** Whether to auto-deliver finalized statements */
   autoDeliver?: boolean;
+}
+
+/**
+ * Orchestrator workflow job data. Enqueued by OrchestratorScheduleService
+ * (monthly MONTH_END cron) and consumed by OrchestratorWorkflowProcessor,
+ * which delegates to OrchestratorAgent.executeWorkflow().
+ */
+export interface OrchestratorWorkflowJobData extends ScheduledJobData {
+  /** Internal WorkflowType — one of MONTHLY_CLOSE, BANK_IMPORT, GENERATE_VAT201, etc. */
+  workflowType: string;
+  /** Optional workflow parameters — e.g. `{ periodMonth: "YYYY-MM" }` for MONTH_END. */
+  parameters?: Record<string, unknown>;
+  /** Pre-allocated workflow_runs row id, so the processor + agent share one persisted record. */
+  runId: string;
 }
 
 /**

@@ -14,6 +14,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WebhookController } from '../../../src/webhooks/webhook.controller';
 import { WebhookService } from '../../../src/webhooks/webhook.service';
 import { IdempotencyService } from '../../../src/common/services/idempotency.service';
+import { OnboardingConversationHandler } from '../../../src/integrations/whatsapp/handlers/onboarding-conversation.handler';
+import { ParentMenuHandler } from '../../../src/integrations/whatsapp/handlers/parent-menu.handler';
+import { PrismaService } from '../../../src/database/prisma/prisma.service';
+import { InboundMessagePersistenceService } from '../../../src/api/whatsapp/inbound-message-persistence.service';
 import { BusinessException } from '../../../src/shared/exceptions';
 import type { WhatsAppWebhookPayload } from '../../../src/webhooks/types/webhook.types';
 
@@ -86,6 +90,25 @@ describe('WebhookController - WhatsApp', () => {
         {
           provide: IdempotencyService,
           useValue: idempotencyService,
+        },
+        {
+          provide: OnboardingConversationHandler,
+          useValue: {
+            handleInboundMessage: jest.fn(),
+            hasActiveSession: jest.fn().mockResolvedValue(false),
+          },
+        },
+        {
+          provide: ParentMenuHandler,
+          useValue: { handleInbound: jest.fn() },
+        },
+        {
+          provide: PrismaService,
+          useValue: {},
+        },
+        {
+          provide: InboundMessagePersistenceService,
+          useValue: { persistInbound: jest.fn() },
         },
       ],
     }).compile();
@@ -362,14 +385,12 @@ describe('WebhookController - WhatsApp', () => {
       ).rejects.toThrow(BusinessException);
     });
 
-    it('should skip signature verification in development', async () => {
+    it('should enforce signature verification even in development', async () => {
+      // SECURITY: the dev-mode skip was removed — signatures are verified in
+      // every environment because staging holds real parent data and
+      // verifyTwilioSignature fails closed when TWILIO_AUTH_TOKEN is missing.
       process.env.NODE_ENV = 'development';
       webhookService.verifyTwilioSignature.mockReturnValue(false);
-      webhookService.processTwilioStatusCallback.mockResolvedValue({
-        processed: 1,
-        skipped: 0,
-        errors: [],
-      });
 
       const mockReq = {
         headers: {},
@@ -378,14 +399,14 @@ describe('WebhookController - WhatsApp', () => {
         host: 'localhost:3000',
       } as any;
 
-      // Should not throw even with invalid signature
-      const result = await controller.handleTwilioStatusCallback(
-        mockReq,
-        mockTwilioBody,
-        'invalid-signature',
-      );
-
-      expect(result.processed).toBe(1);
+      await expect(
+        controller.handleTwilioStatusCallback(
+          mockReq,
+          mockTwilioBody,
+          'invalid-signature',
+        ),
+      ).rejects.toThrow(BusinessException);
+      expect(webhookService.processTwilioStatusCallback).not.toHaveBeenCalled();
     });
   });
 

@@ -70,13 +70,15 @@ describe('CategorizationService', () => {
     service = module.get<CategorizationService>(CategorizationService);
 
     await prisma.onModuleInit();
-  });
+  }, 30000);
 
   afterAll(async () => {
     await prisma.onModuleDestroy();
-  });
+  }, 30000);
 
   beforeEach(async () => {
+    // cleanDatabase() truncates ~80 tables; under load this can exceed
+    // Jest's default 5000ms hook timeout, so give it more headroom.
     await cleanDatabase(prisma);
 
     testTenant = await prisma.tenant.create({
@@ -100,7 +102,7 @@ describe('CategorizationService', () => {
         role: 'ADMIN',
       },
     });
-  });
+  }, 30000);
 
   // Helper to create a test transaction
   async function createTransaction(
@@ -230,6 +232,9 @@ describe('CategorizationService', () => {
     });
 
     it('should categorize credit transactions as income', async () => {
+      // Fallback defaults were changed in commit 57ddf7b: credit fee
+      // payments now map to '4000'/'School Fees Income' (previously
+      // '4100'/'Fee Income').
       const transaction = await createTransaction({
         description: 'EFT SCHOOL FEE PAYMENT',
         amountCents: 250000,
@@ -241,8 +246,8 @@ describe('CategorizationService', () => {
         testTenant.id,
       );
 
-      expect(result.accountCode).toBe('4100');
-      expect(result.accountName).toBe('Fee Income');
+      expect(result.accountCode).toBe('4000');
+      expect(result.accountName).toBe('School Fees Income');
     });
   });
 

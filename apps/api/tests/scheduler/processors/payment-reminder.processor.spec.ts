@@ -17,7 +17,7 @@ import { ParentRepository } from '../../../src/database/repositories/parent.repo
 import { ReminderRepository } from '../../../src/database/repositories/reminder.repository';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { EmailService } from '../../../src/integrations/email/email.service';
-import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../../src/integrations/whatsapp/services/whatsapp-provider.service';
 import { ReminderTemplateService } from '../../../src/billing/reminder-template.service';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { TaxStatus } from '../../../src/database/entities/tenant.entity';
@@ -41,10 +41,8 @@ const createMockEmailService = () => ({
  */
 const createMockWhatsAppService = () => ({
   sendMessage: jest.fn().mockResolvedValue({
+    success: true,
     messageId: 'wa-msg-123',
-    status: 'sent',
-    sentAt: new Date(),
-    recipientPhone: '+27821234567',
   }),
   sendInvoice: jest.fn().mockResolvedValue({
     messageId: 'wa-invoice-123',
@@ -123,7 +121,7 @@ describe('PaymentReminderProcessor Integration Tests', () => {
         PaymentRepository,
         ReminderTemplateService,
         { provide: EmailService, useValue: mockEmailService },
-        { provide: WhatsAppService, useValue: mockWhatsAppService },
+        { provide: WhatsAppProviderService, useValue: mockWhatsAppService },
       ],
     }).compile();
 

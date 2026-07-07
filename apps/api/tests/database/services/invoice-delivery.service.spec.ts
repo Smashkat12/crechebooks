@@ -102,6 +102,12 @@ describe('InvoiceDeliveryService', () => {
   let invoiceRepo: InvoiceRepository;
   let mockEmailService: ReturnType<typeof createMockEmailService>;
   let mockWhatsAppService: ReturnType<typeof createMockWhatsAppService>;
+  // TASK-WA-007: InvoiceDeliveryService dispatches WhatsApp invoice notifications
+  // through WhatsAppProviderService.sendInvoiceNotification, not the legacy
+  // WhatsAppService (Meta direct) mock above.
+  let mockWhatsAppProviderService: {
+    sendInvoiceNotification: jest.Mock;
+  };
   let mockEmailTemplateService: ReturnType<
     typeof createMockEmailTemplateService
   >;
@@ -124,6 +130,11 @@ describe('InvoiceDeliveryService', () => {
   beforeAll(async () => {
     mockEmailService = createMockEmailService();
     mockWhatsAppService = createMockWhatsAppService();
+    mockWhatsAppProviderService = {
+      sendInvoiceNotification: jest
+        .fn()
+        .mockResolvedValue({ success: true, messageId: 'wa-123' }),
+    };
     mockEmailTemplateService = createMockEmailTemplateService();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -143,11 +154,7 @@ describe('InvoiceDeliveryService', () => {
         { provide: WhatsAppService, useValue: mockWhatsAppService },
         {
           provide: WhatsAppProviderService,
-          useValue: {
-            sendInvoiceNotification: jest
-              .fn()
-              .mockResolvedValue({ success: true, messageId: 'wa-123' }),
-          },
+          useValue: mockWhatsAppProviderService,
         },
         {
           provide: EventEmitter2,
@@ -195,6 +202,10 @@ describe('InvoiceDeliveryService', () => {
     mockWhatsAppService.sendMessage.mockResolvedValue({
       messageId: 'wa-msg-123',
       status: 'sent',
+    });
+    mockWhatsAppProviderService.sendInvoiceNotification.mockResolvedValue({
+      success: true,
+      messageId: 'wa-123',
     });
 
     await cleanDatabase(prisma);
@@ -479,10 +490,19 @@ describe('InvoiceDeliveryService', () => {
       expect(result.sent).toBe(1);
       expect(result.failed).toBe(0);
 
-      expect(mockWhatsAppService.sendMessage).toHaveBeenCalledTimes(1);
-      expect(mockWhatsAppService.sendMessage).toHaveBeenCalledWith(
+      expect(
+        mockWhatsAppProviderService.sendInvoiceNotification,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        mockWhatsAppProviderService.sendInvoiceNotification,
+      ).toHaveBeenCalledWith(
+        testTenant.id,
         testParentWhatsApp.whatsapp,
-        expect.stringContaining('INV-2025-002'),
+        expect.any(String),
+        'INV-2025-002',
+        expect.any(Number),
+        expect.any(Date),
+        expect.any(String),
       );
 
       const updatedInvoice = await invoiceRepo.findById(
@@ -502,7 +522,9 @@ describe('InvoiceDeliveryService', () => {
       expect(result.failed).toBe(0);
 
       expect(mockEmailService.sendEmailWithOptions).toHaveBeenCalledTimes(1);
-      expect(mockWhatsAppService.sendMessage).toHaveBeenCalledTimes(1);
+      expect(
+        mockWhatsAppProviderService.sendInvoiceNotification,
+      ).toHaveBeenCalledTimes(1);
     });
 
     it('should handle multiple invoices in batch', async () => {

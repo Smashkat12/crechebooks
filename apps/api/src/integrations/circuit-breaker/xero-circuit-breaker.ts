@@ -2,18 +2,19 @@
  * XeroCircuitBreaker
  * TASK-REL-101: Circuit Breaker Pattern for Xero Integration
  *
- * Implements circuit breaker pattern using opossum to prevent cascade failures
+ * Hand-rolled circuit breaker state machine to prevent cascade failures
  * during Xero API outages. Wraps all Xero API calls to provide fault tolerance.
  *
  * Circuit States:
  * - CLOSED: Normal operation, requests flow through
  * - OPEN: Circuit tripped, requests fail fast
- * - HALF_OPEN: Testing if service recovered
+ * - HALF_OPEN: Testing if service recovered - the next request is treated as
+ *   a trial: success closes the circuit, failure re-opens it with a fresh
+ *   recovery timer.
  */
 
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import CircuitBreaker from 'opossum';
 import { EventEmitter } from 'events';
 
 /**
@@ -98,12 +99,18 @@ export class XeroCircuitBreaker implements OnModuleDestroy {
   private lastClosedAt: Date | null = null;
   private currentState: CircuitBreakerState = 'CLOSED';
 
-  // Generic circuit breaker for Xero operations
-  private breaker: CircuitBreaker<unknown[], unknown>;
+  // Timer used to schedule the OPEN -> HALF_OPEN transition
+  private resetTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly configService: ConfigService) {
     this.config = this.loadConfig();
-    this.initializeBreaker();
+
+    this.logger.log(
+      `XeroCircuitBreaker initialized with config: timeout=${this.config.timeout}ms, ` +
+        `errorThreshold=${this.config.errorThresholdPercentage}%, ` +
+        `resetTimeout=${this.config.resetTimeout}ms, ` +
+        `volumeThreshold=${this.config.volumeThreshold}`,
+    );
   }
 
   /**
@@ -131,117 +138,6 @@ export class XeroCircuitBreaker implements OnModuleDestroy {
   }
 
   /**
-   * Initialize the opossum circuit breaker
-   */
-  private initializeBreaker(): void {
-    // Create a generic action function that will be replaced per-call
-    // eslint-disable-next-line @typescript-eslint/require-await
-    const action = async (..._args: unknown[]): Promise<unknown> => {
-      // This will be overridden by execute()
-      throw new Error('Action not provided');
-    };
-
-    this.breaker = new CircuitBreaker(action, {
-      timeout: this.config.timeout,
-      errorThresholdPercentage: this.config.errorThresholdPercentage,
-      resetTimeout: this.config.resetTimeout,
-      volumeThreshold: this.config.volumeThreshold,
-      name: 'xero-api',
-    });
-
-    // Wire up event handlers
-    this.setupEventHandlers();
-
-    this.logger.log(
-      `XeroCircuitBreaker initialized with config: timeout=${this.config.timeout}ms, ` +
-        `errorThreshold=${this.config.errorThresholdPercentage}%, ` +
-        `resetTimeout=${this.config.resetTimeout}ms, ` +
-        `volumeThreshold=${this.config.volumeThreshold}`,
-    );
-  }
-
-  /**
-   * Set up event handlers for circuit breaker events
-   */
-  private setupEventHandlers(): void {
-    this.breaker.on('success', () => {
-      this.successes++;
-      this.logger.debug('Circuit breaker: success');
-    });
-
-    this.breaker.on('failure', (error) => {
-      this.failures++;
-      this.logger.warn(
-        `Circuit breaker: failure - ${error?.message || 'Unknown error'}`,
-      );
-    });
-
-    this.breaker.on('timeout', () => {
-      this.timeouts++;
-      this.logger.warn('Circuit breaker: timeout');
-    });
-
-    this.breaker.on('reject', () => {
-      this.rejects++;
-      this.logger.warn('Circuit breaker: rejected (circuit open)');
-    });
-
-    this.breaker.on('fallback', () => {
-      this.fallbacks++;
-      this.logger.debug('Circuit breaker: fallback executed');
-    });
-
-    this.breaker.on('open', () => {
-      const previousState = this.currentState;
-      this.currentState = 'OPEN';
-      this.lastOpenedAt = new Date();
-
-      this.logger.error(
-        `Circuit breaker OPENED - Xero API may be experiencing issues. ` +
-          `Will retry after ${this.config.resetTimeout}ms`,
-      );
-
-      this.notifyStateChange({
-        previousState,
-        currentState: 'OPEN',
-        timestamp: this.lastOpenedAt,
-        reason: 'Error threshold exceeded',
-      });
-    });
-
-    this.breaker.on('close', () => {
-      const previousState = this.currentState;
-      this.currentState = 'CLOSED';
-      this.lastClosedAt = new Date();
-
-      this.logger.log('Circuit breaker CLOSED - Xero API recovered');
-
-      this.notifyStateChange({
-        previousState,
-        currentState: 'CLOSED',
-        timestamp: this.lastClosedAt,
-        reason: 'Service recovered',
-      });
-    });
-
-    this.breaker.on('halfOpen', () => {
-      const previousState = this.currentState;
-      this.currentState = 'HALF_OPEN';
-
-      this.logger.log(
-        'Circuit breaker HALF_OPEN - Testing Xero API availability',
-      );
-
-      this.notifyStateChange({
-        previousState,
-        currentState: 'HALF_OPEN',
-        timestamp: new Date(),
-        reason: 'Reset timeout elapsed',
-      });
-    });
-  }
-
-  /**
    * Execute an action with circuit breaker protection
    *
    * @param action - Async function to execute (Xero API call)
@@ -252,18 +148,8 @@ export class XeroCircuitBreaker implements OnModuleDestroy {
     action: () => Promise<T>,
     fallback?: () => Promise<T>,
   ): Promise<T> {
-    // Create a new circuit breaker instance for this specific action
-    const breaker = new CircuitBreaker(action, {
-      timeout: this.config.timeout,
-      errorThresholdPercentage: this.config.errorThresholdPercentage,
-      resetTimeout: this.config.resetTimeout,
-      volumeThreshold: this.config.volumeThreshold,
-      name: 'xero-api-action',
-    });
-
-    // Copy state from main breaker
     if (this.currentState === 'OPEN') {
-      // If main breaker is open, use fallback or throw
+      // Circuit is open - fail fast via fallback or rejection
       if (fallback) {
         this.fallbacks++;
         return fallback();
@@ -274,44 +160,78 @@ export class XeroCircuitBreaker implements OnModuleDestroy {
       );
     }
 
-    // Wire up event handlers to main breaker metrics
-    breaker.on('success', () => {
-      this.successes++;
-    });
-
-    breaker.on('failure', (_error) => {
-      this.failures++;
-      // Check if we should open the main breaker
-      this.checkErrorThreshold();
-    });
-
-    breaker.on('timeout', () => {
-      this.timeouts++;
-      this.failures++;
-      this.checkErrorThreshold();
-    });
+    // A CLOSED-state call is normal traffic; a HALF_OPEN-state call is the
+    // trial request that decides whether the circuit re-closes or re-opens.
+    const wasHalfOpen = this.currentState === 'HALF_OPEN';
 
     try {
-      if (fallback) {
-        // Register fallback with the breaker - opossum will track it
-        breaker.fallback(fallback);
-        breaker.on('fallback', () => {
-          this.fallbacks++;
-        });
-      }
-
-      const result = await breaker.fire();
-      return result as T;
+      const result = await this.runWithTimeout(action);
+      this.onActionSuccess(wasHalfOpen);
+      return result;
     } catch (error) {
-      // If we have a fallback and the action failed, use it
+      this.onActionFailure(wasHalfOpen);
       if (fallback) {
         this.fallbacks++;
         return fallback();
       }
       throw error;
-    } finally {
-      breaker.shutdown();
     }
+  }
+
+  /**
+   * Race the action against the configured timeout so a hung Xero call
+   * still counts as a failure instead of blocking indefinitely.
+   */
+  private async runWithTimeout<T>(action: () => Promise<T>): Promise<T> {
+    if (!this.config.timeout || this.config.timeout <= 0) {
+      return action();
+    }
+
+    let timer: NodeJS.Timeout;
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        this.timeouts++;
+        reject(
+          new Error(`Xero API call timed out after ${this.config.timeout}ms`),
+        );
+      }, this.config.timeout);
+    });
+
+    try {
+      return await Promise.race([action(), timeoutPromise]);
+    } finally {
+      clearTimeout(timer!);
+    }
+  }
+
+  /**
+   * Record a successful action and, if it was the HALF_OPEN trial request,
+   * close the circuit.
+   */
+  private onActionSuccess(wasHalfOpen: boolean): void {
+    this.successes++;
+    this.logger.debug('Circuit breaker: success');
+
+    if (wasHalfOpen) {
+      this.closeCircuit('Service recovered');
+    }
+  }
+
+  /**
+   * Record a failed action. If it was the HALF_OPEN trial request, re-open
+   * the circuit immediately with a fresh recovery timer; otherwise check
+   * whether the CLOSED-state error threshold has been exceeded.
+   */
+  private onActionFailure(wasHalfOpen: boolean): void {
+    this.failures++;
+    this.logger.warn('Circuit breaker: failure');
+
+    if (wasHalfOpen) {
+      this.openCircuit('Half-open trial request failed');
+      return;
+    }
+
+    this.checkErrorThreshold();
   }
 
   /**
@@ -319,56 +239,101 @@ export class XeroCircuitBreaker implements OnModuleDestroy {
    */
   private checkErrorThreshold(): void {
     const total = this.successes + this.failures;
-    if (total >= this.config.volumeThreshold) {
-      const errorPercentage = (this.failures / total) * 100;
-      if (errorPercentage >= this.config.errorThresholdPercentage) {
-        if (this.currentState !== 'OPEN') {
-          const previousState = this.currentState;
-          this.currentState = 'OPEN';
-          this.lastOpenedAt = new Date();
+    if (total < this.config.volumeThreshold) {
+      return;
+    }
 
-          this.logger.error(
-            `Circuit breaker OPENED - Error percentage ${errorPercentage.toFixed(1)}% ` +
-              `exceeds threshold ${this.config.errorThresholdPercentage}%`,
-          );
-
-          this.notifyStateChange({
-            previousState,
-            currentState: 'OPEN',
-            timestamp: this.lastOpenedAt,
-            reason: `Error percentage ${errorPercentage.toFixed(1)}% exceeded threshold`,
-          });
-
-          // Schedule reset
-          setTimeout(() => {
-            if (this.currentState === 'OPEN') {
-              const prevState = this.currentState;
-              this.currentState = 'HALF_OPEN';
-              this.notifyStateChange({
-                previousState: prevState,
-                currentState: 'HALF_OPEN',
-                timestamp: new Date(),
-                reason: 'Reset timeout elapsed',
-              });
-            }
-          }, this.config.resetTimeout);
-        }
-      }
+    const errorPercentage = (this.failures / total) * 100;
+    if (
+      errorPercentage >= this.config.errorThresholdPercentage &&
+      this.currentState !== 'OPEN'
+    ) {
+      this.openCircuit(
+        `Error percentage ${errorPercentage.toFixed(1)}% exceeded threshold ${this.config.errorThresholdPercentage}%`,
+      );
     }
   }
 
   /**
-   * Check if an error is a circuit breaker error
+   * Transition to OPEN and schedule the OPEN -> HALF_OPEN recovery timer.
    */
-  private isCircuitBreakerError(error: unknown): boolean {
-    if (error instanceof Error) {
-      return (
-        error.message.includes('circuit') ||
-        error.message.includes('Breaker is open') ||
-        error.message.includes('timeout')
-      );
+  private openCircuit(reason: string): void {
+    const previousState = this.currentState;
+    this.currentState = 'OPEN';
+    this.lastOpenedAt = new Date();
+
+    this.logger.error(
+      `Circuit breaker OPENED - ${reason}. Will retry after ${this.config.resetTimeout}ms`,
+    );
+
+    this.notifyStateChange({
+      previousState,
+      currentState: 'OPEN',
+      timestamp: this.lastOpenedAt,
+      reason,
+    });
+
+    this.scheduleHalfOpenTransition();
+  }
+
+  /**
+   * Schedule the transition from OPEN to HALF_OPEN once the reset timeout
+   * elapses. Any previously scheduled timer is cleared first so re-opening
+   * from a HALF_OPEN failure always gets a fresh window.
+   */
+  private scheduleHalfOpenTransition(): void {
+    if (this.resetTimer) {
+      clearTimeout(this.resetTimer);
     }
-    return false;
+
+    this.resetTimer = setTimeout(() => {
+      this.resetTimer = null;
+      if (this.currentState === 'OPEN') {
+        const previousState = this.currentState;
+        this.currentState = 'HALF_OPEN';
+
+        this.logger.log(
+          'Circuit breaker HALF_OPEN - Testing Xero API availability',
+        );
+
+        this.notifyStateChange({
+          previousState,
+          currentState: 'HALF_OPEN',
+          timestamp: new Date(),
+          reason: 'Reset timeout elapsed',
+        });
+      }
+    }, this.config.resetTimeout);
+
+    // Don't let the recovery timer keep the process alive on its own
+    this.resetTimer.unref?.();
+  }
+
+  /**
+   * Transition to CLOSED, clearing any pending recovery timer and resetting
+   * the failure/success counters so a stale error history from before the
+   * outage doesn't immediately re-trip the breaker.
+   */
+  private closeCircuit(reason: string): void {
+    const previousState = this.currentState;
+    this.currentState = 'CLOSED';
+    this.successes = 0;
+    this.failures = 0;
+    this.lastClosedAt = new Date();
+
+    if (this.resetTimer) {
+      clearTimeout(this.resetTimer);
+      this.resetTimer = null;
+    }
+
+    this.logger.log(`Circuit breaker CLOSED - ${reason}`);
+
+    this.notifyStateChange({
+      previousState,
+      currentState: 'CLOSED',
+      timestamp: this.lastClosedAt,
+      reason,
+    });
   }
 
   /**
@@ -455,6 +420,11 @@ export class XeroCircuitBreaker implements OnModuleDestroy {
     this.timeouts = 0;
     this.lastClosedAt = new Date();
 
+    if (this.resetTimer) {
+      clearTimeout(this.resetTimer);
+      this.resetTimer = null;
+    }
+
     this.logger.log('Circuit breaker manually reset');
 
     this.notifyStateChange({
@@ -469,7 +439,10 @@ export class XeroCircuitBreaker implements OnModuleDestroy {
    * Cleanup on module destroy
    */
   onModuleDestroy(): void {
-    this.breaker.shutdown();
+    if (this.resetTimer) {
+      clearTimeout(this.resetTimer);
+      this.resetTimer = null;
+    }
     this.eventEmitter.removeAllListeners();
     this.stateChangeCallbacks.length = 0;
     this.logger.log('XeroCircuitBreaker shutdown');

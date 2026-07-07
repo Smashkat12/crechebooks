@@ -64,8 +64,14 @@ export class XeroSyncRecoveryProcessor {
         `Circuit breaker state changed: ${event.previousState} -> ${event.currentState}`,
       );
 
-      // Trigger immediate processing when circuit closes
-      if (event.currentState === 'CLOSED' && event.previousState === 'OPEN') {
+      // Trigger immediate processing when circuit closes. Recovery normally
+      // transitions OPEN -> HALF_OPEN -> CLOSED (a successful trial request),
+      // but a manual reset() can also close directly from OPEN, so handle
+      // both previous states.
+      if (
+        event.currentState === 'CLOSED' &&
+        (event.previousState === 'OPEN' || event.previousState === 'HALF_OPEN')
+      ) {
         this.logger.log(
           'Circuit closed - triggering immediate recovery processing',
         );

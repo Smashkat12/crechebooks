@@ -20,7 +20,6 @@ import {
   Query,
   Req,
   Res,
-
   UseInterceptors,
   UploadedFile,
   HttpStatus,
@@ -74,7 +73,6 @@ import * as fs from 'fs';
 @Controller()
 @ApiTags('Staff Onboarding')
 @ApiBearerAuth('JWT-auth')
-
 export class StaffOnboardingController {
   private readonly logger = new Logger(StaffOnboardingController.name);
 

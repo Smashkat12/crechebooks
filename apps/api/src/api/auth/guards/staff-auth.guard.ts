@@ -19,9 +19,7 @@ import { StaffMagicLinkService } from '../services/staff-magic-link.service';
 export class StaffAuthGuard implements CanActivate {
   private readonly logger = new Logger(StaffAuthGuard.name);
 
-  constructor(
-    private readonly staffMagicLinkService: StaffMagicLinkService,
-  ) {}
+  constructor(private readonly staffMagicLinkService: StaffMagicLinkService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // StaffAuthGuard always authenticates — it does not check @Public().

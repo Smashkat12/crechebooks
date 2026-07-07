@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
-    branches: [main]
+    branches: [main, staging]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -92,7 +92,7 @@ jobs:
         run: pnpm --filter @crechebooks/types build
 
       - name: Run linting
-        run: pnpm lint
+        run: pnpm lint:check
 
       - name: Type check API
         run: pnpm --filter @crechebooks/api exec tsc --noEmit
@@ -159,11 +159,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
 
-      # NOTE: Unit tests have pre-existing database isolation issues causing FK constraint
-      # errors when test cleanup runs. The actual tests pass; cleanup fails.
-      # TODO: Implement proper cascade deletes or test transaction rollback.
       - name: Run API tests (shard ${{ matrix.shard }}/4)
-        continue-on-error: true
         run: pnpm --filter @crechebooks/api exec jest --runInBand --forceExit --testPathIgnorePatterns=".e2e.spec.ts" --shard=${{ matrix.shard }}/4
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
@@ -179,12 +175,8 @@ jobs:
           XERO_CLIENT_SECRET: test-xero-client-secret
           NODE_ENV: test
 
-      # NOTE: E2E tests have pre-existing database isolation issues causing FK constraint
-      # errors when tests run in sequence. Unit tests pass; E2E needs proper test isolation.
-      # TODO: Implement per-test database cleanup or transaction rollback in E2E tests.
       - name: Run API e2e tests
         if: matrix.shard == 1
-        continue-on-error: true
         run: pnpm --filter @crechebooks/api test:e2e
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test

@@ -29,7 +29,7 @@ import {
   BusinessException,
   ConflictException,
 } from '../../shared/exceptions';
-import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
+import { TokenManager } from '../../integrations/xero/client/auth/token-manager';
 import {
   BankConnection,
   BankSyncResult,

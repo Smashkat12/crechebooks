@@ -201,8 +201,9 @@ export class ReportsController {
     summary: 'Export report as PDF, Excel, or CSV',
     description:
       'Generates and downloads a report in the specified format. ' +
-      'PDF and Excel include formatting and branding. ' +
-      'Optionally includes AI-generated insights.',
+      'Currently INCOME_STATEMENT supports PDF, Excel, and CSV; ' +
+      'BALANCE_SHEET supports CSV only. Other report types return 400. ' +
+      'PDF exports optionally include AI-generated insights.',
   })
   @ApiParam({
     name: 'type',
@@ -306,11 +307,14 @@ export class ReportsController {
       name: string;
       description: string;
       available: boolean;
+      exportFormats: ExportFormat[];
     }>;
   }> {
     const tenantId = getTenantId(user);
     this.logger.debug(`GET /reports/types for tenant ${tenantId}`);
 
+    // `available` = report data can be viewed; `exportFormats` = formats
+    // the export endpoint actually supports (empty = not exportable yet).
     return {
       types: [
         {
@@ -319,6 +323,11 @@ export class ReportsController {
           description:
             'Profit & Loss report showing income and expenses for a period',
           available: true,
+          exportFormats: [
+            ExportFormat.PDF,
+            ExportFormat.EXCEL,
+            ExportFormat.CSV,
+          ],
         },
         {
           type: ReportType.BALANCE_SHEET,
@@ -326,30 +335,35 @@ export class ReportsController {
           description:
             'Snapshot of assets, liabilities, and equity at a point in time',
           available: true,
+          exportFormats: [ExportFormat.CSV],
         },
         {
           type: ReportType.CASH_FLOW,
           name: 'Cash Flow Statement',
           description: 'Analysis of cash inflows and outflows',
           available: true,
+          exportFormats: [],
         },
         {
           type: ReportType.VAT_REPORT,
           name: 'VAT Report',
           description: 'VAT201 report for SARS submission',
           available: true,
+          exportFormats: [],
         },
         {
           type: ReportType.AGED_RECEIVABLES,
           name: 'Aged Receivables',
           description: 'Outstanding invoices grouped by age',
           available: true,
+          exportFormats: [],
         },
         {
           type: ReportType.AGED_PAYABLES,
           name: 'Aged Payables',
           description: 'Outstanding payables grouped by age',
           available: false,
+          exportFormats: [],
         },
       ],
     };

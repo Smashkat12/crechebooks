@@ -20,7 +20,6 @@ import { CashFlowService } from '../../database/services/cash-flow.service';
 @ApiTags('Cash Flow')
 @ApiBearerAuth()
 @Controller('cash-flow')
-
 export class CashFlowController {
   private readonly logger = new Logger(CashFlowController.name);
 

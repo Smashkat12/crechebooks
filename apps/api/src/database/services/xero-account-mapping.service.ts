@@ -26,8 +26,8 @@ import {
   AccountMappingSummary,
 } from '../dto/xero-payroll-journal.dto';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
-import { TokenManager } from '../../mcp/xero-mcp/auth/token-manager';
-import { RateLimiter } from '../../mcp/xero-mcp/utils/rate-limiter';
+import { TokenManager } from '../../integrations/xero/client/auth/token-manager';
+import { RateLimiter } from '../../integrations/xero/client/utils/rate-limiter';
 
 // Required account types for payroll journal creation
 const REQUIRED_ACCOUNT_TYPES: XeroAccountType[] = [

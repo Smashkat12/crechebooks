@@ -1,18 +1,14 @@
 /**
  * WhatsApp Provider Service
- * TASK-WA-007: Unified WhatsApp provider that switches between Meta and Twilio
+ * TASK-WA-007: Unified WhatsApp provider facade.
  *
- * This service acts as a facade that delegates to the appropriate provider
- * based on the WHATSAPP_PROVIDER environment variable.
- *
- * Benefits:
- * - Single entry point for all WhatsApp messaging
- * - Easy switching between providers
- * - Consistent API regardless of underlying provider
+ * Twilio is the only supported provider. The former Meta Cloud API path
+ * was dead code (every Meta branch threw META_TEMPLATE_REQUIRED) and has
+ * been removed; if WHATSAPP_PROVIDER is set to anything other than
+ * 'twilio', all send methods throw a clear configuration error.
  */
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { WhatsAppService } from '../whatsapp.service';
 import { TwilioWhatsAppService } from './twilio-whatsapp.service';
 import { BusinessException } from '../../../shared/exceptions';
 import {
@@ -44,10 +40,7 @@ export class WhatsAppProviderService implements OnModuleInit {
   private readonly logger = new Logger(WhatsAppProviderService.name);
   private readonly provider: WhatsAppProvider;
 
-  constructor(
-    private readonly metaService: WhatsAppService,
-    private readonly twilioService: TwilioWhatsAppService,
-  ) {
+  constructor(private readonly twilioService: TwilioWhatsAppService) {
     // Determine provider from environment
     const providerEnv = process.env.WHATSAPP_PROVIDER?.toLowerCase();
     this.provider =
@@ -59,13 +52,17 @@ export class WhatsAppProviderService implements OnModuleInit {
   onModuleInit() {
     this.logger.log(`WhatsApp Provider initialized: ${this.provider}`);
 
-    // Check if the selected provider is configured
     if (this.provider === WhatsAppProvider.TWILIO) {
       if (!this.twilioService.isConfigured()) {
         this.logger.warn(
           'Twilio provider selected but not configured. Check TWILIO_* environment variables.',
         );
       }
+    } else {
+      this.logger.warn(
+        `WHATSAPP_PROVIDER is '${this.provider}' but only 'twilio' is supported. ` +
+          'All WhatsApp sends will fail until WHATSAPP_PROVIDER=twilio is set.',
+      );
     }
   }
 
@@ -80,11 +77,23 @@ export class WhatsAppProviderService implements OnModuleInit {
    * Check if the current provider is configured
    */
   isConfigured(): boolean {
-    if (this.provider === WhatsAppProvider.TWILIO) {
-      return this.twilioService.isConfigured();
+    return (
+      this.provider === WhatsAppProvider.TWILIO &&
+      this.twilioService.isConfigured()
+    );
+  }
+
+  /**
+   * Ensure Twilio is the active provider; throw a configuration error otherwise.
+   */
+  private ensureTwilio(): void {
+    if (this.provider !== WhatsAppProvider.TWILIO) {
+      throw new BusinessException(
+        `WhatsApp provider '${this.provider}' is not supported. ` +
+          'Set WHATSAPP_PROVIDER=twilio and configure TWILIO_* environment variables.',
+        'WHATSAPP_PROVIDER_NOT_SUPPORTED',
+      );
     }
-    // Meta service will throw on use if not configured
-    return true;
   }
 
   /**
@@ -105,36 +114,19 @@ export class WhatsAppProviderService implements OnModuleInit {
       invoiceNumber,
       to: parentPhone,
     });
+    this.ensureTwilio();
 
-    if (this.provider === WhatsAppProvider.TWILIO) {
-      const result = await this.twilioService.sendInvoiceNotification(
-        tenantId,
-        parentPhone,
-        parentName,
-        invoiceNumber,
-        amount,
-        dueDate,
-        organizationName,
-        pdfUrl,
-      );
-      return {
-        success: result.success,
-        messageId: result.messageId,
-        error: result.error,
-        errorCode: result.errorCode,
-        status: result.success
-          ? WhatsAppMessageStatus.SENT
-          : WhatsAppMessageStatus.FAILED,
-      };
-    }
-
-    // Meta provider - use the existing WhatsAppService
-    // Note: Meta requires template-based messages, so we would need to
-    // implement sendInvoiceNotification on MetaService or use sendInvoice
-    throw new BusinessException(
-      'Invoice notification via Meta requires template setup. Use Twilio for sandbox testing.',
-      'META_TEMPLATE_REQUIRED',
+    const result = await this.twilioService.sendInvoiceNotification(
+      tenantId,
+      parentPhone,
+      parentName,
+      invoiceNumber,
+      amount,
+      dueDate,
+      organizationName,
+      pdfUrl,
     );
+    return this.toProviderResult(result);
   }
 
   /**
@@ -155,32 +147,18 @@ export class WhatsAppProviderService implements OnModuleInit {
       daysOverdue,
       to: parentPhone,
     });
+    this.ensureTwilio();
 
-    if (this.provider === WhatsAppProvider.TWILIO) {
-      const result = await this.twilioService.sendPaymentReminder(
-        tenantId,
-        parentPhone,
-        parentName,
-        invoiceNumber,
-        amount,
-        daysOverdue,
-        organizationName,
-      );
-      return {
-        success: result.success,
-        messageId: result.messageId,
-        error: result.error,
-        errorCode: result.errorCode,
-        status: result.success
-          ? WhatsAppMessageStatus.SENT
-          : WhatsAppMessageStatus.FAILED,
-      };
-    }
-
-    throw new BusinessException(
-      'Payment reminder via Meta requires template setup. Use Twilio for sandbox testing.',
-      'META_TEMPLATE_REQUIRED',
+    const result = await this.twilioService.sendPaymentReminder(
+      tenantId,
+      parentPhone,
+      parentName,
+      invoiceNumber,
+      amount,
+      daysOverdue,
+      organizationName,
     );
+    return this.toProviderResult(result);
   }
 
   /**
@@ -201,32 +179,18 @@ export class WhatsAppProviderService implements OnModuleInit {
       paymentReference,
       to: parentPhone,
     });
+    this.ensureTwilio();
 
-    if (this.provider === WhatsAppProvider.TWILIO) {
-      const result = await this.twilioService.sendPaymentConfirmation(
-        tenantId,
-        parentPhone,
-        parentName,
-        invoiceNumber,
-        amount,
-        paymentReference,
-        organizationName,
-      );
-      return {
-        success: result.success,
-        messageId: result.messageId,
-        error: result.error,
-        errorCode: result.errorCode,
-        status: result.success
-          ? WhatsAppMessageStatus.SENT
-          : WhatsAppMessageStatus.FAILED,
-      };
-    }
-
-    throw new BusinessException(
-      'Payment confirmation via Meta requires template setup. Use Twilio for sandbox testing.',
-      'META_TEMPLATE_REQUIRED',
+    const result = await this.twilioService.sendPaymentConfirmation(
+      tenantId,
+      parentPhone,
+      parentName,
+      invoiceNumber,
+      amount,
+      paymentReference,
+      organizationName,
     );
+    return this.toProviderResult(result);
   }
 
   /**
@@ -247,33 +211,19 @@ export class WhatsAppProviderService implements OnModuleInit {
       statementPeriod,
       to: parentPhone,
     });
+    this.ensureTwilio();
 
-    if (this.provider === WhatsAppProvider.TWILIO) {
-      const result = await this.twilioService.sendStatementNotification(
-        tenantId,
-        parentPhone,
-        parentName,
-        statementPeriod,
-        openingBalance,
-        closingBalance,
-        organizationName,
-        pdfUrl,
-      );
-      return {
-        success: result.success,
-        messageId: result.messageId,
-        error: result.error,
-        errorCode: result.errorCode,
-        status: result.success
-          ? WhatsAppMessageStatus.SENT
-          : WhatsAppMessageStatus.FAILED,
-      };
-    }
-
-    throw new BusinessException(
-      'Statement notification via Meta requires template setup. Use Twilio for sandbox testing.',
-      'META_TEMPLATE_REQUIRED',
+    const result = await this.twilioService.sendStatementNotification(
+      tenantId,
+      parentPhone,
+      parentName,
+      statementPeriod,
+      openingBalance,
+      closingBalance,
+      organizationName,
+      pdfUrl,
     );
+    return this.toProviderResult(result);
   }
 
   /**
@@ -293,31 +243,17 @@ export class WhatsAppProviderService implements OnModuleInit {
       childName,
       to: parentPhone,
     });
+    this.ensureTwilio();
 
-    if (this.provider === WhatsAppProvider.TWILIO) {
-      const result = await this.twilioService.sendWelcomeMessage(
-        tenantId,
-        parentPhone,
-        parentName,
-        childName,
-        crecheName,
-        portalUrl,
-      );
-      return {
-        success: result.success,
-        messageId: result.messageId,
-        error: result.error,
-        errorCode: result.errorCode,
-        status: result.success
-          ? WhatsAppMessageStatus.SENT
-          : WhatsAppMessageStatus.FAILED,
-      };
-    }
-
-    throw new BusinessException(
-      'Welcome message via Meta requires template setup. Use Twilio for sandbox testing.',
-      'META_TEMPLATE_REQUIRED',
+    const result = await this.twilioService.sendWelcomeMessage(
+      tenantId,
+      parentPhone,
+      parentName,
+      childName,
+      crecheName,
+      portalUrl,
     );
+    return this.toProviderResult(result);
   }
 
   /**
@@ -339,32 +275,10 @@ export class WhatsAppProviderService implements OnModuleInit {
       to,
       hasMedia: !!options?.mediaUrl,
     });
+    this.ensureTwilio();
 
-    if (this.provider === WhatsAppProvider.TWILIO) {
-      const result = await this.twilioService.sendMessage(to, body, options);
-      return {
-        success: result.success,
-        messageId: result.messageId,
-        error: result.error,
-        errorCode: result.errorCode,
-        status: result.success
-          ? WhatsAppMessageStatus.SENT
-          : WhatsAppMessageStatus.FAILED,
-      };
-    }
-
-    // Meta requires templates for business-initiated conversations
-    throw new BusinessException(
-      'Free-form messages via Meta are not supported. WhatsApp Business API requires template messages. Use Twilio for sandbox testing.',
-      'META_TEMPLATE_REQUIRED',
-    );
-  }
-
-  /**
-   * Get underlying Meta service (for backwards compatibility)
-   */
-  getMetaService(): WhatsAppService {
-    return this.metaService;
+    const result = await this.twilioService.sendMessage(to, body, options);
+    return this.toProviderResult(result);
   }
 
   /**
@@ -372,5 +286,25 @@ export class WhatsAppProviderService implements OnModuleInit {
    */
   getTwilioService(): TwilioWhatsAppService {
     return this.twilioService;
+  }
+
+  /**
+   * Map a Twilio send result to the provider-agnostic result shape.
+   */
+  private toProviderResult(result: {
+    success: boolean;
+    messageId?: string;
+    error?: string;
+    errorCode?: string;
+  }): WhatsAppProviderResult {
+    return {
+      success: result.success,
+      messageId: result.messageId,
+      error: result.error,
+      errorCode: result.errorCode,
+      status: result.success
+        ? WhatsAppMessageStatus.SENT
+        : WhatsAppMessageStatus.FAILED,
+    };
   }
 }

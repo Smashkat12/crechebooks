@@ -102,6 +102,7 @@ describe('PayeeAlias Integration', () => {
       findByTenant: jest.fn(),
       findByIds: jest.fn(),
       updateStatus: jest.fn(),
+      updateCategorization: jest.fn(),
     };
 
     const mockCategorizationRepo = {

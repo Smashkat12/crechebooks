@@ -397,6 +397,31 @@ describe('ReportsController', () => {
       expect(availableTypes.length).toBeGreaterThan(0);
       expect(unavailableTypes.length).toBeGreaterThan(0);
     });
+
+    it('should only advertise export formats that the export endpoint supports', async () => {
+      const result = await controller.getReportTypes(testUser);
+
+      const byType = new Map(result.types.map((t) => [t.type, t]));
+
+      expect(byType.get(ReportType.INCOME_STATEMENT)?.exportFormats).toEqual([
+        ExportFormat.PDF,
+        ExportFormat.EXCEL,
+        ExportFormat.CSV,
+      ]);
+      expect(byType.get(ReportType.BALANCE_SHEET)?.exportFormats).toEqual([
+        ExportFormat.CSV,
+      ]);
+
+      // Types the export endpoint rejects must not advertise any formats
+      for (const type of [
+        ReportType.CASH_FLOW,
+        ReportType.VAT_REPORT,
+        ReportType.AGED_RECEIVABLES,
+        ReportType.AGED_PAYABLES,
+      ]) {
+        expect(byType.get(type)?.exportFormats).toEqual([]);
+      }
+    });
   });
 
   describe('getExportFormats', () => {

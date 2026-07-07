@@ -248,8 +248,14 @@ describe('FeeStructureRepository', () => {
         feeType: FeeType.FULL_DAY,
       });
 
-      expect(fullDayStructures).toHaveLength(1);
-      expect(fullDayStructures[0].feeType).toBe(FeeType.FULL_DAY);
+      // FeeType only has FULL_DAY since HALF_DAY/HOURLY/CUSTOM were removed
+      // (389e09b), so the filter matches both structures created above.
+      expect(fullDayStructures).toHaveLength(2);
+      expect(
+        fullDayStructures.every(
+          (fs) => String(fs.feeType) === String(FeeType.FULL_DAY),
+        ),
+      ).toBe(true);
     });
 
     it('should order by name ascending', async () => {

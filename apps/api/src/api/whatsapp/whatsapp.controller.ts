@@ -13,7 +13,6 @@ import {
   Body,
   Param,
   Query,
-
   Logger,
   HttpCode,
 } from '@nestjs/common';
@@ -48,7 +47,6 @@ import {
 @Controller('whatsapp')
 @ApiTags('WhatsApp')
 @ApiBearerAuth('JWT-auth')
-
 export class WhatsAppController {
   private readonly logger = new Logger(WhatsAppController.name);
 

@@ -13,6 +13,7 @@ import { CategorizationRepository } from '../../../src/database/repositories/cat
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
+import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
 import { ConflictDetectionService } from '../../../src/database/services/conflict-detection.service';
 import { ConflictResolutionService } from '../../../src/database/services/conflict-resolution.service';
 import { XeroCircuitBreaker } from '../../../src/integrations/circuit-breaker';
@@ -35,13 +36,13 @@ import {
 } from '../../../src/shared/exceptions';
 
 // Mock Xero MCP tools and TokenManager
-jest.mock('../../../src/mcp/xero-mcp/tools', () => ({
+jest.mock('../../../src/integrations/xero/client/tools', () => ({
   getAccounts: jest.fn(),
   getTransactions: jest.fn(),
   updateTransaction: jest.fn(),
 }));
 
-jest.mock('../../../src/mcp/xero-mcp/auth/token-manager', () => ({
+jest.mock('../../../src/integrations/xero/client/auth/token-manager', () => ({
   TokenManager: jest.fn().mockImplementation(() => ({
     hasValidConnection: jest.fn().mockResolvedValue(true),
     getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
@@ -50,8 +51,8 @@ jest.mock('../../../src/mcp/xero-mcp/auth/token-manager', () => ({
 }));
 
 // Import mocked functions for manipulation
-import * as xeroTools from '../../../src/mcp/xero-mcp/tools';
-import { TokenManager } from '../../../src/mcp/xero-mcp/auth/token-manager';
+import * as xeroTools from '../../../src/integrations/xero/client/tools';
+import { TokenManager } from '../../../src/integrations/xero/client/auth/token-manager';
 
 describe('XeroSyncService', () => {
   let service: XeroSyncService;
@@ -101,6 +102,7 @@ describe('XeroSyncService', () => {
         TransactionRepository,
         CategorizationRepository,
         PaymentRepository,
+        InvoiceRepository,
         XeroAccountRepository,
         CategorizationJournalRepository,
         AuditLogService,
@@ -692,6 +694,7 @@ describe('XeroSyncService', () => {
           TransactionRepository,
           CategorizationRepository,
           PaymentRepository,
+          InvoiceRepository,
           XeroAccountRepository,
           CategorizationJournalRepository,
           AuditLogService,

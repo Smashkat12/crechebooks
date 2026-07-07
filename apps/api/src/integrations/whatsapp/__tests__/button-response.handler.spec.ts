@@ -37,6 +37,8 @@ describe('ButtonResponseHandler', () => {
     tenantId: 'tenant-123',
     parentId: 'parent-123',
     isDeleted: false,
+    totalCents: 150000,
+    amountPaidCents: 0,
     parent: {
       id: 'parent-123',
       firstName: 'Sarah',
@@ -222,7 +224,9 @@ describe('ButtonResponseHandler', () => {
       );
     });
 
-    it('should handle pay button and send payment link', async () => {
+    it('should handle pay button and send EFT bank details', async () => {
+      // The pay button sends EFT bank details since the Yoco payment
+      // gateway (and payment links) were removed.
       const result = await handler.handleButtonResponse(
         '+27821234567',
         'pay_INV-2026-001234',
@@ -233,7 +237,12 @@ describe('ButtonResponseHandler', () => {
       expect(result.action).toBe('pay');
       expect(contentService.sendSessionMessage).toHaveBeenCalledWith(
         '+27821234567',
-        expect.stringContaining('payment link'),
+        expect.stringContaining('EFT payment'),
+        'tenant-123',
+      );
+      expect(contentService.sendSessionMessage).toHaveBeenCalledWith(
+        '+27821234567',
+        expect.stringContaining('Amount: R 1500.00'),
         'tenant-123',
       );
       expect(auditLogService.logAction).toHaveBeenCalled();

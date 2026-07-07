@@ -47,7 +47,6 @@ class ProcessPayrollDto {
 @ApiTags('Payroll')
 @ApiBearerAuth()
 @Controller('payroll')
-
 export class PayrollController {
   private readonly logger = new Logger(PayrollController.name);
 

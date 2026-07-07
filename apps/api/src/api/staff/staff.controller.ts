@@ -7,7 +7,6 @@ import {
   Param,
   Body,
   Query,
-
   HttpCode,
   HttpStatus,
   NotFoundException,
@@ -76,7 +75,6 @@ function toSnakeCase(staff: Staff): Record<string, unknown> {
 @ApiTags('Staff')
 @ApiBearerAuth()
 @Controller('staff')
-
 export class StaffController {
   private readonly logger = new Logger(StaffController.name);
 

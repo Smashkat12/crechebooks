@@ -19,7 +19,6 @@ import {
   Param,
   Body,
   Query,
-
   HttpStatus,
   HttpCode,
   Logger,
@@ -69,7 +68,6 @@ import type { IUser } from '../../database/entities/user.entity';
 @Controller('xero/payroll-journals')
 @ApiTags('Xero Payroll Journals')
 @ApiBearerAuth('JWT-auth')
-
 export class XeroPayrollJournalController {
   private readonly logger = new Logger(XeroPayrollJournalController.name);
 
@@ -573,7 +571,6 @@ export class XeroPayrollJournalController {
 @Controller('xero/account-mappings')
 @ApiTags('Xero Account Mappings')
 @ApiBearerAuth('JWT-auth')
-
 export class XeroAccountMappingController {
   private readonly logger = new Logger(XeroAccountMappingController.name);
 

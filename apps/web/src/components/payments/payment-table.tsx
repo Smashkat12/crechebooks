@@ -46,26 +46,20 @@ export function PaymentTable({ tenantId, className }: PaymentTableProps) {
     setDialogOpen(true);
   };
 
-  const handleView = (payment: IPayment) => {
-    // TODO: Implement view details modal or navigate to detail page
-  };
-
-  const handleUnmatch = async (payment: IPayment) => {
-    // TODO: Implement unmatch confirmation and mutation
-  };
-
   const handleMatchSuccess = () => {
     refetch();
   };
 
+  // No payment detail view/route or unmatch (unallocate) endpoint exists in
+  // the API — those menu items are omitted rather than wired to a no-op
+  // (see getPaymentColumns, which only renders them when onView/onUnmatch
+  // are passed).
   const columns = React.useMemo(
     () => getPaymentColumns({
-      onView: handleView,
       onMatch: handleMatch,
-      onUnmatch: handleUnmatch,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handleView, handleMatch, handleUnmatch]
+    [handleMatch]
   );
 
   if (isLoading) {

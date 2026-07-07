@@ -14,6 +14,7 @@ import { PaymentReceiptService } from '../../../src/database/services/payment-re
 import { ArrearsService } from '../../../src/database/services/arrears.service';
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
+import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import {
@@ -31,6 +32,7 @@ describe('PaymentController', () => {
   let allocationService: PaymentAllocationService;
   let paymentRepo: PaymentRepository;
   let invoiceRepo: InvoiceRepository;
+  let prisma: PrismaService;
 
   const mockTenantId = 'tenant-123';
   const mockUserId = 'user-456';
@@ -105,6 +107,13 @@ describe('PaymentController', () => {
             findById: jest.fn(),
           },
         },
+        {
+          provide: PrismaService,
+          useValue: {
+            invoice: { findMany: jest.fn().mockResolvedValue([]) },
+            payment: { findFirst: jest.fn() },
+          },
+        },
       ],
     }).compile();
 
@@ -114,6 +123,7 @@ describe('PaymentController', () => {
     );
     paymentRepo = module.get<PaymentRepository>(PaymentRepository);
     invoiceRepo = module.get<InvoiceRepository>(InvoiceRepository);
+    prisma = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -523,6 +533,11 @@ describe('PaymentController', () => {
 
       jest.spyOn(paymentRepo, 'findByTenantId').mockResolvedValue(payments);
       jest.spyOn(invoiceRepo, 'findById').mockResolvedValue(invoice);
+      jest
+        .spyOn(prisma.invoice, 'findMany')
+        .mockResolvedValue([
+          { id: invoice.id, invoiceNumber: invoice.invoiceNumber },
+        ] as any);
 
       const result = await controller.listPayments({}, mockViewerUser);
 

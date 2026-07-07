@@ -17,7 +17,6 @@ import {
   type Irp5Certificate,
   type Emp201Data,
   type SyncResult,
-  type ImportPayslipsParams,
   type ImportPayslipsResult,
 } from '@/lib/api/simplepay';
 
@@ -176,20 +175,6 @@ export function useImportedPayslips(staffId: string) {
 }
 
 /**
- * Import payslips from SimplePay
- */
-export function useImportPayslips() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (params: ImportPayslipsParams) => simplePayApi.importPayslips(params),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: simplePayKeys.employees() });
-    },
-  });
-}
-
-/**
  * Download payslip PDF
  */
 export function useDownloadPayslipPdf() {
@@ -220,20 +205,5 @@ export function useDownloadIrp5Pdf() {
   return useMutation({
     mutationFn: ({ staffId, year }: { staffId: string; year: number }) =>
       simplePayApi.downloadIrp5Pdf(staffId, year),
-  });
-}
-
-// ============================================================================
-// EMP201 Hooks
-// ============================================================================
-
-/**
- * Get EMP201 data for a specific date
- */
-export function useEmp201Data(date: string) {
-  return useQuery({
-    queryKey: simplePayKeys.emp201(date),
-    queryFn: () => simplePayApi.getEmp201Data(date),
-    enabled: Boolean(date),
   });
 }

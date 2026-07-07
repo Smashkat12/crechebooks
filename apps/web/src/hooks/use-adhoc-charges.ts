@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { apiClient, endpoints, queryKeys } from '@/lib/api';
 
@@ -40,45 +40,12 @@ export const VAT_EXEMPT_CHARGE_TYPES: AdHocChargeType[] = [
   AdHocChargeType.EXTRA_MURAL,
 ];
 
-// API response types (snake_case from backend)
-interface ApiAdhocCharge {
-  line_id: string;
-  description: string;
-  quantity: number;
-  unit_price_cents: number;
-  amount_cents: number;
-  vat_cents: number;
-  account_code?: string;
-  // TASK-BILL-038: New VAT compliance fields
-  charge_type?: string;
-  is_vat_exempt?: boolean;
-}
-
 interface ApiAddChargeResponse {
   success: boolean;
   line_id: string;
   amount_cents: number;
   vat_cents: number;
   invoice_total_cents: number;
-}
-
-interface ApiRemoveChargeResponse {
-  success: boolean;
-  invoice_total_cents: number;
-}
-
-// Frontend types (camelCase)
-export interface AdhocCharge {
-  lineId: string;
-  description: string;
-  quantity: number;
-  unitPriceCents: number;
-  amountCents: number;
-  vatCents: number;
-  accountCode?: string;
-  // TASK-BILL-038: New VAT compliance fields
-  chargeType?: AdHocChargeType;
-  isVatExempt?: boolean;
 }
 
 export interface AddChargeParams {
@@ -90,41 +57,6 @@ export interface AddChargeParams {
   // TASK-BILL-038: New VAT compliance fields
   chargeType?: AdHocChargeType;
   isVatExempt?: boolean;
-}
-
-export interface RemoveChargeParams {
-  invoiceId: string;
-  lineId: string;
-}
-
-// Transform API response to frontend format
-function transformCharge(api: ApiAdhocCharge): AdhocCharge {
-  return {
-    lineId: api.line_id,
-    description: api.description,
-    quantity: api.quantity,
-    unitPriceCents: api.unit_price_cents,
-    amountCents: api.amount_cents,
-    vatCents: api.vat_cents,
-    accountCode: api.account_code,
-    // TASK-BILL-038: Transform VAT compliance fields
-    chargeType: api.charge_type as AdHocChargeType | undefined,
-    isVatExempt: api.is_vat_exempt,
-  };
-}
-
-// Get list of ad-hoc charges for an invoice
-export function useAdhocCharges(invoiceId: string, enabled = true) {
-  return useQuery<AdhocCharge[], AxiosError>({
-    queryKey: queryKeys.invoices.adhocCharges(invoiceId),
-    queryFn: async () => {
-      const { data } = await apiClient.get<{ charges: ApiAdhocCharge[] }>(
-        endpoints.adhocCharges.list(invoiceId)
-      );
-      return data.charges.map(transformCharge);
-    },
-    enabled: enabled && !!invoiceId,
-  });
 }
 
 // Add ad-hoc charge to invoice
@@ -156,30 +88,6 @@ export function useAddCharge() {
           charge_type: chargeType,
           is_vat_exempt: isVatExempt,
         }
-      );
-      return data;
-    },
-    onSuccess: (_, variables) => {
-      // Invalidate invoice queries to refresh totals
-      queryClient.invalidateQueries({ queryKey: queryKeys.invoices.detail(variables.invoiceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.invoices.adhocCharges(variables.invoiceId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.invoices.lists() });
-    },
-  });
-}
-
-// Remove ad-hoc charge from invoice
-export function useRemoveCharge() {
-  const queryClient = useQueryClient();
-
-  return useMutation<
-    ApiRemoveChargeResponse,
-    AxiosError,
-    RemoveChargeParams
-  >({
-    mutationFn: async ({ invoiceId, lineId }) => {
-      const { data } = await apiClient.delete<ApiRemoveChargeResponse>(
-        endpoints.adhocCharges.remove(invoiceId, lineId)
       );
       return data;
     },

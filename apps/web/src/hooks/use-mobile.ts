@@ -143,4 +143,3 @@ export function useMobileUtils() {
   };
 }
 
-export default useMobile;

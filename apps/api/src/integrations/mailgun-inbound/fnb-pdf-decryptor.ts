@@ -153,9 +153,7 @@ export async function decryptPdf(
         const stderr = ((err as { stderr?: string }).stderr ?? '').trim();
         if (code === 3) {
           // warnings only — output is still usable
-          logger.warn(
-            `qpdf warnings (length=${password.length}): ${stderr}`,
-          );
+          logger.warn(`qpdf warnings (length=${password.length}): ${stderr}`);
           const decrypted = await readFile(outPath);
           if (decrypted.length > 0) return decrypted;
         }

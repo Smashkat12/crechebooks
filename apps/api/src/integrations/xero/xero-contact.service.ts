@@ -16,6 +16,7 @@ import { AxiosError } from 'axios';
 
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { XeroRateLimiter } from './xero-rate-limiter.service';
+import { TokenManager } from './client/auth/token-manager';
 import {
   ContactSyncResponseDto,
   BulkContactSyncResponseDto,
@@ -526,9 +527,6 @@ export class XeroContactService {
    * This is a simplified version - in production use TokenManager.
    */
   private getAccessToken(tenantId: string): Promise<string> {
-    // Import and use TokenManager
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { TokenManager } = require('../../mcp/xero-mcp/auth/token-manager');
     const tokenManager = new TokenManager(this.prisma);
     return tokenManager.getAccessToken(tenantId);
   }

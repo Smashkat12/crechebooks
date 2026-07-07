@@ -324,4 +324,3 @@ export function LeaveCalendar({ events, className, onDateClick }: LeaveCalendarP
   );
 }
 
-export default LeaveCalendar;

@@ -262,4 +262,3 @@ export function FeeStructureForm({ onComplete, onCancel }: FeeStructureFormProps
   );
 }
 
-export default FeeStructureForm;

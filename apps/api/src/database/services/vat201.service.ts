@@ -361,13 +361,20 @@ export class Vat201Service {
    *   apps/api/src/api/sars/sars-readiness.service.ts
    * which computes `new Date(y, pem + 1, 25)` — 25th of the month after
    * the period-end month.
+   *
+   * NOTE: `SarsSubmission.deadline` is a `@db.Date` column. Prisma persists
+   * `@db.Date` values using the UTC calendar date of the JS Date instant.
+   * Building the deadline with LOCAL Date components (as the readiness
+   * service does for in-memory display only) silently shifts the stored
+   * date back by one day whenever the host process runs with a positive
+   * UTC offset (e.g. Africa/Johannesburg, SAST = UTC+2) — local midnight
+   * on the 25th is 22:00 UTC on the 24th. Using `Date.UTC(...)` keeps the
+   * persisted value correct regardless of host timezone.
    */
   private calculateDeadline(periodEnd: Date): Date {
     // 25th of the month following the period-end month (VAT Act 89/1991 §27)
     const deadline = new Date(
-      periodEnd.getFullYear(),
-      periodEnd.getMonth() + 1, // month after period end
-      25,
+      Date.UTC(periodEnd.getUTCFullYear(), periodEnd.getUTCMonth() + 1, 25),
     );
     return deadline;
   }

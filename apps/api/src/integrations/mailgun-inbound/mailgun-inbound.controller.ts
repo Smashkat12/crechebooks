@@ -23,6 +23,7 @@ import {
   HttpStatus,
   Logger,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
@@ -60,10 +61,13 @@ export class MailgunInboundController {
     private readonly configService: ConfigService,
     private readonly importService: TransactionImportService,
   ) {
-    this.signingKey = this.configService.get<string>(
-      'MAILGUN_SIGNING_KEY',
-      '',
-    );
+    // MAILGUN_SIGNING_KEY is this controller's historical env var name;
+    // MAILGUN_WEBHOOK_SIGNING_KEY is the name used elsewhere (webhook.service.ts,
+    // .env) and documented in .env.example. Prefer the former for backward
+    // compatibility, fall back to the latter so both names work.
+    this.signingKey =
+      this.configService.get<string>('MAILGUN_SIGNING_KEY', '') ||
+      this.configService.get<string>('MAILGUN_WEBHOOK_SIGNING_KEY', '');
     this.fnbPassword = this.configService.get<string>(
       'FNB_STATEMENT_PASSWORD',
       '',
@@ -182,15 +186,29 @@ export class MailgunInboundController {
 
   /**
    * Verify Mailgun's HMAC-SHA256 signature.
-   * Throws BadRequestException if invalid; only no-ops if no signing key is
-   * configured (dev/local).
+   *
+   * SECURITY: fails closed. If no signing key is configured, the webhook is
+   * rejected in all environments except test/development, where a loud
+   * warning is logged instead (so local dev without a signing key still
+   * works, but staging/production never silently accept unsigned payloads).
    */
   private verifySignature(body: MailgunInboundBody): void {
     if (!this.signingKey) {
-      this.logger.warn(
-        'MAILGUN_SIGNING_KEY not set; skipping signature verification',
+      const nodeEnv = this.configService.get<string>('NODE_ENV', 'production');
+      if (nodeEnv === 'test' || nodeEnv === 'development') {
+        this.logger.warn(
+          'SECURITY: MAILGUN_SIGNING_KEY / MAILGUN_WEBHOOK_SIGNING_KEY not set; ' +
+            `skipping signature verification (NODE_ENV=${nodeEnv})`,
+        );
+        return;
+      }
+      this.logger.error(
+        'SECURITY: MAILGUN_SIGNING_KEY / MAILGUN_WEBHOOK_SIGNING_KEY not configured. ' +
+          'Rejecting inbound webhook — signature verification is required outside test/development.',
       );
-      return;
+      throw new UnauthorizedException(
+        'Mailgun webhook signing key not configured',
+      );
     }
 
     const { signature, token, timestamp } = body;

@@ -183,4 +183,3 @@ export function BankDetailsForm({ onComplete, onCancel }: BankDetailsFormProps) 
   );
 }
 
-export default BankDetailsForm;

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -25,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useParent } from "@/hooks/use-parents";
+import { useSendReminder } from "@/hooks/use-arrears";
+import { useTenant } from "@/hooks/useTenant";
 import { useToast } from "@/hooks/use-toast";
 
 const reminderSchema = z.object({
@@ -50,8 +51,10 @@ export function SendReminderDialog({
   onOpenChange,
 }: SendReminderDialogProps) {
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const { data: parent, isLoading } = useParent(parentId ?? "");
+  const { data: tenant } = useTenant();
+  const sendReminder = useSendReminder();
+  const isSubmitting = sendReminder.isPending;
 
   const form = useForm<ReminderFormValues>({
     resolver: zodResolver(reminderSchema),
@@ -74,23 +77,24 @@ Best regards,
   const onSubmit = async (data: ReminderFormValues) => {
     if (!parentId || !parent) return;
 
-    setIsSubmitting(true);
+    const crecheName = tenant?.tradingName || tenant?.name || "Your Creche";
+    const personalizedMessage = data.message
+      .replace("[Parent Name]", `${parent.firstName} ${parent.lastName}`)
+      .replace("[Creche Name]", crecheName);
+
+    const method =
+      data.sendEmail && data.sendWhatsApp
+        ? "both"
+        : data.sendWhatsApp
+        ? "whatsapp"
+        : "email";
+
     try {
-      // Replace template variables
-      const _personalizedMessage = data.message
-        .replace("[Parent Name]", `${parent.firstName} ${parent.lastName}`)
-        .replace("[Creche Name]", "Your Creche"); // TODO: Get from settings
-
-      // TODO: Call API to send reminder
-      // await sendPaymentReminder({
-      //   parentId,
-      //   message: personalizedMessage,
-      //   sendEmail: data.sendEmail,
-      //   sendWhatsApp: data.sendWhatsApp,
-      // });
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await sendReminder.mutateAsync({
+        parentIds: [parentId],
+        method,
+        template: personalizedMessage,
+      });
 
       toast({
         title: "Reminder Sent",
@@ -111,8 +115,6 @@ Best regards,
         description: "Failed to send reminder. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

@@ -29,6 +29,13 @@ import {
   NotFoundException,
 } from '../../../shared/exceptions';
 
+// Mock TokenManager (hoisted by ts-jest above the service import)
+jest.mock('../../../integrations/xero/client/auth/token-manager', () => ({
+  TokenManager: jest.fn().mockImplementation(() => ({
+    getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
+  })),
+}));
+
 describe('XeroContactService', () => {
   let service: XeroContactService;
   let httpService: HttpService;
@@ -70,13 +77,6 @@ describe('XeroContactService', () => {
       findUnique: jest.fn(),
     },
   };
-
-  // Mock TokenManager
-  jest.mock('../../../mcp/xero-mcp/auth/token-manager', () => ({
-    TokenManager: jest.fn().mockImplementation(() => ({
-      getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
-    })),
-  }));
 
   const createMockAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
     data,

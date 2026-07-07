@@ -130,4 +130,3 @@ export function BankingDetailsDisplay({ details, className }: BankingDetailsProp
   );
 }
 
-export default BankingDetailsDisplay;

@@ -132,13 +132,10 @@ describe('TemplatesService', () => {
         updatedAt: new Date(),
       });
 
-      await service.upsert(
-        tenantA,
-        userId,
-        'ARREARS_REMINDER_FIRM',
-        'EMAIL',
-        { subject: 'New subj', body: 'New body' },
-      );
+      await service.upsert(tenantA, userId, 'ARREARS_REMINDER_FIRM', 'EMAIL', {
+        subject: 'New subj',
+        body: 'New body',
+      });
 
       expect(auditLog.logAction).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -174,13 +171,10 @@ describe('TemplatesService', () => {
         updatedAt: new Date(),
       });
 
-      await service.upsert(
-        tenantA,
-        userId,
-        'ARREARS_REMINDER_FIRM',
-        'EMAIL',
-        { subject: 'New subj', body: 'New body' },
-      );
+      await service.upsert(tenantA, userId, 'ARREARS_REMINDER_FIRM', 'EMAIL', {
+        subject: 'New subj',
+        body: 'New body',
+      });
 
       expect(auditLog.logAction).toHaveBeenCalledWith(
         expect.objectContaining({

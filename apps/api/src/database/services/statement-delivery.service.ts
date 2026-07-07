@@ -215,8 +215,11 @@ export class StatementDeliveryService {
           childNames,
         };
 
-        const { text, html, subject: defaultSubject } =
-          this.emailTemplateService.renderStatementEmail(templateData);
+        const {
+          text,
+          html,
+          subject: defaultSubject,
+        } = this.emailTemplateService.renderStatementEmail(templateData);
 
         // TASK-TMPL-001: allow tenant to override the subject line.
         const tenantSubjectOverride =

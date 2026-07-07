@@ -11,10 +11,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import {
-  MessageTemplateChannel,
-  MessageTemplateKey,
-} from '@prisma/client';
+import { MessageTemplateChannel, MessageTemplateKey } from '@prisma/client';
 
 export { MessageTemplateChannel, MessageTemplateKey };
 
@@ -27,7 +24,10 @@ export { MessageTemplateChannel, MessageTemplateKey };
  * without a second round trip.
  */
 export class MessageTemplateResponseDto {
-  @ApiProperty({ description: 'DB row id when persisted; null for coded defaults', nullable: true })
+  @ApiProperty({
+    description: 'DB row id when persisted; null for coded defaults',
+    nullable: true,
+  })
   id!: string | null;
 
   @ApiProperty({ description: 'Tenant that owns the template' })
@@ -39,19 +39,28 @@ export class MessageTemplateResponseDto {
   @ApiProperty({ enum: MessageTemplateChannel })
   channel!: MessageTemplateChannel;
 
-  @ApiProperty({ nullable: true, description: 'Email subject; null for WhatsApp/SMS' })
+  @ApiProperty({
+    nullable: true,
+    description: 'Email subject; null for WhatsApp/SMS',
+  })
   subject!: string | null;
 
   @ApiProperty()
   body!: string;
 
-  @ApiProperty({ description: 'True when this row is the coded default (not saved by the tenant)' })
+  @ApiProperty({
+    description:
+      'True when this row is the coded default (not saved by the tenant)',
+  })
   isDefault!: boolean;
 
   @ApiProperty({ description: 'Human-readable name shown in the settings UI' })
   label!: string;
 
-  @ApiProperty({ description: 'Placeholder tokens the template supports', type: [String] })
+  @ApiProperty({
+    description: 'Placeholder tokens the template supports',
+    type: [String],
+  })
   placeholders!: string[];
 
   @ApiProperty({ nullable: true })

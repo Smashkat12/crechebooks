@@ -66,9 +66,13 @@ export class TemplatesService {
     const merged: MessageTemplateResponseDto[] = [];
     for (const def of DEFAULT_MESSAGE_TEMPLATES) {
       if (channel && def.channel !== channel) continue;
-      const override = overrideByKey.get(this.overrideKey(def.key, def.channel));
+      const override = overrideByKey.get(
+        this.overrideKey(def.key, def.channel),
+      );
       if (override) {
-        merged.push(this.toResponse(tenantId, override, def.label, def.placeholders));
+        merged.push(
+          this.toResponse(tenantId, override, def.label, def.placeholders),
+        );
       } else {
         merged.push({
           id: null,
@@ -163,7 +167,8 @@ export class TemplatesService {
       },
     });
 
-    const nextSubject = dto.subject === undefined ? before?.subject ?? null : dto.subject;
+    const nextSubject =
+      dto.subject === undefined ? (before?.subject ?? null) : dto.subject;
 
     const row = await this.prisma.messageTemplate.upsert({
       where: { tenantId_key_channel: { tenantId, key, channel } },

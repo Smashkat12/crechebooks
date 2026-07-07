@@ -33,7 +33,10 @@ import {
 } from '../constants/message-template-defaults';
 
 /** Placeholder substitutions supplied by the caller. */
-export type TemplateVariables = Record<string, string | number | null | undefined>;
+export type TemplateVariables = Record<
+  string,
+  string | number | null | undefined
+>;
 
 /**
  * Resolved template ready for delivery. `subject` is `null` for

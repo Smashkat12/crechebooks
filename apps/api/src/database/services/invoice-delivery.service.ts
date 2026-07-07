@@ -327,8 +327,11 @@ export class InvoiceDeliveryService {
           childName,
         };
 
-        const { text, html, subject: defaultSubject } =
-          this.emailTemplateService.renderInvoiceEmail(templateData);
+        const {
+          text,
+          html,
+          subject: defaultSubject,
+        } = this.emailTemplateService.renderInvoiceEmail(templateData);
 
         // TASK-TMPL-001: give the tenant a chance to override the subject.
         // Body stays code-controlled (HTML template shell + line items).

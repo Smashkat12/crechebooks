@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SchedulerService } from './scheduler.service';
+import { SarsDeadlineScheduleService } from './sars-deadline-schedule.service';
 import { SarsDeadlineProcessor } from './processors/sars-deadline.processor';
 import { InvoiceSchedulerProcessor } from './processors/invoice-scheduler.processor';
 import { PaymentReminderProcessor } from './processors/payment-reminder.processor';
@@ -102,6 +103,7 @@ const schedulerProviders = isRedisConfigured()
   ? [
       SchedulerService,
       SarsDeadlineProcessor,
+      SarsDeadlineScheduleService, // TASK-SARS-017: daily producer for SARS_DEADLINE jobs
       InvoiceSchedulerProcessor,
       PaymentReminderProcessor,
       StatementSchedulerProcessor,

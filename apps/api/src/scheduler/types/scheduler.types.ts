@@ -30,8 +30,13 @@ export interface PaymentReminderJobData extends ScheduledJobData {
 }
 
 export interface SarsDeadlineJobData extends ScheduledJobData {
-  submissionType: 'VAT201' | 'EMP201' | 'EMP501';
-  daysUntilDeadline: number;
+  /**
+   * Optional: daily deadline-check jobs (SarsDeadlineScheduleService) cover
+   * ALL submission types — SarsDeadlineProcessor computes the tenant's
+   * upcoming deadlines itself. Populate only to target a single type.
+   */
+  submissionType?: 'VAT201' | 'EMP201' | 'EMP501';
+  daysUntilDeadline?: number;
 }
 
 export interface BankSyncJobData extends ScheduledJobData {

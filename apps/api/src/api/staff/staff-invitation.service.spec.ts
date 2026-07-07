@@ -24,7 +24,7 @@ import { ConfigService } from '@nestjs/config';
 import { StaffInvitationStatus } from '@prisma/client';
 import { StaffInvitationService } from './staff-invitation.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { MailgunService } from '../../integrations/mailgun/mailgun.service';
+import { EmailService } from '../../integrations/email/email.service';
 import { StaffMagicLinkService } from '../auth/services/staff-magic-link.service';
 
 // ---------------------------------------------------------------------------
@@ -112,8 +112,8 @@ const mockPrisma = {
   },
 };
 
-const mockMailgun = {
-  sendEmail: jest.fn(),
+const mockEmail = {
+  sendEmailWithOptions: jest.fn(),
 };
 
 const mockStaffMagicLink = {
@@ -137,10 +137,9 @@ describe('StaffInvitationService', () => {
     // Default: config returns undefined → falls back to localhost
     mockConfig.get.mockReturnValue(undefined);
     // Default: email succeeds
-    mockMailgun.sendEmail.mockResolvedValue({
-      id: 'mg-id',
+    mockEmail.sendEmailWithOptions.mockResolvedValue({
+      messageId: 'mg-id',
       status: 'queued',
-      message: 'ok',
     });
     // Default: magic link succeeds
     mockStaffMagicLink.generateMagicLink.mockResolvedValue(true);
@@ -153,7 +152,7 @@ describe('StaffInvitationService', () => {
       providers: [
         StaffInvitationService,
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: MailgunService, useValue: mockMailgun },
+        { provide: EmailService, useValue: mockEmail },
         { provide: StaffMagicLinkService, useValue: mockStaffMagicLink },
         { provide: ConfigService, useValue: mockConfig },
       ],
@@ -179,8 +178,9 @@ describe('StaffInvitationService', () => {
       expect(result.inviteSentAt).toBeInstanceOf(Date);
       expect(result.expiresAt).toBeInstanceOf(Date);
       expect(mockPrisma.staffInvitation.create).toHaveBeenCalledTimes(1);
-      expect(mockMailgun.sendEmail).toHaveBeenCalledTimes(1);
-      const emailCall = mockMailgun.sendEmail.mock.calls[0][0] as {
+      expect(mockEmail.sendEmailWithOptions).toHaveBeenCalledTimes(1);
+      const emailCall = mockEmail.sendEmailWithOptions.mock
+        .calls[0][0] as {
         to: string;
         subject: string;
         tags: string[];
@@ -235,7 +235,7 @@ describe('StaffInvitationService', () => {
       expect(mockPrisma.staffInvitation.create).toHaveBeenCalledTimes(1);
       expect(result.inviteSentAt).toBeInstanceOf(Date);
       // Email was sent once (for the new invite)
-      expect(mockMailgun.sendEmail).toHaveBeenCalledTimes(1);
+      expect(mockEmail.sendEmailWithOptions).toHaveBeenCalledTimes(1);
     });
 
     it('should enforce tenant isolation — wrong tenantId → NotFoundException', async () => {

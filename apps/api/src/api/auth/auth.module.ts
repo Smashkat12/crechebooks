@@ -25,7 +25,7 @@ import { RedisModule } from '../../common/redis/redis.module';
 import { RateLimitModule } from '../../common/rate-limit/rate-limit.module';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { CsrfStoreService } from './csrf-store.service';
-import { MailgunModule } from '../../integrations/mailgun/mailgun.module';
+import { EmailModule } from '../../integrations/email/email.module';
 import { AdminModule } from '../admin/admin.module';
 
 /**
@@ -86,7 +86,7 @@ export type AuthProvider = 'auth0' | 'jwt';
     PrismaModule,
     RedisModule,
     RateLimitModule,
-    MailgunModule,
+    EmailModule, // Provides EmailService for MagicLinkService / StaffMagicLinkService
     AdminModule, // For ImpersonationService in logout
   ],
   controllers: [

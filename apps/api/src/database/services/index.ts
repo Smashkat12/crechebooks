@@ -37,7 +37,6 @@ export type {
 export * from './payee-alias.service';
 export * from './amount-variation.service';
 export type {
-  AmountThresholdConfig,
   Statistics as PayeeStatistics,
   VariationAnalysis,
 } from './amount-variation.service';

@@ -18,7 +18,6 @@ import {
   Param,
   Logger,
   HttpCode,
-
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
@@ -114,7 +113,6 @@ function transformFilterDto(
 @Controller('communications')
 @ApiTags('Communications')
 @ApiBearerAuth('JWT-auth')
-
 export class CommunicationController {
   private readonly logger = new Logger(CommunicationController.name);
 

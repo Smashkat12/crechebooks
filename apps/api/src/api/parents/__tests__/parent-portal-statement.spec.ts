@@ -44,13 +44,15 @@ const PARENT_ROW = {
   email: 'jane@example.com',
 };
 
-function makeInvoiceLine(overrides: Partial<{
-  id: string;
-  date: Date;
-  description: string;
-  referenceNumber: string;
-  debitCents: number;
-}> = {}) {
+function makeInvoiceLine(
+  overrides: Partial<{
+    id: string;
+    date: Date;
+    description: string;
+    referenceNumber: string;
+    debitCents: number;
+  }> = {},
+) {
   return {
     date: new Date('2026-04-05T10:00:00.000Z'),
     description: 'Tommy Doe – April 2026',
@@ -65,11 +67,13 @@ function makeInvoiceLine(overrides: Partial<{
   };
 }
 
-function makePaymentLine(overrides: Partial<{
-  id: string;
-  date: Date;
-  creditCents: number;
-}> = {}) {
+function makePaymentLine(
+  overrides: Partial<{
+    id: string;
+    date: Date;
+    creditCents: number;
+  }> = {},
+) {
   return {
     date: new Date('2026-04-10T10:00:00.000Z'),
     description: 'Payment received',
@@ -84,11 +88,13 @@ function makePaymentLine(overrides: Partial<{
   };
 }
 
-function makeCreditLine(overrides: Partial<{
-  referenceId: string;
-  description: string;
-  creditCents: number;
-}> = {}) {
+function makeCreditLine(
+  overrides: Partial<{
+    referenceId: string;
+    description: string;
+    creditCents: number;
+  }> = {},
+) {
   return {
     date: new Date('2026-04-12T09:00:00.000Z'),
     description: 'Credit note for April adjustment',
@@ -137,15 +143,19 @@ describe('ParentPortalController — getStatementDetail (consolidated to LiveLed
   let controller: ParentPortalController;
   let computeLiveLedger: jest.Mock;
 
-  async function buildController(opts: {
-    parent?: typeof PARENT_ROW | null;
-    ledger?: any;
-  } = {}) {
+  async function buildController(
+    opts: {
+      parent?: typeof PARENT_ROW | null;
+      ledger?: any;
+    } = {},
+  ) {
     const prismaMock = {
       parent: {
         findUnique: jest
           .fn()
-          .mockResolvedValue(opts.parent === undefined ? PARENT_ROW : opts.parent),
+          .mockResolvedValue(
+            opts.parent === undefined ? PARENT_ROW : opts.parent,
+          ),
       },
     };
     computeLiveLedger = jest.fn().mockResolvedValue(opts.ledger);
@@ -161,7 +171,10 @@ describe('ParentPortalController — getStatementDetail (consolidated to LiveLed
         { provide: PaymentReceiptService, useValue: {} },
         { provide: StatementDeliveryService, useValue: {} },
         { provide: AuditLogService, useValue: { logAction: jest.fn() } },
-        { provide: ParentAccountService, useValue: { calculateOpeningBalance: jest.fn() } },
+        {
+          provide: ParentAccountService,
+          useValue: { calculateOpeningBalance: jest.fn() },
+        },
         {
           provide: StatementGenerationService,
           useValue: { computeLiveLedger },
@@ -278,7 +291,9 @@ describe('ParentPortalController — getStatementDetail (consolidated to LiveLed
         '4',
       );
       const creditRow = result.transactions.find((t) => t.type === 'credit');
-      expect(creditRow?.description).toContain('Credit note for April adjustment');
+      expect(creditRow?.description).toContain(
+        'Credit note for April adjustment',
+      );
     });
 
     it('reduces netMovement by the credit amount', async () => {

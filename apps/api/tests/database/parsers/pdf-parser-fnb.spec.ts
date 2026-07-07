@@ -54,7 +54,9 @@ describe('PdfParser - FNB decline-row regression', () => {
       expect(tx.isCredit).toBe(false);
     }
 
-    const interest = txs.find((t) => /Int On Debit Balance/i.test(t.description));
+    const interest = txs.find((t) =>
+      /Int On Debit Balance/i.test(t.description),
+    );
     expect(interest?.amountCents).toBe(439);
 
     const fee = txs.find((t) => /Monthly Account Fee/i.test(t.description));
@@ -86,7 +88,7 @@ Statement Period : 01 March 2026 to 31 March 2026
     jest.doMock('pdf-parse', () =>
       jest.fn(async () => ({ text: noMerchant, numpages: 1 })),
     );
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const freshModule = require('../../../src/database/parsers/pdf-parser');
     const FreshPdfParser = freshModule.PdfParser;
     const parser = new FreshPdfParser();
@@ -123,7 +125,7 @@ Statement Period : 01 March 2026 to 31 March 2026
     jest.doMock('pdf-parse', () =>
       jest.fn(async () => ({ text: noisy, numpages: 1 })),
     );
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const freshModule = require('../../../src/database/parsers/pdf-parser');
     const FreshPdfParser = freshModule.PdfParser;
     const parser = new FreshPdfParser();

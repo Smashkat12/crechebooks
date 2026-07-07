@@ -407,7 +407,10 @@ export class PaymentAllocationService {
           createdPayments.push(payment);
 
           // Recompute invoice counter from payment rows (derives PAID/PARTIALLY_PAID correctly)
-          await this.invoiceRepo.recomputePaidAndStatus(tx, allocation.invoiceId);
+          await this.invoiceRepo.recomputePaidAndStatus(
+            tx,
+            allocation.invoiceId,
+          );
 
           invoicesUpdated.push(allocation.invoiceId);
         }

@@ -148,9 +148,9 @@ describe('deriveInvoiceStatus', () => {
     });
 
     it('returns SENT when current is PARTIALLY_PAID and paid drops to 0 (reversal)', () => {
-      expect(
-        deriveInvoiceStatus(0, 10000, InvoiceStatus.PARTIALLY_PAID),
-      ).toBe(InvoiceStatus.SENT);
+      expect(deriveInvoiceStatus(0, 10000, InvoiceStatus.PARTIALLY_PAID)).toBe(
+        InvoiceStatus.SENT,
+      );
     });
   });
 
@@ -188,9 +188,9 @@ describe('deriveInvoiceStatus', () => {
     });
 
     it('large invoice: partial payment yields PARTIALLY_PAID', () => {
-      expect(
-        deriveInvoiceStatus(99999999, 100000000, InvoiceStatus.SENT),
-      ).toBe(InvoiceStatus.PARTIALLY_PAID);
+      expect(deriveInvoiceStatus(99999999, 100000000, InvoiceStatus.SENT)).toBe(
+        InvoiceStatus.PARTIALLY_PAID,
+      );
     });
   });
 });

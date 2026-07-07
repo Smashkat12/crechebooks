@@ -39,9 +39,9 @@ function buildFakePrisma(opts: {
     xeroAccount: { findMany: jest.fn().mockResolvedValue([]) },
     transaction: { findMany: jest.fn().mockResolvedValue(opts.transactions) },
     categorization: {
-      findMany: jest.fn().mockResolvedValue(
-        opts.splits.map((s) => ({ ...s, isSplit: true })),
-      ),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(opts.splits.map((s) => ({ ...s, isSplit: true }))),
     },
     invoice: { findMany: jest.fn().mockResolvedValue([]) },
   };
@@ -74,7 +74,9 @@ describe('FinancialReportService - splits in income statement', () => {
     });
 
     const svc = new FinancialReportService(
-      fake as unknown as ConstructorParameters<typeof FinancialReportService>[0],
+      fake as unknown as ConstructorParameters<
+        typeof FinancialReportService
+      >[0],
       {} as unknown as ConstructorParameters<typeof FinancialReportService>[1],
     );
 
@@ -87,8 +89,12 @@ describe('FinancialReportService - splits in income statement', () => {
     expect(report.expenses.totalCents).toBe(100000);
     const codes = report.expenses.breakdown.map((b) => b.accountCode);
     expect(codes).toEqual(expect.arrayContaining(['5400', '5600']));
-    const food = report.expenses.breakdown.find((b) => b.accountCode === '5400');
-    const cleaning = report.expenses.breakdown.find((b) => b.accountCode === '5600');
+    const food = report.expenses.breakdown.find(
+      (b) => b.accountCode === '5400',
+    );
+    const cleaning = report.expenses.breakdown.find(
+      (b) => b.accountCode === '5600',
+    );
     expect(food?.amountCents).toBe(60000);
     expect(cleaning?.amountCents).toBe(40000);
   });
@@ -110,7 +116,9 @@ describe('FinancialReportService - splits in income statement', () => {
     });
 
     const svc = new FinancialReportService(
-      fake as unknown as ConstructorParameters<typeof FinancialReportService>[0],
+      fake as unknown as ConstructorParameters<
+        typeof FinancialReportService
+      >[0],
       {} as unknown as ConstructorParameters<typeof FinancialReportService>[1],
     );
 
@@ -141,13 +149,23 @@ describe('FinancialReportService - splits in income statement', () => {
         },
       ],
       splits: [
-        { transactionId: 'tx-3', accountCode: '4110', splitAmountCents: 150000 },
-        { transactionId: 'tx-3', accountCode: '4120', splitAmountCents: 150000 },
+        {
+          transactionId: 'tx-3',
+          accountCode: '4110',
+          splitAmountCents: 150000,
+        },
+        {
+          transactionId: 'tx-3',
+          accountCode: '4120',
+          splitAmountCents: 150000,
+        },
       ],
     });
 
     const svc = new FinancialReportService(
-      fake as unknown as ConstructorParameters<typeof FinancialReportService>[0],
+      fake as unknown as ConstructorParameters<
+        typeof FinancialReportService
+      >[0],
       {} as unknown as ConstructorParameters<typeof FinancialReportService>[1],
     );
 

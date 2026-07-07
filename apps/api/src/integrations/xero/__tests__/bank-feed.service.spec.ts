@@ -358,9 +358,12 @@ describe('BankFeedService', () => {
         .mockResolvedValue({ body: { bankTransactions: [] } });
 
       jest
-        .spyOn(service as unknown as {
-          getAuthenticatedClient: (tenantId: string) => Promise<unknown>;
-        }, 'getAuthenticatedClient')
+        .spyOn(
+          service as unknown as {
+            getAuthenticatedClient: (tenantId: string) => Promise<unknown>;
+          },
+          'getAuthenticatedClient',
+        )
         .mockResolvedValue({
           client: { accountingApi: { getBankTransactions } },
           xeroTenantId: 'xero-tenant',

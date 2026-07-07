@@ -17,7 +17,6 @@ import {
   Param,
   Body,
   Query,
-
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -157,7 +156,6 @@ class ApiRejectLeaveRequestDto {
 @ApiTags('Staff Leave')
 @ApiBearerAuth()
 @Controller('staff')
-
 export class LeaveController {
   private readonly logger = new Logger(LeaveController.name);
 

@@ -15,7 +15,6 @@ import {
   Query,
   Logger,
   HttpCode,
-
   BadRequestException,
   Res,
   ServiceUnavailableException,
@@ -86,7 +85,6 @@ export class SarsController {
    */
   @Get('readiness')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({
     summary: 'Filing readiness checklist for the next SARS deadline',
     description:
@@ -135,7 +133,6 @@ export class SarsController {
    */
   @Get('submissions')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({ summary: 'List SARS submission history for the tenant' })
   @ApiQuery({
     name: 'type',
@@ -184,7 +181,9 @@ export class SarsController {
 
     // Validate query params
     if (type && !['VAT201', 'EMP201', 'EMP501'].includes(type)) {
-      throw new BadRequestException('type must be one of VAT201, EMP201, EMP501');
+      throw new BadRequestException(
+        'type must be one of VAT201, EMP201, EMP501',
+      );
     }
     if (from && !/^\d{4}-(0[1-9]|1[0-2])$/.test(from)) {
       throw new BadRequestException('from must be in YYYY-MM format');
@@ -255,7 +254,6 @@ export class SarsController {
   @Post(':id/submit')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-
   @ApiOperation({ summary: 'Mark SARS submission as submitted to eFiling' })
   @ApiParam({ name: 'id', description: 'SARS submission ID (UUID)' })
   @ApiResponse({ status: 200, type: SarsSubmissionResponseDto })
@@ -305,7 +303,6 @@ export class SarsController {
   @Post('vat201')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({ summary: 'Generate VAT201 return for period' })
   @ApiResponse({ status: 201, type: ApiVat201ResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid date format or period' })
@@ -376,7 +373,6 @@ export class SarsController {
   @Post('emp201')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({ summary: 'Generate EMP201 return for period' })
   @ApiResponse({ status: 201, type: ApiEmp201ResponseDto })
   @ApiResponse({
@@ -476,7 +472,6 @@ export class SarsController {
    */
   @Get('emp201/download')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({
     summary: 'Download EMP201 CSV for SARS eFiling',
     description:
@@ -561,7 +556,6 @@ export class SarsController {
    */
   @Get('emp501/download')
   @Roles(UserRole.OWNER, UserRole.ADMIN, UserRole.ACCOUNTANT)
-
   @ApiOperation({
     summary: 'Download EMP501 CSV for SARS annual reconciliation',
     description:

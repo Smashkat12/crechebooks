@@ -330,7 +330,6 @@ export class InvoiceController {
   @Post('generate')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-
   @ApiOperation({
     summary: 'Generate monthly invoices for enrolled children',
     description:
@@ -406,7 +405,6 @@ export class InvoiceController {
   @Post('catch-up')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-
   @ApiOperation({
     summary: 'Generate catch-up invoices for historic enrollments',
     description:
@@ -452,7 +450,6 @@ export class InvoiceController {
   @Post('send')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-
   @ApiOperation({
     summary: 'Send invoices to parents',
     description:
@@ -501,7 +498,6 @@ export class InvoiceController {
   @Post(':id/charges')
   @HttpCode(201)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-
   @ApiOperation({
     summary: 'Add an ad-hoc charge to an invoice',
     description:
@@ -605,7 +601,6 @@ export class InvoiceController {
   @Delete(':id/charges/:lineId')
   @HttpCode(200)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
-
   @ApiOperation({
     summary: 'Remove an ad-hoc charge from an invoice',
     description:

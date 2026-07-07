@@ -38,5 +38,4 @@ export interface INotificationChannel {
    * @throws BusinessException if delivery fails
    */
   send(notification: Notification): Promise<DeliveryResult>;
-
 }

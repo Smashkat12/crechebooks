@@ -7,7 +7,6 @@ import {
   Get,
   Param,
   Query,
-
   Logger,
   BadRequestException,
   Res,
@@ -34,7 +33,6 @@ import { TenantRepository } from '../../database/repositories/tenant.repository'
 @ApiTags('General Ledger')
 @ApiBearerAuth()
 @Controller('general-ledger')
-
 export class GeneralLedgerController {
   private readonly logger = new Logger(GeneralLedgerController.name);
 

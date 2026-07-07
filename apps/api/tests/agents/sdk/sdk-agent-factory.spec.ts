@@ -14,6 +14,58 @@ import {
   AgentType,
 } from '../../../src/agents/sdk/sdk-config';
 import { AgentDefinition } from '../../../src/agents/sdk/interfaces/sdk-agent.interface';
+import { AgentToolRegistry } from '../../../src/agents/sdk/tools/tool-registry.service';
+
+// Minimal registry stub — returns the real per-agent allowlist so the factory
+// produces populated tool lists for definition-shape assertions, without
+// pulling in Prisma/services required by the real registry.
+const fakeRegistry: Partial<AgentToolRegistry> = {
+  getToolNamesForAgent(agent: AgentType): string[] {
+    const map: Record<AgentType, string[]> = {
+      categorizer: [
+        'list_transactions',
+        'get_tenant',
+        'categorize_transactions',
+      ],
+      matcher: [
+        'list_invoices',
+        'list_payments',
+        'list_transactions',
+        'allocate_payment',
+        'run_payment_matching',
+      ],
+      sars: ['get_tenant', 'get_dashboard_metrics'],
+      extraction: ['get_tenant'],
+      orchestrator: [
+        'list_invoices',
+        'list_payments',
+        'list_transactions',
+        'get_arrears_summary',
+        'get_dashboard_metrics',
+        'list_children',
+        'list_parents',
+        'list_staff',
+        'get_tenant',
+        'generate_invoices',
+        'run_payment_matching',
+        'allocate_payment',
+        'categorize_transactions',
+      ],
+      conversational: [
+        'list_invoices',
+        'list_payments',
+        'list_transactions',
+        'get_arrears_summary',
+        'get_dashboard_metrics',
+        'list_children',
+        'list_parents',
+        'list_staff',
+        'get_tenant',
+      ],
+    };
+    return map[agent] ?? [];
+  },
+};
 
 describe('SdkAgentFactory', () => {
   let factory: SdkAgentFactory;
@@ -41,7 +93,11 @@ describe('SdkAgentFactory', () => {
           ],
         }),
       ],
-      providers: [SdkAgentFactory, SdkConfigService],
+      providers: [
+        SdkAgentFactory,
+        SdkConfigService,
+        { provide: AgentToolRegistry, useValue: fakeRegistry },
+      ],
     }).compile();
 
     factory = module.get<SdkAgentFactory>(SdkAgentFactory);
@@ -86,10 +142,10 @@ describe('SdkAgentFactory', () => {
       expect(def.model).toBe('haiku');
     });
 
-    it('should include required MCP tools', () => {
+    it('should include registry-bound tools', () => {
       const def = factory.createCategorizerAgent(tenantId);
-      expect(def.tools).toContain('chart_of_accounts');
-      expect(def.tools).toContain('pattern_match');
+      expect(def.tools).toContain('list_transactions');
+      expect(def.tools).toContain('categorize_transactions');
     });
   });
 

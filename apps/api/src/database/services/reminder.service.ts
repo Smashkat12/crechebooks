@@ -24,10 +24,11 @@ import { ArrearsService } from './arrears.service';
 import { EmailService } from '../../integrations/email/email.service';
 import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
-import {
-  REMINDER_TEMPLATES,
-  REMINDER_TEMPLATES_WHATSAPP,
-} from '../constants/reminder-templates';
+import { MessageTemplateResolverService } from './message-template-resolver.service';
+import type {
+  MessageTemplateKeyLiteral,
+  MessageTemplateChannelLiteral,
+} from '../constants/message-template-defaults';
 import {
   EscalationLevel,
   ReminderStatus,
@@ -58,7 +59,21 @@ export class ReminderService {
     private readonly arrearsService: ArrearsService,
     private readonly emailService: EmailService,
     private readonly whatsAppService: WhatsAppProviderService,
+    private readonly templateResolver: MessageTemplateResolverService,
   ) {}
+
+  /**
+   * Map an escalation level to the corresponding MessageTemplate key so the
+   * resolver returns the right customizable template.
+   */
+  private static readonly TEMPLATE_KEY_BY_LEVEL: Record<
+    EscalationLevel,
+    MessageTemplateKeyLiteral
+  > = {
+    [EscalationLevel.FRIENDLY]: 'ARREARS_REMINDER_FRIENDLY',
+    [EscalationLevel.FIRM]: 'ARREARS_REMINDER_FIRM',
+    [EscalationLevel.FINAL]: 'ARREARS_REMINDER_FINAL',
+  };
 
   /**
    * Send reminders for specified invoices
@@ -207,6 +222,7 @@ export class ReminderService {
           whatsappResult = await this.sendViaWhatsApp(
             invoice.parent.whatsapp,
             content,
+            tenantId,
           );
         }
 
@@ -588,8 +604,6 @@ export class ReminderService {
       const outstandingCents = invoice.totalCents - invoice.amountPaidCents;
       const daysOverdue = this.calculateDaysOverdue(invoice.dueDate);
 
-      const template = REMINDER_TEMPLATES[escalationLevel];
-
       const values = {
         parentName: invoice.parent.firstName,
         childName: invoice.child.firstName,
@@ -606,9 +620,26 @@ export class ReminderService {
         branchCode: '',
       };
 
+      // Resolve the tenant's override (or fall through to the coded default)
+      // for this escalation level, then substitute placeholders.
+      const templateKey =
+        ReminderService.TEMPLATE_KEY_BY_LEVEL[escalationLevel];
+      const rendered = await this.templateResolver.resolveAndRender(
+        tenantId,
+        templateKey,
+        'EMAIL',
+        values,
+      );
+      if (!rendered || !rendered.subject) {
+        throw new BusinessException(
+          `No email template resolved for escalation level ${escalationLevel}`,
+          'TEMPLATE_NOT_FOUND',
+        );
+      }
+
       return {
-        subject: this.renderTemplate(template.subject, values),
-        body: this.renderTemplate(template.body, values),
+        subject: rendered.subject,
+        body: rendered.body,
         escalationLevel,
         invoiceNumber: invoice.invoiceNumber,
         outstandingCents,
@@ -923,6 +954,7 @@ export class ReminderService {
   private async sendViaWhatsApp(
     parentPhone: string | null,
     content: ReminderContent,
+    tenantId: string,
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!parentPhone) {
       return {
@@ -932,36 +964,45 @@ export class ReminderService {
     }
 
     try {
-      // Use WhatsApp-specific template (shorter)
-      const whatsappTemplate =
-        REMINDER_TEMPLATES_WHATSAPP[content.escalationLevel];
-
-      // Extract values from content for WhatsApp template
-
+      // Recover the values used for the email template from the ReminderContent
+      // (still regex-based for backwards compatibility with pre-template callers)
+      // and pass them to the resolver so the tenant's WHATSAPP override — or the
+      // coded default — renders with the same substitutions.
       const parentNameMatch = content.body.match(/Dear ([^,]+)/);
-
       const childNameMatch = content.body.match(/for ([^']+)'s/);
-
       const crecheNameMatch = content.body.match(/([^\n]+)$/);
 
-      const whatsappContent = this.renderTemplate(whatsappTemplate.body, {
-        parentName: parentNameMatch?.[1] ?? 'Parent',
-        childName: childNameMatch?.[1] ?? 'your child',
-        invoiceNumber: content.invoiceNumber,
-        amount: this.formatCentsToRand(content.outstandingCents),
-        daysOverdue: content.daysOverdue.toString(),
-        dueDate: '', // Would need to pass this separately
-        crecheName: crecheNameMatch?.[1] ?? '',
-        crechePhone: '',
-        crecheEmail: '',
-        bankName: '',
-        accountNumber: '',
-        branchCode: '',
-      });
+      const templateKey =
+        ReminderService.TEMPLATE_KEY_BY_LEVEL[content.escalationLevel];
+      const rendered = await this.templateResolver.resolveAndRender(
+        tenantId,
+        templateKey,
+        'WHATSAPP',
+        {
+          parentName: parentNameMatch?.[1] ?? 'Parent',
+          childName: childNameMatch?.[1] ?? 'your child',
+          invoiceNumber: content.invoiceNumber,
+          amount: this.formatCentsToRand(content.outstandingCents),
+          daysOverdue: content.daysOverdue.toString(),
+          dueDate: '', // Would need to pass this separately
+          crecheName: crecheNameMatch?.[1] ?? '',
+          crechePhone: '',
+          crecheEmail: '',
+          bankName: '',
+          accountNumber: '',
+          branchCode: '',
+        },
+      );
+      if (!rendered) {
+        return {
+          success: false,
+          error: `No WhatsApp template for escalation level ${content.escalationLevel}`,
+        };
+      }
 
       const result = await this.whatsAppService.sendMessage(
         parentPhone,
-        whatsappContent,
+        rendered.body,
       );
       if (!result.success) {
         throw new Error(result.error ?? 'WhatsApp send failed');
@@ -976,26 +1017,6 @@ export class ReminderService {
       );
       return { success: false, error: errorMessage };
     }
-  }
-
-  /**
-   * Replace template placeholders with actual values
-   *
-   * Simple template engine: replaces {key} with values[key].
-   *
-   * @param template - Template string with {placeholders}
-   * @param values - Key-value pairs for replacement
-   * @returns Rendered string with all placeholders replaced
-   */
-  private renderTemplate(
-    template: string,
-    values: Record<string, string>,
-  ): string {
-    let result = template;
-    for (const [key, value] of Object.entries(values)) {
-      result = result.replaceAll(`{${key}}`, value);
-    }
-    return result;
   }
 
   /**

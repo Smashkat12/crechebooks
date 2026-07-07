@@ -1,13 +1,15 @@
-import { Module, Logger } from '@nestjs/common';
+import { Module, Logger, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SchedulerService } from './scheduler.service';
 import { SarsDeadlineScheduleService } from './sars-deadline-schedule.service';
+import { OrchestratorScheduleService } from './orchestrator-schedule.service';
 import { SarsDeadlineProcessor } from './processors/sars-deadline.processor';
 import { InvoiceSchedulerProcessor } from './processors/invoice-scheduler.processor';
 import { StatementSchedulerProcessor } from './processors/statement-scheduler.processor';
 import { XeroSyncRecoveryProcessor } from './processors/xero-sync-recovery.processor';
+import { OrchestratorWorkflowProcessor } from './processors/orchestrator-workflow.processor';
 import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
 import { StaffInvitationCleanupJob } from '../jobs/staff-invitation-cleanup.job';
 import { PaymentAttachmentJanitorJob } from '../jobs/payment-attachment-janitor.job';
@@ -19,6 +21,7 @@ import { StatementScheduleService } from '../billing/statement-schedule.service'
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
+import { OrchestratorModule } from '../agents/orchestrator/orchestrator.module';
 import { CircuitBreakerModule } from '../integrations/circuit-breaker';
 import { EmailModule } from '../integrations/email/email.module';
 
@@ -77,10 +80,18 @@ const bullImports = isRedisConfigured()
           name: QUEUE_NAMES.SARS_DEADLINE,
         },
         {
-          name: QUEUE_NAMES.BANK_SYNC,
+          name: QUEUE_NAMES.STATEMENT_GENERATION,
         },
         {
-          name: QUEUE_NAMES.STATEMENT_GENERATION,
+          name: QUEUE_NAMES.ORCHESTRATOR_WORKFLOW,
+          defaultJobOptions: {
+            // Orchestrator failures are already persisted to workflow_runs
+            // as FAILED — Bull retries would produce duplicate audit noise
+            // without fixing the underlying cause. Set attempts=1.
+            attempts: 1,
+            removeOnComplete: 50,
+            removeOnFail: false,
+          },
         },
       ),
     ]
@@ -101,6 +112,10 @@ const schedulerProviders = isRedisConfigured()
       SarsDeadlineScheduleService, // TASK-SARS-017: daily producer for SARS_DEADLINE jobs
       InvoiceSchedulerProcessor,
       StatementSchedulerProcessor,
+      // Orchestrator month-end cron producer + Bull consumer. Registered
+      // together so the queue always has both a producer and consumer.
+      OrchestratorScheduleService,
+      OrchestratorWorkflowProcessor,
     ]
   : [];
 
@@ -134,6 +149,10 @@ const billingSchedulingProviders = isRedisConfigured()
   imports: [
     SarsSchedulerModule,
     DatabaseModule,
+    // OrchestratorModule provides OrchestratorAgent + WorkflowRunRepository
+    // for OrchestratorWorkflowProcessor / OrchestratorScheduleService.
+    // forwardRef because DatabaseModule already imports OrchestratorModule.
+    forwardRef(() => OrchestratorModule),
     CircuitBreakerModule,
     EmailModule, // TASK-BILL-013: Email service for arrears reminders
     StaffModule, // TASK-STAFF-INVITE-001: Provides StaffInvitationService for cleanup job

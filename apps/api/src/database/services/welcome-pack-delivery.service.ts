@@ -26,6 +26,7 @@ import { ParentRepository } from '../repositories/parent.repository';
 import { FeeStructureRepository } from '../repositories/fee-structure.repository';
 import { TenantRepository } from '../repositories/tenant.repository';
 import { NotFoundException } from '../../shared/exceptions';
+import { MessageTemplateResolverService } from './message-template-resolver.service';
 
 /**
  * Result of welcome pack delivery attempt
@@ -60,6 +61,9 @@ export class WelcomePackDeliveryService {
     private readonly tenantRepo: TenantRepository,
     // TASK-WA-007: Optional WhatsApp service for welcome messages
     @Optional() private readonly twilioWhatsAppService?: TwilioWhatsAppService,
+    // TASK-TMPL-001: Optional tenant-editable subject line
+    @Optional()
+    private readonly templateResolver?: MessageTemplateResolverService,
   ) {}
 
   /**
@@ -181,11 +185,28 @@ export class WelcomePackDeliveryService {
       const renderedEmail =
         this.emailTemplateService.renderWelcomePackEmail(emailData);
 
+      // TASK-TMPL-001: allow tenant to override the subject line.
+      let subject = renderedEmail.subject;
+      if (this.templateResolver) {
+        const override = await this.templateResolver.resolveAndRender(
+          tenantId,
+          'WELCOME_PACK',
+          'EMAIL',
+          {
+            tenantName: tenant.tradingName ?? tenant.name,
+            childName,
+          },
+        );
+        if (override?.isCustom && override.subject) {
+          subject = override.subject;
+        }
+      }
+
       // 10. Send email with PDF attachment
       this.logger.debug(`Sending welcome pack email to ${parent.email}`);
       await this.emailService.sendEmailWithOptions({
         to: parent.email,
-        subject: renderedEmail.subject,
+        subject,
         body: renderedEmail.text,
         html: renderedEmail.html,
         attachments: [

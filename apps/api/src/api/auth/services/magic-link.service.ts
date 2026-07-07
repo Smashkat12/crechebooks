@@ -20,7 +20,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../database/prisma/prisma.service';
-import { MailgunService } from '../../../integrations/mailgun/mailgun.service';
+import { EmailService } from '../../../integrations/email/email.service';
 
 /** Magic link token payload */
 interface MagicLinkPayload {
@@ -63,7 +63,7 @@ export class MagicLinkService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
-    private readonly mailgunService: MailgunService,
+    private readonly emailService: EmailService,
     private readonly configService: ConfigService,
   ) {
     const portalBaseUrl =
@@ -167,7 +167,7 @@ export class MagicLinkService {
   }
 
   /**
-   * Send the magic link email using Mailgun.
+   * Send the magic link email via the EmailService adapter.
    */
   private async sendMagicLinkEmail(
     email: string,
@@ -233,10 +233,10 @@ The CrecheBooks Team
 </html>
     `.trim();
 
-    await this.mailgunService.sendEmail({
+    await this.emailService.sendEmailWithOptions({
       to: email,
       subject,
-      text,
+      body: text,
       html,
       tags: ['parent-portal', 'magic-link'],
     });

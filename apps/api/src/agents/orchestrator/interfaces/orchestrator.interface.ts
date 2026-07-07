@@ -73,7 +73,11 @@ export interface WorkflowResult {
 }
 
 /**
- * Decision log entry for orchestrator
+ * @deprecated Superseded by the `workflow_runs` table + AuditTrailService
+ * (see WorkflowRunRepository). The historical decisions.jsonl file was
+ * unreachable from the API on Railway (ephemeral container filesystem);
+ * this interface is retained only to avoid a breaking export removal and
+ * will be dropped in a follow-up.
  */
 export interface OrchestratorDecisionLog {
   timestamp: string;

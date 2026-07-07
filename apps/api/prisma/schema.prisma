@@ -574,6 +574,12 @@ model Tenant {
   // TASK-FIX-005: Bank fee configuration for multi-bank support
   bankFeeConfig Json? @map("bank_fee_config")
 
+  // TASK-STMT-008: Per-tenant opt-in for the scheduled monthly statement
+  // generation cron. Default false — StatementScheduleService only enrolls
+  // tenants whose flag is true, so this must be explicitly flipped (via the
+  // admin UpdateTenant endpoint) before a tenant is auto-billed statements.
+  statementScheduleEnabled Boolean @default(false) @map("statement_schedule_enabled")
+
   // TASK-ENROL-006: Parent welcome pack customization
   parentWelcomeMessage String? @map("parent_welcome_message") @db.Text
   operatingHours       String? @map("operating_hours") @db.VarChar(200)
@@ -607,6 +613,7 @@ model Tenant {
   invoiceDeliveryLogs   InvoiceDeliveryLog[]
   reminderTemplates     ReminderTemplate[]
   reminderConfig        ReminderConfig? // TASK-FEAT-102: Automated arrears config
+  messageTemplates      MessageTemplate[] // TASK-TMPL-001: Tenant-editable message templates
   creditBalances        CreditBalance[]
   statements            Statement[]
   staffDocuments        StaffDocument[]
@@ -694,9 +701,6 @@ model Tenant {
   // TASK-REL-101: Circuit Breaker Pending Sync Queue
   pendingSyncs PendingSync[]
 
-  // TASK-INT-101: Stitch Open Banking Integration
-  linkedBankAccounts LinkedBankAccount[]
-
   // TASK-WA-001: WhatsApp Message History
   whatsAppMessages WhatsAppMessage[]
 
@@ -738,6 +742,14 @@ model Tenant {
 
   // TASK-SDK-012: Feature Flags for SDK Rollout
   featureFlags FeatureFlag[]
+
+  // Orchestrator Workflow Runs — persisted invocations of executeWorkflow
+  workflowRuns WorkflowRun[]
+
+  // Per-tenant opt-in for the monthly MONTH_END orchestrator cron. Default OFF —
+  // the cron enumerates ACTIVE tenants and skips any where this flag is false,
+  // so no automation runs until an operator flips it explicitly.
+  orchestratorMonthEndEnabled Boolean @default(false) @map("orchestrator_month_end_enabled")
 
   // TASK-CLI-001: API Keys for CLI/MCP Access
   apiKeys ApiKey[]
@@ -1980,71 +1992,6 @@ model BankConnection {
   @@map("bank_connections")
 }
 
-// TASK-INT-101: Open Banking Integration via Stitch API
-enum LinkedBankAccountStatus {
-  PENDING // OAuth flow initiated, waiting for callback
-  ACTIVE // Account linked and syncing
-  EXPIRED // Consent expired (90 days)
-  REVOKED // User revoked access
-  ERROR // Sync error occurred
-}
-
-// TASK-INT-101: Linked bank accounts for Open Banking (Stitch API)
-// Stores encrypted access/refresh tokens for SA banks (FNB, Standard, Nedbank, ABSA, Capitec)
-model LinkedBankAccount {
-  id                  String                  @id @default(uuid())
-  tenantId            String                  @map("tenant_id")
-  bankName            String                  @map("bank_name") @db.VarChar(100)
-  accountHolderName   String?                 @map("account_holder_name") @db.VarChar(200)
-  accountNumberMasked String                  @map("account_number_masked") @db.VarChar(20) // Last 4 digits only
-  accountType         String                  @map("account_type") @db.VarChar(50) // CURRENT, SAVINGS, etc.
-  stitchAccountId     String                  @unique @map("stitch_account_id") @db.VarChar(100)
-  accessToken         String                  @map("access_token") @db.Text // AES-256 encrypted
-  refreshToken        String                  @map("refresh_token") @db.Text // AES-256 encrypted
-  tokenExpiresAt      DateTime                @map("token_expires_at")
-  consentExpiresAt    DateTime                @map("consent_expires_at") // 90-day regulatory limit
-  consentGrantedAt    DateTime                @map("consent_granted_at")
-  lastSyncedAt        DateTime?               @map("last_synced_at")
-  lastSyncError       String?                 @map("last_sync_error") @db.Text
-  syncErrorCount      Int                     @default(0) @map("sync_error_count")
-  status              LinkedBankAccountStatus @default(PENDING)
-  metadata            Json? // Additional bank-specific metadata
-  createdAt           DateTime                @default(now()) @map("created_at")
-  updatedAt           DateTime                @updatedAt @map("updated_at")
-
-  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  bankSyncHistory LinkedBankSyncEvent[]
-
-  @@index([tenantId, status])
-  @@index([consentExpiresAt])
-  @@index([lastSyncedAt])
-  @@map("linked_bank_accounts")
-}
-
-// TASK-INT-101: Bank sync event audit log
-// Tracks all sync operations for compliance and debugging
-model LinkedBankSyncEvent {
-  id                    String    @id @default(uuid())
-  linkedBankAccountId   String    @map("linked_bank_account_id")
-  syncType              String    @map("sync_type") @db.VarChar(50) // SCHEDULED, MANUAL, REFRESH_TOKEN
-  startedAt             DateTime  @default(now()) @map("started_at")
-  completedAt           DateTime? @map("completed_at")
-  transactionsFetched   Int?      @map("transactions_fetched")
-  transactionsImported  Int?      @map("transactions_imported")
-  transactionsDuplicate Int?      @map("transactions_duplicate")
-  status                String    @map("status") @db.VarChar(20) // SUCCESS, FAILED, PARTIAL
-  errorMessage          String?   @map("error_message") @db.Text
-  errorCode             String?   @map("error_code") @db.VarChar(50)
-  durationMs            Int?      @map("duration_ms")
-  createdAt             DateTime  @default(now()) @map("created_at")
-
-  linkedBankAccount LinkedBankAccount @relation(fields: [linkedBankAccountId], references: [id], onDelete: Cascade)
-
-  @@index([linkedBankAccountId, startedAt])
-  @@index([status])
-  @@map("linked_bank_sync_events")
-}
-
 // TASK-TRANS-017: Transaction Categorization Accuracy Tracking
 enum MetricEventType {
   CATEGORIZED
@@ -2192,6 +2139,48 @@ model ReminderTemplate {
   @@unique([tenantId, stage])
   @@index([tenantId])
   @@map("reminder_templates")
+}
+
+// TASK-TMPL-001: Tenant-Editable Message Templates
+// Unified model for all outbound message templates (reminders, invoice delivery,
+// welcome pack, statement delivery, admin summaries). Each template row is a
+// tenant override; if no row exists for a (tenantId, key, channel) triple, the
+// resolver falls back to the coded DEFAULT_TEMPLATES.
+//
+// Placeholders per key are documented in
+// apps/api/src/database/constants/message-template-defaults.ts.
+model MessageTemplate {
+  id        String                 @id @default(uuid())
+  tenantId  String                 @map("tenant_id")
+  key       MessageTemplateKey
+  channel   MessageTemplateChannel
+  subject   String?                @db.VarChar(500)
+  body      String                 @db.Text
+  isDefault Boolean                @default(false) @map("is_default")
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key, channel])
+  @@index([tenantId])
+  @@map("message_templates")
+}
+
+enum MessageTemplateKey {
+  ARREARS_REMINDER_FRIENDLY
+  ARREARS_REMINDER_FIRM
+  ARREARS_REMINDER_FINAL
+  INVOICE_DELIVERY
+  WELCOME_PACK
+  STATEMENT_DELIVERY
+  INVOICE_SCHEDULER_ADMIN_SUMMARY
+}
+
+enum MessageTemplateChannel {
+  EMAIL
+  WHATSAPP
+  SMS
 }
 
 // TASK-USER-001: Multi-Tenant User Role Assignment
@@ -4246,6 +4235,42 @@ model FeatureFlag {
   @@unique([tenantId, flag])
   @@index([tenantId])
   @@map("feature_flags")
+}
+
+// ============================================
+// Orchestrator Workflow Runs
+// Persists every invocation of OrchestratorAgent.executeWorkflow so operators
+// can inspect current state, replay history, and gate month-end automation
+// on a per-tenant basis. See apps/api/src/agents/orchestrator/workflow-run.
+// ============================================
+
+enum WorkflowRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  AWAITING_ESCALATION
+}
+
+model WorkflowRun {
+  id           String            @id @default(uuid())
+  tenantId     String            @map("tenant_id")
+  workflowType String            @map("workflow_type") @db.VarChar(50)
+  status       WorkflowRunStatus @default(RUNNING)
+  triggeredBy  String            @map("triggered_by") @db.VarChar(30)
+  currentStep  String?           @map("current_step") @db.VarChar(80)
+  input        Json?
+  output       Json?
+  error        String?           @db.Text
+  escalatedTo  String?           @map("escalated_to") @db.VarChar(120)
+  startedAt    DateTime          @default(now()) @map("started_at")
+  completedAt  DateTime?         @map("completed_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startedAt])
+  @@index([tenantId, workflowType, startedAt])
+  @@index([status, startedAt])
+  @@map("workflow_runs")
 }
 
 // TASK-STUB-012: Shadow Comparison persistence for SHADOW mode analysis

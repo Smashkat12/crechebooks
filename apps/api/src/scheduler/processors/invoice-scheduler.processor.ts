@@ -35,6 +35,7 @@ import { EnrollmentStatus } from '../../database/entities/enrollment.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { InvoiceBatchCompletedEvent } from '../../database/events/domain-events';
 import { EmailService } from '../../integrations/email/email.service';
+import { MessageTemplateResolverService } from '../../database/services/message-template-resolver.service';
 
 /** Batch size for processing enrollments */
 const BATCH_SIZE = 10;
@@ -62,6 +63,7 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly emailService: EmailService,
+    private readonly templateResolver: MessageTemplateResolverService,
   ) {
     super(QUEUE_NAMES.INVOICE_GENERATION);
   }
@@ -377,36 +379,44 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
       return;
     }
 
-    const subject =
+    // Build the error lines block once so the template variable is a single
+    // interpolated string (keeps the coded default readable).
+    const errorLines =
       result.errorCount > 0
+        ? `Errors:\n${result.errors
+            .slice(0, 10)
+            .map((e) => `- ${e.enrollmentId}: ${e.error}`)
+            .join('\n')}${
+            result.errors.length > 10
+              ? `\n... and ${result.errors.length - 10} more errors`
+              : ''
+          }\n`
+        : '';
+
+    const rendered = await this.templateResolver.resolveAndRender(
+      tenantId,
+      'INVOICE_SCHEDULER_ADMIN_SUMMARY',
+      'EMAIL',
+      {
+        tenantName: tenant.name,
+        periodLabel: billingMonth,
+        totalEnrollments: result.totalEnrollments,
+        successCount: result.successCount,
+        errorCount: result.errorCount,
+        skippedCount: result.skippedCount,
+        durationSeconds: (result.durationMs / 1000).toFixed(1),
+        errorLines,
+      },
+    );
+
+    // Preserve the "…with Errors" subject flavour when the tenant hasn't
+    // customized the subject (empty errorLines = happy path).
+    const subject =
+      rendered?.subject ??
+      (result.errorCount > 0
         ? `Invoice Generation Completed with Errors - ${billingMonth}`
-        : `Invoice Generation Completed - ${billingMonth}`;
-
-    const body = `
-Invoice Generation Summary for ${tenant.name}
-Billing Period: ${billingMonth}
-
-Total Enrollments: ${result.totalEnrollments}
-Successfully Generated: ${result.successCount}
-Skipped (existing): ${result.skippedCount}
-Errors: ${result.errorCount}
-Duration: ${(result.durationMs / 1000).toFixed(1)}s
-
-${
-  result.errorCount > 0
-    ? `
-Errors:
-${result.errors
-  .slice(0, 10)
-  .map((e) => `- ${e.enrollmentId}: ${e.error}`)
-  .join('\n')}
-${result.errors.length > 10 ? `... and ${result.errors.length - 10} more errors` : ''}
-`
-    : ''
-}
----
-This is an automated notification.
-    `.trim();
+        : `Invoice Generation Completed - ${billingMonth}`);
+    const body = rendered?.body ?? '';
 
     // Send admin summary email (same pattern as ArrearsReminderJob.sendAdminSummary).
     // COMMS_DISABLED gate is enforced inside EmailService — no extra gate needed here.

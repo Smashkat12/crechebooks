@@ -151,20 +151,22 @@ describe('SdkSemanticValidator', () => {
     });
 
     it('parses LLM response with issues correctly', async () => {
+      const content = JSON.stringify({
+        isSemanticValid: false,
+        semanticConfidence: 40,
+        documentType: 'unknown',
+        issues: [
+          {
+            severity: 'ERROR',
+            code: 'OCR_CORRUPTION',
+            description: 'Many descriptions contain gibberish characters',
+          },
+        ],
+        summary: 'Document appears corrupted.',
+      });
       claudeClient.sendMessage.mockResolvedValueOnce({
-        content: JSON.stringify({
-          isSemanticValid: false,
-          semanticConfidence: 40,
-          documentType: 'unknown',
-          issues: [
-            {
-              severity: 'ERROR',
-              code: 'OCR_CORRUPTION',
-              description: 'Many descriptions contain gibberish characters',
-            },
-          ],
-          summary: 'Document appears corrupted.',
-        }),
+        content,
+        contentBlocks: [{ type: 'text', text: content }],
         model: 'claude-3-5-haiku-20241022',
         usage: { inputTokens: 150, outputTokens: 60 },
         stopReason: 'end_turn',
@@ -180,6 +182,7 @@ describe('SdkSemanticValidator', () => {
     it('falls back gracefully when LLM returns malformed JSON', async () => {
       claudeClient.sendMessage.mockResolvedValueOnce({
         content: 'not json at all',
+        contentBlocks: [{ type: 'text', text: 'not json at all' }],
         model: 'claude-3-5-haiku-20241022',
         usage: { inputTokens: 50, outputTokens: 10 },
         stopReason: 'end_turn',

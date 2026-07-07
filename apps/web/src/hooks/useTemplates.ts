@@ -1,61 +1,98 @@
 /**
  * Template Hooks
- * TASK-WEB-045: Payment Reminder Template Editor
+ * TASK-TMPL-001: Tenant-Editable Message Templates
  *
  * @module hooks/useTemplates
- * @description React Query hooks for managing reminder templates.
+ * @description React Query hooks for the settings/templates page. Fetches
+ * ARREARS_REMINDER_* templates from `/api/v1/templates` and adapts the wire
+ * shape (MessageTemplateResponseDto) into the ReminderTemplate shape the
+ * existing UI expects.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { AxiosError } from 'axios';
+import { apiClient } from '@/lib/api';
 
 /**
- * Template variable that can be inserted into templates
+ * Template variable that can be inserted into templates.
+ * The `key` values match the placeholder tokens supported by the backend
+ * MessageTemplateResolverService — `{parentName}` etc.
  */
 export interface TemplateVariable {
-  /** Variable placeholder (e.g., "parent_name") */
   key: string;
-  /** Display label (e.g., "Parent Name") */
   label: string;
-  /** Description of what the variable contains */
   description: string;
-  /** Example value for preview */
   example: string;
 }
 
 /**
- * Reminder template structure
+ * Reminder template shape consumed by the settings/templates UI.
+ *
+ * Note: `id` is the API row id when the tenant has a saved override, or a
+ * synthetic `<KEY>::<CHANNEL>` identifier when the resolver returned the
+ * coded default. The mutation hooks translate this back into the (key,
+ * channel) tuple the REST API needs.
  */
 export interface ReminderTemplate {
-  /** Unique template ID */
   id: string;
-  /** Template name */
   name: string;
-  /** Escalation level: FRIENDLY, FIRM, FINAL */
   escalationLevel: 'FRIENDLY' | 'FIRM' | 'FINAL';
-  /** Delivery channel */
   channel: 'email' | 'whatsapp';
-  /** Email subject (email templates only) */
   subject?: string;
-  /** Template body content */
   body: string;
-  /** Whether this is the default template */
   isDefault: boolean;
-  /** Last updated timestamp */
   updatedAt: string;
+  /**
+   * Backend key/channel pair — kept alongside `id` because mutations
+   * address templates by (key, channel), not by uuid.
+   */
+  key: MessageTemplateKey;
+  apiChannel: MessageTemplateChannel;
+}
+
+export type MessageTemplateKey =
+  | 'ARREARS_REMINDER_FRIENDLY'
+  | 'ARREARS_REMINDER_FIRM'
+  | 'ARREARS_REMINDER_FINAL'
+  | 'INVOICE_DELIVERY'
+  | 'WELCOME_PACK'
+  | 'STATEMENT_DELIVERY'
+  | 'INVOICE_SCHEDULER_ADMIN_SUMMARY';
+
+export type MessageTemplateChannel = 'EMAIL' | 'WHATSAPP' | 'SMS';
+
+/**
+ * Wire shape returned by GET /templates. Matches the MessageTemplateResponseDto
+ * on the API side.
+ */
+interface MessageTemplateResponse {
+  id: string | null;
+  tenantId: string;
+  key: MessageTemplateKey;
+  channel: MessageTemplateChannel;
+  subject: string | null;
+  body: string;
+  isDefault: boolean;
+  label: string;
+  placeholders: string[];
+  createdAt: string | null;
+  updatedAt: string | null;
 }
 
 /**
- * Available template variables
+ * Placeholders the reminder templates understand. Names match the backend
+ * substitution keys — MessageTemplateResolverService replaces `{parentName}`
+ * with the parent's first name, and so on.
  */
 export const TEMPLATE_VARIABLES: TemplateVariable[] = [
   {
-    key: 'parent_name',
+    key: 'parentName',
     label: 'Parent Name',
     description: 'Full name of the parent/guardian',
     example: 'John Smith',
   },
   {
-    key: 'child_name',
+    key: 'childName',
     label: 'Child Name',
     description: 'Name of the enrolled child',
     example: 'Emma Smith',
@@ -67,226 +104,161 @@ export const TEMPLATE_VARIABLES: TemplateVariable[] = [
     example: 'R1,500.00',
   },
   {
-    key: 'due_date',
+    key: 'dueDate',
     label: 'Due Date',
     description: 'Invoice due date',
     example: '15 January 2024',
   },
   {
-    key: 'days_overdue',
+    key: 'daysOverdue',
     label: 'Days Overdue',
     description: 'Number of days past due date',
     example: '7',
   },
   {
-    key: 'creche_name',
+    key: 'crecheName',
     label: 'Creche Name',
     description: 'Name of the creche/daycare',
     example: 'Sunshine Creche',
   },
   {
-    key: 'invoice_number',
+    key: 'invoiceNumber',
     label: 'Invoice Number',
     description: 'Invoice reference number',
     example: 'INV-2024-001',
   },
 ];
 
-/**
- * Default templates for each escalation level
- */
-const DEFAULT_TEMPLATES: Omit<ReminderTemplate, 'id' | 'updatedAt'>[] = [
-  {
-    name: 'Friendly Reminder - Email',
-    escalationLevel: 'FRIENDLY',
-    channel: 'email',
-    subject: 'Payment Reminder - Invoice from {creche_name}',
-    body: `Dear {parent_name},
-
-This is a friendly reminder that your invoice for {child_name}'s care is now overdue.
-
-Outstanding Amount: {amount}
-Due Date: {due_date}
-Days Overdue: {days_overdue}
-
-Please arrange payment at your earliest convenience.
-
-Kind regards,
-{creche_name}`,
-    isDefault: true,
-  },
-  {
-    name: 'Friendly Reminder - WhatsApp',
-    escalationLevel: 'FRIENDLY',
-    channel: 'whatsapp',
-    body: `Hi {parent_name}, this is a friendly reminder from {creche_name}. Your payment of {amount} for {child_name} is now {days_overdue} days overdue. Please arrange payment soon. Thank you!`,
-    isDefault: true,
-  },
-  {
-    name: 'Firm Reminder - Email',
-    escalationLevel: 'FIRM',
-    channel: 'email',
-    subject: 'Urgent: Payment Required - {creche_name}',
-    body: `Dear {parent_name},
-
-Your payment for {child_name}'s care is now significantly overdue and requires immediate attention.
-
-Outstanding Amount: {amount}
-Due Date: {due_date}
-Days Overdue: {days_overdue}
-
-Please note that continued non-payment may affect your child's enrollment status.
-
-Please contact us immediately to discuss payment arrangements.
-
-Regards,
-{creche_name}`,
-    isDefault: true,
-  },
-  {
-    name: 'Firm Reminder - WhatsApp',
-    escalationLevel: 'FIRM',
-    channel: 'whatsapp',
-    body: `URGENT: {parent_name}, your payment of {amount} for {child_name} at {creche_name} is {days_overdue} days overdue. Please settle immediately or contact us to discuss.`,
-    isDefault: true,
-  },
-  {
-    name: 'Final Notice - Email',
-    escalationLevel: 'FINAL',
-    channel: 'email',
-    subject: 'FINAL NOTICE: Immediate Payment Required - {creche_name}',
-    body: `Dear {parent_name},
-
-This is a FINAL NOTICE regarding your outstanding payment.
-
-Outstanding Amount: {amount}
-Due Date: {due_date}
-Days Overdue: {days_overdue}
-
-Failure to settle this account within 48 hours may result in:
-- Suspension of {child_name}'s enrollment
-- Referral to debt collection
-
-Please contact us immediately to avoid these actions.
-
-{creche_name}`,
-    isDefault: true,
-  },
-  {
-    name: 'Final Notice - WhatsApp',
-    escalationLevel: 'FINAL',
-    channel: 'whatsapp',
-    body: `FINAL NOTICE: {parent_name}, {amount} outstanding for {child_name} at {creche_name}. {days_overdue} days overdue. Pay within 48 hours to avoid enrollment suspension. Contact us urgently.`,
-    isDefault: true,
-  },
-];
-
-/**
- * Query key factory for templates
- */
 const templateKeys = {
   all: ['templates'] as const,
   lists: () => [...templateKeys.all, 'list'] as const,
   list: (channel: 'email' | 'whatsapp') => [...templateKeys.lists(), channel] as const,
   detail: (id: string) => [...templateKeys.all, 'detail', id] as const,
-  preview: (id: string) => [...templateKeys.all, 'preview', id] as const,
 };
 
-/**
- * Generate mock templates (simulating API response)
- */
-function generateMockTemplates(): ReminderTemplate[] {
-  return DEFAULT_TEMPLATES.map((template, index) => ({
-    ...template,
-    id: `template-${index + 1}`,
-    updatedAt: new Date().toISOString(),
-  }));
+/** Map wire key → the UI's escalation level literal. Non-reminder keys → null. */
+function keyToEscalationLevel(key: MessageTemplateKey): ReminderTemplate['escalationLevel'] | null {
+  switch (key) {
+    case 'ARREARS_REMINDER_FRIENDLY':
+      return 'FRIENDLY';
+    case 'ARREARS_REMINDER_FIRM':
+      return 'FIRM';
+    case 'ARREARS_REMINDER_FINAL':
+      return 'FINAL';
+    default:
+      return null;
+  }
 }
 
 /**
- * Hook to fetch templates by channel
+ * Synthesise a stable id for coded-default rows so the UI's selected-item
+ * state doesn't churn when the query refetches. Once a tenant saves an
+ * override the API returns a real uuid instead.
  */
+function templateId(row: MessageTemplateResponse): string {
+  return row.id ?? `${row.key}::${row.channel}`;
+}
+
+function adaptResponse(row: MessageTemplateResponse): ReminderTemplate | null {
+  const level = keyToEscalationLevel(row.key);
+  if (!level) return null;
+  const channel = row.channel === 'EMAIL' ? 'email' : row.channel === 'WHATSAPP' ? 'whatsapp' : null;
+  if (!channel) return null;
+  return {
+    id: templateId(row),
+    name: row.label,
+    escalationLevel: level,
+    channel,
+    subject: row.subject ?? undefined,
+    body: row.body,
+    isDefault: row.isDefault,
+    updatedAt: row.updatedAt ?? new Date(0).toISOString(),
+    key: row.key,
+    apiChannel: row.channel,
+  };
+}
+
+/** Fetch reminder templates for a channel (arrears keys only). */
 export function useTemplates(channel: 'email' | 'whatsapp') {
   return useQuery({
     queryKey: templateKeys.list(channel),
     queryFn: async (): Promise<ReminderTemplate[]> => {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/templates?channel=${channel}`);
-      // return response.json();
-
-      // Mock data for now
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return generateMockTemplates().filter(t => t.channel === channel);
+      const apiChannel: MessageTemplateChannel = channel === 'email' ? 'EMAIL' : 'WHATSAPP';
+      const { data } = await apiClient.get<MessageTemplateResponse[]>('/templates', {
+        params: { channel: apiChannel },
+      });
+      return data
+        .map(adaptResponse)
+        .filter((t): t is ReminderTemplate => t !== null);
     },
   });
 }
 
 /**
- * Hook to update a template
+ * Upsert a tenant's template override. `id` here is the local UI id — either
+ * the API row uuid or the synthetic `<KEY>::<CHANNEL>` id from the default;
+ * either way we look up the (key, channel) from the cached template list to
+ * address the correct row on the server.
  */
 export function useUpdateTemplate() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (data: { id: string; subject?: string; body: string }): Promise<ReminderTemplate> => {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/templates/${data.id}`, {
-      //   method: 'PATCH',
-      //   body: JSON.stringify(data),
-      // });
-      // return response.json();
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const templates = generateMockTemplates();
-      const template = templates.find(t => t.id === data.id);
-      if (!template) throw new Error('Template not found');
-
-      return {
-        ...template,
-        subject: data.subject,
-        body: data.body,
-        updatedAt: new Date().toISOString(),
-      };
+  return useMutation<
+    ReminderTemplate,
+    AxiosError,
+    { id: string; subject?: string; body: string; key: MessageTemplateKey; apiChannel: MessageTemplateChannel }
+  >({
+    mutationFn: async ({ key, apiChannel, subject, body }) => {
+      const { data } = await apiClient.put<MessageTemplateResponse>(
+        `/templates/${key}/${apiChannel}`,
+        { subject, body },
+      );
+      const adapted = adaptResponse(data);
+      if (!adapted) {
+        throw new Error(`Unexpected template response for ${key}/${apiChannel}`);
+      }
+      return adapted;
     },
-    onSuccess: (data) => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: templateKeys.lists() });
-      queryClient.setQueryData(templateKeys.detail(data.id), data);
+      queryClient.setQueryData(templateKeys.detail(updated.id), updated);
     },
   });
 }
 
-/**
- * Hook to reset a template to default
- */
+/** Revert to the coded default by deleting the tenant override. */
 export function useResetTemplate() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (id: string): Promise<ReminderTemplate> => {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const templates = generateMockTemplates();
-      const template = templates.find(t => t.id === id);
-      if (!template) throw new Error('Template not found');
-
-      return template;
+  return useMutation<
+    ReminderTemplate,
+    AxiosError,
+    { key: MessageTemplateKey; apiChannel: MessageTemplateChannel }
+  >({
+    mutationFn: async ({ key, apiChannel }) => {
+      const { data } = await apiClient.delete<MessageTemplateResponse>(
+        `/templates/${key}/${apiChannel}`,
+      );
+      const adapted = adaptResponse(data);
+      if (!adapted) {
+        throw new Error(`Unexpected template response for ${key}/${apiChannel}`);
+      }
+      return adapted;
     },
-    onSuccess: (data) => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: templateKeys.lists() });
-      queryClient.setQueryData(templateKeys.detail(data.id), data);
+      queryClient.setQueryData(templateKeys.detail(updated.id), updated);
     },
   });
 }
 
 /**
- * Preview a template with sample data
+ * Preview a template body with sample values. Purely client-side — matches
+ * the substitution behaviour of the backend resolver.
  */
 export function usePreviewTemplate() {
   return useMutation({
     mutationFn: async (data: { body: string; subject?: string }): Promise<{ subject?: string; body: string }> => {
-      // Replace variables with sample values
       let previewBody = data.body;
       let previewSubject = data.subject;
 

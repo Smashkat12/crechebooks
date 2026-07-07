@@ -13,15 +13,37 @@ if (!E2E_TEST_EMAIL || !E2E_TEST_PASSWORD) {
 }
 
 /**
- * Auth fixture that provides a properly authenticated page
- * Reusable login helper for all E2E tests
- * Credentials are sourced from environment variables (E2E_TEST_EMAIL, E2E_TEST_PASSWORD)
+ * Auth fixture that provides a properly authenticated page.
+ *
+ * IMPORTANT: with `globalSetup` + `storageState`, most tests already start
+ * authenticated. `login()` here is now a "get me to the dashboard" helper —
+ * if the shared storage state is present the browser just navigates there;
+ * only when a spec runs with cleared storage (e.g. auth.spec.ts) does it fall
+ * back to filling the login form. This avoids hammering the dev-login
+ * endpoint's rate limit (5/15min per IP) once per test.
+ *
+ * Credentials are sourced from environment variables (E2E_TEST_EMAIL, E2E_TEST_PASSWORD).
  */
 export async function login(page: any) {
+  // Fast path — the shared storageState from globalSetup means we're already
+  // authenticated. Just go to the dashboard.
+  await page.goto('/dashboard');
+
+  // If we land on the dashboard, we're done.
+  try {
+    await page.waitForURL(/.*dashboard/, { timeout: 3000 });
+    return;
+  } catch {
+    // Fall through to full login flow (spec cleared storageState).
+  }
+
   await page.goto('/login');
   await page.getByLabel(/email/i).fill(E2E_TEST_EMAIL);
   await page.getByLabel(/password/i).fill(E2E_TEST_PASSWORD);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  // The login page has two buttons matching /sign in/i — "Sign in" (form
+  // submit) and "Sign in with SSO instead". Use exact match on the submit
+  // button to avoid strict-mode selector violations.
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
   // Wait for login to complete - dashboard should be loaded
   await page.waitForURL(/.*dashboard/, { timeout: 15000 });

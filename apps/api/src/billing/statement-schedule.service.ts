@@ -16,17 +16,16 @@
  * finalizing/delivering) statements must not surprise tenants who never
  * asked for it, and delivery can reach real parents. Two independent gates:
  *
- *   1. Per-tenant enablement — isStatementScheduleEnabled() below. There is
- *      currently NO tenant-level column for this (checked: Tenant model has
- *      no generic "settings" JSON and no dedicated config table for this
- *      feature — cf. ReminderConfig for the equivalent arrears-reminder
- *      pattern). Until schema-guardian adds one (recommendation: a boolean
- *      column, e.g. `Tenant.statementScheduleEnabled @default(false)`, or a
- *      small `StatementScheduleConfig` model mirroring ReminderConfig),
- *      isStatementScheduleEnabled() always returns false — bootstrap
- *      enrolls ZERO tenants. This keeps the producer fully wired and ready,
- *      while guaranteeing no tenant is auto-enrolled until product/schema
- *      sign-off lands. See billing-engineer mental model for tracking.
+ *   1. Per-tenant enablement — isStatementScheduleEnabled() below reads the
+ *      `tenants.statement_schedule_enabled` column (migration
+ *      20260707120000_add_statement_schedule_opt_in). The column defaults to
+ *      false for every existing and new tenant, so bootstrap enrolls only
+ *      tenants that have been explicitly opted in (via the admin PATCH
+ *      /admin/tenants/:id endpoint, or a direct schema flip). This mirrors
+ *      the ReminderConfig-style opt-in pattern for arrears reminders — kept
+ *      as a single boolean here because StatementSchedulerProcessor only
+ *      reads tenant.name / tenant.email, so no per-tenant cron or
+ *      autoFinalize/autoDeliver defaults belong on the Tenant model yet.
  *
  *   2. autoFinalize/autoDeliver default to false in the scheduled job data —
  *      even once a tenant is opted in, the cron only generates DRAFT
@@ -77,12 +76,17 @@ export class StatementScheduleService implements OnApplicationBootstrap {
   }
 
   /**
-   * Per-tenant opt-in gate — see OPT-IN SAFETY note in file header. Always
-   * false until schema-guardian adds a tenant-level enablement column;
-   * intentionally NOT reading an unrelated JSON field as a workaround.
+   * Per-tenant opt-in gate — see OPT-IN SAFETY note in file header. Reads
+   * `tenants.statement_schedule_enabled`. Returns false for unknown tenants
+   * (defensive: caller filters ACTIVE tenants only, so this is belt-and-
+   * braces against a delete-race between the list query and this lookup).
    */
-  private isStatementScheduleEnabled(_tenantId: string): boolean {
-    return false;
+  private async isStatementScheduleEnabled(tenantId: string): Promise<boolean> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { statementScheduleEnabled: true },
+    });
+    return tenant?.statementScheduleEnabled ?? false;
   }
 
   /**
@@ -94,15 +98,18 @@ export class StatementScheduleService implements OnApplicationBootstrap {
    * does not exist, so repeated cold-starts are safe.
    */
   async onApplicationBootstrap(): Promise<void> {
+    // Fetch ACTIVE tenants together with their opt-in flag in a single query,
+    // then filter in memory — avoids the N+1 that a per-tenant
+    // isStatementScheduleEnabled() lookup would otherwise incur on cold-start.
     const activeTenants = await this.prisma.tenant.findMany({
       where: {
         subscriptionStatus: SubscriptionStatus.ACTIVE,
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, statementScheduleEnabled: true },
     });
 
-    const optedInTenants = activeTenants.filter((tenant) =>
-      this.isStatementScheduleEnabled(tenant.id),
+    const optedInTenants = activeTenants.filter(
+      (tenant) => tenant.statementScheduleEnabled === true,
     );
 
     if (optedInTenants.length === 0) {

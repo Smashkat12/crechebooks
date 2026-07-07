@@ -68,7 +68,6 @@ describe('RecipientResolverService', () => {
     await prisma.categorizationMetric.deleteMany({});
     await prisma.categorizationJournal.deleteMany({});
     await prisma.transaction.deleteMany({});
-    await prisma.linkedBankAccount.deleteMany({});
     await prisma.calculationItemCache.deleteMany({});
     await prisma.simplePayConnection.deleteMany({});
     await prisma.user.deleteMany({});

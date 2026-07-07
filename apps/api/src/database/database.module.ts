@@ -30,6 +30,7 @@ import { PaymentAllocationService } from './services/payment-allocation.service'
 import { ArrearsService } from './services/arrears.service';
 import { ReminderRepository } from './repositories/reminder.repository';
 import { ReminderService } from './services/reminder.service';
+import { MessageTemplateResolverService } from './services/message-template-resolver.service';
 import { VatService } from './services/vat.service';
 import { VatAdjustmentService } from './services/vat-adjustment.service';
 import { PayeService } from './services/paye.service';
@@ -110,10 +111,8 @@ import { ParentConsentFormsPdfService } from './services/parent-consent-forms-pd
 import { ParentOnboardingService } from './services/parent-onboarding.service';
 // TASK-REPORTS-005: Missing Report Types
 import { CashFlowReportService } from './services/cash-flow-report.service';
-import { AgedPayablesService } from './services/aged-payables.service';
 import { ReminderTemplateService } from '../billing/reminder-template.service';
 import { EmailModule } from '../integrations/email/email.module';
-import { MailgunModule } from '../integrations/mailgun/mailgun.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { WhatsAppModule } from '../integrations/whatsapp/whatsapp.module';
 import { AgentMemoryModule } from '../agents/memory/agent-memory.module';
@@ -133,7 +132,8 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
 @Module({
   imports: [
     EmailModule,
-    MailgunModule, // provides CommsGuardService for InvoiceDeliveryService staging gate
+    // CommsGuardService for InvoiceDeliveryService staging gate is provided
+    // globally by CommsGuardModule (AppModule).
     forwardRef(() => WhatsAppModule),
     forwardRef(() => AgentMemoryModule),
     forwardRef(() => AuditTrailModule), // TASK-SDK-011: Structured Audit Trail
@@ -182,6 +182,7 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ArrearsService,
     ReminderRepository,
     ReminderService,
+    MessageTemplateResolverService,
     VatService,
     VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,
@@ -264,7 +265,6 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ParentOnboardingService,
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
-    AgedPayablesService,
     // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
     ReminderTemplateService,
   ],
@@ -300,6 +300,7 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ArrearsService,
     ReminderRepository,
     ReminderService,
+    MessageTemplateResolverService,
     VatService,
     VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,
@@ -383,7 +384,6 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ParentOnboardingService,
     // TASK-REPORTS-005: Missing Report Types
     CashFlowReportService,
-    AgedPayablesService,
     // TASK-PAY-017: Moved from SchedulerModule/BillingSchedulerModule to break dual-registration
     ReminderTemplateService,
   ],

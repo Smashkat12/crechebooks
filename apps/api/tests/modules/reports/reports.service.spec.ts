@@ -15,7 +15,6 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { RedisService } from '../../../src/common/redis/redis.service';
 import { FinancialReportService } from '../../../src/database/services/financial-report.service';
 import { CashFlowReportService } from '../../../src/database/services/cash-flow-report.service';
-import { AgedPayablesService } from '../../../src/database/services/aged-payables.service';
 import { ArrearsService } from '../../../src/database/services/arrears.service';
 import { VatService } from '../../../src/database/services/vat.service';
 import { PdfGeneratorService } from '../../../src/modules/reports/pdf-generator.service';
@@ -148,14 +147,6 @@ describe('ReportsService', () => {
       getCashFlowSummary: jest.fn(),
     };
 
-    const mockAgedPayablesService = {
-      generateAgedPayablesReport: jest.fn(),
-      isFeatureAvailable: jest.fn().mockReturnValue(false),
-      getFeatureMessage: jest
-        .fn()
-        .mockReturnValue('Supplier bills feature coming soon'),
-    };
-
     const mockArrearsService = {
       getArrearsReport: jest.fn(),
     };
@@ -182,10 +173,6 @@ describe('ReportsService', () => {
         {
           provide: CashFlowReportService,
           useValue: mockCashFlowReportService,
-        },
-        {
-          provide: AgedPayablesService,
-          useValue: mockAgedPayablesService,
         },
         { provide: ArrearsService, useValue: mockArrearsService },
         { provide: VatService, useValue: mockVatService },

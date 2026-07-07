@@ -9,6 +9,7 @@ import { PrismaModule } from './database/prisma';
 import { ApiModule } from './api/api.module';
 import { PublicModule } from './api/public/public.module';
 import { AdminModule } from './api/admin/admin.module';
+import { OrchestratorAdminModule } from './api/admin/orchestrator/orchestrator-admin.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -20,15 +21,19 @@ import { LoggerModule } from './common/logger';
 import { CircuitBreakerModule } from './integrations/circuit-breaker';
 import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
-import { BankingModule } from './integrations/banking';
 import { AccountingModule } from './integrations/accounting/accounting.module';
 import { MailgunInboundModule } from './integrations/mailgun-inbound/mailgun-inbound.module';
 import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
 import { ReportsModule } from './modules/reports';
+import { CommsGuardModule } from './common/services/comms-guard/comms-guard.module';
 
 @Module({
   imports: [
     ConfigModule,
+    // Global CommsGuardService — staging safety gate that short-circuits
+    // outbound comms when COMMS_DISABLED=true. Injected by EmailService,
+    // TwilioWhatsAppService, InvoiceDeliveryService, etc.
+    CommsGuardModule,
     // Global event emitter for domain events (enrollment.completed, staff.created, etc.)
     EventEmitterModule.forRoot(),
     // TASK-INFRA-005: Structured JSON logging with correlation ID
@@ -65,12 +70,12 @@ import { ReportsModule } from './modules/reports';
     ApiModule,
     PublicModule,
     AdminModule,
+    OrchestratorAdminModule, // /admin/orchestrator/* — SUPER_ADMIN workflow triggers
     SchedulerModule,
     WebhookModule,
     MetricsModule, // TASK-PERF-104: Database pool metrics endpoint
     CspModule, // TASK-SEC-103: CSP configuration and violation reporting
     WebSocketModule, // TASK-FEAT-101: Real-time Dashboard WebSocket
-    BankingModule, // TASK-INT-101: Bank API Integration (Stitch Open Banking)
     AccountingModule.forRoot(), // Provider-agnostic accounting abstraction (Xero, Stub.africa)
     MailgunInboundModule, // FNB statement ingestion via Mailgun-forwarded emails
     ReportsModule, // TASK-REPORTS-002: Reports API Module

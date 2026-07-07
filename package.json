@@ -43,10 +43,7 @@
     "dev:infra": "docker compose -f docker-compose.dev.yml up -d",
     "dev:infra:down": "docker compose -f docker-compose.dev.yml down",
     "dev:infra:reset": "docker compose -f docker-compose.dev.yml down -v && docker compose -f docker-compose.dev.yml up -d",
-    "deploy": "./scripts/deploy-railway.sh",
-    "cli": "pnpm --filter @crechebooks/cli start",
-    "cli:dev": "pnpm --filter @crechebooks/cli dev",
-    "cli:build": "pnpm --filter @crechebooks/cli build"
+    "deploy": "./scripts/deploy-railway.sh"
   },
   "devDependencies": {
     "@claude-flow/embeddings": "3.0.0-alpha.7",

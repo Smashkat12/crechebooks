@@ -18,10 +18,49 @@ import { ConfigService } from '@nestjs/config';
 
 /**
  * Message format for Claude API requests.
+ *
+ * `content` accepts either a plain string (single-turn chat) or an array of
+ * content blocks — the latter is required to carry `tool_use` / `tool_result`
+ * blocks in the multi-turn tool-use loop.
  */
 export interface ClaudeMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | ClaudeContentBlock[];
+}
+
+/**
+ * Content block shapes accepted by the Anthropic Messages API. We keep the
+ * union narrow to what our tool-use loop actually round-trips: text (both
+ * directions), tool_use (LLM → us), tool_result (us → LLM).
+ */
+export type ClaudeContentBlock =
+  | { type: 'text'; text: string }
+  | {
+      type: 'tool_use';
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    }
+  | {
+      type: 'tool_result';
+      tool_use_id: string;
+      content: string;
+      is_error?: boolean;
+    };
+
+/**
+ * Anthropic tool definition (subset). Matches the shape emitted by
+ * {@link AgentToolRegistry.getToolDefinitionsForAgent}.
+ */
+export interface ClaudeToolDefinition {
+  name: string;
+  description: string;
+  input_schema: {
+    type: 'object';
+    properties: Record<string, unknown>;
+    required?: string[];
+    additionalProperties?: boolean;
+  };
 }
 
 /**
@@ -40,14 +79,18 @@ export interface ClaudeRequestOptions {
   temperature?: number;
   /** Optional request metadata for logging */
   metadata?: Record<string, string>;
+  /** Tool definitions for the LLM tool_use path */
+  tools?: ClaudeToolDefinition[];
 }
 
 /**
  * Response from Claude API.
  */
 export interface ClaudeResponse {
-  /** The assistant's response text */
+  /** The assistant's flattened text content (joined text blocks) */
   content: string;
+  /** All content blocks from the response, in order — needed for the tool-use loop */
+  contentBlocks: ClaudeContentBlock[];
   /** Model that was used */
   model: string;
   /** Token usage statistics */
@@ -135,7 +178,7 @@ export class ClaudeClientService implements OnModuleInit {
     const maxTokens = options.maxTokens ?? 1024;
     const temperature = options.temperature ?? 0;
 
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       model,
       max_tokens: maxTokens,
       temperature,
@@ -145,6 +188,9 @@ export class ClaudeClientService implements OnModuleInit {
         content: m.content,
       })),
     };
+    if (options.tools && options.tools.length > 0) {
+      requestBody.tools = options.tools;
+    }
 
     const startTime = Date.now();
     const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -176,21 +222,32 @@ export class ClaudeClientService implements OnModuleInit {
         );
       }
 
+      // The Anthropic Messages API returns a mix of content-block types
+      // (text + tool_use). We keep the raw blocks around so the tool-use
+      // loop can round-trip them, and flatten just the text for the legacy
+      // `content` string field.
       const data = (await response.json()) as {
-        content: Array<{ type: string; text: string }>;
+        content: Array<Record<string, unknown>>;
         model: string;
         usage: { input_tokens: number; output_tokens: number };
         stop_reason: string;
       };
 
-      // Extract text content from response
-      const textContent = data.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text)
+      const contentBlocks: ClaudeContentBlock[] = data.content
+        .map((raw) => normaliseContentBlock(raw))
+        .filter((b): b is ClaudeContentBlock => b !== null);
+
+      const textContent = contentBlocks
+        .filter(
+          (b): b is Extract<ClaudeContentBlock, { type: 'text' }> =>
+            b.type === 'text',
+        )
+        .map((b) => b.text)
         .join('\n');
 
       const result: ClaudeResponse = {
         content: textContent,
+        contentBlocks,
         model: data.model,
         usage: {
           inputTokens: data.usage.input_tokens,
@@ -242,4 +299,33 @@ export class ClaudeClientService implements OnModuleInit {
     });
     return response.content;
   }
+}
+
+/**
+ * Narrow a raw content block from the Anthropic response into a typed
+ * {@link ClaudeContentBlock}. Unknown types are dropped (returned as null)
+ * — the tool-use loop only cares about text and tool_use blocks.
+ */
+function normaliseContentBlock(
+  raw: Record<string, unknown>,
+): ClaudeContentBlock | null {
+  const type = raw['type'];
+  if (type === 'text' && typeof raw['text'] === 'string') {
+    return { type: 'text', text: raw['text'] };
+  }
+  if (
+    type === 'tool_use' &&
+    typeof raw['id'] === 'string' &&
+    typeof raw['name'] === 'string' &&
+    typeof raw['input'] === 'object' &&
+    raw['input'] !== null
+  ) {
+    return {
+      type: 'tool_use',
+      id: raw['id'],
+      name: raw['name'],
+      input: raw['input'] as Record<string, unknown>,
+    };
+  }
+  return null;
 }

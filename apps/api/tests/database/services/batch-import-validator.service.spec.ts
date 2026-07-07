@@ -49,6 +49,7 @@ describe('BatchImportValidatorService', () => {
   beforeEach(async () => {
     // Clean up
     await prisma.auditLog.deleteMany({});
+    await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});
     await prisma.tenant.deleteMany({
       where: { email: { contains: 'test-batch' } },
@@ -70,6 +71,7 @@ describe('BatchImportValidatorService', () => {
 
   afterEach(async () => {
     await prisma.auditLog.deleteMany({});
+    await prisma.categorization.deleteMany({});
     await prisma.transaction.deleteMany({});
     if (testTenant) {
       await prisma.tenant
@@ -426,32 +428,6 @@ describe('BatchImportValidatorService', () => {
         (e) => e.field === 'date' && e.severity === ValidationSeverity.WARNING,
       );
       expect(dateWarning).toBeDefined();
-    });
-  });
-
-  describe('import history', () => {
-    it('should save import history record', () => {
-      const record = service.saveImportHistory({
-        tenantId: testTenant.id,
-        batchId: 'batch-123',
-        fileName: 'test.csv',
-        importedAt: new Date(),
-        totalRows: 100,
-        importedRows: 95,
-        skippedRows: 5,
-        errorLog: [
-          {
-            rowNumber: 3,
-            field: 'date',
-            severity: ValidationSeverity.ERROR,
-            message: 'Invalid date',
-          },
-        ],
-        status: 'PARTIAL',
-      });
-
-      expect(record.id).toBeDefined();
-      expect(record.status).toBe('PARTIAL');
     });
   });
 

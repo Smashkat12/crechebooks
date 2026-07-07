@@ -1,9 +1,0 @@
-{
-  "schema": 1,
-  "algorithm": "ed25519",
-  "manifest_sha256": "f33613d1faa53cdae7aa79b57d8d989bcb11ca1c62843504e9ca02d475ee3394",
-  "signature": "g/T+nWF7Ras02SDk645LZTtGpDZiHirycU+mubiVxUGuleddbLvbdyE04vUvQFPfPxA4OsnZDxgCl58CBMocCA==",
-  "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAZRPZ/d3UgG+wR4DtI4K752v10tKCI9lmYu2uLO3DwSo=\n-----END PUBLIC KEY-----\n",
-  "signed_at": "2026-06-22T07:51:07.233Z",
-  "signer": null
-}

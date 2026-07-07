@@ -3,8 +3,8 @@
  *
  * Reads the COMMS_DISABLED environment variable and exposes a single
  * isDisabled() predicate. When true, all outbound communication adapters
- * (MailgunService, EmailService, TwilioWhatsAppService) short-circuit their
- * send paths and return a mocked response without hitting external APIs.
+ * (EmailService, TwilioWhatsAppService, InvoiceDeliveryService) short-circuit
+ * their send paths and return a mocked response without hitting external APIs.
  *
  * Usage: inject into an adapter, call this.commsGuard.isDisabled() before send.
  *

@@ -37,7 +37,6 @@ export type {
 export * from './payee-alias.service';
 export * from './amount-variation.service';
 export type {
-  AmountThresholdConfig,
   Statistics as PayeeStatistics,
   VariationAnalysis,
 } from './amount-variation.service';
@@ -66,7 +65,6 @@ export type {
   RowValidationError,
   RowValidationResult,
   BatchValidationResult,
-  ImportHistoryRecord,
   ColumnMapping,
 } from './batch-import-validator.service';
 
@@ -116,9 +114,3 @@ export type {
 // TASK-REPORTS-005: Missing Report Types
 export * from './cash-flow-report.service';
 export type { CashFlowStatement } from './cash-flow-report.service';
-export * from './aged-payables.service';
-export type {
-  AgedPayablesReport,
-  SupplierAgingBucket,
-  SupplierAging,
-} from './aged-payables.service';

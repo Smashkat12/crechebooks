@@ -13,6 +13,7 @@ import { ReminderRepository } from '../../repositories/reminder.repository';
 import { ArrearsService } from '../arrears.service';
 import { EmailService } from '../../../integrations/email/email.service';
 import { WhatsAppProviderService } from '../../../integrations/whatsapp/services/whatsapp-provider.service';
+import { MessageTemplateResolverService } from '../message-template-resolver.service';
 import { DeliveryChannel, ReminderStatus } from '../../dto/reminder.dto';
 
 describe('ReminderService.sendManualParentReminders', () => {
@@ -94,6 +95,11 @@ describe('ReminderService.sendManualParentReminders', () => {
         { provide: ArrearsService, useValue: { getArrearsReport: jest.fn() } },
         { provide: EmailService, useValue: mockEmailService },
         { provide: WhatsAppProviderService, useValue: mockWhatsAppService },
+        // TASK-TMPL-001: use the real resolver. mockPrisma has no
+        // messageTemplate mock, so its findUnique throws → the resolver
+        // falls through to the coded default. That's the exact production
+        // behaviour we want to exercise here.
+        MessageTemplateResolverService,
       ],
     }).compile();
 

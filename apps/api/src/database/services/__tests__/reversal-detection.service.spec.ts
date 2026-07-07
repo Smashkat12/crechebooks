@@ -351,24 +351,18 @@ describe('ReversalDetectionService', () => {
 
       transactionRepository.findById.mockResolvedValueOnce(reversal as any);
       transactionRepository.findById.mockResolvedValueOnce(original as any);
-      // Mock prisma access for update
-      (transactionRepository as any).prisma = {
-        transaction: {
-          update: jest.fn().mockResolvedValue({}),
-        },
-      };
+      transactionRepository.update.mockResolvedValue({} as any);
 
       await service.linkReversalWithTenant(TENANT_ID, reversalId, originalId);
 
-      expect(
-        (transactionRepository as any).prisma.transaction.update,
-      ).toHaveBeenCalledWith({
-        where: { id: reversalId },
-        data: {
+      expect(transactionRepository.update).toHaveBeenCalledWith(
+        TENANT_ID,
+        reversalId,
+        {
           reversesTransactionId: originalId,
           isReversal: true,
         },
-      });
+      );
 
       expect(auditLogService.logAction).toHaveBeenCalledWith({
         tenantId: TENANT_ID,

@@ -19,6 +19,7 @@ import { IntelligenceEngineService } from './intelligence-engine.service';
 import { PersistenceConfig } from './persistence-config';
 import { SonaBootstrapService } from './sona-bootstrap.service';
 import { PgVectorRepository } from '../../database/repositories/pgvector.repository';
+import { AgentToolRegistry } from './tools/tool-registry.service';
 
 @Module({
   // PrismaService is globally available via PrismaModule (@Global),
@@ -34,6 +35,7 @@ import { PgVectorRepository } from '../../database/repositories/pgvector.reposit
     PersistenceConfig,
     SonaBootstrapService,
     PgVectorRepository, // TASK-PGVEC-001: pgvector backend for RuvectorService
+    AgentToolRegistry, // Real tool bindings for LLM tool_use path
   ],
   exports: [
     SdkAgentFactory,
@@ -44,6 +46,7 @@ import { PgVectorRepository } from '../../database/repositories/pgvector.reposit
     PersistenceConfig,
     SonaBootstrapService,
     PgVectorRepository,
+    AgentToolRegistry,
   ],
 })
 export class SdkAgentModule {}

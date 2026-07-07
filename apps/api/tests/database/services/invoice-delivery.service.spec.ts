@@ -18,6 +18,7 @@ import { AuditLogService } from '../../../src/database/services/audit-log.servic
 import { EmailService } from '../../../src/integrations/email/email.service';
 import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
 import { WhatsAppProviderService } from '../../../src/integrations/whatsapp/services/whatsapp-provider.service';
+import { MessageTemplateResolverService } from '../../../src/database/services/message-template-resolver.service';
 import { EmailTemplateService } from '../../../src/common/services/email-template/email-template.service';
 import { InvoicePdfService } from '../../../src/database/services/invoice-pdf.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -174,6 +175,9 @@ describe('InvoiceDeliveryService', () => {
           provide: CommsGuardService,
           useValue: { isDisabled: jest.fn().mockReturnValue(false) },
         },
+        // TASK-TMPL-001: real resolver — a tenant with no override falls
+        // through to the coded default, preserving pre-template behaviour.
+        MessageTemplateResolverService,
       ],
     }).compile();
 

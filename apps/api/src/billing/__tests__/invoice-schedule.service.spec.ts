@@ -36,6 +36,10 @@ describe('InvoiceScheduleService', () => {
     mockInvoiceQueue = {
       add: jest.fn().mockResolvedValue({ id: 'job-1' }),
       removeRepeatable: jest.fn().mockResolvedValue(undefined),
+      // BUGFIX (cancel-with-wrong-cron): cancelSchedule() now looks up the
+      // tenant's persisted repeatable via getRepeatableJobs() before removal.
+      getRepeatableJobs: jest.fn().mockResolvedValue([]),
+      removeRepeatableByKey: jest.fn().mockResolvedValue(undefined),
     };
 
     mockPrisma = {
@@ -223,13 +227,72 @@ describe('InvoiceScheduleService', () => {
       );
     });
 
-    it('should invoke queue.removeRepeatable with default cron and this tenant jobId only', async () => {
+    it('should fall back to removeRepeatable with default cron when no persisted repeatable is found', async () => {
+      mockInvoiceQueue.getRepeatableJobs.mockResolvedValue([]);
+
       await service.cancelSchedule(tenantId);
 
       expect(mockInvoiceQueue.removeRepeatable).toHaveBeenCalledWith({
         cron: '0 6 1 * *',
         jobId: `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`,
       });
+      expect(mockInvoiceQueue.removeRepeatableByKey).not.toHaveBeenCalled();
+    });
+
+    // BUGFIX regression (cancel-with-wrong-cron): when the tenant's schedule
+    // was previously customised to a non-default cron via updateSchedule(),
+    // cancelSchedule() must remove the repeatable keyed by its ACTUAL cron —
+    // not silently no-op by assuming DEFAULT_CRON.
+    it('should remove the persisted repeatable by key when the tenant has a custom (non-default) cron', async () => {
+      const customJobId = `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`;
+      mockInvoiceQueue.getRepeatableJobs.mockResolvedValue([
+        {
+          key: `${QUEUE_NAMES.INVOICE_GENERATION}::0 9 15 * *::${customJobId}`,
+          id: customJobId,
+          name: QUEUE_NAMES.INVOICE_GENERATION,
+          cron: '0 9 15 * *',
+          next: 0,
+        },
+      ]);
+
+      await service.cancelSchedule(tenantId);
+
+      expect(mockInvoiceQueue.removeRepeatableByKey).toHaveBeenCalledWith(
+        `${QUEUE_NAMES.INVOICE_GENERATION}::0 9 15 * *::${customJobId}`,
+      );
+      // Must NOT fall back to blindly removing with DEFAULT_CRON, which
+      // would not match this tenant's actual repeatable key.
+      expect(mockInvoiceQueue.removeRepeatable).not.toHaveBeenCalled();
+    });
+
+    it('should only match this tenant jobId among multiple persisted repeatables', async () => {
+      const thisJobId = `${QUEUE_NAMES.INVOICE_GENERATION}:${tenantId}`;
+      const otherJobId = `${QUEUE_NAMES.INVOICE_GENERATION}:other-tenant`;
+      mockInvoiceQueue.getRepeatableJobs.mockResolvedValue([
+        {
+          key: `key-other`,
+          id: otherJobId,
+          name: QUEUE_NAMES.INVOICE_GENERATION,
+          cron: '0 6 1 * *',
+          next: 0,
+        },
+        {
+          key: `key-this`,
+          id: thisJobId,
+          name: QUEUE_NAMES.INVOICE_GENERATION,
+          cron: '0 6 1 * *',
+          next: 0,
+        },
+      ]);
+
+      await service.cancelSchedule(tenantId);
+
+      expect(mockInvoiceQueue.removeRepeatableByKey).toHaveBeenCalledWith(
+        'key-this',
+      );
+      expect(mockInvoiceQueue.removeRepeatableByKey).not.toHaveBeenCalledWith(
+        'key-other',
+      );
     });
   });
 

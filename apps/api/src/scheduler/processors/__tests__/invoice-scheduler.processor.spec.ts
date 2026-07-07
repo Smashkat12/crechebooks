@@ -10,6 +10,7 @@ import { InvoiceDeliveryService } from '../../../database/services/invoice-deliv
 import { AuditLogService } from '../../../database/services/audit-log.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { EmailService } from '../../../integrations/email/email.service';
 import { EnrollmentStatus } from '../../../database/entities/enrollment.entity';
 import { InvoiceStatus } from '../../../database/entities/invoice.entity';
 import type { InvoiceGenerationResult } from '../../../database/dto/invoice-generation.dto';
@@ -21,6 +22,7 @@ describe('InvoiceSchedulerProcessor', () => {
   let mockAuditLogService: any;
   let mockPrisma: any;
   let mockEventEmitter: any;
+  let mockEmailService: any;
 
   const tenantId = 'tenant-123';
   const billingMonth = '2025-01';
@@ -51,6 +53,12 @@ describe('InvoiceSchedulerProcessor', () => {
       emit: jest.fn(),
     };
 
+    mockEmailService = {
+      sendEmail: jest
+        .fn()
+        .mockResolvedValue({ messageId: 'msg-001', status: 'sent' }),
+    };
+
     return Test.createTestingModule({
       providers: [
         InvoiceSchedulerProcessor,
@@ -65,6 +73,7 @@ describe('InvoiceSchedulerProcessor', () => {
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventEmitter2, useValue: mockEventEmitter },
+        { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
   };
@@ -476,6 +485,41 @@ describe('InvoiceSchedulerProcessor', () => {
         where: { id: tenantId },
         select: { name: true, email: true },
       });
+
+      // Verify a real admin email was sent to the tenant admin address
+      expect(mockEmailService.sendEmail).toHaveBeenCalledWith(
+        'admin@test.co.za',
+        expect.stringContaining('Invoice Generation Completed'),
+        expect.stringContaining('Successfully Generated: 1'),
+      );
+    });
+
+    it('should not fail the job when admin email send fails', async () => {
+      const mockJob = {
+        id: 'job-123',
+        data: {
+          tenantId,
+          billingMonth,
+          triggeredBy: 'cron' as const,
+          scheduledAt: new Date(),
+          dryRun: false,
+        },
+        progress: jest.fn(),
+      };
+
+      mockPrisma.enrollment.findMany.mockResolvedValue([]);
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@test.co.za',
+      });
+      mockEmailService.sendEmail.mockRejectedValue(
+        new Error('Email service not configured'),
+      );
+
+      await processor.processJob(mockJob as any);
+
+      // Job still completes despite notification failure
+      expect(mockJob.progress).toHaveBeenCalledWith(100);
     });
 
     it('should handle missing tenant gracefully for notification', async () => {

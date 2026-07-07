@@ -34,6 +34,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { EnrollmentStatus } from '../../database/entities/enrollment.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { InvoiceBatchCompletedEvent } from '../../database/events/domain-events';
+import { EmailService } from '../../integrations/email/email.service';
 
 /** Batch size for processing enrollments */
 const BATCH_SIZE = 10;
@@ -60,6 +61,7 @@ export class InvoiceSchedulerProcessor extends BaseProcessor<InvoiceGenerationJo
     private readonly auditLogService: AuditLogService,
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly emailService: EmailService,
   ) {
     super(QUEUE_NAMES.INVOICE_GENERATION);
   }
@@ -406,15 +408,29 @@ ${result.errors.length > 10 ? `... and ${result.errors.length - 10} more errors`
 This is an automated notification.
     `.trim();
 
-    // Log notification (would integrate with email service)
-    this.logger.log({
-      message: 'Admin notification prepared',
-      tenantId,
-      recipientEmail: tenant.email,
-      subject,
-      bodyPreview: body.substring(0, 200) + '...',
-    });
-
-    // TODO: Integrate with email service when available
+    // Send admin summary email (same pattern as ArrearsReminderJob.sendAdminSummary).
+    // COMMS_DISABLED gate is enforced inside EmailService — no extra gate needed here.
+    // Notification failure must never fail the generation job itself.
+    try {
+      await this.emailService.sendEmail(tenant.email, subject, body);
+      this.logger.log({
+        message: 'Admin notification sent',
+        tenantId,
+        recipientEmail: tenant.email,
+        subject,
+      });
+    } catch (error) {
+      this.logger.error({
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : 'UnknownError',
+        },
+        file: 'invoice-scheduler.processor.ts',
+        function: 'sendAdminNotification',
+        tenantId,
+        recipientEmail: tenant.email,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 }

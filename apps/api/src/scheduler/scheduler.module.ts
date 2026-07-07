@@ -16,6 +16,7 @@ import { StaffModule } from '../api/staff/staff.module';
 import { StorageModule } from '../integrations/storage/storage.module';
 import { InvoiceScheduleService } from '../billing/invoice-schedule.service';
 import { PaymentReminderService } from '../billing/payment-reminder.service';
+import { StatementScheduleService } from '../billing/statement-schedule.service';
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
@@ -129,7 +130,7 @@ const cronProviders = [
 // Guard behind isRedisConfigured() because both services inject SchedulerService,
 // which is only provided when Bull queues are available.
 const billingSchedulingProviders = isRedisConfigured()
-  ? [InvoiceScheduleService, PaymentReminderService]
+  ? [InvoiceScheduleService, PaymentReminderService, StatementScheduleService]
   : [];
 
 @Module({
@@ -155,6 +156,7 @@ const billingSchedulingProviders = isRedisConfigured()
           BullModule,
           InvoiceScheduleService, // TASK-BILL-016: Available for future controller wiring
           PaymentReminderService, // TASK-PAY-015: Available for future controller wiring
+          StatementScheduleService, // TASK-STMT-008: Statement generation cron producer
         ]
       : []),
     XeroSyncRecoveryProcessor, // TASK-REL-101: Export for manual triggering

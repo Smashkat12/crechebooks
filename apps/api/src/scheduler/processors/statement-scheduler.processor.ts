@@ -27,6 +27,7 @@ import { StatementRepository } from '../../database/repositories/statement.repos
 import { AuditLogService } from '../../database/services/audit-log.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
 import { PrismaService } from '../../database/prisma/prisma.service';
+import { EmailService } from '../../integrations/email/email.service';
 
 /** Batch size for processing parents */
 const BATCH_SIZE = 10;
@@ -37,10 +38,13 @@ interface StatementGenerationResult {
   generatedCount: number;
   finalizedCount: number;
   deliveredCount: number;
+  /** Auto-deliver attempts that failed (delivery errors must not be silent) */
+  deliveryFailedCount: number;
   skippedCount: number;
   errorCount: number;
   statementIds: string[];
   errors: Array<{ parentId: string; error: string }>;
+  deliveryErrors: Array<{ statementId: string; parentId: string; error: string }>;
   durationMs: number;
 }
 
@@ -55,6 +59,7 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
     private readonly statementRepository: StatementRepository,
     private readonly auditLogService: AuditLogService,
     private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
   ) {
     super(QUEUE_NAMES.STATEMENT_GENERATION);
   }
@@ -113,6 +118,7 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
           generatedCount: result.generatedCount,
           finalizedCount: result.finalizedCount,
           deliveredCount: result.deliveredCount,
+          deliveryFailedCount: result.deliveryFailedCount,
           skippedCount: result.skippedCount,
           errorCount: result.errorCount,
           durationMs: result.durationMs,
@@ -136,6 +142,8 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
           generatedCount: result.generatedCount,
           finalizedCount: result.finalizedCount,
           deliveredCount: result.deliveredCount,
+          deliveryFailedCount: result.deliveryFailedCount,
+          deliveryErrors: result.deliveryErrors,
           skippedCount: result.skippedCount,
           errorCount: result.errorCount,
           statementIds: result.statementIds,
@@ -216,10 +224,12 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
       generatedCount: 0,
       finalizedCount: 0,
       deliveredCount: 0,
+      deliveryFailedCount: 0,
       skippedCount: 0,
       errorCount: 0,
       statementIds: [],
       errors: [],
+      deliveryErrors: [],
       durationMs: 0,
     };
 
@@ -302,17 +312,36 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
 
                 if (deliveryResult.success) {
                   result.deliveredCount++;
+                } else {
+                  // Unsuccessful delivery without a throw — count it so the
+                  // admin notification surfaces it instead of swallowing it.
+                  result.deliveryFailedCount++;
+                  result.deliveryErrors.push({
+                    statementId: statement.id,
+                    parentId,
+                    error:
+                      deliveryResult.error ?? 'Delivery reported unsuccessful',
+                  });
                 }
               } catch (deliveryError) {
-                // Log delivery error but don't fail the whole job
+                // Log delivery error but don't fail the whole job.
+                // Count the failure and carry the reason into the admin
+                // notification (previously only a warn — errors were silent).
+                const errorMessage =
+                  deliveryError instanceof Error
+                    ? deliveryError.message
+                    : String(deliveryError);
+                result.deliveryFailedCount++;
+                result.deliveryErrors.push({
+                  statementId: statement.id,
+                  parentId,
+                  error: errorMessage,
+                });
                 this.logger.warn({
                   message: 'Statement delivery failed',
                   statementId: statement.id,
                   parentId,
-                  error:
-                    deliveryError instanceof Error
-                      ? deliveryError.message
-                      : String(deliveryError),
+                  error: errorMessage,
                 });
               }
             }
@@ -446,7 +475,8 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
       return;
     }
 
-    const hasErrors = result.errorCount > 0;
+    const hasErrors =
+      result.errorCount > 0 || result.deliveryFailedCount > 0;
     const subject = hasErrors
       ? `Statement Generation Completed with Errors - ${statementMonth}`
       : `Statement Generation Completed - ${statementMonth}`;
@@ -459,12 +489,13 @@ Total Parents: ${result.totalParents}
 Statements Generated: ${result.generatedCount}
 Statements Finalized: ${result.finalizedCount}
 Statements Delivered: ${result.deliveredCount}
+Delivery Failures: ${result.deliveryFailedCount}
 Skipped (no activity/balance): ${result.skippedCount}
 Errors: ${result.errorCount}
 Duration: ${(result.durationMs / 1000).toFixed(1)}s
 
 ${
-  hasErrors
+  result.errorCount > 0
     ? `
 Errors:
 ${result.errors
@@ -475,17 +506,45 @@ ${result.errors.length > 10 ? `... and ${result.errors.length - 10} more errors`
 `
     : ''
 }
+${
+  result.deliveryFailedCount > 0
+    ? `
+Delivery Failures:
+${result.deliveryErrors
+  .slice(0, 10)
+  .map((e) => `- Statement ${e.statementId} (parent ${e.parentId}): ${e.error}`)
+  .join('\n')}
+${result.deliveryErrors.length > 10 ? `... and ${result.deliveryErrors.length - 10} more delivery failures` : ''}
+`
+    : ''
+}
 ---
 This is an automated notification.
     `.trim();
 
-    // Log notification (integrates with notification system if needed)
-    this.logger.log({
-      message: 'Admin notification prepared',
-      tenantId,
-      recipientEmail: tenant.email,
-      subject,
-      bodyPreview: body.substring(0, 200) + '...',
-    });
+    // Send admin summary email (same pattern as ArrearsReminderJob.sendAdminSummary).
+    // COMMS_DISABLED gate is enforced inside EmailService — no extra gate needed here.
+    // Notification failure must never fail the generation job itself.
+    try {
+      await this.emailService.sendEmail(tenant.email, subject, body);
+      this.logger.log({
+        message: 'Admin notification sent',
+        tenantId,
+        recipientEmail: tenant.email,
+        subject,
+      });
+    } catch (error) {
+      this.logger.error({
+        error: {
+          message: error instanceof Error ? error.message : String(error),
+          name: error instanceof Error ? error.name : 'UnknownError',
+        },
+        file: 'statement-scheduler.processor.ts',
+        function: 'sendAdminNotification',
+        tenantId,
+        recipientEmail: tenant.email,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 }

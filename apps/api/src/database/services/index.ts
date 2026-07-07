@@ -71,7 +71,6 @@ export type {
 } from './batch-import-validator.service';
 
 // TASK-STAFF-004: Staff Termination
-export * from './staff-termination.service';
 
 // TASK-STAFF-005: Time Tracking
 export * from './time-tracking.service';

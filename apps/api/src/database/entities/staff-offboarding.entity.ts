@@ -136,6 +136,29 @@ export interface IAssetReturn {
 }
 
 /**
+ * Source of the annual leave balance used in a final pay calculation
+ * - SIMPLEPAY: fetched from the tenant's SimplePay payroll (authoritative)
+ * - LOCAL_COMPUTATION: computed from staff.startDate accrual and approved
+ *   annual LeaveRequest records (fallback)
+ */
+export type LeaveBalanceSource = 'SIMPLEPAY' | 'LOCAL_COMPUTATION';
+
+/**
+ * Annual leave balance computation details (BCEA Section 20-22)
+ * Recorded on audit logs for traceability of leave payout figures
+ */
+export interface ILeaveBalanceComputation {
+  /** Days paid out: max(0, accrued - taken), 2dp */
+  balanceDays: number;
+  /** Days accrued in the current leave cycle (1.25 per completed month) */
+  accruedDays: number;
+  /** Approved annual leave days taken in the current cycle */
+  takenDays: number;
+  /** Where the balance came from */
+  source: LeaveBalanceSource;
+}
+
+/**
  * Final Pay Calculation Interface (BCEA Compliant)
  * Used to calculate and display the complete final pay breakdown
  */
@@ -153,6 +176,11 @@ export interface IFinalPayCalculation {
   totalDeductionsCents: number;
   netPayCents: number;
   dailyRateCents: number;
+  /**
+   * How the leave balance was determined. Optional because historical
+   * breakdowns reconstructed from stored offboarding records do not have it.
+   */
+  leaveCalculation?: ILeaveBalanceComputation;
 }
 
 /**

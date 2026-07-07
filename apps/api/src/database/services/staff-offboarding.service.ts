@@ -20,11 +20,13 @@ import { PayeService } from './paye.service';
 import { UifService } from './uif.service';
 import { AuditLogService } from './audit-log.service';
 import { SimplePayServicePeriodService } from '../../integrations/simplepay/simplepay-service-period.service';
+import { SimplePayLeaveService } from '../../integrations/simplepay/simplepay-leave.service';
 import { SimplePayRepository } from '../repositories/simplepay.repository';
 import {
   OffboardingReason,
   StaffOffboardingStatus,
   IFinalPayCalculation,
+  ILeaveBalanceComputation,
   ISettlementPreview,
   IOffboardingProgress,
   SimplePaySyncStatus,
@@ -54,6 +56,11 @@ Decimal.set({
 // Average working days per month (BCEA standard)
 const WORKING_DAYS_PER_MONTH = 21.67;
 
+// BCEA Section 20: 21 consecutive days annual leave per cycle, which is
+// approximately 15 working days => 15 / 12 = 1.25 working days accrued
+// per completed month of service.
+const LEAVE_ACCRUAL_RATE_PER_MONTH = 1.25;
+
 // BCEA Section 37 notice period thresholds (months)
 const NOTICE_THRESHOLDS = {
   LESS_THAN_6_MONTHS: 6,
@@ -79,6 +86,8 @@ export class StaffOffboardingService {
     private readonly auditLogService: AuditLogService,
     @Inject(forwardRef(() => SimplePayServicePeriodService))
     private readonly simplePayServicePeriod: SimplePayServicePeriodService,
+    @Inject(forwardRef(() => SimplePayLeaveService))
+    private readonly simplePayLeave: SimplePayLeaveService,
     private readonly simplePayRepo: SimplePayRepository,
   ) {}
 
@@ -190,10 +199,16 @@ export class StaffOffboardingService {
       (monthlySalaryCents * daysWorked) / daysInMonth,
     );
 
-    // Leave payout calculation
-    // In production, this would come from a leave tracking system
-    // Using placeholder: assume 15 days annual leave entitlement, calculate balance
-    const leaveBalanceDays = await this.getLeaveBalance(staffId);
+    // Leave payout: annual leave balance sourced from SimplePay when the
+    // tenant runs payroll there, otherwise computed locally from BCEA accrual
+    // (1.25 days/month) minus approved annual leave taken in the current cycle.
+    const leaveCalculation = await this.computeLeaveBalanceDays(
+      staffId,
+      staff.tenantId,
+      staff.startDate,
+      lastWorkingDay,
+    );
+    const leaveBalanceDays = leaveCalculation.balanceDays;
     const leavePayoutCents = Math.round(dailyRateCents * leaveBalanceDays);
 
     // Notice pay calculation (if employer waives notice period)
@@ -245,53 +260,189 @@ export class StaffOffboardingService {
       totalDeductionsCents,
       netPayCents,
       dailyRateCents,
+      leaveCalculation,
     };
   }
 
   /**
-   * Get leave balance for a staff member
-   * In production, this would query a leave tracking system
+   * Determine the annual leave balance for payout (BCEA Section 20-22)
+   *
+   * Source priority:
+   * 1. SimplePay: if the tenant has an active SimplePay connection AND the
+   *    staff member is mapped to a SimplePay employee, the payroll system's
+   *    current balance is authoritative.
+   * 2. Local computation: fallback when SimplePay is unavailable, the staff
+   *    member is not mapped, or the lookup fails for any reason.
    *
    * @param staffId - Staff ID
-   * @returns Leave balance in days
+   * @param tenantId - Tenant ID
+   * @param startDate - Employment start date (leave cycle anchor)
+   * @param lastWorkingDay - Last working day (balance as-at date)
+   * @returns Leave balance computation with source for audit traceability
    */
-  private async getLeaveBalance(staffId: string): Promise<number> {
-    // Placeholder implementation
-    // In a real system, this would calculate:
-    // - Annual leave entitlement (15 days for BCEA)
-    // - Pro-rata for tenure
-    // - Minus leave taken
-    // For now, return a default value
-    const staff = await this.prisma.staff.findUnique({
-      where: { id: staffId },
-    });
+  private async computeLeaveBalanceDays(
+    staffId: string,
+    tenantId: string,
+    startDate: Date | null,
+    lastWorkingDay: Date,
+  ): Promise<ILeaveBalanceComputation> {
+    try {
+      const connection = await this.simplePayRepo.findConnection(tenantId);
+      if (connection?.isActive) {
+        const mapping = await this.simplePayRepo.findEmployeeMapping(staffId);
+        if (mapping) {
+          const balances = await this.simplePayLeave.getLeaveBalancesByStaff(
+            tenantId,
+            staffId,
+          );
 
-    if (!staff) {
-      return 0;
+          // Heuristic: SimplePay leave types are tenant-defined with unstable
+          // numeric IDs, so the annual leave type is matched by name — any
+          // leave type whose name contains "annual" (case-insensitive).
+          const annual = balances.find((b) =>
+            b.leave_type_name.toLowerCase().includes('annual'),
+          );
+
+          if (annual) {
+            return {
+              // Negative payroll balances (over-taken leave) are not
+              // recovered via payout — clamp at 0 (BCEA).
+              balanceDays: Math.max(0, annual.current_balance),
+              // The SimplePay balance endpoint only exposes the net current
+              // balance; accrued/taken decomposition is not available here.
+              accruedDays: annual.accrued,
+              takenDays: annual.taken,
+              source: 'SIMPLEPAY',
+            };
+          }
+
+          this.logger.warn(
+            `No annual leave type found in SimplePay balances for staff ${staffId} - falling back to local computation`,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `SimplePay leave balance lookup failed for staff ${staffId}: ${
+          error instanceof Error ? error.message : String(error)
+        } - falling back to local computation`,
+      );
     }
 
-    // Calculate pro-rata leave based on months worked in current year
-    const currentYear = new Date().getFullYear();
-    const yearStart = new Date(currentYear, 0, 1);
-    const monthsWorkedThisYear = Math.min(
-      12,
-      Math.ceil(
-        (new Date().getTime() -
-          Math.max(yearStart.getTime(), staff.startDate.getTime())) /
-          (1000 * 60 * 60 * 24 * 30),
-      ),
+    return this.computeLocalLeaveBalance(staffId, startDate, lastWorkingDay);
+  }
+
+  /**
+   * Local annual leave balance computation (BCEA Section 20)
+   *
+   * The leave cycle is a 12-month period anchored to the employment
+   * start-date anniversary; the current cycle is the one containing
+   * lastWorkingDay. Accrual is 1.25 working days per completed month in the
+   * cycle, minus approved annual leave taken within the cycle.
+   *
+   * @param staffId - Staff ID
+   * @param startDate - Employment start date
+   * @param lastWorkingDay - Last working day
+   * @returns Leave balance computation (source LOCAL_COMPUTATION)
+   */
+  private async computeLocalLeaveBalance(
+    staffId: string,
+    startDate: Date | null,
+    lastWorkingDay: Date,
+  ): Promise<ILeaveBalanceComputation> {
+    if (!startDate) {
+      // Conservative: without a start date we cannot compute accrual, so pay
+      // out nothing rather than guessing.
+      this.logger.warn(
+        `Staff ${staffId} has no start date - treating annual leave accrual as 0`,
+      );
+      return {
+        balanceDays: 0,
+        accruedDays: 0,
+        takenDays: 0,
+        source: 'LOCAL_COMPUTATION',
+      };
+    }
+
+    const cycleStart = this.getCurrentLeaveCycleStart(
+      startDate,
+      lastWorkingDay,
     );
 
-    // 15 days annual leave = 1.25 days per month
-    const earnedLeave = new Decimal(monthsWorkedThisYear)
-      .mul(1.25)
-      .round()
+    // Whole (completed) months worked in the current cycle - floor.
+    // <1 month tenure yields 0 accrued days and therefore a 0 payout.
+    const tenureInCycle = this.calculateTenure(cycleStart, lastWorkingDay);
+    const monthsWorkedInCycle = tenureInCycle.years * 12 + tenureInCycle.months;
+
+    const accruedDays = new Decimal(monthsWorkedInCycle)
+      .mul(LEAVE_ACCRUAL_RATE_PER_MONTH)
+      .toDecimalPlaces(2)
       .toNumber();
 
-    // Assume some leave taken (placeholder)
-    const leaveTaken = Math.floor(earnedLeave * 0.6);
+    // Approved ANNUAL leave taken within the current cycle. Matching on the
+    // leave type name excludes unpaid, sick and other leave types from the
+    // payout computation (leaveTypeId is tenant-defined and unstable, so the
+    // name is the reliable discriminator).
+    const approvedAnnualLeave = await this.prisma.leaveRequest.findMany({
+      where: {
+        staffId,
+        status: 'APPROVED',
+        leaveTypeName: { contains: 'annual', mode: 'insensitive' },
+        startDate: { gte: cycleStart, lte: lastWorkingDay },
+      },
+      select: { totalDays: true },
+    });
 
-    return Math.max(0, earnedLeave - leaveTaken);
+    const takenDays = approvedAnnualLeave
+      .reduce(
+        (sum, leave) => sum.add(new Decimal(leave.totalDays.toString())),
+        new Decimal(0),
+      )
+      .toDecimalPlaces(2)
+      .toNumber();
+
+    // BCEA: a leave payout can never be negative. If more leave was taken
+    // than accrued, the balance clamps to 0 (no deduction from final pay).
+    const balanceDays = Decimal.max(
+      0,
+      new Decimal(accruedDays).minus(takenDays),
+    )
+      .toDecimalPlaces(2)
+      .toNumber();
+
+    return {
+      balanceDays,
+      accruedDays,
+      takenDays,
+      source: 'LOCAL_COMPUTATION',
+    };
+  }
+
+  /**
+   * Get the start of the annual leave cycle containing lastWorkingDay.
+   * Cycles are 12-month periods anchored to the start-date anniversary.
+   *
+   * @param startDate - Employment start date
+   * @param lastWorkingDay - Last working day
+   * @returns Start date of the current leave cycle
+   */
+  private getCurrentLeaveCycleStart(
+    startDate: Date,
+    lastWorkingDay: Date,
+  ): Date {
+    const start = new Date(startDate);
+    const anchor = new Date(
+      lastWorkingDay.getFullYear(),
+      start.getMonth(),
+      start.getDate(),
+    );
+
+    if (anchor.getTime() > lastWorkingDay.getTime()) {
+      anchor.setFullYear(anchor.getFullYear() - 1);
+    }
+
+    // Employee is still in their first cycle
+    return anchor.getTime() < start.getTime() ? start : anchor;
   }
 
   /**
@@ -426,7 +577,7 @@ export class StaffOffboardingService {
       await this.offboardingRepo.createAssetReturn(offboarding.id, asset);
     }
 
-    // Log the action
+    // Log the action, including how the leave payout was derived
     await this.auditLogService.logCreate({
       tenantId,
       userId,
@@ -437,6 +588,16 @@ export class StaffOffboardingService {
         reason: dto.reason,
         status: 'INITIATED',
         lastWorkingDay: dto.lastWorkingDay,
+        leavePayoutCents: finalPay.leavePayoutCents,
+        leaveBalanceDays: finalPay.leaveBalanceDays,
+        leaveCalculation: finalPay.leaveCalculation
+          ? {
+              accruedDays: finalPay.leaveCalculation.accruedDays,
+              takenDays: finalPay.leaveCalculation.takenDays,
+              dailyRateCents: finalPay.dailyRateCents,
+              source: finalPay.leaveCalculation.source,
+            }
+          : null,
       },
     });
 
@@ -598,13 +759,39 @@ export class StaffOffboardingService {
 
     await this.offboardingRepo.updateFinalPay(offboardingId, dto);
 
+    // Record the system-computed leave balance alongside the (possibly
+    // manually overridden) values so auditors can compare the two.
+    let leaveCalculation: Prisma.InputJsonValue | null = null;
+    const staff = await this.prisma.staff.findUnique({
+      where: { id: offboarding.staffId },
+    });
+    if (staff) {
+      const computation = await this.computeLeaveBalanceDays(
+        staff.id,
+        staff.tenantId,
+        staff.startDate,
+        offboarding.lastWorkingDay,
+      );
+      leaveCalculation = {
+        accruedDays: computation.accruedDays,
+        takenDays: computation.takenDays,
+        dailyRateCents: Math.round(
+          staff.basicSalaryCents / WORKING_DAYS_PER_MONTH,
+        ),
+        source: computation.source,
+      };
+    }
+
     await this.auditLogService.logUpdate({
       tenantId,
       userId,
       entityType: 'StaffOffboarding',
       entityId: offboardingId,
       beforeValue,
-      afterValue: dto as unknown as Prisma.InputJsonValue,
+      afterValue: {
+        ...dto,
+        leaveCalculation,
+      } as unknown as Prisma.InputJsonValue,
       changeSummary: 'Updated final pay calculation',
     });
 

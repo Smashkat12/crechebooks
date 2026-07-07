@@ -87,7 +87,9 @@ export class WorkflowRunRepository {
    * a caller-supplied ID so the orchestrator's existing workflowId (already
    * threaded through logging + audit trail) doubles as the DB row id.
    */
-  async create(input: CreateWorkflowRunInput): Promise<WorkflowRunRecord | null> {
+  async create(
+    input: CreateWorkflowRunInput,
+  ): Promise<WorkflowRunRecord | null> {
     if (!this.prisma) {
       this.logger.debug('Prisma unavailable — skipping WorkflowRun.create');
       return null;

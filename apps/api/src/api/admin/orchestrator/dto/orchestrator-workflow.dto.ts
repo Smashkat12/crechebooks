@@ -77,7 +77,8 @@ export class RunOrchestratorWorkflowResponseDto {
   runId!: string;
 
   @ApiProperty({
-    description: 'Status at the moment the endpoint returned (see WorkflowRunStatus)',
+    description:
+      'Status at the moment the endpoint returned (see WorkflowRunStatus)',
     example: 'AWAITING_ESCALATION',
   })
   status!: string;
@@ -142,7 +143,8 @@ export class WorkflowRunResponseDto {
   tenantId!: string;
 
   @ApiProperty({
-    description: 'Public workflow type — maps back from the internal workflow type.',
+    description:
+      'Public workflow type — maps back from the internal workflow type.',
   })
   workflowType!: string;
 

@@ -189,12 +189,9 @@ export class OrchestratorAdminController {
   }
 
   private parseWorkflowType(value: string): AdminOrchestratorWorkflowType {
-    if (
-      value === AdminOrchestratorWorkflowType.BANK_IMPORT ||
-      value === AdminOrchestratorWorkflowType.MONTH_END ||
-      value === AdminOrchestratorWorkflowType.TAX_SUBMISSION
-    ) {
-      return value;
+    const valid = Object.values(AdminOrchestratorWorkflowType) as string[];
+    if (valid.includes(value)) {
+      return value as AdminOrchestratorWorkflowType;
     }
     throw new NotFoundException(
       `Unknown workflow type "${value}". Expected one of: BANK_IMPORT, MONTH_END, TAX_SUBMISSION.`,

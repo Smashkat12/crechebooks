@@ -123,8 +123,6 @@ export class OrchestratorScheduleService {
       }
     }
 
-    this.logger.log(
-      `MONTH_END enqueued: ${enqueued}/${optedInTenants.length}`,
-    );
+    this.logger.log(`MONTH_END enqueued: ${enqueued}/${optedInTenants.length}`);
   }
 }

@@ -81,22 +81,6 @@ export interface BatchValidationResult {
 }
 
 /**
- * Import history record
- */
-export interface ImportHistoryRecord {
-  id: string;
-  tenantId: string;
-  batchId: string;
-  fileName: string;
-  importedAt: Date;
-  totalRows: number;
-  importedRows: number;
-  skippedRows: number;
-  errorLog: RowValidationError[];
-  status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
-}
-
-/**
  * Column mapping for CSV import
  */
 export interface ColumnMapping {
@@ -640,32 +624,4 @@ export class BatchImportValidatorService {
     };
   }
 
-  /**
-   * Save import history record
-   */
-  saveImportHistory(
-    record: Omit<ImportHistoryRecord, 'id'>,
-  ): ImportHistoryRecord {
-    const id = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // TODO: Store in database table when available
-    // For now, log and return
-    this.logger.log(
-      `Import history: tenant=${record.tenantId}, batch=${record.batchId}, ` +
-        `status=${record.status}, imported=${record.importedRows}/${record.totalRows}`,
-    );
-
-    return { id, ...record };
-  }
-
-  /**
-   * Get import history for a tenant
-   */
-  getImportHistory(
-    _tenantId: string,
-    _limit: number = 20,
-  ): ImportHistoryRecord[] {
-    // TODO: Implement when database table is available
-    return [];
-  }
 }

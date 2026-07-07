@@ -66,7 +66,6 @@ export type {
   RowValidationError,
   RowValidationResult,
   BatchValidationResult,
-  ImportHistoryRecord,
   ColumnMapping,
 } from './batch-import-validator.service';
 

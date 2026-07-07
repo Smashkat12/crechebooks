@@ -429,32 +429,6 @@ describe('BatchImportValidatorService', () => {
     });
   });
 
-  describe('import history', () => {
-    it('should save import history record', () => {
-      const record = service.saveImportHistory({
-        tenantId: testTenant.id,
-        batchId: 'batch-123',
-        fileName: 'test.csv',
-        importedAt: new Date(),
-        totalRows: 100,
-        importedRows: 95,
-        skippedRows: 5,
-        errorLog: [
-          {
-            rowNumber: 3,
-            field: 'date',
-            severity: ValidationSeverity.ERROR,
-            message: 'Invalid date',
-          },
-        ],
-        status: 'PARTIAL',
-      });
-
-      expect(record.id).toBeDefined();
-      expect(record.status).toBe('PARTIAL');
-    });
-  });
-
   describe('edge cases', () => {
     it('should handle empty batch', async () => {
       const result = await service.validateBatch([], testTenant.id);

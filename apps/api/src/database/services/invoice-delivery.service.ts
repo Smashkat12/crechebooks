@@ -51,6 +51,7 @@ import { PreferredContact } from '../entities/parent.entity';
 import { AuditAction } from '../entities/audit-log.entity';
 import { NotFoundException, BusinessException } from '../../shared/exceptions';
 import { CommsGuardService } from '../../common/services/comms-guard/comms-guard.service';
+import { MessageTemplateResolverService } from './message-template-resolver.service';
 
 /** Maximum delivery retry attempts */
 const MAX_RETRY_COUNT = 3;
@@ -77,6 +78,8 @@ export class InvoiceDeliveryService {
     private readonly whatsAppProviderService: WhatsAppProviderService,
     // AUDIT-WA-DELIVERY: comms guard for staging-safety gate
     private readonly commsGuard: CommsGuardService,
+    // TASK-TMPL-001: tenant-editable subject lines
+    private readonly templateResolver: MessageTemplateResolverService,
   ) {}
 
   /**
@@ -324,8 +327,25 @@ export class InvoiceDeliveryService {
           childName,
         };
 
-        const { text, html, subject } =
+        const { text, html, subject: defaultSubject } =
           this.emailTemplateService.renderInvoiceEmail(templateData);
+
+        // TASK-TMPL-001: give the tenant a chance to override the subject.
+        // Body stays code-controlled (HTML template shell + line items).
+        const tenantSubjectOverride =
+          await this.templateResolver.resolveAndRender(
+            tenantId,
+            'INVOICE_DELIVERY',
+            'EMAIL',
+            {
+              invoiceNumber: invoice.invoiceNumber,
+              tenantName: tenant.tradingName ?? tenant.name,
+            },
+          );
+        const subject =
+          tenantSubjectOverride?.isCustom && tenantSubjectOverride.subject
+            ? tenantSubjectOverride.subject
+            : defaultSubject;
 
         this.logger.log(
           `TASK-BILL-042: Rendered HTML template for invoice ${invoice.invoiceNumber}`,

@@ -10,7 +10,6 @@ import {
   Param,
   Body,
   Query,
-
   HttpCode,
   HttpStatus,
   Logger,
@@ -39,7 +38,6 @@ import {
 @ApiTags('Suppliers')
 @ApiBearerAuth()
 @Controller('suppliers')
-
 export class SupplierController {
   private readonly logger = new Logger(SupplierController.name);
 

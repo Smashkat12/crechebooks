@@ -54,7 +54,10 @@ describe('TransactionRepository.updateCategorization', () => {
       data: { status: 'CATEGORIZED', xeroAccountCode: '4110' },
     });
     expect(result).toEqual(
-      expect.objectContaining({ status: 'CATEGORIZED', xeroAccountCode: '4110' }),
+      expect.objectContaining({
+        status: 'CATEGORIZED',
+        xeroAccountCode: '4110',
+      }),
     );
   });
 

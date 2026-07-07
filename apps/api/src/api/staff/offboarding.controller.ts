@@ -35,7 +35,6 @@ import {
   Body,
   Query,
   Res,
-
   HttpStatus,
   HttpCode,
   ParseIntPipe,
@@ -81,7 +80,6 @@ import { StaffOffboardingStatus } from '../../database/entities/staff-offboardin
 @ApiTags('Staff Offboarding')
 @ApiBearerAuth()
 @Controller('staff/:staffId/offboarding')
-
 export class StaffOffboardingController {
   constructor(
     private readonly offboardingService: StaffOffboardingService,
@@ -685,7 +683,6 @@ export class StaffOffboardingController {
 @ApiTags('Staff Offboardings')
 @ApiBearerAuth()
 @Controller('staff/offboardings')
-
 export class StaffOffboardingsController {
   constructor(
     private readonly offboardingService: StaffOffboardingService,

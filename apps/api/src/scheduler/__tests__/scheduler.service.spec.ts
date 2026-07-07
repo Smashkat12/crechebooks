@@ -11,7 +11,6 @@ describe('SchedulerService', () => {
   let service: SchedulerService;
   let mockInvoiceQueue: any;
   let mockSarsQueue: any;
-  let mockBankQueue: any;
   let mockStatementQueue: any;
 
   beforeEach(async () => {
@@ -28,7 +27,6 @@ describe('SchedulerService', () => {
 
     mockInvoiceQueue = createMockQueue();
     mockSarsQueue = createMockQueue();
-    mockBankQueue = createMockQueue();
     mockStatementQueue = createMockQueue();
 
     const module: TestingModule = await Test.createTestingModule({
@@ -41,10 +39,6 @@ describe('SchedulerService', () => {
         {
           provide: getQueueToken(QUEUE_NAMES.SARS_DEADLINE),
           useValue: mockSarsQueue,
-        },
-        {
-          provide: getQueueToken(QUEUE_NAMES.BANK_SYNC),
-          useValue: mockBankQueue,
         },
         {
           provide: getQueueToken(QUEUE_NAMES.STATEMENT_GENERATION),

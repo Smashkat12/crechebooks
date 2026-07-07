@@ -20,7 +20,6 @@ import { LoggerModule } from './common/logger';
 import { CircuitBreakerModule } from './integrations/circuit-breaker';
 import { CspModule } from './api/csp';
 import { WebSocketModule } from './websocket';
-import { BankingModule } from './integrations/banking';
 import { AccountingModule } from './integrations/accounting/accounting.module';
 import { MailgunInboundModule } from './integrations/mailgun-inbound/mailgun-inbound.module';
 import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
@@ -70,7 +69,6 @@ import { ReportsModule } from './modules/reports';
     MetricsModule, // TASK-PERF-104: Database pool metrics endpoint
     CspModule, // TASK-SEC-103: CSP configuration and violation reporting
     WebSocketModule, // TASK-FEAT-101: Real-time Dashboard WebSocket
-    BankingModule, // TASK-INT-101: Bank API Integration (Stitch Open Banking)
     AccountingModule.forRoot(), // Provider-agnostic accounting abstraction (Xero, Stub.africa)
     MailgunInboundModule, // FNB statement ingestion via Mailgun-forwarded emails
     ReportsModule, // TASK-REPORTS-002: Reports API Module

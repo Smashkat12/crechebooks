@@ -7,7 +7,6 @@ import {
   ScheduledJobData,
   InvoiceGenerationJobData,
   SarsDeadlineJobData,
-  BankSyncJobData,
   StatementGenerationJobData,
   JobOptions,
   DEFAULT_JOB_OPTIONS,
@@ -24,8 +23,6 @@ export class SchedulerService {
     private readonly invoiceQueue: Queue<InvoiceGenerationJobData>,
     @InjectQueue(QUEUE_NAMES.SARS_DEADLINE)
     private readonly sarsQueue: Queue<SarsDeadlineJobData>,
-    @InjectQueue(QUEUE_NAMES.BANK_SYNC)
-    private readonly bankQueue: Queue<BankSyncJobData>,
     @InjectQueue(QUEUE_NAMES.STATEMENT_GENERATION)
     private readonly statementQueue: Queue<StatementGenerationJobData>,
   ) {}
@@ -36,8 +33,6 @@ export class SchedulerService {
         return this.invoiceQueue as Queue<ScheduledJobData>;
       case QUEUE_NAMES.SARS_DEADLINE:
         return this.sarsQueue as Queue<ScheduledJobData>;
-      case QUEUE_NAMES.BANK_SYNC:
-        return this.bankQueue as Queue<ScheduledJobData>;
       case QUEUE_NAMES.STATEMENT_GENERATION:
         return this.statementQueue as Queue<ScheduledJobData>;
       default:

@@ -25,16 +25,10 @@ export interface CorrectionConflict {
   patternId: string;
 }
 
-export type ConflictResolutionType =
-  | 'update_all'
-  | 'just_this_one'
-  | 'split_by_amount'
-  | 'split_by_description';
+export type ConflictResolutionType = 'update_all' | 'just_this_one';
 
 export interface ConflictResolution {
   type: ConflictResolutionType;
-  threshold?: number; // For split_by_amount
-  pattern?: string; // For split_by_description
 }
 
 @Injectable()
@@ -133,14 +127,6 @@ export class CorrectionConflictService {
 
       case 'just_this_one':
         await this.resolveJustThisOne(tenantId, transactionId, conflict);
-        break;
-
-      case 'split_by_amount':
-        this.resolveSplitByAmount(tenantId, conflict, resolution.threshold!);
-        break;
-
-      case 'split_by_description':
-        this.resolveSplitByDescription(tenantId, conflict, resolution.pattern!);
         break;
 
       default:
@@ -295,52 +281,6 @@ export class CorrectionConflictService {
     this.logger.log(
       `Exception created - transaction categorized as ${conflict.newCategoryCode}`,
     );
-  }
-
-  /**
-   * Resolution: Split by amount threshold (future enhancement)
-   */
-  private resolveSplitByAmount(
-    _tenantId: string,
-    _conflict: CorrectionConflict,
-    threshold: number,
-  ): void {
-    this.logger.log(
-      `Creating split rule by amount: threshold=${threshold} cents`,
-    );
-
-    // Future enhancement: Create conditional pattern
-    // For now, default to "just this one" behavior
-    this.logger.warn(
-      'Split by amount not fully implemented - using "just this one" fallback',
-    );
-
-    // TODO: Implement conditional pattern creation
-    // Would create two patterns:
-    // 1. Pattern for amounts >= threshold -> new category
-    // 2. Pattern for amounts < threshold -> existing category
-  }
-
-  /**
-   * Resolution: Split by description pattern (future enhancement)
-   */
-  private resolveSplitByDescription(
-    _tenantId: string,
-    _conflict: CorrectionConflict,
-    pattern: string,
-  ): void {
-    this.logger.log(`Creating split rule by description pattern: ${pattern}`);
-
-    // Future enhancement: Create conditional pattern
-    // For now, default to "just this one" behavior
-    this.logger.warn(
-      'Split by description not fully implemented - using "just this one" fallback',
-    );
-
-    // TODO: Implement conditional pattern creation
-    // Would create two patterns:
-    // 1. Pattern for descriptions matching regex -> new category
-    // 2. Pattern for descriptions not matching -> existing category
   }
 
   /**

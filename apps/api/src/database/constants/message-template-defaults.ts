@@ -336,18 +336,20 @@ Already paid? Send proof NOW to prevent suspension.
       '{durationSeconds}',
       '{errorLines}',
     ],
-    subject: 'Invoice Generation Summary - {periodLabel}',
-    body: `Invoice generation for {periodLabel} completed.
+    // Original subject was branched on errorCount ("with Errors" or plain).
+    // Default stays on the plain variant; the processor keeps the errors
+    // variant as a fallback when the tenant hasn't customised the subject.
+    subject: 'Invoice Generation Completed - {periodLabel}',
+    body: `Invoice Generation Summary for {tenantName}
+Billing Period: {periodLabel}
 
-Summary:
-- Total enrollments processed: {totalEnrollments}
-- Successful: {successCount}
-- Errors: {errorCount}
-- Skipped: {skippedCount}
-- Duration: {durationSeconds}s
+Total Enrollments: {totalEnrollments}
+Successfully Generated: {successCount}
+Skipped (existing): {skippedCount}
+Errors: {errorCount}
+Duration: {durationSeconds}s
 
-{errorLines}
----
+{errorLines}---
 This is an automated notification.`,
   },
 ];

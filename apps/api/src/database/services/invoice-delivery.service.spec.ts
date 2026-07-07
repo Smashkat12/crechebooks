@@ -17,6 +17,7 @@ import { AuditLogService } from './audit-log.service';
 import { InvoicePdfService } from './invoice-pdf.service';
 import { EmailService } from '../../integrations/email/email.service';
 import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
+import { MessageTemplateResolverService } from './message-template-resolver.service';
 import { EmailTemplateService } from '../../common/services/email-template/email-template.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CommsGuardService } from '../../common/services/comms-guard/comms-guard.service';
@@ -152,6 +153,14 @@ const buildModule = async (commsDisabled = false): Promise<TestingModule> => {
       { provide: EventEmitter2, useValue: mockEventEmitter },
       { provide: WhatsAppProviderService, useValue: mockWAProviderService },
       { provide: CommsGuardService, useValue: mockCommsGuard },
+      // TASK-TMPL-001: template resolver; default = no override, so behaviour
+      // matches the pre-template path bit-for-bit.
+      {
+        provide: MessageTemplateResolverService,
+        useValue: {
+          resolveAndRender: jest.fn().mockResolvedValue(null),
+        },
+      },
     ],
   }).compile();
 

@@ -11,6 +11,7 @@ import { AuditLogService } from '../../../database/services/audit-log.service';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EmailService } from '../../../integrations/email/email.service';
+import { MessageTemplateResolverService } from '../../../database/services/message-template-resolver.service';
 import { EnrollmentStatus } from '../../../database/entities/enrollment.entity';
 import { InvoiceStatus } from '../../../database/entities/invoice.entity';
 import type { InvoiceGenerationResult } from '../../../database/dto/invoice-generation.dto';
@@ -47,6 +48,9 @@ describe('InvoiceSchedulerProcessor', () => {
     mockPrisma = {
       enrollment: { findMany: jest.fn() },
       tenant: { findUnique: jest.fn() },
+      // TASK-TMPL-001: resolver falls through to coded defaults when this
+      // returns undefined, which is exactly what pre-template behaviour was.
+      messageTemplate: { findUnique: jest.fn() },
     };
 
     mockEventEmitter = {
@@ -74,6 +78,12 @@ describe('InvoiceSchedulerProcessor', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: EventEmitter2, useValue: mockEventEmitter },
         { provide: EmailService, useValue: mockEmailService },
+        // TASK-TMPL-001: real resolver with the mocked Prisma so the coded
+        // INVOICE_SCHEDULER_ADMIN_SUMMARY default flows through. mockPrisma's
+        // messageTemplate.findUnique returns undefined by default, so the
+        // resolver falls through to the coded default — mirroring production
+        // behaviour for a tenant that has not customised anything.
+        MessageTemplateResolverService,
       ],
     }).compile();
   };

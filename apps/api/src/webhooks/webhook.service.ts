@@ -828,10 +828,33 @@ export class WebhookService {
 
         result.processed++;
       } else {
-        // No record found - just log for now
-        this.logger.debug(
-          `No WhatsApp message record found for Twilio SID: ${messageSid}`,
+        // Unknown SID — the callback references a WhatsApp message we never
+        // recorded (out-of-order, cross-environment, or stale). Warn so it
+        // surfaces in logs (was debug — silently swallowed), record to the
+        // webhook_logs table for triage, and still audit for the paper trail.
+        this.logger.warn(
+          `Twilio status callback for unknown WhatsApp SID ${messageSid} ` +
+            `(status=${messageStatus}, to=${to}, from=${from}, errorCode=${errorCode ?? 'none'})`,
         );
+
+        await this.prisma.webhookLog.create({
+          data: {
+            source: 'twilio',
+            eventType: `whatsapp.status.unknown_sid.${messageStatus}`,
+            deliveryId: messageSid,
+            payload: {
+              messageSid,
+              messageStatus,
+              to,
+              from,
+              errorCode,
+              errorMessage,
+              timestamp: new Date().toISOString(),
+            } as never,
+            processed: false,
+            error: `No WhatsApp message record found for Twilio SID: ${messageSid}`,
+          },
+        });
 
         // Log to audit for tracking
         await this.auditLogService.logAction({

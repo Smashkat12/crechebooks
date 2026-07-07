@@ -33,7 +33,7 @@ import type {
   RolloutMode,
   ComparisonReport,
 } from '../../../agents/rollout/interfaces/comparison-report.interface';
-import { DEFAULT_PROMOTION_CRITERIA } from '../../../agents/rollout/interfaces/comparison-report.interface';
+import { resolvePromotionCriteria } from '../../../agents/rollout/interfaces/comparison-report.interface';
 import {
   AGENT_FLAG_MAP,
   AgentRolloutListResponseDto,
@@ -210,12 +210,15 @@ export class AgentRolloutService {
     )) as RolloutMode;
 
     // PRIMARY promotion: enforce criteria unless force=true
+    // Uses per-agent-aware criteria so agents with custom SLA (via
+    // PROMOTION_CRITERIA_BY_AGENT) evaluate against their own thresholds.
     if (mode === 'PRIMARY' && !force) {
+      const effectiveCriteria = resolvePromotionCriteria(agentType);
       const report = await this.aggregator.generateReport(
         agentType,
         tenantId,
-        DEFAULT_PROMOTION_CRITERIA.minPeriodDays,
-        DEFAULT_PROMOTION_CRITERIA,
+        effectiveCriteria.minPeriodDays,
+        effectiveCriteria,
       );
       if (!report.meetsPromotionCriteria) {
         this.logger.warn(

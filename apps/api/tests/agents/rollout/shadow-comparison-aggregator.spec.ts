@@ -8,6 +8,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ShadowComparisonAggregator } from '../../../src/agents/rollout/shadow-comparison-aggregator';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
+import {
+  DEFAULT_PROMOTION_CRITERIA,
+  PROMOTION_CRITERIA_BY_AGENT,
+  resolvePromotionCriteria,
+} from '../../../src/agents/rollout/interfaces/comparison-report.interface';
+import type { PromotableAgentType } from '../../../src/agents/rollout/interfaces/comparison-report.interface';
 
 describe('ShadowComparisonAggregator', () => {
   let aggregator: ShadowComparisonAggregator;
@@ -167,8 +173,9 @@ describe('ShadowComparisonAggregator', () => {
       ).toBe(true);
     });
 
-    it('should identify promotion blockers for high latency', async () => {
-      // Create 200 comparisons with 100% match but 3x SDK latency
+    it('should identify promotion blockers for egregious latency (>10x)', async () => {
+      // Create 200 comparisons with 100% match but 12x SDK latency.
+      // 12x exceeds the raised default 10x ceiling — should still block.
       const comparisons = Array.from({ length: 200 }, (_, i) => ({
         id: `c-${i}`,
         tenantId: TEST_TENANT,
@@ -178,7 +185,7 @@ describe('ShadowComparisonAggregator', () => {
         resultsMatch: true,
         sdkConfidence: 90,
         heuristicConfidence: 85,
-        sdkDurationMs: 300, // 3x heuristic
+        sdkDurationMs: 1200, // 12x heuristic
         heuristicDurationMs: 100,
         matchDetails: null,
         createdAt: new Date(),
@@ -192,6 +199,39 @@ describe('ShadowComparisonAggregator', () => {
       expect(
         report.promotionBlockers.some((b) => b.includes('SDK latency')),
       ).toBe(true);
+    });
+
+    it('tolerates typical LLM overhead (5x) under the raised default ceiling', async () => {
+      // 5x SDK latency should PASS under the new 10x default — SHADOW-gated
+      // agents are background, so LLM overhead is acceptable when accuracy
+      // matches the heuristic.
+      const comparisons = Array.from({ length: 200 }, (_, i) => ({
+        id: `c-${i}`,
+        tenantId: TEST_TENANT,
+        agentType: 'categorizer',
+        sdkResult: {},
+        heuristicResult: {},
+        resultsMatch: true,
+        sdkConfidence: 90,
+        heuristicConfidence: 85,
+        sdkDurationMs: 500, // 5x heuristic — below the 10x ceiling
+        heuristicDurationMs: 100,
+        matchDetails: null,
+        createdAt: new Date(),
+      }));
+
+      prisma.shadowComparison.findMany.mockResolvedValue(comparisons);
+
+      const report = await aggregator.generateReport(
+        'categorizer',
+        TEST_TENANT,
+        7,
+      );
+
+      expect(report.meetsPromotionCriteria).toBe(true);
+      expect(
+        report.promotionBlockers.some((b) => b.includes('SDK latency')),
+      ).toBe(false);
     });
 
     it('should identify promotion blockers for too few comparisons', async () => {
@@ -422,6 +462,140 @@ describe('ShadowComparisonAggregator', () => {
 
       expect(report.totalDecisions).toBe(0);
       expect(report.meetsPromotionCriteria).toBe(false);
+    });
+  });
+
+  describe('per-agent promotion criteria overrides', () => {
+    // These tests mutate PROMOTION_CRITERIA_BY_AGENT — snapshot & restore per
+    // test so the empty-by-default extension point stays clean for downstream.
+    let snapshot: Partial<
+      Record<PromotableAgentType, Partial<typeof DEFAULT_PROMOTION_CRITERIA>>
+    >;
+
+    beforeEach(() => {
+      snapshot = { ...PROMOTION_CRITERIA_BY_AGENT };
+    });
+    afterEach(() => {
+      for (const k of Object.keys(PROMOTION_CRITERIA_BY_AGENT)) {
+        delete PROMOTION_CRITERIA_BY_AGENT[k as PromotableAgentType];
+      }
+      Object.assign(PROMOTION_CRITERIA_BY_AGENT, snapshot);
+    });
+
+    it('default map is empty (extension point only)', () => {
+      expect(Object.keys(snapshot)).toHaveLength(0);
+    });
+
+    it('resolvePromotionCriteria returns defaults when no override', () => {
+      expect(resolvePromotionCriteria('categorizer')).toEqual(
+        DEFAULT_PROMOTION_CRITERIA,
+      );
+    });
+
+    it('per-agent override is shallow-merged over the default', () => {
+      PROMOTION_CRITERIA_BY_AGENT.sars = { maxLatencyMultiplier: 3.0 };
+      const resolved = resolvePromotionCriteria('sars');
+      expect(resolved.maxLatencyMultiplier).toBe(3.0);
+      // Non-overridden fields fall through
+      expect(resolved.minMatchRate).toBe(
+        DEFAULT_PROMOTION_CRITERIA.minMatchRate,
+      );
+      expect(resolved.minComparisons).toBe(
+        DEFAULT_PROMOTION_CRITERIA.minComparisons,
+      );
+      // Other agents unaffected
+      expect(resolvePromotionCriteria('categorizer').maxLatencyMultiplier).toBe(
+        DEFAULT_PROMOTION_CRITERIA.maxLatencyMultiplier,
+      );
+    });
+
+    it('generateReport picks up per-agent override when criteria omitted', async () => {
+      // Sars gets a tighter 3x latency ceiling via the per-agent map.
+      PROMOTION_CRITERIA_BY_AGENT.sars = { maxLatencyMultiplier: 3.0 };
+
+      // 5x SDK latency: passes default 10x, but fails sars-specific 3x.
+      const comparisons = Array.from({ length: 200 }, (_, i) => ({
+        id: `c-${i}`,
+        tenantId: TEST_TENANT,
+        agentType: 'sars',
+        sdkResult: {},
+        heuristicResult: {},
+        resultsMatch: true,
+        sdkConfidence: 90,
+        heuristicConfidence: 85,
+        sdkDurationMs: 500,
+        heuristicDurationMs: 100,
+        matchDetails: null,
+        createdAt: new Date(),
+      }));
+      prisma.shadowComparison.findMany.mockResolvedValue(comparisons);
+
+      const sarsReport = await aggregator.generateReport(
+        'sars',
+        TEST_TENANT,
+        7,
+      );
+      expect(sarsReport.meetsPromotionCriteria).toBe(false);
+      expect(
+        sarsReport.promotionBlockers.some((b) => b.includes('SDK latency')),
+      ).toBe(true);
+
+      // Same latency profile for categorizer (no override) — should PASS.
+      const catComparisons = comparisons.map((c) => ({
+        ...c,
+        agentType: 'categorizer',
+      }));
+      prisma.shadowComparison.findMany.mockResolvedValue(catComparisons);
+      const catReport = await aggregator.generateReport(
+        'categorizer',
+        TEST_TENANT,
+        7,
+      );
+      expect(catReport.meetsPromotionCriteria).toBe(true);
+    });
+
+    it('explicit criteria argument still bypasses the per-agent map', async () => {
+      // Even though sars has an override, an explicit criteria object wins.
+      PROMOTION_CRITERIA_BY_AGENT.sars = { maxLatencyMultiplier: 3.0 };
+
+      const comparisons = Array.from({ length: 200 }, (_, i) => ({
+        id: `c-${i}`,
+        tenantId: TEST_TENANT,
+        agentType: 'sars',
+        sdkResult: {},
+        heuristicResult: {},
+        resultsMatch: true,
+        sdkConfidence: 90,
+        heuristicConfidence: 85,
+        sdkDurationMs: 500, // 5x — passes 10x, fails per-agent 3x
+        heuristicDurationMs: 100,
+        matchDetails: null,
+        createdAt: new Date(),
+      }));
+      prisma.shadowComparison.findMany.mockResolvedValue(comparisons);
+
+      // Caller passes explicit criteria with 10x ceiling — should PASS,
+      // ignoring the per-agent 3x override.
+      const explicit = {
+        ...DEFAULT_PROMOTION_CRITERIA,
+        maxLatencyMultiplier: 10.0,
+      };
+      const report = await aggregator.generateReport(
+        'sars',
+        TEST_TENANT,
+        7,
+        explicit,
+      );
+      expect(report.meetsPromotionCriteria).toBe(true);
+    });
+  });
+
+  describe('DEFAULT_PROMOTION_CRITERIA', () => {
+    it('permits typical LLM latency overhead on background agents', () => {
+      // Sanity check on the load-bearing constant.
+      expect(DEFAULT_PROMOTION_CRITERIA.maxLatencyMultiplier).toBe(10.0);
+      expect(DEFAULT_PROMOTION_CRITERIA.minMatchRate).toBe(95);
+      expect(DEFAULT_PROMOTION_CRITERIA.minComparisons).toBe(100);
     });
   });
 });

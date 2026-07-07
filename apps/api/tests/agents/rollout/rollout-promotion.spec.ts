@@ -13,7 +13,10 @@ import type {
   ComparisonReport,
   PromotableAgentType,
 } from '../../../src/agents/rollout/interfaces/comparison-report.interface';
-import { DEFAULT_PROMOTION_CRITERIA } from '../../../src/agents/rollout/interfaces/comparison-report.interface';
+import {
+  DEFAULT_PROMOTION_CRITERIA,
+  PROMOTION_CRITERIA_BY_AGENT,
+} from '../../../src/agents/rollout/interfaces/comparison-report.interface';
 
 describe('RolloutPromotionService', () => {
   let service: RolloutPromotionService;
@@ -138,12 +141,14 @@ describe('RolloutPromotionService', () => {
       expect(result.reason).toContain('comparisons');
     });
 
-    it('should block promotion when SDK latency too high', async () => {
+    it('should block promotion when SDK latency egregiously exceeds the ceiling', async () => {
+      // 12x > default 10x ceiling — background-agent-friendly threshold still
+      // catches egregiously slow paths.
       const report = buildReport({
-        sdkAvgLatencyMs: 500,
+        sdkAvgLatencyMs: 1200,
         heuristicAvgLatencyMs: 100,
         meetsPromotionCriteria: false,
-        promotionBlockers: ['SDK latency 5.0x > max 2.0x'],
+        promotionBlockers: ['SDK latency 12.0x > max 10.0x'],
       });
       aggregator.generateReport.mockResolvedValue(report);
 
@@ -229,7 +234,7 @@ describe('RolloutPromotionService', () => {
       }
     });
 
-    it('should pass custom promotion criteria to aggregator', async () => {
+    it('should pass custom promotion criteria to aggregator (full-override path)', async () => {
       const customCriteria = {
         ...DEFAULT_PROMOTION_CRITERIA,
         minMatchRate: 99,
@@ -254,6 +259,47 @@ describe('RolloutPromotionService', () => {
         TEST_TENANT,
         customCriteria.minPeriodDays,
         customCriteria,
+      );
+    });
+
+    it('uses per-agent override when caller omits criteria', async () => {
+      // Simulate a per-agent override for sars with a tighter latency ceiling.
+      const restore = PROMOTION_CRITERIA_BY_AGENT.sars;
+      PROMOTION_CRITERIA_BY_AGENT.sars = { maxLatencyMultiplier: 3.0 };
+      try {
+        aggregator.generateReport.mockResolvedValue(buildReport());
+
+        await service.promote('sars', TEST_TENANT);
+
+        expect(aggregator.generateReport).toHaveBeenCalledWith(
+          'sars',
+          TEST_TENANT,
+          DEFAULT_PROMOTION_CRITERIA.minPeriodDays,
+          expect.objectContaining({
+            maxLatencyMultiplier: 3.0,
+            minMatchRate: DEFAULT_PROMOTION_CRITERIA.minMatchRate,
+            minComparisons: DEFAULT_PROMOTION_CRITERIA.minComparisons,
+          }),
+        );
+      } finally {
+        if (restore === undefined) {
+          delete PROMOTION_CRITERIA_BY_AGENT.sars;
+        } else {
+          PROMOTION_CRITERIA_BY_AGENT.sars = restore;
+        }
+      }
+    });
+
+    it('resolves the raised default 10x latency ceiling when no override', async () => {
+      aggregator.generateReport.mockResolvedValue(buildReport());
+
+      await service.promote('categorizer', TEST_TENANT);
+
+      expect(aggregator.generateReport).toHaveBeenCalledWith(
+        'categorizer',
+        TEST_TENANT,
+        DEFAULT_PROMOTION_CRITERIA.minPeriodDays,
+        expect.objectContaining({ maxLatencyMultiplier: 10.0 }),
       );
     });
   });

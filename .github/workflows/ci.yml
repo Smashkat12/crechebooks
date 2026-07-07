@@ -277,6 +277,185 @@ jobs:
           path: apps/web/.next
           retention-days: 7
 
+  # Playwright browser E2E — currently OPTIONAL / non-blocking.
+  # Intentionally not wired into the ci-summary required set until the suite
+  # has been observed as stable across several runs. Report failures visibly
+  # via the HTML artifact so authors see them without blocking the PR merge.
+  playwright-e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [build]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: crechebooks_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Test infra
+      DATABASE_URL: postgresql://test:test@localhost:5432/crechebooks_test
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      NODE_ENV: test
+      # API auth — JWT provider + dev-login enabled so Playwright can sign in
+      # without Auth0 credentials.
+      AUTH_PROVIDER: jwt
+      DEV_AUTH_ENABLED: 'true'
+      JWT_SECRET: test-secret-key-for-ci-playwright-32chars!
+      JWT_EXPIRES_IN: 7d
+      TOKEN_ENCRYPTION_KEY: test-encryption-key-for-ci-32chars!
+      ENCRYPTION_KEY: test-encryption-key-for-playwright-ci-32chars!
+      # Auth0 / Xero secrets required by config validation even in jwt mode
+      AUTH0_DOMAIN: test-tenant.auth0.com
+      AUTH0_CLIENT_ID: test-client-id-for-ci
+      AUTH0_CLIENT_SECRET: test-client-secret-for-ci
+      XERO_STATE_KEY: test-xero-state-key-for-ci-32ch!
+      XERO_CLIENT_ID: test-xero-client-id
+      XERO_CLIENT_SECRET: test-xero-client-secret
+      # Kill every outbound comms path — Playwright must never trigger email/WA/SMS
+      COMMS_DISABLED: 'true'
+      APP_ENV: test
+      # Dev-login fixture user (matches apps/api/prisma/seed-e2e.ts)
+      # Password: CrecheBooks2026!
+      DEV_USER_1_EMAIL: admin@crechebooks.dev
+      DEV_USER_1_PASSWORD_HASH: $2b$10$832vAOfUH58hxxMEoSU2buJilwW8GNPAQ1BrArlG2/gwyNqeC3Sty
+      DEV_USER_1_NAME: E2E Admin
+      DEV_USER_1_ROLE: ADMIN
+      # Playwright side
+      E2E_TEST_EMAIL: admin@crechebooks.dev
+      E2E_TEST_PASSWORD: CrecheBooks2026!
+      PLAYWRIGHT_BASE_URL: http://localhost:3001
+      # Point Web at the local API
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      NEXT_PUBLIC_ENABLE_DEV_LOGIN: 'true'
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: test-nextauth-secret-min-32-chars-long!
+      # CORS: allow web -> api
+      CORS_ALLOWED_ORIGINS: http://localhost:3001
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @crechebooks/api prisma:generate
+
+      - name: Build shared types
+        run: pnpm --filter @crechebooks/types build
+
+      - name: Run database migrations
+        run: pnpm --filter @crechebooks/api exec prisma migrate deploy
+
+      - name: Seed E2E fixtures
+        run: pnpm --filter @crechebooks/api exec tsx prisma/seed-e2e.ts
+
+      - name: Build API
+        run: pnpm --filter @crechebooks/api build
+
+      - name: Build Web
+        run: pnpm --filter @crechebooks/web build
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @crechebooks/web exec playwright install --with-deps chromium
+
+      - name: Start API server
+        # NOTE: apps/api's `start:prod` script points at `dist/main` which is stale —
+        # the real entrypoint is `dist/src/main.js` (start.sh in prod calls that).
+        # Invoke node directly so this doesn't silently break.
+        run: |
+          nohup node apps/api/dist/src/main.js > /tmp/api.log 2>&1 &
+          echo $! > /tmp/api.pid
+          echo "API PID: $(cat /tmp/api.pid)"
+
+      - name: Start Web server
+        run: |
+          nohup pnpm --filter @crechebooks/web exec next start -p 3001 > /tmp/web.log 2>&1 &
+          echo $! > /tmp/web.pid
+          echo "Web PID: $(cat /tmp/web.pid)"
+
+      - name: Wait for API (port 3000) and Web (port 3001)
+        run: |
+          set -e
+          for port in 3000 3001; do
+            echo "Waiting for port $port..."
+            for i in $(seq 1 60); do
+              if nc -z localhost $port; then
+                echo "Port $port is up (after ${i}s)"
+                break
+              fi
+              sleep 1
+              if [ $i -eq 60 ]; then
+                echo "::error::Port $port did not come up in 60s"
+                echo "=== /tmp/api.log ==="
+                tail -100 /tmp/api.log || true
+                echo "=== /tmp/web.log ==="
+                tail -100 /tmp/web.log || true
+                exit 1
+              fi
+            done
+          done
+          # Additional API health check
+          curl -sS http://localhost:3000/health | head -c 200 || echo "(health endpoint response above)"
+
+      - name: Run Playwright tests
+        run: pnpm --filter @crechebooks/web exec playwright test
+
+      - name: Stop servers
+        if: always()
+        run: |
+          [ -f /tmp/api.pid ] && kill $(cat /tmp/api.pid) 2>/dev/null || true
+          [ -f /tmp/web.pid ] && kill $(cat /tmp/web.pid) 2>/dev/null || true
+
+      - name: Upload Playwright HTML report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 14
+
+      - name: Upload server logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-server-logs
+          path: |
+            /tmp/api.log
+            /tmp/web.log
+          retention-days: 7
+
   # Docker Build (PR only)
   docker-build:
     name: Docker Build Test

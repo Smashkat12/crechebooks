@@ -80,14 +80,51 @@ export interface PromotionCriteria {
   minPeriodDays: number;
 }
 
-/** Default promotion criteria */
+/**
+ * Default promotion criteria.
+ *
+ * NOTE on `maxLatencyMultiplier`: SHADOW-gated agents are all background
+ * (categorization, matching, orchestrator workflows, SARS, extraction validator)
+ * — absolute LLM latency does not affect user-facing UX. Only egregiously slow
+ * paths (≈10× the heuristic) should block promotion. Historical 2.0× ceiling
+ * was blocking legitimate promotions where the LLM agreed with the heuristic
+ * 98–100% of the time on hundreds of shadow decisions.
+ */
 export const DEFAULT_PROMOTION_CRITERIA: PromotionCriteria = {
   minMatchRate: 95,
-  maxLatencyMultiplier: 2.0,
+  maxLatencyMultiplier: 10.0,
   minComparisons: 100,
   maxErrorRate: 1,
   minPeriodDays: 7,
 };
+
+/**
+ * Per-agent promotion criteria overrides.
+ *
+ * Extension point — populate this if a specific agent has different SLA needs
+ * (e.g. real-time inline agents added later where SDK latency IS user-visible).
+ * Overrides are shallow-merged on top of `DEFAULT_PROMOTION_CRITERIA` via
+ * `resolvePromotionCriteria(agentType)`; unspecified keys fall through to the
+ * default. An explicit `criteria` argument to
+ * `RolloutPromotionService.promote()` still bypasses this map entirely.
+ */
+export const PROMOTION_CRITERIA_BY_AGENT: Partial<
+  Record<PromotableAgentType, Partial<PromotionCriteria>>
+> = {};
+
+/**
+ * Resolve the effective promotion criteria for a given agent type by shallow-
+ * merging `PROMOTION_CRITERIA_BY_AGENT[agentType]` on top of
+ * `DEFAULT_PROMOTION_CRITERIA`. Per-agent overrides take precedence.
+ */
+export function resolvePromotionCriteria(
+  agentType: PromotableAgentType,
+): PromotionCriteria {
+  return {
+    ...DEFAULT_PROMOTION_CRITERIA,
+    ...(PROMOTION_CRITERIA_BY_AGENT[agentType] ?? {}),
+  };
+}
 
 /**
  * Result of a promotion or rollback operation.

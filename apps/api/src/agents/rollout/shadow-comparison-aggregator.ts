@@ -16,7 +16,7 @@ import type {
   PromotionCriteria,
   AgentMetric,
 } from './interfaces/comparison-report.interface';
-import { DEFAULT_PROMOTION_CRITERIA } from './interfaces/comparison-report.interface';
+import { resolvePromotionCriteria } from './interfaces/comparison-report.interface';
 
 /** Shape of a ShadowComparison row returned from Prisma */
 interface ShadowComparisonRow {
@@ -51,15 +51,20 @@ export class ShadowComparisonAggregator {
    * @param agentType - Agent type to report on
    * @param tenantId - Tenant ID
    * @param periodDays - Number of days to include (default: 7)
-   * @param criteria - Promotion criteria to evaluate against
+   * @param criteria - Optional promotion criteria. When omitted, resolves via
+   *   `resolvePromotionCriteria(agentType)` — i.e. default criteria merged with
+   *   any `PROMOTION_CRITERIA_BY_AGENT[agentType]` overrides. Callers that want
+   *   a hand-crafted set (e.g. previewing "what if we raised min match rate")
+   *   still pass criteria explicitly and bypass the per-agent map.
    * @returns Aggregated comparison report
    */
   async generateReport(
     agentType: PromotableAgentType,
     tenantId: string,
     periodDays: number = 7,
-    criteria: PromotionCriteria = DEFAULT_PROMOTION_CRITERIA,
+    criteria?: PromotionCriteria,
   ): Promise<ComparisonReport> {
+    const effectiveCriteria = criteria ?? resolvePromotionCriteria(agentType);
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - periodDays);
@@ -70,7 +75,7 @@ export class ShadowComparisonAggregator {
       startDate,
       endDate,
       periodDays,
-      criteria,
+      effectiveCriteria,
     );
 
     if (!this.prisma) {
@@ -99,7 +104,7 @@ export class ShadowComparisonAggregator {
         startDate,
         endDate,
         periodDays,
-        criteria,
+        effectiveCriteria,
       );
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

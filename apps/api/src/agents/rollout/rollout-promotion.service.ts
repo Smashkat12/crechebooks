@@ -22,7 +22,7 @@ import type {
   PromotionResult,
   PromotionCriteria,
 } from './interfaces/comparison-report.interface';
-import { DEFAULT_PROMOTION_CRITERIA } from './interfaces/comparison-report.interface';
+import { resolvePromotionCriteria } from './interfaces/comparison-report.interface';
 
 /** Maps agent type to feature flag key */
 const AGENT_FLAG_MAP: Record<PromotableAgentType, string> = {
@@ -50,14 +50,19 @@ export class RolloutPromotionService {
    *
    * @param agentType - Agent type to promote
    * @param tenantId - Tenant ID (per-tenant promotion)
-   * @param criteria - Promotion criteria (defaults to standard go/no-go)
+   * @param criteria - Optional full-override promotion criteria. When omitted,
+   *   the effective criteria are `DEFAULT_PROMOTION_CRITERIA` shallow-merged
+   *   with `PROMOTION_CRITERIA_BY_AGENT[agentType]` (per-agent takes precedence).
+   *   Passing an explicit `criteria` object still works as a full override —
+   *   callers that hand-craft criteria for one-off promotions are unchanged.
    * @returns Promotion result with success/failure and report
    */
   async promote(
     agentType: PromotableAgentType,
     tenantId: string,
-    criteria: PromotionCriteria = DEFAULT_PROMOTION_CRITERIA,
+    criteria?: PromotionCriteria,
   ): Promise<PromotionResult> {
+    const effectiveCriteria = criteria ?? resolvePromotionCriteria(agentType);
     const flagKey = AGENT_FLAG_MAP[agentType];
     if (!flagKey) {
       return {
@@ -94,8 +99,8 @@ export class RolloutPromotionService {
     const report = await this.aggregator.generateReport(
       agentType,
       tenantId,
-      criteria.minPeriodDays,
-      criteria,
+      effectiveCriteria.minPeriodDays,
+      effectiveCriteria,
     );
 
     // Check if promotion criteria are met

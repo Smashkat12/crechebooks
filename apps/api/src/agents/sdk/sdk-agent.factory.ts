@@ -14,15 +14,32 @@
  * - Tenant isolation enforced in prompts
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { SdkConfigService, AgentType } from './sdk-config';
 import { AgentDefinition } from './interfaces/sdk-agent.interface';
+import { AgentToolRegistry } from './tools/tool-registry.service';
 
 @Injectable()
 export class SdkAgentFactory {
   private readonly logger = new Logger(SdkAgentFactory.name);
 
-  constructor(private readonly configService: SdkConfigService) {}
+  constructor(
+    private readonly configService: SdkConfigService,
+    // Registry is optional so unit tests that only mock the config service
+    // continue to work. When present, tool lists come from the registry
+    // (real, callable bindings). When absent, tool lists are empty — the LLM
+    // gets no tools rather than fake ones.
+    @Optional() private readonly toolRegistry?: AgentToolRegistry,
+  ) {}
+
+  /**
+   * Resolve the tool-name allowlist for an agent type from the registry.
+   * Returns [] when the registry isn't wired (e.g. bare unit-test setups).
+   */
+  private toolsFor(agent: AgentType): string[] {
+    if (!this.toolRegistry) return [];
+    return this.toolRegistry.getToolNamesForAgent(agent);
+  }
 
   /**
    * Create a categoriser agent definition for classifying bank transactions.
@@ -33,12 +50,7 @@ export class SdkAgentFactory {
       description:
         'Categorises bank transactions into SA chart-of-accounts codes with VAT classification',
       prompt: this.buildCategorizerPrompt(tenantId),
-      tools: [
-        'transaction_lookup',
-        'chart_of_accounts',
-        'historical_categorizations',
-        'pattern_match',
-      ],
+      tools: this.toolsFor('categorizer'),
       model: this.configService.getModelForAgent('categorizer'),
     };
   }
@@ -52,12 +64,7 @@ export class SdkAgentFactory {
       description:
         'Matches bank transactions to outstanding invoices using amount, reference, and date analysis',
       prompt: this.buildMatcherPrompt(tenantId),
-      tools: [
-        'invoice_search',
-        'transaction_lookup',
-        'payment_history',
-        'reference_parser',
-      ],
+      tools: this.toolsFor('matcher'),
       model: this.configService.getModelForAgent('matcher'),
     };
   }
@@ -71,14 +78,7 @@ export class SdkAgentFactory {
       description:
         'Validates and prepares SARS tax submissions for South African compliance',
       prompt: this.buildSarsPrompt(tenantId),
-      tools: [
-        'vat201_lookup',
-        'itr14_lookup',
-        'emp501_lookup',
-        'tax_calendar',
-        'sars_efiling_validate',
-        'withholding_tax_check',
-      ],
+      tools: this.toolsFor('sars'),
       model: this.configService.getModelForAgent('sars'),
     };
   }
@@ -92,12 +92,7 @@ export class SdkAgentFactory {
       description:
         'Validates extracted financial document data (invoices, receipts, statements) for accuracy',
       prompt: this.buildExtractionPrompt(tenantId),
-      tools: [
-        'ocr_result_lookup',
-        'document_metadata',
-        'amount_sanity_check',
-        'balance_reconcile',
-      ],
+      tools: this.toolsFor('extraction'),
       model: this.configService.getModelForAgent('extraction'),
     };
   }
@@ -111,13 +106,7 @@ export class SdkAgentFactory {
       description:
         'Orchestrates multi-agent workflows, routing tasks and managing escalations',
       prompt: this.buildOrchestratorPrompt(tenantId),
-      tools: [
-        'workflow_status',
-        'agent_dispatch',
-        'escalation_manager',
-        'priority_queue',
-        'tenant_config',
-      ],
+      tools: this.toolsFor('orchestrator'),
       model: this.configService.getModelForAgent('orchestrator'),
     };
   }
@@ -131,13 +120,7 @@ export class SdkAgentFactory {
       description:
         'Handles natural language interactions with creche administrators about their finances',
       prompt: this.buildConversationalPrompt(tenantId),
-      tools: [
-        'account_summary',
-        'recent_transactions',
-        'invoice_search',
-        'report_generator',
-        'help_articles',
-      ],
+      tools: this.toolsFor('conversational'),
       model: this.configService.getModelForAgent('conversational'),
     };
   }

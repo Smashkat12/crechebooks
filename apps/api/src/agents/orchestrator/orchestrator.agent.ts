@@ -13,12 +13,20 @@
  * - SARS workflows always L2 (require review)
  * - Transaction/Payment workflows use L3 for high confidence
  * - Tenant isolation on ALL operations
+ *
+ * Persistence & audit trail:
+ *   Every executeWorkflow() call creates a `workflow_runs` row (via
+ *   WorkflowRunRepository) and appends WORKFLOW_START / WORKFLOW_END entries
+ *   to the AgentAuditLog (via AuditTrailService). Both writes are optional
+ *   and non-blocking — a database blip must never regress the workflow.
+ *   The historical .claude/logs/decisions.jsonl file was replaced by these
+ *   two paths; the container filesystem is ephemeral on Railway so the
+ *   file-based log was effectively invisible.
  */
 
 import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { WorkflowRunStatus } from '@prisma/client';
 import { TransactionCategorizerAgent } from '../transaction-categorizer/categorizer.agent';
 import { PaymentMatcherAgent } from '../payment-matcher/matcher.agent';
 import { SarsAgent } from '../sars-agent/sars.agent';
@@ -28,21 +36,31 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import {
   WorkflowRequest,
   WorkflowResult,
-  OrchestratorDecisionLog,
 } from './interfaces/orchestrator.interface';
 import { SdkOrchestrator } from './sdk-orchestrator';
 import { isMultiStepWorkflow } from './workflow-definitions';
 import { AuditTrailService } from '../audit/audit-trail.service';
 import { ShadowRunner } from '../rollout/shadow-runner';
 import type { ComparisonResult } from '../rollout/interfaces/rollout.interface';
+import {
+  WorkflowRunRepository,
+  WorkflowRunTriggeredBy,
+} from './workflow-run.repository';
+
+/**
+ * Optional per-invocation metadata that can be threaded through a workflow
+ * request without touching the shared WorkflowRequest interface. `runId` lets
+ * an outer caller (admin controller, scheduler) reuse an already-created
+ * workflow_runs row; `triggeredBy` records how the run originated for auditing.
+ */
+export interface ExecuteWorkflowOptions {
+  runId?: string;
+  triggeredBy?: WorkflowRunTriggeredBy;
+}
 
 @Injectable()
 export class OrchestratorAgent {
   private readonly logger = new Logger(OrchestratorAgent.name);
-  private readonly decisionsPath = path.join(
-    process.cwd(),
-    '.claude/logs/decisions.jsonl',
-  );
 
   constructor(
     private readonly transactionCategorizer: TransactionCategorizerAgent,
@@ -60,21 +78,28 @@ export class OrchestratorAgent {
     @Optional()
     @Inject(ShadowRunner)
     private readonly shadowRunner?: ShadowRunner,
+    @Optional()
+    @Inject(WorkflowRunRepository)
+    private readonly workflowRuns?: WorkflowRunRepository,
   ) {}
 
   /**
    * Execute a workflow with automatic agent routing
    *
    * @param request - Workflow request with type and parameters
+   * @param options - Optional run metadata (runId reuse, triggeredBy tag)
    * @returns Workflow result with aggregated agent results
    */
-  async executeWorkflow(request: WorkflowRequest): Promise<WorkflowResult> {
+  async executeWorkflow(
+    request: WorkflowRequest,
+    options: ExecuteWorkflowOptions = {},
+  ): Promise<WorkflowResult> {
     if (this.shadowRunner && this.sdkOrchestrator) {
       return this.shadowRunner.run<WorkflowResult>({
         tenantId: request.tenantId,
         agentType: 'orchestrator',
-        sdkFn: () => this._executeWorkflowCore(request, false),
-        heuristicFn: () => this._executeWorkflowCore(request, true),
+        sdkFn: () => this._executeWorkflowCore(request, false, options),
+        heuristicFn: () => this._executeWorkflowCore(request, true, options),
         compareFn: (
           sdk: WorkflowResult,
           heuristic: WorkflowResult,
@@ -95,19 +120,36 @@ export class OrchestratorAgent {
         }),
       });
     }
-    return this._executeWorkflowCore(request, false);
+    return this._executeWorkflowCore(request, false, options);
   }
 
   private async _executeWorkflowCore(
     request: WorkflowRequest,
     skipSdk: boolean,
+    options: ExecuteWorkflowOptions,
   ): Promise<WorkflowResult> {
-    const workflowId = uuidv4();
+    const workflowId = options.runId ?? uuidv4();
     const startedAt = new Date().toISOString();
+    const triggeredBy = options.triggeredBy ?? 'internal';
 
     this.logger.log(
       `Starting workflow ${workflowId}: ${request.type} for tenant ${request.tenantId}`,
     );
+
+    // Persist the run up-front so status endpoints see RUNNING immediately.
+    // When the caller pre-created the row (admin controller / scheduler) we
+    // still call create() — the repository is idempotent-safe: a duplicate
+    // create will log-and-return, and the subsequent updates land on the
+    // existing row.
+    if (this.workflowRuns && !options.runId) {
+      await this.workflowRuns.create({
+        id: workflowId,
+        tenantId: request.tenantId,
+        workflowType: request.type,
+        triggeredBy,
+        input: request.parameters,
+      });
+    }
 
     // TASK-SDK-011: Log workflow start (non-blocking)
     if (this.auditTrail) {
@@ -116,7 +158,11 @@ export class OrchestratorAgent {
           tenantId: request.tenantId,
           workflowId,
           eventType: 'WORKFLOW_START',
-          details: { type: request.type, parameters: request.parameters },
+          details: {
+            type: request.type,
+            parameters: request.parameters,
+            triggeredBy,
+          },
         })
         .catch((err: Error) =>
           this.logger.warn(`Audit workflow start failed: ${err.message}`),
@@ -145,19 +191,26 @@ export class OrchestratorAgent {
         isMultiStepWorkflow(request.type)
       ) {
         try {
+          await this.markStep(workflowId, 'sdk-orchestrator');
           const sdkResult = await this.sdkOrchestrator.execute(request);
           if (sdkResult) {
             // SDK handled it - preserve our workflowId and startedAt
             sdkResult.workflowId = workflowId;
             sdkResult.startedAt = startedAt;
-            // Still log escalations and decisions
+            // Still log escalations
             await this.escalationManager.logMultipleEscalations(
               workflowId,
               request.type,
               request.tenantId,
               sdkResult.escalations,
             );
-            await this.logWorkflowDecision(sdkResult);
+            await this.persistFinalRun(
+              workflowId,
+              request.tenantId,
+              sdkResult,
+              startedAt,
+              request.type,
+            );
             return sdkResult;
           }
         } catch (sdkError) {
@@ -170,27 +223,33 @@ export class OrchestratorAgent {
 
       switch (request.type) {
         case 'CATEGORIZE_TRANSACTIONS':
+          await this.markStep(workflowId, 'categorize');
           await this.executeCategorization(request, result);
           break;
         case 'MATCH_PAYMENTS':
+          await this.markStep(workflowId, 'match');
           await this.executePaymentMatching(request, result);
           break;
         case 'CALCULATE_PAYE':
+          await this.markStep(workflowId, 'paye');
           await this.executePayeCalculation(request, result);
           break;
         case 'GENERATE_EMP201':
+          await this.markStep(workflowId, 'emp201');
           await this.executeEmp201(request, result);
           break;
         case 'GENERATE_VAT201':
+          await this.markStep(workflowId, 'vat201');
           await this.executeVat201(request, result);
           break;
         case 'BANK_IMPORT':
-          // Categorize first, then match payments
+          await this.markStep(workflowId, 'categorize');
           await this.executeCategorization(request, result);
+          await this.markStep(workflowId, 'match');
           await this.executePaymentMatching(request, result);
           break;
         case 'MONTHLY_CLOSE':
-          await this.executeMonthlyClose(request, result);
+          await this.executeMonthlyClose(request, result, workflowId);
           break;
         default:
           throw new Error(`Unknown workflow type: ${String(request.type)}`);
@@ -229,28 +288,14 @@ export class OrchestratorAgent {
       result.escalations,
     );
 
-    // Log workflow decision
-    await this.logWorkflowDecision(result);
-
-    // TASK-SDK-011: Log workflow end (non-blocking)
-    if (this.auditTrail) {
-      const durationMs = Date.now() - new Date(startedAt).getTime();
-      this.auditTrail
-        .logWorkflow({
-          tenantId: request.tenantId,
-          workflowId,
-          eventType: 'WORKFLOW_END',
-          details: {
-            type: request.type,
-            status: result.status,
-            resultCount: result.results.length,
-          },
-          durationMs,
-        })
-        .catch((err: Error) =>
-          this.logger.warn(`Audit workflow end failed: ${err.message}`),
-        );
-    }
+    // Persist final workflow_runs row + emit WORKFLOW_END audit entry
+    await this.persistFinalRun(
+      workflowId,
+      request.tenantId,
+      result,
+      startedAt,
+      request.type,
+    );
 
     this.logger.log(
       `Workflow ${workflowId} completed: ${result.status} ` +
@@ -501,18 +546,22 @@ export class OrchestratorAgent {
   private async executeMonthlyClose(
     request: WorkflowRequest,
     result: WorkflowResult,
+    workflowId: string,
   ): Promise<void> {
     const params = request.parameters as {
       periodMonth: string;
     };
 
     // Step 1: Categorize remaining transactions
+    await this.markStep(workflowId, 'categorize');
     await this.executeCategorization(request, result);
 
     // Step 2: Match pending payments
+    await this.markStep(workflowId, 'match');
     await this.executePaymentMatching(request, result);
 
     // Step 3: Generate EMP201
+    await this.markStep(workflowId, 'emp201');
     await this.executeEmp201(
       { ...request, parameters: { periodMonth: params.periodMonth } },
       result,
@@ -531,32 +580,88 @@ export class OrchestratorAgent {
   }
 
   /**
-   * Log workflow decision to decisions.jsonl
+   * Bump the current step on the workflow_runs row. Non-blocking — a DB
+   * blip must not derail the workflow.
    */
-  private async logWorkflowDecision(result: WorkflowResult): Promise<void> {
-    const entry: OrchestratorDecisionLog = {
-      timestamp: new Date().toISOString(),
-      agent: 'orchestrator',
-      workflowId: result.workflowId,
-      type: result.type,
-      status: result.status,
-      autonomyLevel: result.autonomyLevel,
-      totalProcessed: result.results.reduce((s, r) => s + r.processed, 0),
-      totalAutoApplied: result.results.reduce((s, r) => s + r.autoApplied, 0),
-      totalEscalated: result.results.reduce((s, r) => s + r.escalated, 0),
-      durationMs:
-        new Date(result.completedAt).getTime() -
-        new Date(result.startedAt).getTime(),
-    };
+  private async markStep(workflowId: string, step: string): Promise<void> {
+    if (!this.workflowRuns) return;
+    await this.workflowRuns.update(workflowId, { currentStep: step });
+  }
 
-    try {
-      const logsDir = path.dirname(this.decisionsPath);
-      await fs.mkdir(logsDir, { recursive: true });
-      await fs.appendFile(this.decisionsPath, JSON.stringify(entry) + '\n');
-    } catch (error) {
-      this.logger.error(
-        `Failed to log workflow decision: ${error instanceof Error ? error.message : String(error)}`,
-      );
+  /**
+   * Persist the final state of a workflow run: DB status + WORKFLOW_END audit
+   * entry. Maps WorkflowResult.status → WorkflowRunStatus, so `ESCALATED` and
+   * `PARTIAL` land as `AWAITING_ESCALATION` (both still need a human).
+   */
+  private async persistFinalRun(
+    workflowId: string,
+    tenantId: string,
+    result: WorkflowResult,
+    startedAtIso: string,
+    workflowType: string,
+  ): Promise<void> {
+    const completedAt = new Date();
+    const runStatus = this.mapResultToRunStatus(result.status);
+    const errorMsg =
+      result.status === 'FAILED'
+        ? (result.escalations.find((e) => e.type === 'WORKFLOW_ERROR')
+            ?.reason ?? 'workflow failed')
+        : null;
+
+    if (this.workflowRuns) {
+      await this.workflowRuns.update(workflowId, {
+        status: runStatus,
+        completedAt,
+        currentStep: null,
+        output: {
+          status: result.status,
+          autonomyLevel: result.autonomyLevel,
+          results: result.results,
+          escalations: result.escalations,
+          totalProcessed: result.results.reduce((s, r) => s + r.processed, 0),
+          totalAutoApplied: result.results.reduce(
+            (s, r) => s + r.autoApplied,
+            0,
+          ),
+          totalEscalated: result.results.reduce((s, r) => s + r.escalated, 0),
+        },
+        error: errorMsg,
+      });
+    }
+
+    if (this.auditTrail) {
+      const durationMs = Date.now() - new Date(startedAtIso).getTime();
+      this.auditTrail
+        .logWorkflow({
+          tenantId,
+          workflowId,
+          eventType: 'WORKFLOW_END',
+          details: {
+            type: workflowType,
+            status: result.status,
+            resultCount: result.results.length,
+          },
+          durationMs,
+        })
+        .catch((err: Error) =>
+          this.logger.warn(`Audit workflow end failed: ${err.message}`),
+        );
+    }
+  }
+
+  private mapResultToRunStatus(
+    status: WorkflowResult['status'],
+  ): WorkflowRunStatus {
+    switch (status) {
+      case 'COMPLETED':
+        return WorkflowRunStatus.COMPLETED;
+      case 'FAILED':
+        return WorkflowRunStatus.FAILED;
+      case 'ESCALATED':
+      case 'PARTIAL':
+        return WorkflowRunStatus.AWAITING_ESCALATION;
+      default:
+        return WorkflowRunStatus.COMPLETED;
     }
   }
 

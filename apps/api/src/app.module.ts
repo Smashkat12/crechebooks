@@ -9,6 +9,7 @@ import { PrismaModule } from './database/prisma';
 import { ApiModule } from './api/api.module';
 import { PublicModule } from './api/public/public.module';
 import { AdminModule } from './api/admin/admin.module';
+import { OrchestratorAdminModule } from './api/admin/orchestrator/orchestrator-admin.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { WebhookModule } from './webhooks/webhook.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -69,6 +70,7 @@ import { CommsGuardModule } from './common/services/comms-guard/comms-guard.modu
     ApiModule,
     PublicModule,
     AdminModule,
+    OrchestratorAdminModule, // /admin/orchestrator/* — SUPER_ADMIN workflow triggers
     SchedulerModule,
     WebhookModule,
     MetricsModule, // TASK-PERF-104: Database pool metrics endpoint

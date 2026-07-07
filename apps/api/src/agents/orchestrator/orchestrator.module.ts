@@ -13,6 +13,7 @@ import { WorkflowRouter } from './workflow-router';
 import { EscalationManager } from './escalation-manager';
 import { SdkOrchestrator } from './sdk-orchestrator';
 import { WorkflowResultAdaptor } from './workflow-result-adaptor';
+import { WorkflowRunRepository } from './workflow-run.repository';
 import { TransactionCategorizerModule } from '../transaction-categorizer/categorizer.module';
 import { PaymentMatcherModule } from '../payment-matcher/matcher.module';
 import { SarsAgentModule } from '../sars-agent/sars.module';
@@ -37,7 +38,8 @@ import { RolloutModule } from '../rollout/rollout.module';
     EscalationManager,
     SdkOrchestrator,
     WorkflowResultAdaptor,
+    WorkflowRunRepository,
   ],
-  exports: [OrchestratorAgent],
+  exports: [OrchestratorAgent, WorkflowRunRepository],
 })
 export class OrchestratorModule {}

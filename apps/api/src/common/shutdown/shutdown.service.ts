@@ -57,9 +57,6 @@ export class ShutdownService implements OnApplicationShutdown {
     @InjectQueue(QUEUE_NAMES.INVOICE_GENERATION)
     invoiceQueue?: Queue,
     @Optional()
-    @InjectQueue(QUEUE_NAMES.PAYMENT_REMINDER)
-    paymentReminderQueue?: Queue,
-    @Optional()
     @InjectQueue(QUEUE_NAMES.SARS_DEADLINE)
     sarsDeadlineQueue?: Queue,
     @Optional()
@@ -85,12 +82,6 @@ export class ShutdownService implements OnApplicationShutdown {
       this.queues.push({
         name: QUEUE_NAMES.INVOICE_GENERATION,
         queue: invoiceQueue,
-      });
-    }
-    if (paymentReminderQueue) {
-      this.queues.push({
-        name: QUEUE_NAMES.PAYMENT_REMINDER,
-        queue: paymentReminderQueue,
       });
     }
     if (sarsDeadlineQueue) {

@@ -151,6 +151,44 @@ export interface ReminderDetail {
 }
 
 /**
+ * Per-channel sent/failed counts for manual reminder sends
+ */
+export interface ChannelSendCounts {
+  sent: number;
+  failed: number;
+}
+
+/**
+ * Result of a manual (user-initiated) per-parent reminder send
+ * (POST /arrears/reminder)
+ */
+export interface ManualReminderResult {
+  /** Parents with at least one successful channel delivery */
+  sent: number;
+
+  /** Parents where every attempted channel failed */
+  failed: number;
+
+  /** Parents skipped (not found, inactive, or no overdue invoices) */
+  skipped: number;
+
+  /** Per-channel delivery counts across all parents */
+  byChannel: {
+    email: ChannelSendCounts;
+    whatsapp: ChannelSendCounts;
+  };
+
+  /** Detailed per-parent results */
+  details: Array<{
+    parentId: string;
+    status: 'SENT' | 'FAILED' | 'SKIPPED';
+    /** Anchor invoice the reminder record was attached to (oldest overdue) */
+    invoiceId?: string;
+    error?: string;
+  }>;
+}
+
+/**
  * Result of processing reminders by escalation level
  */
 export interface EscalationResult {

@@ -75,7 +75,6 @@ describe('ShutdownService', () => {
 
     mockQueues = new Map([
       [QUEUE_NAMES.INVOICE_GENERATION, createMockQueue('invoice-generation')],
-      [QUEUE_NAMES.PAYMENT_REMINDER, createMockQueue('payment-reminder')],
       [QUEUE_NAMES.SARS_DEADLINE, createMockQueue('sars-deadline')],
       [QUEUE_NAMES.BANK_SYNC, createMockQueue('bank-sync')],
       [
@@ -98,10 +97,6 @@ describe('ShutdownService', () => {
         {
           provide: getQueueToken(QUEUE_NAMES.INVOICE_GENERATION),
           useValue: mockQueues.get(QUEUE_NAMES.INVOICE_GENERATION)!.queue,
-        },
-        {
-          provide: getQueueToken(QUEUE_NAMES.PAYMENT_REMINDER),
-          useValue: mockQueues.get(QUEUE_NAMES.PAYMENT_REMINDER)!.queue,
         },
         {
           provide: getQueueToken(QUEUE_NAMES.SARS_DEADLINE),
@@ -168,7 +163,7 @@ describe('ShutdownService', () => {
         'Graceful shutdown initiated',
         expect.objectContaining({
           signal: 'SIGTERM',
-          queueCount: 6,
+          queueCount: 5,
         }),
       );
     });
@@ -180,7 +175,7 @@ describe('ShutdownService', () => {
         'Graceful shutdown completed',
         expect.objectContaining({
           durationMs: expect.any(Number),
-          queueCount: 6,
+          queueCount: 5,
         }),
       );
     });

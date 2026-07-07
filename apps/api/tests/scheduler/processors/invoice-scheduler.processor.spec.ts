@@ -27,6 +27,7 @@ import { InvoiceNumberService } from '../../../src/database/services/invoice-num
 import { WelcomePackDeliveryService } from '../../../src/database/services/welcome-pack-delivery.service';
 import { InvoiceDeliveryService } from '../../../src/database/services/invoice-delivery.service';
 import { CommsGuardService } from '../../../src/common/services/comms-guard/comms-guard.service';
+import { EmailService } from '../../../src/integrations/email/email.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InvoiceStatus } from '../../../src/database/entities/invoice.entity';
 import { EnrollmentStatus } from '../../../src/database/entities/enrollment.entity';
@@ -140,6 +141,15 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
           // FEAT-BILLING-AUTOSEND: CommsGuardService stub — isDisabled=false lets sendInvoices path run
           provide: CommsGuardService,
           useValue: { isDisabled: jest.fn().mockReturnValue(false) },
+        },
+        {
+          // Admin notification email — SERVICE mock for external SMTP, not a data mock
+          provide: EmailService,
+          useValue: {
+            sendEmail: jest
+              .fn()
+              .mockResolvedValue({ messageId: 'test-noop', status: 'sent' }),
+          },
         },
       ],
     }).compile();

@@ -1,35 +1,21 @@
 /**
  * Billing Module Exports
  * TASK-BILL-016: Invoice Generation Scheduling Cron Job
- * TASK-PAY-015: Payment Reminder Scheduler Service
  * TASK-PAY-017: Tenant-Customizable Reminder Template Entity
  *
- * BillingSchedulerModule dissolved into SchedulerModule (TASK-BILL-016/TASK-PAY-015 fix).
- * InvoiceScheduleService and PaymentReminderService are provided by SchedulerModule and
- * imported there directly — they are not re-exported from this barrel to avoid confusion.
+ * BillingSchedulerModule dissolved into SchedulerModule (TASK-BILL-016 fix).
+ * InvoiceScheduleService and StatementScheduleService are provided by
+ * SchedulerModule and imported there directly — they are not re-exported from
+ * this barrel to avoid confusion.
+ *
+ * PaymentReminderService and its types/reminder.types were deleted: they
+ * duplicated ArrearsReminderJob (src/jobs/arrears-reminder.job.ts), the
+ * complete always-on arrears reminder engine.
  */
 
 export { ReminderTemplateService } from './reminder-template.service';
 
-// Re-export from types (original reminder types)
-export type {
-  ReminderStage,
-  ReminderChannel,
-  ReminderSchedule,
-  InvoiceWithParent,
-  OverdueInvoice,
-  ReminderHistory,
-  PaymentReminderResult,
-} from './types/reminder.types';
-
-export {
-  DEFAULT_REMINDER_SCHEDULE,
-  getStageForDaysOverdue,
-  getScheduleForStage,
-  shouldUseWhatsApp,
-} from './types/reminder.types';
-
-// Re-export template DTOs (with aliases to avoid conflicts)
+// Re-export template DTOs
 export {
   ReminderStage as TemplateReminderStage,
   ReminderChannel as TemplateReminderChannel,

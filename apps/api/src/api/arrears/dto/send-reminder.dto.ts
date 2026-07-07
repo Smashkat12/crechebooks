@@ -39,13 +39,42 @@ export class SendReminderDto {
   template?: string;
 }
 
-export class SendReminderResponseDto {
-  @ApiProperty()
-  success: boolean;
-
+export class ChannelCountsDto {
   @ApiProperty()
   sent: number;
 
   @ApiProperty()
   failed: number;
+}
+
+export class ReminderChannelBreakdownDto {
+  @ApiProperty({ type: ChannelCountsDto })
+  email: ChannelCountsDto;
+
+  @ApiProperty({ type: ChannelCountsDto })
+  whatsapp: ChannelCountsDto;
+}
+
+export class SendReminderResponseDto {
+  @ApiProperty()
+  success: boolean;
+
+  @ApiProperty({
+    description: 'Parents with at least one successful delivery',
+  })
+  sent: number;
+
+  @ApiProperty({ description: 'Parents where all attempted channels failed' })
+  failed: number;
+
+  @ApiPropertyOptional({
+    description: 'Parents skipped (not found or no overdue invoices)',
+  })
+  skipped?: number;
+
+  @ApiPropertyOptional({
+    description: 'Per-channel delivery counts',
+    type: ReminderChannelBreakdownDto,
+  })
+  byChannel?: ReminderChannelBreakdownDto;
 }

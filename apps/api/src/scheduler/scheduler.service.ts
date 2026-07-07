@@ -6,7 +6,6 @@ import {
   QueueName,
   ScheduledJobData,
   InvoiceGenerationJobData,
-  PaymentReminderJobData,
   SarsDeadlineJobData,
   BankSyncJobData,
   StatementGenerationJobData,
@@ -23,8 +22,6 @@ export class SchedulerService {
   constructor(
     @InjectQueue(QUEUE_NAMES.INVOICE_GENERATION)
     private readonly invoiceQueue: Queue<InvoiceGenerationJobData>,
-    @InjectQueue(QUEUE_NAMES.PAYMENT_REMINDER)
-    private readonly paymentQueue: Queue<PaymentReminderJobData>,
     @InjectQueue(QUEUE_NAMES.SARS_DEADLINE)
     private readonly sarsQueue: Queue<SarsDeadlineJobData>,
     @InjectQueue(QUEUE_NAMES.BANK_SYNC)
@@ -37,8 +34,6 @@ export class SchedulerService {
     switch (queueName) {
       case QUEUE_NAMES.INVOICE_GENERATION:
         return this.invoiceQueue as Queue<ScheduledJobData>;
-      case QUEUE_NAMES.PAYMENT_REMINDER:
-        return this.paymentQueue as Queue<ScheduledJobData>;
       case QUEUE_NAMES.SARS_DEADLINE:
         return this.sarsQueue as Queue<ScheduledJobData>;
       case QUEUE_NAMES.BANK_SYNC:

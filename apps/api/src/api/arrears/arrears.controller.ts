@@ -29,6 +29,10 @@ import {
   ArrearsReportPdfService,
   ArrearsReportOptions,
 } from '../../database/services/arrears-report-pdf.service';
+import { ReminderService } from '../../database/services/reminder.service';
+import { AuditLogService } from '../../database/services/audit-log.service';
+import { AuditAction } from '../../database/entities/audit-log.entity';
+import { DeliveryChannel } from '../../database/dto/reminder.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { IUser } from '../../database/entities/user.entity';
@@ -39,6 +43,7 @@ import {
   ArrearsSummaryResponseDto,
   SendReminderDto,
   SendReminderResponseDto,
+  ReminderMethod,
 } from './dto';
 
 @Controller('arrears')
@@ -52,6 +57,8 @@ export class ArrearsController {
     private readonly parentRepo: ParentRepository,
     private readonly childRepo: ChildRepository,
     private readonly arrearsPdfService: ArrearsReportPdfService,
+    private readonly reminderService: ReminderService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Get()
@@ -298,24 +305,63 @@ export class ArrearsController {
     description: 'Requires OWNER or ADMIN role',
   })
   @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
-  sendReminder(
+  async sendReminder(
     @Body() dto: SendReminderDto,
     @CurrentUser() user: IUser,
-  ): SendReminderResponseDto {
+  ): Promise<SendReminderResponseDto> {
+    const tenantId = getTenantId(user);
+
     this.logger.log(
-      `Send reminder: tenant=${getTenantId(user)}, count=${dto.parentIds.length}, method=${dto.method}`,
+      `Send reminder: tenant=${tenantId}, count=${dto.parentIds.length}, method=${dto.method}`,
     );
 
-    // TODO: In a real implementation, this would integrate with email/WhatsApp services
-    const sent = dto.parentIds.length;
-    const failed = 0;
+    const channelMap: Record<ReminderMethod, DeliveryChannel> = {
+      [ReminderMethod.EMAIL]: DeliveryChannel.EMAIL,
+      [ReminderMethod.WHATSAPP]: DeliveryChannel.WHATSAPP,
+      [ReminderMethod.BOTH]: DeliveryChannel.BOTH,
+    };
 
-    this.logger.log(`Reminders sent: ${sent}, failed: ${failed}`);
+    const result = await this.reminderService.sendManualParentReminders({
+      tenantId,
+      parentIds: dto.parentIds,
+      channel: channelMap[dto.method],
+      template: dto.template,
+    });
+
+    // Audit-log the operator-initiated send (comms mutation)
+    await this.auditLogService.logAction({
+      tenantId,
+      userId: user.id,
+      entityType: 'ArrearsReminder',
+      entityId: `manual-${new Date().toISOString()}`,
+      action: AuditAction.CREATE,
+      afterValue: {
+        parentIds: dto.parentIds,
+        method: dto.method,
+        customTemplate: !!dto.template,
+        sent: result.sent,
+        failed: result.failed,
+        skipped: result.skipped,
+        // Serialise via intermediates to satisfy Prisma.InputJsonValue
+        byChannel: {
+          email: { ...result.byChannel.email },
+          whatsapp: { ...result.byChannel.whatsapp },
+        },
+        details: result.details.map((d) => ({ ...d })),
+      },
+      changeSummary: `Manual arrears reminder via ${dto.method}: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped`,
+    });
+
+    this.logger.log(
+      `Reminders sent: ${result.sent}, failed: ${result.failed}, skipped: ${result.skipped}`,
+    );
 
     return {
-      success: true,
-      sent,
-      failed,
+      success: result.failed === 0,
+      sent: result.sent,
+      failed: result.failed,
+      skipped: result.skipped,
+      byChannel: result.byChannel,
     };
   }
 

@@ -84,10 +84,13 @@ function ChannelTemplates({ channel }: { channel: 'email' | 'whatsapp' }) {
     if (!selectedTemplate) return;
 
     try {
-      await updateTemplate.mutateAsync({
+      const updated = await updateTemplate.mutateAsync({
         id: selectedTemplate.id,
+        key: selectedTemplate.key,
+        apiChannel: selectedTemplate.apiChannel,
         ...data,
       });
+      setSelectedTemplate(updated);
       toast({
         title: 'Template saved',
         description: 'Your changes have been saved successfully.',
@@ -105,7 +108,10 @@ function ChannelTemplates({ channel }: { channel: 'email' | 'whatsapp' }) {
     if (!selectedTemplate) return;
 
     try {
-      const updated = await resetTemplate.mutateAsync(selectedTemplate.id);
+      const updated = await resetTemplate.mutateAsync({
+        key: selectedTemplate.key,
+        apiChannel: selectedTemplate.apiChannel,
+      });
       setSelectedTemplate(updated);
       toast({
         title: 'Template reset',
@@ -191,7 +197,7 @@ export default function TemplatesPage() {
           <CardTitle>Payment Reminder Templates</CardTitle>
           <CardDescription>
             Customize the messages sent to parents for payment reminders.
-            Use variables like {'{parent_name}'} to personalize messages.
+            Use variables like {'{parentName}'} to personalize messages.
           </CardDescription>
         </CardHeader>
         <CardContent>

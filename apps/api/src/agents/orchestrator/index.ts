@@ -10,5 +10,13 @@ export { EscalationManager } from './escalation-manager';
 export { OrchestratorModule } from './orchestrator.module';
 export { SdkOrchestrator } from './sdk-orchestrator';
 export { WorkflowResultAdaptor } from './workflow-result-adaptor';
+export {
+  WorkflowRunRepository,
+  type WorkflowRunTriggeredBy,
+  type WorkflowRunRecord,
+  type CreateWorkflowRunInput,
+  type UpdateWorkflowRunInput,
+  type ListWorkflowRunsFilters,
+} from './workflow-run.repository';
 export * from './interfaces/orchestrator.interface';
 export * from './interfaces/sdk-orchestrator.interface';

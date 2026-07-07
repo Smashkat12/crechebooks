@@ -18,6 +18,7 @@ import { AxiosError } from 'axios';
 
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { XeroRateLimiter } from './xero-rate-limiter.service';
+import { TokenManager } from './client/auth/token-manager';
 import {
   PaymentSyncResponseDto,
   BulkPaymentSyncResponseDto,
@@ -553,8 +554,6 @@ export class XeroPaymentService {
    * Get access token using TokenManager pattern.
    */
   private getAccessToken(tenantId: string): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { TokenManager } = require('../../integrations/xero/client/auth/token-manager');
     const tokenManager = new TokenManager(this.prisma);
     return tokenManager.getAccessToken(tenantId);
   }

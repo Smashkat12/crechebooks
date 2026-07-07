@@ -683,7 +683,7 @@ export class InvoiceRepository {
   async recordPayment(
     id: string,
     tenantId: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     _amountCents: number,
   ): Promise<Invoice> {
     try {

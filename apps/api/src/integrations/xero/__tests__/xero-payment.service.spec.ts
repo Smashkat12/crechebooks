@@ -30,6 +30,13 @@ import {
 } from '../../../shared/exceptions';
 import { centsToRands, randsToCents } from '../dto/xero-payment.dto';
 
+// Mock TokenManager (hoisted by ts-jest above the service import)
+jest.mock('../../../integrations/xero/client/auth/token-manager', () => ({
+  TokenManager: jest.fn().mockImplementation(() => ({
+    getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
+  })),
+}));
+
 describe('XeroPaymentService', () => {
   let service: XeroPaymentService;
   let httpService: HttpService;
@@ -76,13 +83,6 @@ describe('XeroPaymentService', () => {
       findUnique: jest.fn(),
     },
   };
-
-  // Mock TokenManager
-  jest.mock('../../../integrations/xero/client/auth/token-manager', () => ({
-    TokenManager: jest.fn().mockImplementation(() => ({
-      getAccessToken: jest.fn().mockResolvedValue('mock-access-token'),
-    })),
-  }));
 
   const createMockAxiosResponse = <T>(data: T): AxiosResponse<T> => ({
     data,

@@ -9,13 +9,7 @@
  * /webhooks/stub, which inserts the transactions.
  */
 
-import {
-  Controller,
-  Post,
-  HttpCode,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { Controller, Post, HttpCode, HttpStatus, Logger } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,

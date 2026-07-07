@@ -11,7 +11,6 @@ import {
   Param,
   Body,
   Query,
-
   HttpCode,
   HttpStatus,
   Logger,
@@ -62,7 +61,6 @@ function toSnakeCase(fee: FeeStructure): Record<string, unknown> {
 @ApiTags('Fee Structures')
 @ApiBearerAuth()
 @Controller('fee-structures')
-
 export class FeeStructureController {
   private readonly logger = new Logger(FeeStructureController.name);
 

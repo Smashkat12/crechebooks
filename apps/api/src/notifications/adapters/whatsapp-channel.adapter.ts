@@ -182,5 +182,4 @@ export class WhatsAppChannelAdapter implements INotificationChannel {
       };
     }
   }
-
 }

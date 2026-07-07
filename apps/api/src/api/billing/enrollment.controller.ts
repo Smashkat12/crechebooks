@@ -18,7 +18,6 @@ import {
   Param,
   Logger,
   HttpCode,
-
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
@@ -71,7 +70,6 @@ interface EnrollmentResponse {
 @Controller('enrollments')
 @ApiTags('Enrollments')
 @ApiBearerAuth('JWT-auth')
-
 export class EnrollmentController {
   private readonly logger = new Logger(EnrollmentController.name);
 

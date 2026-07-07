@@ -10,7 +10,6 @@ import {
   Param,
   Body,
   Query,
-
   HttpCode,
   HttpStatus,
   Logger,
@@ -39,7 +38,6 @@ import { AccountType } from '@prisma/client';
 @ApiTags('Chart of Accounts')
 @ApiBearerAuth()
 @Controller('accounts')
-
 export class ChartOfAccountController {
   private readonly logger = new Logger(ChartOfAccountController.name);
 

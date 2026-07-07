@@ -2,15 +2,7 @@
  * Onboarding Controller
  * TASK-ACCT-014: Tenant Onboarding Wizard API
  */
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Body,
-
-  Logger,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Logger } from '@nestjs/common';
 import { getTenantId } from '../auth/utils/tenant-assertions';
 import {
   ApiTags,
@@ -32,7 +24,6 @@ import {
 @ApiTags('Onboarding')
 @ApiBearerAuth()
 @Controller('onboarding')
-
 export class OnboardingController {
   private readonly logger = new Logger(OnboardingController.name);
 

@@ -6,7 +6,6 @@ import {
   Body,
   Logger,
   HttpCode,
-
   Res,
   Header,
 } from '@nestjs/common';
@@ -45,7 +44,6 @@ import {
 @Controller('arrears')
 @ApiTags('Arrears')
 @ApiBearerAuth('JWT-auth')
-
 export class ArrearsController {
   private readonly logger = new Logger(ArrearsController.name);
 

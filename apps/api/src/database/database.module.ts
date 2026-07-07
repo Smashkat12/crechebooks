@@ -30,6 +30,7 @@ import { PaymentAllocationService } from './services/payment-allocation.service'
 import { ArrearsService } from './services/arrears.service';
 import { ReminderRepository } from './repositories/reminder.repository';
 import { ReminderService } from './services/reminder.service';
+import { MessageTemplateResolverService } from './services/message-template-resolver.service';
 import { VatService } from './services/vat.service';
 import { VatAdjustmentService } from './services/vat-adjustment.service';
 import { PayeService } from './services/paye.service';
@@ -182,6 +183,7 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ArrearsService,
     ReminderRepository,
     ReminderService,
+    MessageTemplateResolverService,
     VatService,
     VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,
@@ -300,6 +302,7 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     ArrearsService,
     ReminderRepository,
     ReminderService,
+    MessageTemplateResolverService,
     VatService,
     VatAdjustmentService, // TASK-SARS-002: VAT201 Adjustment Fields
     PayeService,

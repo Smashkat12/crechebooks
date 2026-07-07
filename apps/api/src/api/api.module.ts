@@ -21,6 +21,7 @@ import { NotificationApiModule } from './notifications/notification-api.module';
 import { ClassGroupsModule } from './class-groups/class-groups.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { PaymentAttachmentsModule } from './payment-attachments/payment-attachments.module';
+import { TemplatesModule } from './templates/templates.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PaymentAttachmentsModule } from './payment-attachments/payment-attachme
     ClassGroupsModule, // Class Groups CRUD — foundation for attendance (#6, #8, #9, #10)
     AttendanceModule, // Daily Attendance API (#6) — admin+parent endpoints
     PaymentAttachmentsModule, // Proof-of-payment upload + admin review (#11)
+    TemplatesModule, // TASK-TMPL-001: Tenant-editable message templates
   ],
   exports: [
     AuthModule,
@@ -69,6 +71,7 @@ import { PaymentAttachmentsModule } from './payment-attachments/payment-attachme
     ClassGroupsModule,
     AttendanceModule,
     PaymentAttachmentsModule,
+    TemplatesModule,
   ],
 })
 export class ApiModule {}

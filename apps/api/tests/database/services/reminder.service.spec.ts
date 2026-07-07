@@ -16,6 +16,7 @@ import { PaymentRepository } from '../../../src/database/repositories/payment.re
 import { ArrearsService } from '../../../src/database/services/arrears.service';
 import { EmailService } from '../../../src/integrations/email/email.service';
 import { WhatsAppProviderService } from '../../../src/integrations/whatsapp/services/whatsapp-provider.service';
+import { MessageTemplateResolverService } from '../../../src/database/services/message-template-resolver.service';
 import {
   NotFoundException,
   BusinessException,
@@ -96,6 +97,9 @@ describe('ReminderService', () => {
         // Mock external services that require real API credentials
         { provide: EmailService, useValue: mockEmailService },
         { provide: WhatsAppProviderService, useValue: mockWhatsAppService },
+        // TASK-TMPL-001: real resolver — falls through to coded defaults
+        // when no override row exists, matching pre-template behaviour.
+        MessageTemplateResolverService,
       ],
     }).compile();
 

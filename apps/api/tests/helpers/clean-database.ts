@@ -73,6 +73,7 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
       leave_requests,
       manual_match_history,
       message_recipients,
+      message_templates,
       onboarding_checklist_items,
       onboarding_progress,
       opening_balance_imports,

@@ -9,6 +9,7 @@ import 'dotenv/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { InvoiceSchedulerProcessor } from '../../../src/scheduler/processors/invoice-scheduler.processor';
+import { MessageTemplateResolverService } from '../../../src/database/services/message-template-resolver.service';
 import { InvoiceGenerationService } from '../../../src/database/services/invoice-generation.service';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { InvoiceRepository } from '../../../src/database/repositories/invoice.repository';
@@ -151,6 +152,8 @@ describe('InvoiceSchedulerProcessor Integration Tests', () => {
               .mockResolvedValue({ messageId: 'test-noop', status: 'sent' }),
           },
         },
+        // TASK-TMPL-001: real resolver — pulls the coded INVOICE_SCHEDULER_ADMIN_SUMMARY default.
+        MessageTemplateResolverService,
       ],
     }).compile();
 

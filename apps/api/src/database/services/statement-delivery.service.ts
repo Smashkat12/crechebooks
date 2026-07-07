@@ -33,6 +33,7 @@ import {
 } from '../../common/services/email-template/email-template.service';
 // TASK-WA-007: WhatsApp provider (Twilio facade)
 import { WhatsAppProviderService } from '../../integrations/whatsapp/services/whatsapp-provider.service';
+import { MessageTemplateResolverService } from './message-template-resolver.service';
 
 /**
  * Input for delivering a statement
@@ -93,6 +94,8 @@ export class StatementDeliveryService {
     private readonly emailTemplateService: EmailTemplateService,
     // TASK-WA-007: WhatsApp provider service (Twilio)
     private readonly whatsAppProviderService: WhatsAppProviderService,
+    // TASK-TMPL-001: tenant-editable subject line
+    private readonly templateResolver: MessageTemplateResolverService,
   ) {
     this.appUrl =
       this.configService.get<string>('APP_URL') || 'http://localhost:3000';
@@ -212,8 +215,26 @@ export class StatementDeliveryService {
           childNames,
         };
 
-        const { text, html, subject } =
-          this.emailTemplateService.renderStatementEmail(templateData);
+        const {
+          text,
+          html,
+          subject: defaultSubject,
+        } = this.emailTemplateService.renderStatementEmail(templateData);
+
+        // TASK-TMPL-001: allow tenant to override the subject line.
+        const tenantSubjectOverride =
+          await this.templateResolver.resolveAndRender(
+            tenantId,
+            'STATEMENT_DELIVERY',
+            'EMAIL',
+            {
+              tenantName: tenant.tradingName ?? tenant.name,
+            },
+          );
+        const subject =
+          tenantSubjectOverride?.isCustom && tenantSubjectOverride.subject
+            ? tenantSubjectOverride.subject
+            : defaultSubject;
 
         this.logger.log(
           `TASK-BILL-042: Rendered HTML template for statement ${statement.statementNumber}`,

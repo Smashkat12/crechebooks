@@ -15,7 +15,7 @@ import { ReminderRepository } from '../../../src/database/repositories/reminder.
 import { PaymentRepository } from '../../../src/database/repositories/payment.repository';
 import { ArrearsService } from '../../../src/database/services/arrears.service';
 import { EmailService } from '../../../src/integrations/email/email.service';
-import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../../src/integrations/whatsapp/services/whatsapp-provider.service';
 import {
   NotFoundException,
   BusinessException,
@@ -48,7 +48,7 @@ const createMockEmailService = () => ({
 const createMockWhatsAppService = () => ({
   sendMessage: jest
     .fn()
-    .mockResolvedValue({ messageId: 'wa-msg-123', status: 'sent' }),
+    .mockResolvedValue({ success: true, messageId: 'wa-msg-123' }),
   sanitizePhoneNumber: jest.fn().mockImplementation((phone: string) => {
     let digits = phone.replace(/\D/g, '');
     if (digits.length === 10 && digits.startsWith('0')) {
@@ -95,7 +95,7 @@ describe('ReminderService', () => {
         ArrearsService,
         // Mock external services that require real API credentials
         { provide: EmailService, useValue: mockEmailService },
-        { provide: WhatsAppService, useValue: mockWhatsAppService },
+        { provide: WhatsAppProviderService, useValue: mockWhatsAppService },
       ],
     }).compile();
 
@@ -117,8 +117,8 @@ describe('ReminderService', () => {
       status: 'sent',
     });
     mockWhatsAppService.sendMessage.mockResolvedValue({
+      success: true,
       messageId: 'wa-msg-123',
-      status: 'sent',
     });
 
     // CRITICAL: Clean database in FK order - leaf tables first!

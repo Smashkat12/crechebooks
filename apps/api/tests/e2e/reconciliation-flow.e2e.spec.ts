@@ -620,69 +620,42 @@ describe('E2E: Reconciliation Flow', () => {
 
   describe('Income Statement', () => {
     beforeAll(async () => {
-      // Create invoices for income
-      const invoice1 = await prisma.invoice.create({
-        data: {
-          tenantId: testTenant.id,
-          invoiceNumber: 'INV-INCOME-001',
-          parentId,
-          childId,
-          billingPeriodStart: new Date('2025-01-01'),
-          billingPeriodEnd: new Date('2025-01-31'),
-          issueDate: new Date('2025-01-05'),
-          dueDate: new Date('2025-02-05'),
-          subtotalCents: 1000000, // R10,000
-          vatCents: 0,
-          totalCents: 1000000,
-          status: 'PAID',
-          amountPaidCents: 1000000,
-        },
-      });
-      invoiceIds.push(invoice1.id);
+      // NOTE: commit b02ca33 rewrote generateIncomeStatement to read directly
+      // from transactions.xero_account_code (income: 4000-4999, expenses:
+      // 5000-8999 ranges) instead of paid invoices / the categorizations
+      // relation. Income and expense fixtures below are Transaction rows with
+      // xeroAccountCode set, matching that architecture.
 
-      // Create payment for invoice
-      const payment1 = await prisma.payment.create({
+      // Create income transactions
+      const incomeTx1 = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
-          invoiceId: invoice1.id,
-          amountCents: 1000000,
-          paymentDate: new Date('2025-01-20'),
-          matchType: 'EXACT',
-          matchedBy: 'USER',
+          bankAccount: BANK_ACCOUNT,
+          date: new Date('2025-01-05'),
+          description: 'School fee payment - Parent A',
+          amountCents: 1000000, // R10,000
+          isCredit: true,
+          xeroAccountCode: '4110', // Monthly Tuition Fees
+          status: 'CATEGORIZED',
+          source: 'BANK_FEED',
         },
       });
-      paymentIds.push(payment1.id);
+      transactionIds.push(incomeTx1.id);
 
-      const invoice2 = await prisma.invoice.create({
+      const incomeTx2 = await prisma.transaction.create({
         data: {
           tenantId: testTenant.id,
-          invoiceNumber: 'INV-INCOME-002',
-          parentId,
-          childId,
-          billingPeriodStart: new Date('2025-01-01'),
-          billingPeriodEnd: new Date('2025-01-31'),
-          issueDate: new Date('2025-01-10'),
-          dueDate: new Date('2025-02-10'),
-          subtotalCents: 500000, // R5,000
-          vatCents: 0,
-          totalCents: 500000,
-          status: 'PAID',
-          amountPaidCents: 500000,
+          bankAccount: BANK_ACCOUNT,
+          date: new Date('2025-01-10'),
+          description: 'School fee payment - Parent B',
+          amountCents: 500000, // R5,000
+          isCredit: true,
+          xeroAccountCode: '4110', // Monthly Tuition Fees
+          status: 'CATEGORIZED',
+          source: 'BANK_FEED',
         },
       });
-      invoiceIds.push(invoice2.id);
-
-      const payment2 = await prisma.payment.create({
-        data: {
-          tenantId: testTenant.id,
-          invoiceId: invoice2.id,
-          amountCents: 500000,
-          paymentDate: new Date('2025-01-25'),
-          matchType: 'EXACT',
-          matchedBy: 'USER',
-        },
-      });
-      paymentIds.push(payment2.id);
+      transactionIds.push(incomeTx2.id);
 
       // Create expense transactions
       const expenseTx1 = await prisma.transaction.create({
@@ -693,6 +666,7 @@ describe('E2E: Reconciliation Flow', () => {
           description: 'Office supplies',
           amountCents: 200000, // R2,000
           isCredit: false,
+          xeroAccountCode: '5100',
           status: 'CATEGORIZED',
           source: 'BANK_FEED',
         },
@@ -719,6 +693,7 @@ describe('E2E: Reconciliation Flow', () => {
           description: 'Utilities',
           amountCents: 300000, // R3,000
           isCredit: false,
+          xeroAccountCode: '5200',
           status: 'CATEGORIZED',
           source: 'BANK_FEED',
         },
@@ -736,9 +711,36 @@ describe('E2E: Reconciliation Flow', () => {
           confidenceScore: 100,
         },
       });
+
+      const expenseTx3 = await prisma.transaction.create({
+        data: {
+          tenantId: testTenant.id,
+          bankAccount: BANK_ACCOUNT,
+          date: new Date('2025-01-15'),
+          description: 'Salary payment',
+          amountCents: 500000, // R5,000
+          isCredit: false,
+          xeroAccountCode: '5110', // Principal Salary
+          status: 'CATEGORIZED',
+          source: 'BANK_FEED',
+        },
+      });
+      transactionIds.push(expenseTx3.id);
+
+      await prisma.categorization.create({
+        data: {
+          transactionId: expenseTx3.id,
+          accountCode: '5110',
+          accountName: 'Principal Salary',
+          vatType: 'NO_VAT',
+          vatAmountCents: 0,
+          source: 'USER_OVERRIDE',
+          confidenceScore: 100,
+        },
+      });
     });
 
-    it('should calculate total income from paid invoices', async () => {
+    it('should calculate total income from categorized transactions', async () => {
       const response = await request(app.getHttpServer())
         .get('/reconciliation/income-statement')
         .set('Authorization', `Bearer ${authToken}`)
@@ -762,7 +764,7 @@ describe('E2E: Reconciliation Flow', () => {
         });
 
       expect(response.status).toBe(200);
-      // Total expenses: R5k (salary from Bank Reconciliation) + R2k (office) + R3k (utilities)
+      // Total expenses: R5k (salary) + R2k (office) + R3k (utilities)
       expect(response.body.data.expenses.total).toBe(10000.0);
     });
 

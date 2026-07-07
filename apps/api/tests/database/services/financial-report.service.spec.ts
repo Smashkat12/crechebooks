@@ -138,6 +138,16 @@ describe('FinancialReportService (Integration)', () => {
         vatAmountCents: 6522,
       });
 
+      // The P&L reads transactions.xero_account_code directly (b02ca33), so
+      // mirror the real categorization pipeline which stamps the code onto
+      // the transaction row.
+      await transactionRepo.updateCategorization(
+        testTenantId,
+        transaction.id,
+        'CATEGORIZED',
+        DEFAULT_ACCOUNTS.RENT.code,
+      );
+
       // Generate income statement
       const periodStart = new Date('2025-01-01');
       const periodEnd = new Date('2025-01-31');

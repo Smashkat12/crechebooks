@@ -11,6 +11,7 @@ import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { BankFeedService } from '../../../src/integrations/xero/bank-feed.service';
 import { XeroSyncGateway } from '../../../src/integrations/xero/xero.gateway';
 import { XeroAuthService } from '../../../src/integrations/xero/xero-auth.service';
+import { XeroAutoSyncJob } from '../../../src/integrations/xero/xero-auto-sync.job';
 import { TokenManager } from '../../../src/integrations/xero/client/auth/token-manager';
 import type { IUser } from '../../../src/database/entities/user.entity';
 import { BusinessException } from '../../../src/shared/exceptions';
@@ -142,6 +143,13 @@ describe('XeroController - Chart of Accounts', () => {
           useValue: {
             getAccessToken: jest.fn().mockResolvedValue('mock-token'),
             isConnected: jest.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: XeroAutoSyncJob,
+          useValue: {
+            isInFlight: jest.fn().mockReturnValue(false),
+            getRetryState: jest.fn().mockReturnValue(null),
           },
         },
       ],

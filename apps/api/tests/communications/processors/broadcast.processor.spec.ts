@@ -12,7 +12,7 @@ import { BroadcastProcessor } from '../../../src/communications/processors/broad
 import { BroadcastMessageEntity } from '../../../src/communications/entities/broadcast-message.entity';
 import { MessageRecipientEntity } from '../../../src/communications/entities/message-recipient.entity';
 import { EmailService } from '../../../src/integrations/email/email.service';
-import { WhatsAppService } from '../../../src/integrations/whatsapp/whatsapp.service';
+import { WhatsAppProviderService } from '../../../src/integrations/whatsapp/services/whatsapp-provider.service';
 import { AuditLogService } from '../../../src/database/services/audit-log.service';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { cleanDatabase } from '../../helpers/clean-database';
@@ -29,7 +29,7 @@ const mockEmailService = {
 };
 
 const mockWhatsAppService = {
-  sendTextMessage: jest.fn(),
+  sendMessage: jest.fn(),
 };
 
 describe('BroadcastProcessor', () => {
@@ -56,7 +56,7 @@ describe('BroadcastProcessor', () => {
           useValue: mockEmailService,
         },
         {
-          provide: WhatsAppService,
+          provide: WhatsAppProviderService,
           useValue: mockWhatsAppService,
         },
       ],
@@ -82,8 +82,9 @@ describe('BroadcastProcessor', () => {
     // Reset mocks
     jest.clearAllMocks();
     mockEmailService.sendRaw.mockResolvedValue({ messageId: 'test-msg-id' });
-    mockWhatsAppService.sendTextMessage.mockResolvedValue({
-      wamid: 'test-wamid',
+    mockWhatsAppService.sendMessage.mockResolvedValue({
+      success: true,
+      messageId: 'test-wamid',
     });
 
     await cleanDatabase(prisma);
@@ -243,8 +244,8 @@ describe('BroadcastProcessor', () => {
 
       await processor.handleSend(job);
 
-      expect(mockWhatsAppService.sendTextMessage).toHaveBeenCalledTimes(2);
-      expect(mockWhatsAppService.sendTextMessage).toHaveBeenCalledWith(
+      expect(mockWhatsAppService.sendMessage).toHaveBeenCalledTimes(2);
+      expect(mockWhatsAppService.sendMessage).toHaveBeenCalledWith(
         '0821234567',
         'This is a test message',
       );
@@ -266,7 +267,7 @@ describe('BroadcastProcessor', () => {
 
       // Should send via both email and WhatsApp
       expect(mockEmailService.sendRaw).toHaveBeenCalledTimes(2);
-      expect(mockWhatsAppService.sendTextMessage).toHaveBeenCalledTimes(2);
+      expect(mockWhatsAppService.sendMessage).toHaveBeenCalledTimes(2);
     });
 
     it('should update recipient status after sending', async () => {

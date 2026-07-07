@@ -12,6 +12,7 @@ import { BankFeedService } from '../../../src/integrations/xero/bank-feed.servic
 import { XeroSyncGateway } from '../../../src/integrations/xero/xero.gateway';
 import { XeroSyncService } from '../../../src/database/services/xero-sync.service';
 import { XeroAuthService } from '../../../src/integrations/xero/xero-auth.service';
+import { XeroAutoSyncJob } from '../../../src/integrations/xero/xero-auto-sync.job';
 import { PrismaService } from '../../../src/database/prisma/prisma.service';
 import { TokenManager } from '../../../src/integrations/xero/client/auth/token-manager';
 import { IUser, UserRole } from '../../../src/database/entities/user.entity';
@@ -184,6 +185,13 @@ describe('XeroController - Push Categorizations', () => {
           useValue: {
             getAccessToken: jest.fn().mockResolvedValue('mock-token'),
             isConnected: jest.fn().mockResolvedValue(true),
+          },
+        },
+        {
+          provide: XeroAutoSyncJob,
+          useValue: {
+            isInFlight: jest.fn().mockReturnValue(false),
+            getRetryState: jest.fn().mockReturnValue(null),
           },
         },
       ],

@@ -11,6 +11,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OnboardingConversationHandler } from '../onboarding-conversation.handler';
 import { PrismaService } from '../../../../database/prisma/prisma.service';
 import { TwilioContentService } from '../../services/twilio-content.service';
+import { EnrollmentService } from '../../../../database/services/enrollment.service';
+import { FeeStructureRepository } from '../../../../database/repositories/fee-structure.repository';
+import { ParentFeeAgreementPdfService } from '../../../../database/services/parent-fee-agreement-pdf.service';
+import { ParentConsentFormsPdfService } from '../../../../database/services/parent-consent-forms-pdf.service';
+import { MagicLinkService } from '../../../../api/auth/services/magic-link.service';
+// AUDIT-WA-DELIVERY: handler now delivers the enrollment invoice inline
+import { InvoiceDeliveryService } from '../../../../database/services/invoice-delivery.service';
 
 // ============================================
 // Mock factories
@@ -19,6 +26,14 @@ import { TwilioContentService } from '../../services/twilio-content.service';
 const TENANT_ID = 'tenant-e2e';
 const WA_ID = '27821234567';
 const SESSION_ID = 'session-e2e-1';
+
+/** Format a Date as DD/MM/YYYY for validateStartDate / validateDOB inputs */
+function formatDDMMYYYY(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 const mockTenant = {
   id: TENANT_ID,
@@ -97,10 +112,16 @@ function buildMocks(state: SessionState) {
     },
     parent: {
       create: jest.fn().mockResolvedValue({ id: 'parent-e2e-1' }),
+      // PARENT_ADDRESS is stored via a follow-up update once the parent row exists
+      update: jest.fn().mockResolvedValue({ id: 'parent-e2e-1' }),
       findFirst: jest.fn(),
     },
     child: {
       create: jest.fn().mockResolvedValue({ id: 'child-e2e-1' }),
+      update: jest.fn().mockResolvedValue({ id: 'child-e2e-1' }),
+      // Duplicate-child guard (completeOnboarding) looks up an existing child
+      // by name+DOB before creating — no match by default in these tests.
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     user: {
       findMany: jest
@@ -138,9 +159,51 @@ function buildMocks(state: SessionState) {
       ),
   };
 
+  // TASK-WA-015 / AUDIT-WA-DELIVERY: handler now depends on these services for
+  // auto-enrollment, PDF generation, magic-link, and invoice delivery. None of
+  // the flows in this suite select a fee structure, so enrollChild/sendInvoices
+  // are not expected to be invoked, but Nest still needs a provider for each
+  // constructor param to compile the testing module.
+  const mockEnrollmentService = {
+    enrollChild: jest
+      .fn()
+      .mockResolvedValue({ enrollment: { id: 'enr-e2e-1' }, invoice: null }),
+  };
+
+  const mockFeeStructureRepo = {
+    findActiveByTenant: jest.fn().mockResolvedValue([]),
+    findById: jest.fn().mockResolvedValue(null),
+  };
+
+  const mockFeeAgreementPdfService = {
+    generateFeeAgreement: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockConsentFormsPdfService = {
+    generateConsentForms: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockMagicLinkService = {
+    generateMagicLinkUrl: jest
+      .fn()
+      .mockResolvedValue('https://app.example.com/magic?token=e2e'),
+  };
+
+  const mockInvoiceDeliveryService = {
+    sendInvoices: jest
+      .fn()
+      .mockResolvedValue({ sent: 1, failed: 0, failures: [] }),
+  };
+
   return {
     mockPrisma,
     mockContentService,
+    mockEnrollmentService,
+    mockFeeStructureRepo,
+    mockFeeAgreementPdfService,
+    mockConsentFormsPdfService,
+    mockMagicLinkService,
+    mockInvoiceDeliveryService,
     sentMessages,
     sentQuickReplies,
     sentListPickers,
@@ -165,6 +228,27 @@ describe('Onboarding E2E Integration', () => {
         OnboardingConversationHandler,
         { provide: PrismaService, useValue: mocks.mockPrisma },
         { provide: TwilioContentService, useValue: mocks.mockContentService },
+        {
+          provide: EnrollmentService,
+          useValue: mocks.mockEnrollmentService,
+        },
+        {
+          provide: FeeStructureRepository,
+          useValue: mocks.mockFeeStructureRepo,
+        },
+        {
+          provide: ParentFeeAgreementPdfService,
+          useValue: mocks.mockFeeAgreementPdfService,
+        },
+        {
+          provide: ParentConsentFormsPdfService,
+          useValue: mocks.mockConsentFormsPdfService,
+        },
+        { provide: MagicLinkService, useValue: mocks.mockMagicLinkService },
+        {
+          provide: InvoiceDeliveryService,
+          useValue: mocks.mockInvoiceDeliveryService,
+        },
       ],
     }).compile();
 
@@ -217,8 +301,18 @@ describe('Onboarding E2E Integration', () => {
       // Step 7: PARENT_ID_NUMBER (skip)
       await handler.handleMessage(WA_ID, TENANT_ID, 'skip');
 
+      // Step 7b: PARENT_ADDRESS
+      await handler.handleMessage(
+        WA_ID,
+        TENANT_ID,
+        '12 Oak Street, Johannesburg, 2196',
+      );
+
       // Step 8: CHILD_NAME
       await handler.handleMessage(WA_ID, TENANT_ID, 'Lily');
+
+      // Step 8b: CHILD_SURNAME
+      await handler.handleMessage(WA_ID, TENANT_ID, 'Smith');
 
       // Step 9: CHILD_DOB
       await handler.handleMessage(WA_ID, TENANT_ID, `15/06/${year}`);
@@ -241,8 +335,20 @@ describe('Onboarding E2E Integration', () => {
       // Step 15: ID_DOCUMENT (skip)
       await handler.handleMessage(WA_ID, TENANT_ID, 'skip');
 
-      // Step 16: FEE_AGREEMENT
+      // Step 16: FEE_AGREEMENT (FEE_SELECTION auto-skips — no fee structures mocked)
       await handler.handleMessage(WA_ID, TENANT_ID, 'agree');
+
+      // Step 16b: START_DATE
+      await handler.handleMessage(WA_ID, TENANT_ID, formatDDMMYYYY(new Date()));
+
+      // Step 16c: MEDIA_CONSENT
+      await handler.handleMessage(WA_ID, TENANT_ID, 'media_all');
+
+      // Step 16d: AUTHORIZED_COLLECTORS (skip)
+      await handler.handleMessage(WA_ID, TENANT_ID, 'skip');
+
+      // Step 16e: CONSENT_AGREEMENT
+      await handler.handleMessage(WA_ID, TENANT_ID, 'I Agree');
 
       // Step 17: COMMUNICATION_PREFS
       await handler.handleMessage(WA_ID, TENANT_ID, 'both');
@@ -286,21 +392,14 @@ describe('Onboarding E2E Integration', () => {
       expect(completedCall).toBeDefined();
 
       // Verify: Confirmation message sent with tenant name
+      // TASK-WA-014/c1fde82: completion copy is "Enrollment complete for ..."
+      // (was "Registration complete"); admin visibility now flows through the
+      // enrollment.completed domain event rather than a direct user query.
       expect(mocks.mockContentService.sendSessionMessage).toHaveBeenCalledWith(
         WA_ID,
-        expect.stringContaining('Registration complete'),
+        expect.stringContaining('Enrollment complete'),
         TENANT_ID,
       );
-
-      // TASK-WA-014: Verify admin notification was attempted
-      expect(mocks.mockPrisma.user.findMany).toHaveBeenCalledWith({
-        where: {
-          tenantId: TENANT_ID,
-          role: { in: ['ADMIN', 'OWNER'] },
-          isActive: true,
-        },
-        select: { email: true, name: true },
-      });
     });
   });
 
@@ -414,12 +513,15 @@ describe('Onboarding E2E Integration', () => {
         collectedData: {},
       });
 
+      // TASK-WA-013 (4f874d4): ID_DOCUMENT now accepts PDFs in addition to
+      // images, so a PDF is no longer rejected here — use a content type
+      // that is genuinely neither an image nor a PDF to exercise rejection.
       await handler.handleMessage(
         WA_ID,
         TENANT_ID,
         '',
-        'https://example.com/doc.pdf',
-        'application/pdf',
+        'https://example.com/doc.mp4',
+        'video/mp4',
       );
 
       expect(mocks.mockContentService.sendSessionMessage).toHaveBeenCalledWith(
@@ -449,9 +551,15 @@ describe('Onboarding E2E Integration', () => {
       await handler.handleMessage(WA_ID, TENANT_ID, 'Smith');
       await handler.handleMessage(WA_ID, TENANT_ID, 'jane@example.com');
       await handler.handleMessage(WA_ID, TENANT_ID, 'skip');
+      await handler.handleMessage(
+        WA_ID,
+        TENANT_ID,
+        '12 Oak Street, Johannesburg, 2196',
+      );
 
       // First child
       await handler.handleMessage(WA_ID, TENANT_ID, 'Lily');
+      await handler.handleMessage(WA_ID, TENANT_ID, 'Smith');
       await handler.handleMessage(WA_ID, TENANT_ID, `15/06/${year}`);
       await handler.handleMessage(WA_ID, TENANT_ID, 'None');
 
@@ -460,6 +568,7 @@ describe('Onboarding E2E Integration', () => {
 
       // Second child
       await handler.handleMessage(WA_ID, TENANT_ID, 'Max');
+      await handler.handleMessage(WA_ID, TENANT_ID, 'Smith');
       await handler.handleMessage(WA_ID, TENANT_ID, `01/03/${year}`);
       await handler.handleMessage(WA_ID, TENANT_ID, 'Dairy');
 
@@ -474,8 +583,20 @@ describe('Onboarding E2E Integration', () => {
       // ID document skip
       await handler.handleMessage(WA_ID, TENANT_ID, 'skip');
 
-      // Fee agreement
+      // Fee agreement (FEE_SELECTION auto-skips — no fee structures mocked)
       await handler.handleMessage(WA_ID, TENANT_ID, 'agree');
+
+      // Start date
+      await handler.handleMessage(WA_ID, TENANT_ID, formatDDMMYYYY(new Date()));
+
+      // Media consent
+      await handler.handleMessage(WA_ID, TENANT_ID, 'media_all');
+
+      // Authorized collectors (skip)
+      await handler.handleMessage(WA_ID, TENANT_ID, 'skip');
+
+      // Consent agreement
+      await handler.handleMessage(WA_ID, TENANT_ID, 'I Agree');
 
       // Communication prefs
       await handler.handleMessage(WA_ID, TENANT_ID, 'whatsapp only');
@@ -687,11 +808,15 @@ describe('Onboarding E2E Integration', () => {
   });
 
   // ==========================================
-  // TASK-WA-014: Admin notification on completion
+  // TASK-WA-014: Admin visibility on completion
+  // c1fde82: direct `user.findMany` admin query was removed from this
+  // handler — admin visibility is now delivered via the enrollment.completed
+  // domain event (EnrollmentService.enrollChild -> EnrollmentCompletedHandler),
+  // which is outside this handler's responsibility and mocked out here.
   // ==========================================
 
   describe('Admin notification on completion', () => {
-    it('should query admin users after successful completion', async () => {
+    it('should complete successfully without querying users directly', async () => {
       state.create({
         currentStep: 'CONFIRMATION',
         collectedData: {
@@ -715,20 +840,13 @@ describe('Onboarding E2E Integration', () => {
 
       await handler.handleMessage(WA_ID, TENANT_ID, 'confirm');
 
-      expect(mocks.mockPrisma.user.findMany).toHaveBeenCalledWith({
-        where: {
-          tenantId: TENANT_ID,
-          role: { in: ['ADMIN', 'OWNER'] },
-          isActive: true,
-        },
-        select: { email: true, name: true },
-      });
+      expect(mocks.mockPrisma.parent.create).toHaveBeenCalled();
+      // Admin notification is no longer the handler's responsibility.
+      expect(mocks.mockPrisma.user.findMany).not.toHaveBeenCalled();
     });
 
-    it('should not fail completion if admin notification throws', async () => {
-      mocks.mockPrisma.user.findMany.mockRejectedValue(
-        new Error('User table error'),
-      );
+    it('should not fail completion if child duplicate-guard lookup throws', async () => {
+      mocks.mockPrisma.child.findFirst.mockRejectedValue(new Error('DB error'));
 
       state.create({
         currentStep: 'CONFIRMATION',
@@ -751,15 +869,14 @@ describe('Onboarding E2E Integration', () => {
         },
       });
 
-      // Should not throw - admin notification failure is caught
+      // Should not throw - completeOnboarding wraps the whole flow in try/catch
       await handler.handleMessage(WA_ID, TENANT_ID, 'confirm');
 
-      // Parent should still have been created
-      expect(mocks.mockPrisma.parent.create).toHaveBeenCalled();
-      // Confirmation message should still have been sent
+      // Falls into the error path: a friendly error message is sent instead
+      // of crashing the handler.
       expect(mocks.mockContentService.sendSessionMessage).toHaveBeenCalledWith(
         WA_ID,
-        expect.stringContaining('Registration complete'),
+        expect.stringContaining('something went wrong'),
         TENANT_ID,
       );
     });

@@ -57,7 +57,7 @@ const mockPrisma = {
   featureFlag: {
     findUnique: jest.fn().mockResolvedValue(null), // Not bootstrapped yet
     upsert: jest.fn().mockResolvedValue({
-      tenantId: '__system__',
+      tenantId: '00000000-0000-0000-0000-000000000000',
       flag: 'SONA_BOOTSTRAPPED',
       enabled: true,
       mode: 'PRIMARY',
@@ -145,7 +145,7 @@ describe('SonaBootstrapService', () => {
     ]);
     mockPrisma.featureFlag.findUnique.mockResolvedValue(null);
     mockPrisma.featureFlag.upsert.mockResolvedValue({
-      tenantId: '__system__',
+      tenantId: '00000000-0000-0000-0000-000000000000',
       flag: 'SONA_BOOTSTRAPPED',
       enabled: true,
       mode: 'PRIMARY',
@@ -198,7 +198,7 @@ describe('SonaBootstrapService', () => {
 
     it('should be idempotent (skip if already bootstrapped)', async () => {
       mockPrisma.featureFlag.findUnique.mockResolvedValueOnce({
-        tenantId: '__system__',
+        tenantId: '00000000-0000-0000-0000-000000000000',
         flag: 'SONA_BOOTSTRAPPED',
         enabled: true,
         mode: 'PRIMARY',
@@ -281,12 +281,12 @@ describe('SonaBootstrapService', () => {
         expect.objectContaining({
           where: {
             tenantId_flag: {
-              tenantId: '__system__',
+              tenantId: '00000000-0000-0000-0000-000000000000',
               flag: 'SONA_BOOTSTRAPPED',
             },
           },
           create: expect.objectContaining({
-            tenantId: '__system__',
+            tenantId: '00000000-0000-0000-0000-000000000000',
             flag: 'SONA_BOOTSTRAPPED',
             enabled: true,
             mode: 'PRIMARY',
@@ -434,7 +434,7 @@ describe('SonaBootstrapService', () => {
       expect(mockPrisma.featureFlag.findUnique).toHaveBeenCalledWith({
         where: {
           tenantId_flag: {
-            tenantId: '__system__',
+            tenantId: '00000000-0000-0000-0000-000000000000',
             flag: 'SONA_BOOTSTRAPPED',
           },
         },

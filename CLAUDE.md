@@ -312,72 +312,7 @@ NestJS 11, Prisma 7, PostgreSQL 16, Redis 7 (via BullMQ), Passport (JWT + API ke
 ### Web (`apps/web`)
 Next.js 15, React 19, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Zustand, next-auth
 
-## CLI Tool (@crechebooks/cli)
-
-The CLI provides terminal-based access to CrecheBooks operations.
-
-### Installation
-```bash
-pnpm cli:build                # Build the CLI package
-pnpm cli:link                 # Link globally for 'cb' command
-```
-
-### Authentication
-```bash
-cb auth login                 # Authenticate with API key or OAuth
-cb auth status                # Show current authentication state
-cb auth logout                # Clear stored credentials
-```
-
-### Invoice Commands
-```bash
-# List invoices
-cb invoices list                           # All invoices
-cb invoices list --status DRAFT            # Filter by status
-cb invoices list --from 2025-01-01 --to 2025-01-31
-cb invoices list --format json             # JSON output
-
-# Generate invoices
-cb invoices generate --month 2025-01       # Generate for all enrolled children
-cb invoices generate --month 2025-01 --dry-run  # Preview without creating
-
-# Send invoices
-cb invoices send                           # Send all unsent DRAFT invoices
-cb invoices send --ids INV-001,INV-002     # Send specific invoices
-cb invoices send --channel whatsapp        # Send via WhatsApp
-cb invoices send --channel both            # Send via email and WhatsApp
-
-# Download invoices
-cb invoices download INV-001               # Download single PDF
-cb invoices download --month 2025-01       # Download all for month as ZIP
-```
-
-### Payment Commands
-```bash
-# List payments
-cb payments list                           # All payments
-cb payments list --unallocated             # Unallocated only
-cb payments list --from 2025-01-01         # Filter by date
-cb payments list --format csv > payments.csv
-
-# AI payment matching
-cb payments match                          # Run AI matcher
-cb payments match --dry-run                # Preview matches
-cb payments match --min-confidence 0.9     # Set confidence threshold
-
-# Manual allocation
-cb payments allocate --payment TX-001 --invoice INV-001
-cb payments allocate --payment TX-001 --invoice INV-001 --amount 150000
-```
-
-### Output Formats
-```bash
---format table                # Default tabular output
---format json                 # JSON output for scripting
---format csv                  # CSV output for spreadsheets
-```
-
-All amounts are displayed in ZAR and stored internally as cents.
+All amounts are handled in ZAR and stored internally as cents.
 
 ## important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

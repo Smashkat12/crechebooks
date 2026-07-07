@@ -7,7 +7,6 @@ monorepo_layout:
     web:  apps/web      # Next.js 15
   packages:
     types: packages/types     # Shared TS types (workspace:*)
-    cli:   packages/cli       # `cb` command (Commander + vitest)
 
 team_routing:
   billing-engineer:

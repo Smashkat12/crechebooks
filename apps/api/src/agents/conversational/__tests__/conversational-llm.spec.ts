@@ -70,6 +70,7 @@ function makeClaudeClient(available = true): jest.Mocked<ClaudeClientService> {
     isAvailable: jest.fn().mockReturnValue(available),
     sendMessage: jest.fn().mockResolvedValue({
       content: 'Your total revenue is R5,000.',
+      contentBlocks: [{ type: 'text', text: 'Your total revenue is R5,000.' }],
       model: 'claude-sonnet-4-20250514',
       usage: { inputTokens: 150, outputTokens: 60 },
       stopReason: 'end_turn',

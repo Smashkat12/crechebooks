@@ -25,6 +25,18 @@ export { SdkAgentFactory } from './sdk-agent.factory';
 
 // Base Agent
 export { BaseSdkAgent } from './base-sdk-agent';
+export type { RunWithToolsOptions, ToolLoopResult } from './base-sdk-agent';
+
+// Tool registry + real tool bindings (replaces the decorative string tools).
+export {
+  AgentToolRegistry,
+  AgentToolError,
+  type AgentTool,
+  type AgentToolContext,
+  type AgentToolInputSchema,
+  type AgentToolResult,
+  type AnthropicToolDefinition,
+} from './tools';
 
 // Ruvector Service
 export { RuvectorService } from './ruvector.service';
@@ -36,6 +48,8 @@ export type {
   ClaudeMessage,
   ClaudeRequestOptions,
   ClaudeResponse,
+  ClaudeContentBlock,
+  ClaudeToolDefinition,
 } from './claude-client.service';
 
 // IntelligenceEngine Service

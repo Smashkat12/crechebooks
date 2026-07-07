@@ -130,6 +130,9 @@ describe('SdkSarsExplainer', () => {
     it('returns LLM content directly', async () => {
       claudeClient.sendMessage.mockResolvedValueOnce({
         content: 'Your PAYE for February is R3,750.00.',
+        contentBlocks: [
+          { type: 'text', text: 'Your PAYE for February is R3,750.00.' },
+        ],
         model: 'claude-sonnet-4-20250514',
         usage: { inputTokens: 80, outputTokens: 40 },
         stopReason: 'end_turn',

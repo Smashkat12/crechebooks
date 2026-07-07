@@ -179,8 +179,7 @@ describe('StaffInvitationService', () => {
       expect(result.expiresAt).toBeInstanceOf(Date);
       expect(mockPrisma.staffInvitation.create).toHaveBeenCalledTimes(1);
       expect(mockEmail.sendEmailWithOptions).toHaveBeenCalledTimes(1);
-      const emailCall = mockEmail.sendEmailWithOptions.mock
-        .calls[0][0] as {
+      const emailCall = mockEmail.sendEmailWithOptions.mock.calls[0][0] as {
         to: string;
         subject: string;
         tags: string[];

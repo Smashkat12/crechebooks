@@ -13,6 +13,8 @@
  *   - 4 enrollments (one WITHDRAWN so the status filter has variety)
  *   - 4 invoices covering DRAFT / SENT / PAID / OVERDUE — DRAFT is what the
  *     adhoc-charges spec navigates to
+ *   - 1 staff + 2 APPROVED payrolls (current and previous month) so the
+ *     EMP201 spec can render PAYE / UIF / SDL tiles
  *
  * Intentionally does NOT trigger any comms side-effects (no InvoiceDelivery,
  * no scheduler jobs).
@@ -33,6 +35,9 @@ import {
   UserRole,
   TaxStatus,
   VatCategory,
+  EmploymentType,
+  PayFrequency,
+  PayrollStatus,
 } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -57,6 +62,13 @@ const INVOICE_DRAFT_ID = 'e2e00005-0000-0000-0000-000000000001';
 const INVOICE_SENT_ID = 'e2e00005-0000-0000-0000-000000000002';
 const INVOICE_PAID_ID = 'e2e00005-0000-0000-0000-000000000003';
 const INVOICE_OVERDUE_ID = 'e2e00005-0000-0000-0000-000000000004';
+
+// Staff + payroll for the EMP201 spec. Generating an EMP201 requires at least
+// one APPROVED payroll row for the queried period; without one, the API
+// throws SarsNoPayrollException and the UI never renders the PAYE/UIF/SDL
+// tiles, breaking two SARS specs.
+const STAFF_1_ID = 'e2e00006-0000-0000-0000-000000000001';
+const PAYROLL_1_ID = 'e2e00007-0000-0000-0000-000000000001';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -415,6 +427,88 @@ async function seed() {
     });
   }
   console.log(`E2E seed: ${invoices.length} invoices ready`);
+
+  // 8) Staff — one active employee so the EMP201 spec has PAYE/UIF/SDL to
+  // render. Uses a synthetic but valid-length SA ID (13 digits) so
+  // Emp201Service's validation doesn't blow up.
+  await prisma.staff.upsert({
+    where: { id: STAFF_1_ID },
+    update: {},
+    create: {
+      id: STAFF_1_ID,
+      tenantId: TENANT_ID,
+      employeeNumber: 'E2E-001',
+      firstName: 'Erin',
+      lastName: 'Employee',
+      idNumber: '8501015800081', // 13-digit SA ID, valid checksum
+      taxNumber: '1234567890',
+      email: 'erin.employee@e2e.test',
+      phone: '+27821000004',
+      dateOfBirth: new Date('1985-01-01'),
+      startDate: new Date('2024-01-01'),
+      employmentType: EmploymentType.PERMANENT,
+      payFrequency: PayFrequency.MONTHLY,
+      basicSalaryCents: 2000000, // R20 000
+      isActive: true,
+    },
+  });
+  console.log('E2E seed: staff ready');
+
+  // 9) Payroll — APPROVED payroll for the current calendar month so the
+  // EMP201 spec's `${YYYY}-${MM}` period query returns data. We also seed
+  // the previous month so a late-day roll-over doesn't accidentally push
+  // "current" into a period with no seed data.
+  //
+  // Use UTC dates. Prisma stores @db.Date columns as UTC calendar days; a
+  // local `new Date(y, m, 1)` in negative-offset timezones ends up as the
+  // previous day in UTC and the Emp201Service periodStart >= boundary
+  // filter excludes it.
+  const nowForPayroll = new Date();
+  const monthStart = (offset: number) =>
+    new Date(Date.UTC(nowForPayroll.getUTCFullYear(), nowForPayroll.getUTCMonth() + offset, 1));
+  const monthEnd = (offset: number) =>
+    // Last day of the month at offset — day 0 of the next month, in UTC.
+    new Date(Date.UTC(nowForPayroll.getUTCFullYear(), nowForPayroll.getUTCMonth() + offset + 1, 0));
+
+  const payrollPeriods: Array<{ id: string; start: Date; end: Date }> = [
+    { id: PAYROLL_1_ID, start: monthStart(0), end: monthEnd(0) },
+    {
+      id: PAYROLL_1_ID.replace(/1$/, '2'),
+      start: monthStart(-1),
+      end: monthEnd(-1),
+    },
+  ];
+
+  for (const period of payrollPeriods) {
+    // Round numbers — PAYE/UIF are illustrative, we just need APPROVED rows
+    // for Emp201Service.generateEmp201() to aggregate.
+    const grossCents = 2000000; // R20 000
+    const payeCents = 200000; // R2 000 (illustrative)
+    const uifEmpCents = 20000; // 1% of gross
+    const uifErCents = 20000; // 1% of gross
+    const netCents = grossCents - payeCents - uifEmpCents;
+
+    await prisma.payroll.upsert({
+      where: { id: period.id },
+      update: { status: PayrollStatus.APPROVED },
+      create: {
+        id: period.id,
+        tenantId: TENANT_ID,
+        staffId: STAFF_1_ID,
+        payPeriodStart: period.start,
+        payPeriodEnd: period.end,
+        basicSalaryCents: grossCents,
+        grossSalaryCents: grossCents,
+        payeCents,
+        uifEmployeeCents: uifEmpCents,
+        uifEmployerCents: uifErCents,
+        netSalaryCents: netCents,
+        status: PayrollStatus.APPROVED,
+        paymentDate: period.end,
+      },
+    });
+  }
+  console.log(`E2E seed: ${payrollPeriods.length} approved payroll(s) ready`);
 
   console.log('E2E seed: DONE');
 }

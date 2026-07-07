@@ -17,7 +17,6 @@ import {
   Param,
   Query,
   Res,
-
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -69,7 +68,6 @@ import {
 @ApiTags('SimplePay Integration')
 @ApiBearerAuth()
 @Controller('integrations/simplepay')
-
 @ApiExtraModels(
   SetupConnectionDto,
   ConnectionStatusDto,

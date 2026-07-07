@@ -293,10 +293,23 @@ describe('StaffOnboardingController — S3 upload', () => {
 // ---------------------------------------------------------------------------
 
 const mockOnboardingProgress = {
-  onboarding: { id: 'onb-id', staffId: STAFF_ID, status: 'IN_PROGRESS', currentStep: 'PERSONAL_INFO' },
+  onboarding: {
+    id: 'onb-id',
+    staffId: STAFF_ID,
+    status: 'IN_PROGRESS',
+    currentStep: 'PERSONAL_INFO',
+  },
   checklistItems: [],
   documents: [],
-  progress: { totalItems: 14, completedItems: 0, requiredItems: 10, completedRequiredItems: 0, percentComplete: 0, requiredPercentComplete: 0, byCategory: {} },
+  progress: {
+    totalItems: 14,
+    completedItems: 0,
+    requiredItems: 10,
+    completedRequiredItems: 0,
+    percentComplete: 0,
+    requiredPercentComplete: 0,
+    byCategory: {},
+  },
 };
 
 const mockOnboardingService = {
@@ -394,10 +407,9 @@ describe('StaffPortalController — S3 upload', () => {
         'ID_DOCUMENT',
       );
 
-      expect(mockOnboardingService.ensureOnboardingForStaff).toHaveBeenCalledWith(
-        STAFF_ID,
-        TENANT_ID,
-      );
+      expect(
+        mockOnboardingService.ensureOnboardingForStaff,
+      ).toHaveBeenCalledWith(STAFF_ID, TENANT_ID);
     });
 
     it('calls linkDocumentToChecklistItem with staffId and documentType after upload', async () => {
@@ -407,11 +419,9 @@ describe('StaffPortalController — S3 upload', () => {
         'ID_DOCUMENT',
       );
 
-      expect(mockOnboardingService.linkDocumentToChecklistItem).toHaveBeenCalledWith(
-        STAFF_ID,
-        'ID_DOCUMENT',
-        STAFF_ID,
-      );
+      expect(
+        mockOnboardingService.linkDocumentToChecklistItem,
+      ).toHaveBeenCalledWith(STAFF_ID, 'ID_DOCUMENT', STAFF_ID);
     });
   });
 });
@@ -464,10 +474,9 @@ describe('StaffPortalController — onboarding bootstrap on first step update', 
     it('calls ensureOnboardingForStaff with staffId and tenantId', async () => {
       await controller.updateTaxInfo(mockSession, { taxNumber: '1234567890' });
 
-      expect(mockOnboardingService.ensureOnboardingForStaff).toHaveBeenCalledWith(
-        STAFF_ID,
-        TENANT_ID,
-      );
+      expect(
+        mockOnboardingService.ensureOnboardingForStaff,
+      ).toHaveBeenCalledWith(STAFF_ID, TENANT_ID);
     });
 
     it('calls updateOnboardingStep with TAX_INFO step after ensuring row', async () => {
@@ -484,16 +493,23 @@ describe('StaffPortalController — onboarding bootstrap on first step update', 
     it('calls updateOnboardingStep even when ensureOnboardingForStaff returns fresh row', async () => {
       mockOnboardingService.ensureOnboardingForStaff.mockResolvedValueOnce({
         ...mockOnboardingProgress,
-        onboarding: { ...mockOnboardingProgress.onboarding, status: 'IN_PROGRESS' },
+        onboarding: {
+          ...mockOnboardingProgress.onboarding,
+          status: 'IN_PROGRESS',
+        },
       });
 
       await controller.updateTaxInfo(mockSession, { taxStatus: 'REGISTERED' });
 
-      expect(mockOnboardingService.updateOnboardingStep).toHaveBeenCalledTimes(1);
+      expect(mockOnboardingService.updateOnboardingStep).toHaveBeenCalledTimes(
+        1,
+      );
     });
 
     it('returns success response', async () => {
-      const result = await controller.updateTaxInfo(mockSession, { taxNumber: '9876543210' });
+      const result = await controller.updateTaxInfo(mockSession, {
+        taxNumber: '9876543210',
+      });
 
       expect(result).toEqual({
         success: true,
@@ -506,10 +522,9 @@ describe('StaffPortalController — onboarding bootstrap on first step update', 
     it('calls ensureOnboardingForStaff with staffId and tenantId', async () => {
       await controller.updateBankingDetails(mockSession, { bankName: 'FNB' });
 
-      expect(mockOnboardingService.ensureOnboardingForStaff).toHaveBeenCalledWith(
-        STAFF_ID,
-        TENANT_ID,
-      );
+      expect(
+        mockOnboardingService.ensureOnboardingForStaff,
+      ).toHaveBeenCalledWith(STAFF_ID, TENANT_ID);
     });
 
     it('calls updateOnboardingStep with BANKING step after ensuring row', async () => {
@@ -529,7 +544,9 @@ describe('StaffPortalController — onboarding bootstrap on first step update', 
     });
 
     it('returns success response', async () => {
-      const result = await controller.updateBankingDetails(mockSession, { bankName: 'ABSA' });
+      const result = await controller.updateBankingDetails(mockSession, {
+        bankName: 'ABSA',
+      });
 
       expect(result).toEqual({
         success: true,

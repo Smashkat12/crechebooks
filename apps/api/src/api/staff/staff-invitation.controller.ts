@@ -16,7 +16,6 @@ import {
   Get,
   Param,
   Body,
-
   HttpCode,
   HttpStatus,
   Logger,
@@ -39,7 +38,6 @@ import { StaffInvitationService } from './staff-invitation.service';
 @ApiTags('Staff Invitations')
 @ApiBearerAuth()
 @Controller('staff')
-
 export class StaffInvitationController {
   private readonly logger = new Logger(StaffInvitationController.name);
 

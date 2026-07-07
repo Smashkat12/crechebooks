@@ -10,7 +10,6 @@ import {
   Param,
   Body,
   Query,
-
   HttpCode,
   HttpStatus,
   Logger,
@@ -35,7 +34,6 @@ import { QuoteStatus } from '@prisma/client';
 @ApiTags('Quotes')
 @ApiBearerAuth()
 @Controller('quotes')
-
 export class QuoteController {
   private readonly logger = new Logger(QuoteController.name);
 

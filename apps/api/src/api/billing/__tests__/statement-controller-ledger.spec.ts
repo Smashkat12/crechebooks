@@ -95,11 +95,13 @@ const sampleLedger = {
   ],
 };
 
-async function buildController(overrides: {
-  computeLiveLedger?: jest.Mock;
-  generateLedgerPdf?: jest.Mock;
-  parent?: typeof parent | null;
-} = {}) {
+async function buildController(
+  overrides: {
+    computeLiveLedger?: jest.Mock;
+    generateLedgerPdf?: jest.Mock;
+    parent?: typeof parent | null;
+  } = {},
+) {
   const computeLiveLedger =
     overrides.computeLiveLedger ?? jest.fn().mockResolvedValue(sampleLedger);
   const generateLedgerPdf =
@@ -128,16 +130,24 @@ async function buildController(overrides: {
         provide: StatementRepository,
         useValue: { findByTenant: jest.fn(), findById: jest.fn() },
       },
-      { provide: ParentAccountService, useValue: { getAccountSummary: jest.fn() } },
+      {
+        provide: ParentAccountService,
+        useValue: { getAccountSummary: jest.fn() },
+      },
       {
         provide: ParentRepository,
         useValue: {
           findById: jest
             .fn()
-            .mockResolvedValue(overrides.parent === undefined ? parent : overrides.parent),
+            .mockResolvedValue(
+              overrides.parent === undefined ? parent : overrides.parent,
+            ),
         },
       },
-      { provide: StatementDeliveryService, useValue: { deliverStatement: jest.fn() } },
+      {
+        provide: StatementDeliveryService,
+        useValue: { deliverStatement: jest.fn() },
+      },
     ],
   }).compile();
 

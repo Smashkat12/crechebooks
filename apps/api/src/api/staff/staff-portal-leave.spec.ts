@@ -152,8 +152,12 @@ async function buildModule() {
       {
         provide: Irp5PortalService,
         useValue: {
-          listForStaff: jest.fn().mockResolvedValue({ data: [], total: 0, availableYears: [] }),
-          getYearAggregate: jest.fn().mockRejectedValue(new NotFoundException('no data')),
+          listForStaff: jest
+            .fn()
+            .mockResolvedValue({ data: [], total: 0, availableYears: [] }),
+          getYearAggregate: jest
+            .fn()
+            .mockRejectedValue(new NotFoundException('no data')),
         },
       },
       { provide: Irp5PdfService, useValue: {} },

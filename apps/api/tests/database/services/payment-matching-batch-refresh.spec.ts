@@ -38,13 +38,15 @@ describe('PaymentMatchingService - intra-batch invoice consumption', () => {
     const svc = Object.create(
       PaymentMatchingService.prototype,
     ) as PaymentMatchingService;
-    (svc as unknown as {
-      markInvoicePaidInBatch: (
-        invs: InvoiceLike[],
-        id: string,
-        cents: number,
-      ) => void;
-    }).markInvoicePaidInBatch(invoices, invoiceId, amountCents);
+    (
+      svc as unknown as {
+        markInvoicePaidInBatch: (
+          invs: InvoiceLike[],
+          id: string,
+          cents: number,
+        ) => void;
+      }
+    ).markInvoicePaidInBatch(invoices, invoiceId, amountCents);
   };
 
   it('bumps amountPaidCents on the matched invoice without removing it for partial payments', () => {

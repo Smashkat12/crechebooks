@@ -70,7 +70,11 @@ export class FinancialReportService {
    * list sums to the transaction amount (within rounding).
    */
   private async resolveAccountContributions(
-    transactions: { id: string; xeroAccountCode: string | null; amountCents: number }[],
+    transactions: {
+      id: string;
+      xeroAccountCode: string | null;
+      amountCents: number;
+    }[],
   ): Promise<Map<string, AccountContribution[]>> {
     const result = new Map<string, AccountContribution[]>();
     if (transactions.length === 0) return result;
@@ -172,7 +176,8 @@ export class FinancialReportService {
     const expensesByAccount = new Map<string, Decimal>();
 
     for (const tx of transactions) {
-      for (const { accountCode, amountCents } of contributions.get(tx.id) ?? []) {
+      for (const { accountCode, amountCents } of contributions.get(tx.id) ??
+        []) {
         if (tx.isCredit) {
           // Credit transactions are income (or equity injections)
           if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
@@ -180,13 +185,15 @@ export class FinancialReportService {
             incomeByAccount.set(accountCode, current.plus(amountCents));
           } else {
             // Credit to an expense account = refund/reversal, reduce expenses
-            const current = expensesByAccount.get(accountCode) || new Decimal(0);
+            const current =
+              expensesByAccount.get(accountCode) || new Decimal(0);
             expensesByAccount.set(accountCode, current.minus(amountCents));
           }
         } else {
           // Debit transactions
           if (isExpenseAccount(accountCode)) {
-            const current = expensesByAccount.get(accountCode) || new Decimal(0);
+            const current =
+              expensesByAccount.get(accountCode) || new Decimal(0);
             expensesByAccount.set(accountCode, current.plus(amountCents));
           } else if (isIncomeAccount(accountCode)) {
             // Debit to income account = reversal/refund, reduce income
@@ -323,7 +330,8 @@ export class FinancialReportService {
         bankBalanceCents = bankBalanceCents.minus(tx.amountCents);
       }
 
-      for (const { accountCode, amountCents } of contributions.get(tx.id) ?? []) {
+      for (const { accountCode, amountCents } of contributions.get(tx.id) ??
+        []) {
         // Track income and expenses for retained earnings calculation
         if (isIncomeAccount(accountCode) || isEquityAccount(accountCode)) {
           if (tx.isCredit) {
@@ -588,7 +596,8 @@ export class FinancialReportService {
     >();
 
     for (const tx of transactions) {
-      for (const { accountCode, amountCents } of contributions.get(tx.id) ?? []) {
+      for (const { accountCode, amountCents } of contributions.get(tx.id) ??
+        []) {
         const accountName =
           accountNameMap.get(accountCode) || this.getAccountName(accountCode);
 

@@ -153,8 +153,7 @@ export class StaffOnboardingService {
     staffId: string,
     tenantId: string,
   ): Promise<OnboardingProgressResponse> {
-    const existing =
-      await this.onboardingRepo.findOnboardingByStaffId(staffId);
+    const existing = await this.onboardingRepo.findOnboardingByStaffId(staffId);
     if (existing) {
       return this.getOnboardingProgress(existing.id);
     }

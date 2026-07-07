@@ -143,5 +143,4 @@ export class EmailChannelAdapter implements INotificationChannel {
       };
     }
   }
-
 }

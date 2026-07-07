@@ -19,6 +19,7 @@
     "start:api": "pnpm --filter @crechebooks/api start:prod",
     "start:web": "pnpm --filter @crechebooks/web start",
     "lint": "pnpm -r lint",
+    "lint:check": "pnpm --filter @crechebooks/api lint:check && pnpm --filter=!@crechebooks/api -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "test": "pnpm -r test",
     "test:api": "pnpm --filter @crechebooks/api test",

@@ -574,6 +574,12 @@ model Tenant {
   // TASK-FIX-005: Bank fee configuration for multi-bank support
   bankFeeConfig Json? @map("bank_fee_config")
 
+  // TASK-STMT-008: Per-tenant opt-in for the scheduled monthly statement
+  // generation cron. Default false — StatementScheduleService only enrolls
+  // tenants whose flag is true, so this must be explicitly flipped (via the
+  // admin UpdateTenant endpoint) before a tenant is auto-billed statements.
+  statementScheduleEnabled Boolean @default(false) @map("statement_schedule_enabled")
+
   // TASK-ENROL-006: Parent welcome pack customization
   parentWelcomeMessage String? @map("parent_welcome_message") @db.Text
   operatingHours       String? @map("operating_hours") @db.VarChar(200)

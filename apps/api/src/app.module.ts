@@ -24,10 +24,15 @@ import { AccountingModule } from './integrations/accounting/accounting.module';
 import { MailgunInboundModule } from './integrations/mailgun-inbound/mailgun-inbound.module';
 import { RedisThrottlerStorageService } from './common/redis/redis-throttler-storage.service';
 import { ReportsModule } from './modules/reports';
+import { CommsGuardModule } from './common/services/comms-guard/comms-guard.module';
 
 @Module({
   imports: [
     ConfigModule,
+    // Global CommsGuardService — staging safety gate that short-circuits
+    // outbound comms when COMMS_DISABLED=true. Injected by EmailService,
+    // TwilioWhatsAppService, InvoiceDeliveryService, etc.
+    CommsGuardModule,
     // Global event emitter for domain events (enrollment.completed, staff.created, etc.)
     EventEmitterModule.forRoot(),
     // TASK-INFRA-005: Structured JSON logging with correlation ID

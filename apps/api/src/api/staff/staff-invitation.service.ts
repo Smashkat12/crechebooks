@@ -24,7 +24,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { MailgunService } from '../../integrations/mailgun/mailgun.service';
+import { EmailService } from '../../integrations/email/email.service';
 import { StaffMagicLinkService } from '../auth/services/staff-magic-link.service';
 import { AuditAction } from '../../database/entities/audit-log.entity';
 import { Prisma, StaffInvitationStatus } from '@prisma/client';
@@ -68,7 +68,7 @@ export class StaffInvitationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly mailgunService: MailgunService,
+    private readonly emailService: EmailService,
     private readonly staffMagicLinkService: StaffMagicLinkService,
     private readonly configService: ConfigService,
   ) {
@@ -509,10 +509,10 @@ The CrecheBooks Team
 </body>
 </html>`;
 
-    await this.mailgunService.sendEmail({
+    await this.emailService.sendEmailWithOptions({
       to: email,
       subject,
-      text,
+      body: text,
       html,
       tags: ['staff-portal', 'staff-invite'],
     });

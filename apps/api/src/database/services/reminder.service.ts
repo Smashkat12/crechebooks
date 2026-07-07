@@ -223,6 +223,18 @@ export class ReminderService {
             invoice.parent.whatsapp,
             content,
             tenantId,
+            {
+              parentName: invoice.parent.firstName,
+              childName: invoice.child.firstName,
+              dueDate: this.formatDate(invoice.dueDate),
+              crecheName: invoice.tenant.name,
+              crechePhone: invoice.tenant.phone ?? '',
+              crecheEmail: invoice.tenant.email ?? '',
+              // TASK-BILL-043: bank details for the WhatsApp template.
+              bankName: invoice.tenant.bankName ?? '',
+              accountNumber: invoice.tenant.bankAccountNumber ?? '',
+              branchCode: invoice.tenant.bankBranchCode ?? '',
+            },
           );
         }
 
@@ -614,10 +626,13 @@ export class ReminderService {
         crecheName: invoice.tenant.name,
         crechePhone: invoice.tenant.phone ?? '',
         crecheEmail: invoice.tenant.email ?? '',
-        // TODO: Add bank details to Tenant model when available
-        bankName: '',
-        accountNumber: '',
-        branchCode: '',
+        // TASK-BILL-043: tenant-level bank details resolved for the
+        // ARREARS_REMINDER_* templates. If a field is not set on the tenant
+        // the placeholder renders as empty string (never as the literal
+        // `{bankName}` token).
+        bankName: invoice.tenant.bankName ?? '',
+        accountNumber: invoice.tenant.bankAccountNumber ?? '',
+        branchCode: invoice.tenant.bankBranchCode ?? '',
       };
 
       // Resolve the tenant's override (or fall through to the coded default)
@@ -949,12 +964,30 @@ export class ReminderService {
    *
    * @param parentPhone - Parent's WhatsApp number (may be null)
    * @param content - Generated reminder content
+   * @param tenantId - Tenant ID for template resolution
+   * @param context - Substitution values that don't live on ReminderContent
+   *                  (parent/child/tenant/bank fields). Optional so pre-template
+   *                  callers still work; when omitted we fall back to regex
+   *                  recovery from `content.body`. TASK-BILL-043 wires the
+   *                  tenant's bank details through this argument so the
+   *                  ARREARS_REMINDER_* WhatsApp templates get real values.
    * @returns Success status with message ID or error
    */
   private async sendViaWhatsApp(
     parentPhone: string | null,
     content: ReminderContent,
     tenantId: string,
+    context?: {
+      parentName?: string;
+      childName?: string;
+      dueDate?: string;
+      crecheName?: string;
+      crechePhone?: string;
+      crecheEmail?: string;
+      bankName?: string;
+      accountNumber?: string;
+      branchCode?: string;
+    },
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!parentPhone) {
       return {
@@ -964,10 +997,9 @@ export class ReminderService {
     }
 
     try {
-      // Recover the values used for the email template from the ReminderContent
-      // (still regex-based for backwards compatibility with pre-template callers)
-      // and pass them to the resolver so the tenant's WHATSAPP override — or the
-      // coded default — renders with the same substitutions.
+      // Regex fallback for callers that don't pass an explicit context.
+      // Prefer the explicit context when available — it carries the tenant's
+      // real bank details and other fields that the email body doesn't expose.
       const parentNameMatch = content.body.match(/Dear ([^,]+)/);
       const childNameMatch = content.body.match(/for ([^']+)'s/);
       const crecheNameMatch = content.body.match(/([^\n]+)$/);
@@ -979,18 +1011,18 @@ export class ReminderService {
         templateKey,
         'WHATSAPP',
         {
-          parentName: parentNameMatch?.[1] ?? 'Parent',
-          childName: childNameMatch?.[1] ?? 'your child',
+          parentName: context?.parentName ?? parentNameMatch?.[1] ?? 'Parent',
+          childName: context?.childName ?? childNameMatch?.[1] ?? 'your child',
           invoiceNumber: content.invoiceNumber,
           amount: this.formatCentsToRand(content.outstandingCents),
           daysOverdue: content.daysOverdue.toString(),
-          dueDate: '', // Would need to pass this separately
-          crecheName: crecheNameMatch?.[1] ?? '',
-          crechePhone: '',
-          crecheEmail: '',
-          bankName: '',
-          accountNumber: '',
-          branchCode: '',
+          dueDate: context?.dueDate ?? '',
+          crecheName: context?.crecheName ?? crecheNameMatch?.[1] ?? '',
+          crechePhone: context?.crechePhone ?? '',
+          crecheEmail: context?.crecheEmail ?? '',
+          bankName: context?.bankName ?? '',
+          accountNumber: context?.accountNumber ?? '',
+          branchCode: context?.branchCode ?? '',
         },
       );
       if (!rendered) {

@@ -104,10 +104,11 @@ test.describe('Enrollments Register', () => {
       // Click filter and select an option
       await statusFilter.first().click();
 
-      // Look for status options (ACTIVE, WITHDRAWN, etc.)
-      const activeOption = page
-        .getByRole('option', { name: /active/i })
-        .or(page.locator('text=Active').first());
+      // The current filter dropdown lists exactly: Active, Inactive, Pending,
+      // All Status (see components/enrollments/EnrollmentFilters.tsx after the
+      // FeeType enum reduction). A permissive /active/i matcher hits both
+      // "Active" and "Inactive" and violates strict-mode — anchor the match.
+      const activeOption = page.getByRole('option', { name: 'Active', exact: true });
 
       if (await activeOption.isVisible({ timeout: 1000 }).catch(() => false)) {
         await activeOption.click();
@@ -245,9 +246,9 @@ test.describe('Enrollments Register', () => {
 
       await statusFilter.first().click();
 
-      const activeOption = page
-        .getByRole('option', { name: /active/i })
-        .or(page.locator('text=Active').first());
+      // Anchor the match — "Active" and "Inactive" both contain "active"
+      // and would violate strict mode with a loose /active/i pattern.
+      const activeOption = page.getByRole('option', { name: 'Active', exact: true });
 
       if (await activeOption.isVisible({ timeout: 1000 }).catch(() => false)) {
         await activeOption.click();

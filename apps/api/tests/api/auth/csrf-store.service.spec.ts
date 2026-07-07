@@ -262,7 +262,12 @@ describe('CsrfStoreService', () => {
       // Verify timestamps are reasonable
       expect(metadata.createdAt).toBeGreaterThanOrEqual(beforeStore);
       expect(metadata.createdAt).toBeLessThanOrEqual(afterStore);
-      expect(metadata.expiresAt).toBe(metadata.createdAt + ttl * 1000);
+      // Service captures createdAt and expiresAt at separate Date.now()
+      // calls, so allow up to a few ms of drift rather than exact equality.
+      const drift = Math.abs(
+        metadata.expiresAt - (metadata.createdAt + ttl * 1000),
+      );
+      expect(drift).toBeLessThanOrEqual(50);
     });
   });
 

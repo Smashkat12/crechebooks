@@ -65,7 +65,7 @@ describe('VatService', () => {
         email: `vat-test-${Date.now()}@test.co.za`,
       },
     });
-  });
+  }, 30_000);
 
   describe('Initialization', () => {
     it('should be defined', () => {

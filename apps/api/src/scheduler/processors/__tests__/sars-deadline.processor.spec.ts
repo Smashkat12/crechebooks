@@ -227,6 +227,66 @@ describe('SarsDeadlineProcessor', () => {
       );
     });
 
+    it('does NOT record the whatsapp channel as sent (pending implementation)', async () => {
+      const deadline = {
+        type: 'VAT201' as const,
+        deadline: new Date(),
+        daysRemaining: 7,
+        period: '2024-01',
+        isSubmitted: false,
+      };
+
+      mockDeadlineService.getUpcomingDeadlines.mockResolvedValue([deadline]);
+      mockDeadlineService.shouldSendReminder.mockResolvedValue(true);
+      mockDeadlineService.getReminderPreferences.mockResolvedValue({
+        reminderDays: [...DEFAULT_REMINDER_DAYS],
+        channels: ['whatsapp'],
+        recipientEmails: ['admin@example.com'],
+        enabled: true,
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@example.com',
+      });
+
+      await processor.processJob(mockJob as any);
+
+      // Nothing dispatched and nothing recorded as sent
+      expect(mockEmailService.sendEmailWithOptions).not.toHaveBeenCalled();
+      expect(mockDeadlineService.recordReminderSent).not.toHaveBeenCalled();
+    });
+
+    it('records only the email channel when both email and whatsapp are configured', async () => {
+      const deadline = {
+        type: 'EMP201' as const,
+        deadline: new Date(),
+        daysRemaining: 7,
+        period: '2024-01',
+        isSubmitted: false,
+      };
+
+      mockDeadlineService.getUpcomingDeadlines.mockResolvedValue([deadline]);
+      mockDeadlineService.shouldSendReminder.mockResolvedValue(true);
+      mockDeadlineService.getReminderPreferences.mockResolvedValue({
+        reminderDays: [...DEFAULT_REMINDER_DAYS],
+        channels: ['email', 'whatsapp'],
+        recipientEmails: ['admin@example.com'],
+        enabled: true,
+      });
+      mockPrisma.tenant.findUnique.mockResolvedValue({
+        name: 'Test Creche',
+        email: 'admin@example.com',
+      });
+
+      await processor.processJob(mockJob as any);
+
+      expect(mockDeadlineService.recordReminderSent).toHaveBeenCalledTimes(1);
+      expect(mockDeadlineService.recordReminderSent).toHaveBeenCalledWith(
+        tenantId,
+        expect.objectContaining({ channel: 'email' }),
+      );
+    });
+
     it('should audit log with comms_disabled status when COMMS_DISABLED gate fires', async () => {
       const deadline = {
         type: 'VAT201' as const,

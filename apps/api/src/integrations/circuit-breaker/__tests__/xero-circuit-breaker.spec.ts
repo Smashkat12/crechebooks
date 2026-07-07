@@ -234,6 +234,123 @@ describe('XeroCircuitBreaker', () => {
     });
   });
 
+  describe('state machine transitions (fake timers)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick'] });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    /** Trip the circuit open by exhausting the configured volume threshold. */
+    async function tripCircuitOpen(): Promise<void> {
+      for (let i = 0; i < 4; i++) {
+        try {
+          await service.execute(() => Promise.reject(new Error('API Error')));
+        } catch {
+          // Expected
+        }
+      }
+    }
+
+    it('transitions CLOSED -> OPEN once the error threshold is exceeded', async () => {
+      const stateChanges: StateChangeEvent[] = [];
+      service.onStateChange((event) => stateChanges.push(event));
+
+      expect(service.getState()).toBe('CLOSED');
+
+      await tripCircuitOpen();
+
+      expect(service.getState()).toBe('OPEN');
+      const openEvent = stateChanges.find((e) => e.currentState === 'OPEN');
+      expect(openEvent).toBeDefined();
+      expect(openEvent?.previousState).toBe('CLOSED');
+    });
+
+    it('transitions OPEN -> HALF_OPEN after the reset timeout elapses', async () => {
+      const stateChanges: StateChangeEvent[] = [];
+      service.onStateChange((event) => stateChanges.push(event));
+
+      await tripCircuitOpen();
+      expect(service.getState()).toBe('OPEN');
+
+      // resetTimeout is configured to 500ms in this suite's ConfigService mock
+      await jest.advanceTimersByTimeAsync(500);
+
+      expect(service.getState()).toBe('HALF_OPEN');
+      const halfOpenEvent = stateChanges.find(
+        (e) => e.currentState === 'HALF_OPEN',
+      );
+      expect(halfOpenEvent).toBeDefined();
+      expect(halfOpenEvent?.previousState).toBe('OPEN');
+    });
+
+    it('transitions HALF_OPEN -> CLOSED when the trial request succeeds', async () => {
+      const stateChanges: StateChangeEvent[] = [];
+      service.onStateChange((event) => stateChanges.push(event));
+
+      await tripCircuitOpen();
+      await jest.advanceTimersByTimeAsync(500);
+      expect(service.getState()).toBe('HALF_OPEN');
+
+      const result = await service.execute(() => Promise.resolve('recovered'));
+
+      expect(result).toBe('recovered');
+      expect(service.getState()).toBe('CLOSED');
+
+      const closeEvent = stateChanges.find(
+        (e) => e.currentState === 'CLOSED' && e.previousState === 'HALF_OPEN',
+      );
+      expect(closeEvent).toBeDefined();
+
+      // Counters should reset so pre-outage failure history doesn't
+      // immediately re-trip the breaker.
+      const metrics = service.getMetrics();
+      expect(metrics.successes).toBe(0);
+      expect(metrics.failures).toBe(0);
+    });
+
+    it('transitions HALF_OPEN -> OPEN when the trial request fails, with a fresh recovery timer', async () => {
+      const stateChanges: StateChangeEvent[] = [];
+      service.onStateChange((event) => stateChanges.push(event));
+
+      await tripCircuitOpen();
+      await jest.advanceTimersByTimeAsync(500);
+      expect(service.getState()).toBe('HALF_OPEN');
+
+      await expect(
+        service.execute(() => Promise.reject(new Error('still down'))),
+      ).rejects.toThrow('still down');
+
+      expect(service.getState()).toBe('OPEN');
+      const reopenEvent = stateChanges.find(
+        (e) => e.currentState === 'OPEN' && e.previousState === 'HALF_OPEN',
+      );
+      expect(reopenEvent).toBeDefined();
+
+      // A fresh recovery timer should be scheduled - it should not have
+      // closed/half-opened again until another full resetTimeout elapses.
+      await jest.advanceTimersByTimeAsync(499);
+      expect(service.getState()).toBe('OPEN');
+
+      await jest.advanceTimersByTimeAsync(1);
+      expect(service.getState()).toBe('HALF_OPEN');
+    });
+
+    it('does not get stuck in HALF_OPEN indefinitely (regression for stuck-breaker bug)', async () => {
+      await tripCircuitOpen();
+      await jest.advanceTimersByTimeAsync(500);
+      expect(service.getState()).toBe('HALF_OPEN');
+
+      // Previously nothing transitioned HALF_OPEN -> CLOSED automatically;
+      // only a manual reset() could close the circuit. Verify a normal
+      // successful call now closes it without calling reset().
+      await service.execute(() => Promise.resolve('ok'));
+      expect(service.getState()).toBe('CLOSED');
+    });
+  });
+
   describe('state change callbacks', () => {
     it('should notify on state changes', async () => {
       const stateChanges: StateChangeEvent[] = [];

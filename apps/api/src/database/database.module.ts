@@ -87,7 +87,6 @@ import { CertificateOfServiceService } from './services/certificate-of-service.s
 import { ExitPackPdfService } from './services/exit-pack-pdf.service';
 import { EmploymentContractPdfService } from './services/employment-contract-pdf.service';
 import { PopiaConsentPdfService } from './services/popia-consent-pdf.service';
-import { StaffTerminationService } from './services/staff-termination.service';
 import { TimeTrackingService } from './services/time-tracking.service';
 import { OvertimeService } from './services/overtime.service';
 import { CommissionService } from './services/commission.service';
@@ -242,7 +241,6 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     CategorizationJournalRepository,
     PgVectorRepository, // TASK-PGVEC-001: pgvector for AI embedding persistence
     // TASK-STAFF-004 to TASK-STAFF-007: Staff Management Services
-    StaffTerminationService,
     TimeTrackingService,
     OvertimeService,
     CommissionService,
@@ -361,7 +359,6 @@ import { StorageModule } from '../integrations/storage/storage.module'; // AUDIT
     CategorizationJournalRepository,
     PgVectorRepository, // TASK-PGVEC-001: pgvector for AI embedding persistence
     // TASK-STAFF-004 to TASK-STAFF-007: Staff Management Services
-    StaffTerminationService,
     TimeTrackingService,
     OvertimeService,
     CommissionService,

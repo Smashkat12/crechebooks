@@ -34,6 +34,7 @@ import {
   DeliveryChannel,
   ReminderContent,
   ReminderResult,
+  ManualReminderResult,
   EscalationResult,
   ReminderHistoryEntry,
   ScheduleReminderDto,
@@ -283,6 +284,275 @@ export class ReminderService {
     );
 
     return result;
+  }
+
+  /**
+   * Send manual (user-initiated) reminders to specific parents.
+   *
+   * Backs POST /arrears/reminder. Unlike the automated engines, this is an
+   * explicit operator action, so the 3-day duplicate-prevention window is
+   * intentionally NOT applied. Per parent:
+   * - finds their overdue unpaid invoices (oldest = anchor for the record)
+   * - uses the caller's template text when provided (the frontend
+   *   pre-resolves [Parent Name]/[Creche Name], but substitution is applied
+   *   again here for robustness), else falls back to the escalation-level
+   *   template for the anchor invoice
+   * - delivers via the requested channel(s) and records a Reminder row
+   *
+   * @param params.tenantId - Tenant ID (multi-tenant isolation)
+   * @param params.parentIds - Parents to remind
+   * @param params.channel - EMAIL, WHATSAPP, or BOTH
+   * @param params.template - Optional custom message body from the caller
+   * @returns True per-parent and per-channel sent/failed/skipped counts
+   */
+  async sendManualParentReminders(params: {
+    tenantId: string;
+    parentIds: string[];
+    channel: DeliveryChannel;
+    template?: string;
+  }): Promise<ManualReminderResult> {
+    const { tenantId, parentIds, channel, template } = params;
+
+    this.logger.log(
+      `Manual reminder send for ${parentIds.length} parent(s) via ${channel} (tenant: ${tenantId})`,
+    );
+
+    const result: ManualReminderResult = {
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      byChannel: {
+        email: { sent: 0, failed: 0 },
+        whatsapp: { sent: 0, failed: 0 },
+      },
+      details: [],
+    };
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, tradingName: true },
+    });
+
+    if (!tenant) {
+      this.logger.error(`Tenant ${tenantId} not found for manual reminders`);
+      throw new NotFoundException('Tenant', tenantId);
+    }
+
+    const crecheName = tenant.tradingName ?? tenant.name;
+    const useEmail =
+      channel === DeliveryChannel.EMAIL || channel === DeliveryChannel.BOTH;
+    const useWhatsApp =
+      channel === DeliveryChannel.WHATSAPP || channel === DeliveryChannel.BOTH;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const parentId of parentIds) {
+      try {
+        const parent = await this.parentRepo.findById(parentId, tenantId);
+        if (!parent) {
+          result.skipped++;
+          result.details.push({
+            parentId,
+            status: 'SKIPPED',
+            error: 'Parent not found',
+          });
+          continue;
+        }
+
+        // Overdue unpaid invoices — oldest is the anchor for the record
+        const overdueInvoices = await this.prisma.invoice.findMany({
+          where: {
+            tenantId,
+            parentId,
+            isDeleted: false,
+            dueDate: { lt: today },
+            status: { in: ['SENT', 'VIEWED', 'PARTIALLY_PAID', 'OVERDUE'] },
+          },
+          orderBy: { dueDate: 'asc' },
+        });
+        const unpaidInvoices = overdueInvoices.filter(
+          (inv) => inv.amountPaidCents < inv.totalCents,
+        );
+
+        if (unpaidInvoices.length === 0) {
+          result.skipped++;
+          result.details.push({
+            parentId,
+            status: 'SKIPPED',
+            error: 'No overdue invoices',
+          });
+          continue;
+        }
+
+        const anchorInvoice = unpaidInvoices[0];
+        const daysOverdue = this.calculateDaysOverdue(anchorInvoice.dueDate);
+        const escalationLevel = this.determineEscalationLevel(daysOverdue);
+
+        // Build content: caller's template (with placeholder substitution
+        // re-applied for robustness) or the escalation-level default.
+        let subject: string;
+        let body: string;
+
+        if (template && template.trim().length > 0) {
+          const parentName =
+            `${parent.firstName} ${parent.lastName}`.trim() || 'Parent';
+          body = template
+            .replaceAll('[Parent Name]', parentName)
+            .replaceAll('[Creche Name]', crecheName);
+          subject = `Payment Reminder - ${crecheName}`;
+        } else {
+          const content = await this.generateReminderContent(
+            anchorInvoice.id,
+            escalationLevel,
+            tenantId,
+          );
+          subject = content.subject;
+          body = content.body;
+        }
+
+        // Deliver via requested channel(s)
+        let emailResult: {
+          success: boolean;
+          messageId?: string;
+          error?: string;
+        } | null = null;
+        let whatsappResult: {
+          success: boolean;
+          messageId?: string;
+          error?: string;
+        } | null = null;
+
+        if (useEmail) {
+          emailResult = await this.sendViaEmail(parent.email, {
+            subject,
+            body,
+            escalationLevel,
+            invoiceNumber: anchorInvoice.invoiceNumber,
+            outstandingCents:
+              anchorInvoice.totalCents - anchorInvoice.amountPaidCents,
+            daysOverdue,
+          });
+          if (emailResult.success) {
+            result.byChannel.email.sent++;
+          } else {
+            result.byChannel.email.failed++;
+          }
+        }
+
+        if (useWhatsApp) {
+          // Manual sends deliver the operator's message verbatim — do NOT
+          // route through the escalation WhatsApp templates.
+          whatsappResult = await this.sendManualWhatsAppMessage(
+            parent.whatsapp,
+            body,
+          );
+          if (whatsappResult.success) {
+            result.byChannel.whatsapp.sent++;
+          } else {
+            result.byChannel.whatsapp.failed++;
+          }
+        }
+
+        const anySuccess =
+          emailResult?.success === true || whatsappResult?.success === true;
+
+        // Record the reminder against the anchor invoice
+        const reminderData: CreateReminderData = {
+          tenantId,
+          invoiceId: anchorInvoice.id,
+          parentId,
+          escalationLevel,
+          deliveryMethod: channel,
+          reminderStatus: anySuccess
+            ? ReminderStatus.SENT
+            : ReminderStatus.FAILED,
+          sentAt: anySuccess ? new Date() : undefined,
+          content: body,
+          subject,
+          failureReason: !anySuccess
+            ? (emailResult?.error ?? whatsappResult?.error)
+            : undefined,
+        };
+        await this.reminderRepo.create(reminderData);
+
+        if (anySuccess) {
+          result.sent++;
+          result.details.push({
+            parentId,
+            status: 'SENT',
+            invoiceId: anchorInvoice.id,
+          });
+        } else {
+          result.failed++;
+          result.details.push({
+            parentId,
+            status: 'FAILED',
+            invoiceId: anchorInvoice.id,
+            error: emailResult?.error ?? whatsappResult?.error,
+          });
+        }
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        this.logger.error(
+          `Manual reminder failed for parent ${parentId}: ${errorMessage}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+        result.failed++;
+        result.details.push({
+          parentId,
+          status: 'FAILED',
+          error: errorMessage,
+        });
+      }
+    }
+
+    this.logger.log(
+      `Manual reminder batch complete: ${result.sent} sent, ${result.failed} failed, ${result.skipped} skipped ` +
+        `(email ${result.byChannel.email.sent}/${result.byChannel.email.sent + result.byChannel.email.failed}, ` +
+        `whatsapp ${result.byChannel.whatsapp.sent}/${result.byChannel.whatsapp.sent + result.byChannel.whatsapp.failed})`,
+    );
+
+    return result;
+  }
+
+  /**
+   * Send a verbatim WhatsApp message for manual reminders
+   *
+   * @param parentPhone - Parent's WhatsApp number (may be null)
+   * @param body - Resolved message body to send as-is
+   * @returns Success status with message ID or error
+   */
+  private async sendManualWhatsAppMessage(
+    parentPhone: string | null,
+    body: string,
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    if (!parentPhone) {
+      return {
+        success: false,
+        error: 'Parent has no WhatsApp number configured',
+      };
+    }
+
+    try {
+      const result = await this.whatsAppService.sendMessage(parentPhone, body);
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error ?? 'WhatsApp send failed',
+        };
+      }
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `WhatsApp send failed to ${parentPhone}: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return { success: false, error: errorMessage };
+    }
   }
 
   /**

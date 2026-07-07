@@ -1,6 +1,5 @@
 export const QUEUE_NAMES = {
   INVOICE_GENERATION: 'invoice-generation',
-  PAYMENT_REMINDER: 'payment-reminder',
   SARS_DEADLINE: 'sars-deadline',
   BANK_SYNC: 'bank-sync',
   STATEMENT_GENERATION: 'statement-generation',
@@ -24,14 +23,14 @@ export interface InvoiceGenerationJobData extends ScheduledJobData {
   dryRun?: boolean;
 }
 
-export interface PaymentReminderJobData extends ScheduledJobData {
-  reminderType: 'gentle' | 'second' | 'final' | 'escalation';
-  invoiceIds?: string[];
-}
-
 export interface SarsDeadlineJobData extends ScheduledJobData {
-  submissionType: 'VAT201' | 'EMP201' | 'EMP501';
-  daysUntilDeadline: number;
+  /**
+   * Optional: daily deadline-check jobs (SarsDeadlineScheduleService) cover
+   * ALL submission types — SarsDeadlineProcessor computes the tenant's
+   * upcoming deadlines itself. Populate only to target a single type.
+   */
+  submissionType?: 'VAT201' | 'EMP201' | 'EMP501';
+  daysUntilDeadline?: number;
 }
 
 export interface BankSyncJobData extends ScheduledJobData {

@@ -230,13 +230,33 @@ export class InvoiceScheduleService implements OnApplicationBootstrap {
   /**
    * Cancel invoice generation schedule for a tenant
    *
+   * BUGFIX (cancel-with-wrong-cron): Bull's removeRepeatable() keys a
+   * repeatable by queue name + repeat options (cron/every/tz) + jobId — NOT
+   * by jobId alone. Blindly passing DEFAULT_CRON here silently no-ops
+   * whenever the tenant's schedule was customised via updateSchedule() to a
+   * different cron, leaving the stale custom-cron repeatable active. Look up
+   * the tenant's actual persisted repeatable (by jobId) via
+   * getRepeatableJobs() and remove it by its Bull-assigned key, which works
+   * regardless of what cron it was created with.
+   *
    * @param tenantId - Tenant ID
    */
   async cancelSchedule(tenantId: string): Promise<void> {
-    await this.invoiceQueue.removeRepeatable({
-      cron: DEFAULT_CRON,
-      jobId: this.getRepeatableJobId(tenantId),
-    });
+    const jobId = this.getRepeatableJobId(tenantId);
+    const repeatableJobs = await this.invoiceQueue.getRepeatableJobs();
+    const existing = repeatableJobs.find((job) => job.id === jobId);
+
+    if (existing) {
+      await this.invoiceQueue.removeRepeatableByKey(existing.key);
+    } else {
+      // No persisted repeatable found for this jobId (never scheduled, or
+      // already removed). Best-effort fallback to DEFAULT_CRON so a
+      // repeatable created before this fix landed still gets cleaned up.
+      await this.invoiceQueue.removeRepeatable({
+        cron: DEFAULT_CRON,
+        jobId,
+      });
+    }
 
     this.logger.log({
       message: 'Invoice schedule cancellation requested',

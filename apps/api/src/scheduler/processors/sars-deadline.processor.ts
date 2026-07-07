@@ -141,11 +141,22 @@ export class SarsDeadlineProcessor extends BaseProcessor<SarsDeadlineJobData> {
             body,
           );
         } else if (channel === 'whatsapp') {
-          // WhatsApp integration pending (TASK-BILL-015)
-          this.logger.debug('WhatsApp channel pending implementation');
+          // WhatsApp integration pending (TASK-BILL-015). Nothing is
+          // dispatched, so do NOT record this channel as sent — recording
+          // unsent reminders as SENT would suppress future reminders via
+          // shouldSendReminder's same-day audit-log dedup.
+          this.logger.debug(
+            'WhatsApp channel pending implementation — reminder not sent, not recorded',
+          );
+          continue;
+        } else {
+          this.logger.warn(
+            `Unknown SARS reminder channel '${String(channel)}' — skipping`,
+          );
+          continue;
         }
 
-        // Record reminder sent
+        // Record reminder sent (only for channels actually dispatched)
         await this.deadlineService.recordReminderSent(tenantId, {
           type: deadline.type,
           period: deadline.period,

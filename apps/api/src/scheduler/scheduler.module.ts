@@ -3,9 +3,9 @@ import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SchedulerService } from './scheduler.service';
+import { SarsDeadlineScheduleService } from './sars-deadline-schedule.service';
 import { SarsDeadlineProcessor } from './processors/sars-deadline.processor';
 import { InvoiceSchedulerProcessor } from './processors/invoice-scheduler.processor';
-import { PaymentReminderProcessor } from './processors/payment-reminder.processor';
 import { StatementSchedulerProcessor } from './processors/statement-scheduler.processor';
 import { XeroSyncRecoveryProcessor } from './processors/xero-sync-recovery.processor';
 import { ArrearsReminderJob } from '../jobs/arrears-reminder.job';
@@ -15,7 +15,7 @@ import { PopOrphanSweepJob } from '../jobs/pop-orphan-sweep.job';
 import { StaffModule } from '../api/staff/staff.module';
 import { StorageModule } from '../integrations/storage/storage.module';
 import { InvoiceScheduleService } from '../billing/invoice-schedule.service';
-import { PaymentReminderService } from '../billing/payment-reminder.service';
+import { StatementScheduleService } from '../billing/statement-schedule.service';
 import { QUEUE_NAMES } from './types/scheduler.types';
 import { SarsSchedulerModule } from '../sars/sars.module';
 import { DatabaseModule } from '../database/database.module';
@@ -74,9 +74,6 @@ const bullImports = isRedisConfigured()
           name: QUEUE_NAMES.INVOICE_GENERATION,
         },
         {
-          name: QUEUE_NAMES.PAYMENT_REMINDER,
-        },
-        {
           name: QUEUE_NAMES.SARS_DEADLINE,
         },
         {
@@ -101,8 +98,8 @@ const schedulerProviders = isRedisConfigured()
   ? [
       SchedulerService,
       SarsDeadlineProcessor,
+      SarsDeadlineScheduleService, // TASK-SARS-017: daily producer for SARS_DEADLINE jobs
       InvoiceSchedulerProcessor,
-      PaymentReminderProcessor,
       StatementSchedulerProcessor,
     ]
   : [];
@@ -121,15 +118,16 @@ const cronProviders = [
   PopOrphanSweepJob,
 ];
 
-// TASK-BILL-016 / TASK-PAY-015: tenant-customisable scheduling services.
+// TASK-BILL-016 / TASK-STMT-008: tenant-customisable scheduling services.
 // Dissolved from BillingSchedulerModule (which was never wired into the app graph)
 // to avoid a redundant module shell. DatabaseModule (already imported above) provides
 // PrismaService + AuditLogService; SchedulerService is in schedulerProviders.
-// These are not yet called by any controller; they are preserved for future wiring.
-// Guard behind isRedisConfigured() because both services inject SchedulerService,
-// which is only provided when Bull queues are available.
+// Guard behind isRedisConfigured() because these services inject Bull queues /
+// SchedulerService, which are only provided when Redis is available.
+// (PaymentReminderService was deleted: it duplicated ArrearsReminderJob, the
+// complete always-on arrears reminder engine.)
 const billingSchedulingProviders = isRedisConfigured()
-  ? [InvoiceScheduleService, PaymentReminderService]
+  ? [InvoiceScheduleService, StatementScheduleService]
   : [];
 
 @Module({
@@ -154,7 +152,7 @@ const billingSchedulingProviders = isRedisConfigured()
           SchedulerService,
           BullModule,
           InvoiceScheduleService, // TASK-BILL-016: Available for future controller wiring
-          PaymentReminderService, // TASK-PAY-015: Available for future controller wiring
+          StatementScheduleService, // TASK-STMT-008: Statement generation cron producer
         ]
       : []),
     XeroSyncRecoveryProcessor, // TASK-REL-101: Export for manual triggering

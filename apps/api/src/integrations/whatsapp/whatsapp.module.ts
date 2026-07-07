@@ -30,13 +30,12 @@ import { OnboardingExpiryJob } from './jobs/onboarding-expiry.job';
 import { OnboardingController } from './controllers/onboarding.controller';
 import { DatabaseModule } from '../../database/database.module';
 import { AuthModule } from '../../api/auth/auth.module';
-import { MailgunModule } from '../mailgun/mailgun.module';
 
 @Module({
   imports: [
     forwardRef(() => DatabaseModule),
     forwardRef(() => AuthModule), // TASK-WA-015: MagicLinkService for onboarding completion
-    MailgunModule, // Provides CommsGuardService for outbound suppression
+    // CommsGuardService for outbound suppression is provided globally by CommsGuardModule (AppModule).
     ConfigModule,
     ScheduleModule.forRoot(), // TASK-WA-013: Enable @Cron for OnboardingExpiryJob
     JwtModule.registerAsync({

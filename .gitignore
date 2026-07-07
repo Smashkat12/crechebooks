@@ -109,6 +109,8 @@ out/
 # Playwright test artifacts
 playwright-report/
 test-results/
+# Playwright globalSetup storage state (regenerated per test run)
+apps/web/e2e/.auth/
 .playwright-mcp/
 
 # Claude Code / MCP local development artifacts

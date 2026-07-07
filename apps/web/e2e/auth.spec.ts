@@ -22,7 +22,7 @@ test.describe('Authentication', () => {
     await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible();
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByLabel(/password/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
   });
 
   test('should login with valid dev credentials', async ({ page }) => {
@@ -39,7 +39,7 @@ test.describe('Authentication', () => {
     await page.getByLabel(/email/i).fill('invalid@example.com');
     await page.getByLabel(/password/i).fill('wrongpassword');
 
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
     // Wait for the form to process
     await page.waitForTimeout(2000);

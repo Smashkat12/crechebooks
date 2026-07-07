@@ -24,8 +24,9 @@ test.describe('Enrollments Register', () => {
     await expect(page.getByRole('heading', { name: /enrollments/i })).toBeVisible();
 
     // Should have description text
+    // Page copy: "Manage child enrollments and fee tiers"
     await expect(
-      page.getByText(/view and manage child enrollments/i)
+      page.getByText(/manage child enrollments/i)
     ).toBeVisible();
   });
 

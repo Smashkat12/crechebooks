@@ -82,6 +82,8 @@ export async function cleanDatabase(prisma: PrismaService): Promise<void> {
       parent_generated_documents,
       parents,
       payee_patterns,
+      payment_attachments,
+      payment_receipts,
       payments,
       payroll_adjustments,
       payroll_journal_lines,

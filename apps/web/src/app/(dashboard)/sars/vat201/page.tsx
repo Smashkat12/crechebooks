@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Download, Send, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PeriodSelector } from '@/components/sars';
 import { useSarsVat201 } from '@/hooks/use-sars-vat201';
 
@@ -63,21 +64,18 @@ export default function Vat201Page() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">VAT201 Return</h1>
             <p className="text-muted-foreground">
-              Prepare and submit monthly VAT return to SARS
+              Prepare the bi-monthly VAT return for SARS eFiling
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
-          <Button>
-            <Send className="h-4 w-4 mr-2" />
-            Submit to SARS
-          </Button>
-        </div>
       </div>
+
+      <Alert>
+        <AlertDescription>
+          CrecheBooks does not export or submit VAT201 returns to SARS automatically. Use the
+          figures below to complete and file your VAT201 return via the SARS eFiling portal.
+        </AlertDescription>
+      </Alert>
 
       <div className="flex items-center gap-4">
         <PeriodSelector

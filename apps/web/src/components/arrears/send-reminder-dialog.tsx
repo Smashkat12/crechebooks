@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -39,6 +40,27 @@ const reminderSchema = z.object({
 
 type ReminderFormValues = z.infer<typeof reminderSchema>;
 
+const DEFAULT_REMINDER_MESSAGE = `Dear [Parent Name],
+
+This is a friendly reminder that you have outstanding invoices with us. Please review your account and make payment at your earliest convenience.
+
+If you have any questions or concerns, please don't hesitate to contact us.
+
+Thank you for your prompt attention to this matter.
+
+Best regards,
+[Creche Name]`;
+
+function resolveReminderTemplate(
+  template: string,
+  parentName: string,
+  crecheName: string
+): string {
+  return template
+    .replace("[Parent Name]", parentName)
+    .replace("[Creche Name]", crecheName);
+}
+
 interface SendReminderDialogProps {
   parentId: string | null;
   open: boolean;
@@ -59,28 +81,36 @@ export function SendReminderDialog({
   const form = useForm<ReminderFormValues>({
     resolver: zodResolver(reminderSchema),
     defaultValues: {
-      message: `Dear [Parent Name],
-
-This is a friendly reminder that you have outstanding invoices with us. Please review your account and make payment at your earliest convenience.
-
-If you have any questions or concerns, please don't hesitate to contact us.
-
-Thank you for your prompt attention to this matter.
-
-Best regards,
-[Creche Name]`,
+      message: DEFAULT_REMINDER_MESSAGE,
       sendEmail: true,
       sendWhatsApp: false,
     },
   });
 
+  const crecheName = tenant?.tradingName || tenant?.name || "Your Creche";
+
+  // Pre-resolve the placeholder tokens in the default message once the
+  // parent (and tenant) data has loaded, so users see the real message
+  // they're about to send rather than literal `[Parent Name]` / `[Creche
+  // Name]` tokens. Skipped once the user has started editing the message
+  // themselves so we never clobber their edits.
+  useEffect(() => {
+    if (!open || !parent) return;
+    const isMessageDirty = form.getFieldState("message", form.formState).isDirty;
+    if (isMessageDirty) return;
+
+    const parentName = `${parent.firstName} ${parent.lastName}`;
+    form.setValue(
+      "message",
+      resolveReminderTemplate(DEFAULT_REMINDER_MESSAGE, parentName, crecheName)
+    );
+  }, [open, parent, crecheName, form]);
+
   const onSubmit = async (data: ReminderFormValues) => {
     if (!parentId || !parent) return;
 
-    const crecheName = tenant?.tradingName || tenant?.name || "Your Creche";
-    const personalizedMessage = data.message
-      .replace("[Parent Name]", `${parent.firstName} ${parent.lastName}`)
-      .replace("[Creche Name]", crecheName);
+    const parentName = `${parent.firstName} ${parent.lastName}`;
+    const personalizedMessage = resolveReminderTemplate(data.message, parentName, crecheName);
 
     const method =
       data.sendEmail && data.sendWhatsApp

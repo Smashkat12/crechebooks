@@ -623,5 +623,4 @@ export class BatchImportValidatorService {
       estimatedImportCount: rowResults.filter((r) => r.canImport).length,
     };
   }
-
 }

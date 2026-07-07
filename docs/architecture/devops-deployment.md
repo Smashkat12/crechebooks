@@ -227,8 +227,7 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com
 crechebooks/
 ├── apps/
 │   ├── api/           # @crechebooks/api (NestJS)
-│   ├── web/           # @crechebooks/web (Next.js)
-│   └── cli/           # @crechebooks/cli
+│   └── web/           # @crechebooks/web (Next.js)
 ├── packages/
 │   └── types/         # @crechebooks/types
 ├── scripts/           # DevOps scripts

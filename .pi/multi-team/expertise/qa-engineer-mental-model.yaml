@@ -6,7 +6,6 @@ test_layout:
   api_setup:       "apps/api/test/jest-setup.ts"
   web_unit:        "apps/web/src/__tests__/**/*.test.ts"
   web_e2e:         "apps/web/e2e/**/*.spec.ts (Playwright)"
-  cli:             "packages/cli/ — vitest"
   naming:          "*.spec.ts (api), *.test.ts (web). Unit & e2e mirror src/."
 
 test_command_cheatsheet:

@@ -11,7 +11,6 @@ product:
 stack_at_a_glance:
   api: "NestJS 11 + Prisma 7 + Postgres 16 (pgvector) + Redis 7 + Bull"
   web: "Next.js 15 (App Router) + React 19 + Radix UI + Tailwind + TanStack Query + Zustand"
-  cli: "packages/cli (`cb` command) — TypeScript + Commander + vitest"
   deploy: "Railway (Docker / nixpacks fallback). Postgres + Redis as services."
   auth: "Auth0 OIDC (JWT via JWKS). API key auth (`cb_` prefix) as secondary."
 

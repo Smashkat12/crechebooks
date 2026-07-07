@@ -346,14 +346,12 @@ export class ReversalDetectionService {
       throw new Error('Original transaction not found');
     }
 
-    // Update reversal transaction (using Prisma client directly as DTO doesn't support reversal fields yet)
-    // TODO: Add reversal fields to UpdateTransactionDto
-    await this.transactionRepository['prisma'].transaction.update({
-      where: { id: reversalId },
-      data: {
-        reversesTransactionId: originalId,
-        isReversal: true,
-      },
+    // Persist reversal linkage via the repository update surface (DTO now
+    // carries reversal fields), so tenant isolation and error handling
+    // route through the same code path as any other transaction update.
+    await this.transactionRepository.update(tenantId, reversalId, {
+      reversesTransactionId: originalId,
+      isReversal: true,
     });
 
     // Create audit log

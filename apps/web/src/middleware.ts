@@ -6,26 +6,15 @@ import { logger } from '@/lib/logger';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Get the JWT token from the request.
-  // In production we prefer the `__Secure-`-prefixed cookie NextAuth writes
-  // under HTTPS. If it's missing (e.g. the app is behind a plain-HTTP CI
-  // harness or a reverse proxy that terminated TLS upstream) we fall back to
-  // the unprefixed name so a legitimate session token still gets read.
-  const isProd = process.env.NODE_ENV === 'production';
-  let token = await getToken({
+  // Get the JWT token from the request
+  const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
-    secureCookie: isProd,
-    cookieName: isProd ? '__Secure-authjs.session-token' : 'authjs.session-token',
+    secureCookie: process.env.NODE_ENV === 'production',
+    cookieName: process.env.NODE_ENV === 'production'
+      ? '__Secure-authjs.session-token'
+      : 'authjs.session-token',
   });
-  if (!token && isProd) {
-    token = await getToken({
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-      secureCookie: false,
-      cookieName: 'authjs.session-token',
-    });
-  }
 
   const isLoggedIn = !!token;
 

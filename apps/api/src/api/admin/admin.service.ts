@@ -5,9 +5,9 @@ import {
   SubscriptionStatus,
   SubscriptionPlan,
   UserRole,
-  AuditAction,
   Prisma,
 } from '@prisma/client';
+import { AuditAction } from '../../database/entities/audit-log.entity';
 import {
   ContactSubmissionsResponseDto,
   DemoRequestsResponseDto,
@@ -44,6 +44,7 @@ import {
   AuditLogExportQueryDto,
 } from './dto/audit-logs.dto';
 import { NotFoundException } from '../../shared/exceptions';
+import { AuditLogService } from '../../database/services/audit-log.service';
 
 /** RFC 4180 CSV cell escaping — quote if contains comma, quote, or newline */
 function csvCell(value: string): string {
@@ -61,7 +62,10 @@ function csvRow(cells: string[]): string {
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   // ============================================
   // CONTACT & DEMO SUBMISSIONS (existing)
@@ -352,6 +356,13 @@ export class AdminService {
       throw new NotFoundException('Tenant', id);
     }
 
+    // Explicit-key check (not truthy) so `statementScheduleEnabled: false`
+    // is a real "opt-out" write, not silently dropped.
+    const includesStatementScheduleFlag = Object.prototype.hasOwnProperty.call(
+      dto,
+      'statementScheduleEnabled',
+    );
+
     await this.prisma.tenant.update({
       where: { id },
       data: {
@@ -364,8 +375,33 @@ export class AdminService {
         ...(dto.subscriptionPlan && {
           subscriptionPlan: dto.subscriptionPlan,
         }),
+        ...(includesStatementScheduleFlag && {
+          statementScheduleEnabled: dto.statementScheduleEnabled,
+        }),
       },
     });
+
+    // Audit-log any actual change to the statement-schedule opt-in flag —
+    // this flip is a billing-impacting side effect (enrolls the tenant into
+    // the auto-generate cron) so we track before/after values explicitly.
+    if (
+      includesStatementScheduleFlag &&
+      dto.statementScheduleEnabled !== tenant.statementScheduleEnabled
+    ) {
+      await this.auditLogService.logAction({
+        tenantId: id,
+        entityType: 'Tenant',
+        entityId: id,
+        action: AuditAction.UPDATE,
+        beforeValue: {
+          statementScheduleEnabled: tenant.statementScheduleEnabled,
+        },
+        afterValue: {
+          statementScheduleEnabled: dto.statementScheduleEnabled,
+        },
+        changeSummary: `statement_schedule_enabled: ${tenant.statementScheduleEnabled} → ${dto.statementScheduleEnabled}`,
+      });
+    }
 
     this.logger.log(`Updated tenant ${id}`);
     return this.getTenant(id);

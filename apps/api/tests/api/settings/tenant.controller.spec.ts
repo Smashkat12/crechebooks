@@ -58,6 +58,7 @@ describe('TenantController', () => {
     subscriptionPlan: 'FREE' as any,
     bankFeeConfig: null,
     orchestratorMonthEndEnabled: false,
+    statementScheduleEnabled: false,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

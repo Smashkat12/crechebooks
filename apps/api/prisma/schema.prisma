@@ -613,6 +613,7 @@ model Tenant {
   invoiceDeliveryLogs   InvoiceDeliveryLog[]
   reminderTemplates     ReminderTemplate[]
   reminderConfig        ReminderConfig? // TASK-FEAT-102: Automated arrears config
+  messageTemplates      MessageTemplate[] // TASK-TMPL-001: Tenant-editable message templates
   creditBalances        CreditBalance[]
   statements            Statement[]
   staffDocuments        StaffDocument[]
@@ -2130,6 +2131,48 @@ model ReminderTemplate {
   @@unique([tenantId, stage])
   @@index([tenantId])
   @@map("reminder_templates")
+}
+
+// TASK-TMPL-001: Tenant-Editable Message Templates
+// Unified model for all outbound message templates (reminders, invoice delivery,
+// welcome pack, statement delivery, admin summaries). Each template row is a
+// tenant override; if no row exists for a (tenantId, key, channel) triple, the
+// resolver falls back to the coded DEFAULT_TEMPLATES.
+//
+// Placeholders per key are documented in
+// apps/api/src/database/constants/message-template-defaults.ts.
+model MessageTemplate {
+  id        String                 @id @default(uuid())
+  tenantId  String                 @map("tenant_id")
+  key       MessageTemplateKey
+  channel   MessageTemplateChannel
+  subject   String?                @db.VarChar(500)
+  body      String                 @db.Text
+  isDefault Boolean                @default(false) @map("is_default")
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key, channel])
+  @@index([tenantId])
+  @@map("message_templates")
+}
+
+enum MessageTemplateKey {
+  ARREARS_REMINDER_FRIENDLY
+  ARREARS_REMINDER_FIRM
+  ARREARS_REMINDER_FINAL
+  INVOICE_DELIVERY
+  WELCOME_PACK
+  STATEMENT_DELIVERY
+  INVOICE_SCHEDULER_ADMIN_SUMMARY
+}
+
+enum MessageTemplateChannel {
+  EMAIL
+  WHATSAPP
+  SMS
 }
 
 // TASK-USER-001: Multi-Tenant User Role Assignment

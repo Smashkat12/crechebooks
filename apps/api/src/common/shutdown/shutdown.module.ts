@@ -26,7 +26,6 @@ const bullImports = isRedisConfigured()
   ? [
       BullModule.registerQueue(
         { name: QUEUE_NAMES.INVOICE_GENERATION },
-        { name: QUEUE_NAMES.PAYMENT_REMINDER },
         { name: QUEUE_NAMES.SARS_DEADLINE },
         { name: QUEUE_NAMES.BANK_SYNC },
         { name: QUEUE_NAMES.STATEMENT_GENERATION },

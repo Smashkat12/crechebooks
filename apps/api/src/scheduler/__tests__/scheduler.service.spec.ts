@@ -10,7 +10,6 @@ import { Job } from 'bull';
 describe('SchedulerService', () => {
   let service: SchedulerService;
   let mockInvoiceQueue: any;
-  let mockPaymentQueue: any;
   let mockSarsQueue: any;
   let mockBankQueue: any;
   let mockStatementQueue: any;
@@ -28,7 +27,6 @@ describe('SchedulerService', () => {
     });
 
     mockInvoiceQueue = createMockQueue();
-    mockPaymentQueue = createMockQueue();
     mockSarsQueue = createMockQueue();
     mockBankQueue = createMockQueue();
     mockStatementQueue = createMockQueue();
@@ -39,10 +37,6 @@ describe('SchedulerService', () => {
         {
           provide: getQueueToken(QUEUE_NAMES.INVOICE_GENERATION),
           useValue: mockInvoiceQueue,
-        },
-        {
-          provide: getQueueToken(QUEUE_NAMES.PAYMENT_REMINDER),
-          useValue: mockPaymentQueue,
         },
         {
           provide: getQueueToken(QUEUE_NAMES.SARS_DEADLINE),
@@ -330,15 +324,15 @@ describe('SchedulerService', () => {
       });
     });
 
-    it('should route payment reminder cron removal to the payment queue', async () => {
-      mockPaymentQueue.removeRepeatable.mockResolvedValue(undefined);
+    it('should route SARS deadline cron removal to the SARS queue', async () => {
+      mockSarsQueue.removeRepeatable.mockResolvedValue(undefined);
 
       await service.removeRepeatableCronJob(
-        QUEUE_NAMES.PAYMENT_REMINDER,
+        QUEUE_NAMES.SARS_DEADLINE,
         '0 9 * * *',
       );
 
-      expect(mockPaymentQueue.removeRepeatable).toHaveBeenCalledWith({
+      expect(mockSarsQueue.removeRepeatable).toHaveBeenCalledWith({
         cron: '0 9 * * *',
       });
       expect(mockInvoiceQueue.removeRepeatable).not.toHaveBeenCalled();

@@ -1,6 +1,5 @@
 export const QUEUE_NAMES = {
   INVOICE_GENERATION: 'invoice-generation',
-  PAYMENT_REMINDER: 'payment-reminder',
   SARS_DEADLINE: 'sars-deadline',
   BANK_SYNC: 'bank-sync',
   STATEMENT_GENERATION: 'statement-generation',
@@ -22,11 +21,6 @@ export interface ScheduledJobData {
 export interface InvoiceGenerationJobData extends ScheduledJobData {
   billingMonth: string; // YYYY-MM format
   dryRun?: boolean;
-}
-
-export interface PaymentReminderJobData extends ScheduledJobData {
-  reminderType: 'gentle' | 'second' | 'final' | 'escalation';
-  invoiceIds?: string[];
 }
 
 export interface SarsDeadlineJobData extends ScheduledJobData {

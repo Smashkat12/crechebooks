@@ -73,7 +73,10 @@ describe('StatementSchedulerProcessor', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StatementSchedulerProcessor,
-        { provide: StatementGenerationService, useValue: mockGenerationService },
+        {
+          provide: StatementGenerationService,
+          useValue: mockGenerationService,
+        },
         { provide: StatementDeliveryService, useValue: mockDeliveryService },
         { provide: StatementRepository, useValue: mockStatementRepository },
         { provide: AuditLogService, useValue: mockAuditLogService },

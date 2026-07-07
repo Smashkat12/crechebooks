@@ -221,7 +221,10 @@ describe('ReminderService.sendManualParentReminders', () => {
 
     expect(result.skipped).toBe(1);
     expect(result.details[0]).toEqual(
-      expect.objectContaining({ status: 'SKIPPED', error: 'No overdue invoices' }),
+      expect.objectContaining({
+        status: 'SKIPPED',
+        error: 'No overdue invoices',
+      }),
     );
     expect(mockEmailService.sendEmail).not.toHaveBeenCalled();
   });

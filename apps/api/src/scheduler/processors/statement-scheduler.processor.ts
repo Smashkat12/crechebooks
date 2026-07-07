@@ -44,7 +44,11 @@ interface StatementGenerationResult {
   errorCount: number;
   statementIds: string[];
   errors: Array<{ parentId: string; error: string }>;
-  deliveryErrors: Array<{ statementId: string; parentId: string; error: string }>;
+  deliveryErrors: Array<{
+    statementId: string;
+    parentId: string;
+    error: string;
+  }>;
   durationMs: number;
 }
 
@@ -475,8 +479,7 @@ export class StatementSchedulerProcessor extends BaseProcessor<StatementGenerati
       return;
     }
 
-    const hasErrors =
-      result.errorCount > 0 || result.deliveryFailedCount > 0;
+    const hasErrors = result.errorCount > 0 || result.deliveryFailedCount > 0;
     const subject = hasErrors
       ? `Statement Generation Completed with Errors - ${statementMonth}`
       : `Statement Generation Completed - ${statementMonth}`;

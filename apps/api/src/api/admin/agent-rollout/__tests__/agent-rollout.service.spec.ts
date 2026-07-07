@@ -159,7 +159,11 @@ describe('AgentRolloutService', () => {
 
     it('returns the tenant’s five agents joined with reports', async () => {
       aggregator.generateAllReports.mockResolvedValue([
-        makeReport({ agentType: 'matcher', matchRate: 97, totalDecisions: 250 }),
+        makeReport({
+          agentType: 'matcher',
+          matchRate: 97,
+          totalDecisions: 250,
+        }),
       ]);
       featureFlags.getMode.mockImplementation((_t, flag) =>
         flag === 'sdk_matcher' ? 'SHADOW' : 'DISABLED',

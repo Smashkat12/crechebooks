@@ -9,6 +9,7 @@ import { PrismaModule } from '../../database/prisma';
 import { DatabaseModule } from '../../database/database.module';
 import { StorageModule } from '../../integrations/storage/storage.module';
 import { PopOrphanSweepJob } from '../../jobs/pop-orphan-sweep.job';
+import { AgentRolloutApiModule } from './agent-rollout/agent-rollout.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PopOrphanSweepJob } from '../../jobs/pop-orphan-sweep.job';
     // undefined at scan time and crashes on bootstrap.
     forwardRef(() => DatabaseModule), // provides AuditLogService for PopOrphanSweepJob
     StorageModule, // provides StorageService for PopOrphanSweepJob
+    AgentRolloutApiModule, // /admin/agent-rollout endpoints (SDK feature-flag console)
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

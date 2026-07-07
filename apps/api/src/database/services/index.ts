@@ -116,9 +116,3 @@ export type {
 // TASK-REPORTS-005: Missing Report Types
 export * from './cash-flow-report.service';
 export type { CashFlowStatement } from './cash-flow-report.service';
-export * from './aged-payables.service';
-export type {
-  AgedPayablesReport,
-  SupplierAgingBucket,
-  SupplierAging,
-} from './aged-payables.service';

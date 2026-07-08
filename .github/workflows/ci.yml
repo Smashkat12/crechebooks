@@ -384,8 +384,16 @@ jobs:
       - name: Build API
         run: pnpm --filter @crechebooks/api build
 
-      - name: Build Web
-        run: pnpm --filter @crechebooks/web build
+      # NOTE: We intentionally DO NOT run `next build` here — the production
+      # build tree-shakes `process.env.NODE_ENV === 'production'` to a constant
+      # `true`, which makes middleware.ts always look for the __Secure-prefixed
+      # session cookie. On plain HTTP (which CI serves) Auth.js writes to the
+      # unprefixed cookie name (protocol check at runtime), so the built
+      # middleware can't find the token and 307-redirects every protected route
+      # to /login. Running `next dev` keeps NODE_ENV=test at runtime for the
+      # middleware, cookie names match, auth works, tests pass.
+      # The general "Build Applications" job on this workflow still validates
+      # that `pnpm --filter @crechebooks/web build` succeeds.
 
       - name: Install Playwright browsers
         run: pnpm --filter @crechebooks/web exec playwright install --with-deps chromium
@@ -399,9 +407,12 @@ jobs:
           echo $! > /tmp/api.pid
           echo "API PID: $(cat /tmp/api.pid)"
 
-      - name: Start Web server
+      - name: Start Web server (dev mode)
+        # `next dev` avoids the middleware constant-fold that breaks auth in a
+        # production build served over HTTP — see note above the previous step.
+        # PORT=3001 so PLAYWRIGHT_BASE_URL=http://localhost:3001 still points here.
         run: |
-          nohup pnpm --filter @crechebooks/web exec next start -p 3001 > /tmp/web.log 2>&1 &
+          nohup env PORT=3001 pnpm --filter @crechebooks/web exec next dev -p 3001 > /tmp/web.log 2>&1 &
           echo $! > /tmp/web.pid
           echo "Web PID: $(cat /tmp/web.pid)"
 
@@ -428,6 +439,26 @@ jobs:
           done
           # Additional API health check
           curl -sS http://localhost:3000/health | head -c 200 || echo "(health endpoint response above)"
+          # Wait until next dev has actually compiled the login route.
+          # A TCP-open on 3001 doesn't mean the app is ready to serve — next dev
+          # accepts connections while still compiling, and Playwright's login
+          # helper otherwise races against the first-page compile and times out.
+          echo ""
+          echo "Waiting for next dev to compile /login..."
+          for i in $(seq 1 120); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/login || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "Web /login served 200 after ${i}s"
+              break
+            fi
+            sleep 1
+            if [ $i -eq 120 ]; then
+              echo "::error::Web /login did not compile in 120s (last code=$code)"
+              echo "=== /tmp/web.log ==="
+              tail -100 /tmp/web.log || true
+              exit 1
+            fi
+          done
 
       - name: Run Playwright tests
         run: pnpm --filter @crechebooks/web exec playwright test

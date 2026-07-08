@@ -439,6 +439,26 @@ jobs:
           done
           # Additional API health check
           curl -sS http://localhost:3000/health | head -c 200 || echo "(health endpoint response above)"
+          # Wait until next dev has actually compiled the login route.
+          # A TCP-open on 3001 doesn't mean the app is ready to serve — next dev
+          # accepts connections while still compiling, and Playwright's login
+          # helper otherwise races against the first-page compile and times out.
+          echo ""
+          echo "Waiting for next dev to compile /login..."
+          for i in $(seq 1 120); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/login || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "Web /login served 200 after ${i}s"
+              break
+            fi
+            sleep 1
+            if [ $i -eq 120 ]; then
+              echo "::error::Web /login did not compile in 120s (last code=$code)"
+              echo "=== /tmp/web.log ==="
+              tail -100 /tmp/web.log || true
+              exit 1
+            fi
+          done
 
       - name: Run Playwright tests
         run: pnpm --filter @crechebooks/web exec playwright test

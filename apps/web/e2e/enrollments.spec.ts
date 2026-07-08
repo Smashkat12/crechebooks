@@ -60,15 +60,19 @@ test.describe('Enrollments Register', () => {
   });
 
   test('should have status filter dropdown', async ({ page }) => {
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
+    // Wait for page to load. `networkidle` is unreliable here (long-poll
+    // sockets), but the enrollments table is a good proxy — once the header
+    // row renders, the filters row above it has already mounted.
+    await expect(
+      page.getByRole('heading', { name: /enrollments/i })
+    ).toBeVisible({ timeout: 10000 });
 
-    // Look for status filter (combobox or select)
-    const statusFilter = page.getByRole('combobox', { name: /status/i }).or(
-      page.getByLabel(/status/i)
-    );
-
-    // Filter should be visible if data is loaded
+    // The status Select trigger from EnrollmentFilters.tsx renders as a
+    // combobox but has no aria-label — the accessible name is the current
+    // value ("Active" by default). Asserting by /status/i or getByLabel
+    // never matches. Verify the filter row instead: two comboboxes (status +
+    // fee tier) exist above the table, and the first one holds a status
+    // option name.
     const tableVisible = await page
       .locator('table, [role="grid"]')
       .first()
@@ -76,7 +80,12 @@ test.describe('Enrollments Register', () => {
       .catch(() => false);
 
     if (tableVisible) {
-      await expect(statusFilter.first()).toBeVisible();
+      const comboboxes = page.getByRole('combobox');
+      await expect(comboboxes.first()).toBeVisible();
+      // Sanity-check that the first combobox is the status filter (not the
+      // fee tier one) by peeking at its label — default value is "Active".
+      const firstName = await comboboxes.first().textContent();
+      expect(firstName ?? '').toMatch(/active|inactive|pending|all status/i);
     }
   });
 

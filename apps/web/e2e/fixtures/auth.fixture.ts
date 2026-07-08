@@ -24,6 +24,11 @@ if (!E2E_TEST_EMAIL || !E2E_TEST_PASSWORD) {
  *
  * Credentials are sourced from environment variables (E2E_TEST_EMAIL, E2E_TEST_PASSWORD).
  */
+// Strict match: only the /dashboard route, not `/login?callbackUrl=/dashboard`
+// (which contains the substring "dashboard" and used to satisfy the loose
+// /.*dashboard/ pattern, making failed logins look like successes).
+const ON_DASHBOARD = /\/dashboard(?:$|[/?#])/;
+
 export async function login(page: any) {
   // Fast path — the shared storageState from globalSetup means we're already
   // authenticated. Just go to the dashboard.
@@ -31,10 +36,11 @@ export async function login(page: any) {
 
   // If we land on the dashboard, we're done.
   try {
-    await page.waitForURL(/.*dashboard/, { timeout: 3000 });
+    await page.waitForURL(ON_DASHBOARD, { timeout: 3000 });
     return;
   } catch {
-    // Fall through to full login flow (spec cleared storageState).
+    // Fall through to full login flow (spec cleared storageState, or the
+    // storage-state cookie was rejected by middleware in this build).
   }
 
   await page.goto('/login');
@@ -46,8 +52,8 @@ export async function login(page: any) {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 
   // Wait for login to complete - dashboard should be loaded
-  await page.waitForURL(/.*dashboard/, { timeout: 15000 });
-  await expect(page).toHaveURL(/.*dashboard/);
+  await page.waitForURL(ON_DASHBOARD, { timeout: 15000 });
+  await expect(page).toHaveURL(ON_DASHBOARD);
 }
 
 /**

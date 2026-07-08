@@ -45,7 +45,9 @@ async function globalSetup(config: FullConfig) {
     // Exact match — the page has both "Sign in" (submit) and
     // "Sign in with SSO instead".
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await page.waitForURL(/.*dashboard/, { timeout: 20000 });
+    // Strict — /login?callbackUrl=/dashboard contains "dashboard" but is NOT
+    // a successful login. Only /dashboard proper counts.
+    await page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 20000 });
     await context.storageState({ path: AUTH_FILE });
     console.log(`[global-setup] Storage state written to ${AUTH_FILE}`);
   } finally {

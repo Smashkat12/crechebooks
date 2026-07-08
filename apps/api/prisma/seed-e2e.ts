@@ -459,16 +459,22 @@ async function seed() {
   // the previous month so a late-day roll-over doesn't accidentally push
   // "current" into a period with no seed data.
   //
-  // Use UTC dates. Prisma stores @db.Date columns as UTC calendar days; a
-  // local `new Date(y, m, 1)` in negative-offset timezones ends up as the
-  // previous day in UTC and the Emp201Service periodStart >= boundary
-  // filter excludes it.
+  // Emp201Service builds its query boundaries with local-time
+  // `new Date(year, month - 1, 1)` / `new Date(year, month, 0)`. In UTC that
+  // resolves to the 1st and last of the month at 00:00 UTC — matches the
+  // seed exactly. In non-UTC timezones the boundaries shift and either the
+  // seed's payroll start (negative offset) or end (positive offset) falls
+  // outside the period. To stay green cross-timezone, seed the payroll a
+  // day inside each month boundary — narrower than any timezone drift.
+  //
+  // (CI runs in UTC so exact boundaries work there too; this only matters
+  // when engineers run the suite locally in ZA / EU / US timezones.)
   const nowForPayroll = new Date();
   const monthStart = (offset: number) =>
-    new Date(Date.UTC(nowForPayroll.getUTCFullYear(), nowForPayroll.getUTCMonth() + offset, 1));
+    new Date(Date.UTC(nowForPayroll.getUTCFullYear(), nowForPayroll.getUTCMonth() + offset, 2));
   const monthEnd = (offset: number) =>
-    // Last day of the month at offset — day 0 of the next month, in UTC.
-    new Date(Date.UTC(nowForPayroll.getUTCFullYear(), nowForPayroll.getUTCMonth() + offset + 1, 0));
+    // Second-to-last day of the month at offset — day -1 of the next month, UTC.
+    new Date(Date.UTC(nowForPayroll.getUTCFullYear(), nowForPayroll.getUTCMonth() + offset + 1, -1));
 
   const payrollPeriods: Array<{ id: string; start: Date; end: Date }> = [
     { id: PAYROLL_1_ID, start: monthStart(0), end: monthEnd(0) },
@@ -490,7 +496,15 @@ async function seed() {
 
     await prisma.payroll.upsert({
       where: { id: period.id },
-      update: { status: PayrollStatus.APPROVED },
+      // Keep update in sync with create so re-seeding actually re-applies
+      // date/amount changes (the payroll-period-narrowing fix wouldn't take
+      // effect otherwise on a re-run against an existing DB).
+      update: {
+        status: PayrollStatus.APPROVED,
+        payPeriodStart: period.start,
+        payPeriodEnd: period.end,
+        paymentDate: period.end,
+      },
       create: {
         id: period.id,
         tenantId: TENANT_ID,

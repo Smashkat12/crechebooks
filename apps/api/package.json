@@ -92,7 +92,7 @@
     "swagger-ui-express": "^5.0.1",
     "tesseract.js": "5.1.0",
     "uuid": "^13.0.1",
-    "xero-node": "^6.0.0"
+    "xero-node": "^18.0.0"
   },
   "devDependencies": {
     "aws-sdk-client-mock": "^4.1.0",
